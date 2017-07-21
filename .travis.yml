@@ -1,0 +1,12 @@
+language: swift
+osx_image: xcode9
+
+branches:
+  only:
+  - master
+
+install:
+  - brew install swiftlint
+script:
+  - swiftlint
+  - swift test
