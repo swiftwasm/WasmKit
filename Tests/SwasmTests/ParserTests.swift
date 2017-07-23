@@ -101,6 +101,32 @@ final class ParserValueTests: ParserTestCase {
 		}
 	}
 
+	func testParseFloat() {
+		stream = StringStream(string: "123.456")
+		do {
+			let result = try Parser<Float>.float.parse(stream: stream)
+			XCTAssertEqual(result, 123.456)
+		} catch let error {
+			XCTFail(String(describing: error))
+		}
+
+		stream = StringStream(string: "123.456E-10")
+		do {
+			let result = try Parser<Float>.float.parse(stream: stream)
+			XCTAssertEqual(result, 1)
+		} catch let error {
+			XCTFail(String(describing: error))
+		}
+
+		stream = StringStream(string: "0x1AF.B13")
+		do {
+			let result = try Parser<Float>.hexFloat.parse(stream: stream)
+			XCTAssertEqual(result, 0x1AF.B13p0)
+		} catch let error {
+			XCTFail(String(describing: error))
+		}
+	}
+
 	func testParseID() {
 		stream = StringStream(string: "$abcde")
 		do {

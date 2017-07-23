@@ -16,6 +16,7 @@ extension Int64: ParserResult {}
 extension UInt: ParserResult {}
 extension UInt32: ParserResult {}
 extension UInt64: ParserResult {}
+extension Float: ParserResult {}
 
 struct BinaryResult<A: ParserResult, B: ParserResult>: ParserResult {
 	let first: A
@@ -215,7 +216,7 @@ extension Parser {
 
 	static var hexNumber: Parser<Int> {
 		return Parser.hexDigit.repeated().map { cs in
-			cs.reduce(0) { n, d in n * 10 + d }
+			cs.reduce(0) { n, d in n * 16 + d }
 		}
 	}
 	
@@ -224,7 +225,7 @@ extension Parser {
 			.followed(by: Parser.character(.single("x".utf8.first!)))
 			.followed(by: Parser.hexNumber)
 			.map { results in UInt32(results.second) }
-			.or(by: Parser.number.map { UInt32($0) })
+			.or(Parser.number.map { UInt32($0) })
 	}
 
 	static var u64: Parser<UInt64> {
@@ -232,7 +233,7 @@ extension Parser {
 			.followed(by: Parser.character(.single("x".utf8.first!)))
 			.followed(by: Parser.hexNumber)
 			.map { results in UInt64(results.second) }
-			.or(by: Parser.number.map { UInt64($0) })
+			.or(Parser.number.map { UInt64($0) })
 	}
 
 	static var s32: Parser<Int32> {
@@ -251,6 +252,75 @@ extension Parser {
 
 /// ## Floating-Point
 /// - SeeAlso: https://webassembly.github.io/spec/text/values.html#floating-point
+
+extension Parser {
+
+	static var fraction: Parser<Float> {
+		return Parser<Float>.digit
+			.repeated()
+			.map { $0
+				.reversed()
+				.reduce(0) { (d: Float, q: Int) in (d + Float(q)) / 10 }
+			}
+			.optional()
+			.map { $0 ?? 0 }
+	}
+
+	static var hexFraction: Parser<Float> {
+		return Parser<Float>.hexDigit
+			.repeated()
+			.map { $0
+				.reversed()
+				.reduce(0) { (d: Float, q: Int) in (d + Float(q)) / 16 }
+			}
+			.optional()
+			.map { $0 ?? 0 }
+	}
+
+	static var float: Parser<Float> {
+		let num_frac = Parser.number
+			.followed(by: Parser.character(.single(".".utf8.first!)))
+			.map { $0.first }
+			.followed(by: Parser.fraction)
+			.map { Float($0.first) + $0.second }
+
+		let num_e_sign_num = Parser.number
+			.followed(by: Parser.character(.set(["e".utf8.first!, "E".utf8.first!])))
+			.map { $0.first }
+			.followed(by: Parser.sign)
+			.followed(by: Parser.number)
+			.map { Float(
+				sign: $0.first.second > 0 ? .plus : .minus,
+				exponent: $0.second,
+				significand: Float($0.first.first)) }
+
+		let num_frac_e_sign_num = Parser.number
+			.followed(by: Parser.fraction)
+			.map { Float($0.first) + $0.second }
+			.followed(by: Parser.character(.set(["e".utf8.first!, "E".utf8.first!])))
+			.map { $0.first }
+			.followed(by: Parser.sign)
+			.followed(by: Parser.number)
+			.map { Float(
+				sign: $0.first.second > 0 ? .plus : .minus,
+				exponent: $0.second,
+				significand: $0.first.first) }
+
+		return num_frac_e_sign_num.or(num_e_sign_num).or(num_frac)
+	}
+
+	static var hexFloat: Parser<Float> {
+		return Parser.character(.single("0".utf8.first!))
+			.followed(by: Parser.character(.single("x".utf8.first!)))
+			.followed(by: Parser.hexNumber)
+			.map { $0.second }
+			.followed(by: Parser.character(.single(".".utf8.first!)))
+			.map { $0.first }
+			.followed(by: Parser.hexFraction)
+			.map { Float($0.first) + $0.second }
+	}
+
+}
 
 /// ## Strings
 /// - SeeAlso: https://webassembly.github.io/spec/text/values.html#strings
@@ -323,7 +393,7 @@ extension Parser {
 		}
 	}
 
-	func or<Another>(by parser: Parser<Another>) -> Parser<EitherResult<Result, Another>> {
+	func or<Another>(_ parser: Parser<Another>) -> Parser<EitherResult<Result, Another>> {
 		let expectation = CharacterSet.union([self.expectation, parser.expectation])
 		return Parser<EitherResult<Result, Another>>(expects: expectation) { stream in
 			if let first = try? self.parse(stream: stream) {
@@ -336,8 +406,8 @@ extension Parser {
 		}
 	}
 
-	func or(by parser: Parser<Result>) -> Parser<Result> {
-		return or(by: parser).map { (result: EitherResult<Result, Result>) in
+	func or(_ parser: Parser<Result>) -> Parser<Result> {
+		return or(parser).map { (result: EitherResult<Result, Result>) in
 			switch result {
 			case let .first(r):
 				return r
