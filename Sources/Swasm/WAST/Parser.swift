@@ -75,7 +75,7 @@ indirect enum CharacterSet {
 		case let .range(range):
 			return range.contains(character)
 		case let .union(sets):
-			return sets.reduce(true) { $0 && $1.contains(character) }
+			return sets.reduce(false) { $0 || $1.contains(character) }
 		case .all:
 			return true
 		}
@@ -224,12 +224,7 @@ extension Parser {
 			.followed(by: Parser.character(.single("x".utf8.first!)))
 			.followed(by: Parser.hexNumber)
 			.map { results in UInt32(results.second) }
-	}
-
-	static var s32: Parser<Int32> {
-		return Parser.sign.followed(by: Parser.u32).map { result in
-			Int32(result.first) * Int32(result.second)
-		}
+			.or(by: Parser.number.map { UInt32($0) })
 	}
 
 	static var u64: Parser<UInt64> {
@@ -237,6 +232,13 @@ extension Parser {
 			.followed(by: Parser.character(.single("x".utf8.first!)))
 			.followed(by: Parser.hexNumber)
 			.map { results in UInt64(results.second) }
+			.or(by: Parser.number.map { UInt64($0) })
+	}
+
+	static var s32: Parser<Int32> {
+		return Parser.sign.followed(by: Parser.u32).map { result in
+			Int32(result.first) * Int32(result.second)
+		}
 	}
 
 	static var s64: Parser<Int64> {
@@ -331,6 +333,17 @@ extension Parser {
 			}
 			guard let c = stream.look() else { throw ParserError.unexpectedEnd }
 			throw ParserError.unexpectedCharacter(c, expected: expectation)
+		}
+	}
+
+	func or(by parser: Parser<Result>) -> Parser<Result> {
+		return or(by: parser).map { (result: EitherResult<Result, Result>) in
+			switch result {
+			case let .first(r):
+				return r
+			case let .second(r):
+				return r
+			}
 		}
 	}
 
