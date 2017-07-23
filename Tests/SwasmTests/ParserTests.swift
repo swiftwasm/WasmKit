@@ -1,97 +1,81 @@
 import XCTest
 @testable import Swasm
 
-final class ParserTests: XCTestCase {
+class ParserTestCase: XCTestCase {
+	var parser: Parser!
+}
+
+final class ParserLexicalFormatTests: ParserTestCase {
+
+	var query: String.UTF8View.Element!
 
 	func testParseCharacter() {
-		let context1 = ParserContext(stream: StringStream(string: "abcde"))
+		parser = Parser(stream: StringStream(string: "abcde"))
+		query = "a".utf8.first
 		do {
-			let c = "a".utf8.first!
-			let result = try parseCharacter(c)(context1)
-			XCTAssertEqual(Array("a".utf8), result)
+			let result = try parser.parse(character: .single(query))()
+			XCTAssertEqual([query], result)
 		} catch let error {
 			XCTFail(String(describing: error))
 		}
 
-		let context2 = ParserContext(stream: StringStream(string: "abcde"))
+		parser = Parser(stream: StringStream(string: "cdeab"))
+		query = "a".utf8.first
 		do {
-			let c = "c".utf8.first!
-			let result = try parseCharacter(c)(context2)
+			let result = try parser.parse(character: .single(query))()
 			XCTFail("shoud throw, but got \(result)")
-		} catch let ParserError.unexpectedCharacter(c) {
-			XCTAssertEqual("a".utf8.first!, c)
+		} catch let ParserError.unexpectedCharacter(actual, _) {
+			XCTAssertEqual(actual, "c".utf8.first!)
 		} catch let error {
 			XCTFail(String(describing: error))
 		}
 	}
 
 	func testParseAnyCharacter() {
-		let context = ParserContext(stream: StringStream(string: "abcde"))
+		parser = Parser(stream: StringStream(string: "abcde"))
 		do {
-			let result = try parseAnyCharacter(context)
+			let result = try parser.parse(character: .all)()
 			XCTAssertEqual(Array("a".utf8), result)
 		} catch let error {
 			XCTFail(String(describing: error))
 		}
 	}
+
+}
+
+final class ParserTokenTests: ParserTestCase {
 
 	func testParseIDCharacters() {
-		let context1 = ParserContext(stream: StringStream(string: "abcde"))
+		parser = Parser(stream: StringStream(string: "abcde"))
 		do {
-			let result = try parseIDCharacter(context1)
+			let result = try parser.parseIDCharacter()
 			XCTAssertEqual(Array("a".utf8), result)
 		} catch let error {
 			XCTFail(String(describing: error))
 		}
 
-		let context2 = ParserContext(stream: StringStream(string: "$$$$$"))
+		parser = Parser(stream: StringStream(string: "あああ"))
 		do {
-			let result = try parseIDCharacter(context2)
+			let result = try parser.parseIDCharacter()
 			XCTFail("shoud throw, but got \(result)")
-		} catch let ParserError.unexpectedCharacter(c) {
-			XCTAssertEqual("$".utf8.first!, c)
+		} catch let ParserError.unexpectedCharacter(actual, _) {
+			XCTAssertEqual(actual, "あ".utf8.first!)
 		} catch let error {
 			XCTFail(String(describing: error))
 		}
 	}
 
-	func testParseID() {
-		let context1 = ParserContext(stream: StringStream(string: "$abc"))
-		do {
-			let result = try parseID(context1)
-			XCTAssertEqual(Array("$abc".utf8), result)
-		} catch let error {
-			XCTFail(String(describing: error))
-		}
+}
 
-		let context2 = ParserContext(stream: StringStream(string: "abcde"))
-		do {
-			let result = try parseID(context2)
-			XCTFail("shoud throw, but got \(result)")
-		} catch let ParserError.unexpectedCharacter(c) {
-			XCTAssertEqual("a".utf8.first!, c)
-		} catch let error {
-			XCTFail(String(describing: error))
-		}
-
-		let context3 = ParserContext(stream: StringStream(string: "$$$$$"))
-		do {
-			let result = try parseID(context3)
-			XCTFail("shoud throw, but got \(result)")
-		} catch let ParserError.unexpectedCharacter(c) {
-			XCTAssertEqual("$".utf8.first!, c)
-		} catch let error {
-			XCTFail(String(describing: error))
-		}
-	}
+final class ParserCombinatorTests: ParserTestCase {
 
 	func testRepeated() {
-		let context = ParserContext(stream: StringStream(string: "aaade"))
+		parser = Parser(stream: StringStream(string: "aaabcde"))
 		do {
 			let c = "a".utf8.first!
-			let parseCharacters = try repeated(parseCharacter(c))
-			let result = try parseCharacters(context)
-			XCTAssertEqual(Array("aaa".utf8), result)
+			let parseRepeated = parser.repeated(parser.parse(character: .single(c)))
+			let result = try parseRepeated()
+			XCTAssertEqual(result, Array("aaa".utf8))
 		} catch let error {
 			XCTFail(String(describing: error))
 		}
