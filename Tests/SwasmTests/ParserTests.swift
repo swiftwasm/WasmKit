@@ -14,7 +14,11 @@ final class ParserLexicalFormatTests: ParserTestCase {
 		query = "a".utf8.first
 		do {
 			let result = try parser.parse(character: .single(query))()
-			XCTAssertEqual([query], result)
+			guard let character = result as? Parser.Character else {
+				XCTFail(String(describing: result))
+				return
+			}
+			XCTAssertEqual(character, query)
 		} catch let error {
 			XCTFail(String(describing: error))
 		}
@@ -35,7 +39,11 @@ final class ParserLexicalFormatTests: ParserTestCase {
 		parser = Parser(stream: StringStream(string: "abcde"))
 		do {
 			let result = try parser.parse(character: .all)()
-			XCTAssertEqual(Array("a".utf8), result)
+			guard let character = result as? Parser.Character else {
+				XCTFail(String(describing: result))
+				return
+			}
+			XCTAssertEqual(character, "a".utf8.first!)
 		} catch let error {
 			XCTFail(String(describing: error))
 		}
@@ -43,13 +51,85 @@ final class ParserLexicalFormatTests: ParserTestCase {
 
 }
 
-final class ParserTokenTests: ParserTestCase {
+final class ParserValueTests: ParserTestCase {
+
+	func testParseU32() {
+		parser = Parser(stream: StringStream(string: "123"))
+		do {
+			let result = try parser.parseU32()
+			guard let number = result as? Int, number == 123 else {
+				XCTFail(String(describing: result))
+				return
+			}
+		} catch let error {
+			XCTFail(String(describing: error))
+		}
+
+		parser = Parser(stream: StringStream(string: "+123"))
+		do {
+			let result = try parser.parseU32()
+			XCTFail("shoud throw, but got \(result)")
+		} catch let ParserError.unexpectedCharacter(actual, _) {
+			XCTAssertEqual(actual, "+".utf8.first!)
+		} catch let error {
+			XCTFail(String(describing: error))
+		}
+
+		parser = Parser(stream: StringStream(string: "-123"))
+		do {
+			let result = try parser.parseU32()
+			XCTFail("shoud throw, but got \(result)")
+		} catch let ParserError.unexpectedCharacter(actual, _) {
+			XCTAssertEqual(actual, "-".utf8.first!)
+		} catch let error {
+			XCTFail(String(describing: error))
+		}
+	}
+
+	func testParseI32() {
+		parser = Parser(stream: StringStream(string: "123"))
+		do {
+			let result = try parser.parseI32()
+			guard let number = result as? Int, number == 123 else {
+				XCTFail(String(describing: result))
+				return
+			}
+		} catch let error {
+			XCTFail(String(describing: error))
+		}
+
+		parser = Parser(stream: StringStream(string: "+123"))
+		do {
+			let result = try parser.parseI32()
+			guard let number = result as? Int, number == 123 else {
+				XCTFail(String(describing: result))
+				return
+			}
+		} catch let error {
+			XCTFail(String(describing: error))
+		}
+
+		parser = Parser(stream: StringStream(string: "-123"))
+		do {
+			let result = try parser.parseI32()
+			guard let number = result as? Int, number == -123 else {
+				XCTFail(String(describing: result))
+				return
+			}
+		} catch let error {
+			XCTFail(String(describing: error))
+		}
+	}
 
 	func testParseIDCharacters() {
 		parser = Parser(stream: StringStream(string: "abcde"))
 		do {
-			let result = try parser.parseIDCharacter()
-			XCTAssertEqual(Array("a".utf8), result)
+			let result = try parser.parseIDCharacters()
+			guard let cs = result as? [Parser.Character] else {
+				XCTFail(String(describing: result))
+				return
+			}
+			XCTAssertEqual(cs, "abcde".utf8.map { $0 })
 		} catch let error {
 			XCTFail(String(describing: error))
 		}
@@ -75,7 +155,44 @@ final class ParserCombinatorTests: ParserTestCase {
 			let c = "a".utf8.first!
 			let parseRepeated = parser.repeated(parser.parse(character: .single(c)))
 			let result = try parseRepeated()
-			XCTAssertEqual(result, Array("aaa".utf8))
+			guard let results = result as? [ParserResult] else {
+				XCTFail(String(describing: result))
+				return
+			}
+			guard let cs = results as? [Parser.Character] else {
+				XCTFail(String(describing: result))
+				return
+			}
+			XCTAssertEqual(cs, "aaa".utf8.map { $0 })
+		} catch let error {
+			XCTFail(String(describing: error))
+		}
+	}
+
+	func testOptional() {
+		parser = Parser(stream: StringStream(string: "abcde"))
+		do {
+			let c = "f".utf8.first!
+			let parseOptional = parser.optional(parser.parse(character: .single(c)))
+			let result = try parseOptional()
+			guard let results = result as? [ParserResult], results.isEmpty else {
+				XCTFail(String(describing: result))
+				return
+			}
+		} catch let error {
+			XCTFail(String(describing: error))
+		}
+
+		parser = Parser(stream: StringStream(string: "abcde"))
+		do {
+			let c = "a".utf8.first!
+			let parseOptional = parser.optional(parser.parse(character: .single(c)))
+			let result = try parseOptional()
+			guard let character = result as? Parser.Character else {
+				XCTFail(String(describing: result))
+				return
+			}
+			XCTAssertEqual(character, "a".utf8.first!)
 		} catch let error {
 			XCTFail(String(describing: error))
 		}
