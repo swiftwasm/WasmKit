@@ -1,4 +1,5 @@
 protocol CharacterStream {
+	typealias Element = String.UTF8View.Element
 	func look() -> String.UTF8View.Element?
 	func consume()
 }
