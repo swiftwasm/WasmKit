@@ -8,7 +8,7 @@ let package = Package(
 		.library(
 			name: "Swasm",
 			targets: ["Swasm"]
-		),],
+		), ],
 	dependencies: [],
 	targets: [
 		.target(
@@ -18,5 +18,5 @@ let package = Package(
 		.testTarget(
 			name: "SwasmTests",
 			dependencies: ["Swasm"]
-		),]
+		), ]
 )
