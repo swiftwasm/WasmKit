@@ -8,5 +8,5 @@ branches:
 install:
   - brew install swiftlint
 script:
-  - swiftlint
+  - swiftlint --strict
   - swift test
