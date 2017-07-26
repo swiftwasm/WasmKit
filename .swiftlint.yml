@@ -1,5 +1,5 @@
 excluded:
-  - Package.swift
+  - .build
 
 disabled_rules:
   - type_name
