@@ -31,8 +31,8 @@ struct FunctionType {
 
 // https://webassembly.github.io/spec/syntax/types.html#limits
 struct Limits {
-	let min: Int32
-	let max: Int32?
+	let min: UInt32
+	let max: UInt32?
 }
 
 // https://webassembly.github.io/spec/syntax/types.html#memory-types

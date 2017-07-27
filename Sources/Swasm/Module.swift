@@ -37,7 +37,7 @@ struct Data {
 }
 
 struct Export {
-	let name: String
+	let name: Name
 	let descriptor: ExportDescriptor
 }
 
@@ -49,8 +49,8 @@ enum ExportDescriptor {
 }
 
 struct Import {
-	let module: String
-	let name: String
+	let module: Name
+	let name: Name
 	let descripter: ImportDescriptor
 }
 

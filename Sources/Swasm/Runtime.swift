@@ -79,7 +79,7 @@ enum ExternalValue {
 
 // https://webassembly.github.io/spec/exec/runtime.html#stack
 
-typealias Label = String
+typealias Label = Name
 
 struct Stack {
 	var values: [Value]
