@@ -55,4 +55,11 @@ struct GlobalType {
 	var mutability: Mutability?
 	var valueType: ValueType
 }
+
+// https://webassembly.github.io/spec/syntax/types.html#external-types
+enum ExternalType {
+	case function(FunctionType)
+	case table(TableType)
+	case memory(MemoryType)
+	case global(GlobalType)
 }
