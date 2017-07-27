@@ -52,5 +52,7 @@ enum Mutability {
 
 // https://webassembly.github.io/spec/syntax/types.html#global-types
 struct GlobalType {
-	var mutability: Mutability
+	var mutability: Mutability?
+	var valueType: ValueType
+}
 }
