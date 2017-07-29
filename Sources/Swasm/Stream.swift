@@ -1,5 +1,5 @@
-protocol Stream {
-	associatedtype Element
+protocol Stream: Equatable {
+	associatedtype Element: Equatable
 	associatedtype Index
 
 	var startIndex: Index { get }
@@ -32,5 +32,11 @@ struct ByteStream: Stream {
 
 	func index(after index: Int) -> Int {
 		return bytes.index(after: index)
+	}
+}
+
+extension ByteStream: Equatable {
+	static func == (lhs: ByteStream, rhs: ByteStream) -> Bool {
+		return lhs.bytes == rhs.bytes
 	}
 }

@@ -4,6 +4,20 @@ enum ParserStreamError<S: Stream>: Error {
 	case vectorInvalidLength(Int)
 }
 
+extension ParserStreamError: Equatable {
+	public static func == (lhs: ParserStreamError<S>, rhs: ParserStreamError<S>) -> Bool {
+		switch (lhs, rhs) {
+		case (.unexpected(let l), .unexpected(let r)):
+			return l == r
+		case (.unexpectedEnd, .unexpectedEnd):
+			return true
+		case (.vectorInvalidLength(let l), .vectorInvalidLength(let r)):
+			return l == r
+		default: return false
+		}
+	}
+}
+
 protocol Parser {
 	associatedtype Input: Stream
 	associatedtype Result
