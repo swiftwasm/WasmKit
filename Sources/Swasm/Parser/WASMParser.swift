@@ -284,9 +284,16 @@ extension WASMParser {
 	/// - SeeAlso: https://webassembly.github.io/spec/binary/modules.html#sections
 	static func section<S, Content>(_ n: UInt8, of contentParser: ChainableParser<S, Content>)
 		-> ChainableParser<S, Content> where S.Element == Byte {
-			return byte(n)
-				.followed(by: uint(32)) { _, size in size }
-				.followed(by: contentParser) { _, content in content }
+			return .init { stream, index in
+				let (_, idEnd) = try byte(n).parse(stream: stream, index: index)
+				let (size, sizeEnd) = try uint(32).parse(stream: stream, index: idEnd)
+				let (content, contentEnd) = try contentParser.parse(stream: stream, index: sizeEnd)
+				let actualSize = sizeEnd.distance(to: contentEnd)
+				guard actualSize == S.Index(size) else {
+					throw ParserStreamError<S>.sectionInvalidSize(actualSize, expected: Int(size), location: sizeEnd)
+				}
+				return (content, contentEnd)
+			}
 	}
 
 	/// ## Type Section
