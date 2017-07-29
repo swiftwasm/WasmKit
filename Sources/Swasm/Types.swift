@@ -19,6 +19,20 @@ enum ValueType {
 	case any
 }
 
+extension Array where Element == ValueType {
+	static func == (lhs: [ValueType], rhs: [ValueType]) -> Bool {
+		guard lhs.count == rhs.count else {
+			return false
+		}
+		for (l, r) in zip(lhs, rhs) {
+			guard l == r else {
+				return false
+			}
+		}
+		return true
+	}
+}
+
 // https://webassembly.github.io/spec/syntax/types.html#result-types
 typealias ResultType = [ValueType]
 

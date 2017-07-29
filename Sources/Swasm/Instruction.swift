@@ -11,7 +11,7 @@ extension Expression: Equatable {
 	}
 }
 
-protocol Instruction {
+protocol Instruction: Validatable {
 	var isConstant: Bool { get }
 
 	func isEqual(to another: Instruction) -> Bool
@@ -608,4 +608,17 @@ extension NumericInstruction {
 			}
 		}
 	}
+}
+
+enum PseudoInstruction: Instruction {
+
+	case end
+	case `else`
+
+	var isConstant: Bool {
+		return false
+	}
+
+	func validate(with context: Context) throws {}
+
 }
