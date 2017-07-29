@@ -137,44 +137,56 @@ enum WASMParser {
 	/// ## Names
 	/// - SeeAlso: https://webassembly.github.io/spec/binary/values.html#names
 	static func name() -> ChainableParser<ByteStream, Name> {
-		return vector(of: unicode()).map { String(String.UnicodeScalarView($0)) }
-	}
-
-	static func unicode() -> ChainableParser<ByteStream, Unicode.Scalar> {
 		return .init { stream, index in
-			var index = index
-			guard let b1 = stream.take(at: index) else {
-				throw ParserStreamError<ByteStream>.unexpectedEnd
-			}
-			guard 0b11000000 <= b1 else {
-				let scalar = Unicode.UTF8.decode(Unicode.UTF8.EncodedScalar([b1]))
-				return (scalar, stream.index(after: index))
+			var scalars = [UnicodeScalar]()
+			let (length, vectorStart) = try uint(32).parse(stream: stream, index: index)
+			var index = vectorStart
+
+			while vectorStart.distance(to: index) < length {
+				guard let b1 = stream.take(at: index) else {
+					throw ParserStreamError<ByteStream>.unexpectedEnd
+				}
+				index = stream.index(after: index)
+
+				guard 0b11000000 <= b1 else {
+					let scalar = Unicode.UTF8.decode(Unicode.UTF8.EncodedScalar([b1]))
+					scalars.append(scalar)
+					continue
+				}
+
+				guard let b2 = stream.take(at: index) else {
+					throw ParserStreamError<ByteStream>.unexpectedEnd
+				}
+				index = stream.index(after: index)
+
+				guard 0b11100000 <= b1 else {
+					let scalar = Unicode.UTF8.decode(Unicode.UTF8.EncodedScalar([b1, b2]))
+					scalars.append(scalar)
+					continue
+				}
+
+				guard let b3 = stream.take(at: index) else {
+					throw ParserStreamError<ByteStream>.unexpectedEnd
+				}
+				index = stream.index(after: index)
+
+				guard 0b11110000 <= b1 else {
+					let scalar = Unicode.UTF8.decode(Unicode.UTF8.EncodedScalar([b1, b2, b3]))
+					scalars.append(scalar)
+					continue
+				}
+
+				guard let b4 = stream.take(at: index) else {
+					throw ParserStreamError<ByteStream>.unexpectedEnd
+				}
+				index = stream.index(after: index)
+
+				let scalar = Unicode.UTF8.decode(Unicode.UTF8.EncodedScalar([b1, b2, b3, b4]))
+				scalars.append(scalar)
+				continue
 			}
 
-			index = stream.index(after: index)
-			guard let b2 = stream.take(at: index) else {
-				throw ParserStreamError<ByteStream>.unexpectedEnd
-			}
-			guard 0b11100000 <= b1 else {
-				let scalar = Unicode.UTF8.decode(Unicode.UTF8.EncodedScalar([b1, b2]))
-				return (scalar, stream.index(after: index))
-			}
-
-			index = stream.index(after: index)
-			guard let b3 = stream.take(at: index) else {
-				throw ParserStreamError<ByteStream>.unexpectedEnd
-			}
-			guard 0b11110000 <= b1 else {
-				let scalar = Unicode.UTF8.decode(Unicode.UTF8.EncodedScalar([b1, b2, b3]))
-				return (scalar, stream.index(after: index))
-			}
-
-			index = stream.index(after: index)
-			guard let b4 = stream.take(at: index) else {
-				throw ParserStreamError<ByteStream>.unexpectedEnd
-			}
-			let scalar = Unicode.UTF8.decode(Unicode.UTF8.EncodedScalar([b1, b2, b3, b4]))
-			return (scalar, stream.index(after: index))
+			return (String(String.UnicodeScalarView(scalars)), index)
 		}
 	}
 
