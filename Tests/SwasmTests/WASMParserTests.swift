@@ -10,7 +10,7 @@ extension WASMParserTests {
 		       toBe: ParserStreamError<ByteStream>.unexpectedEnd)
 
 		expect(WASMParser.vector(of: WASMParser.byte(0x01)), ByteStream(bytes: [0x00]),
-		       toBe: ParserStreamError<ByteStream>.vectorInvalidLength(0))
+		       toBe: ParserStreamError<ByteStream>.vectorInvalidLength(0, location: 0))
 
 		expect(WASMParser.vector(of: WASMParser.byte(0x01)), ByteStream(bytes: [0x02, 0x01, 0x01]),
 		       toBe: [0x01, 0x01])
@@ -24,7 +24,7 @@ extension WASMParserTests {
 		       toBe: ParserStreamError<ByteStream>.unexpectedEnd)
 
 		expect(WASMParser.byte(0x01), ByteStream(bytes: [0x02]),
-		       toBe: ParserStreamError<ByteStream>.unexpected(0x02))
+		       toBe: ParserStreamError<ByteStream>.unexpected(0x02, location: 0))
 	}
 
 	func testByteInRange() {
@@ -38,7 +38,7 @@ extension WASMParserTests {
 		       toBe: ParserStreamError<ByteStream>.unexpectedEnd)
 
 		expect(WASMParser.byte(in: 0x01..<0x03), ByteStream(bytes: [0x00]),
-		       toBe: ParserStreamError<ByteStream>.unexpected(0x00))
+		       toBe: ParserStreamError<ByteStream>.unexpected(0x00, location: 0))
 	}
 
 	func testByteInSet() {
@@ -49,7 +49,7 @@ extension WASMParserTests {
 		       toBe: ParserStreamError<ByteStream>.unexpectedEnd)
 
 		expect(WASMParser.byte(in: Set([0x01, 0x02, 0x03])), ByteStream(bytes: [0x00]),
-		       toBe: ParserStreamError<ByteStream>.unexpected(0x00))
+		       toBe: ParserStreamError<ByteStream>.unexpected(0x00, location: 0))
 	}
 
 	func testBytes() {
@@ -60,7 +60,7 @@ extension WASMParserTests {
 		       toBe: [0x01, 0x02, 0x03])
 
 		expect(WASMParser.bytes([0x01, 0x02, 0x03]), ByteStream(bytes: [0x01, 0x09]),
-		       toBe: ParserStreamError<ByteStream>.unexpected(0x09))
+		       toBe: ParserStreamError<ByteStream>.unexpected(0x09, location: 1))
 	}
 }
 
@@ -76,7 +76,7 @@ extension WASMParserTests {
 		       toBe: ParserStreamError<ByteStream>.unexpectedEnd)
 
 		expect(WASMParser.uint(1), ByteStream(bytes: [0b10000000, 0b10000000]),
-		       toBe: ParserStreamError<ByteStream>.unexpected(0b10000000))
+		       toBe: ParserStreamError<ByteStream>.unexpected(0b10000000, location: 0))
 
 		expect(WASMParser.uint(8), ByteStream(bytes: [0b10000010, 0b00000001]),
 		       toBe: 0b0000001_0000010)
@@ -96,7 +96,7 @@ extension WASMParserTests {
 		       toBe: ParserStreamError<ByteStream>.unexpectedEnd)
 
 		expect(WASMParser.sint(1), ByteStream(bytes: [0b10000000, 0b10000000]),
-		       toBe: ParserStreamError<ByteStream>.unexpected(0b10000000))
+		       toBe: ParserStreamError<ByteStream>.unexpected(0b10000000, location: 0))
 
 		expect(WASMParser.sint(8), ByteStream(bytes: [0b10000000, 0b00000001]),
 		       toBe: 0b10000000)
@@ -116,7 +116,7 @@ extension WASMParserTests {
 		       toBe: ParserStreamError<ByteStream>.unexpectedEnd)
 
 		expect(WASMParser.int(1), ByteStream(bytes: [0b10000000, 0b10000000]),
-		       toBe: ParserStreamError<ByteStream>.unexpected(0b10000000))
+		       toBe: ParserStreamError<ByteStream>.unexpected(0b10000000, location: 0))
 
 		expect(WASMParser.int(8), ByteStream(bytes: [0b10000000, 0b00000001]),
 		       toBe: -0b10000000)
@@ -206,7 +206,7 @@ extension WASMParserTests {
 		       toBe: .uint64)
 
 		expect(WASMParser.valueType(), ByteStream(bytes: [0x7B]),
-		       toBe: ParserStreamError<ByteStream>.unexpected(0x7B))
+		       toBe: ParserStreamError<ByteStream>.unexpected(0x7B, location: 0))
 	}
 
 	func testResultType() {
@@ -229,7 +229,7 @@ extension WASMParserTests {
 		       toBe: [.uint64])
 
 		expect(WASMParser.resultType(), ByteStream(bytes: [0x7B]),
-		       toBe: ParserStreamError<ByteStream>.unexpected(0x7B))
+		       toBe: ParserStreamError<ByteStream>.unexpected(0x7B, location: 0))
 	}
 
 	func testFunctionType() {

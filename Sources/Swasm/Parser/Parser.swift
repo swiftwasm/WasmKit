@@ -1,7 +1,7 @@
 enum ParserStreamError<S: Stream>: Error {
-	case unexpected(S.Element)
+	case unexpected(S.Element, location: S.Index)
 	case unexpectedEnd
-	case vectorInvalidLength(Int)
+	case vectorInvalidLength(Int, location: S.Index)
 }
 
 extension ParserStreamError: Equatable {

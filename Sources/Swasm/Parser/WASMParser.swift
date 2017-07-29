@@ -11,7 +11,7 @@ enum WASMParser {
 		return .init { stream, index in
 			let (length, vectorStart) = try uint(32).parse(stream: stream, index: index)
 			guard let parser = parser.repeated(count: Int(length)) else {
-				throw ParserStreamError<S>.vectorInvalidLength(Int(length))
+				throw ParserStreamError<S>.vectorInvalidLength(Int(length), location: index)
 			}
 			return try parser.parse(stream: stream, index: vectorStart)
 		}
@@ -38,7 +38,7 @@ enum WASMParser {
 				throw ParserStreamError<S>.unexpectedEnd
 			}
 			guard set.contains(byte) else {
-				throw ParserStreamError<S>.unexpected(byte)
+				throw ParserStreamError<S>.unexpected(byte, location: index)
 			}
 			return (byte, stream.index(after: index))
 		}
@@ -50,7 +50,7 @@ enum WASMParser {
 				throw ParserStreamError<S>.unexpectedEnd
 			}
 			guard byte == b else {
-				throw ParserStreamError<S>.unexpected(byte)
+				throw ParserStreamError<S>.unexpected(byte, location: index)
 			}
 			return (byte, stream.index(after: index))
 		}
@@ -80,7 +80,7 @@ enum WASMParser {
 				let result = p2(7) * m + (n - p2(7))
 				return (result, endIndex)
 			default:
-				throw ParserStreamError<S>.unexpected(byte)
+				throw ParserStreamError<S>.unexpected(byte, location: index)
 			}
 		}
 	}
@@ -101,7 +101,7 @@ enum WASMParser {
 				let result = m << 7 + (n - p2(7))
 				return (result, endIndex)
 			default:
-				throw ParserStreamError<S>.unexpected(byte)
+				throw ParserStreamError<S>.unexpected(byte, location: index)
 			}
 		}
 	}
@@ -205,7 +205,7 @@ enum WASMParser {
 			case 0x7E: return (.int64, stream.index(after: index))
 			case 0x7D: return (.uint32, stream.index(after: index))
 			case 0x7C: return (.uint64, stream.index(after: index))
-			default: throw ParserStreamError<S>.unexpected(byte)
+			default: throw ParserStreamError<S>.unexpected(byte, location: index)
 			}
 		}
 	}
