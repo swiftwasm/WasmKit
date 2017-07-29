@@ -31,8 +31,8 @@ func expect<P: Parser, E>(
 		}
 		XCTAssertNoThrow(try {
 			let (result, endIndex) = try parser.parse(stream: stream, index: stream.startIndex)
-			XCTAssertEqual(result, expectation)
-			XCTAssertEqual(endIndex, stream.endIndex)
+			XCTAssertEqual(result, expectation, message, file: file, line: line)
+			XCTAssertEqual(endIndex, stream.endIndex, message, file: file, line: line)
 			}(), message, file: file, line: line)
 }
 
@@ -53,6 +53,6 @@ func expect<P: Parser, E: Error>(
 					XCTFail()
 					return
 				}
-				XCTAssertEqual(error, expectation)
+				XCTAssertEqual(error, expectation, message, file: file, line: line)
 		}
 }
