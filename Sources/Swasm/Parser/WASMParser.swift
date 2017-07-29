@@ -38,7 +38,7 @@ enum WASMParser {
 				throw ParserStreamError<ByteStream>.unexpectedEnd
 			}
 			guard set.contains(byte) else {
-				throw ParserStreamError<ByteStream>.unexpected(element: byte)
+				throw ParserStreamError<ByteStream>.unexpected(byte)
 			}
 			return (byte, stream.index(after: index))
 		}
@@ -50,7 +50,7 @@ enum WASMParser {
 				throw ParserStreamError<ByteStream>.unexpectedEnd
 			}
 			guard byte == b else {
-				throw ParserStreamError<ByteStream>.unexpected(element: byte)
+				throw ParserStreamError<ByteStream>.unexpected(byte)
 			}
 			return (byte, stream.index(after: index))
 		}
@@ -80,7 +80,7 @@ enum WASMParser {
 				let result = p2(7) * m + (n - p2(7))
 				return (result, endIndex)
 			default:
-				throw ParserStreamError<ByteStream>.unexpected(element: byte)
+				throw ParserStreamError<ByteStream>.unexpected(byte)
 			}
 		}
 	}
@@ -101,7 +101,7 @@ enum WASMParser {
 				let result = m << 7 + (n - p2(7))
 				return (result, endIndex)
 			default:
-				throw ParserStreamError<ByteStream>.unexpected(element: byte)
+				throw ParserStreamError<ByteStream>.unexpected(byte)
 			}
 		}
 	}
@@ -193,7 +193,7 @@ enum WASMParser {
 			case 0x7E: return (.int64, stream.index(after: index))
 			case 0x7D: return (.uint32, stream.index(after: index))
 			case 0x7C: return (.uint64, stream.index(after: index))
-			default: throw ParserStreamError<ByteStream>.unexpected(element: byte)
+			default: throw ParserStreamError<ByteStream>.unexpected(byte)
 			}
 		}
 	}

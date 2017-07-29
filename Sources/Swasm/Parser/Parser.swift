@@ -1,5 +1,5 @@
 enum ParserStreamError<S: Stream>: Error {
-	case unexpected(element: S.Element)
+	case unexpected(S.Element)
 	case unexpectedEnd
 	case vectorInvalidLength(Int)
 }
