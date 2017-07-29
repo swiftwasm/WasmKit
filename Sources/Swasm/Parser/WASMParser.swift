@@ -253,7 +253,9 @@ enum WASMParser {
 			.or(byte(0x01).map { _ in Mutability.variable })
 		return valueType().followed(by: mutabilityParser) { GlobalType(mutability: $1, valueType: $0) }
 	}
+}
 
+extension WASMParser {
 	/// # Instructions
 	/// - SeeAlso: https://webassembly.github.io/spec/binary/instructions.html#instructions
 
@@ -264,7 +266,9 @@ enum WASMParser {
 			return (Expression(instructions: []), index)
 		}
 	}
+}
 
+extension WASMParser {
 	/// # Modules
 	/// - SeeAlso: https://webassembly.github.io/spec/binary/modules.html#modules
 
