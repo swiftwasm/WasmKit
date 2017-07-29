@@ -18,20 +18,6 @@ extension UInt64: Value {}
 
 typealias ValueType = Value.Type
 
-extension Array where Element == ValueType {
-	static func == (lhs: [ValueType], rhs: [ValueType]) -> Bool {
-		guard lhs.count == rhs.count else {
-			return false
-		}
-		for (l, r) in zip(lhs, rhs) {
-			guard l == r else {
-				return false
-			}
-		}
-		return true
-	}
-}
-
 // https://webassembly.github.io/spec/syntax/types.html#result-types
 typealias ResultType = (ValueType)
 
@@ -41,16 +27,6 @@ struct FunctionType {
 	static let any = FunctionType(parameters: [_Any.self], results: [_Any.self])
 	var parameters: [ValueType]
 	var results: [ValueType]
-}
-
-extension FunctionType: Equatable {
-	static func == (lhs: FunctionType, rhs: FunctionType) -> Bool {
-		return (
-			lhs.parameters == rhs.parameters
-			&&
-			lhs.results == rhs.results
-		)
-	}
 }
 
 // https://webassembly.github.io/spec/syntax/types.html#limits
