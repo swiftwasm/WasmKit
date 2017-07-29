@@ -5,430 +5,272 @@ import XCTest
 class WASMParserTests: XCTestCase {}
 
 extension WASMParserTests {
+	func testVector() {
+		expect(WASMParser.vector(of: WASMParser.byte(0x01)), ByteStream(bytes: [0x01]),
+		       toBe: ParserStreamError<ByteStream>.unexpectedEnd)
+
+		expect(WASMParser.vector(of: WASMParser.byte(0x01)), ByteStream(bytes: [0x00]),
+		       toBe: ParserStreamError<ByteStream>.vectorInvalidLength(0))
+
+		expect(WASMParser.vector(of: WASMParser.byte(0x01)), ByteStream(bytes: [0x02, 0x01, 0x01]),
+		       toBe: [0x01, 0x01])
+	}
+
 	func testByte() {
-		XCTAssertThrowsError(try {
-			let stream = ByteStream(bytes: [])
-			let parser = WASMParser.byte(0x01)
-			_ = try parser.parse(stream: stream)
-			}()) { error in
-				guard case ParserStreamError<ByteStream>.unexpectedEnd = error else {
-					XCTFail(String(describing: error))
-					return
-				}
-		}
+		expect(WASMParser.byte(0x01), ByteStream(bytes: [0x01]),
+		       toBe: 0x01)
 
-		XCTAssertNoThrow(try {
-			let stream = ByteStream(bytes: [0x01])
-			let parser = WASMParser.byte(0x01)
-			let (result, endIndex) = try parser.parse(stream: stream)
-			XCTAssertEqual(result, 0x01)
-			XCTAssertEqual(endIndex, stream.endIndex)
-			}())
+		expect(WASMParser.byte(0x01), ByteStream(bytes: []),
+		       toBe: ParserStreamError<ByteStream>.unexpectedEnd)
 
-		XCTAssertThrowsError(try {
-			let stream = ByteStream(bytes: [0x02])
-			let parser = WASMParser.byte(0x01)
-			_ = try parser.parse(stream: stream)
-			}()) { error in
-				guard case ParserStreamError<ByteStream>.unexpected(0x02) = error else {
-					XCTFail(String(describing: error))
-					return
-				}
-		}
+		expect(WASMParser.byte(0x01), ByteStream(bytes: [0x02]),
+		       toBe: ParserStreamError<ByteStream>.unexpected(0x02))
 	}
 
 	func testByteInRange() {
-		XCTAssertThrowsError(try {
-			let stream = ByteStream(bytes: [])
-			let parser = WASMParser.byte(in: 0x01..<0x03)
-			_ = try parser.parse(stream: stream)
-			}()) { error in
-				guard case ParserStreamError<ByteStream>.unexpectedEnd = error else {
-					XCTFail(String(describing: error))
-					return
-				}
-		}
+		expect(WASMParser.byte(in: 0x01..<0x03), ByteStream(bytes: [0x02]),
+		       toBe: 0x02)
 
-		XCTAssertNoThrow(try {
-			let stream = ByteStream(bytes: [0x02])
-			let parser = WASMParser.byte(in: 0x01..<0x03)
-			let (result, endIndex) = try parser.parse(stream: stream)
-			XCTAssertEqual(result, 0x02)
-			XCTAssertEqual(endIndex, stream.endIndex)
-			}())
+		expect(WASMParser.byte(in: 0x01..<0x03), ByteStream(bytes: [0x02]),
+		       toBe: 0x02)
 
-		XCTAssertThrowsError(try {
-			let stream = ByteStream(bytes: [0x00])
-			let parser = WASMParser.byte(in: 0x01..<0x03)
-			_ = try parser.parse(stream: stream)
-			}()) { error in
-				guard case ParserStreamError<ByteStream>.unexpected(0x00) = error else {
-					XCTFail(String(describing: error))
-					return
-				}
-		}
+		expect(WASMParser.byte(in: 0x01..<0x03), ByteStream(bytes: []),
+		       toBe: ParserStreamError<ByteStream>.unexpectedEnd)
+
+		expect(WASMParser.byte(in: 0x01..<0x03), ByteStream(bytes: [0x00]),
+		       toBe: ParserStreamError<ByteStream>.unexpected(0x00))
 	}
 
 	func testByteInSet() {
-		XCTAssertThrowsError(try {
-			let stream = ByteStream(bytes: [])
-			let parser = WASMParser.byte(in: Set([0x01, 0x02, 0x03]))
-			_ = try parser.parse(stream: stream)
-			}()) { error in
-				guard case ParserStreamError<ByteStream>.unexpectedEnd = error else {
-					XCTFail(String(describing: error))
-					return
-				}
-		}
+		expect(WASMParser.byte(in: Set([0x01, 0x02, 0x03])), ByteStream(bytes: [0x02]),
+		       toBe: 0x02)
 
-		XCTAssertNoThrow(try {
-			let stream = ByteStream(bytes: [0x02])
-			let parser = WASMParser.byte(in: Set([0x01, 0x02, 0x03]))
-			let (result, endIndex) = try parser.parse(stream: stream)
-			XCTAssertEqual(result, 2)
-			XCTAssertEqual(endIndex, stream.endIndex)
-			}())
+		expect(WASMParser.byte(in: Set([0x01, 0x02, 0x03])), ByteStream(bytes: []),
+		       toBe: ParserStreamError<ByteStream>.unexpectedEnd)
 
-		XCTAssertThrowsError(try {
-			let stream = ByteStream(bytes: [0])
-			let parser = WASMParser.byte(in: Set([0x01, 0x02, 0x03]))
-			_ = try parser.parse(stream: stream)
-			}()) { error in
-				guard case ParserStreamError<ByteStream>.unexpected(0x00) = error else {
-					XCTFail(String(describing: error))
-					return
-				}
-		}
+		expect(WASMParser.byte(in: Set([0x01, 0x02, 0x03])), ByteStream(bytes: [0x00]),
+		       toBe: ParserStreamError<ByteStream>.unexpected(0x00))
 	}
 
 	func testBytes() {
-		XCTAssertThrowsError(try {
-			let stream = ByteStream(bytes: [0x00])
-			let parser = WASMParser.bytes([0x00, 0x01, 0x02])
-			XCTAssertNotNil(parser)
-			_ = try parser!.parse(stream: stream)
-			}()) { error in
-				guard case ParserStreamError<ByteStream>.unexpectedEnd = error else {
-					XCTFail(String(describing: error))
-					return
-				}
-		}
+		expect(WASMParser.bytes([0x01, 0x02, 0x03]), ByteStream(bytes: [0x01]),
+		       toBe: ParserStreamError<ByteStream>.unexpectedEnd)
 
-		XCTAssertNoThrow(try {
-			let stream = ByteStream(bytes: [0x00, 0x01, 0x02])
-			let parser = WASMParser.bytes([0x00, 0x01, 0x02])
-			XCTAssertNotNil(parser)
-			let (result, endIndex) = try parser!.parse(stream: stream)
-			XCTAssertEqual(result, [0x00, 0x01, 0x02])
-			XCTAssertEqual(endIndex, stream.endIndex)
-			}())
+		expect(WASMParser.bytes([0x01, 0x02, 0x03]), ByteStream(bytes: [0x01, 0x02, 0x03]),
+		       toBe: [0x01, 0x02, 0x03])
 
-		XCTAssertThrowsError(try {
-			let stream = ByteStream(bytes: [0x00, 0x02, 0x02])
-			let parser = WASMParser.bytes([0x00, 0x01, 0x02])
-			XCTAssertNotNil(parser)
-			_ = try parser!.parse(stream: stream)
-			}()) { error in
-				guard case ParserStreamError<ByteStream>.unexpected(0x02) = error else {
-					XCTFail(String(describing: error))
-					return
-				}
-		}
+		expect(WASMParser.bytes([0x01, 0x02, 0x03]), ByteStream(bytes: [0x01, 0x09]),
+		       toBe: ParserStreamError<ByteStream>.unexpected(0x09))
 	}
 }
 
 extension WASMParserTests {
 	func testUInt() {
-		XCTAssertNoThrow(try {
-			let stream = ByteStream(bytes: [0b01111111])
-			let parser = WASMParser.uint(8)
-			let (result, endIndex) = try parser.parse(stream: stream)
-			XCTAssertEqual(result, 127)
-			XCTAssertEqual(endIndex, stream.endIndex)
-			}())
+		expect(WASMParser.uint(8), ByteStream(bytes: [0b01111111]),
+		       toBe: 0b01111111)
 
-		XCTAssertThrowsError(try {
-			let stream = ByteStream(bytes: [0b10000000])
-			let parser = WASMParser.uint(8)
-			_ = try parser.parse(stream: stream)
-			}()) { error in
-				guard case ParserStreamError<ByteStream>.unexpectedEnd = error else {
-					XCTFail(String(describing: error))
-					return
-				}
-		}
+		expect(WASMParser.uint(8), ByteStream(bytes: [0b10000000]),
+		       toBe: ParserStreamError<ByteStream>.unexpectedEnd)
 
-		XCTAssertThrowsError(try {
-			let stream = ByteStream(bytes: [0b10000000, 0b10000000])
-			let parser = WASMParser.uint(1)
-			_ = try parser.parse(stream: stream)
-			}()) { error in
-				guard case ParserStreamError<ByteStream>.unexpected(0b10000000) = error else {
-					XCTFail(String(describing: error))
-					return
-				}
-		}
+		expect(WASMParser.uint(8), ByteStream(bytes: [0b10000000, 0b10000000]),
+		       toBe: ParserStreamError<ByteStream>.unexpectedEnd)
 
-		XCTAssertThrowsError(try {
-			let stream = ByteStream(bytes: [0b10000000, 0b10000000])
-			let parser = WASMParser.uint(8)
-			_ = try parser.parse(stream: stream)
-			}()) { error in
-				guard case ParserStreamError<ByteStream>.unexpectedEnd = error else {
-					XCTFail(String(describing: error))
-					return
-				}
-		}
+		expect(WASMParser.uint(1), ByteStream(bytes: [0b10000000, 0b10000000]),
+		       toBe: ParserStreamError<ByteStream>.unexpected(0b10000000))
 
-		XCTAssertNoThrow(try {
-			let stream = ByteStream(bytes: [0b10000010, 0b00000001])
-			let parser = WASMParser.uint(8)
-			let (result, endIndex) = try parser.parse(stream: stream)
-			XCTAssertEqual(result, 0b0000001_0000010)
-			XCTAssertEqual(endIndex, stream.endIndex)
-			}())
+		expect(WASMParser.uint(8), ByteStream(bytes: [0b10000010, 0b00000001]),
+		       toBe: 0b0000001_0000010)
 
-		XCTAssertNoThrow(try {
-			let stream = ByteStream(bytes: [0b10000011, 0b10000010, 0b00000001])
-			let parser = WASMParser.uint(8)
-			let (result, endIndex) = try parser.parse(stream: stream)
-			XCTAssertEqual(result, 0b0000001_0000010_0000011)
-			XCTAssertEqual(endIndex, stream.endIndex)
-			}())
+		expect(WASMParser.uint(8), ByteStream(bytes: [0b10000011, 0b10000010, 0b00000001]),
+		       toBe: 0b0000001_0000010_0000011)
 	}
 
 	func testSInt() {
-		XCTAssertNoThrow(try {
-			let stream = ByteStream(bytes: [0b01000001])
-			let parser = WASMParser.sint(8)
-			let (result, endIndex) = try parser.parse(stream: stream)
-			XCTAssertEqual(result, -0b00111111)
-			XCTAssertEqual(endIndex, stream.endIndex)
-			}())
+		expect(WASMParser.sint(8), ByteStream(bytes: [0b01000001]),
+		       toBe: -0b00111111)
 
-		XCTAssertThrowsError(try {
-			let stream = ByteStream(bytes: [0b10000000])
-			let parser = WASMParser.sint(8)
-			_ = try parser.parse(stream: stream)
-			}()) { error in
-				guard case ParserStreamError<ByteStream>.unexpectedEnd = error else {
-					XCTFail(String(describing: error))
-					return
-				}
-		}
+		expect(WASMParser.sint(8), ByteStream(bytes: [0b10000000]),
+		       toBe: ParserStreamError<ByteStream>.unexpectedEnd)
 
-		XCTAssertThrowsError(try {
-			let stream = ByteStream(bytes: [0b10000000, 0b10000000])
-			let parser = WASMParser.sint(1)
-			_ = try parser.parse(stream: stream)
-			}()) { error in
-				guard case ParserStreamError<ByteStream>.unexpected(0b10000000) = error else {
-					XCTFail(String(describing: error))
-					return
-				}
-		}
+		expect(WASMParser.sint(8), ByteStream(bytes: [0b10000000, 0b10000000]),
+		       toBe: ParserStreamError<ByteStream>.unexpectedEnd)
 
-		XCTAssertThrowsError(try {
-			let stream = ByteStream(bytes: [0b10000000, 0b10000000])
-			let parser = WASMParser.sint(8)
-			_ = try parser.parse(stream: stream)
-			}()) { error in
-				guard case ParserStreamError<ByteStream>.unexpectedEnd = error else {
-					XCTFail(String(describing: error))
-					return
-				}
-		}
+		expect(WASMParser.sint(1), ByteStream(bytes: [0b10000000, 0b10000000]),
+		       toBe: ParserStreamError<ByteStream>.unexpected(0b10000000))
 
-		XCTAssertNoThrow(try {
-			let stream = ByteStream(bytes: [0b10000000, 0b00000001])
-			let parser = WASMParser.sint(8)
-			let (result, endIndex) = try parser.parse(stream: stream)
-			XCTAssertEqual(result, 0b10000000)
-			XCTAssertEqual(endIndex, stream.endIndex)
-			}())
+		expect(WASMParser.sint(8), ByteStream(bytes: [0b10000000, 0b00000001]),
+		       toBe: 0b10000000)
 
-		XCTAssertNoThrow(try {
-			let stream = ByteStream(bytes: [0b11000010, 0b11000001, 0b01000000])
-			let parser = WASMParser.sint(8)
-			let (result, endIndex) = try parser.parse(stream: stream)
-			XCTAssertEqual(result, -0b0111111_0111110_0111110)
-			XCTAssertEqual(endIndex, stream.endIndex)
-			}())
+		expect(WASMParser.sint(8), ByteStream(bytes: [0b11000010, 0b11000001, 0b01000000]),
+		       toBe: -0b0111111_0111110_0111110)
+	}
+
+	func testInt() {
+		expect(WASMParser.int(8), ByteStream(bytes: [0b01000001]),
+		       toBe: -0b00111111)
+
+		expect(WASMParser.int(8), ByteStream(bytes: [0b10000000]),
+		       toBe: ParserStreamError<ByteStream>.unexpectedEnd)
+
+		expect(WASMParser.int(8), ByteStream(bytes: [0b10000000, 0b10000000]),
+		       toBe: ParserStreamError<ByteStream>.unexpectedEnd)
+
+		expect(WASMParser.int(1), ByteStream(bytes: [0b10000000, 0b10000000]),
+		       toBe: ParserStreamError<ByteStream>.unexpected(0b10000000))
+
+		expect(WASMParser.int(8), ByteStream(bytes: [0b10000000, 0b00000001]),
+		       toBe: -0b10000000)
+
+		expect(WASMParser.int(8), ByteStream(bytes: [0b11000010, 0b11000001, 0b01000000]),
+		       toBe: -0b0111111_0111110_0111110)
 	}
 }
 
 extension WASMParserTests {
-	func testFloat() {
-		XCTAssertThrowsError(try {
-			let stream = ByteStream(bytes: [0b11111111])
-			let parser = WASMParser.float32()
-			_ = try parser.parse(stream: stream)
-			}()) { error in
-				guard case ParserStreamError<ByteStream>.unexpectedEnd = error else {
-					XCTFail(String(describing: error))
-					return
-				}
-		}
+	func testFloat32() {
+		expect(WASMParser.float32(), ByteStream(bytes: [0b11111111, 0b11111111]),
+		       toBe: ParserStreamError<ByteStream>.unexpectedEnd)
 
-		XCTAssertNoThrow(try {
-			let stream = ByteStream(bytes: [0b00111111, 0b10000000, 0b00000000, 0b00000000])
-			let parser = WASMParser.float32()
-			let (result, endIndex) = try parser.parse(stream: stream)
-			XCTAssertEqual(result, 1.0)
-			XCTAssertEqual(endIndex, stream.endIndex)
-			}())
+		expect(WASMParser.float32(), ByteStream(bytes: [0b00111111, 0b10000000, 0b00000000, 0b00000000]),
+		       toBe: 1.0)
 
-		XCTAssertNoThrow(try {
-			let stream = ByteStream(bytes: [0b01000000, 0b01001001, 0b00001111, 0b11011010])
-			let parser = WASMParser.float32()
-			let (result, endIndex) = try parser.parse(stream: stream)
-			XCTAssertEqual(result, .pi)
-			XCTAssertEqual(endIndex, stream.endIndex)
-			}())
+		expect(WASMParser.float32(), ByteStream(bytes: [0b01000000, 0b01001001, 0b00001111, 0b11011010]),
+		       toBe: .pi)
+	}
 
-		XCTAssertNoThrow(try {
-			let stream = ByteStream(bytes: [0b11000000, 0b01001001, 0b00001111, 0b11011010])
-			let parser = WASMParser.float32()
-			let (result, endIndex) = try parser.parse(stream: stream)
-			XCTAssertEqual(result, -.pi)
-			XCTAssertEqual(endIndex, stream.endIndex)
-			}())
+	func testFloat64() {
+		expect(WASMParser.float64(), ByteStream(bytes: [
+			0b11111111, 0b11111111, 0b11111111, 0b11111111,
+			]), toBe: ParserStreamError<ByteStream>.unexpectedEnd)
+
+		expect(WASMParser.float64(), ByteStream(bytes: [
+			0b00111111, 0b11110000, 0b00000000, 0b00000000,
+			0b00000000, 0b00000000, 0b00000000, 0b00000000,
+			]), toBe: 1.0)
+
+		expect(WASMParser.float64(), ByteStream(bytes: [
+			0b01000000, 0b00001001, 0b00100001, 0b11111011,
+			0b01010100, 0b01000100, 0b00101101, 0b00011000,
+			]), toBe: .pi)
 	}
 }
 
 extension WASMParserTests {
+	func testUnicode() {
+		expect(WASMParser.name(), ByteStream(bytes: [0x01, 0x61]),
+		       toBe: "a")
+
+		expect(WASMParser.name(), ByteStream(bytes: [0x01]),
+		       toBe: ParserStreamError<ByteStream>.unexpectedEnd)
+
+		expect(WASMParser.name(), ByteStream(bytes: [0x02, 0xC3, 0xA6]),
+		       toBe: "æ")
+
+		expect(WASMParser.name(), ByteStream(bytes: [0x02, 0xC3]),
+		       toBe: ParserStreamError<ByteStream>.unexpectedEnd)
+
+		expect(WASMParser.name(), ByteStream(bytes: [0x03, 0xE3, 0x81, 0x82]),
+		       toBe: "あ")
+
+		expect(WASMParser.name(), ByteStream(bytes: [0x03, 0xE3, 0x81]),
+		       toBe: ParserStreamError<ByteStream>.unexpectedEnd)
+
+		expect(WASMParser.name(), ByteStream(bytes: [0x04, 0xF0, 0x9F, 0x8D, 0xA3]),
+		       toBe: "🍣")
+
+		expect(WASMParser.name(), ByteStream(bytes: [0x04, 0xF0, 0x9F, 0x8D]),
+		       toBe: ParserStreamError<ByteStream>.unexpectedEnd)
+	}
+
 	func testName() {
-		XCTAssertNoThrow(try {
-			let stream = ByteStream(bytes: [0x61])
-			let parser = WASMParser.unicode()
-			let (result, endIndex) = try parser.parse(stream: stream)
-			XCTAssertEqual(result, "a")
-			XCTAssertEqual(endIndex, stream.endIndex)
-			}())
-
-		XCTAssertNoThrow(try {
-			let stream = ByteStream(bytes: [0xC3, 0xA6])
-			let parser = WASMParser.unicode()
-			let (result, endIndex) = try parser.parse(stream: stream)
-			XCTAssertEqual(result, "æ")
-			XCTAssertEqual(endIndex, stream.endIndex)
-			}())
-
-		XCTAssertNoThrow(try {
-			let stream = ByteStream(bytes: [0xE3, 0x81, 0x82])
-			let parser = WASMParser.unicode()
-			let (result, endIndex) = try parser.parse(stream: stream)
-			XCTAssertEqual(result, "あ")
-			XCTAssertEqual(endIndex, stream.endIndex)
-			}())
-
-		XCTAssertNoThrow(try {
-			let stream = ByteStream(bytes: [0xF0, 0x9F, 0x8D, 0xA3])
-			let parser = WASMParser.unicode()
-			let (result, endIndex) = try parser.parse(stream: stream)
-			XCTAssertEqual(result, "🍣")
-			XCTAssertEqual(endIndex, stream.endIndex)
-			}())
-
-		XCTAssertThrowsError(try {
-			let stream = ByteStream(bytes: [0xF0])
-			let parser = WASMParser.unicode()
-			_ = try parser.parse(stream: stream)
-			}()) { error in
-				guard case ParserStreamError<ByteStream>.unexpectedEnd = error else {
-					XCTFail(String(describing: error))
-					return
-				}
-		}
+		expect(WASMParser.name(), ByteStream(bytes: [0x03, 0xE3, 0x81, 0x82]),
+		       toBe: "あ")
 	}
 }
 
 extension WASMParserTests {
 	func testValueType() {
-		XCTAssertNoThrow(try {
-			let stream = ByteStream(bytes: [0x7F])
-			let parser = WASMParser.valueType()
-			let (result, endIndex) = try parser.parse(stream: stream)
-			XCTAssert(result == Int32.self)
-			XCTAssertEqual(endIndex, stream.endIndex)
-			}())
+		expect(WASMParser.valueType(), ByteStream(bytes: []),
+		       toBe: ParserStreamError<ByteStream>.unexpectedEnd)
 
-		XCTAssertNoThrow(try {
-			let stream = ByteStream(bytes: [0x7E])
-			let parser = WASMParser.valueType()
-			let (result, endIndex) = try parser.parse(stream: stream)
-			XCTAssert(result == Int64.self)
-			XCTAssertEqual(endIndex, stream.endIndex)
-			}())
+		expect(WASMParser.valueType(), ByteStream(bytes: [0x7F]),
+		       toBe: .int32)
 
-		XCTAssertNoThrow(try {
-			let stream = ByteStream(bytes: [0x7D])
-			let parser = WASMParser.valueType()
-			let (result, endIndex) = try parser.parse(stream: stream)
-			XCTAssert(result == UInt32.self)
-			XCTAssertEqual(endIndex, stream.endIndex)
-			}())
+		expect(WASMParser.valueType(), ByteStream(bytes: [0x7E]),
+		       toBe: .int64)
 
-		XCTAssertNoThrow(try {
-			let stream = ByteStream(bytes: [0x7C])
-			let parser = WASMParser.valueType()
-			let (result, endIndex) = try parser.parse(stream: stream)
-			XCTAssert(result == UInt64.self)
-			XCTAssertEqual(endIndex, stream.endIndex)
-			}())
+		expect(WASMParser.valueType(), ByteStream(bytes: [0x7D]),
+		       toBe: .uint32)
 
-		XCTAssertThrowsError(try {
-			let stream = ByteStream(bytes: [0x7B])
-			let parser = WASMParser.valueType()
-			let (result, endIndex) = try parser.parse(stream: stream)
-			XCTAssert(result == UInt64.self)
-			XCTAssertEqual(endIndex, stream.endIndex)
-			}()) { error in
-				guard case ParserStreamError<ByteStream>.unexpected(element: 0x7B) = error else {
-					XCTFail(String(describing: error))
-					return
-				}
-		}
+		expect(WASMParser.valueType(), ByteStream(bytes: [0x7C]),
+		       toBe: .uint64)
+
+		expect(WASMParser.valueType(), ByteStream(bytes: [0x7B]),
+		       toBe: ParserStreamError<ByteStream>.unexpected(0x7B))
 	}
 
 	func testResultType() {
-		XCTAssertNoThrow(try {
-			let stream = ByteStream(bytes: [0x7F])
-			let parser = WASMParser.valueType()
-			let (result, endIndex) = try parser.parse(stream: stream)
-			XCTAssert(result == Int32.self)
-			XCTAssertEqual(endIndex, stream.endIndex)
-			}())
+		expect(WASMParser.resultType(), ByteStream(bytes: []),
+		       toBe: ParserStreamError<ByteStream>.unexpectedEnd)
+
+		expect(WASMParser.resultType(), ByteStream(bytes: [0x40]),
+		       toBe: [])
+
+		expect(WASMParser.resultType(), ByteStream(bytes: [0x7F]),
+		       toBe: [.int32])
+
+		expect(WASMParser.resultType(), ByteStream(bytes: [0x7E]),
+		       toBe: [.int64])
+
+		expect(WASMParser.resultType(), ByteStream(bytes: [0x7D]),
+		       toBe: [.uint32])
+
+		expect(WASMParser.resultType(), ByteStream(bytes: [0x7C]),
+		       toBe: [.uint64])
+
+		expect(WASMParser.resultType(), ByteStream(bytes: [0x7B]),
+		       toBe: ParserStreamError<ByteStream>.unexpected(0x7B))
 	}
 
 	func testFunctionType() {
-		XCTAssertNoThrow(try {
-			let stream = ByteStream(bytes: [0x60, 0x01, 0x7E, 0x01, 0x7D])
-			let parser = WASMParser.functionType()
-			let (result, endIndex) = try parser.parse(stream: stream)
-			XCTAssert(result.parameters == [Int64.self])
-			XCTAssert(result.results == [UInt32.self])
-			XCTAssertEqual(endIndex, stream.endIndex)
-			}())
+		expect(WASMParser.functionType(), ByteStream(bytes: [0x60, 0x01, 0x7E, 0x01, 0x7D]),
+		       toBe: FunctionType(parameters: [.int64], results: [.uint32]))
 	}
 
 	func testLimits() {
-		XCTAssertNoThrow(try {
-			let stream = ByteStream(bytes: [0x00, 0x01])
-			let parser = WASMParser.limits()
-			let (result, endIndex) = try parser.parse(stream: stream)
-			XCTAssertEqual(result.min, 1)
-			XCTAssertNil(result.max)
-			XCTAssertEqual(endIndex, stream.endIndex)
-			}())
+		expect(WASMParser.limits(), ByteStream(bytes: [0x00, 0x01]),
+		       toBe: Limits(min: 1, max: nil))
 
-		XCTAssertNoThrow(try {
-			let stream = ByteStream(bytes: [0x01, 0x01, 0x02])
-			let parser = WASMParser.limits()
-			let (result, endIndex) = try parser.parse(stream: stream)
-			XCTAssertEqual(result.min, 1)
-			XCTAssertEqual(result.max, 2)
-			XCTAssertEqual(endIndex, stream.endIndex)
-			}())
+		expect(WASMParser.limits(), ByteStream(bytes: [0x01, 0x01, 0x02]),
+		       toBe: Limits(min: 1, max: 0x02))
+	}
+
+	func testMemoryType() {
+		expect(WASMParser.memoryType(), ByteStream(bytes: [0x00, 0x01]),
+		       toBe: MemoryType(min: 1, max: nil))
+
+		expect(WASMParser.memoryType(), ByteStream(bytes: [0x01, 0x01, 0x02]),
+		       toBe: MemoryType(min: 1, max: 0x02))
+	}
+
+	func testTableType() {
+		expect(WASMParser.tableType(), ByteStream(bytes: [0x70, 0x00, 0x01]),
+		       toBe: TableType(limits: Limits(min: 1, max: nil)))
+
+		expect(WASMParser.tableType(), ByteStream(bytes: [0x70, 0x01, 0x01, 0x02]),
+		       toBe: TableType(limits: Limits(min: 1, max: 0x02)))
+	}
+
+	func testGlobalType() {
+		expect(WASMParser.globalType(), ByteStream(bytes: [0x7F, 0x00]),
+		       toBe: GlobalType(mutability: .constant, valueType: .int32))
+
+		expect(WASMParser.globalType(), ByteStream(bytes: [0x7F, 0x01]),
+		       toBe: GlobalType(mutability: .variable, valueType: .int32))
+	}
+
+	func testIndex() {
+		expect(WASMParser.index(), ByteStream(bytes: [0x7F]),
+		       toBe: 0x7F)
 	}
 }
