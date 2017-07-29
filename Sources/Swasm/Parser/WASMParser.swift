@@ -22,7 +22,7 @@ enum WASMParser {
 
 	/// ## Bytes
 	/// - SeeAlso: https://webassembly.github.io/spec/binary/values.html#bytes
-	static var byte: ChainableParser<ByteStream, ByteStream.Element> {
+	static func byte() -> ChainableParser<ByteStream, ByteStream.Element> {
 		return .init { stream, index in
 			guard let byte = stream.take(at: index) else {
 				throw ParserStreamError<ByteStream>.unexpectedEnd
@@ -61,7 +61,7 @@ enum WASMParser {
 	}
 
 	static func bytes(length: Int) -> ChainableParser<ByteStream, [ByteStream.Element]>? {
-		return byte.repeated(count: length)
+		return byte().repeated(count: length)
 	}
 
 	/// ## Integers
