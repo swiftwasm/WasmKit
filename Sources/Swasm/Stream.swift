@@ -1,6 +1,6 @@
 protocol Stream: Equatable {
 	associatedtype Element: Equatable
-	associatedtype Index
+	typealias Index = Array<Element>.Index
 
 	var startIndex: Index { get }
 	var endIndex: Index { get }
