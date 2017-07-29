@@ -183,8 +183,9 @@ extension WASMParserTests {
 	}
 
 	func testName() {
-		expect(WASMParser.name(), ByteStream(bytes: [0x03, 0xE3, 0x81, 0x82]),
-		       toBe: "あ")
+		expect(WASMParser.name(), ByteStream(bytes: [
+			0x09, 0xE3, 0x81, 0x82, 0xE3, 0x81, 0x84, 0xE3, 0x81, 0x86,
+			]), toBe: "あいう")
 	}
 }
 
@@ -268,9 +269,134 @@ extension WASMParserTests {
 		expect(WASMParser.globalType(), ByteStream(bytes: [0x7F, 0x01]),
 		       toBe: GlobalType(mutability: .variable, valueType: .int32))
 	}
+}
 
+extension WASMParserTests {
 	func testIndex() {
 		expect(WASMParser.index(), ByteStream(bytes: [0x7F]),
 		       toBe: 0x7F)
+	}
+
+	func testTypeSection() {
+		expect(WASMParser.typeSection(), ByteStream(bytes: [
+			0x01, // Section ID
+			0x0B, // Content Size
+			0x02, // Vector Length
+			0x60, 0x01, 0x7F, 0x01, 0x7E, // Function Type
+			0x60, 0x01, 0x7D, 0x01, 0x7C, // Function Type
+			]), toBe: [
+				FunctionType(parameters: [.int32], results: [.int64]),
+				FunctionType(parameters: [.uint32], results: [.uint64]),
+			])
+
+		expect(WASMParser.typeSection(), ByteStream(bytes: [
+			0x01, 0x04, 0x01, 0x60, 0x01, 0x7F, 0x01, 0x7E,
+			]), toBe: ParserStreamError<ByteStream>.sectionInvalidSize(6, expected: 4, location: 2))
+	}
+
+	func testImportSection() {
+		expect(WASMParser.importSection(), ByteStream(bytes: [
+			0x02, // Section ID
+			0x0D, // Content Size
+			0x02, // Vector Length
+			0x01, 0x61, // Module Name
+			0x01, 0x62, // Import Name
+			0x00, 0x12, // Import Descriptor (function)
+			0x01, 0x63, // Module Name
+			0x01, 0x64, // Import Name
+			0x00, 0x34, // Import Descriptor (function)
+			]), toBe: [
+				Import(module: "a", name: "b", descripter: .function(18)),
+				Import(module: "c", name: "d", descripter: .function(52)),
+			])
+	}
+
+	func testFunctionSection() {
+		expect(WASMParser.functionSection(), ByteStream(bytes: [
+			0x03, // Section ID
+			0x03, // Content Size
+			0x02, // Vector Length
+			0x01, 0x02, // Function Indices
+			]), toBe: [0x01, 0x02])
+	}
+
+	func testTableSection() {
+		expect(WASMParser.tableSection(), ByteStream(bytes: [
+			0x04, // Section ID
+			0x08, // Content Size
+			0x02, // Vector Length
+			0x70, // Element Type
+			0x00, 0x12, // Limits
+			0x70, // Element Type
+			0x01, 0x34, 0x56, // Limits
+			]), toBe: [
+				Table(type: TableType(limits: Limits(min: 18, max: nil))),
+				Table(type: TableType(limits: Limits(min: 52, max: 86))),
+			])
+	}
+
+	func testMemorySection() {
+		expect(WASMParser.memorySection(), ByteStream(bytes: [
+			0x05, // Section ID
+			0x06, // Content Size
+			0x02, // Vector Length
+			0x00, 0x12, // Limits
+			0x01, 0x34, 0x56, // Limits
+			]), toBe: [
+				Memory(type: MemoryType(min: 18, max: nil)),
+				Memory(type: MemoryType(min: 52, max: 86)),
+				])
+	}
+
+	func testGlobalSection() {
+		expect(WASMParser.globalSection(), ByteStream(bytes: [
+			0x06, // Section ID
+			0x05, // Content Size
+			0x02, // Vector Length
+			0x7F, // Value Type
+			0x00, // Mutability.constant
+			0x7E, // Value Type
+			0x01, // Mutability.variable
+			]), toBe: [
+				Global(type: GlobalType(mutability: .constant, valueType: .int32), initializer: Expression(instructions: [])),
+				Global(type: GlobalType(mutability: .variable, valueType: .int64), initializer: Expression(instructions: [])),
+				])
+	}
+
+	func testExportSection() {
+		expect(WASMParser.exportSection(), ByteStream(bytes: [
+			0x07, // Section ID
+			0x05, // Content Size
+			0x01, // Vector Length
+			0x01, 0x61, // Name
+			0x00, 0x12, // Descriptor
+			]), toBe: [
+				Export(name: "a", descriptor: .function(18)),
+				])
+	}
+
+	func testStartSection() {
+		expect(WASMParser.startSection(), ByteStream(bytes: [
+			0x08, // Section ID
+			0x01, // Content Size
+			0x12, // Function Index
+			]), toBe: 18)
+	}
+
+	func testElementSection() {
+		expect(WASMParser.elementSection(), ByteStream(bytes: [
+			0x09, // Section ID
+			0x07, // Content Size
+			0x02, // Vector Length
+			0x12, // Table Index
+			0x01, // Vector Length
+			0x34, // Function Index
+			0x56, // Table Index
+			0x01, // Vector Length
+			0x78, // Function Index
+			]), toBe: [
+				Element(table: 18, offset: Expression(instructions: []), initializer: [52]),
+				Element(table: 86, offset: Expression(instructions: []), initializer: [120]),
+			])
 	}
 }
