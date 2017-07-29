@@ -16,7 +16,13 @@ extension Int64: Value {}
 extension UInt32: Value {}
 extension UInt64: Value {}
 
-typealias ValueType = Value.Type
+enum ValueType {
+	case int32
+	case int64
+	case uint32
+	case uint64
+	case any
+}
 
 // https://webassembly.github.io/spec/syntax/types.html#result-types
 typealias ResultType = (ValueType)
@@ -24,7 +30,7 @@ typealias ResultType = (ValueType)
 // https://webassembly.github.io/spec/syntax/types.html#function-types
 struct FunctionType {
 	private struct _Any: Value {}
-	static let any = FunctionType(parameters: [_Any.self], results: [_Any.self])
+	static let any = FunctionType(parameters: [ValueType.any], results: [ValueType.any])
 	var parameters: [ValueType]
 	var results: [ValueType]
 }

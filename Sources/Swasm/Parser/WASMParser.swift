@@ -189,10 +189,10 @@ enum WASMParser {
 				throw ParserStreamError<ByteStream>.unexpectedEnd
 			}
 			switch byte {
-			case 0x7F: return (Int32.self, stream.index(after: index))
-			case 0x7E: return (Int64.self, stream.index(after: index))
-			case 0x7D: return (UInt32.self, stream.index(after: index))
-			case 0x7C: return (UInt64.self, stream.index(after: index))
+			case 0x7F: return (.int32, stream.index(after: index))
+			case 0x7E: return (.int64, stream.index(after: index))
+			case 0x7D: return (.uint32, stream.index(after: index))
+			case 0x7C: return (.uint64, stream.index(after: index))
 			default: throw ParserStreamError<ByteStream>.unexpected(element: byte)
 			}
 		}
