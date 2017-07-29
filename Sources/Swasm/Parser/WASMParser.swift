@@ -270,17 +270,15 @@ enum WASMParser {
 
 	/// ## Indices
 	/// - SeeAlso: https://webassembly.github.io/spec/binary/modules.html#indices
-
 	static func index() -> ChainableParser<ByteStream, UInt32> {
 		return uint(32).map { UInt32($0) }
 	}
 
 	/// ## Sections
 	/// - SeeAlso: https://webassembly.github.io/spec/binary/modules.html#sections
-
-	static func section<Content>(of contentParser: ChainableParser<ByteStream, Content>)
+	static func section<Content>(_ n: UInt8, of contentParser: ChainableParser<ByteStream, Content>)
 		-> ChainableParser<ByteStream, Content> {
-		return byte(1)
+		return byte(n)
 			.followed(by: uint(32)) { _, size in size }
 			.followed(by: contentParser) { _, content in content }
 	}
@@ -288,65 +286,68 @@ enum WASMParser {
 	/// ## Type Section
 	/// - SeeAlso: https://webassembly.github.io/spec/binary/modules.html#type-section
 	static func typeSection() -> ChainableParser<ByteStream, [FunctionType]> {
-		return section(of: vector(of: functionType()))
+		return section(1, of: vector(of: functionType()))
 	}
 
 	/// ## Import Section
 	/// - SeeAlso: https://webassembly.github.io/spec/binary/modules.html#import-section
-	static func importSection() -> ChainableParser<ByteStream, [Import]> {
-		let importDesc = byte(0x00).followed(by: index()) { ImportDescriptor.function($1) }
+	static func importDescriptor() -> ChainableParser<ByteStream, ImportDescriptor> {
+		return byte(0x00).followed(by: index()) { ImportDescriptor.function($1) }
 			.or(byte(0x01).followed(by: tableType()) { ImportDescriptor.table($1) })
 			.or(byte(0x02).followed(by: memoryType()) { ImportDescriptor.memory($1) })
 			.or(byte(0x03).followed(by: globalType()) { ImportDescriptor.global($1) })
+	}
 
-		let importParser = byte(2)
-			.followed(by: name()) { _, name in name }
-			.followed(by: name())
-			.followed(by: importDesc) { Import(module: $0.0, name: $0.1, descripter: $1) }
+	static func importSection() -> ChainableParser<ByteStream, [Import]> {
+		let `import` = name().followed(by: name())
+			.followed(by: importDescriptor()) { Import(module: $0.0, name: $0.1, descripter: $1) }
 
-		return vector(of: importParser)
+		return section(2, of: vector(of: `import`))
 	}
 
 	/// ## Function Section
 	/// - SeeAlso: https://webassembly.github.io/spec/binary/modules.html#function-section
 	static func functionSection() -> ChainableParser<ByteStream, [TypeIndex]> {
-		return byte(3).followed(by: vector(of: index())) { $1 }
+		return section(3, of: vector(of: index()))
 	}
 
 	/// ## Table Section
 	/// - SeeAlso: https://webassembly.github.io/spec/binary/modules.html#table-section
 	static func tableSection() -> ChainableParser<ByteStream, [Table]> {
-		return byte(4).followed(by: vector(of: tableType().map { Table(type: $0) })) { $1 }
+		return section(4, of: vector(of: tableType().map { Table(type: $0) }))
 	}
 
 	/// ## Memory Section
 	/// - SeeAlso: https://webassembly.github.io/spec/binary/modules.html#memory-section
 	static func memorySection() -> ChainableParser<ByteStream, [Memory]> {
-		return byte(5).followed(by: vector(of: memoryType().map { Memory(type: $0) })) { $1 }
+		return section(5, of: vector(of: memoryType().map { Memory(type: $0) }))
 	}
 
 	/// ## Global Section
 	/// - SeeAlso: https://webassembly.github.io/spec/binary/modules.html#global-section
 	static func globalSection() -> ChainableParser<ByteStream, [Global]> {
 		let globalParser = globalType().followed(by: expression()) { Global(type: $0, initializer: $1) }
-		return byte(6).followed(by: vector(of: globalParser)) { $1 }
+		return section(6, of: vector(of: globalParser))
 	}
 
 	/// ## Export Section
 	/// - SeeAlso: https://webassembly.github.io/spec/binary/modules.html#export-section
-	static func exportSection() -> ChainableParser<ByteStream, [Export]> {
-		let exportDesc = byte(0x00).followed(by: index()) { ExportDescriptor.function($1) }
+	static func exportDescriptor() -> ChainableParser<ByteStream, ExportDescriptor> {
+		return byte(0x00).followed(by: index()) { ExportDescriptor.function($1) }
 			.or(byte(0x01).followed(by: index()) { ExportDescriptor.table($1) })
 			.or(byte(0x02).followed(by: index()) { ExportDescriptor.memory($1) })
 			.or(byte(0x03).followed(by: index()) { ExportDescriptor.global($1) })
-		let exportParser = name().followed(by: exportDesc) { Export(name: $0, descriptor: $1) }
-		return byte(7).followed(by: vector(of: exportParser)) { $1 }
+	}
+
+	static func exportSection() -> ChainableParser<ByteStream, [Export]> {
+		let export = name().followed(by: exportDescriptor()) { Export(name: $0, descriptor: $1) }
+		return section(7, of: vector(of: export))
 	}
 
 	/// ## Start Section
 	/// - SeeAlso: https://webassembly.github.io/spec/binary/modules.html#start-section
 	static func startSection() -> ChainableParser<ByteStream, FunctionIndex?> {
-		return byte(8).followed(by: index().optional()) { $1 }
+		return section(8, of: index().optional())
 	}
 
 	/// ## Element Section
@@ -355,6 +356,6 @@ enum WASMParser {
 		let element = index().followed(by: expression()).followed(by: vector(of: index())) {
 			Element(table: $0.0, offset: $0.1, initializer: $1)
 		}
-		return byte(9).followed(by: vector(of: element)).map { $1 }
+		return section(9, of: vector(of: element))
 	}
 }
