@@ -361,8 +361,8 @@ extension WASMParser {
 
 	/// ## Start Section
 	/// - SeeAlso: https://webassembly.github.io/spec/binary/modules.html#start-section
-	static func startSection<S>() -> ChainableParser<S, FunctionIndex?> where S.Element == Byte {
-		return section(8, of: index().optional())
+	static func startSection<S>() -> ChainableParser<S, FunctionIndex> where S.Element == Byte {
+		return section(8, of: index())
 	}
 
 	/// ## Element Section
