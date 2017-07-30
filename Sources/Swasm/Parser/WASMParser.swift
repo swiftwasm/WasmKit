@@ -391,7 +391,7 @@ extension WASMParser {
 			guard actualSize == size else {
 				throw ParserStreamError<S>.codeInvalidSize(actualSize, expected: Int(size), location: eEnd)
 			}
-			let code = Code(types: Array(types.joined()), expression: e)
+			let code = Code(locals: Array(types.joined()), expression: e)
 			return (code, eEnd)
 		}
 		return section(10, of: vector(of: code))

@@ -138,12 +138,12 @@ extension ImportDescriptor: Equatable {
 }
 
 struct Code {
-	let types: [ValueType]
+	let locals: [ValueType]
 	let expression: Expression
 }
 
 extension Code: Equatable {
 	static func == (lhs: Code, rhs: Code) -> Bool {
-		return lhs.types == rhs.types && lhs.expression == rhs.expression
+		return lhs.locals == rhs.locals && lhs.expression == rhs.expression
 	}
 }
