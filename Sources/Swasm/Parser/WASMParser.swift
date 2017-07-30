@@ -527,8 +527,8 @@ extension WASMParser {
 				elements: elements,
 				data: data,
 				start: start,
-				exports: exports,
-				imports: imports
+				imports: imports,
+				exports: exports
 			)
 
 			return (module, index)

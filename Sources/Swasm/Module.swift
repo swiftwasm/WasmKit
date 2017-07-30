@@ -7,8 +7,8 @@ struct Module {
 	let elements: [Element]
 	let data: [Data]
 	let start: FunctionIndex?
-	let exports: [Export]
 	let imports: [Import]
+	let exports: [Export]
 }
 
 struct Table {
