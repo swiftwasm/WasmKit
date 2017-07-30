@@ -25,7 +25,7 @@ enum ValueType {
 }
 
 // https://webassembly.github.io/spec/syntax/types.html#result-types
-typealias ResultType = (ValueType)
+typealias ResultType = [ValueType]
 
 // https://webassembly.github.io/spec/syntax/types.html#function-types
 struct FunctionType {

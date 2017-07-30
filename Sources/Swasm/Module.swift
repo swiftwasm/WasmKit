@@ -11,6 +11,23 @@ struct Module {
 	let exports: [Export]
 }
 
+extension Module: Equatable {
+	static func == (lhs: Module, rhs: Module) -> Bool {
+		return (
+			lhs.types == rhs.types &&
+			lhs.functions == rhs.functions &&
+			lhs.tables == rhs.tables &&
+			lhs.memories == rhs.memories &&
+			lhs.globals == rhs.globals &&
+			lhs.elements == rhs.elements &&
+			lhs.data == rhs.data &&
+			lhs.start == rhs.start &&
+			lhs.imports == rhs.imports &&
+			lhs.exports == rhs.exports
+		)
+	}
+}
+
 struct Table {
 	let type: TableType
 }

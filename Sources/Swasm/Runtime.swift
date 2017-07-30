@@ -41,6 +41,16 @@ struct Function {
 	let body: Expression
 }
 
+extension Function: Equatable {
+	static func == (lhs: Function, rhs: Function) -> Bool {
+		return (
+			lhs.type == rhs.type &&
+			lhs.locals == rhs.locals &&
+			lhs.body == rhs.body
+		)
+	}
+}
+
 // https://webassembly.github.io/spec/exec/runtime.html#table-instances
 struct TableInstance {
 	let elements: [FunctionElement]
