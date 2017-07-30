@@ -60,6 +60,12 @@ struct Data {
 	let initializer: [Byte]
 }
 
+extension Data: Equatable {
+	static func == (lhs: Data, rhs: Data) -> Bool {
+		return (lhs.data, lhs.offset) == (rhs.data, rhs.offset) && lhs.initializer == rhs.initializer
+	}
+}
+
 struct Export {
 	let name: Name
 	let descriptor: ExportDescriptor
@@ -128,5 +134,16 @@ extension ImportDescriptor: Equatable {
 		default:
 			return false
 		}
+	}
+}
+
+struct Code {
+	let types: [ValueType]
+	let expression: Expression
+}
+
+extension Code: Equatable {
+	static func == (lhs: Code, rhs: Code) -> Bool {
+		return lhs.types == rhs.types && lhs.expression == rhs.expression
 	}
 }

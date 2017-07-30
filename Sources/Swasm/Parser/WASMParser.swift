@@ -374,4 +374,35 @@ extension WASMParser {
 			}
 		return section(9, of: vector(of: element))
 	}
+
+	/// ## Code Section
+	/// - SeeAlso: https://webassembly.github.io/spec/binary/modules.html#code-section
+	static func codeSection<S>() -> ChainableParser<S, [Code]> where S.Element == Byte {
+		let locals: ChainableParser<S, [ValueType]> = .init { stream, index in
+			let (n, nEnd) = try uint(32).parse(stream: stream, index: index)
+			let (type, typeEnd) = try valueType().parse(stream: stream, index: nEnd)
+			return (Array(repeating: type, count: Int(n)), typeEnd)
+		}
+		let code: ChainableParser<S, Code> = .init { stream, index in
+			let (size, sizeEnd) = try uint(32).parse(stream: stream, index: index)
+			let (types, typesEnd) = try vector(of: locals).parse(stream: stream, index: sizeEnd)
+			let (e, eEnd) = try expression().parse(stream: stream, index: typesEnd)
+			let actualSize = sizeEnd.distance(to: eEnd)
+			guard actualSize == size else {
+				throw ParserStreamError<S>.codeInvalidSize(actualSize, expected: Int(size), location: eEnd)
+			}
+			let code = Code(types: Array(types.joined()), expression: e)
+			return (code, eEnd)
+		}
+		return section(10, of: vector(of: code))
+	}
+
+	/// ## Data Section
+	/// - SeeAlso: https://webassembly.github.io/spec/binary/modules.html#data-section
+	static func dataSection<S>() -> ChainableParser<S, [Data]> where S.Element == Byte {
+		let data: ChainableParser<S, Data> = index().followed(by: expression()).followed(by: vector(of: byte())) {
+			Data(data: $0.0, offset: $0.1, initializer: $1)
+		}
+		return section(11, of: vector(of: data))
+	}
 }

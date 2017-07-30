@@ -3,6 +3,7 @@ enum ParserStreamError<S: Stream>: Error {
 	case unexpectedEnd
 	case vectorInvalidLength(Int, location: S.Index)
 	case sectionInvalidSize(Int, expected: Int, location: S.Index)
+	case codeInvalidSize(Int, expected: Int, location: S.Index)
 }
 
 extension ParserStreamError: Equatable {
