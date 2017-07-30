@@ -405,4 +405,133 @@ extension WASMParser {
 		}
 		return section(11, of: vector(of: data))
 	}
+
+	/// ## Module
+	/// - SeeAlso: https://webassembly.github.io/spec/binary/modules.html#binary-module
+	static func module<S>() -> ChainableParser<S, Module> where S.Element == Byte {
+		return .init { stream, index in
+			var index = index
+			(_, index) = try bytes([0x00, 0x61, 0x73, 0x6D])!.parse(stream: stream, index: index)
+			(_, index) = try bytes([0x01, 0x00, 0x00, 0x00])!.parse(stream: stream, index: index)
+
+			var types: [FunctionType] = []
+			var typeIndices: [TypeIndex] = []
+			var codes: [Code] = []
+			var tables: [Table] = []
+			var memories: [Memory] = []
+			var globals: [Global] = []
+			var elements: [Element] = []
+			var data: [Data] = []
+			var start: FunctionIndex? = nil
+			var imports: [Import] = []
+			var exports: [Export] = []
+
+			do {
+				let (result, i) = try typeSection().parse(stream: stream, index: index)
+				index = i
+				types = result
+			} catch let error {
+				print("typeSection", error)
+			}
+
+			do {
+				let (result, i) = try importSection().parse(stream: stream, index: index)
+				index = i
+				imports = result
+			} catch let error {
+				print("importSection", error)
+			}
+
+			do {
+				let (result, i) = try functionSection().parse(stream: stream, index: index)
+				index = i
+				typeIndices = result
+			} catch let error {
+				print("functionSection", error)
+			}
+
+			do {
+				let (result, i) = try tableSection().parse(stream: stream, index: index)
+				index = i
+				tables = result
+			} catch let error {
+				print("tableSection", error)
+			}
+
+			do {
+				let (result, i) = try memorySection().parse(stream: stream, index: index)
+				index = i
+				memories = result
+			} catch let error {
+				print("memorySection", error)
+			}
+
+			do {
+				let (result, i) = try globalSection().parse(stream: stream, index: index)
+				index = i
+				globals = result
+			} catch let error {
+				print("globalSection", error)
+			}
+
+			do {
+				let (result, i) = try exportSection().parse(stream: stream, index: index)
+				index = i
+				exports = result
+			} catch let error {
+				print("exportSection", error)
+			}
+
+			do {
+				let (result, i) = try startSection().parse(stream: stream, index: index)
+				index = i
+				start = result
+			} catch let error {
+				print("startSection", error)
+			}
+
+			do {
+				let (result, i) = try elementSection().parse(stream: stream, index: index)
+				index = i
+				elements = result
+			} catch let error {
+				print("elementSection", error)
+			}
+
+			do {
+				let (result, i) = try codeSection().parse(stream: stream, index: index)
+				index = i
+				codes = result
+			} catch let error {
+				print("codeSection", error)
+			}
+
+			do {
+				let (result, i) = try dataSection().parse(stream: stream, index: index)
+				index = i
+				data = result
+			} catch let error {
+				print("dataSection", error)
+			}
+
+			let functions = codes.enumerated().map { index, code in
+				Function(type: typeIndices[index], locals: code.locals, body: code.expression)
+			}
+
+			let module = Module(
+				types: types,
+				functions: functions,
+				tables: tables,
+				memories: memories,
+				globals: globals,
+				elements: elements,
+				data: data,
+				start: start,
+				exports: exports,
+				imports: imports
+			)
+
+			return (module, index)
+		}
+	}
 }
