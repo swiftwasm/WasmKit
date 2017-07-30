@@ -287,7 +287,7 @@ extension WASMParserTests {
 			]), toBe: [
 				FunctionType(parameters: [.int32], results: [.int64]),
 				FunctionType(parameters: [.uint32], results: [.uint64]),
-			])
+				])
 
 		expect(WASMParser.typeSection(), ByteStream(bytes: [
 			0x01, 0x04, 0x01, 0x60, 0x01, 0x7F, 0x01, 0x7E,
@@ -308,7 +308,7 @@ extension WASMParserTests {
 			]), toBe: [
 				Import(module: "a", name: "b", descripter: .function(18)),
 				Import(module: "c", name: "d", descripter: .function(52)),
-			])
+				])
 	}
 
 	func testFunctionSection() {
@@ -332,7 +332,7 @@ extension WASMParserTests {
 			]), toBe: [
 				Table(type: TableType(limits: Limits(min: 18, max: nil))),
 				Table(type: TableType(limits: Limits(min: 52, max: 86))),
-			])
+				])
 	}
 
 	func testMemorySection() {
@@ -397,7 +397,7 @@ extension WASMParserTests {
 			]), toBe: [
 				Element(table: 18, offset: Expression(instructions: []), initializer: [52]),
 				Element(table: 86, offset: Expression(instructions: []), initializer: [120]),
-			])
+				])
 	}
 
 	func testCodeSection() {
