@@ -351,12 +351,14 @@ extension WASMParserTests {
 	func testGlobalSection() {
 		expect(WASMParser.globalSection(), ByteStream(bytes: [
 			0x06, // Section ID
-			0x05, // Content Size
+			0x07, // Content Size
 			0x02, // Vector Length
 			0x7F, // Value Type
 			0x00, // Mutability.constant
+			0x0b, // Expression end
 			0x7E, // Value Type
 			0x01, // Mutability.variable
+			0x0b, // Expression end
 			]), toBe: [
 				Global(type: GlobalType(mutability: .constant, valueType: .int32), initializer: Expression(instructions: [])),
 				Global(type: GlobalType(mutability: .variable, valueType: .int64), initializer: Expression(instructions: [])),
@@ -386,12 +388,14 @@ extension WASMParserTests {
 	func testElementSection() {
 		expect(WASMParser.elementSection(), ByteStream(bytes: [
 			0x09, // Section ID
-			0x07, // Content Size
+			0x09, // Content Size
 			0x02, // Vector Length
 			0x12, // Table Index
+			0x0b, // Expression end
 			0x01, // Vector Length
 			0x34, // Function Index
 			0x56, // Table Index
+			0x0b, // Expression end
 			0x01, // Vector Length
 			0x78, // Function Index
 			]), toBe: [
@@ -403,22 +407,24 @@ extension WASMParserTests {
 	func testCodeSection() {
 		expect(WASMParser.codeSection(), ByteStream(bytes: [
 			0x0A, // Section ID
-			0x0B, // Content Size
+			0x0D, // Content Size
 			0x02, // Vector Length (code)
-			0x03, // Code Size
+			0x04, // Code Size
 			0x01, // Vector Length (locals)
 			0x03, // n
 			0x7F, // .int32
-			0x05, // Code Size
+			0x0b, // Expression end
+			0x06, // Code Size
 			0x02, // Vector Length (locals)
 			0x01, // n
 			0x7E, // .int64
 			0x02, // n
 			0x7D, // .uint32
+			0x0b, // Expression end
 			]), toBe: [
-				Code(types: [.int32, .int32, .int32],
+				Code(locals: [.int32, .int32, .int32],
 				     expression: Expression(instructions: [])),
-				Code(types: [.int64, .uint32, .uint32],
+				Code(locals: [.int64, .uint32, .uint32],
 				     expression: Expression(instructions: [])),
 				])
 	}
@@ -426,12 +432,14 @@ extension WASMParserTests {
 	func testDataSection() {
 		expect(WASMParser.dataSection(), ByteStream(bytes: [
 			0x0B, // Section ID
-			0x0B, // Content Size
+			0x0D, // Content Size
 			0x02, // Vector Length
 			0x12, // Memory Index
+			0x0b, // Expression end
 			0x04, // Vector Length (bytes)
 			0x01, 0x02, 0x03, 0x04, // bytes
 			0x34, // Memory Index
+			0x0b, // Expression end
 			0x02, // Vector Length (bytes)
 			0x05, 0x06, // bytes
 			]), toBe: [
