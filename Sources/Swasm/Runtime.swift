@@ -37,7 +37,7 @@ struct FunctionInstance {
 // https://webassembly.github.io/spec/syntax/modules.html#functions
 struct Function {
 	let type: TypeIndex
-	let locals: [Value]
+	let locals: [ValueType]
 	let body: Expression
 }
 
