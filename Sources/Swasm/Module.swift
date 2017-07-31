@@ -1,3 +1,4 @@
+// https://webassembly.github.io/spec/syntax/modules.html#modules
 struct Module {
 	let types: [FunctionType]
 	let functions: [Function]
@@ -28,6 +29,30 @@ extension Module: Equatable {
 	}
 }
 
+// https://webassembly.github.io/spec/syntax/modules.html#syntax-typeidx
+typealias TypeIndex = UInt32
+typealias FunctionIndex = UInt32
+typealias TableIndex = UInt32
+typealias MemoryIndex = UInt32
+typealias GlobalIndex = UInt32
+typealias LocalIndex = UInt32
+typealias LabelIndex = UInt32
+
+// https://webassembly.github.io/spec/syntax/modules.html#functions
+struct Function {
+	let type: TypeIndex
+	let locals: [ValueType]
+	let body: Expression
+}
+
+extension Function: Equatable {
+	static func == (lhs: Function, rhs: Function) -> Bool {
+		return lhs.type == rhs.type && lhs.locals == rhs.locals && lhs.body == rhs.body
+	}
+}
+
+// https://webassembly.github.io/spec/syntax/modules.html#tables
+
 struct Table {
 	let type: TableType
 }
@@ -37,6 +62,8 @@ extension Table: Equatable {
 		return lhs.type == rhs.type
 	}
 }
+
+// https://webassembly.github.io/spec/syntax/modules.html#memories
 
 struct Memory {
 	let type: MemoryType
@@ -48,6 +75,8 @@ extension Memory: Equatable {
 	}
 }
 
+// https://webassembly.github.io/spec/syntax/modules.html#globals
+
 struct Global {
 	let type: GlobalType
 	let initializer: Expression
@@ -58,6 +87,8 @@ extension Global: Equatable {
 		return (lhs.type, lhs.initializer) == (rhs.type, rhs.initializer)
 	}
 }
+
+// https://webassembly.github.io/spec/syntax/modules.html#element-segments
 
 struct Element {
 	let table: TableIndex
@@ -71,6 +102,8 @@ extension Element: Equatable {
 	}
 }
 
+// https://webassembly.github.io/spec/syntax/modules.html#data-segments
+
 struct Data {
 	let data: MemoryIndex
 	let offset: Expression
@@ -82,6 +115,8 @@ extension Data: Equatable {
 		return (lhs.data, lhs.offset) == (rhs.data, rhs.offset) && lhs.initializer == rhs.initializer
 	}
 }
+
+// https://webassembly.github.io/spec/syntax/modules.html#exports
 
 struct Export {
 	let name: Name
@@ -118,6 +153,8 @@ extension ExportDescriptor: Equatable {
 	}
 }
 
+// https://webassembly.github.io/spec/syntax/modules.html#imports
+
 struct Import {
 	let module: Name
 	let name: Name
@@ -151,16 +188,5 @@ extension ImportDescriptor: Equatable {
 		default:
 			return false
 		}
-	}
-}
-
-struct Code {
-	let locals: [ValueType]
-	let expression: Expression
-}
-
-extension Code: Equatable {
-	static func == (lhs: Code, rhs: Code) -> Bool {
-		return lhs.locals == rhs.locals && lhs.expression == rhs.expression
 	}
 }

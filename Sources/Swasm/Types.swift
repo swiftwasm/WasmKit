@@ -1,11 +1,6 @@
-// https://webassembly.github.io/spec/syntax/modules.html#syntax-typeidx
-typealias TypeIndex = UInt32
-typealias FunctionIndex = UInt32
-typealias TableIndex = UInt32
-typealias MemoryIndex = UInt32
-typealias GlobalIndex = UInt32
-typealias LocalIndex = UInt32
-typealias LabelIndex = UInt32
+// https://webassembly.github.io/spec/syntax/values.html#values
+typealias Byte = UInt8
+typealias Name = String
 
 // https://webassembly.github.io/spec/syntax/types.html#value-types
 protocol Value {

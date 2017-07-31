@@ -1,6 +1,18 @@
 private func p2(_ n: Int) -> Int { return 1 << n }
 private func p2(_ n: UInt) -> UInt { return 1 << n }
 
+// https://webassembly.github.io/spec/binary/modules.html#binary-code
+struct Code {
+	let locals: [ValueType]
+	let expression: Expression
+}
+
+extension Code: Equatable {
+	static func == (lhs: Code, rhs: Code) -> Bool {
+		return lhs.locals == rhs.locals && lhs.expression == rhs.expression
+	}
+}
+
 enum WASMParser {
 	/// # Conventions
 	/// - SeeAlso: https://webassembly.github.io/spec/binary/conventions.html#conventions
