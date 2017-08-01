@@ -1,5 +1,3 @@
-// Validation
-
 protocol ValidationError: Error, CustomStringConvertible {}
 
 protocol Validatable {
@@ -19,7 +17,6 @@ extension UInt32: IndexConvertible {
 }
 
 extension Array {
-
 	subscript(index: IndexConvertible) -> Element {
 		get {
 			return self[index.indexValue]
@@ -29,7 +26,6 @@ extension Array {
 	func contains(index: IndexConvertible) -> Bool {
 		return indices.contains(index.indexValue)
 	}
-
 }
 
 // https://webassembly.github.io/spec/valid/conventions.html#contexts
@@ -45,7 +41,6 @@ struct Context {
 }
 
 extension Module: Validatable {
-
 	enum ModuleValidationError: ValidationError {
 		case invalidTypeIndex(TypeIndex)
 		case invalidFunctionIndexForStart(FunctionIndex)
@@ -209,11 +204,9 @@ extension Module: Validatable {
 			throw ModuleValidationError.namesInExportsAreNotDistinct(names)
 		}
 	}
-
 }
 
 extension FunctionType: Validatable {
-
 	enum FunctionTypeValidationError: ValidationError {
 		case tooManyResultTypes([ValueType])
 
@@ -230,11 +223,9 @@ extension FunctionType: Validatable {
 			throw FunctionTypeValidationError.tooManyResultTypes(results)
 		}
 	}
-
 }
 
 extension Function: Validatable {
-
 	enum FunctionValidationError: ValidationError {
 		case invalidTypeIndex(TypeIndex)
 		case tooManyResultTypes([ValueType])
@@ -262,8 +253,8 @@ extension Function: Validatable {
 			guard functionType.results.count <= 1 else {
 				throw FunctionValidationError.tooManyResultTypes(functionType.results)
 			}
-			c.labels = functionType.results
-			c.`return` = functionType.results.first
+			c.labels = [functionType.results]
+			c.`return` = functionType.results
 			return c
 		}()
 
@@ -271,15 +262,13 @@ extension Function: Validatable {
 	}
 }
 
+// https://webassembly.github.io/spec/valid/instructions.html#expressions
 extension Expression: Validatable {
-
-	// https://webassembly.github.io/spec/valid/instructions.html#expressions
 	func validate(with context: Context) throws {
-		for instruction in instructions {
-			try instruction.validate(with: context)
-		}
+//		for instruction in instructions {
+//			try instruction.validate(with: context)
+//		}
 	}
-
 }
 
 extension Expression {
@@ -302,19 +291,17 @@ extension Table: Validatable {
 
 }
 
+// https://webassembly.github.io/spec/valid/modules.html#memories
 extension Memory: Validatable {
-
-	// https://webassembly.github.io/spec/valid/modules.html#memories
 	func validate(with context: Context) throws {
 		try type.validate(with: context)
 	}
-
 }
 
+// https://webassembly.github.io/spec/valid/types.html#valid-limits
 extension Limits: Validatable {
-
 	enum LimitsValidationError: ValidationError {
-		case maxIsSmallerThanMin(min: Int32, max: Int32)
+		case maxIsSmallerThanMin(min: UInt32, max: UInt32)
 
 		var description: String {
 			switch self {
@@ -324,17 +311,15 @@ extension Limits: Validatable {
 		}
 	}
 
-	// https://webassembly.github.io/spec/valid/types.html#valid-limits
 	func validate(with _: Context) throws {
 		if let max = max, max < min {
 			throw LimitsValidationError.maxIsSmallerThanMin(min: min, max: max)
 		}
 	}
-
 }
 
+// https://webassembly.github.io/spec/valid/modules.html#globals
 extension Global: Validatable {
-
 	enum GlobalValidateError: ValidationError {
 		case initializerIsNotConstant(Expression)
 
@@ -346,7 +331,6 @@ extension Global: Validatable {
 		}
 	}
 
-	// https://webassembly.github.io/spec/valid/modules.html#globals
 	func validate(with context: Context) throws {
 		// type.mutability is always valid
 		try initializer.validate(with: context)
@@ -355,11 +339,10 @@ extension Global: Validatable {
 			throw GlobalValidateError.initializerIsNotConstant(initializer)
 		}
 	}
-
 }
 
+// https://webassembly.github.io/spec/valid/modules.html#element-segments
 extension Element: Validatable {
-
 	enum ElementValidationError: ValidationError {
 		case invalidTableIndex(TableIndex)
 		case elementTypeOfTableIsNotAny(FunctionType)
@@ -380,7 +363,6 @@ extension Element: Validatable {
 		}
 	}
 
-	// https://webassembly.github.io/spec/valid/modules.html#element-segments
 	func validate(with context: Context) throws {
 		guard context.tables.contains(index: table) else {
 			throw ElementValidationError.invalidTableIndex(table)
@@ -402,11 +384,10 @@ extension Element: Validatable {
 			}
 		}
 	}
-
 }
 
+// https://webassembly.github.io/spec/valid/modules.html#data-segments
 extension Data: Validatable {
-
 	enum DataValidationError: ValidationError {
 		case invalidMemoryIndex(MemoryIndex)
 		case offsetIsNotConstant(Expression)
@@ -431,19 +412,16 @@ extension Data: Validatable {
 			throw DataValidationError.offsetIsNotConstant(offset)
 		}
 	}
-
 }
 
+// https://webassembly.github.io/spec/valid/modules.html#exports
 extension Export: Validatable {
-
 	func validate(with context: Context) throws {
 		try descriptor.validate(with: context)
 	}
-
 }
 
 extension ExportDescriptor: Validatable {
-
 	enum ExportDescriptorValidationError: ValidationError {
 		case invalidFunctionIndex(FunctionIndex)
 		case invalidTableIndex(TableIndex)
@@ -491,19 +469,16 @@ extension ExportDescriptor: Validatable {
 			}
 		}
 	}
-
 }
 
+// https://webassembly.github.io/spec/valid/modules.html#imports
 extension Import: Validatable {
-
 	func validate(with context: Context) throws {
 		try descripter.validate(with: context)
 	}
-
 }
 
 extension ImportDescriptor: Validatable {
-
 	enum ImportDescriptorValidationError: ValidationError {
 		case invalidFunctionIndex(FunctionIndex)
 		case globalMutabilityIsNotConstant(GlobalType)
@@ -534,5 +509,4 @@ extension ImportDescriptor: Validatable {
 			}
 		}
 	}
-
 }
