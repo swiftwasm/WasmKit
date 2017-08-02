@@ -8,8 +8,11 @@ let package = Package(
 		.library(
 			name: "Swasm",
 			targets: ["Swasm"]
-		), ],
-	dependencies: [],
+		),
+	],
+	dependencies: [
+		.package(url: "https://github.com/Quick/Nimble", from: "7.0.1"),
+	],
 	targets: [
 		.target(
 			name: "Swasm",
@@ -17,6 +20,7 @@ let package = Package(
 		),
 		.testTarget(
 			name: "SwasmTests",
-			dependencies: ["Swasm"]
-		), ]
+			dependencies: ["Swasm", "Nimble"]
+		),
+	]
 )

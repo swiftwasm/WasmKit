@@ -1,5 +1,9 @@
 struct Expression {
 	let instructions: [Instruction]
+
+	var isConstant: Bool {
+		return instructions.reduce(true) { $0 && $1.isConstant }
+	}
 }
 
 extension Expression: Equatable {

@@ -251,10 +251,10 @@ extension WASMParserTests {
 
 	func testMemoryType() {
 		expect(WASMParser.memoryType(), ByteStream(bytes: [0x00, 0x01]),
-		       toBe: MemoryType(min: 1, max: nil))
+		       toBe: MemoryType(limits: Limits(min: 1, max: nil)))
 
 		expect(WASMParser.memoryType(), ByteStream(bytes: [0x01, 0x01, 0x02]),
-		       toBe: MemoryType(min: 1, max: 0x02))
+		       toBe: MemoryType(limits: Limits(min: 1, max: 0x02)))
 	}
 
 	func testTableType() {
@@ -527,8 +527,8 @@ extension WASMParserTests {
 			0x00, 0x12, // Limits
 			0x01, 0x34, 0x56, // Limits
 			]), toBe: [
-				Memory(type: MemoryType(min: 18, max: nil)),
-				Memory(type: MemoryType(min: 52, max: 86)),
+				Memory(type: MemoryType(limits: Limits(min: 18, max: nil))),
+				Memory(type: MemoryType(limits: Limits(min: 52, max: 86))),
 				])
 	}
 
@@ -742,7 +742,7 @@ extension WASMParserTests {
 						])
 				), ],
 			tables: [Table(type: TableType(limits: Limits(min: 0, max: nil)))],
-			memories: [Memory(type: MemoryType(min: 2, max: nil))],
+			memories: [Memory(type: MemoryType(limits: Limits(min: 2, max: nil)))],
 			globals: [],
 			elements: [],
 			data: [Data(

@@ -245,7 +245,7 @@ enum WASMParser {
 	/// ## Memory Types
 	/// - SeeAlso: https://webassembly.github.io/spec/binary/types.html#memory-types
 	static func memoryType<S>() -> ChainableParser<S, MemoryType> where S.Element == Byte {
-		return limits()
+		return limits().map { MemoryType(limits: $0) }
 	}
 
 	/// ## Table Types

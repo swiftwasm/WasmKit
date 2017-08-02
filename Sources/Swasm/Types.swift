@@ -63,7 +63,15 @@ extension Limits: Equatable {
 }
 
 // https://webassembly.github.io/spec/syntax/types.html#memory-types
-typealias MemoryType = Limits
+struct MemoryType {
+	let limits: Limits
+}
+
+extension MemoryType: Equatable {
+	static func == (lhs: MemoryType, rhs: MemoryType) -> Bool {
+		return lhs.limits == rhs.limits
+	}
+}
 
 // https://webassembly.github.io/spec/syntax/types.html#table-types
 struct TableType {
