@@ -198,16 +198,16 @@ extension WASMParserTests {
 		       toBe: ParserStreamError<ByteStream>.unexpectedEnd)
 
 		expect(WASMParser.valueType(), ByteStream(bytes: [0x7F]),
-		       toBe: .int32)
+		       toBe: Int32.self)
 
 		expect(WASMParser.valueType(), ByteStream(bytes: [0x7E]),
-		       toBe: .int64)
+		       toBe: Int64.self)
 
 		expect(WASMParser.valueType(), ByteStream(bytes: [0x7D]),
-		       toBe: .uint32)
+		       toBe: Float32.self)
 
 		expect(WASMParser.valueType(), ByteStream(bytes: [0x7C]),
-		       toBe: .uint64)
+		       toBe: Float64.self)
 
 		expect(WASMParser.valueType(), ByteStream(bytes: [0x7B]),
 		       toBe: ParserStreamError<ByteStream>.unexpected(0x7B, location: 0))
@@ -221,16 +221,16 @@ extension WASMParserTests {
 		       toBe: [])
 
 		expect(WASMParser.resultType(), ByteStream(bytes: [0x7F]),
-		       toBe: [.int32])
+		       toBe: [Int32.self])
 
 		expect(WASMParser.resultType(), ByteStream(bytes: [0x7E]),
-		       toBe: [.int64])
+		       toBe: [Int64.self])
 
 		expect(WASMParser.resultType(), ByteStream(bytes: [0x7D]),
-		       toBe: [.uint32])
+		       toBe: [Float32.self])
 
 		expect(WASMParser.resultType(), ByteStream(bytes: [0x7C]),
-		       toBe: [.uint64])
+		       toBe: [Float64.self])
 
 		expect(WASMParser.resultType(), ByteStream(bytes: [0x7B]),
 		       toBe: ParserStreamError<ByteStream>.unexpected(0x7B, location: 0))
@@ -238,7 +238,7 @@ extension WASMParserTests {
 
 	func testFunctionType() {
 		expect(WASMParser.functionType(), ByteStream(bytes: [0x60, 0x01, 0x7E, 0x01, 0x7D]),
-		       toBe: FunctionType(parameters: [.int64], results: [.uint32]))
+		       toBe: FunctionType(parameters: [Int64.self], results: [Float32.self]))
 	}
 
 	func testLimits() {
@@ -267,10 +267,10 @@ extension WASMParserTests {
 
 	func testGlobalType() {
 		expect(WASMParser.globalType(), ByteStream(bytes: [0x7F, 0x00]),
-		       toBe: GlobalType(mutability: .constant, valueType: .int32))
+		       toBe: GlobalType(mutability: .constant, valueType: Int32.self))
 
 		expect(WASMParser.globalType(), ByteStream(bytes: [0x7F, 0x01]),
-		       toBe: GlobalType(mutability: .variable, valueType: .int32))
+		       toBe: GlobalType(mutability: .variable, valueType: Int32.self))
 	}
 }
 
@@ -469,8 +469,8 @@ extension WASMParserTests {
 			0x60, 0x01, 0x7F, 0x01, 0x7E, // Function Type
 			0x60, 0x01, 0x7D, 0x01, 0x7C, // Function Type
 			]), toBe: [
-				FunctionType(parameters: [.int32], results: [.int64]),
-				FunctionType(parameters: [.uint32], results: [.uint64]),
+				FunctionType(parameters: [Int32.self], results: [Int64.self]),
+				FunctionType(parameters: [Float32.self], results: [Float64.self]),
 				])
 
 		expect(WASMParser.typeSection(), ByteStream(bytes: [
@@ -545,10 +545,10 @@ extension WASMParserTests {
 			0x0b, // Expression end
 			]), toBe: [
 				Global(
-					type: GlobalType(mutability: .constant, valueType: .int32),
+					type: GlobalType(mutability: .constant, valueType: Int32.self),
 					initializer: Expression(instructions: [PseudoInstruction.end])),
 				Global(
-					type: GlobalType(mutability: .variable, valueType: .int64),
+					type: GlobalType(mutability: .variable, valueType: Int64.self),
 					initializer: Expression(instructions: [PseudoInstruction.end])),
 				])
 	}
@@ -600,19 +600,19 @@ extension WASMParserTests {
 			0x04, // Code Size
 			0x01, // Vector Length (locals)
 			0x03, // n
-			0x7F, // .int32
+			0x7F, // Int32.self
 			0x0b, // Expression end
 			0x06, // Code Size
 			0x02, // Vector Length (locals)
 			0x01, // n
-			0x7E, // .int64
+			0x7E, // Int64.self
 			0x02, // n
-			0x7D, // .uint32
+			0x7D, // Float32.self
 			0x0b, // Expression end
 			]), toBe: [
-				Code(locals: [.int32, .int32, .int32],
+				Code(locals: [Int32.self, Int32.self, Int32.self],
 				     expression: Expression(instructions: [PseudoInstruction.end])),
-				Code(locals: [.int64, .uint32, .uint32],
+				Code(locals: [Int64.self, Float32.self, Float32.self],
 				     expression: Expression(instructions: [PseudoInstruction.end])),
 				])
 	}
@@ -670,13 +670,13 @@ extension WASMParserTests {
 		let module = Module(
 			types: [
 				FunctionType(
-					parameters: [.int32],
-					results: [.int32]),
+					parameters: [Int32.self],
+					results: [Int32.self]),
 				],
 			functions: [
 				Function(
 					type: 0,
-					locals: [ValueType.int32],
+					locals: [Int32.self],
 					body: Expression(instructions: [
 						NumericInstruction.i32.const(0), NumericInstruction.i32.const(0), MemoryInstruction.i32.load((2, 4)),
 						NumericInstruction.i32.const(16), NumericInstruction.i32.sub, VariableInstruction.teeLocal(1),
@@ -701,7 +701,7 @@ extension WASMParserTests {
 				),
 				Function(
 					type: 0,
-					locals: [ValueType.int32, ValueType.int32, ValueType.int32],
+					locals: [Int32.self, Int32.self, Int32.self],
 					body: Expression(instructions: [
 						NumericInstruction.i32.const(0), MemoryInstruction.i32.load((2, 4)), NumericInstruction.i32.const(32),
 						NumericInstruction.i32.sub, VariableInstruction.teeLocal(2), VariableInstruction.teeLocal(3),

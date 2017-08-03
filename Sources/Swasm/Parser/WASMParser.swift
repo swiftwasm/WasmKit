@@ -3,7 +3,7 @@ private func p2(_ n: UInt) -> UInt { return 1 << n }
 
 // https://webassembly.github.io/spec/binary/modules.html#binary-code
 struct Code {
-	let locals: [ValueType]
+	let locals: [Value.Type]
 	let expression: Expression
 }
 
@@ -201,16 +201,16 @@ enum WASMParser {
 
 	/// ## Value Types
 	/// - SeeAlso: https://webassembly.github.io/spec/binary/types.html#value-types
-	static func valueType<S>() -> ChainableParser<S, ValueType> where S.Element == Byte {
+	static func valueType<S>() -> ChainableParser<S, Value.Type> where S.Element == Byte {
 		return .init { stream, index in
 			guard let byte = stream.take(at: index) else {
 				throw ParserStreamError<S>.unexpectedEnd
 			}
 			switch byte {
-			case 0x7F: return (.int32, stream.index(after: index))
-			case 0x7E: return (.int64, stream.index(after: index))
-			case 0x7D: return (.uint32, stream.index(after: index))
-			case 0x7C: return (.uint64, stream.index(after: index))
+			case 0x7F: return (Int32.self, stream.index(after: index))
+			case 0x7E: return (Int64.self, stream.index(after: index))
+			case 0x7D: return (Float32.self, stream.index(after: index))
+			case 0x7C: return (Float64.self, stream.index(after: index))
 			default: throw ParserStreamError<S>.unexpected(byte, location: index)
 			}
 		}
@@ -218,7 +218,7 @@ enum WASMParser {
 
 	/// ## Result Types
 	/// - SeeAlso: https://webassembly.github.io/spec/binary/types.html#result-types
-	static func resultType<S>() -> ChainableParser<S, [ValueType]> where S.Element == Byte {
+	static func resultType<S>() -> ChainableParser<S, [Value.Type]> where S.Element == Byte {
 		return byte(0x40).map { _ in [] }.or(valueType().map { [$0] })
 	}
 
@@ -829,7 +829,7 @@ extension WASMParser {
 	/// ## Code Section
 	/// - SeeAlso: https://webassembly.github.io/spec/binary/modules.html#code-section
 	static func codeSection<S>() -> ChainableParser<S, [Code]> where S.Element == Byte {
-		let locals: ChainableParser<S, [ValueType]> = .init { stream, index in
+		let locals: ChainableParser<S, [Value.Type]> = .init { stream, index in
 			let (n, nEnd) = try uint(32).parse(stream: stream, index: index)
 			let (type, typeEnd) = try valueType().parse(stream: stream, index: nEnd)
 			return (Array(repeating: type, count: Int(n)), typeEnd)
