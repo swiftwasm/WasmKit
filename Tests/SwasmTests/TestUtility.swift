@@ -36,6 +36,40 @@ func expect<P: Parser, E>(
 			}(), message, file: file, line: line)
 }
 
+func expect<P: Parser>(
+	_ parser: P?,
+	_ stream: P.Input,
+	toBe expectation: Value.Type,
+	_ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line)
+	where P.Input == ByteStream, P.Result == Value.Type {
+		XCTAssertNotNil(parser, message, file: file, line: line)
+		guard let parser = parser else {
+			return
+		}
+		XCTAssertNoThrow(try {
+			let (result, endIndex) = try parser.parse(stream: stream, index: stream.startIndex)
+			XCTAssert(result == expectation, message, file: file, line: line)
+			XCTAssertEqual(endIndex, stream.endIndex, message, file: file, line: line)
+			}(), message, file: file, line: line)
+}
+
+func expect<P: Parser>(
+	_ parser: P?,
+	_ stream: P.Input,
+	toBe expectation: [Value.Type],
+	_ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line)
+	where P.Input == ByteStream, P.Result == [Value.Type] {
+		XCTAssertNotNil(parser, message, file: file, line: line)
+		guard let parser = parser else {
+			return
+		}
+		XCTAssertNoThrow(try {
+			let (result, endIndex) = try parser.parse(stream: stream, index: stream.startIndex)
+			XCTAssert(result == expectation, message, file: file, line: line)
+			XCTAssertEqual(endIndex, stream.endIndex, message, file: file, line: line)
+			}(), message, file: file, line: line)
+}
+
 func expect<P: Parser, E: Error>(
 	_ parser: P?,
 	_ stream: P.Input,

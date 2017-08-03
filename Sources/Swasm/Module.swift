@@ -41,7 +41,7 @@ typealias LabelIndex = UInt32
 // https://webassembly.github.io/spec/syntax/modules.html#functions
 struct Function {
 	let type: TypeIndex
-	let locals: [ValueType]
+	let locals: [Value.Type]
 	let body: Expression
 }
 

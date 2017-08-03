@@ -3,31 +3,31 @@ typealias Byte = UInt8
 typealias Name = String
 
 // https://webassembly.github.io/spec/syntax/types.html#value-types
-protocol Value {
-}
-
+protocol Value {}
+struct AnyValue: Value {}
 extension Int32: Value {}
 extension Int64: Value {}
-extension UInt32: Value {}
-extension UInt64: Value {}
+extension Float32: Value {}
+extension Float64: Value {}
 
-enum ValueType {
-	case int32
-	case int64
-	case uint32
-	case uint64
-	case any
+extension Array where Element == Value.Type {
+	static func == (lhs: [Value.Type], rhs: [Value.Type]) -> Bool {
+		guard lhs.count == rhs.count else { return false }
+		return zip(lhs, rhs).reduce(true) { result, zipped in
+			return result && zipped.0 == zipped.1
+		}
+	}
 }
 
 // https://webassembly.github.io/spec/syntax/types.html#result-types
-typealias ResultType = [ValueType]
+typealias ResultType = [Value.Type]
 
 // https://webassembly.github.io/spec/syntax/types.html#function-types
 struct FunctionType {
-	private struct _Any: Value {}
-	static let any = FunctionType(parameters: [.any], results: [.any])
-	var parameters: [ValueType]
-	var results: [ValueType]
+	var parameters: [Value.Type]
+	var results: [Value.Type]
+
+	static let any = FunctionType(parameters: [AnyValue.self], results: [AnyValue.self])
 }
 
 extension FunctionType: Equatable {
@@ -72,7 +72,7 @@ enum Mutability {
 // https://webassembly.github.io/spec/syntax/types.html#global-types
 struct GlobalType {
 	var mutability: Mutability?
-	var valueType: ValueType
+	var valueType: Value.Type
 }
 
 extension GlobalType: Equatable {
