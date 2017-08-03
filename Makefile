@@ -11,3 +11,6 @@ project:
 coverage: project
 	xcodebuild -scheme Swasm-Package clean test -enableCodeCoverage YES
 
+.PHONY: clean
+clean:
+	swift package clean
