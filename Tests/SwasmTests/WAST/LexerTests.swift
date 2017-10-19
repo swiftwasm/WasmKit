@@ -65,8 +65,8 @@ class LexerTests: XCTestCase {
             ConsumerTest(";)", nil, WASTLexer.consumeWhitespace),
             ]
 
-        for test in tests {
-            test.run()
+        measure {
+            tests.forEach { $0.run() }
         }
     }
 
@@ -82,8 +82,8 @@ class LexerTests: XCTestCase {
             ConsumerTest("", nil, WASTLexer.consumeIdentifierCharacters),
         ]
 
-        for test in tests {
-            test.run()
+        measure {
+            tests.forEach { $0.run() }
         }
     }
 
@@ -100,8 +100,8 @@ class LexerTests: XCTestCase {
             ConsumerTest("!fasdf", nil, WASTLexer.consumeKeyword),
             ]
 
-        for test in tests {
-            test.run()
+        measure {
+            tests.forEach { $0.run() }
         }
     }
 
@@ -115,8 +115,8 @@ class LexerTests: XCTestCase {
             ConsumerTest("asdf", nil, WASTLexer.consumeDigits),
             ]
 
-        for test in tests {
-            test.run()
+        measure {
+            tests.forEach { $0.run() }
         }
     }
 
@@ -130,8 +130,8 @@ class LexerTests: XCTestCase {
             ConsumerTest("zxcv", nil, WASTLexer.consumeHexDigits),
             ]
 
-        for test in tests {
-            test.run()
+        measure {
+            tests.forEach { $0.run() }
         }
     }
 
@@ -145,8 +145,8 @@ class LexerTests: XCTestCase {
             ConsumerTest("asdf", nil, WASTLexer.consumeDigits),
             ]
 
-        for test in tests {
-            test.run()
+        measure {
+            tests.forEach { $0.run() }
         }
     }
 
@@ -160,8 +160,8 @@ class LexerTests: XCTestCase {
             ConsumerTest("zxcv", nil, WASTLexer.consumeHexNumber),
             ]
 
-        for test in tests {
-            test.run()
+        measure {
+            tests.forEach { $0.run() }
         }
     }
 
@@ -181,8 +181,8 @@ class LexerTests: XCTestCase {
             ConsumerTest("zxcv", nil, WASTLexer.consumeUnsignedInteger),
             ]
 
-        for test in tests {
-            test.run()
+        measure {
+            tests.forEach { $0.run() }
         }
     }
 
@@ -213,8 +213,8 @@ class LexerTests: XCTestCase {
             ConsumerTest("zxcv", nil, WASTLexer.consumeSignedInteger),
             ]
 
-        for test in tests {
-            test.run()
+        measure {
+            tests.forEach { $0.run() }
         }
     }
 
@@ -255,8 +255,8 @@ class LexerTests: XCTestCase {
             ConsumerTest("zxcv", nil, WASTLexer.consumeInteger),
             ]
 
-        for test in tests {
-            test.run()
+        measure {
+            tests.forEach { $0.run() }
         }
     }
 }
