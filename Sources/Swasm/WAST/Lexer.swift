@@ -124,7 +124,9 @@ extension WASTLexer {
 
         return String(codes)
     }
+}
 
+extension WASTLexer {
     internal func consumeDigits() -> Int? {
         var result: Int?
         while let c = stream.next(), let d = Int(c, hex: false) {
