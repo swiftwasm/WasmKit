@@ -1,6 +1,6 @@
 import XCTest
 @testable import Swasm
 
-class SwasmTests: XCTestCase {
+internal final class SwasmTests: XCTestCase {
     static var allTests: [() -> Void] = []
 }

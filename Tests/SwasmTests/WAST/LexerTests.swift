@@ -1,7 +1,7 @@
 import XCTest
 @testable import Swasm
 
-struct ConsumerTest<Type: Equatable> {
+private struct ConsumerTest<Type: Equatable> {
     typealias Consumer = (WASTLexer<UnicodeStream>) -> () -> Type?
 
     let input: String
@@ -42,7 +42,7 @@ struct ConsumerTest<Type: Equatable> {
     }
 }
 
-class LexerTests: XCTestCase {
+internal final class LexerTests: XCTestCase {
     func testConsumeWhitespace() {
         let tests = [
             ConsumerTest(" asdf", " ", WASTLexer.consumeWhitespace),

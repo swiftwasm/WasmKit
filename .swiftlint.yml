@@ -22,6 +22,8 @@ opt_in_rules:
   - first_where
   - object_literal
   - fatal_error_message
+  - explicit_top_level_acl
+  - extension_access_modifier
 
 trailing_comma:
   mandatory_comma: true

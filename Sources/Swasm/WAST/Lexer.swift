@@ -11,15 +11,15 @@ public enum LexicalToken {
 }
 
 public class WASTLexer<InputStream: Stream> where InputStream.Token == UnicodeScalar {
-    public var stream: InputStream
+    var stream: InputStream
 
     init(stream: InputStream) {
         self.stream = stream
     }
 }
 
-extension UnicodeScalar {
-    internal func isIDCharacter() -> Bool {
+private extension UnicodeScalar {
+    func isIDCharacter() -> Bool {
         return ("0" ... "9" ~= self
             ||	"A" ... "Z" ~= self
             ||	"a" ... "z" ~= self
@@ -30,8 +30,8 @@ extension UnicodeScalar {
     }
 }
 
-extension Int {
-    internal init?(_ unicodeScalar: UnicodeScalar, hex: Bool) {
+private extension Int {
+    init?(_ unicodeScalar: UnicodeScalar, hex: Bool) {
         switch unicodeScalar {
         case "0": self = 0
         case "1": self = 1
@@ -59,7 +59,7 @@ extension Int {
 }
 
 extension WASTLexer {
-    internal func consumeWhitespace() -> String? {
+    func consumeWhitespace() -> String? {
         var codes = String.UnicodeScalarView()
 
         loop:
@@ -102,7 +102,7 @@ extension WASTLexer {
         return codes.isEmpty ? nil : String(codes)
     }
 
-    internal func consumeIdentifierCharacters() -> String? {
+    func consumeIdentifierCharacters() -> String? {
         var codes = String.UnicodeScalarView()
 
         while let c = stream.next(), c.isIDCharacter() {
@@ -113,7 +113,7 @@ extension WASTLexer {
         return codes.isEmpty ? nil : String(codes)
     }
 
-    internal func consumeKeyword() -> String? {
+    func consumeKeyword() -> String? {
         guard let c = stream.next(), "a" ... "z" ~= c else { return nil }
         var codes = String.UnicodeScalarView([c])
         stream.advance()
@@ -127,7 +127,7 @@ extension WASTLexer {
 }
 
 extension WASTLexer {
-    internal func consumeDigits() -> Int? {
+    func consumeDigits() -> Int? {
         var result: Int?
         while let c = stream.next(), let d = Int(c, hex: false) {
             result = (result ?? 0) * 10 + d
@@ -136,7 +136,7 @@ extension WASTLexer {
         return result
     }
 
-    internal func consumeHexDigits() -> Int? {
+    func consumeHexDigits() -> Int? {
         var result: Int?
         while let c = stream.next(), let d = Int(c, hex: true) {
             result = (result ?? 0) * 16 + d
@@ -145,7 +145,7 @@ extension WASTLexer {
         return result
     }
 
-    internal func consumeNumber() -> Int? {
+    func consumeNumber() -> Int? {
         guard var result = consumeDigits() else { return nil }
 
         while let c = stream.next() {
@@ -162,7 +162,7 @@ extension WASTLexer {
         return result
     }
 
-    internal func consumeHexNumber() -> Int? {
+    func consumeHexNumber() -> Int? {
         guard var result = consumeHexDigits() else { return nil }
 
         while let c = stream.next() {
@@ -179,7 +179,7 @@ extension WASTLexer {
         return result
     }
 
-    internal func consumeUnsignedInteger() -> Int? {
+    func consumeUnsignedInteger() -> Int? {
         hex:
         if let c1 = stream.next(), c1 == "0", let c2 = stream.next(offset: 1), c2 == "x" {
             stream.advance(); stream.advance()
@@ -197,7 +197,7 @@ extension WASTLexer {
         return result
     }
 
-    internal func consumeSignedInteger() -> Int? {
+    func consumeSignedInteger() -> Int? {
         guard let c = stream.next() else {
             return nil
         }
@@ -214,7 +214,7 @@ extension WASTLexer {
         }
     }
 
-    internal func consumeInteger() -> Int? {
+    func consumeInteger() -> Int? {
         return consumeUnsignedInteger() ?? consumeSignedInteger()
     }
 }
