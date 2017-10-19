@@ -10,6 +10,7 @@ SWIFT_TESTS_LIST = $(shell find Tests -name '*.swift')
 Swasm.xcodeproj: Package.swift $(SWIFT_SOURCES_LIST) $(SWIFT_TESTS_LIST)
 	swift package generate-xcodeproj --enable-code-coverage
 	scripts/add_lint_phase.rb
+	@touch $@
 
 .PHONY: coverage
 coverage: project
