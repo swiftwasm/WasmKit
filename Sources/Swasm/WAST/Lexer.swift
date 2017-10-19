@@ -31,7 +31,7 @@ extension UnicodeScalar {
 }
 
 extension Int {
-    internal init?(_ unicodeScalar: UnicodeScalar) {
+    internal init?(_ unicodeScalar: UnicodeScalar, hex: Bool) {
         switch unicodeScalar {
         case "0": self = 0
         case "1": self = 1
@@ -43,7 +43,17 @@ extension Int {
         case "7": self = 7
         case "8": self = 8
         case "9": self = 9
-        default: return nil
+        default:
+            guard hex else { return nil }
+            switch unicodeScalar {
+            case "a", "A": self = 10
+            case "b", "B": self = 11
+            case "c", "C": self = 12
+            case "d", "D": self = 13
+            case "e", "E": self = 14
+            case "f", "F": self = 15
+            default: return nil
+            }
         }
     }
 }
@@ -117,8 +127,17 @@ extension WASTLexer {
 
     internal func consumeDigits() -> Int? {
         var result: Int?
-        while let c = stream.next(), let d = Int(c) {
+        while let c = stream.next(), let d = Int(c, hex: false) {
             result = (result ?? 0) * 10 + d
+            stream.advance()
+        }
+        return result
+    }
+
+    internal func consumeHexDigits() -> Int? {
+        var result: Int?
+        while let c = stream.next(), let d = Int(c, hex: true) {
+            result = (result ?? 0) * 16 + d
             stream.advance()
         }
         return result
@@ -128,7 +147,7 @@ extension WASTLexer {
         guard var result = consumeDigits() else { return nil }
 
         while let c = stream.next() {
-            if let d = Int(c) {
+            if let d = Int(c, hex: false) {
                 result = result * 10 + d
                 stream.advance()
             } else if c == "_" {
@@ -139,5 +158,61 @@ extension WASTLexer {
         }
 
         return result
+    }
+
+    internal func consumeHexNumber() -> Int? {
+        guard var result = consumeHexDigits() else { return nil }
+
+        while let c = stream.next() {
+            if let d = Int(c, hex: true) {
+                result = result * 16 + d
+                stream.advance()
+            } else if c == "_" {
+                stream.advance()
+            } else {
+                break
+            }
+        }
+
+        return result
+    }
+
+    internal func consumeUnsignedInteger() -> Int? {
+        hex:
+        if let c1 = stream.next(), c1 == "0", let c2 = stream.next(offset: 1), c2 == "x" {
+            stream.advance(); stream.advance()
+
+            guard let result = consumeHexNumber() else {
+                break hex
+            }
+            return result
+        }
+
+        guard let result = consumeNumber() else {
+            return nil
+        }
+
+        return result
+    }
+
+    internal func consumeSignedInteger() -> Int? {
+        guard let c = stream.next() else {
+            return nil
+        }
+
+        switch c {
+        case "+":
+            stream.advance()
+            return consumeUnsignedInteger()
+        case "-":
+            stream.advance()
+            return consumeUnsignedInteger().flatMap { -$0 }
+        default:
+            return nil
+        }
+    }
+
+    internal func consumeInteger() -> Int? {
+        return consumeUnsignedInteger() ?? consumeSignedInteger()
     }
 }

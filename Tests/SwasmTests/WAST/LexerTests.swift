@@ -108,10 +108,8 @@ class LexerTests: XCTestCase {
     func testConsumeDigits() {
         let tests = [
             ConsumerTest("00123456789", 123456789, WASTLexer.consumeDigits),
-            ConsumerTest("00123_0045678", 123, WASTLexer.consumeDigits),
-            ConsumerTest("123asdf", 123, WASTLexer.consumeDigits),
-            ConsumerTest("123_", 123, WASTLexer.consumeNumber),
-            ConsumerTest("123_asdf", 123, WASTLexer.consumeNumber),
+            ConsumerTest("123abczxc", 123, WASTLexer.consumeDigits),
+            ConsumerTest("123_abc_zxc", 123, WASTLexer.consumeDigits),
 
             ConsumerTest("", nil, WASTLexer.consumeDigits),
             ConsumerTest("asdf", nil, WASTLexer.consumeDigits),
@@ -122,16 +120,139 @@ class LexerTests: XCTestCase {
         }
     }
 
+    func testConsumeHexDigits() {
+        let tests = [
+            ConsumerTest("00123456789abcdef", 0x123456789abcdef, WASTLexer.consumeHexDigits),
+            ConsumerTest("123abczxc", 0x123abc, WASTLexer.consumeHexDigits),
+            ConsumerTest("123_abc_zxc", 0x123, WASTLexer.consumeHexDigits),
+
+            ConsumerTest("", nil, WASTLexer.consumeHexDigits),
+            ConsumerTest("zxcv", nil, WASTLexer.consumeHexDigits),
+            ]
+
+        for test in tests {
+            test.run()
+        }
+    }
+
     func testConsumeNumber() {
         let tests = [
-            ConsumerTest("00123456789", 123456789, WASTLexer.consumeNumber),
-            ConsumerTest("00123_0045678", 1230045678, WASTLexer.consumeNumber),
-            ConsumerTest("123asdf", 123, WASTLexer.consumeNumber),
-            ConsumerTest("123_", 123, WASTLexer.consumeNumber),
-            ConsumerTest("123_asdf", 123, WASTLexer.consumeNumber),
+            ConsumerTest("00123456789abcdef", 123456789, WASTLexer.consumeDigits),
+            ConsumerTest("123abczxc", 123, WASTLexer.consumeDigits),
+            ConsumerTest("123_abc_zxc", 123, WASTLexer.consumeDigits),
 
-            ConsumerTest("", nil, WASTLexer.consumeNumber),
-            ConsumerTest("asdf", nil, WASTLexer.consumeNumber),
+            ConsumerTest("", nil, WASTLexer.consumeDigits),
+            ConsumerTest("asdf", nil, WASTLexer.consumeDigits),
+            ]
+
+        for test in tests {
+            test.run()
+        }
+    }
+
+    func testConsumeHexNumber() {
+        let tests = [
+            ConsumerTest("00123456789abcdef", 0x123456789abcdef, WASTLexer.consumeHexNumber),
+            ConsumerTest("123abczxc", 0x123abc, WASTLexer.consumeHexNumber),
+            ConsumerTest("123_abc_zxc", 0x123abc, WASTLexer.consumeHexNumber),
+
+            ConsumerTest("", nil, WASTLexer.consumeHexNumber),
+            ConsumerTest("zxcv", nil, WASTLexer.consumeHexNumber),
+            ]
+
+        for test in tests {
+            test.run()
+        }
+    }
+
+    func testConsumeUnsignedInteger() {
+        let tests = [
+            ConsumerTest("00123456789", 123456789, WASTLexer.consumeUnsignedInteger),
+            ConsumerTest("0x00123456789", 0x123456789, WASTLexer.consumeUnsignedInteger),
+            ConsumerTest("0_012_300_456_789", 12300456789, WASTLexer.consumeUnsignedInteger),
+            ConsumerTest("0x0_012_300_456_789", 0x12300456789, WASTLexer.consumeUnsignedInteger),
+            ConsumerTest("123asdf", 123, WASTLexer.consumeUnsignedInteger),
+            ConsumerTest("0x123asdf", 0x123a, WASTLexer.consumeUnsignedInteger),
+            ConsumerTest("123_zxcv", 123, WASTLexer.consumeUnsignedInteger),
+            ConsumerTest("0x123_zxcv", 0x123, WASTLexer.consumeUnsignedInteger),
+
+            ConsumerTest("", nil, WASTLexer.consumeUnsignedInteger),
+            ConsumerTest("0xzxcv", nil, WASTLexer.consumeUnsignedInteger),
+            ConsumerTest("zxcv", nil, WASTLexer.consumeUnsignedInteger),
+            ]
+
+        for test in tests {
+            test.run()
+        }
+    }
+
+    func testConsumeSignedInteger() {
+        let tests = [
+            ConsumerTest("+00123456789", 123456789, WASTLexer.consumeSignedInteger),
+            ConsumerTest("-00123456789", -123456789, WASTLexer.consumeSignedInteger),
+            ConsumerTest("+0x00123456789", 0x123456789, WASTLexer.consumeSignedInteger),
+            ConsumerTest("-0x00123456789", -0x123456789, WASTLexer.consumeSignedInteger),
+            ConsumerTest("+0_012_300_456_789", 12300456789, WASTLexer.consumeSignedInteger),
+            ConsumerTest("-0_012_300_456_789", -12300456789, WASTLexer.consumeSignedInteger),
+            ConsumerTest("+0x0_012_300_456_789", 0x12300456789, WASTLexer.consumeSignedInteger),
+            ConsumerTest("-0x0_012_300_456_789", -0x12300456789, WASTLexer.consumeSignedInteger),
+            ConsumerTest("+123asdf", 123, WASTLexer.consumeSignedInteger),
+            ConsumerTest("-123asdf", -123, WASTLexer.consumeSignedInteger),
+            ConsumerTest("+0x123asdf", 0x123a, WASTLexer.consumeSignedInteger),
+            ConsumerTest("-0x123asdf", -0x123a, WASTLexer.consumeSignedInteger),
+            ConsumerTest("+123_zxcv", 123, WASTLexer.consumeSignedInteger),
+            ConsumerTest("-123_zxcv", -123, WASTLexer.consumeSignedInteger),
+            ConsumerTest("+0x123_zxcv", 0x123, WASTLexer.consumeSignedInteger),
+            ConsumerTest("-0x123_zxcv", -0x123, WASTLexer.consumeSignedInteger),
+
+            ConsumerTest("", nil, WASTLexer.consumeSignedInteger),
+            ConsumerTest("+zxcv", nil, WASTLexer.consumeSignedInteger),
+            ConsumerTest("-zxcv", nil, WASTLexer.consumeSignedInteger),
+            ConsumerTest("+0xzxcv", nil, WASTLexer.consumeSignedInteger),
+            ConsumerTest("-0xzxcv", nil, WASTLexer.consumeSignedInteger),
+            ConsumerTest("zxcv", nil, WASTLexer.consumeSignedInteger),
+            ]
+
+        for test in tests {
+            test.run()
+        }
+    }
+
+    func testConsumeInteger() {
+        let tests = [
+            ConsumerTest("00123456789", 123456789, WASTLexer.consumeInteger),
+            ConsumerTest("+00123456789", 123456789, WASTLexer.consumeInteger),
+            ConsumerTest("-00123456789", -123456789, WASTLexer.consumeInteger),
+            ConsumerTest("0x00123456789", 0x123456789, WASTLexer.consumeInteger),
+            ConsumerTest("+0x00123456789", 0x123456789, WASTLexer.consumeInteger),
+            ConsumerTest("-0x00123456789", -0x123456789, WASTLexer.consumeInteger),
+            ConsumerTest("0_012_300_456_789", 12300456789, WASTLexer.consumeInteger),
+            ConsumerTest("+0_012_300_456_789", 12300456789, WASTLexer.consumeInteger),
+            ConsumerTest("-0_012_300_456_789", -12300456789, WASTLexer.consumeInteger),
+            ConsumerTest("0x0_012_300_456_789", 0x12300456789, WASTLexer.consumeInteger),
+            ConsumerTest("+0x0_012_300_456_789", 0x12300456789, WASTLexer.consumeInteger),
+            ConsumerTest("-0x0_012_300_456_789", -0x12300456789, WASTLexer.consumeInteger),
+            ConsumerTest("123asdf", 123, WASTLexer.consumeInteger),
+            ConsumerTest("+123asdf", 123, WASTLexer.consumeInteger),
+            ConsumerTest("-123asdf", -123, WASTLexer.consumeInteger),
+            ConsumerTest("0x123asdf", 0x123a, WASTLexer.consumeInteger),
+            ConsumerTest("+0x123asdf", 0x123a, WASTLexer.consumeInteger),
+            ConsumerTest("-0x123asdf", -0x123a, WASTLexer.consumeInteger),
+            ConsumerTest("123_zxcv", 123, WASTLexer.consumeInteger),
+            ConsumerTest("+123_zxcv", 123, WASTLexer.consumeInteger),
+            ConsumerTest("-123_zxcv", -123, WASTLexer.consumeInteger),
+            ConsumerTest("0x123_zxcv", 0x123, WASTLexer.consumeInteger),
+            ConsumerTest("+0x123_zxcv", 0x123, WASTLexer.consumeInteger),
+            ConsumerTest("-0x123_zxcv", -0x123, WASTLexer.consumeInteger),
+
+            ConsumerTest("", nil, WASTLexer.consumeInteger),
+            ConsumerTest("zxcv", nil, WASTLexer.consumeInteger),
+            ConsumerTest("+zxcv", nil, WASTLexer.consumeInteger),
+            ConsumerTest("-zxcv", nil, WASTLexer.consumeInteger),
+            ConsumerTest("0xzxcv", nil, WASTLexer.consumeInteger),
+            ConsumerTest("+0xzxcv", nil, WASTLexer.consumeInteger),
+            ConsumerTest("-0xzxcv", nil, WASTLexer.consumeInteger),
+            ConsumerTest("zxcv", nil, WASTLexer.consumeInteger),
             ]
 
         for test in tests {

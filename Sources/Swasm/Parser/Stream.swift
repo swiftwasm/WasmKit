@@ -12,7 +12,6 @@ extension Stream {
 }
 
 public struct UnicodeStream: Stream {
-
     public let unicodeScalars: String.UnicodeScalarView
     private var index: String.Index
 
