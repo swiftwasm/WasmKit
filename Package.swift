@@ -7,7 +7,7 @@ let package = Package(
     products: [
 		.library(
 			name: "Swasm",
-			targets: ["Swasm"])
+			targets: ["Swasm"]),
     ],
     dependencies: [],
     targets: [
@@ -16,6 +16,7 @@ let package = Package(
             dependencies: []),
         .testTarget(
             name: "SwasmTests",
-            dependencies: ["Swasm"])
-    ]
+            dependencies: ["Swasm"]),
+    ],
+    swiftLanguageVersions: [4]
 )

@@ -2,5 +2,5 @@ import XCTest
 @testable import SwasmTests
 
 XCTMain([
-    testCase(SwasmTests.allTests)
+    testCase(SwasmTests.allTests),
 ])

@@ -1,0 +1,27 @@
+excluded:
+  - .build
+
+disabled_rules:
+  - type_name
+  - identifier_name
+  - file_length
+  - closure_parameter_position
+  - function_body_length
+  - cyclomatic_complexity
+
+opt_in_rules:
+  - empty_count
+  - explicit_init
+  - closure_spacing
+  - overridden_super_call
+  - prohibited_super_call
+  - redundant_nil_coalescing
+  - attributes
+  - operator_usage_whitespace
+  - closure_end_indentation
+  - first_where
+  - object_literal
+  - fatal_error_message
+
+trailing_comma:
+  mandatory_comma: true
