@@ -22,23 +22,26 @@ private struct ConsumerTest<Type: Equatable> {
         self.line = line
     }
 
+    func assert(_ actual: Type?, _ expected: Type?) {
+        switch (actual, expected) {
+        case (_, nil):
+            XCTAssertNil(actual, file: file, line: line)
+        case let (nil, expected?):
+            XCTFail("got nil but should be \(expected)", file: file, line: line)
+        case let (actual, expected) as (Float, Float):
+            XCTAssertEqual(actual, expected, accuracy: Float.ulpOfOne, file: file, line: line)
+        case let (actual, expected) as (Double, Double):
+            XCTAssertEqual(actual, expected, accuracy: Double.ulpOfOne, file: file, line: line)
+        default:
+            XCTAssertEqual(actual, expected, file: file, line: line)
+        }
+    }
+
     func run() {
         let stream = UnicodeStream(input)
         let lexer = WASTLexer(stream: stream)
         let actual = consumer(lexer)()
-        if let expected = expected {
-            XCTAssertEqual(
-                actual, expected,
-                "\(consumer) should return \(expected) but got \(String(describing: actual))",
-                file: file, line: line
-            )
-        } else {
-            XCTAssertNil(
-                actual,
-                "\(consumer) should return nil but got \(String(describing: actual))",
-                file: file, line: line
-            )
-        }
+        assert(actual, expected)
     }
 }
 
