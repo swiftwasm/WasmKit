@@ -127,26 +127,13 @@ extension WASTLexer {
 }
 
 extension WASTLexer {
-    func consumeDigits() -> UInt? {
-        var result: UInt?
-        while let c = stream.next(), let d = UInt(c, hex: false) {
-            result = (result ?? 0) * 10 + d
-            stream.advance()
-        }
-        return result
-    }
-
-    func consumeHexDigits() -> UInt? {
-        var result: UInt?
-        while let c = stream.next(), let d = UInt(c, hex: true) {
-            result = (result ?? 0) * 16 + d
-            stream.advance()
-        }
-        return result
-    }
-
     func consumeNumber() -> UInt? {
-        guard var result = consumeDigits() else { return nil }
+        var first: UInt?
+        while let c = stream.next(), let d = UInt(c, hex: false) {
+            first = (first ?? 0) * 10 + d
+            stream.advance()
+        }
+        guard var result = first else { return first }
 
         while let c = stream.next() {
             if let d = UInt(c, hex: false) {
@@ -163,7 +150,12 @@ extension WASTLexer {
     }
 
     func consumeHexNumber() -> UInt? {
-        guard var result = consumeHexDigits() else { return nil }
+        var first: UInt?
+        while let c = stream.next(), let d = UInt(c, hex: true) {
+            first = (first ?? 0) * 16 + d
+            stream.advance()
+        }
+        guard var result = first else { return first }
 
         while let c = stream.next() {
             if let d = UInt(c, hex: true) {

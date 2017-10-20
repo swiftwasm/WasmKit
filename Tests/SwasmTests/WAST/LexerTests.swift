@@ -108,44 +108,14 @@ internal final class LexerTests: XCTestCase {
         }
     }
 
-    func testConsumeDigits() {
-        let tests = [
-            ConsumerTest("00123456789", 123456789, WASTLexer.consumeDigits),
-            ConsumerTest("123abczxc", 123, WASTLexer.consumeDigits),
-            ConsumerTest("123_abc_zxc", 123, WASTLexer.consumeDigits),
-
-            ConsumerTest("", nil, WASTLexer.consumeDigits),
-            ConsumerTest("asdf", nil, WASTLexer.consumeDigits),
-            ]
-
-        measure {
-            tests.forEach { $0.run() }
-        }
-    }
-
-    func testConsumeHexDigits() {
-        let tests = [
-            ConsumerTest("00123456789abcdef", 0x123456789abcdef, WASTLexer.consumeHexDigits),
-            ConsumerTest("123abczxc", 0x123abc, WASTLexer.consumeHexDigits),
-            ConsumerTest("123_abc_zxc", 0x123, WASTLexer.consumeHexDigits),
-
-            ConsumerTest("", nil, WASTLexer.consumeHexDigits),
-            ConsumerTest("zxcv", nil, WASTLexer.consumeHexDigits),
-            ]
-
-        measure {
-            tests.forEach { $0.run() }
-        }
-    }
-
     func testConsumeNumber() {
         let tests = [
-            ConsumerTest("00123456789abcdef", 123456789, WASTLexer.consumeDigits),
-            ConsumerTest("123abczxc", 123, WASTLexer.consumeDigits),
-            ConsumerTest("123_abc_zxc", 123, WASTLexer.consumeDigits),
+            ConsumerTest("00123456789abcdef", 123456789, WASTLexer.consumeNumber),
+            ConsumerTest("123abczxc", 123, WASTLexer.consumeNumber),
+            ConsumerTest("123_abc_zxc", 123, WASTLexer.consumeNumber),
 
-            ConsumerTest("", nil, WASTLexer.consumeDigits),
-            ConsumerTest("asdf", nil, WASTLexer.consumeDigits),
+            ConsumerTest("", nil, WASTLexer.consumeNumber),
+            ConsumerTest("asdf", nil, WASTLexer.consumeNumber),
             ]
 
         measure {
