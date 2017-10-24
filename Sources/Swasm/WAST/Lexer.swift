@@ -75,9 +75,9 @@ extension WASTLexer: Stream {
                 }
                 _ = stream.next(); _ = stream.next()
 
-            case ("a" ... "z", _, _): // Keyword
+            case (CharacterSet.keywordPrefixes, _, _): // Keyword
                 var cs = [c0]
-                while let c = stream.next(), c.isIDCharacter {
+                while let c = stream.next(), CharacterSet.IDCharacters.contains(c) {
                     cs.append(c)
                 }
 
@@ -92,15 +92,54 @@ extension WASTLexer: Stream {
     }
 }
 
-private extension UnicodeScalar {
-    var isIDCharacter: Bool {
-        return ("0" ... "9" ~= self
-            ||	"A" ... "Z" ~= self
-            ||	"a" ... "z" ~= self
-            || ["!", "#", "$", "%", "&", "`", "*", "+", "-", ".", "/",
-                ":", "<", "=", ">", "?", "@", "\\", "^", "_", "`", ",", "~",
-                ].contains(self)
+internal struct CharacterSet {
+    static func ~= (lhs: CharacterSet, rhs: UnicodeScalar) -> Bool {
+        return lhs.contains(rhs)
+    }
+
+    let ranges: [ClosedRange<String>]
+    let characters: Set<Character>
+
+    init(ranges: [ClosedRange<String>] = [], characters: Set<Character> = Set()) {
+        self.ranges = ranges
+        self.characters = Set(characters)
+    }
+
+    func with(_ ranges: ClosedRange<String>...) -> CharacterSet {
+        return CharacterSet(
+            ranges: self.ranges + ranges,
+            characters: self.characters
         )
+    }
+
+    func with(_ characters: Character...) -> CharacterSet {
+        return CharacterSet(
+            ranges: self.ranges,
+            characters: self.characters.union(characters)
+        )
+    }
+
+    func contains(_ character: UnicodeScalar) -> Bool {
+        for range in ranges where range.contains(String(character)) {
+            return true
+        }
+
+        return characters.contains(Character(character))
+    }
+}
+
+private extension CharacterSet {
+    static var keywordPrefixes: CharacterSet {
+        return CharacterSet().with("a" ... "z")
+    }
+
+    static var IDCharacters: CharacterSet {
+        return CharacterSet()
+            .with("0" ... "9")
+            .with("a" ... "z")
+            .with("A" ... "Z")
+            .with("!", "#", "$", "%", "&", "`", "*", "+", "-", ".", "/",
+                  ":", "<", "=", ">", "?", "@", "\\", "^", "_", "`", ",", "~")
     }
 }
 
