@@ -37,12 +37,9 @@ internal final class LexerTests: XCTestCase {
         let tests: [LexerTest] = [
             // Whitespace
             LexerTest(" \t\n\r", []),
-            LexerTest(" abcde", [.keyword("abcde")]),
-            LexerTest("a \t b \n c \r d", [.keyword("a"), .keyword("b"), .keyword("c"), .keyword("d")]),
 
             // Line Comments
             LexerTest(";; a", []),
-            LexerTest(";; a \n ;; b", []),
             LexerTest(";; a \n b", [.keyword("b")]),
 
             // Block Comments
@@ -50,7 +47,7 @@ internal final class LexerTests: XCTestCase {
             LexerTest("(; \n a \n ;) b", [.keyword("b")]),
 
             // Keywords
-            LexerTest("a", [.keyword("a")]),
+            LexerTest("a!b#c$d", [.keyword("a!b#c$d")]),
 
             // Numbers
             LexerTest("0", [.unsigned(0)]),

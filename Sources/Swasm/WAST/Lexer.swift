@@ -49,7 +49,6 @@ public class WASTLexer<InputStream: LA2Stream> where InputStream.Element == Unic
 }
 
 extension WASTLexer: Stream {
-
     public var position: InputStream.Index {
         return stream.position
     }
@@ -73,11 +72,11 @@ extension WASTLexer: Stream {
                 while case let (end1?, end2?) = stream.look(), (end1, end2) != (";", ")") {
                     _ = stream.next()
                 }
-                _ = stream.next(); _ = stream.next()
+                _ = stream.next(); _ = stream.next() // skip ";)"
 
             case (CharacterSet.keywordPrefixes, _, _): // Keyword
                 var cs = [c0]
-                while let c = stream.next(), CharacterSet.IDCharacters.contains(c) {
+                while let c: UnicodeScalar = stream.next(), CharacterSet.IDCharacters.contains(c) {
                     cs.append(c)
                 }
 

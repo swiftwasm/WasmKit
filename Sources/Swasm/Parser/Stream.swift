@@ -43,14 +43,12 @@ public struct UnicodeStream: LA2Stream {
     public func look() -> (Unicode.Scalar?, Unicode.Scalar?) {
         guard unicodeScalars.indices.contains(index) else {
             return (nil, nil)
-
         }
         let c1 = unicodeScalars[index]
 
         let nextIndex = unicodeScalars.index(after: index)
         guard unicodeScalars.indices.contains(nextIndex) else {
-            return (nil, nil)
-
+            return (c1, nil)
         }
         let c2 = unicodeScalars[nextIndex]
 
