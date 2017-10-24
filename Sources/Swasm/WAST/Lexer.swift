@@ -83,33 +83,12 @@ extension WASTLexer: Stream {
                 return .keyword(String(String.UnicodeScalarView(cs)))
 
             case ("0", "x"?, CharacterSet.hexDigits?): // Hexadecimal Unsigned
-                var result = UInt(c0, hex: true)!
-
-                _ = stream.next() // skip "x"
-                while let c: UnicodeScalar = stream.next() {
-                    if let d = UInt(c, hex: true) {
-                        result = result * 16 + d
-                    } else if c == "_" {
-                        continue
-                    } else {
-                        break
-                    }
-                }
+                _ = stream.next(); _ = stream.next() // skip "x", c2
+                let result: UInt = consumeNumber(startsFrom: c2!, hex: true)
                 return .unsigned(result)
 
             case (CharacterSet.decimalDigits, _, _): // Decimal Unsigned
-                var result = UInt(c0, hex: false)!
-                while let c: UnicodeScalar = stream.look() {
-                    if let d = UInt(c, hex: false) {
-                        _ = stream.next()
-                        result = result * 10 + d
-                    } else if c == "_" {
-                        _ = stream.next()
-                        continue
-                    } else {
-                        break
-                    }
-                }
+                let result: UInt = consumeNumber(startsFrom: c0, hex: false)
                 return .unsigned(result)
 
             default: // Unexpected
@@ -118,6 +97,23 @@ extension WASTLexer: Stream {
         }
 
         return nil
+    }
+}
+
+internal extension WASTLexer {
+    func consumeNumber<T: Numeric>(startsFrom c: UnicodeScalar, hex: Bool) -> T {
+        var result = T(c, hex: hex)!
+        while let c: UnicodeScalar = stream.look() {
+            if let d = T(c, hex: hex) {
+                _ = stream.next()
+                result = result * (hex ? 16 : 10) + d
+            } else if c == "_" {
+                _ = stream.next()
+            } else {
+                break
+            }
+        }
+        return result
     }
 }
 
