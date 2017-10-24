@@ -1,16 +1,48 @@
 public enum LexicalToken {
     case keyword(String)
-    case unsigned
-    case signed
+    case reserved(String)
+    case unsigned(UInt)
+    case signed(Int)
     case floating
     case string
     case identifier
     case openingBrace
     case closingBrace
-    case whitespace(String)
 }
 
-public class WASTLexer<InputStream: Stream> where InputStream.Token == UnicodeScalar {
+extension LexicalToken: Equatable {
+    public static func == (lhs: LexicalToken, rhs: LexicalToken) -> Bool {
+        switch (lhs, rhs) {
+        case let (.keyword(l), .keyword(r)):
+            return l == r
+        case let (.reserved(l), .reserved(r)):
+            return l == r
+        case let (.unsigned(l), .unsigned(r)):
+            return l == r
+        case let (.signed(l), .signed(r)):
+            return l == r
+        case (.floating, .floating):
+            return true
+        case (.string, .string):
+            return true
+        case (.identifier, .identifier):
+            return true
+        case (.openingBrace, .openingBrace):
+            return true
+        case (.closingBrace, .closingBrace):
+            return true
+        default:
+            return false
+        }
+    }
+}
+
+public class WASTLexer<InputStream: PeekableStream> where InputStream.Token == UnicodeScalar {
+    enum Error: Swift.Error {
+        case unexpectedEnd
+        case unexpectedUnicodeScalar(UnicodeScalar, at: InputStream.Index)
+    }
+
     var stream: InputStream
 
     init(stream: InputStream) {
@@ -18,8 +50,87 @@ public class WASTLexer<InputStream: Stream> where InputStream.Token == UnicodeSc
     }
 }
 
+extension WASTLexer.Error: Equatable {
+    public static func == (lhs: WASTLexer<InputStream>.Error, rhs: WASTLexer<InputStream>.Error) -> Bool {
+        switch (lhs, rhs) {
+        case (.unexpectedEnd, .unexpectedEnd):
+            return true
+        case let (.unexpectedUnicodeScalar(l1, l2), .unexpectedUnicodeScalar(r1, r2)):
+            return l1 == r1 && l2 == r2
+        default: return false
+        }
+    }
+}
+
+extension WASTLexer: Stream {
+
+    public var position: InputStream.Index {
+        return stream.position
+    }
+
+    public func pop() throws -> LexicalToken? {
+        while let c = try stream.peek() {
+            switch c {
+            case " ", "\t", "\n", "\r": // Whitespace and Format Effectors
+                try stream.pop()
+                // Skip
+
+            case ";": // Line Comment?
+                try stream.pop()
+
+                switch try stream.peek() {
+                case ";"?:
+                    try stream.pop()
+                case let c2?:
+                    throw Error.unexpectedUnicodeScalar(c2, at: stream.position)
+                case nil:
+                    throw Error.unexpectedEnd
+                }
+
+                while let c2 = try stream.peek(), c2 != "\n" {
+                    try stream.pop()
+                }
+                // Skip
+
+            case "(": // Opening Brace or Block Comment
+                try stream.pop()
+
+                guard let c2 = try stream.peek(), c2 == ";" else {
+                    return .openingBrace
+                }
+                try stream.pop()
+
+                BlockComment: while let c3 = try stream.peek() {
+                    try stream.pop()
+
+                    if c3 == ";", let c4 = try stream.peek(), c4 == ")" {
+                        try stream.pop()
+                        break BlockComment
+                    }
+                }
+
+            case let c where "a" ... "z" ~= c: // Keyword
+                try stream.pop()
+
+                var keywordChars = [c]
+                while let idChar = try stream.peek(), idChar.isIDCharacter {
+                    try stream.pop()
+                    keywordChars.append(idChar)
+                }
+
+                return .keyword(String(String.UnicodeScalarView(keywordChars)))
+
+            default: // Unexpected
+                throw Error.unexpectedUnicodeScalar(c, at: stream.position)
+            }
+        }
+
+        return nil
+    }
+}
+
 private extension UnicodeScalar {
-    func isIDCharacter() -> Bool {
+    var isIDCharacter: Bool {
         return ("0" ... "9" ~= self
             ||	"A" ... "Z" ~= self
             ||	"a" ... "z" ~= self
@@ -55,158 +166,5 @@ private extension ExpressibleByIntegerLiteral {
             default: return nil
             }
         }
-    }
-}
-
-extension WASTLexer {
-    func consumeWhitespace() -> String? {
-        var codes = String.UnicodeScalarView()
-
-        loop:
-            while let c1 = stream.next() {
-                let c2 = stream.next(offset: 1)
-                switch (c1, c2) {
-                case (" ", _): // whitespace
-                    codes.append(c1)
-                    stream.advance()
-                case ("\t", _), ("\n", _), ("\r", _): // format
-                    codes.append(c1)
-                    stream.advance()
-                case (";", ";"?): // line comment
-                    codes.append(c1); codes.append(c2!)
-                    stream.advance(); stream.advance()
-
-                    while let cc = stream.next(), cc != "\n" {
-                        codes.append(cc)
-                        stream.advance()
-                    }
-                case ("(", ";"?): // block comment
-                    codes.append(c1); codes.append(c2!)
-                    stream.advance(); stream.advance()
-
-                    while let cc1 = stream.next() {
-                        codes.append(cc1)
-                        stream.advance()
-
-                        if cc1 == ";", let cc2 = stream.next(), cc2 == ")" {
-                            codes.append(cc2)
-                            stream.advance()
-                            break
-                        }
-                    }
-                default:
-                    break loop
-                }
-        }
-
-        return codes.isEmpty ? nil : String(codes)
-    }
-
-    func consumeIdentifierCharacters() -> String? {
-        var codes = String.UnicodeScalarView()
-
-        while let c = stream.next(), c.isIDCharacter() {
-            codes.append(c)
-            stream.advance()
-        }
-
-        return codes.isEmpty ? nil : String(codes)
-    }
-
-    func consumeKeyword() -> String? {
-        guard let c = stream.next(), "a" ... "z" ~= c else { return nil }
-        var codes = String.UnicodeScalarView([c])
-        stream.advance()
-
-        if let cs = consumeIdentifierCharacters() {
-            codes.append(contentsOf: cs.unicodeScalars)
-        }
-
-        return String(codes)
-    }
-}
-
-extension WASTLexer {
-    func consumeNumber() -> UInt? {
-        var first: UInt?
-        while let c = stream.next(), let d = UInt(c, hex: false) {
-            first = (first ?? 0) * 10 + d
-            stream.advance()
-        }
-        guard var result = first else { return first }
-
-        while let c = stream.next() {
-            if let d = UInt(c, hex: false) {
-                result = result * 10 + d
-                stream.advance()
-            } else if c == "_" {
-                stream.advance()
-            } else {
-                break
-            }
-        }
-
-        return result
-    }
-
-    func consumeHexNumber() -> UInt? {
-        var first: UInt?
-        while let c = stream.next(), let d = UInt(c, hex: true) {
-            first = (first ?? 0) * 16 + d
-            stream.advance()
-        }
-        guard var result = first else { return first }
-
-        while let c = stream.next() {
-            if let d = UInt(c, hex: true) {
-                result = result * 16 + d
-                stream.advance()
-            } else if c == "_" {
-                stream.advance()
-            } else {
-                break
-            }
-        }
-
-        return result
-    }
-
-    func consumeUnsignedInteger() -> UInt? {
-        hex:
-        if let c1 = stream.next(), c1 == "0", let c2 = stream.next(offset: 1), c2 == "x" {
-            stream.advance(); stream.advance()
-
-            guard let result = consumeHexNumber() else {
-                break hex
-            }
-            return result
-        }
-
-        guard let result = consumeNumber() else {
-            return nil
-        }
-
-        return result
-    }
-
-    func consumeSignedInteger() -> Int? {
-        guard let c = stream.next() else {
-            return nil
-        }
-
-        switch c {
-        case "+":
-            stream.advance()
-            return consumeUnsignedInteger().flatMap { Int($0) }
-        case "-":
-            stream.advance()
-            return consumeUnsignedInteger().flatMap { -Int($0) }
-        default:
-            return nil
-        }
-    }
-
-    func consumeInteger() -> Int? {
-        return (consumeUnsignedInteger().flatMap { Int($0) } ?? consumeSignedInteger())
     }
 }

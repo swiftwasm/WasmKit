@@ -1,18 +1,27 @@
+public protocol StreamIndex: Equatable, CustomStringConvertible {}
+extension Int: StreamIndex {}
+
 public protocol Stream {
     associatedtype Token
-    associatedtype Offset: ExpressibleByIntegerLiteral
-    func next(offset: Offset) -> Token?
-    mutating func advance()
+    associatedtype Index: StreamIndex
+
+    var position: Index { get }
+
+    @discardableResult
+    mutating func pop() throws -> Token?
 }
 
-extension Stream {
-    func next() -> Token? {
-        return next(offset: 0)
+public protocol PeekableStream: Stream {
+    func peek() throws -> Token?
+}
+
+public struct UnicodeStream: PeekableStream {
+
+    public let unicodeScalars: String.UnicodeScalarView
+
+    public var position: Int {
+        return index.encodedOffset
     }
-}
-
-public struct UnicodeStream: Stream {
-    let unicodeScalars: String.UnicodeScalarView
 
     private var index: String.Index
 
@@ -21,15 +30,15 @@ public struct UnicodeStream: Stream {
         self.index = initialIndex ?? string.startIndex
     }
 
-    public func next(offset: String.IndexDistance) -> UnicodeScalar? {
+    public func peek() -> UnicodeScalar? {
         guard unicodeScalars.indices.contains(index) else { return nil }
-
-        let lastIndex = unicodeScalars.index(before: unicodeScalars.endIndex)
-        guard let index = unicodeScalars.index(index, offsetBy: offset, limitedBy: lastIndex) else { return nil }
         return unicodeScalars[index]
     }
 
-    public mutating func advance() {
+    @discardableResult
+    public mutating func pop() -> UnicodeScalar? {
+        guard unicodeScalars.indices.contains(index) else { return nil }
         index = unicodeScalars.index(after: index)
+        return unicodeScalars[index]
     }
 }
