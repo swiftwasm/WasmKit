@@ -1,21 +1,24 @@
-public protocol StreamIndex: Equatable, CustomStringConvertible {}
-extension Int: StreamIndex {}
-
-public protocol Stream {
-    associatedtype Token
-    associatedtype Index: StreamIndex
-
+public protocol Stream: IteratorProtocol {
+    associatedtype Index: Equatable, CustomStringConvertible
     var position: Index { get }
-
-    @discardableResult
-    mutating func pop() throws -> Token?
 }
 
-public protocol PeekableStream: Stream {
-    func peek() throws -> Token?
+public protocol LA1Stream: Stream {
+    func look() -> Element?
 }
 
-public struct UnicodeStream: PeekableStream {
+public protocol LA2Stream: LA1Stream {
+    func look() -> (Element?, Element?)
+}
+
+public extension LA2Stream {
+    func look() -> Element? {
+        let (c1, _) = look()
+        return c1
+    }
+}
+
+public struct UnicodeStream: LA2Stream {
 
     public let unicodeScalars: String.UnicodeScalarView
 
@@ -27,18 +30,30 @@ public struct UnicodeStream: PeekableStream {
 
     init(_ string: String, from initialIndex: String.Index? = nil) {
         self.unicodeScalars = string.unicodeScalars
-        self.index = initialIndex ?? string.startIndex
+        self.index = initialIndex ?? string.unicodeScalars.startIndex
     }
 
-    public func peek() -> UnicodeScalar? {
+    public mutating func next() -> UnicodeScalar? {
         guard unicodeScalars.indices.contains(index) else { return nil }
-        return unicodeScalars[index]
-    }
-
-    @discardableResult
-    public mutating func pop() -> UnicodeScalar? {
-        guard unicodeScalars.indices.contains(index) else { return nil }
+        let c = unicodeScalars[index]
         index = unicodeScalars.index(after: index)
-        return unicodeScalars[index]
+        return c
+    }
+
+    public func look() -> (Unicode.Scalar?, Unicode.Scalar?) {
+        guard unicodeScalars.indices.contains(index) else {
+            return (nil, nil)
+
+        }
+        let c1 = unicodeScalars[index]
+
+        let nextIndex = unicodeScalars.index(after: index)
+        guard unicodeScalars.indices.contains(nextIndex) else {
+            return (nil, nil)
+
+        }
+        let c2 = unicodeScalars[nextIndex]
+
+        return (c1, c2)
     }
 }

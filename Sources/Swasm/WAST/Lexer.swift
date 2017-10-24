@@ -8,6 +8,7 @@ public enum LexicalToken {
     case identifier
     case openingBrace
     case closingBrace
+    case unknown(UnicodeScalar)
 }
 
 extension LexicalToken: Equatable {
@@ -31,34 +32,19 @@ extension LexicalToken: Equatable {
             return true
         case (.closingBrace, .closingBrace):
             return true
+        case let (.unknown(l), .unknown(r)):
+            return l == r
         default:
             return false
         }
     }
 }
 
-public class WASTLexer<InputStream: PeekableStream> where InputStream.Token == UnicodeScalar {
-    enum Error: Swift.Error {
-        case unexpectedEnd
-        case unexpectedUnicodeScalar(UnicodeScalar, at: InputStream.Index)
-    }
-
+public class WASTLexer<InputStream: LA2Stream> where InputStream.Element == UnicodeScalar {
     var stream: InputStream
 
     init(stream: InputStream) {
         self.stream = stream
-    }
-}
-
-extension WASTLexer.Error: Equatable {
-    public static func == (lhs: WASTLexer<InputStream>.Error, rhs: WASTLexer<InputStream>.Error) -> Bool {
-        switch (lhs, rhs) {
-        case (.unexpectedEnd, .unexpectedEnd):
-            return true
-        case let (.unexpectedUnicodeScalar(l1, l2), .unexpectedUnicodeScalar(r1, r2)):
-            return l1 == r1 && l2 == r2
-        default: return false
-        }
     }
 }
 
@@ -68,60 +54,37 @@ extension WASTLexer: Stream {
         return stream.position
     }
 
-    public func pop() throws -> LexicalToken? {
-        while let c = try stream.peek() {
-            switch c {
-            case " ", "\t", "\n", "\r": // Whitespace and Format Effectors
-                try stream.pop()
-                // Skip
+    public func next() -> LexicalToken? {
+        while let c0 = stream.next() {
+            let (c1, c2) = stream.look()
 
-            case ";": // Line Comment?
-                try stream.pop()
+            switch (c0, c1, c2) {
+            case (" ", _, _), ("\t", _, _), ("\n", _, _), ("\r", _, _): // Whitespace and Format Effectors
+                continue
 
-                switch try stream.peek() {
-                case ";"?:
-                    try stream.pop()
-                case let c2?:
-                    throw Error.unexpectedUnicodeScalar(c2, at: stream.position)
-                case nil:
-                    throw Error.unexpectedEnd
+            case (";", ";"?, _): // Line Comment
+                var c = c2
+                while c != nil, c != "\n" {
+                    c = stream.next()
+                }
+                continue
+
+            case ("(", ";"?, _): // Block Comment
+                while case let (end1?, end2?) = stream.look(), (end1, end2) != (";", ")") {
+                    _ = stream.next()
+                }
+                _ = stream.next(); _ = stream.next()
+
+            case ("a" ... "z", _, _): // Keyword
+                var cs = [c0]
+                while let c = stream.next(), c.isIDCharacter {
+                    cs.append(c)
                 }
 
-                while let c2 = try stream.peek(), c2 != "\n" {
-                    try stream.pop()
-                }
-                // Skip
-
-            case "(": // Opening Brace or Block Comment
-                try stream.pop()
-
-                guard let c2 = try stream.peek(), c2 == ";" else {
-                    return .openingBrace
-                }
-                try stream.pop()
-
-                BlockComment: while let c3 = try stream.peek() {
-                    try stream.pop()
-
-                    if c3 == ";", let c4 = try stream.peek(), c4 == ")" {
-                        try stream.pop()
-                        break BlockComment
-                    }
-                }
-
-            case let c where "a" ... "z" ~= c: // Keyword
-                try stream.pop()
-
-                var keywordChars = [c]
-                while let idChar = try stream.peek(), idChar.isIDCharacter {
-                    try stream.pop()
-                    keywordChars.append(idChar)
-                }
-
-                return .keyword(String(String.UnicodeScalarView(keywordChars)))
+                return .keyword(String(String.UnicodeScalarView(cs)))
 
             default: // Unexpected
-                throw Error.unexpectedUnicodeScalar(c, at: stream.position)
+                return .unknown(c0)
             }
         }
 
