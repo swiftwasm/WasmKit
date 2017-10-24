@@ -58,17 +58,17 @@ extension WASTLexer: Stream {
             let (c1, c2) = stream.look()
 
             switch (c0, c1, c2) {
-            case (" ", _, _), ("\t", _, _), ("\n", _, _), ("\r", _, _): // Whitespace and Format Effectors
+            case (" ", _, _), ("\t", _, _), ("\n", _, _), ("\r", _, _): // Whitespace and format effectors
                 continue
 
-            case (";", ";"?, _): // Line Comment
+            case (";", ";"?, _): // Line comment
                 var c = c2
                 while c != nil, c != "\n" {
                     c = stream.next()
                 }
                 continue
 
-            case ("(", ";"?, _): // Block Comment
+            case ("(", ";"?, _): // Block comment
                 while case let (end1?, end2?) = stream.look(), (end1, end2) != (";", ")") {
                     _ = stream.next()
                 }
@@ -82,14 +82,9 @@ extension WASTLexer: Stream {
 
                 return .keyword(String(String.UnicodeScalarView(cs)))
 
-            case ("0", "x"?, CharacterSet.hexDigits?): // Hexadecimal Unsigned
-                _ = stream.next(); _ = stream.next() // skip "x", c2
-                let result: UInt = consumeNumber(startsFrom: c2!, hex: true)
-                return .unsigned(result)
-
-            case (CharacterSet.decimalDigits, _, _): // Decimal Unsigned
-                let result: UInt = consumeNumber(startsFrom: c0, hex: false)
-                return .unsigned(result)
+            case (CharacterSet.digits, _, _),
+                 (CharacterSet.signs, _, _):
+                return consumeNumber(from: c0)
 
             default: // Unexpected
                 return .unknown(c0)
@@ -101,19 +96,89 @@ extension WASTLexer: Stream {
 }
 
 internal extension WASTLexer {
-    func consumeNumber<T: Numeric>(startsFrom c: UnicodeScalar, hex: Bool) -> T {
-        var result = T(c, hex: hex)!
-        while let c: UnicodeScalar = stream.look() {
-            if let d = T(c, hex: hex) {
+    func consumeNumber(from c0: UnicodeScalar) -> LexicalToken? {
+        var c0 = c0
+        var (isPositive, isHex): (Bool?, Bool)
+        (isPositive, c0) = consumeSign(from: c0)
+        (isHex, c0) = consumeHexPrefix(from: c0)
+        return consumeNumber(from: c0, positive: isPositive, hex: isHex)
+    }
+
+    func consumeSign(from c0: UnicodeScalar) -> (Bool?, UnicodeScalar) {
+        let (c1, _) = stream.look()
+        switch (c0, c1) {
+        case ("+", let c1?) where CharacterSet.digits.contains(c1):
+            _ = stream.next()
+            return (true, c1)
+        case ("-", let c1?) where CharacterSet.digits.contains(c1):
+            _ = stream.next()
+            return (false, c1)
+        default:
+            return (nil, c0)
+        }
+    }
+
+    func consumeHexPrefix(from c0: UnicodeScalar) -> (Bool, UnicodeScalar) {
+        let (c1, c2) = stream.look()
+        switch (c0, c1, c2) {
+        case ("0", "x"?, let c2?) where CharacterSet.hexDigits.contains(c2):
+            _ = stream.next(); _ = stream.next()
+            return (true, c2)
+        default:
+            return (false, c0)
+        }
+    }
+
+    func consumeNumber(from c0: UnicodeScalar, positive: Bool?, hex: Bool) -> LexicalToken? {
+        var result: LexicalToken = positive == nil ? .unsigned(0) : .signed(0)
+
+        var c0 = c0
+        var (c1, c2): (UnicodeScalar?, UnicodeScalar?)
+        while true {
+            (c1, c2) = stream.look()
+
+            switch (result, c0, c1, c2) {
+            case let (.unsigned(n), CharacterSet.decimalDigits, _, _) where !hex:
+                result = .unsigned(n * 10 + UInt(c0, hex: false)!)
+            case let (.signed(n), CharacterSet.decimalDigits, _, _) where !hex:
+                if positive == false {
+                    result = .signed(-(abs(n) * 10 + Int(c0, hex: false)!))
+                } else {
+                    result = .signed(n * 10 + Int(c0, hex: false)!)
+                }
+
+            case let (.unsigned(n), CharacterSet.hexDigits, _, _) where hex:
+                result = .unsigned(n * 16 + UInt(c0, hex: true)!)
+            case let (.signed(n), CharacterSet.hexDigits, _, _) where hex:
+                if positive == false {
+                    result = .signed(-(abs(n) * 16 + Int(c0, hex: true)!))
+                } else {
+                    result = .signed(n * 16 + Int(c0, hex: true)!)
+                }
+
+            default:
+                return .unknown(c0)
+            }
+
+            func skip(_ c: UnicodeScalar) {
+                c0 = c
                 _ = stream.next()
-                result = result * (hex ? 16 : 10) + d
-            } else if c == "_" {
+            }
+
+            guard let c1 = c1 else { return result }
+
+            switch (c1, c2, hex) {
+            case ("_", let c2?, false) where CharacterSet.decimalDigits.contains(c2),
+                 ("_", let c2?, true) where CharacterSet.hexDigits.contains(c2):
                 _ = stream.next()
-            } else {
-                break
+                skip(c2)
+            case (CharacterSet.decimalDigits, _, false),
+                 (CharacterSet.hexDigits, _, true):
+                skip(c1)
+            default:
+                return result
             }
         }
-        return result
     }
 }
 
@@ -127,6 +192,14 @@ internal extension CharacterSet {
             .with("0" ... "9", "a" ... "z", "A" ... "Z")
             .with("!", "#", "$", "%", "&", "`", "*", "+", "-", ".", "/",
                   ":", "<", "=", ">", "?", "@", "\\", "^", "_", "`", ",", "~")
+    }
+
+    static var signs: CharacterSet {
+        return CharacterSet().with("+", "-")
+    }
+
+    static var digits: CharacterSet {
+        return CharacterSet().with("0" ... "9", "a" ... "f", "A" ... "F")
     }
 
     static var decimalDigits: CharacterSet {

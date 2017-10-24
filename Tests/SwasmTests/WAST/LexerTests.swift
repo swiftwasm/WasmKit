@@ -55,6 +55,9 @@ internal final class LexerTests: XCTestCase {
             LexerTest("1234567890", [.unsigned(1234567890)]),
             LexerTest("1_234_567_890", [.unsigned(1_234_567_890)]),
 
+            LexerTest("1_a", [.unsigned(1), .unknown("_")]),
+            LexerTest("1__", [.unsigned(1), .unknown("_")]),
+
             LexerTest("0x", [.unsigned(0), .keyword("x")]),
             LexerTest("0xg", [.unsigned(0), .keyword("xg")]),
 
@@ -62,8 +65,15 @@ internal final class LexerTests: XCTestCase {
             LexerTest("0x0123456789", [.unsigned(0x0123456789)]),
             LexerTest("0x1234567890", [.unsigned(0x1234567890)]),
             LexerTest("0x1_234_567_890", [.unsigned(0x1_234_567_890)]),
+            LexerTest("0x1_g", [.unsigned(0x1), .unknown("_")]),
             LexerTest("0xABCDEF", [.unsigned(0xabcDEF)]),
             LexerTest("0xABC_DEF", [.unsigned(0xabc_DEF)]),
+
+            LexerTest("+", [.unknown("+")]),
+            LexerTest("+0123456789", [.signed(0123456789)]),
+            LexerTest("-0123456789", [.signed(-0123456789)]),
+            LexerTest("+0x0123456789", [.signed(0x0123456789)]),
+            LexerTest("-0x0123456789", [.signed(-0x0123456789)]),
 
             // Error
             LexerTest("\u{3042}", [.unknown("\u{3042}")]),
