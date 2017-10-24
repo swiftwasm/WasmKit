@@ -83,6 +83,36 @@ extension WASTLexer: Stream {
 
                 return .keyword(String(String.UnicodeScalarView(cs)))
 
+            case ("0", "x"?, CharacterSet.hexDigits?): // Hexadecimal Unsigned
+                var result = UInt(c0, hex: true)!
+
+                _ = stream.next() // skip "x"
+                while let c: UnicodeScalar = stream.next() {
+                    if let d = UInt(c, hex: true) {
+                        result = result * 16 + d
+                    } else if c == "_" {
+                        continue
+                    } else {
+                        break
+                    }
+                }
+                return .unsigned(result)
+
+            case (CharacterSet.decimalDigits, _, _): // Decimal Unsigned
+                var result = UInt(c0, hex: false)!
+                while let c: UnicodeScalar = stream.look() {
+                    if let d = UInt(c, hex: false) {
+                        _ = stream.next()
+                        result = result * 10 + d
+                    } else if c == "_" {
+                        _ = stream.next()
+                        continue
+                    } else {
+                        break
+                    }
+                }
+                return .unsigned(result)
+
             default: // Unexpected
                 return .unknown(c0)
             }

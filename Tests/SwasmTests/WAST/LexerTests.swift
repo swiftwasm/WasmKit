@@ -52,6 +52,22 @@ internal final class LexerTests: XCTestCase {
             // Keywords
             LexerTest("a", [.keyword("a")]),
 
+            // Numbers
+            LexerTest("0", [.unsigned(0)]),
+            LexerTest("0123456789", [.unsigned(0123456789)]),
+            LexerTest("1234567890", [.unsigned(1234567890)]),
+            LexerTest("1_234_567_890", [.unsigned(1_234_567_890)]),
+
+            LexerTest("0x", [.unsigned(0), .keyword("x")]),
+            LexerTest("0xg", [.unsigned(0), .keyword("xg")]),
+
+            LexerTest("0x0", [.unsigned(0x0)]),
+            LexerTest("0x0123456789", [.unsigned(0x0123456789)]),
+            LexerTest("0x1234567890", [.unsigned(0x1234567890)]),
+            LexerTest("0x1_234_567_890", [.unsigned(0x1_234_567_890)]),
+            LexerTest("0xABCDEF", [.unsigned(0xabcDEF)]),
+            LexerTest("0xABC_DEF", [.unsigned(0xabc_DEF)]),
+
             // Error
             LexerTest("\u{3042}", [.unknown("\u{3042}")]),
             LexerTest("🙆‍♂️", [.unknown("\u{1F646}")]),
