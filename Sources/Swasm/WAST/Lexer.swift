@@ -3,7 +3,7 @@ public enum LexicalToken {
     case reserved(String)
     case unsigned(UInt)
     case signed(Int)
-    case floating
+    case floating(Double)
     case string
     case identifier
     case openingBrace
@@ -22,8 +22,8 @@ extension LexicalToken: Equatable {
             return l == r
         case let (.signed(l), .signed(r)):
             return l == r
-        case (.floating, .floating):
-            return true
+        case let (.floating(l), .floating(r)):
+            return l == r
         case (.string, .string):
             return true
         case (.identifier, .identifier):
@@ -74,6 +74,11 @@ extension WASTLexer: Stream {
                 }
                 _ = stream.next(); _ = stream.next() // skip ";)"
 
+            case (CharacterSet.decimalDigits, _, _), // Number
+                 (CharacterSet.signs, _?, _),
+                 ("i", "n"?, "f"?):
+                return consumeNumber(from: c0)
+
             case (CharacterSet.keywordPrefixes, _, _): // Keyword
                 var cs = [c0]
                 while let c: UnicodeScalar = stream.next(), CharacterSet.IDCharacters.contains(c) {
@@ -81,10 +86,6 @@ extension WASTLexer: Stream {
                 }
 
                 return .keyword(String(String.UnicodeScalarView(cs)))
-
-            case (CharacterSet.digits, _, _),
-                 (CharacterSet.signs, _, _):
-                return consumeNumber(from: c0)
 
             default: // Unexpected
                 return .unknown(c0)
@@ -107,10 +108,10 @@ internal extension WASTLexer {
     func consumeSign(from c0: UnicodeScalar) -> (Bool?, UnicodeScalar) {
         let (c1, _) = stream.look()
         switch (c0, c1) {
-        case ("+", let c1?) where CharacterSet.digits.contains(c1):
+        case ("+", let c1?):
             _ = stream.next()
             return (true, c1)
-        case ("-", let c1?) where CharacterSet.digits.contains(c1):
+        case ("-", let c1?):
             _ = stream.next()
             return (false, c1)
         default:
@@ -138,23 +139,32 @@ internal extension WASTLexer {
             (c1, c2) = stream.look()
 
             switch (result, c0, c1, c2) {
-            case let (.unsigned(n), CharacterSet.decimalDigits, _, _) where !hex:
-                result = .unsigned(n * 10 + UInt(c0, hex: false)!)
-            case let (.signed(n), CharacterSet.decimalDigits, _, _) where !hex:
-                if positive == false {
-                    result = .signed(-(abs(n) * 10 + Int(c0, hex: false)!))
-                } else {
-                    result = .signed(n * 10 + Int(c0, hex: false)!)
-                }
+            case let (.unsigned(n), CharacterSet.decimalDigits, _, _) where !hex,
+                 let (.unsigned(n), CharacterSet.hexDigits, _, _) where hex:
+                result = .unsigned(n * (!hex ? 10 : 16) + UInt(c0, hex: hex)!)
 
-            case let (.unsigned(n), CharacterSet.hexDigits, _, _) where hex:
-                result = .unsigned(n * 16 + UInt(c0, hex: true)!)
-            case let (.signed(n), CharacterSet.hexDigits, _, _) where hex:
-                if positive == false {
-                    result = .signed(-(abs(n) * 16 + Int(c0, hex: true)!))
-                } else {
-                    result = .signed(n * 16 + Int(c0, hex: true)!)
+            case let (.signed(n), CharacterSet.decimalDigits, _, _) where !hex,
+                 let (.signed(n), CharacterSet.hexDigits, _, _) where hex:
+                result = positive == false
+                    ? .signed(-(abs(n) * (!hex ? 10 : 16) + Int(c0, hex: hex)!))
+                    : .signed(n * (!hex ? 10 : 16) + Int(c0, hex: hex)!)
+
+            case let (.floating(n), CharacterSet.decimalDigits, _, _) where !hex,
+                 let (.floating(n), CharacterSet.hexDigits, _, _) where hex:
+                var p: Double = 1
+                while abs((n * p).remainder(dividingBy: 1)) >= Double.ulpOfOne * p {
+                    p *= !hex ? 10 : 16
                 }
+                p *= !hex ? 10 : 16
+
+                let frac = Double(c0, hex: hex)! / p
+                result = positive == false
+                    ? .floating(-(abs(Double(n)) + frac))
+                    : .floating(Double(n) + frac)
+
+            case (_, "i", "n"?, "f"?):
+                _ = stream.next(); _ = stream.next()
+                return .floating(positive == false ? -Double.infinity : Double.infinity)
 
             default:
                 return .unknown(c0)
@@ -167,14 +177,29 @@ internal extension WASTLexer {
 
             guard let c1 = c1 else { return result }
 
-            switch (c1, c2, hex) {
-            case ("_", let c2?, false) where CharacterSet.decimalDigits.contains(c2),
-                 ("_", let c2?, true) where CharacterSet.hexDigits.contains(c2):
+            switch (result, c1, c2, hex) {
+            case (_, "_", let c2?, false) where CharacterSet.decimalDigits.contains(c2),
+                 (_, "_", let c2?, true) where CharacterSet.hexDigits.contains(c2):
                 _ = stream.next()
                 skip(c2)
-            case (CharacterSet.decimalDigits, _, false),
-                 (CharacterSet.hexDigits, _, true):
+
+            case (let .unsigned(n), ".", let c2?, false) where CharacterSet.decimalDigits.contains(c2),
+                 (let .unsigned(n), ".", let c2?, true) where CharacterSet.hexDigits.contains(c2):
+                result = .floating(Double(n))
+                _ = stream.next()
+                skip(c2)
+
+            case (let .signed(n), ".", let c2?, false) where CharacterSet.decimalDigits.contains(c2),
+                 (let .signed(n), ".", let c2?, true) where CharacterSet.hexDigits.contains(c2):
+                result = .floating(Double(n))
+                _ = stream.next()
+                skip(c2)
+
+            case (_, CharacterSet.decimalDigits, _, false),
+                 (_, CharacterSet.hexDigits, _, true),
+                 (_, "i", _, _):
                 skip(c1)
+
             default:
                 return result
             }
