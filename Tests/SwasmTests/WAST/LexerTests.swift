@@ -75,6 +75,17 @@ internal final class LexerTests: XCTestCase {
             LexerTest("+0x0123456789", [.signed(0x0123456789)]),
             LexerTest("-0x0123456789", [.signed(-0x0123456789)]),
 
+            LexerTest("1.23456789", [.floating(1.23456789e0)]),
+            LexerTest("0x1.23456789", [.floating(0x1.23456789p0)]),
+            LexerTest("+1.23456789", [.floating(+1.23456789e0)]),
+            LexerTest("+0x1.23456789", [.floating(+0x1.23456789p0)]),
+            LexerTest("-1.23456789", [.floating(-1.23456789e0)]),
+            LexerTest("-0x1.23456789", [.floating(-0x1.23456789p0)]),
+
+            LexerTest("inf", [.floating(Double.infinity)]),
+            LexerTest("+inf", [.floating(Double.infinity)]),
+            LexerTest("-inf", [.floating(-Double.infinity)]),
+
             // Error
             LexerTest("\u{3042}", [.unknown("\u{3042}")]),
             LexerTest("🙆‍♂️", [.unknown("\u{1F646}")]),
