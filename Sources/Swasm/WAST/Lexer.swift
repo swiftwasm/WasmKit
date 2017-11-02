@@ -4,7 +4,7 @@ public enum LexicalToken {
     case unsigned(UInt)
     case signed(Int)
     case floating(Double)
-    case string
+    case string(String)
     case identifier
     case openingBrace
     case closingBrace
@@ -24,8 +24,8 @@ extension LexicalToken: Equatable {
             return l == r
         case let (.floating(l), .floating(r)):
             return l == r
-        case (.string, .string):
-            return true
+        case let (.string(l), .string(r)):
+            return l == r
         case (.identifier, .identifier):
             return true
         case (.openingBrace, .openingBrace):
@@ -74,17 +74,30 @@ extension WASTLexer: Stream {
                 }
                 _ = stream.next(); _ = stream.next() // skip ";)"
 
-            case (CharacterSet.decimalDigits, _, _), // Number
+            case (CharacterSet.decimalDigits, _, _),
                  (CharacterSet.signs, _?, _),
-                 ("i", "n"?, "f"?):
+                 ("i", "n"?, "f"?): // Number
                 return consumeNumber(from: c0)
+
+            case ("\"", _, _): // String
+                var result = String.UnicodeScalarView()
+
+                guard c1 != "\"" else {
+                    _ = stream.next()
+                    return .string("")
+                }
+
+                while let c = consumeCharacter() {
+                    result.append(c)
+                }
+
+                return .string(String(result))
 
             case (CharacterSet.keywordPrefixes, _, _): // Keyword
                 var cs = [c0]
                 while let c: UnicodeScalar = stream.next(), CharacterSet.IDCharacters.contains(c) {
                     cs.append(c)
                 }
-
                 return .keyword(String(String.UnicodeScalarView(cs)))
 
             default: // Unexpected
@@ -203,6 +216,58 @@ internal extension WASTLexer {
             default:
                 return result
             }
+        }
+    }
+}
+
+internal extension WASTLexer {
+    func consumeCharacter() -> UnicodeScalar? {
+        guard let c0 = stream.next() else { return nil }
+        let (c1, c2) = stream.look()
+
+        switch (c0, c1, c2) {
+        case ("\\", "t"?, _):
+            _ = stream.next()
+            return "\t"
+        case ("\\", "n"?, _):
+            _ = stream.next()
+            return "\n"
+        case ("\\", "r"?, _):
+            _ = stream.next()
+            return "\r"
+
+        case ("\\", "\""?, _),
+             ("\\", "'"?, _),
+             ("\\", "\\"?, _):
+            _ = stream.next()
+            return c1!
+
+        case ("\"", _, _):
+            return nil
+
+        case let ("\\", c1?, c2?) where CharacterSet.hexDigits.contains(c1) && CharacterSet.hexDigits.contains(c2):
+            var codes: [UTF8.CodeUnit] = [UTF8.CodeUnit(c1, hex: true)! << 4 + UTF8.CodeUnit(c2, hex: true)!]
+            _ = stream.next(); _ = stream.next() // skip c1 and c2
+            while stream.next() == "\\", case let (c1?, c2?) = stream.look() {
+                codes.append(UTF8.CodeUnit(c1, hex: true)! << 4 + UTF8.CodeUnit(c2, hex: true)!)
+                _ = stream.next(); _ = stream.next()
+            }
+            var codeIterator = codes.makeIterator()
+            var decoder = UTF8()
+            guard case let .scalarValue(v) = decoder.decode(&codeIterator) else {
+                return nil
+            }
+            return v
+
+        case ("\\", "u"?, "{"?):
+            _ = stream.next(); _ = stream.next() // skip "u" and "{"
+            guard let c = stream.next() else { return nil }
+            guard case let .unsigned(hexNumber)? = consumeNumber(from: c, positive: nil, hex: true) else { return nil }
+            guard let scalar = UnicodeScalar(UInt32(hexNumber)) else { return nil }
+            _ = stream.next() // skip "}"
+            return scalar
+        default:
+            return c0
         }
     }
 }
