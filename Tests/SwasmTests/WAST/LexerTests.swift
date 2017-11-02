@@ -86,6 +86,13 @@ internal final class LexerTests: XCTestCase {
             LexerTest("+inf", [.floating(Double.infinity)]),
             LexerTest("-inf", [.floating(-Double.infinity)]),
 
+            // String
+            LexerTest("\"\"", [.string("")]),
+            LexerTest("\"asdf\"", [.string("asdf")]),
+            LexerTest("\"\\t\\n\\r\\\\\\\"\'\"", [.string("\t\n\r\\\"\'")]),
+            LexerTest("\"\\F0\\9F\\8C\\8D\"", [.string("🌍")]),
+            LexerTest("\"\\u{1F30D}\"", [.string("🌍")]),
+
             // Error
             LexerTest("\u{3042}", [.unknown("\u{3042}")]),
             LexerTest("🙆‍♂️", [.unknown("\u{1F646}")]),
