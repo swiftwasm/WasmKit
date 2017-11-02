@@ -1,3 +1,2 @@
 ignore:
-  - "Package.*"
-  - "Tests"
+  - "./SwasmTests.xctest.coverage.txt"
