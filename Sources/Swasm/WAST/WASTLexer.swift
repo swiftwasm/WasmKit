@@ -1,4 +1,4 @@
-public enum LexicalToken {
+public enum WASTLexicalToken {
     case keyword(String)
     case reserved(String)
     case unsigned(UInt)
@@ -11,8 +11,8 @@ public enum LexicalToken {
     case unknown(UnicodeScalar)
 }
 
-extension LexicalToken: Equatable {
-    public static func == (lhs: LexicalToken, rhs: LexicalToken) -> Bool {
+extension WASTLexicalToken: Equatable {
+    public static func == (lhs: WASTLexicalToken, rhs: WASTLexicalToken) -> Bool {
         switch (lhs, rhs) {
         case let (.keyword(l), .keyword(r)):
             return l == r
@@ -53,7 +53,7 @@ extension WASTLexer: Stream {
         return stream.position
     }
 
-    public func next() -> LexicalToken? {
+    public func next() -> WASTLexicalToken? {
         while let c0 = stream.next() {
             let (c1, c2) = stream.look()
 
@@ -110,7 +110,7 @@ extension WASTLexer: Stream {
 }
 
 internal extension WASTLexer {
-    func consumeNumber(from c0: UnicodeScalar) -> LexicalToken? {
+    func consumeNumber(from c0: UnicodeScalar) -> WASTLexicalToken? {
         var c0 = c0
         var (isPositive, isHex): (Bool?, Bool)
         (isPositive, c0) = consumeSign(from: c0)
@@ -143,8 +143,8 @@ internal extension WASTLexer {
         }
     }
 
-    func consumeNumber(from c0: UnicodeScalar, positive: Bool?, hex: Bool) -> LexicalToken? {
-        var result: LexicalToken = positive == nil ? .unsigned(0) : .signed(0)
+    func consumeNumber(from c0: UnicodeScalar, positive: Bool?, hex: Bool) -> WASTLexicalToken? {
+        var result: WASTLexicalToken = positive == nil ? .unsigned(0) : .signed(0)
 
         var c0 = c0
         var (c1, c2): (UnicodeScalar?, UnicodeScalar?)
