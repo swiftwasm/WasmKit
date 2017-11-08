@@ -46,6 +46,12 @@ internal final class WASTLexerTests: XCTestCase {
             WASTLexerTestCase("(; a ;)", []),
             WASTLexerTestCase("(; \n a \n ;) b", [.keyword("b")]),
 
+            // Braces
+            WASTLexerTestCase("()", [.openingBrace, .closingBrace]),
+
+            // Identifiers
+            WASTLexerTestCase("$abcde", [.identifier("abcde")]),
+
             // Keywords
             WASTLexerTestCase("a!b#c$d", [.keyword("a!b#c$d")]),
 

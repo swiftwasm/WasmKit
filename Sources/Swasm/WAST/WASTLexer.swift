@@ -5,7 +5,7 @@ public enum WASTLexicalToken {
     case signed(Int)
     case floating(Double)
     case string(String)
-    case identifier
+    case identifier(String)
     case openingBrace
     case closingBrace
     case unknown(UnicodeScalar)
@@ -26,8 +26,8 @@ extension WASTLexicalToken: Equatable {
             return l == r
         case let (.string(l), .string(r)):
             return l == r
-        case (.identifier, .identifier):
-            return true
+        case let (.identifier(l), .identifier(r)):
+            return l == r
         case (.openingBrace, .openingBrace):
             return true
         case (.closingBrace, .closingBrace):
@@ -74,31 +74,43 @@ extension WASTLexer: Stream {
                 }
                 _ = stream.next(); _ = stream.next() // skip ";)"
 
+            case ("(", _, _): // Opening brace
+                return .openingBrace
+
+            case (")", _, _): // Closing brace
+                return .closingBrace
+
+            case ("$", _?, _): // Identifier
+                var result = String.UnicodeScalarView()
+                while let c = stream.next(), CharacterSet.IDCharacters.contains(c) {
+                    result.append(c)
+                }
+                return .identifier(String(result))
+
             case (CharacterSet.decimalDigits, _, _),
                  (CharacterSet.signs, _?, _),
                  ("i", "n"?, "f"?): // Number
                 return consumeNumber(from: c0)
 
             case ("\"", _, _): // String
-                var result = String.UnicodeScalarView()
-
                 guard c1 != "\"" else {
                     _ = stream.next()
                     return .string("")
                 }
 
+                var result = String.UnicodeScalarView()
                 while let c = consumeCharacter() {
                     result.append(c)
                 }
-
                 return .string(String(result))
 
             case (CharacterSet.keywordPrefixes, _, _): // Keyword
-                var cs = [c0]
+                var result = String.UnicodeScalarView()
+                result.append(c0)
                 while let c: UnicodeScalar = stream.next(), CharacterSet.IDCharacters.contains(c) {
-                    cs.append(c)
+                    result.append(c)
                 }
-                return .keyword(String(String.UnicodeScalarView(cs)))
+                return .keyword(String(result))
 
             default: // Unexpected
                 return .unknown(c0)
