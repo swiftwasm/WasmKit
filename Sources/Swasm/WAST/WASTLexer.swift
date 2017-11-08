@@ -1,6 +1,5 @@
 public enum WASTLexicalToken {
     case keyword(String)
-    case reserved(String)
     case unsigned(UInt)
     case signed(Int)
     case floating(Double)
@@ -15,8 +14,6 @@ extension WASTLexicalToken: Equatable {
     public static func == (lhs: WASTLexicalToken, rhs: WASTLexicalToken) -> Bool {
         switch (lhs, rhs) {
         case let (.keyword(l), .keyword(r)):
-            return l == r
-        case let (.reserved(l), .reserved(r)):
             return l == r
         case let (.unsigned(l), .unsigned(r)):
             return l == r
@@ -298,10 +295,6 @@ internal extension CharacterSet {
 
     static var signs: CharacterSet {
         return CharacterSet().with("+", "-")
-    }
-
-    static var digits: CharacterSet {
-        return CharacterSet().with("0" ... "9", "a" ... "f", "A" ... "F")
     }
 
     static var decimalDigits: CharacterSet {
