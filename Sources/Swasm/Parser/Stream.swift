@@ -19,7 +19,6 @@ public extension LA2Stream {
 }
 
 public struct UnicodeStream: LA2Stream {
-
     public let unicodeScalars: String.UnicodeScalarView
 
     public var position: Int {

@@ -37,7 +37,7 @@ extension WASTLexicalToken: Equatable {
     }
 }
 
-public class WASTLexer<InputStream: LA2Stream> where InputStream.Element == UnicodeScalar {
+public struct WASTLexer<InputStream: LA2Stream> where InputStream.Element == UnicodeScalar {
     var stream: InputStream
 
     init(stream: InputStream) {
@@ -50,7 +50,7 @@ extension WASTLexer: Stream {
         return stream.position
     }
 
-    public func next() -> WASTLexicalToken? {
+    public mutating func next() -> WASTLexicalToken? {
         while let c0 = stream.next() {
             let (c1, c2) = stream.look()
 
@@ -119,7 +119,7 @@ extension WASTLexer: Stream {
 }
 
 internal extension WASTLexer {
-    func consumeNumber(from c0: UnicodeScalar) -> WASTLexicalToken? {
+    mutating func consumeNumber(from c0: UnicodeScalar) -> WASTLexicalToken? {
         var c0 = c0
         var (isPositive, isHex): (Bool?, Bool)
         (isPositive, c0) = consumeSign(from: c0)
@@ -127,7 +127,7 @@ internal extension WASTLexer {
         return consumeNumber(from: c0, positive: isPositive, hex: isHex)
     }
 
-    func consumeSign(from c0: UnicodeScalar) -> (Bool?, UnicodeScalar) {
+    mutating func consumeSign(from c0: UnicodeScalar) -> (Bool?, UnicodeScalar) {
         let (c1, _) = stream.look()
         switch (c0, c1) {
         case ("+", let c1?):
@@ -141,7 +141,7 @@ internal extension WASTLexer {
         }
     }
 
-    func consumeHexPrefix(from c0: UnicodeScalar) -> (Bool, UnicodeScalar) {
+    mutating func consumeHexPrefix(from c0: UnicodeScalar) -> (Bool, UnicodeScalar) {
         let (c1, c2) = stream.look()
         switch (c0, c1, c2) {
         case ("0", "x"?, let c2?) where CharacterSet.hexDigits.contains(c2):
@@ -152,7 +152,7 @@ internal extension WASTLexer {
         }
     }
 
-    func consumeNumber(from c0: UnicodeScalar, positive: Bool?, hex: Bool) -> WASTLexicalToken? {
+    mutating func consumeNumber(from c0: UnicodeScalar, positive: Bool?, hex: Bool) -> WASTLexicalToken? {
         var result: WASTLexicalToken = positive == nil ? .unsigned(0) : .signed(0)
 
         var c0 = c0
@@ -230,7 +230,7 @@ internal extension WASTLexer {
 }
 
 internal extension WASTLexer {
-    func consumeCharacter() -> UnicodeScalar? {
+    mutating func consumeCharacter() -> UnicodeScalar? {
         guard let c0 = stream.next() else { return nil }
         let (c1, c2) = stream.look()
 

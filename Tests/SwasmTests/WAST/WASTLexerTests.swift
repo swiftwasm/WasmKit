@@ -20,7 +20,7 @@ private struct WASTLexerTestCase {
 
     func run() {
         let stream = UnicodeStream(input)
-        let lexer = WASTLexer(stream: stream)
+        var lexer = WASTLexer(stream: stream)
         var actual = [WASTLexicalToken]()
         while let token = lexer.next() {
             actual.append(token)
