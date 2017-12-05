@@ -5,9 +5,12 @@ require 'xcodeproj'
 project_path = File.expand_path('../../Swasm.xcodeproj', __FILE__)
 project = Xcodeproj::Project.open(project_path)
 
+TARGET_NAME = "Swasm"
 PHASE_NAME = "Run SwiftLint"
 
 project.targets.each do |target|
+  next unless target.name == TARGET_NAME
+
   next if target.build_phases.any? do |phase|
     phase.respond_to?(:name) and phase.name == PHASE_NAME
   end
