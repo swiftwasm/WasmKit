@@ -1,7 +1,24 @@
 {
   "object": {
     "pins": [
-
+      {
+        "package": "Antlr4",
+        "repositoryURL": "https://github.com/akkyie/antlr4-swift.git",
+        "state": {
+          "branch": null,
+          "revision": "a19b997cb3e1470032161d343c249de9850ec20e",
+          "version": "4.0.0"
+        }
+      },
+      {
+        "package": "Result",
+        "repositoryURL": "https://github.com/antitypical/Result.git",
+        "state": {
+          "branch": null,
+          "revision": "7477584259bfce2560a19e06ad9f71db441fff11",
+          "version": "3.2.4"
+        }
+      }
     ]
   },
   "version": 1

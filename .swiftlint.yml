@@ -1,5 +1,6 @@
 excluded:
   - .build
+  - Sources/Swasm/ANTLR
 
 disabled_rules:
   - type_name

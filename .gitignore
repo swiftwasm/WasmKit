@@ -2,3 +2,5 @@
 /.build
 /Packages
 /*.xcodeproj
+/Sources/Swasm/ANTLR/*
+!/Sources/Swasm/ANTLR/*.g4
