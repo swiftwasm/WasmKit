@@ -180,7 +180,9 @@ plainInstruction : 'unreachable'
                  | 'call_indirect' typeIndex
                  ;
 
-expression : instruction*;
+expression : '(' instruction* ')'
+           |
+           ;
 
 // Modules
 // https://webassembly.github.io/spec/text/modules.html
@@ -217,8 +219,8 @@ importDescriptor : '(' 'func' id? typeUse ')'
 
 // Functions
 
-functionDefinition : '(' 'func' id? typeUse localDefinition* instruction* ')'
-                   | '(' 'func' id? '(' 'export' name ')' typeUse localDefinition* instruction* ')';
+functionDefinition : '(' 'func' id? typeUse localDefinition* expression ')'
+                   | '(' 'func' id? '(' 'export' name ')' typeUse localDefinition* expression ')';
 localDefinition : '(' 'local' id? valueType ')';
 
 // Tables
