@@ -10,7 +10,7 @@ TOKENS_FILE = $(PARSER_SOURCES)/WAST.tokens
 .PHONY: parser
 parser: $(TOKENS_FILE)
 
-ANTLR4 = java -Xmx500M -cp "/usr/local/lib/antlr4-4.7.1-SNAPSHOT-complete.jar:$CLASSPATH" org.antlr.v4.Tool
+ANTLR4 = java -Xmx500M -cp "/usr/local/lib/antlr4-4.7.1-SNAPSHOT-complete.jar:$$CLASSPATH" org.antlr.v4.Tool
 
 $(TOKENS_FILE): $(GRAMMER_FILE)
 	$(ANTLR4) -Dlanguage=Swift -visitor -no-listener $(GRAMMER_FILE)
