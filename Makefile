@@ -5,6 +5,7 @@ test:
 .PHONY: project
 project:
 	swift package generate-xcodeproj --enable-code-coverage
+	scripts/run_swiftformat.rb
 	scripts/run_swiftlint.rb
 
 .PHONY: coverage
