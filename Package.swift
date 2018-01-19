@@ -3,20 +3,22 @@
 import PackageDescription
 
 let package = Package(
-	name: "Swasm",
-	products: [
-		.library(
-			name: "Swasm",
-			targets: ["Swasm"]
-		), ],
-	dependencies: [],
-	targets: [
-		.target(
-			name: "Swasm",
-			dependencies: []
-		),
-		.testTarget(
-			name: "SwasmTests",
-			dependencies: ["Swasm"]
-		), ]
+    name: "Swasm",
+    products: [
+        .library(
+            name: "Swasm",
+            targets: ["Swasm"]
+        ),
+    ],
+    dependencies: [],
+    targets: [
+        .target(
+            name: "Swasm",
+            dependencies: []
+        ),
+        .testTarget(
+            name: "SwasmTests",
+            dependencies: ["Swasm"]
+        ),
+    ]
 )
