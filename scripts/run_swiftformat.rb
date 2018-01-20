@@ -20,7 +20,7 @@ project.targets.each do |target|
   if which swiftformat >/dev/null; then
     swiftformat Package.swift "${SRCROOT}/Sources" "${SRCROOT}/Tests"
   else
-    echo "warning: SwiftLint not installed, download from https://github.com/realm/SwiftLint"
+    echo "warning: SwiftFormat not installed, download from https://github.com/nicklockwood/SwiftFormat"
   fi
   EOS
 
