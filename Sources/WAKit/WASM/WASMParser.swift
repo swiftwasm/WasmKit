@@ -21,6 +21,18 @@ extension WASMParser {
     typealias StreamError = Parser.Error<Stream.Element>
 }
 
+// https://webassembly.github.io/spec/core/binary/conventions.html#vectors
+extension WASMParser {
+    func parseVector<Content>(content parser: () throws -> Content) throws -> [Content] {
+        var contents = [Content]()
+        let count = try parseUnsigned(bits: 32)
+        for _ in 0 ..< count {
+            contents.append(try parser())
+        }
+        return contents
+    }
+}
+
 // https://webassembly.github.io/spec/core/binary/values.html#integers
 extension WASMParser {
 
@@ -91,15 +103,30 @@ extension WASMParser {
     }
 }
 
-// https://webassembly.github.io/spec/core/binary/conventions.html#vectors
+// https://webassembly.github.io/spec/core/binary/types.html#types
+
 extension WASMParser {
-    func parseVector<Content>(content parser: () throws -> Content) throws -> [Content] {
-        var contents = [Content]()
-        let count = try parseUnsigned(bits: 32)
-        for _ in 0 ..< count {
-            contents.append(try parser())
+    // https://webassembly.github.io/spec/core/binary/types.html#value-types
+    func parseValueType() throws -> Value.Type {
+        guard let b = try stream.peek() else {
+            throw StreamError.unexpectedEnd
         }
-        return contents
+        switch b {
+        case 0x7F:
+            try stream.consumeAny()
+            return Int32.self
+        case 0x7E:
+            try stream.consumeAny()
+            return Int64.self
+        case 0x7D:
+            try stream.consumeAny()
+            return Float32.self
+        case 0x7C:
+            try stream.consumeAny()
+            return Float64.self
+        default:
+            throw StreamError.unexpected(b, expected: Set(0x7C ... 0x7F))
+        }
     }
 }
 

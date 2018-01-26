@@ -196,6 +196,47 @@ extension WASMParserTests {
 }
 
 extension WASMParserTests {
+    func testWASMParser_parseValueType() {
+        var stream: StaticByteStream!
+        var parser: WASMParser<StaticByteStream>!
+
+        stream = StaticByteStream(bytes: [0x7F])
+        parser = WASMParser(stream: stream)
+        XCTAssert(try parser.parseValueType() == Int32.self)
+        XCTAssertEqual(parser.currentIndex, stream.bytes.count)
+
+        stream = StaticByteStream(bytes: [0x7E])
+        parser = WASMParser(stream: stream)
+        XCTAssert(try parser.parseValueType() == Int64.self)
+        XCTAssertEqual(parser.currentIndex, stream.bytes.count)
+
+        stream = StaticByteStream(bytes: [0x7D])
+        parser = WASMParser(stream: stream)
+        XCTAssert(try parser.parseValueType() == Float32.self)
+        XCTAssertEqual(parser.currentIndex, stream.bytes.count)
+
+        stream = StaticByteStream(bytes: [0x7C])
+        parser = WASMParser(stream: stream)
+        XCTAssert(try parser.parseValueType() == Float64.self)
+        XCTAssertEqual(parser.currentIndex, stream.bytes.count)
+
+        stream = StaticByteStream(bytes: [0x7B])
+        parser = WASMParser(stream: stream)
+        do {
+            _ = try parser.parseValueType()
+            XCTFail("Shoud occur an error")
+        } catch let error {
+            if case let Parser.Error<UInt8>.unexpected(0x7B, expected: expected) = error,
+                expected == Set(0x7C ... 0x7F) {
+                XCTAssertEqual(stream.currentIndex, 0)
+            } else {
+                XCTFail("Unexpected error: \(error)")
+            }
+        }
+    }
+}
+
+extension WASMParserTests {
     func testWASMParser_parseMagicNumbers() {
         let stream = StaticByteStream(bytes: [0x00, 0x61, 0x73, 0x6D])
         let parser = WASMParser(stream: stream)
