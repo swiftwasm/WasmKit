@@ -14,7 +14,7 @@ public final class WASMParser<Stream: ByteStream> {
 
 public enum WASMParserError: Swift.Error {
     case invalidUnicode([UInt8])
-    case invalidSectionSize(UInt)
+    case invalidSectionSize(UInt32)
 }
 
 extension WASMParser {
@@ -76,6 +76,12 @@ extension WASMParser {
     }
 }
 
+extension WASMParser {
+    func parseUnsigned32() throws -> UInt32 {
+        return UInt32(try parseUnsigned(bits: 32))
+    }
+}
+
 // https://webassembly.github.io/spec/core/binary/values.html#names
 extension WASMParser {
     func parseName() throws -> String {
@@ -104,20 +110,16 @@ extension WASMParser {
 
     // https://webassembly.github.io/spec/core/binary/types.html#value-types
     func parseValueType() throws -> Value.Type {
-        let b = try stream.peek()
+        let b = try stream.consume(Set(0x7C ... 0x7F))
 
         switch b {
         case 0x7F:
-            try stream.consumeAny()
             return Int32.self
         case 0x7E:
-            try stream.consumeAny()
             return Int64.self
         case 0x7D:
-            try stream.consumeAny()
             return Float32.self
         case 0x7C:
-            try stream.consumeAny()
             return Float64.self
         default:
             throw StreamError.unexpected(b, expected: Set(0x7C ... 0x7F))
@@ -152,10 +154,10 @@ extension WASMParser {
         switch b {
         case 0x00:
             try stream.consumeAny()
-            return try Limits(min: UInt32(parseUnsigned(bits: 32)), max: nil)
+            return try Limits(min: parseUnsigned32(), max: nil)
         case 0x01:
             try stream.consumeAny()
-            return try Limits(min: UInt32(parseUnsigned(bits: 32)), max: UInt32(parseUnsigned(bits: 32)))
+            return try Limits(min: parseUnsigned32(), max: parseUnsigned32())
         default:
             throw StreamError.unexpected(b, expected: [0x00, 0x01])
         }
@@ -168,7 +170,17 @@ extension WASMParser {
 
     // https://webassembly.github.io/spec/core/binary/types.html#table-types
     func parseTableType() throws -> TableType {
-        return TableType(limits: try parseLimits())
+        let elementType: FunctionType
+        let b = try stream.peek()
+        switch b {
+        case 0x70:
+            try stream.consumeAny()
+            elementType = .any
+        default:
+            throw StreamError.unexpected(b, expected: [0x70])
+        }
+        let limits = try parseLimits()
+        return TableType(elementType: elementType, limits: limits)
     }
 
     // https://webassembly.github.io/spec/core/binary/types.html#global-types
@@ -193,35 +205,216 @@ extension WASMParser {
     }
 }
 
-// https://webassembly.github.io/spec/core/binary/modules.html#sections
+// https://webassembly.github.io/spec/core/binary/instructions.html
 extension WASMParser {
-    func parseSection() throws -> Section {
-        let id = try stream.peek()
-
-        switch id {
-        case 0:
-            return try parseCustomSection()
+    func parseInstruction() throws -> Instruction {
+        let code = try stream.consumeAny()
+        switch code {
+        case 0x00:
+            return ControlInstruction.unreachable
+        case 0x01:
+            return ControlInstruction.nop
+        case 0x0B:
+            return PseudoInstruction.end
         default:
-            throw StreamError.unexpected(id, expected: Set(0 ... 11))
+            throw StreamError.unexpected(code, expected: nil)
         }
     }
 
-    func parseCustomSection() throws -> CustomSection {
-        try stream.consume(0)
+    func parseExpression() throws -> Expression {
+        var instructions = [Instruction]()
+        var instruction: Instruction
 
-        let size = try parseUnsigned(bits: 32)
+        repeat {
+            instruction = try parseInstruction()
+            instructions.append(instruction)
+        } while !instruction.isEqual(to: PseudoInstruction.end)
+
+        return Expression(instructions: instructions)
+    }
+}
+
+// https://webassembly.github.io/spec/core/binary/modules.html#sections
+extension WASMParser {
+
+    // https://webassembly.github.io/spec/core/binary/modules.html#custom-section
+    func parseCustomSection() throws -> Section {
+        try stream.consume(0)
+        let size = try parseUnsigned32()
+
         let name = try parseName()
         guard size > name.utf8.count else {
             throw WASMParserError.invalidSectionSize(size)
         }
         let contentSize = Int(size) - name.utf8.count
 
-        var content = [UInt8]()
+        var bytes = [UInt8]()
         for _ in 0 ..< contentSize {
-            content.append(try stream.consumeAny())
+            bytes.append(try stream.consumeAny())
         }
 
-        return CustomSection(name: name, content: content)
+        return .custom(name: name, bytes: bytes)
+    }
+
+    // https://webassembly.github.io/spec/core/binary/modules.html#type-section
+    func parseTypeSection() throws -> Section {
+        try stream.consume(1)
+        /* size */ _ = try parseUnsigned32()
+        return .type(try parseVector { try parseFunctionType() })
+    }
+
+    // https://webassembly.github.io/spec/core/binary/modules.html#import-section
+    func parseImportSection() throws -> Section {
+        try stream.consume(2)
+        /* size */ _ = try parseUnsigned32()
+
+        let imports: [Import] = try parseVector {
+            let module = try parseName()
+            let name = try parseName()
+            let descriptor = try parseImportDescriptor()
+            return Import(module: module, name: name, descripter: descriptor)
+        }
+        return .import(imports)
+    }
+
+    // https://webassembly.github.io/spec/core/binary/modules.html#binary-importdesc
+    func parseImportDescriptor() throws -> ImportDescriptor {
+        let b = try stream.peek()
+        switch b {
+        case 0x00:
+            try stream.consumeAny()
+            return try .function(parseUnsigned32())
+        case 0x01:
+            try stream.consumeAny()
+            return try .table(parseTableType())
+        case 0x02:
+            try stream.consumeAny()
+            return try .memory(parseMemoryType())
+        case 0x03:
+            try stream.consumeAny()
+            return try .global(parseGlobalType())
+        default:
+            throw StreamError.unexpected(b, expected: Set(0x00 ... 0x03))
+        }
+    }
+
+    // https://webassembly.github.io/spec/core/binary/modules.html#function-section
+    func parseFunctionSection() throws -> Section {
+        try stream.consume(3)
+        /* size */ _ = try parseUnsigned32()
+        return .function(try parseVector { try parseUnsigned32() })
+    }
+
+    // https://webassembly.github.io/spec/core/binary/modules.html#table-section
+    func parseTableSection() throws -> Section {
+        try stream.consume(4)
+        /* size */ _ = try parseUnsigned32()
+
+        return .table(try parseVector { Table(type: try parseTableType()) })
+    }
+
+    // https://webassembly.github.io/spec/core/binary/modules.html#memory-section
+    func parseMemorySection() throws -> Section {
+        try stream.consume(5)
+        /* size */ _ = try parseUnsigned32()
+
+        return .memory(try parseVector { Memory(type: try parseLimits()) })
+    }
+
+    // https://webassembly.github.io/spec/core/binary/modules.html#global-section
+    func parseGlobalSection() throws -> Section {
+        try stream.consume(6)
+        /* size */ _ = try parseUnsigned32()
+
+        return .global(try parseVector {
+            let type = try parseGlobalType()
+            let expression = try parseExpression()
+            return Global(type: type, initializer: expression)
+        })
+    }
+
+    // https://webassembly.github.io/spec/core/binary/modules.html#export-section
+    func parseExportSection() throws -> Section {
+        try stream.consume(7)
+        /* size */ _ = try parseUnsigned32()
+
+        return .export(try parseVector {
+            let name = try parseName()
+            let descriptor = try parseExportDescriptor()
+            return Export(name: name, descriptor: descriptor)
+        })
+    }
+
+    // https://webassembly.github.io/spec/core/binary/modules.html#binary-exportdesc
+    func parseExportDescriptor() throws -> ExportDescriptor {
+        let b = try stream.peek()
+        switch b {
+        case 0x00:
+            try stream.consumeAny()
+            return try .function(parseUnsigned32())
+        case 0x01:
+            try stream.consumeAny()
+            return try .table(parseUnsigned32())
+        case 0x02:
+            try stream.consumeAny()
+            return try .memory(parseUnsigned32())
+        case 0x03:
+            try stream.consumeAny()
+            return try .global(parseUnsigned32())
+        default:
+            throw StreamError.unexpected(b, expected: Set(0x00 ... 0x03))
+        }
+    }
+
+    // https://webassembly.github.io/spec/core/binary/modules.html#start-section
+    func parseStartSection() throws -> Section {
+        try stream.consume(8)
+        /* size */ _ = try parseUnsigned32()
+
+        return .start(try parseUnsigned32())
+    }
+
+    // https://webassembly.github.io/spec/core/binary/modules.html#element-section
+    func parseElementSection() throws -> Section {
+        try stream.consume(9)
+        /* size */ _ = try parseUnsigned32()
+
+        return .element(try parseVector {
+            let table = try parseUnsigned32()
+            let expression = try parseExpression()
+            let initializer = try parseVector { try parseUnsigned32() }
+            return Element(table: table, offset: expression, initializer: initializer)
+        })
+    }
+
+    // https://webassembly.github.io/spec/core/binary/modules.html#code-section
+    func parseCodeSection() throws -> Section {
+        try stream.consume(10)
+        /* size */ _ = try parseUnsigned32()
+
+        return .code(try parseVector {
+            /* size */ _ = try parseUnsigned32()
+            let locals = try parseVector { () -> [Value.Type] in
+                let n = try parseUnsigned32()
+                let t = try parseValueType()
+                return (0 ..< n).map { _ in t }
+            }
+            let expression = try parseExpression()
+            return Code(locals: locals.flatMap { $0 }, expression: expression)
+        })
+    }
+
+    // https://webassembly.github.io/spec/core/binary/modules.html#data-section
+    func parseDataSection() throws -> Section {
+        try stream.consume(11)
+        /* size */ _ = try parseUnsigned32()
+
+        return .data(try parseVector {
+            let data = try parseUnsigned32()
+            let offset = try parseExpression()
+            let initializer = try parseVector { try stream.consumeAny() }
+            return Data(data: data, offset: offset, initializer: initializer)
+        })
     }
 }
 
@@ -242,10 +435,8 @@ extension WASMParser {
         try parseMagicNumbers()
         try parseVersion()
 
-        let module = Module()
-        while try stream.hasReachedEnd() == false {
-            _ = try parseSection()
-        }
+        var module = Module()
+
         return module
     }
 }

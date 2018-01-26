@@ -20,8 +20,8 @@ typealias ResultType = [Value.Type]
 
 // https://webassembly.github.io/spec/syntax/types.html#function-types
 public struct FunctionType {
-    var parameters: [Value.Type]
-    var results: [Value.Type]
+    let parameters: [Value.Type]
+    let results: [Value.Type]
 
     static let any = FunctionType(parameters: [AnyValue.self], results: [AnyValue.self])
 }
@@ -49,8 +49,8 @@ public typealias MemoryType = Limits
 
 // https://webassembly.github.io/spec/syntax/types.html#table-types
 public struct TableType {
-    var limits: Limits
-    let elementType: FunctionType = .any
+    let elementType: FunctionType
+    let limits: Limits
 }
 
 extension TableType: Equatable {
@@ -67,8 +67,8 @@ public enum Mutability {
 
 // https://webassembly.github.io/spec/syntax/types.html#global-types
 public struct GlobalType {
-    var mutability: Mutability?
-    var valueType: Value.Type
+    let mutability: Mutability?
+    let valueType: Value.Type
 }
 
 extension GlobalType: Equatable {

@@ -1,15 +1,15 @@
 // https://webassembly.github.io/spec/syntax/modules.html#modules
 public struct Module {
-    let types: [FunctionType]
-    let functions: [Function]
-    let tables: [Table]
-    let memories: [Memory]
-    let globals: [Global]
-    let elements: [Element]
-    let data: [Data]
-    let start: FunctionIndex?
-    let imports: [Import]
-    let exports: [Export]
+    var types: [FunctionType]
+    var functions: [Function]
+    var tables: [Table]
+    var memories: [Memory]
+    var globals: [Global]
+    var elements: [Element]
+    var data: [Data]
+    var start: FunctionIndex?
+    var imports: [Import]
+    var exports: [Export]
 
     public init(types: [FunctionType] = [],
                 functions: [Function] = [],
@@ -51,19 +51,51 @@ extension Module: Equatable {
     }
 }
 
-protocol Section {}
-
-struct CustomSection: Section {
-    let name: String
-    let content: [UInt8]
+public enum Section {
+    case custom(name: String, bytes: [UInt8])
+    case type([FunctionType])
+    case `import`([Import])
+    case function([TypeIndex])
+    case table([Table])
+    case memory([Memory])
+    case global([Global])
+    case export([Export])
+    case start(FunctionIndex)
+    case element([Element])
+    case code([Code])
+    case data([Data])
 }
 
-extension CustomSection: Equatable {
-    static func == (lhs: CustomSection, rhs: CustomSection) -> Bool {
-        return (
-            lhs.name == rhs.name &&
-                lhs.content == rhs.content
-        )
+extension Section: Equatable {
+    public static func == (lhs: Section, rhs: Section) -> Bool {
+        switch (lhs, rhs) {
+        case let (.custom(l1, l2), .custom(name: r1, bytes: r2)):
+            return l1 == r1 && l2 == r2
+        case let (.type(l), .type(r)):
+            return l == r
+        case let (.import(l), .import(r)):
+            return l == r
+        case let (.function(l), .function(r)):
+            return l == r
+        case let (.table(l), .table(r)):
+            return l == r
+        case let (.memory(l), .memory(r)):
+            return l == r
+        case let (.global(l), .global(r)):
+            return l == r
+        case let (.export(l), .export(r)):
+            return l == r
+        case let (.start(l), .start(r)):
+            return l == r
+        case let (.element(l), .element(r)):
+            return l == r
+        case let (.code(l), .code(r)):
+            return l == r
+        case let (.data(l), .data(r)):
+            return l == r
+        default:
+            return false
+        }
     }
 }
 
