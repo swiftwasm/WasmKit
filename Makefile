@@ -6,8 +6,8 @@ NAME := $(shell basename `pwd`)
 .PHONY: project
 project: $(NAME).xcodeproj
 
-$(NAME).xcodeproj:
-	@swift package generate-xcodeproj
+$(NAME).xcodeproj: Package.swift
+	@swift package generate-xcodeproj --enable-code-coverage
 	@./Scripts/run_swiftformat.rb $(NAME).xcodeproj
 	@./Scripts/run_swiftlint.rb $(NAME).xcodeproj
 
