@@ -39,9 +39,7 @@ extension WASMParser {
     private func p2<I: BinaryInteger>(_ n: I) -> I { return 1 << n }
 
     func parseUnsigned(bits: Int) throws -> UInt {
-        guard let first = try stream.peek() else {
-            throw StreamError.unexpectedEnd
-        }
+        let first = try stream.peek()
 
         switch UInt(first) {
         case let n where n < p2(7) && n < p2(bits):
@@ -58,9 +56,7 @@ extension WASMParser {
     }
 
     func parseSigned(bits: Int) throws -> Int {
-        guard let first = try stream.peek() else {
-            throw StreamError.unexpectedEnd
-        }
+        let first = try stream.peek()
 
         switch Int(first) {
         case let n where n < p2(6) && n < p2(bits - 1):
@@ -108,9 +104,8 @@ extension WASMParser {
 extension WASMParser {
     // https://webassembly.github.io/spec/core/binary/types.html#value-types
     func parseValueType() throws -> Value.Type {
-        guard let b = try stream.peek() else {
-            throw StreamError.unexpectedEnd
-        }
+        let b = try stream.peek()
+
         switch b {
         case 0x7F:
             try stream.consumeAny()
@@ -133,9 +128,8 @@ extension WASMParser {
 // https://webassembly.github.io/spec/core/binary/modules.html#sections
 extension WASMParser {
     func parseSection() throws -> Section {
-        guard let id = try stream.peek() else {
-            throw StreamError.unexpectedEnd
-        }
+        let id = try stream.peek()
+
         switch id {
         case 0:
             return try parseCustomSection()

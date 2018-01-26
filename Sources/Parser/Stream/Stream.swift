@@ -10,7 +10,7 @@ public protocol Stream {
     @discardableResult
     func consume(_ expected: Set<Element>) throws -> Element
 
-    func peek() throws -> Element?
+    func peek() throws -> Element
 }
 
 extension Stream {
@@ -25,6 +25,6 @@ extension Stream {
     }
 
     public func hasReachedEnd() throws -> Bool {
-        return try peek() == nil
+        return (try? peek()) == nil
     }
 }

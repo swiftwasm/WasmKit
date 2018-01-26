@@ -35,8 +35,10 @@ public final class StaticByteStream: ByteStream {
         return consumed
     }
 
-    public func peek() throws -> UInt8? {
-        guard bytes.indices.contains(currentIndex) else { return nil }
+    public func peek() throws -> UInt8 {
+        guard bytes.indices.contains(currentIndex) else {
+            throw Error<Element>.unexpectedEnd
+        }
         return bytes[currentIndex]
     }
 }
