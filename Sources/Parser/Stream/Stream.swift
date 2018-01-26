@@ -14,14 +14,14 @@ public protocol Stream {
 }
 
 extension Stream {
-    public func consume(_ expected: Element) throws {
-        try consume(Set([expected]))
+    @discardableResult
+    public func consume(_ expected: Element) throws -> Element {
+        return try consume(Set([expected]))
     }
 
-    public func consume(_ expected: [Element]) throws {
-        for e in expected {
-            try consume(e)
-        }
+    @discardableResult
+    public func consume(_ expected: [Element]) throws -> [Element] {
+        return try expected.map { try consume($0) }
     }
 
     public func hasReachedEnd() throws -> Bool {

@@ -37,8 +37,13 @@ final class ByteStreamTests: XCTestCase {
             XCTAssertEqual(stream.currentIndex, 2)
             XCTAssertEqual(try stream.hasReachedEnd(), true)
 
-            XCTAssertEqual(try stream.peek(), nil)
-            XCTAssertEqual(stream.currentIndex, 2)
+            XCTAssertThrowsError(try stream.peek()) { error in
+                if case Parser.Error<UInt8>.unexpectedEnd = error {
+                    XCTAssertEqual(stream.currentIndex, 2)
+                } else {
+                    XCTFail("Unexpected error: \(error)")
+                }
+            }
         } catch let error {
             XCTFail("\(error)")
         }
