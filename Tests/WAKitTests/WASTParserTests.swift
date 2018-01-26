@@ -199,6 +199,156 @@ extension WASMParserTests {
             XCTAssertEqual(stream.currentIndex, 0)
         }
     }
+
+    func testWASMParser_parseResultType() {
+        var stream: StaticByteStream!
+        var parser: WASMParser<StaticByteStream>!
+
+        stream = StaticByteStream(bytes: [0x40])
+        parser = WASMParser(stream: stream)
+        XCTAssert(try parser.parseResultType() == [])
+        XCTAssertEqual(parser.currentIndex, stream.bytes.count)
+
+        stream = StaticByteStream(bytes: [0x7E])
+        parser = WASMParser(stream: stream)
+        XCTAssert(try parser.parseResultType() == [Int64.self])
+        XCTAssertEqual(parser.currentIndex, stream.bytes.count)
+
+        stream = StaticByteStream(bytes: [0x7B])
+        parser = WASMParser(stream: stream)
+        XCTAssertThrowsError(try parser.parseValueType()) { error in
+            guard case let Parser.Error<UInt8>.unexpected(0x7B, expected: expected) = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+            XCTAssertEqual(expected, Set(0x7C ... 0x7F))
+            XCTAssertEqual(stream.currentIndex, 0)
+        }
+    }
+
+    func testWASMParser_parseFunctionType() {
+        var stream: StaticByteStream!
+        var parser: WASMParser<StaticByteStream>!
+
+        stream = StaticByteStream(bytes: [0x60, 0x00, 0x00])
+        parser = WASMParser(stream: stream)
+        XCTAssert(try parser.parseFunctionType() == FunctionType(parameters: [], results: []))
+        XCTAssertEqual(parser.currentIndex, stream.bytes.count)
+
+        stream = StaticByteStream(bytes: [0x60, 0x01, 0x7E, 0x01, 0x7D])
+        parser = WASMParser(stream: stream)
+        XCTAssert(try parser.parseFunctionType() == FunctionType(parameters: [Int64.self], results: [Float32.self]))
+        XCTAssertEqual(parser.currentIndex, stream.bytes.count)
+    }
+
+    func testWASMParser_parseLimits() {
+        var stream: StaticByteStream!
+        var parser: WASMParser<StaticByteStream>!
+
+        stream = StaticByteStream(bytes: [0x00, 0x01])
+        parser = WASMParser(stream: stream)
+        XCTAssertEqual(try parser.parseLimits(), Limits(min: 1, max: nil))
+        XCTAssertEqual(parser.currentIndex, stream.bytes.count)
+
+        stream = StaticByteStream(bytes: [0x01, 0x02, 0x03])
+        parser = WASMParser(stream: stream)
+        XCTAssertEqual(try parser.parseLimits(), Limits(min: 2, max: 3))
+        XCTAssertEqual(parser.currentIndex, stream.bytes.count)
+
+        stream = StaticByteStream(bytes: [0x02])
+        parser = WASMParser(stream: stream)
+        XCTAssertThrowsError(try parser.parseLimits()) { error in
+            guard case let Parser.Error<UInt8>.unexpected(0x02, expected: expected) = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+            XCTAssertEqual(expected, Set(0x00 ... 0x01))
+            XCTAssertEqual(stream.currentIndex, 0)
+        }
+    }
+
+    func testWASMParser_parseMemoryType() {
+        var stream: StaticByteStream!
+        var parser: WASMParser<StaticByteStream>!
+
+        stream = StaticByteStream(bytes: [0x00, 0x01])
+        parser = WASMParser(stream: stream)
+        XCTAssertEqual(try parser.parseMemoryType(), Limits(min: 1, max: nil))
+        XCTAssertEqual(parser.currentIndex, stream.bytes.count)
+
+        stream = StaticByteStream(bytes: [0x01, 0x02, 0x03])
+        parser = WASMParser(stream: stream)
+        XCTAssertEqual(try parser.parseMemoryType(), Limits(min: 2, max: 3))
+        XCTAssertEqual(parser.currentIndex, stream.bytes.count)
+
+        stream = StaticByteStream(bytes: [0x02])
+        parser = WASMParser(stream: stream)
+        XCTAssertThrowsError(try parser.parseMemoryType()) { error in
+            guard case let Parser.Error<UInt8>.unexpected(0x02, expected: expected) = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+            XCTAssertEqual(expected, Set(0x00 ... 0x01))
+            XCTAssertEqual(stream.currentIndex, 0)
+        }
+    }
+
+    func testWASMParser_parseTableType() {
+        var stream: StaticByteStream!
+        var parser: WASMParser<StaticByteStream>!
+
+        stream = StaticByteStream(bytes: [0x00, 0x01])
+        parser = WASMParser(stream: stream)
+        XCTAssertEqual(try parser.parseTableType(), TableType(limits: Limits(min: 1, max: nil)))
+        XCTAssertEqual(parser.currentIndex, stream.bytes.count)
+
+        stream = StaticByteStream(bytes: [0x01, 0x02, 0x03])
+        parser = WASMParser(stream: stream)
+        XCTAssertEqual(try parser.parseTableType(), TableType(limits: Limits(min: 2, max: 3)))
+        XCTAssertEqual(parser.currentIndex, stream.bytes.count)
+
+        stream = StaticByteStream(bytes: [0x02])
+        parser = WASMParser(stream: stream)
+        XCTAssertThrowsError(try parser.parseTableType()) { error in
+            guard case let Parser.Error<UInt8>.unexpected(0x02, expected: expected) = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+            XCTAssertEqual(expected, Set(0x00 ... 0x01))
+            XCTAssertEqual(stream.currentIndex, 0)
+        }
+    }
+
+    func testWASMParser_parseGlobalType() {
+        var stream: StaticByteStream!
+        var parser: WASMParser<StaticByteStream>!
+
+        stream = StaticByteStream(bytes: [0x7F, 0x00])
+        parser = WASMParser(stream: stream)
+        XCTAssertEqual(try parser.parseGlobalType(), GlobalType(mutability: .constant, valueType: Int32.self))
+        XCTAssertEqual(parser.currentIndex, stream.bytes.count)
+
+        stream = StaticByteStream(bytes: [0x7F, 0x01])
+        parser = WASMParser(stream: stream)
+        XCTAssertEqual(try parser.parseGlobalType(), GlobalType(mutability: .variable, valueType: Int32.self))
+        XCTAssertEqual(parser.currentIndex, stream.bytes.count)
+
+        stream = StaticByteStream(bytes: [0x7B])
+        parser = WASMParser(stream: stream)
+        XCTAssertThrowsError(try parser.parseGlobalType()) { error in
+            guard case let Parser.Error<UInt8>.unexpected(0x7B, expected: expected) = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+            XCTAssertEqual(expected, Set(0x7C ... 0x7F))
+            XCTAssertEqual(stream.currentIndex, 0)
+        }
+
+        stream = StaticByteStream(bytes: [0x7F, 0x02])
+        parser = WASMParser(stream: stream)
+        XCTAssertThrowsError(try parser.parseGlobalType()) { error in
+            guard case let Parser.Error<UInt8>.unexpected(0x02, expected: expected) = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+            XCTAssertEqual(expected, Set(0x00 ... 0x01))
+            XCTAssertEqual(stream.currentIndex, 1)
+        }
+    }
 }
 
 extension WASMParserTests {

@@ -100,8 +100,8 @@ extension WASMParser {
 }
 
 // https://webassembly.github.io/spec/core/binary/types.html#types
-
 extension WASMParser {
+
     // https://webassembly.github.io/spec/core/binary/types.html#value-types
     func parseValueType() throws -> Value.Type {
         let b = try stream.peek()
@@ -121,6 +121,74 @@ extension WASMParser {
             return Float64.self
         default:
             throw StreamError.unexpected(b, expected: Set(0x7C ... 0x7F))
+        }
+    }
+
+    // https://webassembly.github.io/spec/core/binary/types.html#result-types
+    func parseResultType() throws -> ResultType {
+        let b = try stream.peek()
+
+        switch b {
+        case 0x40:
+            try stream.consumeAny()
+            return []
+        default:
+            return [try parseValueType()]
+        }
+    }
+
+    // https://webassembly.github.io/spec/core/binary/types.html#function-types
+    func parseFunctionType() throws -> FunctionType {
+        try stream.consume(0x60)
+
+        let parameters = try parseVector { try parseValueType() }
+        let results = try parseVector { try parseValueType() }
+        return FunctionType(parameters: parameters, results: results)
+    }
+
+    // https://webassembly.github.io/spec/core/binary/types.html#limits
+    func parseLimits() throws -> Limits {
+        let b = try stream.peek()
+        switch b {
+        case 0x00:
+            try stream.consumeAny()
+            return try Limits(min: UInt32(parseUnsigned(bits: 32)), max: nil)
+        case 0x01:
+            try stream.consumeAny()
+            return try Limits(min: UInt32(parseUnsigned(bits: 32)), max: UInt32(parseUnsigned(bits: 32)))
+        default:
+            throw StreamError.unexpected(b, expected: [0x00, 0x01])
+        }
+    }
+
+    // https://webassembly.github.io/spec/core/binary/types.html#memory-types
+    func parseMemoryType() throws -> MemoryType {
+        return try parseLimits()
+    }
+
+    // https://webassembly.github.io/spec/core/binary/types.html#table-types
+    func parseTableType() throws -> TableType {
+        return TableType(limits: try parseLimits())
+    }
+
+    // https://webassembly.github.io/spec/core/binary/types.html#global-types
+    func parseGlobalType() throws -> GlobalType {
+        let valueType = try parseValueType()
+        let mutability = try parseMutability()
+        return GlobalType(mutability: mutability, valueType: valueType)
+    }
+
+    func parseMutability() throws -> Mutability {
+        let b = try stream.peek()
+        switch b {
+        case 0x00:
+            try stream.consumeAny()
+            return .constant
+        case 0x01:
+            try stream.consumeAny()
+            return .variable
+        default:
+            throw StreamError.unexpected(b, expected: [0x00, 0x01])
         }
     }
 }
