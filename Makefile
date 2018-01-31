@@ -20,14 +20,11 @@ SOURCE_DIRS := $(foreach TARGET, $(TARGETS), $(addprefix Sources/, $(TARGET)))
 generate: $(GENERATED_DIRS)
 
 Sources/%/Generated: Sources/% FORCE
+ifndef SOURCERY
+	$(error "sourcery not installed; run `brew install sourcery`")
+endif
 	@mkdir -p $@
 	@$(SOURCERY) --sources $< --templates Templates --output $@ --quiet
-
-# ifndef SOURCERY
-# 	$(error "sourcery not installed; run `brew install sourcery`")
-# endif
-# 	echo $(TARGETS) | xargs -n1 -I{} mkdir -p Sources/{}/Generated
-# 	echo $(TARGETS) | xargs -n1 -I{} $(SOURCERY) --sources Sources/{} --templates Templates --output Sources/{}/Generated/ --quiet
 
 .PHONY: clean
 clean:

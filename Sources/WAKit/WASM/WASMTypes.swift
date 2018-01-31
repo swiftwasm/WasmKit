@@ -1,6 +1,6 @@
 // https://webassembly.github.io/spec/binary/modules.html#binary-code
 public struct Code {
-    let locals: [Value.Type]
+    let locals: [ValueType]
     let expression: Expression
 }
 

@@ -9,7 +9,7 @@ final class ValidationContext {
     var tables: [TableType] = []
     var memories: [MemoryType] = []
     var globals: [GlobalType] = []
-    var locals: [Value.Type] = []
+    var locals: [ValueType] = []
     var labels: [ResultType] = []
     var `return`: ResultType?
 }
@@ -34,6 +34,9 @@ extension Limits: Validatable {
 // https://webassembly.github.io/spec/core/valid/types.html#function-types
 extension FunctionType: Validatable {
     func validate(context _: ValidationContext) throws {
+        guard let results = results else {
+            return
+        }
         guard results.count <= 1 else {
             throw ValidationError.genericError
         }

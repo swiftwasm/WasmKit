@@ -1,37 +1,40 @@
 // https://webassembly.github.io/spec/syntax/types.html#value-types
-protocol Value {}
-struct AnyValue: Value {}
+enum Value: AutoEquatable {
+    case i32(Int32)
+    case i64(Int64)
+    case f32(Float32)
+    case f64(Float64)
+}
 
-protocol IntegerValue: Value {}
-extension Int32: IntegerValue {}
-extension Int64: IntegerValue {}
+enum ValueType: AutoEquatable {
+    case i32
+    case i64
+    case f32
+    case f64
+}
 
-protocol FloatingPointValue: Value {}
-extension Float32: FloatingPointValue {}
-extension Float64: FloatingPointValue {}
-
-extension Array where Element == Value.Type {
-    static func == (lhs: [Value.Type], rhs: [Value.Type]) -> Bool {
+extension Array where Element == ValueType {
+    static func == (lhs: [ValueType], rhs: [ValueType]) -> Bool {
         guard lhs.count == rhs.count else { return false }
         return zip(lhs, rhs).reduce(true) { result, zipped in
             result && zipped.0 == zipped.1
         }
     }
 
-    static func != (lhs: [Value.Type], rhs: [Value.Type]) -> Bool {
+    static func != (lhs: [ValueType], rhs: [ValueType]) -> Bool {
         return !(lhs == rhs)
     }
 }
 
 // https://webassembly.github.io/spec/syntax/types.html#result-types
-typealias ResultType = [Value.Type]
+typealias ResultType = [ValueType]
 
 // https://webassembly.github.io/spec/syntax/types.html#function-types
 public struct FunctionType {
-    let parameters: [Value.Type]
-    let results: [Value.Type]
+    let parameters: [ValueType]?
+    let results: [ValueType]?
 
-    static let any = FunctionType(parameters: [AnyValue.self], results: [AnyValue.self])
+    static let any = FunctionType(parameters: nil, results: nil)
 }
 
 extension FunctionType: AutoEquatable {}
@@ -64,7 +67,7 @@ public enum Mutability {
 // https://webassembly.github.io/spec/syntax/types.html#global-types
 public struct GlobalType {
     let mutability: Mutability?
-    let valueType: Value.Type
+    let valueType: ValueType
 }
 
 extension GlobalType: AutoEquatable {}
