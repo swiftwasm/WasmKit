@@ -1,13 +1,20 @@
 struct Expression {
     let instructions: [Instruction]
+
+    init(instructions: [Instruction] = []) {
+        self.instructions = instructions
+    }
 }
 
 extension Expression: Equatable {
     static func == (lhs: Expression, rhs: Expression) -> Bool {
-        guard lhs.instructions.count == rhs.instructions.count else { return false }
-        return zip(lhs.instructions, rhs.instructions)
-            .map { l, r in l.isEqual(to: r) }
-            .reduce(true) { $0 && $1 }
+        guard lhs.instructions.count == rhs.instructions.count else {
+            return false
+        }
+        for (l, r) in zip(lhs.instructions, rhs.instructions) {
+            guard l.isEqual(to: r) else { return false }
+        }
+        return true
     }
 }
 
@@ -17,30 +24,30 @@ protocol Instruction {
     func isEqual(to another: Instruction) -> Bool
 }
 
+extension Instruction where Self: Equatable {
+    func isEqual(to another: Instruction) -> Bool {
+        guard let another = another as? Self else { return false }
+        return self == another
+    }
+}
+
 /// Pseudo Instructions
-enum PseudoInstruction: Instruction {
+enum PseudoInstruction: Instruction, AutoEquatable {
     case end
 
     var isConstant: Bool {
         return false
     }
-
-    func isEqual(to another: Instruction) -> Bool {
-        switch (self, another) {
-        case (.end, PseudoInstruction.end): return true
-        default: return false
-        }
-    }
 }
 
 /// Control Instructions
 /// - SeeAlso: https://webassembly.github.io/spec/binary/instructions.html#control-instructions
-enum ControlInstruction: Instruction {
+enum ControlInstruction: Instruction, AutoEquatable {
     case unreachable
     case nop
-    case block(ResultType, [Instruction])
-    case loop(ResultType, [Instruction])
-    case `if`(ResultType, [Instruction], [Instruction])
+    case block(ResultType, Expression)
+    case loop(ResultType, Expression)
+    case `if`(ResultType, Expression, Expression)
     case br(LabelIndex)
     case brIf(LabelIndex)
     case brTable([LabelIndex])
@@ -51,59 +58,22 @@ enum ControlInstruction: Instruction {
     var isConstant: Bool {
         return false
     }
-
-    func isEqual(to another: Instruction) -> Bool {
-        switch (self, another) {
-        case (.unreachable, ControlInstruction.unreachable),
-             (.nop, ControlInstruction.nop):
-            return true
-        case let (.block(l1, l2), ControlInstruction.block(r1, r2)),
-             let (.loop(l1, l2), ControlInstruction.loop(r1, r2)):
-            return l1 == r1 && Expression(instructions: l2) == Expression(instructions: r2)
-        case let (.if(l1, l2, l3), ControlInstruction.if(r1, r2, r3)):
-            return l1 == r1 &&
-                Expression(instructions: l2) == Expression(instructions: r2) &&
-                Expression(instructions: l3) == Expression(instructions: r3)
-        case let (.br(l), ControlInstruction.br(r)),
-             let (.brIf(l), ControlInstruction.brIf(r)):
-            return l == r
-        case let (.brTable(l), ControlInstruction.brTable(r)):
-            return l == r
-        case (.return, ControlInstruction.return):
-            return true
-        case let (.call(l), ControlInstruction.call(r)),
-             let (.callIndirect(l), ControlInstruction.callIndirect(r)):
-            return l == r
-        default:
-            return false
-        }
-    }
 }
 
 /// Parametric Instructions
 /// - SeeAlso: https://webassembly.github.io/spec/binary/instructions.html#parametric-instructions
-enum ParametricInstruction: Instruction {
+enum ParametricInstruction: Instruction, AutoEquatable {
     case drop
     case select
 
     var isConstant: Bool {
         return false
     }
-
-    func isEqual(to another: Instruction) -> Bool {
-        switch (self, another) {
-        case (.drop, ParametricInstruction.drop),
-             (.select, ParametricInstruction.select):
-            return true
-        default:
-            return false
-        }
-    }
 }
 
 /// Variable Instructions
 /// - SeeAlso: https://webassembly.github.io/spec/binary/instructions.html#variable-instructions
-enum VariableInstruction: Instruction {
+enum VariableInstruction: Instruction, AutoEquatable {
     case getLocal(LabelIndex)
     case setLocal(LabelIndex)
     case teeLocal(LabelIndex)
@@ -113,499 +83,108 @@ enum VariableInstruction: Instruction {
     var isConstant: Bool {
         return false
     }
-
-    func isEqual(to another: Instruction) -> Bool {
-        switch (self, another) {
-        case let (.getLocal(l), VariableInstruction.getLocal(r)),
-             let (.setLocal(l), VariableInstruction.setLocal(r)),
-             let (.teeLocal(l), VariableInstruction.teeLocal(r)),
-             let (.getGlobal(l), VariableInstruction.getGlobal(r)),
-             let (.setGlobal(l), VariableInstruction.setGlobal(r)):
-            return l == r
-        default:
-            return false
-        }
-    }
 }
 
 /// Memory Instructions
 /// - SeeAlso: https://webassembly.github.io/spec/binary/instructions.html#memory-instructions
-enum MemoryInstruction: Instruction {
+enum MemoryInstruction: Instruction, AutoEquatable {
     typealias MemoryArgument = (UInt32, UInt32)
 
     case currentMemory
     case growMemory
-}
 
-extension MemoryInstruction {
-    enum i32: Instruction {
-        case load(MemoryArgument)
-        case load8s(MemoryArgument)
-        case load8u(MemoryArgument)
-        case load16s(MemoryArgument)
-        case load16u(MemoryArgument)
-        case store(MemoryArgument)
-        case store8(MemoryArgument)
-        case store16(MemoryArgument)
-
-        var isConstant: Bool {
-            return false
-        }
-
-        func isEqual(to another: Instruction) -> Bool {
-            switch (self, another) {
-            case let (.load(l), i32.load(r)),
-                 let (.load8s(l), i32.load8s(r)),
-                 let (.load8u(l), i32.load8u(r)),
-                 let (.load16s(l), i32.load16s(r)),
-                 let (.load16u(l), i32.load16u(r)),
-                 let (.store(l), i32.store(r)),
-                 let (.store8(l), i32.store8(r)),
-                 let (.store16(l), i32.store16(r)):
-                return l == r
-            default:
-                return false
-            }
-        }
-    }
-}
-
-extension MemoryInstruction {
-    enum i64: Instruction {
-        case load(MemoryArgument)
-        case load8s(MemoryArgument)
-        case load8u(MemoryArgument)
-        case load16s(MemoryArgument)
-        case load16u(MemoryArgument)
-        case load32s(MemoryArgument)
-        case load32u(MemoryArgument)
-        case store(MemoryArgument)
-        case store8(MemoryArgument)
-        case store16(MemoryArgument)
-        case store32(MemoryArgument)
-
-        var isConstant: Bool {
-            return false
-        }
-
-        func isEqual(to another: Instruction) -> Bool {
-            switch (self, another) {
-            case let (.load(l), i64.load(r)),
-                 let (.load8s(l), i64.load8s(r)),
-                 let (.load8u(l), i64.load8u(r)),
-                 let (.load16s(l), i64.load16s(r)),
-                 let (.load16u(l), i64.load16u(r)),
-                 let (.store(l), i64.store(r)),
-                 let (.store8(l), i64.store8(r)),
-                 let (.store16(l), i64.store16(r)):
-                return l == r
-            default:
-                return false
-            }
-        }
-    }
-}
-
-extension MemoryInstruction {
-    enum f32: Instruction {
-        case load(MemoryArgument)
-        case store(MemoryArgument)
-
-        var isConstant: Bool {
-            return false
-        }
-
-        func isEqual(to another: Instruction) -> Bool {
-            switch (self, another) {
-            case let (.load(l), f32.load(r)),
-                 let (.store(l), f32.store(r)):
-                return l == r
-            default:
-                return false
-            }
-        }
-    }
-}
-
-extension MemoryInstruction {
-    enum f64: Instruction {
-        case load(MemoryArgument)
-        case store(MemoryArgument)
-
-        var isConstant: Bool {
-            return false
-        }
-
-        func isEqual(to another: Instruction) -> Bool {
-            switch (self, another) {
-            case let (.load(l), f64.load(r)),
-                 let (.store(l), f64.store(r)):
-                return l == r
-            default:
-                return false
-            }
-        }
-    }
+    case load(Value.Type, MemoryArgument)
+    case load8s(IntegerValue.Type, MemoryArgument)
+    case load8u(IntegerValue.Type, MemoryArgument)
+    case load16s(IntegerValue.Type, MemoryArgument)
+    case load16u(IntegerValue.Type, MemoryArgument)
+    case load32s(IntegerValue.Type, MemoryArgument)
+    case load32u(IntegerValue.Type, MemoryArgument)
+    case store(Value.Type, MemoryArgument)
+    case store8(IntegerValue.Type, MemoryArgument)
+    case store16(IntegerValue.Type, MemoryArgument)
+    case store32(IntegerValue.Type, MemoryArgument)
 
     var isConstant: Bool {
         return false
-    }
-
-    func isEqual(to another: Instruction) -> Bool {
-        switch (self, another) {
-        case (.currentMemory, MemoryInstruction.currentMemory),
-             (.growMemory, MemoryInstruction.growMemory):
-            return true
-        default:
-            return false
-        }
     }
 }
 
 /// Numeric Instructions
 /// - SeeAlso: https://webassembly.github.io/spec/binary/instructions.html#numeric-instructions
-enum NumericInstruction {
-}
+enum NumericInstruction: Instruction, AutoEquatable {
+    case constI32(Int32)
+    case constI64(Int64)
+    case constF32(Float32)
+    case constF64(Float64)
 
-extension NumericInstruction {
-    enum i32: Instruction {
-        case const(Int32)
+    case eqz(IntegerValue.Type)
+    case eq(Value.Type)
+    case ne(Value.Type)
+    case ltS(IntegerValue.Type)
+    case ltU(IntegerValue.Type)
+    case lt(Value.Type)
+    case gtS(IntegerValue.Type)
+    case gtU(IntegerValue.Type)
+    case gt(Value.Type)
+    case leS(IntegerValue.Type)
+    case leU(IntegerValue.Type)
+    case le(Value.Type)
+    case geS(IntegerValue.Type)
+    case geU(IntegerValue.Type)
+    case ge(Value.Type)
 
-        case eqz
-        case eq
-        case ne
-        case ltS
-        case ltU
-        case gtS
-        case gtU
-        case leS
-        case leU
-        case geS
-        case geU
+    case clz(IntegerValue.Type)
+    case ctz(IntegerValue.Type)
+    case popcnt(Value.Type)
+    case add(Value.Type)
+    case sub(Value.Type)
+    case mul(Value.Type)
+    case divS(IntegerValue.Type)
+    case divU(IntegerValue.Type)
+    case remS(IntegerValue.Type)
+    case remU(IntegerValue.Type)
+    case and(Value.Type)
+    case or(Value.Type)
+    case xor(Value.Type)
+    case shl(Value.Type)
+    case shrS(IntegerValue.Type)
+    case shrU(IntegerValue.Type)
+    case rotl(Value.Type)
+    case rotr(Value.Type)
 
-        case clz
-        case ctz
-        case popcnt
-        case add
-        case sub
-        case mul
-        case divS
-        case divU
-        case remS
-        case remU
-        case and
-        case or
-        case xor
-        case shl
-        case shrS
-        case shrU
-        case rotl
-        case rotr
+    case abs(FloatingPointValue.Type)
+    case neg(FloatingPointValue.Type)
+    case ceil(FloatingPointValue.Type)
+    case floor(FloatingPointValue.Type)
+    case trunc(FloatingPointValue.Type)
+    case nearest(FloatingPointValue.Type)
+    case sqrt(FloatingPointValue.Type)
+    case div(FloatingPointValue.Type)
+    case min(FloatingPointValue.Type)
+    case max(FloatingPointValue.Type)
+    case copysign(FloatingPointValue.Type)
 
-        case wrapI64
-        case truncSF32
-        case truncUF32
-        case truncSF64
-        case truncUF64
-        case reinterpretF32
+    case wrap(IntegerValue.Type, IntegerValue.Type)
+    case extendS(IntegerValue.Type, Value.Type)
+    case extendU(IntegerValue.Type, Value.Type)
+    case truncS(IntegerValue.Type, Value.Type)
+    case truncU(IntegerValue.Type, Value.Type)
+    case convertS(FloatingPointValue.Type, IntegerValue.Type)
+    case convertU(FloatingPointValue.Type, IntegerValue.Type)
+    case demote(FloatingPointValue.Type, Value.Type)
+    case promote(FloatingPointValue.Type, Value.Type)
+    case reinterpret(Value.Type, Value.Type)
 
-        var isConstant: Bool {
+    var isConstant: Bool {
+        switch self {
+        case .constI32,
+             .constI64,
+             .constF32,
+             .constF64:
             return true
-        }
-
-        func isEqual(to another: Instruction) -> Bool {
-            switch (self, another) {
-            case let (.const(l), i32.const(r)):
-                return l == r
-            case (.eqz, i32.eqz),
-                 (.eq, i32.eq),
-                 (.ne, i32.ne),
-                 (.ltS, i32.ltS),
-                 (.ltU, i32.ltU),
-                 (.gtS, i32.gtS),
-                 (.gtU, i32.gtU),
-                 (.leS, i32.leS),
-                 (.leU, i32.leU),
-                 (.geS, i32.geS),
-                 (.geU, i32.geU),
-
-                 (.clz, i32.clz),
-                 (.ctz, i32.ctz),
-                 (.popcnt, i32.popcnt),
-                 (.add, i32.add),
-                 (.sub, i32.sub),
-                 (.mul, i32.mul),
-                 (.divS, i32.divS),
-                 (.divU, i32.divU),
-                 (.remS, i32.remS),
-                 (.remU, i32.remU),
-                 (.and, i32.and),
-                 (.or, i32.or),
-                 (.xor, i32.xor),
-                 (.shl, i32.shl),
-                 (.shrS, i32.shrS),
-                 (.shrU, i32.shrU),
-                 (.rotl, i32.rotl),
-                 (.rotr, i32.rotr),
-
-                 (.wrapI64, i32.wrapI64),
-                 (.truncSF32, i32.truncSF32),
-                 (.truncUF32, i32.truncUF32),
-                 (.truncSF64, i32.truncSF64),
-                 (.truncUF64, i32.truncUF64),
-                 (.reinterpretF32, i32.reinterpretF32):
-                return true
-            default:
-                return false
-            }
-        }
-    }
-}
-
-extension NumericInstruction {
-    enum i64: Instruction {
-        case const(Int64)
-        case eqz
-        case eq
-        case ne
-        case ltS
-        case ltU
-        case gtS
-        case gtU
-        case leS
-        case leU
-        case geS
-        case geU
-
-        case clz
-        case ctz
-        case popcnt
-        case add
-        case sub
-        case mul
-        case divS
-        case divU
-        case remS
-        case remU
-        case and
-        case or
-        case xor
-        case shl
-        case shrS
-        case shrU
-        case rotl
-        case rotr
-
-        case wrapI64
-        case extendSI32
-        case extendUI32
-        case truncSF32
-        case truncUF32
-        case truncSF64
-        case truncUF64
-        case reinterpretF64
-
-        var isConstant: Bool {
-            return true
-        }
-
-        func isEqual(to another: Instruction) -> Bool {
-            switch (self, another) {
-            case let (.const(l), i64.const(r)):
-                return l == r
-            case (.eqz, i64.eqz),
-                 (.eq, i64.eq),
-                 (.ne, i64.ne),
-                 (.ltS, i64.ltS),
-                 (.ltU, i64.ltU),
-                 (.gtS, i64.gtS),
-                 (.gtU, i64.gtU),
-                 (.leS, i64.leS),
-                 (.leU, i64.leU),
-                 (.geS, i64.geS),
-                 (.geU, i64.geU),
-
-                 (.clz, i64.clz),
-                 (.ctz, i64.ctz),
-                 (.popcnt, i64.popcnt),
-                 (.add, i64.add),
-                 (.sub, i64.sub),
-                 (.mul, i64.mul),
-                 (.divS, i64.divS),
-                 (.divU, i64.divU),
-                 (.remS, i64.remS),
-                 (.remU, i64.remU),
-                 (.and, i64.and),
-                 (.or, i64.or),
-                 (.xor, i64.xor),
-                 (.shl, i64.shl),
-                 (.shrS, i64.shrS),
-                 (.shrU, i64.shrU),
-                 (.rotl, i64.rotl),
-                 (.rotr, i64.rotr),
-
-                 (.wrapI64, i64.wrapI64),
-                 (.truncSF32, i64.truncSF32),
-                 (.truncUF32, i64.truncUF32),
-                 (.truncSF64, i64.truncSF64),
-                 (.truncUF64, i64.truncUF64),
-                 (.reinterpretF64, i64.reinterpretF64):
-                return true
-            default:
-                return false
-            }
-        }
-    }
-}
-
-extension NumericInstruction {
-    enum f32: Instruction {
-        case const(Float32)
-        case eq
-        case ne
-        case lt
-        case gt
-        case le
-        case ge
-
-        case abs
-        case neg
-        case ceil
-        case floor
-        case trunc
-        case nearest
-        case sqrt
-        case add
-        case sub
-        case mul
-        case div
-        case min
-        case max
-        case copysign
-
-        case convertSI32
-        case convertUI32
-        case convertSI64
-        case convertUI64
-        case demoteF64
-        case reinterpretI32
-
-        var isConstant: Bool {
-            return true
-        }
-
-        func isEqual(to another: Instruction) -> Bool {
-            switch (self, another) {
-            case let (.const(l), f32.const(r)):
-                return l == r
-            case (.eq, f32.eq),
-                 (.ne, f32.ne),
-                 (.lt, f32.lt),
-                 (.gt, f32.gt),
-                 (.le, f32.le),
-                 (.ge, f32.ge),
-
-                 (.abs, f32.abs),
-                 (.neg, f32.neg),
-                 (.ceil, f32.ceil),
-                 (.floor, f32.floor),
-                 (.trunc, f32.trunc),
-                 (.nearest, f32.nearest),
-                 (.sqrt, f32.sqrt),
-                 (.add, f32.add),
-                 (.sub, f32.sub),
-                 (.mul, f32.mul),
-                 (.div, f32.div),
-                 (.min, f32.min),
-                 (.max, f32.max),
-                 (.copysign, f32.copysign),
-
-                 (.convertSI32, f32.convertSI32),
-                 (.convertUI32, f32.convertUI32),
-                 (.convertSI64, f32.convertSI64),
-                 (.convertUI64, f32.convertUI64),
-                 (.demoteF64, f32.demoteF64),
-                 (.reinterpretI32, f32.reinterpretI32):
-                return true
-            default:
-                return false
-            }
-        }
-    }
-}
-
-extension NumericInstruction {
-    enum f64: Instruction {
-        case const(Float64)
-        case eq
-        case ne
-        case lt
-        case gt
-        case le
-        case ge
-
-        case abs
-        case neg
-        case ceil
-        case floor
-        case trunc
-        case nearest
-        case sqrt
-        case add
-        case sub
-        case mul
-        case div
-        case min
-        case max
-        case copysign
-
-        case convertSI32
-        case convertUI32
-        case convertSI64
-        case convertUI64
-        case promoteF32
-        case reinterpretI64
-
-        var isConstant: Bool {
-            return true
-        }
-
-        func isEqual(to another: Instruction) -> Bool {
-            switch (self, another) {
-            case let (.const(l), f64.const(r)):
-                return l == r
-            case (.eq, f64.eq),
-                 (.ne, f64.ne),
-                 (.lt, f64.lt),
-                 (.gt, f64.gt),
-                 (.le, f64.le),
-                 (.ge, f64.ge),
-
-                 (.abs, f64.abs),
-                 (.neg, f64.neg),
-                 (.ceil, f64.ceil),
-                 (.floor, f64.floor),
-                 (.trunc, f64.trunc),
-                 (.nearest, f64.nearest),
-                 (.sqrt, f64.sqrt),
-                 (.add, f64.add),
-                 (.sub, f64.sub),
-                 (.mul, f64.mul),
-                 (.div, f64.div),
-                 (.min, f64.min),
-                 (.max, f64.max),
-                 (.copysign, f64.copysign),
-
-                 (.convertSI32, f64.convertSI32),
-                 (.convertUI32, f64.convertUI32),
-                 (.convertSI64, f64.convertSI64),
-                 (.convertUI64, f64.convertUI64),
-                 (.promoteF32, f64.promoteF32),
-                 (.reinterpretI64, f64.reinterpretI64):
-                return true
-            default:
-                return false
-            }
+        default:
+            return false
         }
     }
 }

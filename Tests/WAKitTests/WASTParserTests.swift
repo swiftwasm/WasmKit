@@ -704,142 +704,127 @@ extension WASMParserTests {
             0x0B, 0x04, 0x10, 0x00, 0x01, 0x00,
         ])
         parser = WASMParser(stream: stream)
+
         XCTAssertEqual(try parser.parseModule(), Module(
             types: [
-                FunctionType(parameters: [Swift.Int32.self], results: [Swift.Int32.self]),
+                FunctionType(parameters: [Int32.self], results: [Int32.self]),
             ],
             functions: [
                 Function(
                     type: 0,
-                    locals: [Swift.Int32.self],
+                    locals: [Int32.self],
                     body: Expression(instructions: [
-                        NumericInstruction.i32.const(0), NumericInstruction.i32.const(0),
-                        MemoryInstruction.i32.load((2, 4)), NumericInstruction.i32.const(16),
-                        NumericInstruction.i32.sub, VariableInstruction.teeLocal(1),
-                        MemoryInstruction.i32.store((2, 4)), VariableInstruction.getLocal(1),
-                        VariableInstruction.getLocal(0), MemoryInstruction.i32.store((2, 8)),
-                        ControlInstruction.block([], [
-                            ControlInstruction.block([], [
-                                VariableInstruction.getLocal(0), NumericInstruction.i32.const(1),
-                                NumericInstruction.i32.gtS, ControlInstruction.brIf(0),
-                                VariableInstruction.getLocal(1), NumericInstruction.i32.const(1),
-                                MemoryInstruction.i32.store((2, 12)), ControlInstruction.br(1),
+                        NumericInstruction.constI32(0), NumericInstruction.constI32(0),
+                        MemoryInstruction.load(Int32.self, (2, 4)), NumericInstruction.constI32(16),
+                        NumericInstruction.sub(Int32.self), VariableInstruction.teeLocal(1),
+                        MemoryInstruction.store(Int32.self, (2, 4)), VariableInstruction.getLocal(1),
+                        VariableInstruction.getLocal(0), MemoryInstruction.store(Int32.self, (2, 8)),
+                        ControlInstruction.block([], Expression(instructions: [
+                            ControlInstruction.block([], Expression(instructions: [
+                                VariableInstruction.getLocal(0), NumericInstruction.constI32(1),
+                                NumericInstruction.gtS(Int32.self), ControlInstruction.brIf(0),
+                                VariableInstruction.getLocal(1), NumericInstruction.constI32(1),
+                                MemoryInstruction.store(Int32.self, (2, 12)), ControlInstruction.br(1),
                                 PseudoInstruction.end,
-                            ]),
+                            ])),
                             VariableInstruction.getLocal(1), VariableInstruction.getLocal(1),
-                            MemoryInstruction.i32.load((2, 8)), NumericInstruction.i32.const(-1),
-                            NumericInstruction.i32.add, ControlInstruction.call(0),
-                            VariableInstruction.getLocal(1), MemoryInstruction.i32.load((2, 8)),
-                            NumericInstruction.i32.const(-2), NumericInstruction.i32.add,
-                            ControlInstruction.call(0), NumericInstruction.i32.add,
-                            MemoryInstruction.i32.store((2, 12)), PseudoInstruction.end,
-                        ]),
-                        VariableInstruction.getLocal(1), MemoryInstruction.i32.load((2, 12)),
-                        VariableInstruction.setLocal(0), NumericInstruction.i32.const(0),
-                        VariableInstruction.getLocal(1), NumericInstruction.i32.const(16),
-                        NumericInstruction.i32.add, MemoryInstruction.i32.store((2, 4)),
+                            MemoryInstruction.load(Int32.self, (2, 8)), NumericInstruction.constI32(-1),
+                            NumericInstruction.add(Int32.self), ControlInstruction.call(0),
+                            VariableInstruction.getLocal(1), MemoryInstruction.load(Int32.self, (2, 8)),
+                            NumericInstruction.constI32(-2), NumericInstruction.add(Int32.self),
+                            ControlInstruction.call(0), NumericInstruction.add(Int32.self),
+                            MemoryInstruction.store(Int32.self, (2, 12)), PseudoInstruction.end,
+                        ])),
+                        VariableInstruction.getLocal(1), MemoryInstruction.load(Int32.self, (2, 12)),
+                        VariableInstruction.setLocal(0), NumericInstruction.constI32(0),
+                        VariableInstruction.getLocal(1), NumericInstruction.constI32(16),
+                        NumericInstruction.add(Int32.self), MemoryInstruction.store(Int32.self, (2, 4)),
                         VariableInstruction.getLocal(0), PseudoInstruction.end,
-                    ])
-                ),
+                ])),
                 Function(
                     type: 0,
-                    locals: [Swift.Int32.self, Swift.Int32.self, Swift.Int32.self],
+                    locals: [Int32.self, Int32.self, Int32.self],
                     body: Expression(instructions: [
-                        NumericInstruction.i32.const(0), MemoryInstruction.i32.load((2, 4)),
-                        NumericInstruction.i32.const(32), NumericInstruction.i32.sub,
+                        NumericInstruction.constI32(0), MemoryInstruction.load(Int32.self, (2, 4)),
+                        NumericInstruction.constI32(32), NumericInstruction.sub(Int32.self),
                         VariableInstruction.teeLocal(2), VariableInstruction.teeLocal(3),
-                        VariableInstruction.getLocal(0), MemoryInstruction.i32.store((2, 24)),
-                        ControlInstruction.block([], [
-                            VariableInstruction.getLocal(0), NumericInstruction.i32.const(1),
-                            NumericInstruction.i32.gtS, ControlInstruction.brIf(0),
-                            VariableInstruction.getLocal(3), NumericInstruction.i32.const(1),
-                            MemoryInstruction.i32.store((2, 28)), VariableInstruction.getLocal(3),
-                            MemoryInstruction.i32.load((2, 28)), ControlInstruction.return,
+                        VariableInstruction.getLocal(0), MemoryInstruction.store(Int32.self, (2, 24)),
+                        ControlInstruction.block([], Expression(instructions: [
+                            VariableInstruction.getLocal(0), NumericInstruction.constI32(1),
+                            NumericInstruction.gtS(Int32.self), ControlInstruction.brIf(0),
+                            VariableInstruction.getLocal(3), NumericInstruction.constI32(1),
+                            MemoryInstruction.store(Int32.self, (2, 28)), VariableInstruction.getLocal(3),
+                            MemoryInstruction.load(Int32.self, (2, 28)), ControlInstruction.return,
                             PseudoInstruction.end,
-                        ]),
-                        VariableInstruction.getLocal(3), MemoryInstruction.i32.load((2, 24)),
+                        ])),
+                        VariableInstruction.getLocal(3), MemoryInstruction.load(Int32.self, (2, 24)),
                         VariableInstruction.setLocal(0), VariableInstruction.getLocal(3),
-                        VariableInstruction.getLocal(2), MemoryInstruction.i32.store((2, 16)),
+                        VariableInstruction.getLocal(2), MemoryInstruction.store(Int32.self, (2, 16)),
                         VariableInstruction.getLocal(2), VariableInstruction.getLocal(0),
-                        NumericInstruction.i32.const(2), NumericInstruction.i32.shl,
-                        NumericInstruction.i32.const(15), NumericInstruction.i32.add,
-                        NumericInstruction.i32.const(-16), NumericInstruction.i32.add,
-                        NumericInstruction.i32.sub, VariableInstruction.teeLocal(1),
+                        NumericInstruction.constI32(2), NumericInstruction.shl(Int32.self),
+                        NumericInstruction.constI32(15), NumericInstruction.add(Int32.self),
+                        NumericInstruction.constI32(-16), NumericInstruction.add(Int32.self),
+                        NumericInstruction.sub(Int32.self), VariableInstruction.teeLocal(1),
                         ParametricInstruction.drop, VariableInstruction.getLocal(1),
-                        NumericInstruction.i64.const(4_294_967_297), MemoryInstruction.i64.store((3, 0)),
-                        VariableInstruction.getLocal(3), NumericInstruction.i32.const(2),
-                        MemoryInstruction.i32.store((2, 12)), ControlInstruction.block([], [
-                            ControlInstruction.loop([], [
-                                VariableInstruction.getLocal(3), MemoryInstruction.i32.load((2, 12)),
-                                VariableInstruction.getLocal(3), MemoryInstruction.i32.load((2, 24)),
-                                NumericInstruction.i32.geS, ControlInstruction.brIf(1),
+                        NumericInstruction.constI64(4_294_967_297), MemoryInstruction.store(Int64.self, (3, 0)),
+                        VariableInstruction.getLocal(3), NumericInstruction.constI32(2),
+                        MemoryInstruction.store(Int32.self, (2, 12)),
+                        ControlInstruction.block([], Expression(instructions: [
+                            ControlInstruction.loop([], Expression(instructions: [
+                                VariableInstruction.getLocal(3), MemoryInstruction.load(Int32.self, (2, 12)),
+                                VariableInstruction.getLocal(3), MemoryInstruction.load(Int32.self, (2, 24)),
+                                NumericInstruction.geS(Int32.self), ControlInstruction.brIf(1),
                                 VariableInstruction.getLocal(1), VariableInstruction.getLocal(3),
-                                MemoryInstruction.i32.load((2, 12)), VariableInstruction.teeLocal(2),
-                                NumericInstruction.i32.const(2), NumericInstruction.i32.shl,
-                                NumericInstruction.i32.add, VariableInstruction.teeLocal(0),
-                                VariableInstruction.getLocal(0), NumericInstruction.i32.const(-4),
-                                NumericInstruction.i32.add, MemoryInstruction.i32.load((2, 0)),
-                                VariableInstruction.getLocal(0), NumericInstruction.i32.const(-8),
-                                NumericInstruction.i32.add, MemoryInstruction.i32.load((2, 0)),
-                                NumericInstruction.i32.add, MemoryInstruction.i32.store((2, 0)),
+                                MemoryInstruction.load(Int32.self, (2, 12)), VariableInstruction.teeLocal(2),
+                                NumericInstruction.constI32(2), NumericInstruction.shl(Int32.self),
+                                NumericInstruction.add(Int32.self), VariableInstruction.teeLocal(0),
+                                VariableInstruction.getLocal(0), NumericInstruction.constI32(-4),
+                                NumericInstruction.add(Int32.self), MemoryInstruction.load(Int32.self, (2, 0)),
+                                VariableInstruction.getLocal(0), NumericInstruction.constI32(-8),
+                                NumericInstruction.add(Int32.self), MemoryInstruction.load(Int32.self, (2, 0)),
+                                NumericInstruction.add(Int32.self), MemoryInstruction.store(Int32.self, (2, 0)),
                                 VariableInstruction.getLocal(3), VariableInstruction.getLocal(2),
-                                NumericInstruction.i32.const(1), NumericInstruction.i32.add,
-                                MemoryInstruction.i32.store((2, 12)), ControlInstruction.br(0),
+                                NumericInstruction.constI32(1), NumericInstruction.add(Int32.self),
+                                MemoryInstruction.store(Int32.self, (2, 12)), ControlInstruction.br(0),
                                 PseudoInstruction.end,
-                            ]),
+                            ])),
                             ControlInstruction.unreachable, PseudoInstruction.end,
-                        ]),
+                        ])),
                         VariableInstruction.getLocal(3), VariableInstruction.getLocal(1),
-                        VariableInstruction.getLocal(3), MemoryInstruction.i32.load((2, 24)),
-                        NumericInstruction.i32.const(2), NumericInstruction.i32.shl,
-                        NumericInstruction.i32.add, MemoryInstruction.i32.load((2, 0)),
-                        MemoryInstruction.i32.store((2, 28)), VariableInstruction.getLocal(3),
-                        MemoryInstruction.i32.load((2, 16)), ParametricInstruction.drop,
-                        VariableInstruction.getLocal(3), MemoryInstruction.i32.load((2, 28)),
+                        VariableInstruction.getLocal(3), MemoryInstruction.load(Int32.self, (2, 24)),
+                        NumericInstruction.constI32(2), NumericInstruction.shl(Int32.self),
+                        NumericInstruction.add(Int32.self), MemoryInstruction.load(Int32.self, (2, 0)),
+                        MemoryInstruction.store(Int32.self, (2, 28)), VariableInstruction.getLocal(3),
+                        MemoryInstruction.load(Int32.self, (2, 16)), ParametricInstruction.drop,
+                        VariableInstruction.getLocal(3), MemoryInstruction.load(Int32.self, (2, 28)),
                         PseudoInstruction.end,
-                ])),
-            ],
-            tables: [
-                Table(
-                    type: TableType(
-                        elementType: FunctionType(
-                            parameters: [AnyValue.self],
-                            results: [AnyValue.self]
-                        ),
-                        limits: Limits(min: 0, max: nil)
-                    )
+                    ])
                 ),
             ],
-            memories: [Memory(type: Limits(min: 2, max: nil))],
+            tables: [
+                Table(type: TableType(elementType: FunctionType.any, limits: Limits(min: 0, max: nil))),
+            ],
+            memories: [
+                Memory(type: Limits(min: 2, max: nil)),
+            ],
             globals: [],
             elements: [],
             data: [
                 Data(
                     data: 0,
-                    offset: Expression(instructions: [
-                        NumericInstruction.i32.const(4),
-                        PseudoInstruction.end,
-                    ]),
-                    initializer: [0x10, 0x00, 0x01, 0x00]
+                    offset: Expression(instructions: [NumericInstruction.constI32(4), PseudoInstruction.end]),
+                    initializer: [16, 0, 1, 0]
                 ),
             ],
             start: nil,
             imports: [],
             exports: [
-                Export(
-                    name: "memory",
-                    descriptor: ExportDescriptor.memory(0)
-                ),
-                Export(
-                    name: "fib",
-                    descriptor: ExportDescriptor.function(0)
-                ),
-                Export(
-                    name: "fib_memo",
-                    descriptor: ExportDescriptor.function(1)
-                ),
+                Export(name: "memory", descriptor: ExportDescriptor.memory(0)),
+                Export(name: "fib", descriptor: ExportDescriptor.function(0)),
+                Export(name: "fib_memo", descriptor: ExportDescriptor.function(1)),
             ]
         ))
+
         XCTAssertEqual(stream.currentIndex, stream.bytes.endIndex)
     }
 }

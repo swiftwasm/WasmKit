@@ -1,10 +1,14 @@
 // https://webassembly.github.io/spec/syntax/types.html#value-types
 protocol Value {}
 struct AnyValue: Value {}
-extension Int32: Value {}
-extension Int64: Value {}
-extension Float32: Value {}
-extension Float64: Value {}
+
+protocol IntegerValue: Value {}
+extension Int32: IntegerValue {}
+extension Int64: IntegerValue {}
+
+protocol FloatingPointValue: Value {}
+extension Float32: FloatingPointValue {}
+extension Float64: FloatingPointValue {}
 
 extension Array where Element == Value.Type {
     static func == (lhs: [Value.Type], rhs: [Value.Type]) -> Bool {
@@ -12,6 +16,10 @@ extension Array where Element == Value.Type {
         return zip(lhs, rhs).reduce(true) { result, zipped in
             result && zipped.0 == zipped.1
         }
+    }
+
+    static func != (lhs: [Value.Type], rhs: [Value.Type]) -> Bool {
+        return !(lhs == rhs)
     }
 }
 
@@ -26,11 +34,7 @@ public struct FunctionType {
     static let any = FunctionType(parameters: [AnyValue.self], results: [AnyValue.self])
 }
 
-extension FunctionType: Equatable {
-    public static func == (lhs: FunctionType, rhs: FunctionType) -> Bool {
-        return lhs.parameters == rhs.parameters && lhs.results == rhs.results
-    }
-}
+extension FunctionType: AutoEquatable {}
 
 // https://webassembly.github.io/spec/syntax/types.html#limits
 public struct Limits {
@@ -38,11 +42,7 @@ public struct Limits {
     let max: UInt32?
 }
 
-extension Limits: Equatable {
-    public static func == (lhs: Limits, rhs: Limits) -> Bool {
-        return lhs.min == rhs.min && lhs.max == rhs.max
-    }
-}
+extension Limits: AutoEquatable {}
 
 // https://webassembly.github.io/spec/syntax/types.html#memory-types
 public typealias MemoryType = Limits
@@ -53,11 +53,7 @@ public struct TableType {
     let limits: Limits
 }
 
-extension TableType: Equatable {
-    public static func == (lhs: TableType, rhs: TableType) -> Bool {
-        return lhs.limits == rhs.limits && lhs.elementType == rhs.elementType
-    }
-}
+extension TableType: AutoEquatable {}
 
 // https://webassembly.github.io/spec/syntax/types.html#global-types
 public enum Mutability {
@@ -71,11 +67,7 @@ public struct GlobalType {
     let valueType: Value.Type
 }
 
-extension GlobalType: Equatable {
-    public static func == (lhs: GlobalType, rhs: GlobalType) -> Bool {
-        return lhs.mutability == rhs.mutability && lhs.valueType == rhs.valueType
-    }
-}
+extension GlobalType: AutoEquatable {}
 
 // https://webassembly.github.io/spec/syntax/types.html#external-types
 public enum ExternalType {
@@ -85,19 +77,4 @@ public enum ExternalType {
     case global(GlobalType)
 }
 
-extension ExternalType: Equatable {
-    public static func == (lhs: ExternalType, rhs: ExternalType) -> Bool {
-        switch (lhs, rhs) {
-        case let (.function(l), .function(r)):
-            return l == r
-        case let (.table(l), .table(r)):
-            return l == r
-        case let (.memory(l), .memory(r)):
-            return l == r
-        case let (.global(l), .global(r)):
-            return l == r
-        default:
-            return false
-        }
-    }
-}
+extension ExternalType: AutoEquatable {}

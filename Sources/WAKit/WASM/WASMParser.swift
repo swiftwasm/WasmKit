@@ -252,19 +252,19 @@ extension WASMParser {
         case 0x02:
             let type = try parseResultType()
             let expression = try parseExpression()
-            return ControlInstruction.block(type, expression.instructions)
+            return ControlInstruction.block(type, expression)
         case 0x03:
             let type = try parseResultType()
             let expression = try parseExpression()
-            return ControlInstruction.loop(type, expression.instructions)
+            return ControlInstruction.loop(type, expression)
         case 0x04:
             let type = try parseResultType()
             let ifExpression = try parseExpression()
             guard (try? stream.consume(0x05)) == nil else {
-                return ControlInstruction.if(type, ifExpression.instructions, [])
+                return ControlInstruction.if(type, ifExpression, Expression())
             }
             let elseExpression = try parseExpression()
-            return ControlInstruction.if(type, ifExpression.instructions, elseExpression.instructions)
+            return ControlInstruction.if(type, ifExpression, elseExpression)
         case 0x0B:
             return PseudoInstruction.end
         case 0x0C:
@@ -309,95 +309,95 @@ extension WASMParser {
         case 0x28:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.i32.load((align, offset))
+            return MemoryInstruction.load(Int32.self, (align, offset))
         case 0x29:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.i64.load((align, offset))
+            return MemoryInstruction.load(Int64.self, (align, offset))
         case 0x2A:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.f32.load((align, offset))
+            return MemoryInstruction.load(Float32.self, (align, offset))
         case 0x2B:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.f64.load((align, offset))
+            return MemoryInstruction.load(Float64.self, (align, offset))
         case 0x2C:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.i32.load8s((align, offset))
+            return MemoryInstruction.load8s(Int32.self, (align, offset))
         case 0x2D:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.i64.load8u((align, offset))
+            return MemoryInstruction.load8u(Int64.self, (align, offset))
         case 0x2E:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.i32.load16s((align, offset))
+            return MemoryInstruction.load16s(Int32.self, (align, offset))
         case 0x2F:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.i32.load16u((align, offset))
+            return MemoryInstruction.load16u(Int32.self, (align, offset))
         case 0x30:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.i64.load8s((align, offset))
+            return MemoryInstruction.load8s(Int64.self, (align, offset))
         case 0x31:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.i64.load8u((align, offset))
+            return MemoryInstruction.load8u(Int64.self, (align, offset))
         case 0x32:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.i64.load16s((align, offset))
+            return MemoryInstruction.load16s(Int64.self, (align, offset))
         case 0x33:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.i64.load16u((align, offset))
+            return MemoryInstruction.load16u(Int64.self, (align, offset))
         case 0x34:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.i64.load32s((align, offset))
+            return MemoryInstruction.load32s(Int64.self, (align, offset))
         case 0x35:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.i64.load32u((align, offset))
+            return MemoryInstruction.load32u(Int64.self, (align, offset))
         case 0x36:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.i32.store((align, offset))
+            return MemoryInstruction.store(Int32.self, (align, offset))
         case 0x37:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.i64.store((align, offset))
+            return MemoryInstruction.store(Int64.self, (align, offset))
         case 0x38:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.f32.store((align, offset))
+            return MemoryInstruction.store(Float32.self, (align, offset))
         case 0x39:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.f64.store((align, offset))
+            return MemoryInstruction.store(Float64.self, (align, offset))
         case 0x3A:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.i32.store8((align, offset))
+            return MemoryInstruction.store8(Int32.self, (align, offset))
         case 0x3B:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.i32.store16((align, offset))
+            return MemoryInstruction.store16(Int32.self, (align, offset))
         case 0x3C:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.i64.store8((align, offset))
+            return MemoryInstruction.store8(Int64.self, (align, offset))
         case 0x3D:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.i64.store16((align, offset))
+            return MemoryInstruction.store16(Int64.self, (align, offset))
         case 0x3E:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.i64.store32((align, offset))
+            return MemoryInstruction.store32(Int64.self, (align, offset))
         case 0x3F:
             try stream.consume(0x00)
             return MemoryInstruction.currentMemory
@@ -407,271 +407,271 @@ extension WASMParser {
 
         case 0x41:
             let n = try parseInteger(bits: 32)
-            return NumericInstruction.i32.const(Int32(n))
+            return NumericInstruction.constI32(Int32(n))
         case 0x42:
             let n = try parseInteger(bits: 64)
-            return NumericInstruction.i64.const(Int64(n))
+            return NumericInstruction.constI64(Int64(n))
         case 0x43:
             let n = try parseFloat()
-            return NumericInstruction.f32.const(n)
+            return NumericInstruction.constF32(Float32(n))
         case 0x44:
             let n = try parseDouble()
-            return NumericInstruction.f64.const(n)
+            return NumericInstruction.constF64(Float64(n))
 
         case 0x45:
-            return NumericInstruction.i32.eqz
+            return NumericInstruction.eqz(Int32.self)
         case 0x46:
-            return NumericInstruction.i32.eq
+            return NumericInstruction.eq(Int32.self)
         case 0x47:
-            return NumericInstruction.i32.ne
+            return NumericInstruction.ne(Int32.self)
         case 0x48:
-            return NumericInstruction.i32.ltS
+            return NumericInstruction.ltS(Int32.self)
         case 0x49:
-            return NumericInstruction.i32.ltU
+            return NumericInstruction.ltU(Int32.self)
         case 0x4A:
-            return NumericInstruction.i32.gtS
+            return NumericInstruction.gtS(Int32.self)
         case 0x4B:
-            return NumericInstruction.i32.gtU
+            return NumericInstruction.gtU(Int32.self)
         case 0x4C:
-            return NumericInstruction.i32.leS
+            return NumericInstruction.leS(Int32.self)
         case 0x4D:
-            return NumericInstruction.i32.leU
+            return NumericInstruction.leU(Int32.self)
         case 0x4E:
-            return NumericInstruction.i32.geS
+            return NumericInstruction.geS(Int32.self)
         case 0x4F:
-            return NumericInstruction.i32.geU
+            return NumericInstruction.geU(Int32.self)
 
         case 0x50:
-            return NumericInstruction.i64.eqz
+            return NumericInstruction.eqz(Int64.self)
         case 0x51:
-            return NumericInstruction.i64.eq
+            return NumericInstruction.eq(Int64.self)
         case 0x52:
-            return NumericInstruction.i64.ne
+            return NumericInstruction.ne(Int64.self)
         case 0x53:
-            return NumericInstruction.i64.ltS
+            return NumericInstruction.ltS(Int64.self)
         case 0x54:
-            return NumericInstruction.i64.ltU
+            return NumericInstruction.ltU(Int64.self)
         case 0x55:
-            return NumericInstruction.i64.gtS
+            return NumericInstruction.gtS(Int64.self)
         case 0x56:
-            return NumericInstruction.i64.gtU
+            return NumericInstruction.gtU(Int64.self)
         case 0x57:
-            return NumericInstruction.i64.leS
+            return NumericInstruction.leS(Int64.self)
         case 0x58:
-            return NumericInstruction.i64.leU
+            return NumericInstruction.leU(Int64.self)
         case 0x59:
-            return NumericInstruction.i64.geS
+            return NumericInstruction.geS(Int64.self)
         case 0x5A:
-            return NumericInstruction.i64.geU
+            return NumericInstruction.geU(Int64.self)
 
         case 0x5B:
-            return NumericInstruction.f32.eq
+            return NumericInstruction.eq(Float32.self)
         case 0x5C:
-            return NumericInstruction.f32.ne
+            return NumericInstruction.ne(Float32.self)
         case 0x5D:
-            return NumericInstruction.f32.lt
+            return NumericInstruction.lt(Float32.self)
         case 0x5E:
-            return NumericInstruction.f32.gt
+            return NumericInstruction.gt(Float32.self)
         case 0x5F:
-            return NumericInstruction.f32.le
+            return NumericInstruction.le(Float32.self)
         case 0x60:
-            return NumericInstruction.f32.ge
+            return NumericInstruction.ge(Float32.self)
 
         case 0x61:
-            return NumericInstruction.f64.eq
+            return NumericInstruction.eq(Float64.self)
         case 0x62:
-            return NumericInstruction.f64.ne
+            return NumericInstruction.ne(Float64.self)
         case 0x63:
-            return NumericInstruction.f64.lt
+            return NumericInstruction.lt(Float64.self)
         case 0x64:
-            return NumericInstruction.f64.gt
+            return NumericInstruction.gt(Float64.self)
         case 0x65:
-            return NumericInstruction.f64.le
+            return NumericInstruction.le(Float64.self)
         case 0x66:
-            return NumericInstruction.f64.ge
+            return NumericInstruction.ge(Float64.self)
 
         case 0x67:
-            return NumericInstruction.i32.clz
+            return NumericInstruction.clz(Int32.self)
         case 0x68:
-            return NumericInstruction.i32.ctz
+            return NumericInstruction.ctz(Int32.self)
         case 0x69:
-            return NumericInstruction.i32.popcnt
+            return NumericInstruction.popcnt(Int32.self)
         case 0x6A:
-            return NumericInstruction.i32.add
+            return NumericInstruction.add(Int32.self)
         case 0x6B:
-            return NumericInstruction.i32.sub
+            return NumericInstruction.sub(Int32.self)
         case 0x6C:
-            return NumericInstruction.i32.mul
+            return NumericInstruction.mul(Int32.self)
         case 0x6D:
-            return NumericInstruction.i32.divS
+            return NumericInstruction.divS(Int32.self)
         case 0x6E:
-            return NumericInstruction.i32.divU
+            return NumericInstruction.divU(Int32.self)
         case 0x6F:
-            return NumericInstruction.i32.remS
+            return NumericInstruction.remS(Int32.self)
         case 0x70:
-            return NumericInstruction.i32.remU
+            return NumericInstruction.remU(Int32.self)
         case 0x71:
-            return NumericInstruction.i32.add
+            return NumericInstruction.add(Int32.self)
         case 0x72:
-            return NumericInstruction.i32.or
+            return NumericInstruction.or(Int32.self)
         case 0x73:
-            return NumericInstruction.i32.xor
+            return NumericInstruction.xor(Int32.self)
         case 0x74:
-            return NumericInstruction.i32.shl
+            return NumericInstruction.shl(Int32.self)
         case 0x75:
-            return NumericInstruction.i32.shrS
+            return NumericInstruction.shrS(Int32.self)
         case 0x76:
-            return NumericInstruction.i32.shrU
+            return NumericInstruction.shrU(Int32.self)
         case 0x77:
-            return NumericInstruction.i32.rotl
+            return NumericInstruction.rotl(Int32.self)
         case 0x78:
-            return NumericInstruction.i32.rotr
+            return NumericInstruction.rotr(Int32.self)
 
         case 0x79:
-            return NumericInstruction.i64.clz
+            return NumericInstruction.clz(Int64.self)
         case 0x7A:
-            return NumericInstruction.i64.ctz
+            return NumericInstruction.ctz(Int64.self)
         case 0x7B:
-            return NumericInstruction.i64.popcnt
+            return NumericInstruction.popcnt(Int64.self)
         case 0x7C:
-            return NumericInstruction.i64.add
+            return NumericInstruction.add(Int64.self)
         case 0x7D:
-            return NumericInstruction.i64.sub
+            return NumericInstruction.sub(Int64.self)
         case 0x7E:
-            return NumericInstruction.i64.mul
+            return NumericInstruction.mul(Int64.self)
         case 0x7F:
-            return NumericInstruction.i64.divS
+            return NumericInstruction.divS(Int64.self)
         case 0x80:
-            return NumericInstruction.i64.divU
+            return NumericInstruction.divU(Int64.self)
         case 0x81:
-            return NumericInstruction.i64.remS
+            return NumericInstruction.remS(Int64.self)
         case 0x82:
-            return NumericInstruction.i64.remU
+            return NumericInstruction.remU(Int64.self)
         case 0x83:
-            return NumericInstruction.i64.add
+            return NumericInstruction.add(Int64.self)
         case 0x84:
-            return NumericInstruction.i64.or
+            return NumericInstruction.or(Int64.self)
         case 0x85:
-            return NumericInstruction.i64.xor
+            return NumericInstruction.xor(Int64.self)
         case 0x86:
-            return NumericInstruction.i64.shl
+            return NumericInstruction.shl(Int64.self)
         case 0x87:
-            return NumericInstruction.i64.shrS
+            return NumericInstruction.shrS(Int64.self)
         case 0x88:
-            return NumericInstruction.i64.shrU
+            return NumericInstruction.shrU(Int64.self)
         case 0x89:
-            return NumericInstruction.i64.rotl
+            return NumericInstruction.rotl(Int64.self)
         case 0x8A:
-            return NumericInstruction.i64.rotr
+            return NumericInstruction.rotr(Int64.self)
 
         case 0x8B:
-            return NumericInstruction.f32.abs
+            return NumericInstruction.abs(Float32.self)
         case 0x8C:
-            return NumericInstruction.f32.neg
+            return NumericInstruction.neg(Float32.self)
         case 0x8D:
-            return NumericInstruction.f32.ceil
+            return NumericInstruction.ceil(Float32.self)
         case 0x8E:
-            return NumericInstruction.f32.floor
+            return NumericInstruction.floor(Float32.self)
         case 0x8F:
-            return NumericInstruction.f32.trunc
+            return NumericInstruction.trunc(Float32.self)
         case 0x90:
-            return NumericInstruction.f32.nearest
+            return NumericInstruction.nearest(Float32.self)
         case 0x91:
-            return NumericInstruction.f32.sqrt
+            return NumericInstruction.sqrt(Float32.self)
         case 0x92:
-            return NumericInstruction.f32.add
+            return NumericInstruction.add(Float32.self)
         case 0x93:
-            return NumericInstruction.f32.sub
+            return NumericInstruction.sub(Float32.self)
         case 0x94:
-            return NumericInstruction.f32.mul
+            return NumericInstruction.mul(Float32.self)
         case 0x95:
-            return NumericInstruction.f32.div
+            return NumericInstruction.div(Float32.self)
         case 0x96:
-            return NumericInstruction.f32.min
+            return NumericInstruction.min(Float32.self)
         case 0x97:
-            return NumericInstruction.f32.max
+            return NumericInstruction.max(Float32.self)
         case 0x98:
-            return NumericInstruction.f32.copysign
+            return NumericInstruction.copysign(Float32.self)
 
         case 0x99:
-            return NumericInstruction.f64.abs
+            return NumericInstruction.abs(Float64.self)
         case 0x9A:
-            return NumericInstruction.f64.neg
+            return NumericInstruction.neg(Float64.self)
         case 0x9B:
-            return NumericInstruction.f64.ceil
+            return NumericInstruction.ceil(Float64.self)
         case 0x9C:
-            return NumericInstruction.f64.floor
+            return NumericInstruction.floor(Float64.self)
         case 0x9D:
-            return NumericInstruction.f64.trunc
+            return NumericInstruction.trunc(Float64.self)
         case 0x9E:
-            return NumericInstruction.f64.nearest
+            return NumericInstruction.nearest(Float64.self)
         case 0x9F:
-            return NumericInstruction.f64.sqrt
+            return NumericInstruction.sqrt(Float64.self)
         case 0xA0:
-            return NumericInstruction.f64.add
+            return NumericInstruction.add(Float64.self)
         case 0xA1:
-            return NumericInstruction.f64.sub
+            return NumericInstruction.sub(Float64.self)
         case 0xA2:
-            return NumericInstruction.f64.mul
+            return NumericInstruction.mul(Float64.self)
         case 0xA3:
-            return NumericInstruction.f64.div
+            return NumericInstruction.div(Float64.self)
         case 0xA4:
-            return NumericInstruction.f64.min
+            return NumericInstruction.min(Float64.self)
         case 0xA5:
-            return NumericInstruction.f64.max
+            return NumericInstruction.max(Float64.self)
         case 0xA6:
-            return NumericInstruction.f64.copysign
+            return NumericInstruction.copysign(Float64.self)
 
         case 0xA7:
-            return NumericInstruction.i32.wrapI64
+            return NumericInstruction.wrap(Int32.self, Int64.self)
         case 0xA8:
-            return NumericInstruction.i32.truncSF32
+            return NumericInstruction.truncS(Int32.self, Float32.self)
         case 0xA9:
-            return NumericInstruction.i32.truncUF32
+            return NumericInstruction.truncU(Int32.self, Float32.self)
         case 0xAA:
-            return NumericInstruction.i32.truncSF64
+            return NumericInstruction.truncS(Int32.self, Float64.self)
         case 0xAB:
-            return NumericInstruction.i32.truncUF64
+            return NumericInstruction.truncU(Int32.self, Float64.self)
         case 0xAC:
-            return NumericInstruction.i64.extendSI32
+            return NumericInstruction.extendS(Int64.self, Int32.self)
         case 0xAD:
-            return NumericInstruction.i64.extendUI32
+            return NumericInstruction.extendU(Int64.self, Int32.self)
         case 0xAE:
-            return NumericInstruction.i64.truncSF32
+            return NumericInstruction.truncS(Int64.self, Float32.self)
         case 0xAF:
-            return NumericInstruction.i64.truncUF32
+            return NumericInstruction.truncU(Int64.self, Float32.self)
         case 0xB0:
-            return NumericInstruction.i64.truncSF64
+            return NumericInstruction.truncS(Int64.self, Float64.self)
         case 0xB1:
-            return NumericInstruction.i64.truncUF64
+            return NumericInstruction.truncU(Int64.self, Float64.self)
         case 0xB2:
-            return NumericInstruction.f32.convertSI32
+            return NumericInstruction.convertS(Float32.self, Int32.self)
         case 0xB3:
-            return NumericInstruction.f32.convertUI32
+            return NumericInstruction.convertU(Float32.self, Int32.self)
         case 0xB4:
-            return NumericInstruction.f32.convertSI64
+            return NumericInstruction.convertS(Float32.self, Int64.self)
         case 0xB5:
-            return NumericInstruction.f32.convertUI64
+            return NumericInstruction.convertU(Float32.self, Int64.self)
         case 0xB6:
-            return NumericInstruction.f32.demoteF64
+            return NumericInstruction.demote(Float32.self, Float64.self)
         case 0xB7:
-            return NumericInstruction.f64.convertSI32
+            return NumericInstruction.convertS(Float64.self, Int32.self)
         case 0xB8:
-            return NumericInstruction.f64.convertUI32
+            return NumericInstruction.convertU(Float64.self, Int32.self)
         case 0xB9:
-            return NumericInstruction.f64.convertSI64
+            return NumericInstruction.convertS(Float64.self, Int64.self)
         case 0xBA:
-            return NumericInstruction.f64.convertUI64
+            return NumericInstruction.convertU(Float64.self, Int64.self)
         case 0xBB:
-            return NumericInstruction.f64.promoteF32
+            return NumericInstruction.promote(Float64.self, Float32.self)
         case 0xBC:
-            return NumericInstruction.i32.reinterpretF32
+            return NumericInstruction.reinterpret(Int32.self, Float32.self)
         case 0xBD:
-            return NumericInstruction.i64.reinterpretF64
+            return NumericInstruction.reinterpret(Int64.self, Float64.self)
         case 0xBE:
-            return NumericInstruction.f32.reinterpretI32
+            return NumericInstruction.reinterpret(Float32.self, Int32.self)
         case 0xBF:
-            return NumericInstruction.f64.reinterpretI64
+            return NumericInstruction.reinterpret(Float64.self, Int64.self)
         default:
             throw StreamError.unexpected(code, expected: nil)
         }
