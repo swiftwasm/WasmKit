@@ -4,6 +4,10 @@ struct Expression {
     init(instructions: [Instruction] = []) {
         self.instructions = instructions
     }
+
+    static var empty: Expression {
+        return Expression(instructions: [])
+    }
 }
 
 extension Expression: Equatable {

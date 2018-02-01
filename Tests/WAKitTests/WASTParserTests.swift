@@ -125,22 +125,22 @@ extension WASMParserTests {
 
         stream = StaticByteStream(bytes: [0x7F])
         parser = WASMParser(stream: stream)
-        XCTAssert(try parser.parseValueType() == Int32.self)
+        XCTAssert(try parser.parseValueType() == .i32)
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
 
         stream = StaticByteStream(bytes: [0x7E])
         parser = WASMParser(stream: stream)
-        XCTAssert(try parser.parseValueType() == Int64.self)
+        XCTAssert(try parser.parseValueType() == .i64)
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
 
         stream = StaticByteStream(bytes: [0x7D])
         parser = WASMParser(stream: stream)
-        XCTAssert(try parser.parseValueType() == Float32.self)
+        XCTAssert(try parser.parseValueType() == .f32)
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
 
         stream = StaticByteStream(bytes: [0x7C])
         parser = WASMParser(stream: stream)
-        XCTAssert(try parser.parseValueType() == Float64.self)
+        XCTAssert(try parser.parseValueType() == .f64)
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
 
         stream = StaticByteStream(bytes: [0x7B])
@@ -165,7 +165,7 @@ extension WASMParserTests {
 
         stream = StaticByteStream(bytes: [0x7E])
         parser = WASMParser(stream: stream)
-        XCTAssert(try parser.parseResultType() == [Int64.self])
+        XCTAssert(try parser.parseResultType() == [.i64])
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
 
         stream = StaticByteStream(bytes: [0x7B])
@@ -190,7 +190,7 @@ extension WASMParserTests {
 
         stream = StaticByteStream(bytes: [0x60, 0x01, 0x7E, 0x01, 0x7D])
         parser = WASMParser(stream: stream)
-        XCTAssert(try parser.parseFunctionType() == FunctionType(parameters: [Int64.self], results: [Float32.self]))
+        XCTAssert(try parser.parseFunctionType() == FunctionType(parameters: [.i64], results: [.f32]))
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
     }
 
@@ -275,12 +275,12 @@ extension WASMParserTests {
 
         stream = StaticByteStream(bytes: [0x7F, 0x00])
         parser = WASMParser(stream: stream)
-        XCTAssertEqual(try parser.parseGlobalType(), GlobalType(mutability: .constant, valueType: Int32.self))
+        XCTAssertEqual(try parser.parseGlobalType(), GlobalType(mutability: .constant, valueType: .i32))
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
 
         stream = StaticByteStream(bytes: [0x7F, 0x01])
         parser = WASMParser(stream: stream)
-        XCTAssertEqual(try parser.parseGlobalType(), GlobalType(mutability: .variable, valueType: Int32.self))
+        XCTAssertEqual(try parser.parseGlobalType(), GlobalType(mutability: .variable, valueType: .i32))
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
 
         stream = StaticByteStream(bytes: [0x7B])
@@ -378,8 +378,8 @@ extension WASMParserTests {
         ])
         parser = WASMParser(stream: stream)
         let expected = Section.type([
-            FunctionType(parameters: [Int32.self], results: [Int64.self]),
-            FunctionType(parameters: [Float32.self], results: [Float64.self]),
+            FunctionType(parameters: [.i32], results: [.i64]),
+            FunctionType(parameters: [.f32], results: [.f64]),
         ])
         XCTAssertEqual(try parser.parseTypeSection(), expected)
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
@@ -485,11 +485,11 @@ extension WASMParserTests {
         parser = WASMParser(stream: stream)
         let expected = Section.global([
             Global(
-                type: GlobalType(mutability: .constant, valueType: Int32.self),
+                type: GlobalType(mutability: .constant, valueType: .i32),
                 initializer: Expression(instructions: [PseudoInstruction.end])
             ),
             Global(
-                type: GlobalType(mutability: .variable, valueType: Int64.self),
+                type: GlobalType(mutability: .variable, valueType: .i64),
                 initializer: Expression(instructions: [PseudoInstruction.end])
             ),
         ])
@@ -582,11 +582,11 @@ extension WASMParserTests {
         parser = WASMParser(stream: stream)
         let expected = Section.code([
             Code(
-                locals: [Int32.self, Int32.self, Int32.self],
+                locals: [.i32, .i32, .i32],
                 expression: Expression(instructions: [PseudoInstruction.end])
             ),
             Code(
-                locals: [Int64.self, Float32.self, Float32.self],
+                locals: [.i64, .f32, .f32],
                 expression: Expression(instructions: [PseudoInstruction.end])
             ),
         ])
@@ -705,125 +705,146 @@ extension WASMParserTests {
         ])
         parser = WASMParser(stream: stream)
 
-        XCTAssertEqual(try parser.parseModule(), Module(
-            types: [
-                FunctionType(parameters: [Int32.self], results: [Int32.self]),
-            ],
-            functions: [
-                Function(
-                    type: 0,
-                    locals: [Int32.self],
-                    body: Expression(instructions: [
-                        NumericInstruction.constI32(0), NumericInstruction.constI32(0),
-                        MemoryInstruction.load(Int32.self, (2, 4)), NumericInstruction.constI32(16),
-                        NumericInstruction.sub(Int32.self), VariableInstruction.teeLocal(1),
-                        MemoryInstruction.store(Int32.self, (2, 4)), VariableInstruction.getLocal(1),
-                        VariableInstruction.getLocal(0), MemoryInstruction.store(Int32.self, (2, 8)),
-                        ControlInstruction.block([], Expression(instructions: [
+        XCTAssertEqual(
+            try parser.parseModule(),
+            Module(
+                types: [
+                    FunctionType(
+                        parameters: [.i32],
+                        results: [.i32]
+                    ),
+                ],
+                functions: [
+                    Function(
+                        type: 0,
+                        locals: [.i32],
+                        body: Expression(instructions: [
+                            NumericInstruction.const(.i32(0)), NumericInstruction.const(.i32(0)),
+                            MemoryInstruction.load(.i32, (2, 4)), NumericInstruction.const(.i32(16)),
+                            NumericInstruction.sub(.i32), VariableInstruction.teeLocal(1),
+                            MemoryInstruction.store(.i32, (2, 4)), VariableInstruction.getLocal(1),
+                            VariableInstruction.getLocal(0), MemoryInstruction.store(.i32, (2, 8)),
                             ControlInstruction.block([], Expression(instructions: [
-                                VariableInstruction.getLocal(0), NumericInstruction.constI32(1),
-                                NumericInstruction.gtS(Int32.self), ControlInstruction.brIf(0),
-                                VariableInstruction.getLocal(1), NumericInstruction.constI32(1),
-                                MemoryInstruction.store(Int32.self, (2, 12)), ControlInstruction.br(1),
+                                ControlInstruction.block([], Expression(instructions: [
+                                    VariableInstruction.getLocal(0), NumericInstruction.const(.i32(1)),
+                                    NumericInstruction.gtS(.i32), ControlInstruction.brIf(0),
+                                    VariableInstruction.getLocal(1), NumericInstruction.const(.i32(1)),
+                                    MemoryInstruction.store(.i32, (2, 12)), ControlInstruction.br(1),
+                                    PseudoInstruction.end,
+                                ])),
+                                VariableInstruction.getLocal(1), VariableInstruction.getLocal(1),
+                                MemoryInstruction.load(.i32, (2, 8)), NumericInstruction.const(.i32(-1)),
+                                NumericInstruction.add(.i32), ControlInstruction.call(0),
+                                VariableInstruction.getLocal(1), MemoryInstruction.load(.i32, (2, 8)),
+                                NumericInstruction.const(.i32(-2)), NumericInstruction.add(.i32),
+                                ControlInstruction.call(0), NumericInstruction.add(.i32),
+                                MemoryInstruction.store(.i32, (2, 12)), PseudoInstruction.end,
+                            ])),
+                            VariableInstruction.getLocal(1), MemoryInstruction.load(.i32, (2, 12)),
+                            VariableInstruction.setLocal(0), NumericInstruction.const(.i32(0)),
+                            VariableInstruction.getLocal(1), NumericInstruction.const(.i32(16)),
+                            NumericInstruction.add(.i32), MemoryInstruction.store(.i32, (2, 4)),
+                            VariableInstruction.getLocal(0), PseudoInstruction.end,
+                    ])),
+                    Function(
+                        type: 0,
+                        locals: [.i32, .i32, .i32],
+                        body: Expression(instructions: [
+                            NumericInstruction.const(.i32(0)), MemoryInstruction.load(.i32, (2, 4)),
+                            NumericInstruction.const(.i32(32)), NumericInstruction.sub(.i32),
+                            VariableInstruction.teeLocal(2), VariableInstruction.teeLocal(3),
+                            VariableInstruction.getLocal(0), MemoryInstruction.store(.i32, (2, 24)),
+                            ControlInstruction.block([], Expression(instructions: [
+                                VariableInstruction.getLocal(0), NumericInstruction.const(.i32(1)),
+                                NumericInstruction.gtS(.i32), ControlInstruction.brIf(0),
+                                VariableInstruction.getLocal(3), NumericInstruction.const(.i32(1)),
+                                MemoryInstruction.store(.i32, (2, 28)), VariableInstruction.getLocal(3),
+                                MemoryInstruction.load(.i32, (2, 28)), ControlInstruction.return,
                                 PseudoInstruction.end,
                             ])),
-                            VariableInstruction.getLocal(1), VariableInstruction.getLocal(1),
-                            MemoryInstruction.load(Int32.self, (2, 8)), NumericInstruction.constI32(-1),
-                            NumericInstruction.add(Int32.self), ControlInstruction.call(0),
-                            VariableInstruction.getLocal(1), MemoryInstruction.load(Int32.self, (2, 8)),
-                            NumericInstruction.constI32(-2), NumericInstruction.add(Int32.self),
-                            ControlInstruction.call(0), NumericInstruction.add(Int32.self),
-                            MemoryInstruction.store(Int32.self, (2, 12)), PseudoInstruction.end,
-                        ])),
-                        VariableInstruction.getLocal(1), MemoryInstruction.load(Int32.self, (2, 12)),
-                        VariableInstruction.setLocal(0), NumericInstruction.constI32(0),
-                        VariableInstruction.getLocal(1), NumericInstruction.constI32(16),
-                        NumericInstruction.add(Int32.self), MemoryInstruction.store(Int32.self, (2, 4)),
-                        VariableInstruction.getLocal(0), PseudoInstruction.end,
-                ])),
-                Function(
-                    type: 0,
-                    locals: [Int32.self, Int32.self, Int32.self],
-                    body: Expression(instructions: [
-                        NumericInstruction.constI32(0), MemoryInstruction.load(Int32.self, (2, 4)),
-                        NumericInstruction.constI32(32), NumericInstruction.sub(Int32.self),
-                        VariableInstruction.teeLocal(2), VariableInstruction.teeLocal(3),
-                        VariableInstruction.getLocal(0), MemoryInstruction.store(Int32.self, (2, 24)),
-                        ControlInstruction.block([], Expression(instructions: [
-                            VariableInstruction.getLocal(0), NumericInstruction.constI32(1),
-                            NumericInstruction.gtS(Int32.self), ControlInstruction.brIf(0),
-                            VariableInstruction.getLocal(3), NumericInstruction.constI32(1),
-                            MemoryInstruction.store(Int32.self, (2, 28)), VariableInstruction.getLocal(3),
-                            MemoryInstruction.load(Int32.self, (2, 28)), ControlInstruction.return,
+                            VariableInstruction.getLocal(3), MemoryInstruction.load(.i32, (2, 24)),
+                            VariableInstruction.setLocal(0), VariableInstruction.getLocal(3),
+                            VariableInstruction.getLocal(2), MemoryInstruction.store(.i32, (2, 16)),
+                            VariableInstruction.getLocal(2), VariableInstruction.getLocal(0),
+                            NumericInstruction.const(.i32(2)), NumericInstruction.shl(.i32),
+                            NumericInstruction.const(.i32(15)), NumericInstruction.add(.i32),
+                            NumericInstruction.const(.i32(-16)), NumericInstruction.add(.i32),
+                            NumericInstruction.sub(.i32), VariableInstruction.teeLocal(1),
+                            ParametricInstruction.drop, VariableInstruction.getLocal(1),
+                            NumericInstruction.const(.i64(4_294_967_297)), MemoryInstruction.store(.i64, (3, 0)),
+                            VariableInstruction.getLocal(3), NumericInstruction.const(.i32(2)),
+                            MemoryInstruction.store(.i32, (2, 12)),
+                            ControlInstruction.block([], Expression(instructions: [
+                                ControlInstruction.loop([], Expression(instructions: [
+                                    VariableInstruction.getLocal(3), MemoryInstruction.load(.i32, (2, 12)),
+                                    VariableInstruction.getLocal(3), MemoryInstruction.load(.i32, (2, 24)),
+                                    NumericInstruction.geS(.i32), ControlInstruction.brIf(1),
+                                    VariableInstruction.getLocal(1), VariableInstruction.getLocal(3),
+                                    MemoryInstruction.load(.i32, (2, 12)), VariableInstruction.teeLocal(2),
+                                    NumericInstruction.const(.i32(2)), NumericInstruction.shl(.i32),
+                                    NumericInstruction.add(.i32), VariableInstruction.teeLocal(0),
+                                    VariableInstruction.getLocal(0), NumericInstruction.const(.i32(-4)),
+                                    NumericInstruction.add(.i32), MemoryInstruction.load(.i32, (2, 0)),
+                                    VariableInstruction.getLocal(0), NumericInstruction.const(.i32(-8)),
+                                    NumericInstruction.add(.i32), MemoryInstruction.load(.i32, (2, 0)),
+                                    NumericInstruction.add(.i32), MemoryInstruction.store(.i32, (2, 0)),
+                                    VariableInstruction.getLocal(3), VariableInstruction.getLocal(2),
+                                    NumericInstruction.const(.i32(1)), NumericInstruction.add(.i32),
+                                    MemoryInstruction.store(.i32, (2, 12)), ControlInstruction.br(0),
+                                    PseudoInstruction.end,
+                                ])),
+                                ControlInstruction.unreachable, PseudoInstruction.end,
+                            ])),
+                            VariableInstruction.getLocal(3), VariableInstruction.getLocal(1),
+                            VariableInstruction.getLocal(3), MemoryInstruction.load(.i32, (2, 24)),
+                            NumericInstruction.const(.i32(2)), NumericInstruction.shl(.i32),
+                            NumericInstruction.add(.i32), MemoryInstruction.load(.i32, (2, 0)),
+                            MemoryInstruction.store(.i32, (2, 28)), VariableInstruction.getLocal(3),
+                            MemoryInstruction.load(.i32, (2, 16)), ParametricInstruction.drop,
+                            VariableInstruction.getLocal(3), MemoryInstruction.load(.i32, (2, 28)),
                             PseudoInstruction.end,
-                        ])),
-                        VariableInstruction.getLocal(3), MemoryInstruction.load(Int32.self, (2, 24)),
-                        VariableInstruction.setLocal(0), VariableInstruction.getLocal(3),
-                        VariableInstruction.getLocal(2), MemoryInstruction.store(Int32.self, (2, 16)),
-                        VariableInstruction.getLocal(2), VariableInstruction.getLocal(0),
-                        NumericInstruction.constI32(2), NumericInstruction.shl(Int32.self),
-                        NumericInstruction.constI32(15), NumericInstruction.add(Int32.self),
-                        NumericInstruction.constI32(-16), NumericInstruction.add(Int32.self),
-                        NumericInstruction.sub(Int32.self), VariableInstruction.teeLocal(1),
-                        ParametricInstruction.drop, VariableInstruction.getLocal(1),
-                        NumericInstruction.constI64(4_294_967_297), MemoryInstruction.store(Int64.self, (3, 0)),
-                        VariableInstruction.getLocal(3), NumericInstruction.constI32(2),
-                        MemoryInstruction.store(Int32.self, (2, 12)),
-                        ControlInstruction.block([], Expression(instructions: [
-                            ControlInstruction.loop([], Expression(instructions: [
-                                VariableInstruction.getLocal(3), MemoryInstruction.load(Int32.self, (2, 12)),
-                                VariableInstruction.getLocal(3), MemoryInstruction.load(Int32.self, (2, 24)),
-                                NumericInstruction.geS(Int32.self), ControlInstruction.brIf(1),
-                                VariableInstruction.getLocal(1), VariableInstruction.getLocal(3),
-                                MemoryInstruction.load(Int32.self, (2, 12)), VariableInstruction.teeLocal(2),
-                                NumericInstruction.constI32(2), NumericInstruction.shl(Int32.self),
-                                NumericInstruction.add(Int32.self), VariableInstruction.teeLocal(0),
-                                VariableInstruction.getLocal(0), NumericInstruction.constI32(-4),
-                                NumericInstruction.add(Int32.self), MemoryInstruction.load(Int32.self, (2, 0)),
-                                VariableInstruction.getLocal(0), NumericInstruction.constI32(-8),
-                                NumericInstruction.add(Int32.self), MemoryInstruction.load(Int32.self, (2, 0)),
-                                NumericInstruction.add(Int32.self), MemoryInstruction.store(Int32.self, (2, 0)),
-                                VariableInstruction.getLocal(3), VariableInstruction.getLocal(2),
-                                NumericInstruction.constI32(1), NumericInstruction.add(Int32.self),
-                                MemoryInstruction.store(Int32.self, (2, 12)), ControlInstruction.br(0),
-                                PseudoInstruction.end,
-                            ])),
-                            ControlInstruction.unreachable, PseudoInstruction.end,
-                        ])),
-                        VariableInstruction.getLocal(3), VariableInstruction.getLocal(1),
-                        VariableInstruction.getLocal(3), MemoryInstruction.load(Int32.self, (2, 24)),
-                        NumericInstruction.constI32(2), NumericInstruction.shl(Int32.self),
-                        NumericInstruction.add(Int32.self), MemoryInstruction.load(Int32.self, (2, 0)),
-                        MemoryInstruction.store(Int32.self, (2, 28)), VariableInstruction.getLocal(3),
-                        MemoryInstruction.load(Int32.self, (2, 16)), ParametricInstruction.drop,
-                        VariableInstruction.getLocal(3), MemoryInstruction.load(Int32.self, (2, 28)),
-                        PseudoInstruction.end,
-                    ])
-                ),
-            ],
-            tables: [
-                Table(type: TableType(elementType: FunctionType.any, limits: Limits(min: 0, max: nil))),
-            ],
-            memories: [
-                Memory(type: Limits(min: 2, max: nil)),
-            ],
-            globals: [],
-            elements: [],
-            data: [
-                Data(
-                    data: 0,
-                    offset: Expression(instructions: [NumericInstruction.constI32(4), PseudoInstruction.end]),
-                    initializer: [16, 0, 1, 0]
-                ),
-            ],
-            start: nil,
-            imports: [],
-            exports: [
-                Export(name: "memory", descriptor: ExportDescriptor.memory(0)),
-                Export(name: "fib", descriptor: ExportDescriptor.function(0)),
-                Export(name: "fib_memo", descriptor: ExportDescriptor.function(1)),
-            ]
-        ))
+                    ])),
+                ],
+                tables: [
+                    Table(
+                        type: TableType(
+                            elementType: FunctionType(parameters: nil, results: nil),
+                            limits: Limits(min: 0, max: nil)
+                        )
+                    ),
+                ],
+                memories: [
+                    Memory(type: Limits(min: 2, max: nil)),
+                ],
+                globals: [],
+                elements: [],
+                data: [
+                    Data(
+                        data: 0,
+                        offset: Expression(instructions: [
+                            NumericInstruction.const(.i32(4)), PseudoInstruction.end,
+                        ]),
+                        initializer: [16, 0, 1, 0]
+                    ),
+                ],
+                start: nil,
+                imports: [],
+                exports: [
+                    Export(
+                        name: "memory",
+                        descriptor: ExportDescriptor.memory(0)
+                    ),
+                    Export(
+                        name: "fib",
+                        descriptor: ExportDescriptor.function(0)
+                    ),
+                    Export(
+                        name: "fib_memo",
+                        descriptor: ExportDescriptor.function(1)
+                    ),
+                ]
+            )
+        )
 
         XCTAssertEqual(stream.currentIndex, stream.bytes.endIndex)
     }

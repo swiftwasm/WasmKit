@@ -7,7 +7,7 @@ public final class WASMParser<Stream: ByteStream> {
         return stream.currentIndex
     }
 
-    init(stream: Stream) {
+    public init(stream: Stream) {
         self.stream = stream
     }
 }
@@ -887,7 +887,7 @@ extension WASMParser {
     }
 
     // https://webassembly.github.io/spec/core/binary/modules.html#binary-module
-    func parseModule() throws -> Module {
+    public func parseModule() throws -> Module {
         try parseMagicNumbers()
         try parseVersion()
 
