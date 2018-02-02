@@ -11,9 +11,6 @@ let package = Package(
         .library(
             name: "Parser",
             targets: ["Parser"]),
-        .executable(
-            name: "CLI",
-            targets: ["CLI"]),
     ],
     dependencies: [
     ],
@@ -36,14 +33,6 @@ let package = Package(
             name: "ParserTests",
             dependencies: ["Parser"],
             path: "./Tests/ParserTests"),
-        .target(
-            name: "CLI",
-            dependencies: ["WAKit"],
-            path: "./Sources/CLI"),
-        .testTarget(
-            name: "CLITests",
-            dependencies: ["CLI"],
-            path: "./Tests/CLITests"),
     ],
     swiftLanguageVersions: [4]
 )
