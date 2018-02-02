@@ -1,5 +1,17 @@
 .PHONY: all
-all: generate project
+all: build
+
+.PHONY: update
+update: Package.swift
+	@swift package update
+
+.PHONY: build
+build: update
+	@swift build
+
+.PHONY: test
+test: update
+	@swift test
 
 NAME := $(shell basename `pwd`)
 
