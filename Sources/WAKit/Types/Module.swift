@@ -1,5 +1,5 @@
 // https://webassembly.github.io/spec/syntax/modules.html#modules
-public struct Module: AutoEquatable {
+public struct Module: Equatable {
     var types: [FunctionType]
     var functions: [Function]
     var tables: [Table]
@@ -34,7 +34,7 @@ public struct Module: AutoEquatable {
     }
 }
 
-public enum Section: AutoEquatable {
+public enum Section: Equatable {
     case custom(name: String, bytes: [UInt8])
     case type([FunctionType])
     case `import`([Import])
@@ -59,7 +59,7 @@ public typealias LocalIndex = UInt32
 public typealias LabelIndex = UInt32
 
 // https://webassembly.github.io/spec/syntax/modules.html#functions
-public struct Function: AutoEquatable {
+public struct Function: Equatable {
     let type: TypeIndex
     let locals: [ValueType]
     let body: Expression
@@ -67,26 +67,26 @@ public struct Function: AutoEquatable {
 
 // https://webassembly.github.io/spec/syntax/modules.html#tables
 
-public struct Table: AutoEquatable {
+public struct Table: Equatable {
     let type: TableType
 }
 
 // https://webassembly.github.io/spec/syntax/modules.html#memories
 
-public struct Memory: AutoEquatable {
+public struct Memory: Equatable {
     let type: MemoryType
 }
 
 // https://webassembly.github.io/spec/syntax/modules.html#globals
 
-public struct Global: AutoEquatable {
+public struct Global: Equatable {
     let type: GlobalType
     let initializer: Expression
 }
 
 // https://webassembly.github.io/spec/syntax/modules.html#element-segments
 
-public struct Element: AutoEquatable {
+public struct Element: Equatable {
     let table: TableIndex
     let offset: Expression
     let initializer: [FunctionIndex]
@@ -94,7 +94,7 @@ public struct Element: AutoEquatable {
 
 // https://webassembly.github.io/spec/syntax/modules.html#data-segments
 
-public struct Data: AutoEquatable {
+public struct Data: Equatable {
     let data: MemoryIndex
     let offset: Expression
     let initializer: [UInt8]
@@ -102,12 +102,12 @@ public struct Data: AutoEquatable {
 
 // https://webassembly.github.io/spec/syntax/modules.html#exports
 
-public struct Export: AutoEquatable {
+public struct Export: Equatable {
     let name: String
     let descriptor: ExportDescriptor
 }
 
-public enum ExportDescriptor: AutoEquatable {
+public enum ExportDescriptor: Equatable {
     case function(FunctionIndex)
     case table(TableIndex)
     case memory(MemoryIndex)
@@ -116,13 +116,13 @@ public enum ExportDescriptor: AutoEquatable {
 
 // https://webassembly.github.io/spec/syntax/modules.html#imports
 
-public struct Import: AutoEquatable {
+public struct Import: Equatable {
     let module: String
     let name: String
     let descripter: ImportDescriptor
 }
 
-public enum ImportDescriptor: AutoEquatable {
+public enum ImportDescriptor: Equatable {
     case function(TypeIndex)
     case table(TableType)
     case memory(MemoryType)

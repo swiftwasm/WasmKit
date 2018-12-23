@@ -32,7 +32,7 @@ extension Instruction where Self: Equatable {
 }
 
 /// Pseudo Instructions
-enum PseudoInstruction: Instruction, AutoEquatable {
+enum PseudoInstruction: Instruction, Equatable {
     case end
 
     var isConstant: Bool {
@@ -42,7 +42,7 @@ enum PseudoInstruction: Instruction, AutoEquatable {
 
 /// Control Instructions
 /// - SeeAlso: https://webassembly.github.io/spec/binary/instructions.html#control-instructions
-enum ControlInstruction: Instruction, AutoEquatable {
+enum ControlInstruction: Instruction, Equatable {
     case unreachable
     case nop
     case block(ResultType, Expression)
@@ -62,7 +62,7 @@ enum ControlInstruction: Instruction, AutoEquatable {
 
 /// Parametric Instructions
 /// - SeeAlso: https://webassembly.github.io/spec/binary/instructions.html#parametric-instructions
-enum ParametricInstruction: Instruction, AutoEquatable {
+enum ParametricInstruction: Instruction, Equatable {
     case drop
     case select
 
@@ -73,7 +73,7 @@ enum ParametricInstruction: Instruction, AutoEquatable {
 
 /// Variable Instructions
 /// - SeeAlso: https://webassembly.github.io/spec/binary/instructions.html#variable-instructions
-enum VariableInstruction: Instruction, AutoEquatable {
+enum VariableInstruction: Instruction, Equatable {
     case getLocal(LabelIndex)
     case setLocal(LabelIndex)
     case teeLocal(LabelIndex)
@@ -87,8 +87,12 @@ enum VariableInstruction: Instruction, AutoEquatable {
 
 /// Memory Instructions
 /// - SeeAlso: https://webassembly.github.io/spec/binary/instructions.html#memory-instructions
-enum MemoryInstruction: Instruction, AutoEquatable {
-    typealias MemoryArgument = (UInt32, UInt32)
+
+enum MemoryInstruction: Instruction, Equatable {
+    struct MemoryArgument: Equatable {
+        let min: UInt32
+        let max: UInt32
+    }
 
     case currentMemory
     case growMemory
@@ -112,7 +116,7 @@ enum MemoryInstruction: Instruction, AutoEquatable {
 
 /// Numeric Instructions
 /// - SeeAlso: https://webassembly.github.io/spec/binary/instructions.html#numeric-instructions
-enum NumericInstruction: Instruction, AutoEquatable {
+enum NumericInstruction: Instruction, Equatable {
     case const(Value)
 
     case eqz(ValueType)

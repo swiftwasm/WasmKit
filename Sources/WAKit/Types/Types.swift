@@ -1,12 +1,12 @@
 // https://webassembly.github.io/spec/syntax/types.html#value-types
-enum Value: AutoEquatable {
+enum Value: Equatable {
     case i32(Int32)
     case i64(Int64)
     case f32(Float32)
     case f64(Float64)
 }
 
-enum ValueType: AutoEquatable {
+enum ValueType: Equatable {
     case i32
     case i64
     case f32
@@ -37,7 +37,7 @@ public struct FunctionType {
     static let any = FunctionType(parameters: nil, results: nil)
 }
 
-extension FunctionType: AutoEquatable {}
+extension FunctionType: Equatable {}
 
 // https://webassembly.github.io/spec/syntax/types.html#limits
 public struct Limits {
@@ -45,7 +45,7 @@ public struct Limits {
     let max: UInt32?
 }
 
-extension Limits: AutoEquatable {}
+extension Limits: Equatable {}
 
 // https://webassembly.github.io/spec/syntax/types.html#memory-types
 public typealias MemoryType = Limits
@@ -56,7 +56,7 @@ public struct TableType {
     let limits: Limits
 }
 
-extension TableType: AutoEquatable {}
+extension TableType: Equatable {}
 
 // https://webassembly.github.io/spec/syntax/types.html#global-types
 public enum Mutability {
@@ -70,7 +70,7 @@ public struct GlobalType {
     let valueType: ValueType
 }
 
-extension GlobalType: AutoEquatable {}
+extension GlobalType: Equatable {}
 
 // https://webassembly.github.io/spec/syntax/types.html#external-types
 public enum ExternalType {
@@ -80,4 +80,4 @@ public enum ExternalType {
     case global(GlobalType)
 }
 
-extension ExternalType: AutoEquatable {}
+extension ExternalType: Equatable {}

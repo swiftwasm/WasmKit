@@ -309,95 +309,95 @@ extension WASMParser {
         case 0x28:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.load(.i32, (align, offset))
+            return MemoryInstruction.load(.i32, .init(min: align, max: offset))
         case 0x29:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.load(.i64, (align, offset))
+            return MemoryInstruction.load(.i64, .init(min: align, max: offset))
         case 0x2A:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.load(.f32, (align, offset))
+            return MemoryInstruction.load(.f32, .init(min: align, max: offset))
         case 0x2B:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.load(.f64, (align, offset))
+            return MemoryInstruction.load(.f64, .init(min: align, max: offset))
         case 0x2C:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.load8s(.i32, (align, offset))
+            return MemoryInstruction.load8s(.i32, .init(min: align, max: offset))
         case 0x2D:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.load8u(.i64, (align, offset))
+            return MemoryInstruction.load8u(.i64, .init(min: align, max: offset))
         case 0x2E:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.load16s(.i32, (align, offset))
+            return MemoryInstruction.load16s(.i32, .init(min: align, max: offset))
         case 0x2F:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.load16u(.i32, (align, offset))
+            return MemoryInstruction.load16u(.i32, .init(min: align, max: offset))
         case 0x30:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.load8s(.i64, (align, offset))
+            return MemoryInstruction.load8s(.i64, .init(min: align, max: offset))
         case 0x31:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.load8u(.i64, (align, offset))
+            return MemoryInstruction.load8u(.i64, .init(min: align, max: offset))
         case 0x32:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.load16s(.i64, (align, offset))
+            return MemoryInstruction.load16s(.i64, .init(min: align, max: offset))
         case 0x33:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.load16u(.i64, (align, offset))
+            return MemoryInstruction.load16u(.i64, .init(min: align, max: offset))
         case 0x34:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.load32s(.i64, (align, offset))
+            return MemoryInstruction.load32s(.i64, .init(min: align, max: offset))
         case 0x35:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.load32u(.i64, (align, offset))
+            return MemoryInstruction.load32u(.i64, .init(min: align, max: offset))
         case 0x36:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.store(.i32, (align, offset))
+            return MemoryInstruction.store(.i32, .init(min: align, max: offset))
         case 0x37:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.store(.i64, (align, offset))
+            return MemoryInstruction.store(.i64, .init(min: align, max: offset))
         case 0x38:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.store(.f32, (align, offset))
+            return MemoryInstruction.store(.f32, .init(min: align, max: offset))
         case 0x39:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.store(.f64, (align, offset))
+            return MemoryInstruction.store(.f64, .init(min: align, max: offset))
         case 0x3A:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.store8(.i32, (align, offset))
+            return MemoryInstruction.store8(.i32, .init(min: align, max: offset))
         case 0x3B:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.store16(.i32, (align, offset))
+            return MemoryInstruction.store16(.i32, .init(min: align, max: offset))
         case 0x3C:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.store8(.i64, (align, offset))
+            return MemoryInstruction.store8(.i64, .init(min: align, max: offset))
         case 0x3D:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.store16(.i64, (align, offset))
+            return MemoryInstruction.store16(.i64, .init(min: align, max: offset))
         case 0x3E:
             let align = try parseUnsigned32()
             let offset = try parseUnsigned32()
-            return MemoryInstruction.store32(.i64, (align, offset))
+            return MemoryInstruction.store32(.i64, .init(min: align, max: offset))
         case 0x3F:
             try stream.consume(0x00)
             return MemoryInstruction.currentMemory
