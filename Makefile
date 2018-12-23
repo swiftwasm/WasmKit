@@ -1,7 +1,7 @@
 .PHONY: all
 all: project
 
-NAME := $(shell basename `pwd`)
+NAME := WAKit
 
 .PHONY: project
 project: $(NAME).xcodeproj
