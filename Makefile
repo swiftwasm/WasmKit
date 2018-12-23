@@ -1,5 +1,5 @@
 .PHONY: all
-all: project
+all: project build
 
 NAME := WAKit
 
@@ -8,6 +8,14 @@ project: $(NAME).xcodeproj
 
 $(NAME).xcodeproj: Package.swift FORCE
 	@swift package generate-xcodeproj --enable-code-coverage
+
+.PHONY: build
+build:
+	@swift build
+
+.PHONY: test
+test:
+	@swift test
 
 .PHONY: clean
 clean:
