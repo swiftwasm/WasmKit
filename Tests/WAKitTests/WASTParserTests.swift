@@ -740,7 +740,8 @@ extension WASMParserTests {
                         VariableInstruction.getLocal(1), NumericInstruction.const(.i32(16)),
                         NumericInstruction.add(.i32), MemoryInstruction.store(.i32, .init(min: 2, max: 4)),
                         VariableInstruction.getLocal(0), PseudoInstruction.end,
-                ])),
+                    ])
+                ),
                 Function(
                     type: 0,
                     locals: [.i32, .i32, .i32],

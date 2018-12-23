@@ -52,8 +52,7 @@ extension TableType: Validatable {
 
 // https://webassembly.github.io/spec/core/valid/types.html#global-types
 extension GlobalType: Validatable {
-    func validate(context _: ValidationContext) throws {
-    }
+    func validate(context _: ValidationContext) throws {}
 }
 
 // https://webassembly.github.io/spec/core/valid/instructions.html#instructions

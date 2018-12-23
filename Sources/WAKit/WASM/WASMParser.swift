@@ -35,7 +35,6 @@ extension WASMParser {
 
 // https://webassembly.github.io/spec/core/binary/values.html#integers
 extension WASMParser {
-
     private func p2<I: BinaryInteger>(_ n: I) -> I { return 1 << n }
 
     func parseUnsigned(bits: Int) throws -> UInt {
@@ -142,7 +141,6 @@ extension WASMParser {
 
 // https://webassembly.github.io/spec/core/binary/types.html#types
 extension WASMParser {
-
     // https://webassembly.github.io/spec/core/binary/types.html#value-types
     func parseValueType() throws -> ValueType {
         let b = try stream.consume(Set(0x7C ... 0x7F))
@@ -692,7 +690,6 @@ extension WASMParser {
 
 // https://webassembly.github.io/spec/core/binary/modules.html#sections
 extension WASMParser {
-
     // https://webassembly.github.io/spec/core/binary/modules.html#custom-section
     func parseCustomSection() throws -> Section {
         try stream.consume(0)

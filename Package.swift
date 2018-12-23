@@ -7,13 +7,16 @@ let package = Package(
     products: [
         .library(
             name: "WAKit",
-            targets: ["WAKit"]),
+            targets: ["WAKit"]
+        ),
         .library(
             name: "Parser",
-            targets: ["Parser"]),
+            targets: ["Parser"]
+        ),
         .executable(
-            name: "CLI",
-            targets: ["CLI"]),
+            name: "wakit",
+            targets: ["CLI"]
+        ),
     ],
     dependencies: [
     ],
@@ -26,7 +29,8 @@ let package = Package(
         .testTarget(
             name: "WAKitTests",
             dependencies: ["WAKit"],
-            path: "./Tests/WAKitTests"),
+            path: "./Tests/WAKitTests"
+        ),
         .target(
             name: "Parser",
             dependencies: [],
@@ -35,15 +39,18 @@ let package = Package(
         .testTarget(
             name: "ParserTests",
             dependencies: ["Parser"],
-            path: "./Tests/ParserTests"),
+            path: "./Tests/ParserTests"
+        ),
         .target(
             name: "CLI",
             dependencies: ["WAKit"],
-            path: "./Sources/CLI"),
+            path: "./Sources/CLI"
+        ),
         .testTarget(
             name: "CLITests",
             dependencies: ["CLI"],
-            path: "./Tests/CLITests"),
+            path: "./Tests/CLITests"
+        ),
     ],
     swiftLanguageVersions: [4]
 )

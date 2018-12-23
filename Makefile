@@ -17,6 +17,10 @@ build:
 test:
 	@swift test
 
+.PHONY: format
+format:
+	@swiftformat .
+
 .PHONY: clean
 clean:
 	@swift package clean
