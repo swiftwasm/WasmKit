@@ -1,4 +1,4 @@
-// https://webassembly.github.io/spec/syntax/modules.html#modules
+// https://webassembly.github.io/spec/core/syntax/modules.html#modules
 public struct Module: Equatable {
     var types: [FunctionType]
     var functions: [Function]
@@ -49,7 +49,7 @@ public enum Section: Equatable {
     case data([Data])
 }
 
-// https://webassembly.github.io/spec/syntax/modules.html#syntax-typeidx
+// https://webassembly.github.io/spec/core/syntax/modules.html#syntax-typeidx
 public typealias TypeIndex = UInt32
 public typealias FunctionIndex = UInt32
 public typealias TableIndex = UInt32
@@ -58,33 +58,33 @@ public typealias GlobalIndex = UInt32
 public typealias LocalIndex = UInt32
 public typealias LabelIndex = UInt32
 
-// https://webassembly.github.io/spec/syntax/modules.html#functions
+// https://webassembly.github.io/spec/core/syntax/modules.html#functions
 public struct Function: Equatable {
     let type: TypeIndex
     let locals: [ValueType]
     let body: Expression
 }
 
-// https://webassembly.github.io/spec/syntax/modules.html#tables
+// https://webassembly.github.io/spec/core/syntax/modules.html#tables
 
 public struct Table: Equatable {
     let type: TableType
 }
 
-// https://webassembly.github.io/spec/syntax/modules.html#memories
+// https://webassembly.github.io/spec/core/syntax/modules.html#memories
 
 public struct Memory: Equatable {
     let type: MemoryType
 }
 
-// https://webassembly.github.io/spec/syntax/modules.html#globals
+// https://webassembly.github.io/spec/core/syntax/modules.html#globals
 
 public struct Global: Equatable {
     let type: GlobalType
     let initializer: Expression
 }
 
-// https://webassembly.github.io/spec/syntax/modules.html#element-segments
+// https://webassembly.github.io/spec/core/syntax/modules.html#element-segments
 
 public struct Element: Equatable {
     let table: TableIndex
@@ -92,7 +92,7 @@ public struct Element: Equatable {
     let initializer: [FunctionIndex]
 }
 
-// https://webassembly.github.io/spec/syntax/modules.html#data-segments
+// https://webassembly.github.io/spec/core/syntax/modules.html#data-segments
 
 public struct Data: Equatable {
     let data: MemoryIndex
@@ -100,7 +100,7 @@ public struct Data: Equatable {
     let initializer: [UInt8]
 }
 
-// https://webassembly.github.io/spec/syntax/modules.html#exports
+// https://webassembly.github.io/spec/core/syntax/modules.html#exports
 
 public struct Export: Equatable {
     let name: String
@@ -114,7 +114,7 @@ public enum ExportDescriptor: Equatable {
     case global(GlobalIndex)
 }
 
-// https://webassembly.github.io/spec/syntax/modules.html#imports
+// https://webassembly.github.io/spec/core/syntax/modules.html#imports
 
 public struct Import: Equatable {
     let module: String
