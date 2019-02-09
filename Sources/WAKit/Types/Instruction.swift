@@ -41,7 +41,8 @@ enum PseudoInstruction: Instruction, Equatable {
 }
 
 /// Control Instructions
-/// - SeeAlso: https://webassembly.github.io/spec/core/binary/instructions.html#control-instructions
+/// - Note:
+/// <https://webassembly.github.io/spec/core/binary/instructions.html#control-instructions>
 enum ControlInstruction: Instruction, Equatable {
     case unreachable
     case nop
@@ -61,7 +62,8 @@ enum ControlInstruction: Instruction, Equatable {
 }
 
 /// Parametric Instructions
-/// - SeeAlso: https://webassembly.github.io/spec/core/binary/instructions.html#parametric-instructions
+/// - Note:
+/// <https://webassembly.github.io/spec/core/binary/instructions.html#parametric-instructions>
 enum ParametricInstruction: Instruction, Equatable {
     case drop
     case select
@@ -72,7 +74,8 @@ enum ParametricInstruction: Instruction, Equatable {
 }
 
 /// Variable Instructions
-/// - SeeAlso: https://webassembly.github.io/spec/core/binary/instructions.html#variable-instructions
+/// - Note:
+/// <https://webassembly.github.io/spec/core/binary/instructions.html#variable-instructions>
 enum VariableInstruction: Instruction, Equatable {
     case getLocal(LabelIndex)
     case setLocal(LabelIndex)
@@ -86,7 +89,8 @@ enum VariableInstruction: Instruction, Equatable {
 }
 
 /// Memory Instructions
-/// - SeeAlso: https://webassembly.github.io/spec/core/binary/instructions.html#memory-instructions
+/// - Note:
+/// <https://webassembly.github.io/spec/core/binary/instructions.html#memory-instructions>
 
 enum MemoryInstruction: Instruction, Equatable {
     struct MemoryArgument: Equatable {
@@ -115,7 +119,8 @@ enum MemoryInstruction: Instruction, Equatable {
 }
 
 /// Numeric Instructions
-/// - SeeAlso: https://webassembly.github.io/spec/core/binary/instructions.html#numeric-instructions
+/// - Note:
+/// <https://webassembly.github.io/spec/core/binary/instructions.html#numeric-instructions>
 enum NumericInstruction: Instruction, Equatable {
     case const(Value)
 

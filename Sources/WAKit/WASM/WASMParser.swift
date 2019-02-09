@@ -21,7 +21,8 @@ extension WASMParser {
     typealias StreamError = Parser.Error<Stream.Element>
 }
 
-// https://webassembly.github.io/spec/core/binary/conventions.html#vectors
+/// - Note:
+/// <https://webassembly.github.io/spec/core/binary/conventions.html#vectors>
 extension WASMParser {
     func parseVector<Content>(content parser: () throws -> Content) throws -> [Content] {
         var contents = [Content]()
@@ -33,7 +34,8 @@ extension WASMParser {
     }
 }
 
-// https://webassembly.github.io/spec/core/binary/values.html#integers
+/// - Note:
+/// <https://webassembly.github.io/spec/core/binary/values.html#integers>
 extension WASMParser {
     private func p2<I: BinaryInteger>(_ n: I) -> I { return 1 << n }
 
@@ -89,7 +91,8 @@ extension WASMParser {
     }
 }
 
-// http://webassembly.github.io/spec/core/binary/values.html#floating-point
+/// - Note:
+/// <https://webassembly.github.io/spec/core/binary/values.html#floating-point>
 extension WASMParser {
     func parseFloatingPoint(bits: Int) throws -> Double {
         assert(bits == 32 || bits == 64)
@@ -116,11 +119,12 @@ extension WASMParser {
     }
 }
 
-// https://webassembly.github.io/spec/core/binary/values.html#names
+/// - Note:
+/// <https://webassembly.github.io/spec/core/binary/values.html#names>
 extension WASMParser {
     func parseName() throws -> String {
         let bytes = try parseVector { () -> UInt8 in
-            return try stream.consumeAny()
+            try stream.consumeAny()
         }
 
         var name = ""
@@ -139,9 +143,11 @@ extension WASMParser {
     }
 }
 
-// https://webassembly.github.io/spec/core/binary/types.html#types
+/// - Note:
+/// <https://webassembly.github.io/spec/core/binary/types.html#types>
 extension WASMParser {
-    // https://webassembly.github.io/spec/core/binary/types.html#value-types
+    /// - Note:
+    /// <https://webassembly.github.io/spec/core/binary/types.html#value-types>
     func parseValueType() throws -> ValueType {
         let b = try stream.consume(Set(0x7C ... 0x7F))
 
@@ -159,7 +165,8 @@ extension WASMParser {
         }
     }
 
-    // https://webassembly.github.io/spec/core/binary/types.html#result-types
+    /// - Note:
+    /// <https://webassembly.github.io/spec/core/binary/types.html#result-types>
     func parseResultType() throws -> ResultType {
         let b = try stream.peek()
 
@@ -172,7 +179,8 @@ extension WASMParser {
         }
     }
 
-    // https://webassembly.github.io/spec/core/binary/types.html#function-types
+    /// - Note:
+    /// <https://webassembly.github.io/spec/core/binary/types.html#function-types>
     func parseFunctionType() throws -> FunctionType {
         try stream.consume(0x60)
 
@@ -181,7 +189,8 @@ extension WASMParser {
         return FunctionType(parameters: parameters, results: results)
     }
 
-    // https://webassembly.github.io/spec/core/binary/types.html#limits
+    /// - Note:
+    /// <https://webassembly.github.io/spec/core/binary/types.html#limits>
     func parseLimits() throws -> Limits {
         let b = try stream.peek()
         switch b {
@@ -196,12 +205,14 @@ extension WASMParser {
         }
     }
 
-    // https://webassembly.github.io/spec/core/binary/types.html#memory-types
+    /// - Note:
+    /// <https://webassembly.github.io/spec/core/binary/types.html#memory-types>
     func parseMemoryType() throws -> MemoryType {
         return try parseLimits()
     }
 
-    // https://webassembly.github.io/spec/core/binary/types.html#table-types
+    /// - Note:
+    /// <https://webassembly.github.io/spec/core/binary/types.html#table-types>
     func parseTableType() throws -> TableType {
         let elementType: FunctionType
         let b = try stream.peek()
@@ -216,7 +227,8 @@ extension WASMParser {
         return TableType(elementType: elementType, limits: limits)
     }
 
-    // https://webassembly.github.io/spec/core/binary/types.html#global-types
+    /// - Note:
+    /// <https://webassembly.github.io/spec/core/binary/types.html#global-types>
     func parseGlobalType() throws -> GlobalType {
         let valueType = try parseValueType()
         let mutability = try parseMutability()
@@ -238,7 +250,8 @@ extension WASMParser {
     }
 }
 
-// https://webassembly.github.io/spec/core/binary/instructions.html
+/// - Note:
+/// <https://webassembly.github.io/spec/core/binary/instructions.html>
 extension WASMParser {
     func parseInstruction() throws -> Instruction {
         let code = try stream.consumeAny()
@@ -688,9 +701,11 @@ extension WASMParser {
     }
 }
 
-// https://webassembly.github.io/spec/core/binary/modules.html#sections
+/// - Note:
+/// <https://webassembly.github.io/spec/core/binary/modules.html#sections>
 extension WASMParser {
-    // https://webassembly.github.io/spec/core/binary/modules.html#custom-section
+    /// - Note:
+    /// <https://webassembly.github.io/spec/core/binary/modules.html#custom-section>
     func parseCustomSection() throws -> Section {
         try stream.consume(0)
         let size = try parseUnsigned32()
@@ -709,14 +724,16 @@ extension WASMParser {
         return .custom(name: name, bytes: bytes)
     }
 
-    // https://webassembly.github.io/spec/core/binary/modules.html#type-section
+    /// - Note:
+    /// <https://webassembly.github.io/spec/core/binary/modules.html#type-section>
     func parseTypeSection() throws -> Section {
         try stream.consume(1)
         /* size */ _ = try parseUnsigned32()
         return .type(try parseVector { try parseFunctionType() })
     }
 
-    // https://webassembly.github.io/spec/core/binary/modules.html#import-section
+    /// - Note:
+    /// <https://webassembly.github.io/spec/core/binary/modules.html#import-section>
     func parseImportSection() throws -> Section {
         try stream.consume(2)
         /* size */ _ = try parseUnsigned32()
@@ -730,7 +747,8 @@ extension WASMParser {
         return .import(imports)
     }
 
-    // https://webassembly.github.io/spec/core/binary/modules.html#binary-importdesc
+    /// - Note:
+    /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-importdesc>
     func parseImportDescriptor() throws -> ImportDescriptor {
         let b = try stream.peek()
         switch b {
@@ -751,14 +769,16 @@ extension WASMParser {
         }
     }
 
-    // https://webassembly.github.io/spec/core/binary/modules.html#function-section
+    /// - Note:
+    /// <https://webassembly.github.io/spec/core/binary/modules.html#function-section>
     func parseFunctionSection() throws -> Section {
         try stream.consume(3)
         /* size */ _ = try parseUnsigned32()
         return .function(try parseVector { try parseUnsigned32() })
     }
 
-    // https://webassembly.github.io/spec/core/binary/modules.html#table-section
+    /// - Note:
+    /// <https://webassembly.github.io/spec/core/binary/modules.html#table-section>
     func parseTableSection() throws -> Section {
         try stream.consume(4)
         /* size */ _ = try parseUnsigned32()
@@ -766,7 +786,8 @@ extension WASMParser {
         return .table(try parseVector { Table(type: try parseTableType()) })
     }
 
-    // https://webassembly.github.io/spec/core/binary/modules.html#memory-section
+    /// - Note:
+    /// <https://webassembly.github.io/spec/core/binary/modules.html#memory-section>
     func parseMemorySection() throws -> Section {
         try stream.consume(5)
         /* size */ _ = try parseUnsigned32()
@@ -774,7 +795,8 @@ extension WASMParser {
         return .memory(try parseVector { Memory(type: try parseLimits()) })
     }
 
-    // https://webassembly.github.io/spec/core/binary/modules.html#global-section
+    /// - Note:
+    /// <https://webassembly.github.io/spec/core/binary/modules.html#global-section>
     func parseGlobalSection() throws -> Section {
         try stream.consume(6)
         /* size */ _ = try parseUnsigned32()
@@ -786,7 +808,8 @@ extension WASMParser {
         })
     }
 
-    // https://webassembly.github.io/spec/core/binary/modules.html#export-section
+    /// - Note:
+    /// <https://webassembly.github.io/spec/core/binary/modules.html#export-section>
     func parseExportSection() throws -> Section {
         try stream.consume(7)
         /* size */ _ = try parseUnsigned32()
@@ -798,7 +821,8 @@ extension WASMParser {
         })
     }
 
-    // https://webassembly.github.io/spec/core/binary/modules.html#binary-exportdesc
+    /// - Note:
+    /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-exportdesc>
     func parseExportDescriptor() throws -> ExportDescriptor {
         let b = try stream.peek()
         switch b {
@@ -819,7 +843,8 @@ extension WASMParser {
         }
     }
 
-    // https://webassembly.github.io/spec/core/binary/modules.html#start-section
+    /// - Note:
+    /// <https://webassembly.github.io/spec/core/binary/modules.html#start-section>
     func parseStartSection() throws -> Section {
         try stream.consume(8)
         /* size */ _ = try parseUnsigned32()
@@ -827,7 +852,8 @@ extension WASMParser {
         return .start(try parseUnsigned32())
     }
 
-    // https://webassembly.github.io/spec/core/binary/modules.html#element-section
+    /// - Note:
+    /// <https://webassembly.github.io/spec/core/binary/modules.html#element-section>
     func parseElementSection() throws -> Section {
         try stream.consume(9)
         /* size */ _ = try parseUnsigned32()
@@ -840,7 +866,8 @@ extension WASMParser {
         })
     }
 
-    // https://webassembly.github.io/spec/core/binary/modules.html#code-section
+    /// - Note:
+    /// <https://webassembly.github.io/spec/core/binary/modules.html#code-section>
     func parseCodeSection() throws -> Section {
         try stream.consume(10)
         /* size */ _ = try parseUnsigned32()
@@ -857,7 +884,8 @@ extension WASMParser {
         })
     }
 
-    // https://webassembly.github.io/spec/core/binary/modules.html#data-section
+    /// - Note:
+    /// <https://webassembly.github.io/spec/core/binary/modules.html#data-section>
     func parseDataSection() throws -> Section {
         try stream.consume(11)
         /* size */ _ = try parseUnsigned32()
@@ -871,19 +899,23 @@ extension WASMParser {
     }
 }
 
-// https://webassembly.github.io/spec/core/binary/modules.html#binary-module
+/// - Note:
+/// <https://webassembly.github.io/spec/core/binary/modules.html#binary-module>
 extension WASMParser {
-    // https://webassembly.github.io/spec/core/binary/modules.html#binary-magic
+    /// - Note:
+    /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-magic>
     func parseMagicNumbers() throws {
         try stream.consume([0x00, 0x61, 0x73, 0x6D])
     }
 
-    // https://webassembly.github.io/spec/core/binary/modules.html#binary-version
+    /// - Note:
+    /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-version>
     func parseVersion() throws {
         try stream.consume([0x01, 0x00, 0x00, 0x00])
     }
 
-    // https://webassembly.github.io/spec/core/binary/modules.html#binary-module
+    /// - Note:
+    /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-module>
     func parseModule() throws -> Module {
         try parseMagicNumbers()
         try parseVersion()

@@ -1,4 +1,5 @@
-// https://webassembly.github.io/spec/core/syntax/types.html#value-types
+/// - Note:
+/// <https://webassembly.github.io/spec/core/syntax/types.html#value-types>
 enum Value: Equatable {
     case i32(Int32)
     case i64(Int64)
@@ -26,10 +27,12 @@ extension Array where Element == ValueType {
     }
 }
 
-// https://webassembly.github.io/spec/core/syntax/types.html#result-types
+/// - Note:
+/// <https://webassembly.github.io/spec/core/syntax/types.html#result-types>
 typealias ResultType = [ValueType]
 
-// https://webassembly.github.io/spec/core/syntax/types.html#function-types
+/// - Note:
+/// <https://webassembly.github.io/spec/core/syntax/types.html#function-types>
 public struct FunctionType {
     let parameters: [ValueType]?
     let results: [ValueType]?
@@ -39,7 +42,8 @@ public struct FunctionType {
 
 extension FunctionType: Equatable {}
 
-// https://webassembly.github.io/spec/core/syntax/types.html#limits
+/// - Note:
+/// <https://webassembly.github.io/spec/core/syntax/types.html#limits>
 public struct Limits {
     let min: UInt32
     let max: UInt32?
@@ -47,10 +51,12 @@ public struct Limits {
 
 extension Limits: Equatable {}
 
-// https://webassembly.github.io/spec/core/syntax/types.html#memory-types
+/// - Note:
+/// <https://webassembly.github.io/spec/core/syntax/types.html#memory-types>
 public typealias MemoryType = Limits
 
-// https://webassembly.github.io/spec/core/syntax/types.html#table-types
+/// - Note:
+/// <https://webassembly.github.io/spec/core/syntax/types.html#table-types>
 public struct TableType {
     let elementType: FunctionType
     let limits: Limits
@@ -58,13 +64,15 @@ public struct TableType {
 
 extension TableType: Equatable {}
 
-// https://webassembly.github.io/spec/core/syntax/types.html#global-types
+/// - Note:
+/// <https://webassembly.github.io/spec/core/syntax/types.html#global-types>
 public enum Mutability {
     case constant
     case variable
 }
 
-// https://webassembly.github.io/spec/core/syntax/types.html#global-types
+/// - Note:
+/// <https://webassembly.github.io/spec/core/syntax/types.html#global-types>
 public struct GlobalType {
     let mutability: Mutability?
     let valueType: ValueType
@@ -72,7 +80,8 @@ public struct GlobalType {
 
 extension GlobalType: Equatable {}
 
-// https://webassembly.github.io/spec/core/syntax/types.html#external-types
+/// - Note:
+/// <https://webassembly.github.io/spec/core/syntax/types.html#external-types>
 public enum ExternalType {
     case function(FunctionType)
     case table(TableType)
