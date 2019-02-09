@@ -46,11 +46,6 @@ let package = Package(
             dependencies: ["WAKit"],
             path: "./Sources/CLI"
         ),
-        .testTarget(
-            name: "CLITests",
-            dependencies: ["CLI"],
-            path: "./Tests/CLITests"
-        ),
     ],
     swiftLanguageVersions: [4]
 )
