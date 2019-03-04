@@ -1,10 +1,18 @@
+NAME := WAKit
+
 MODULES = $(notdir $(wildcard Sources/*))
 TEMPLATES = $(wildcard Templates/*.stencil)
 
-.PHONY: all
-all: project build
+MINT = swift run --package-path Vendor/Mint mint
+SWIFTFORMAT = $(MINT) run swiftformat swiftformat
+SOURCERY = $(MINT) run sourcery sourcery
 
-NAME := WAKit
+.PHONY: all
+all: bootstrap project build
+
+.PHONY: bootstrap
+bootstrap:
+	$(MINT) bootstrap
 
 .PHONY: project
 project: generate $(NAME).xcodeproj
@@ -23,7 +31,7 @@ test:
 
 .PHONY: format
 format:
-	@swiftformat .
+	$(SWIFTFORMAT) Sources Tests
 
 .PHONY: clean
 clean:
@@ -33,7 +41,7 @@ clean:
 GENERATED_SOURCES  = $(TEMPLATES:Templates/%.stencil=Sources/WAKit/Generated/%.swift)
 .PHONY: generate
 generate:
-	@sourcery \
+	$(SOURCERY) \
     --sources Sources/WAKit \
     --templates  $(TEMPLATES)\
     --output $(dir $(GENERATED_SOURCES))
