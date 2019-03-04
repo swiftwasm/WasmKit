@@ -12,16 +12,18 @@ public struct Module: Equatable {
     var imports: [Import]
     var exports: [Export]
 
-    public init(types: [FunctionType] = [],
-                functions: [Function] = [],
-                tables: [Table] = [],
-                memories: [Memory] = [],
-                globals: [Global] = [],
-                elements: [Element] = [],
-                data: [Data] = [],
-                start: FunctionIndex? = nil,
-                imports: [Import] = [],
-                exports: [Export] = []) {
+    public init(
+        types: [FunctionType] = [],
+        functions: [Function] = [],
+        tables: [Table] = [],
+        memories: [Memory] = [],
+        globals: [Global] = [],
+        elements: [Element] = [],
+        data: [Data] = [],
+        start: FunctionIndex? = nil,
+        imports: [Import] = [],
+        exports: [Export] = []
+    ) {
         self.types = types
         self.functions = functions
         self.tables = tables
@@ -62,7 +64,8 @@ public typealias LabelIndex = UInt32
 
 /// - Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#functions>
-public struct Function: Equatable {
+// sourcery: AutoEquatable
+public struct Function {
     let type: TypeIndex
     let locals: [ValueType]
     let body: Expression

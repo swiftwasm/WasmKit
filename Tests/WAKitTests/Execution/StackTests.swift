@@ -5,13 +5,13 @@ extension Int: Stackable {}
 
 final class StackTests: XCTestCase {
     func testStack() {
-        let stack = Stack()
+        var stack = Stack()
         XCTAssertNil(stack.top)
 
         let values = Array(1 ... 10)
 
         for v in values {
-            stack.push(entry: v)
+            stack.push(v)
             XCTAssertEqual(stack.top as? Int, v)
         }
 

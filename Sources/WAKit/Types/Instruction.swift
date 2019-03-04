@@ -1,26 +1,16 @@
-struct Expression {
+struct Expression: Equatable {
     let instructions: [Instruction]
 
     init(instructions: [Instruction] = []) {
         self.instructions = instructions
     }
-}
 
-extension Expression: Equatable {
     static func == (lhs: Expression, rhs: Expression) -> Bool {
-        guard lhs.instructions.count == rhs.instructions.count else {
-            return false
-        }
-        for (l, r) in zip(lhs.instructions, rhs.instructions) {
-            guard l.isEqual(to: r) else { return false }
-        }
-        return true
+        return lhs.instructions == rhs.instructions
     }
 }
 
 protocol Instruction {
-    var isConstant: Bool { get }
-
     func isEqual(to another: Instruction) -> Bool
 }
 
@@ -31,19 +21,28 @@ extension Instruction where Self: Equatable {
     }
 }
 
+extension Array where Element == Instruction {
+    static func == (lhs: [Instruction], rhs: [Instruction]) -> Bool {
+        guard lhs.count == rhs.count else {
+            return false
+        }
+        for (l, r) in zip(lhs, rhs) {
+            guard l.isEqual(to: r) else { return false }
+        }
+        return true
+    }
+}
+
 /// Pseudo Instructions
 enum PseudoInstruction: Instruction, Equatable {
     case end
-
-    var isConstant: Bool {
-        return false
-    }
 }
 
 /// Control Instructions
 /// - Note:
 /// <https://webassembly.github.io/spec/core/binary/instructions.html#control-instructions>
-enum ControlInstruction: Instruction, Equatable {
+// sourcery: AutoEquatable
+enum ControlInstruction: Instruction {
     case unreachable
     case nop
     case block(ResultType, Expression)
@@ -55,10 +54,6 @@ enum ControlInstruction: Instruction, Equatable {
     case `return`
     case call(FunctionIndex)
     case callIndirect(TypeIndex)
-
-    var isConstant: Bool {
-        return false
-    }
 }
 
 /// Parametric Instructions
@@ -67,10 +62,6 @@ enum ControlInstruction: Instruction, Equatable {
 enum ParametricInstruction: Instruction, Equatable {
     case drop
     case select
-
-    var isConstant: Bool {
-        return false
-    }
 }
 
 /// Variable Instructions
@@ -82,17 +73,13 @@ enum VariableInstruction: Instruction, Equatable {
     case teeLocal(LabelIndex)
     case getGlobal(GlobalIndex)
     case setGlobal(GlobalIndex)
-
-    var isConstant: Bool {
-        return false
-    }
 }
 
 /// Memory Instructions
 /// - Note:
 /// <https://webassembly.github.io/spec/core/binary/instructions.html#memory-instructions>
-
-enum MemoryInstruction: Instruction, Equatable {
+// sourcery: AutoEquatable
+enum MemoryInstruction: Instruction {
     struct MemoryArgument: Equatable {
         let min: UInt32
         let max: UInt32
@@ -112,82 +99,92 @@ enum MemoryInstruction: Instruction, Equatable {
     case store8(ValueType, MemoryArgument)
     case store16(ValueType, MemoryArgument)
     case store32(ValueType, MemoryArgument)
-
-    var isConstant: Bool {
-        return false
-    }
 }
 
 /// Numeric Instructions
 /// - Note:
 /// <https://webassembly.github.io/spec/core/binary/instructions.html#numeric-instructions>
-enum NumericInstruction: Instruction, Equatable {
-    case const(Value)
+enum NumericInstruction {
+    enum Constant: Instruction, Equatable {
+        case const(Value)
+    }
 
-    case eqz(ValueType)
-    case eq(ValueType)
-    case ne(ValueType)
-    case ltS(ValueType)
-    case ltU(ValueType)
-    case lt(ValueType)
-    case gtS(ValueType)
-    case gtU(ValueType)
-    case gt(ValueType)
-    case leS(ValueType)
-    case leU(ValueType)
-    case le(ValueType)
-    case geS(ValueType)
-    case geU(ValueType)
-    case ge(ValueType)
+    // sourcery: AutoEquatable
+    enum Unary: Instruction {
+        case clz(IntValueType)
+        case ctz(IntValueType)
+        case popcnt(IntValueType)
 
-    case clz(ValueType)
-    case ctz(ValueType)
-    case popcnt(ValueType)
-    case add(ValueType)
-    case sub(ValueType)
-    case mul(ValueType)
-    case divS(ValueType)
-    case divU(ValueType)
-    case remS(ValueType)
-    case remU(ValueType)
-    case and(ValueType)
-    case or(ValueType)
-    case xor(ValueType)
-    case shl(ValueType)
-    case shrS(ValueType)
-    case shrU(ValueType)
-    case rotl(ValueType)
-    case rotr(ValueType)
+        case abs(FloatValueType)
+        case neg(FloatValueType)
+        case ceil(FloatValueType)
+        case floor(FloatValueType)
+        case trunc(FloatValueType)
+        case nearest(FloatValueType)
+        case sqrt(FloatValueType)
+    }
 
-    case abs(ValueType)
-    case neg(ValueType)
-    case ceil(ValueType)
-    case floor(ValueType)
-    case trunc(ValueType)
-    case nearest(ValueType)
-    case sqrt(ValueType)
-    case div(ValueType)
-    case min(ValueType)
-    case max(ValueType)
-    case copysign(ValueType)
+    // sourcery: AutoEquatable
+    enum Binary: Instruction {
+        case add(ValueType)
+        case sub(ValueType)
+        case mul(ValueType)
 
-    case wrap(ValueType, ValueType)
-    case extendS(ValueType, ValueType)
-    case extendU(ValueType, ValueType)
-    case truncS(ValueType, ValueType)
-    case truncU(ValueType, ValueType)
-    case convertS(ValueType, ValueType)
-    case convertU(ValueType, ValueType)
-    case demote(ValueType, ValueType)
-    case promote(ValueType, ValueType)
-    case reinterpret(ValueType, ValueType)
+        case divS(IntValueType)
+        case divU(IntValueType)
+        case remS(IntValueType)
+        case remU(IntValueType)
+        case and(IntValueType)
+        case or(IntValueType)
+        case xor(IntValueType)
+        case shl(IntValueType)
+        case shrS(IntValueType)
+        case shrU(IntValueType)
+        case rotl(IntValueType)
+        case rotr(IntValueType)
 
-    var isConstant: Bool {
-        switch self {
-        case .const:
-            return true
-        default:
-            return false
-        }
+        case div(FloatValueType)
+        case min(FloatValueType)
+        case max(FloatValueType)
+        case copysign(FloatValueType)
+    }
+
+    // sourcery: AutoEquatable
+    enum Test: Instruction {
+        case eqz(IntValueType)
+    }
+
+    // sourcery: AutoEquatable
+    enum Comparison: Instruction {
+        case eq(ValueType)
+        case ne(ValueType)
+
+        case ltS(IntValueType)
+        case ltU(IntValueType)
+        case gtS(IntValueType)
+        case gtU(IntValueType)
+        case leS(IntValueType)
+        case leU(IntValueType)
+        case geS(IntValueType)
+        case geU(IntValueType)
+
+        case lt(FloatValueType)
+        case gt(FloatValueType)
+        case le(FloatValueType)
+        case ge(FloatValueType)
+    }
+
+    // sourcery: AutoEquatable
+    enum Conversion: Instruction {
+        case wrap(IntValueType, IntValueType)
+        case extendS(IntValueType, IntValueType)
+        case extendU(IntValueType, IntValueType)
+        case truncS(IntValueType, FloatValueType)
+        case truncU(IntValueType, FloatValueType)
+        case convertS(FloatValueType, IntValueType)
+        case convertU(FloatValueType, IntValueType)
+        case demote(FloatValueType, FloatValueType)
+        case promote(FloatValueType, FloatValueType)
+        case reinterpret(ValueType, ValueType)
     }
 }

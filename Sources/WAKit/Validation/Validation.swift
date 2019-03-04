@@ -38,7 +38,7 @@ extension Limits: Validatable {
 /// <https://webassembly.github.io/spec/core/valid/types.html#function-types>
 extension FunctionType: Validatable {
     func validate(context _: ValidationContext) throws {
-        guard let results = results else {
+        guard case let .some(_, results) = self else {
             return
         }
         guard results.count <= 1 else {
