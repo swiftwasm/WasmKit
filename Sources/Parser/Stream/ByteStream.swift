@@ -2,7 +2,7 @@ public protocol ByteStream: Stream where Element == UInt8 {}
 
 public final class StaticByteStream: ByteStream {
     public let bytes: [UInt8]
-    public var currentIndex: Array<UInt8>.Index
+    public var currentIndex: Int
 
     public init(bytes: [UInt8]) {
         self.bytes = bytes
@@ -12,7 +12,7 @@ public final class StaticByteStream: ByteStream {
     @discardableResult
     public func consumeAny() throws -> UInt8 {
         guard bytes.indices.contains(currentIndex) else {
-            throw Error<Element>.unexpectedEnd
+            throw Error<Element>.unexpectedEnd(expected: nil)
         }
 
         let consumed = bytes[currentIndex]
@@ -23,21 +23,21 @@ public final class StaticByteStream: ByteStream {
     @discardableResult
     public func consume(_ expected: Set<UInt8>) throws -> UInt8 {
         guard bytes.indices.contains(currentIndex) else {
-            throw Error<Element>.unexpectedEnd
+            throw Error<Element>.unexpectedEnd(expected: Set(expected))
         }
 
         let consumed = bytes[currentIndex]
         guard expected.contains(consumed) else {
-            throw Error<Element>.unexpected(consumed, expected: Set(expected))
+            throw Error<Element>.unexpected(consumed, index: currentIndex, expected: Set(expected))
         }
 
         currentIndex = bytes.index(after: currentIndex)
         return consumed
     }
 
-    public func peek() throws -> UInt8 {
+    public func peek() -> UInt8? {
         guard bytes.indices.contains(currentIndex) else {
-            throw Error<Element>.unexpectedEnd
+            return nil
         }
         return bytes[currentIndex]
     }

@@ -38,7 +38,7 @@ extension WASMParserTests {
         stream = StaticByteStream(bytes: [0x83, 0x10])
         parser = WASMParser(stream: stream)
         XCTAssertThrowsError(_ = try parser.parseUnsigned(bits: 8)) { error in
-            guard case Parser.Error<UInt8>.unexpected(0x10, nil) = error else {
+            guard case Parser.Error<UInt8>.unexpected(0x10, 1, nil) = error else {
                 return XCTFail("Unexpected error: \(error)")
             }
             XCTAssertEqual(stream.currentIndex, 1)
@@ -76,7 +76,7 @@ extension WASMParserTests {
         stream = StaticByteStream(bytes: [0x83, 0x3E])
         parser = WASMParser(stream: stream)
         XCTAssertThrowsError(_ = try parser.parseSigned(bits: 8)) { error in
-            guard case Parser.Error<UInt8>.unexpected(0x3E, nil) = error else {
+            guard case Parser.Error<UInt8>.unexpected(0x3E, 1, nil) = error else {
                 return XCTFail("Unexpected error: \(error)")
             }
             XCTAssertEqual(stream.currentIndex, 1)
@@ -85,7 +85,7 @@ extension WASMParserTests {
         stream = StaticByteStream(bytes: [0xFF, 0x7B])
         parser = WASMParser(stream: stream)
         XCTAssertThrowsError(_ = try parser.parseSigned(bits: 8)) { error in
-            guard case Parser.Error<UInt8>.unexpected(0x7B, nil) = error else {
+            guard case Parser.Error<UInt8>.unexpected(0x7B, 1, nil) = error else {
                 return XCTFail("Unexpected error: \(error)")
             }
             XCTAssertEqual(stream.currentIndex, 1)
@@ -146,7 +146,7 @@ extension WASMParserTests {
         stream = StaticByteStream(bytes: [0x7B])
         parser = WASMParser(stream: stream)
         XCTAssertThrowsError(try parser.parseValueType()) { error in
-            guard case let Parser.Error<UInt8>.unexpected(0x7B, expected: expected) = error else {
+            guard case let Parser.Error<UInt8>.unexpected(0x7B, 0, expected: expected) = error else {
                 return XCTFail("Unexpected error: \(error)")
             }
             XCTAssertEqual(expected, Set(0x7C ... 0x7F))
@@ -171,7 +171,7 @@ extension WASMParserTests {
         stream = StaticByteStream(bytes: [0x7B])
         parser = WASMParser(stream: stream)
         XCTAssertThrowsError(try parser.parseValueType()) { error in
-            guard case let Parser.Error<UInt8>.unexpected(0x7B, expected: expected) = error else {
+            guard case let Parser.Error<UInt8>.unexpected(0x7B, 0, expected: expected) = error else {
                 return XCTFail("Unexpected error: \(error)")
             }
             XCTAssertEqual(expected, Set(0x7C ... 0x7F))
@@ -211,7 +211,7 @@ extension WASMParserTests {
         stream = StaticByteStream(bytes: [0x02])
         parser = WASMParser(stream: stream)
         XCTAssertThrowsError(try parser.parseLimits()) { error in
-            guard case let Parser.Error<UInt8>.unexpected(0x02, expected: expected) = error else {
+            guard case let Parser.Error<UInt8>.unexpected(0x02, 0, expected: expected) = error else {
                 return XCTFail("Unexpected error: \(error)")
             }
             XCTAssertEqual(expected, Set(0x00 ... 0x01))
@@ -236,7 +236,7 @@ extension WASMParserTests {
         stream = StaticByteStream(bytes: [0x02])
         parser = WASMParser(stream: stream)
         XCTAssertThrowsError(try parser.parseMemoryType()) { error in
-            guard case let Parser.Error<UInt8>.unexpected(0x02, expected: expected) = error else {
+            guard case let Parser.Error<UInt8>.unexpected(0x02, 0, expected: expected) = error else {
                 return XCTFail("Unexpected error: \(error)")
             }
             XCTAssertEqual(expected, Set(0x00 ... 0x01))
@@ -261,7 +261,7 @@ extension WASMParserTests {
         stream = StaticByteStream(bytes: [0x70, 0x02])
         parser = WASMParser(stream: stream)
         XCTAssertThrowsError(try parser.parseTableType()) { error in
-            guard case let Parser.Error<UInt8>.unexpected(0x02, expected: expected) = error else {
+            guard case let Parser.Error<UInt8>.unexpected(0x02, 1, expected: expected) = error else {
                 return XCTFail("Unexpected error: \(error)")
             }
             XCTAssertEqual(expected, Set(0x00 ... 0x01))
@@ -286,7 +286,7 @@ extension WASMParserTests {
         stream = StaticByteStream(bytes: [0x7B])
         parser = WASMParser(stream: stream)
         XCTAssertThrowsError(try parser.parseGlobalType()) { error in
-            guard case let Parser.Error<UInt8>.unexpected(0x7B, expected: expected) = error else {
+            guard case let Parser.Error<UInt8>.unexpected(0x7B, 0, expected: expected) = error else {
                 return XCTFail("Unexpected error: \(error)")
             }
             XCTAssertEqual(expected, Set(0x7C ... 0x7F))
@@ -296,7 +296,7 @@ extension WASMParserTests {
         stream = StaticByteStream(bytes: [0x7F, 0x02])
         parser = WASMParser(stream: stream)
         XCTAssertThrowsError(try parser.parseGlobalType()) { error in
-            guard case let Parser.Error<UInt8>.unexpected(0x02, expected: expected) = error else {
+            guard case let Parser.Error<UInt8>.unexpected(0x02, 1, expected: expected) = error else {
                 return XCTFail("Unexpected error: \(error)")
             }
             XCTAssertEqual(expected, Set(0x00 ... 0x01))

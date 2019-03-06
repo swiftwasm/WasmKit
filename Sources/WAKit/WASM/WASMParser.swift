@@ -3,11 +3,11 @@ import Parser
 public final class WASMParser<Stream: ByteStream> {
     public let stream: Stream
 
-    public var currentIndex: Stream.Index {
+    public var currentIndex: Int {
         return stream.currentIndex
     }
 
-    init(stream: Stream) {
+    public init(stream: Stream) {
         self.stream = stream
     }
 }
@@ -48,39 +48,43 @@ extension WASMParser {
     private func p2<I: BinaryInteger>(_ n: I) -> I { return 1 << n }
 
     func parseUnsigned(bits: Int) throws -> UInt {
-        let first = try stream.peek()
+        guard let first = stream.peek() else {
+            throw StreamError.unexpectedEnd(expected: nil)
+        }
 
         switch UInt(first) {
         case let n where n < p2(7) && n < p2(bits):
-            try stream.consumeAny()
+            _ = try stream.consumeAny()
             return UInt(first)
         case let n where n >= p2(7) && bits > 7:
-            try stream.consumeAny()
+            _ = try stream.consumeAny()
             let m = try parseUnsigned(bits: bits - 7)
             let result = p2(7) * m + (n - p2(7))
             return result
         default:
-            throw StreamError.unexpected(first, expected: nil)
+            throw StreamError.unexpected(first, index: currentIndex, expected: nil)
         }
     }
 
     func parseSigned(bits: Int) throws -> Int {
-        let first = try stream.peek()
+        guard let first = stream.peek() else {
+            throw StreamError.unexpectedEnd(expected: nil)
+        }
 
         switch Int(first) {
         case let n where n < p2(6) && n < p2(bits - 1):
-            try stream.consumeAny()
+            _ = try stream.consumeAny()
             return n
         case let n where p2(6) <= n && n < p2(7) && n >= (p2(7) - p2(bits - 1)):
-            try stream.consumeAny()
+            _ = try stream.consumeAny()
             return n - p2(7)
         case let n where n >= p2(7) && bits > 7:
-            try stream.consumeAny()
+            _ = try stream.consumeAny()
             let m = try parseSigned(bits: bits - 7)
             let result = m << 7 + (n - p2(7))
             return result
         default:
-            throw StreamError.unexpected(first, expected: nil)
+            throw StreamError.unexpected(first, index: currentIndex, expected: nil)
         }
     }
 
@@ -169,18 +173,16 @@ extension WASMParser {
         case 0x7C:
             return Value.Float64.self
         default:
-            throw StreamError.unexpected(b, expected: Set(0x7C ... 0x7F))
+            throw StreamError.unexpected(b, index: currentIndex, expected: Set(0x7C ... 0x7F))
         }
     }
 
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/types.html#result-types>
     func parseResultType() throws -> ResultType {
-        let b = try stream.peek()
-
-        switch b {
-        case 0x40:
-            try stream.consumeAny()
+        switch stream.peek() {
+        case 0x40?:
+            _ = try stream.consumeAny()
             return []
         default:
             return [try parseValueType()]
@@ -190,7 +192,7 @@ extension WASMParser {
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/types.html#function-types>
     func parseFunctionType() throws -> FunctionType {
-        try stream.consume(0x60)
+        _ = try stream.consume(0x60)
 
         let parameters = try parseVector { try parseValueType() }
         let results = try parseVector { try parseValueType() }
@@ -200,16 +202,15 @@ extension WASMParser {
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/types.html#limits>
     func parseLimits() throws -> Limits {
-        let b = try stream.peek()
+        let b = try stream.consume([0x00, 0x01])
+
         switch b {
         case 0x00:
-            try stream.consumeAny()
             return try Limits(min: parseUnsigned32(), max: nil)
         case 0x01:
-            try stream.consumeAny()
             return try Limits(min: parseUnsigned32(), max: parseUnsigned32())
         default:
-            throw StreamError.unexpected(b, expected: [0x00, 0x01])
+            preconditionFailure("should never reach here")
         }
     }
 
@@ -223,14 +224,15 @@ extension WASMParser {
     /// <https://webassembly.github.io/spec/core/binary/types.html#table-types>
     func parseTableType() throws -> TableType {
         let elementType: FunctionType
-        let b = try stream.peek()
+        let b = try stream.consume(0x70)
+
         switch b {
         case 0x70:
-            try stream.consumeAny()
             elementType = .any
         default:
-            throw StreamError.unexpected(b, expected: [0x70])
+            preconditionFailure("should never reach here")
         }
+
         let limits = try parseLimits()
         return TableType(elementType: elementType, limits: limits)
     }
@@ -244,16 +246,14 @@ extension WASMParser {
     }
 
     func parseMutability() throws -> Mutability {
-        let b = try stream.peek()
+        let b = try stream.consume([0x00, 0x01])
         switch b {
         case 0x00:
-            try stream.consumeAny()
             return .constant
         case 0x01:
-            try stream.consumeAny()
             return .variable
         default:
-            throw StreamError.unexpected(b, expected: [0x00, 0x01])
+            preconditionFailure("should never reach here")
         }
     }
 }
@@ -418,10 +418,10 @@ extension WASMParser {
             let offset = try parseUnsigned32()
             return MemoryInstruction.store32(Value.Int64.self, .init(min: align, max: offset))
         case 0x3F:
-            try stream.consume(0x00)
+            _ = try stream.consume(0x00)
             return MemoryInstruction.currentMemory
         case 0x40:
-            try stream.consume(0x00)
+            _ = try stream.consume(0x00)
             return MemoryInstruction.growMemory
 
         case 0x41:
@@ -692,7 +692,7 @@ extension WASMParser {
         case 0xBF:
             return NumericInstruction.Conversion.reinterpret(Value.Float64.self, Value.Int64.self)
         default:
-            throw StreamError.unexpected(code, expected: nil)
+            throw StreamError.unexpected(code, index: currentIndex, expected: nil)
         }
     }
 
@@ -715,7 +715,7 @@ extension WASMParser {
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#custom-section>
     func parseCustomSection() throws -> Section {
-        try stream.consume(0)
+        _ = try stream.consume(0)
         let size = try parseUnsigned32()
 
         let name = try parseName()
@@ -735,7 +735,7 @@ extension WASMParser {
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#type-section>
     func parseTypeSection() throws -> Section {
-        try stream.consume(1)
+        _ = try stream.consume(1)
         /* size */ _ = try parseUnsigned32()
         return .type(try parseVector { try parseFunctionType() })
     }
@@ -743,7 +743,7 @@ extension WASMParser {
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#import-section>
     func parseImportSection() throws -> Section {
-        try stream.consume(2)
+        _ = try stream.consume(2)
         /* size */ _ = try parseUnsigned32()
 
         let imports: [Import] = try parseVector {
@@ -758,29 +758,25 @@ extension WASMParser {
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-importdesc>
     func parseImportDescriptor() throws -> ImportDescriptor {
-        let b = try stream.peek()
+        let b = try stream.consume(Set(0x00 ... 0x03))
         switch b {
         case 0x00:
-            try stream.consumeAny()
             return try .function(parseUnsigned32())
         case 0x01:
-            try stream.consumeAny()
             return try .table(parseTableType())
         case 0x02:
-            try stream.consumeAny()
             return try .memory(parseMemoryType())
         case 0x03:
-            try stream.consumeAny()
             return try .global(parseGlobalType())
         default:
-            throw StreamError.unexpected(b, expected: Set(0x00 ... 0x03))
+            preconditionFailure("should never reach here")
         }
     }
 
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#function-section>
     func parseFunctionSection() throws -> Section {
-        try stream.consume(3)
+        _ = try stream.consume(3)
         /* size */ _ = try parseUnsigned32()
         return .function(try parseVector { try parseUnsigned32() })
     }
@@ -788,7 +784,7 @@ extension WASMParser {
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#table-section>
     func parseTableSection() throws -> Section {
-        try stream.consume(4)
+        _ = try stream.consume(4)
         /* size */ _ = try parseUnsigned32()
 
         return .table(try parseVector { Table(type: try parseTableType()) })
@@ -797,7 +793,7 @@ extension WASMParser {
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#memory-section>
     func parseMemorySection() throws -> Section {
-        try stream.consume(5)
+        _ = try stream.consume(5)
         /* size */ _ = try parseUnsigned32()
 
         return .memory(try parseVector { Memory(type: try parseLimits()) })
@@ -806,7 +802,7 @@ extension WASMParser {
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#global-section>
     func parseGlobalSection() throws -> Section {
-        try stream.consume(6)
+        _ = try stream.consume(6)
         /* size */ _ = try parseUnsigned32()
 
         return .global(try parseVector {
@@ -819,7 +815,7 @@ extension WASMParser {
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#export-section>
     func parseExportSection() throws -> Section {
-        try stream.consume(7)
+        _ = try stream.consume(7)
         /* size */ _ = try parseUnsigned32()
 
         return .export(try parseVector {
@@ -832,29 +828,25 @@ extension WASMParser {
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-exportdesc>
     func parseExportDescriptor() throws -> ExportDescriptor {
-        let b = try stream.peek()
+        let b = try stream.consume(Set(0x00 ... 0x03))
         switch b {
         case 0x00:
-            try stream.consumeAny()
             return try .function(parseUnsigned32())
         case 0x01:
-            try stream.consumeAny()
             return try .table(parseUnsigned32())
         case 0x02:
-            try stream.consumeAny()
             return try .memory(parseUnsigned32())
         case 0x03:
-            try stream.consumeAny()
             return try .global(parseUnsigned32())
         default:
-            throw StreamError.unexpected(b, expected: Set(0x00 ... 0x03))
+            preconditionFailure("should never reach here")
         }
     }
 
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#start-section>
     func parseStartSection() throws -> Section {
-        try stream.consume(8)
+        _ = try stream.consume(8)
         /* size */ _ = try parseUnsigned32()
 
         return .start(try parseUnsigned32())
@@ -863,7 +855,7 @@ extension WASMParser {
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#element-section>
     func parseElementSection() throws -> Section {
-        try stream.consume(9)
+        _ = try stream.consume(9)
         /* size */ _ = try parseUnsigned32()
 
         return .element(try parseVector {
@@ -877,7 +869,7 @@ extension WASMParser {
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#code-section>
     func parseCodeSection() throws -> Section {
-        try stream.consume(10)
+        _ = try stream.consume(10)
         /* size */ _ = try parseUnsigned32()
 
         return .code(try parseVector {
@@ -895,7 +887,7 @@ extension WASMParser {
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#data-section>
     func parseDataSection() throws -> Section {
-        try stream.consume(11)
+        _ = try stream.consume(11)
         /* size */ _ = try parseUnsigned32()
 
         return .data(try parseVector {
@@ -913,18 +905,18 @@ extension WASMParser {
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-magic>
     func parseMagicNumbers() throws {
-        try stream.consume([0x00, 0x61, 0x73, 0x6D])
+        _ = try stream.consume(sequence: [0x00, 0x61, 0x73, 0x6D])
     }
 
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-version>
     func parseVersion() throws {
-        try stream.consume([0x01, 0x00, 0x00, 0x00])
+        _ = try stream.consume(sequence: [0x01, 0x00, 0x00, 0x00])
     }
 
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-module>
-    func parseModule() throws -> Module {
+    public func parseModule() throws -> Module {
         try parseMagicNumbers()
         try parseVersion()
 
@@ -933,55 +925,56 @@ extension WASMParser {
         var typeIndices = [TypeIndex]()
         var codes = [Code]()
 
-        for i in 0 ... 11 {
-            guard let id = try? stream.peek() else {
+        let ids: ClosedRange<UInt8> = 0 ... 11
+        for i in ids {
+            guard let sectionID = stream.peek(), ids.contains(sectionID) else {
                 break
             }
 
-            switch id {
+            switch sectionID {
             case 0:
                 _ = try? parseCustomSection()
-            case 1 where id == i:
+            case 1 where sectionID == i:
                 if case let .type(types) = try parseTypeSection() {
                     module.types = types
                 }
-            case 2 where id == i:
+            case 2 where sectionID == i:
                 if case let .import(imports) = try parseImportSection() {
                     module.imports = imports
                 }
-            case 3 where id == i:
+            case 3 where sectionID == i:
                 if case let .function(_typeIndices) = try parseFunctionSection() {
                     typeIndices = _typeIndices
                 }
-            case 4 where id == i:
+            case 4 where sectionID == i:
                 if case let .table(tables) = try parseTableSection() {
                     module.tables = tables
                 }
-            case 5 where id == i:
+            case 5 where sectionID == i:
                 if case let .memory(memory) = try parseMemorySection() {
                     module.memories = memory
                 }
-            case 6 where id == i:
+            case 6 where sectionID == i:
                 if case let .global(globals) = try parseGlobalSection() {
                     module.globals = globals
                 }
-            case 7 where id == i:
+            case 7 where sectionID == i:
                 if case let .export(exports) = try parseExportSection() {
                     module.exports = exports
                 }
-            case 8 where id == i:
+            case 8 where sectionID == i:
                 if case let .start(start) = try parseStartSection() {
                     module.start = start
                 }
-            case 9 where id == i:
+            case 9 where sectionID == i:
                 if case let .element(elements) = try parseElementSection() {
                     module.elements = elements
                 }
-            case 10 where id == i:
+            case 10 where sectionID == i:
                 if case let .code(_codes) = try parseCodeSection() {
                     codes = _codes
                 }
-            case 11 where id == i:
+            case 11 where sectionID == i:
                 if case let .data(data) = try parseDataSection() {
                     module.data = data
                 }
