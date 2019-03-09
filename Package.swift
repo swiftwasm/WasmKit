@@ -21,6 +21,8 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/pointfreeco/swift-tagged", from: "0.2.0"),
         .package(url: "https://github.com/akkyie/SwiftLEB", from: "0.1.0"),
+        .package(url: "https://github.com/jakeheis/SwiftCLI", from: "5.0.0"),
+        .package(url: "https://github.com/onevcat/Rainbow", from: "3.1.4"),
     ],
     targets: [
         .target(
@@ -45,7 +47,7 @@ let package = Package(
         ),
         .target(
             name: "CLI",
-            dependencies: ["WAKit"],
+            dependencies: ["WAKit", "SwiftCLI", "Rainbow"],
             path: "./Sources/CLI"
         ),
     ],
