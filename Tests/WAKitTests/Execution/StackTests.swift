@@ -9,7 +9,7 @@ internal func XCTAssertEqual(
     _ message: @autoclosure () -> String = "",
     file: StaticString = #file,
     line: UInt = #line
-    ) {
+) {
     let message = message() + " expected: \(expectedEntries), actual: \(stack.entries())"
     let actualEntries = stack.entries()
 
