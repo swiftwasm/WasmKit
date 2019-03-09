@@ -1,3 +1,4 @@
+import LEB
 import Parser
 
 public final class WASMParser<Stream: ByteStream> {
@@ -21,8 +22,12 @@ extension WASMParser {
 }
 
 public enum WASMParserError: Swift.Error {
+    case invalidMagicNumber([UInt8])
+    case unknownVersion([UInt8])
     case invalidUnicode([UInt8])
     case invalidSectionSize(UInt32)
+    case zeroExpected(actual: UInt8, index: Int)
+    case inconsistentFunctionAndCodeLength(functionCount: Int, codeCount: Int)
 }
 
 extension WASMParser {
@@ -34,7 +39,7 @@ extension WASMParser {
 extension WASMParser {
     func parseVector<Content>(content parser: () throws -> Content) throws -> [Content] {
         var contents = [Content]()
-        let count = try parseUnsigned(bits: 32)
+        let count: UInt32 = try parseUnsigned()
         for _ in 0 ..< count {
             contents.append(try parser())
         }
@@ -45,88 +50,40 @@ extension WASMParser {
 /// - Note:
 /// <https://webassembly.github.io/spec/core/binary/values.html#integers>
 extension WASMParser {
-    private func p2<I: BinaryInteger>(_ n: I) -> I { return 1 << n }
-
-    func parseUnsigned(bits: Int) throws -> UInt {
-        guard let first = stream.peek() else {
-            throw StreamError.unexpectedEnd(expected: nil)
+    func parseUnsigned<T: FixedWidthInteger & UnsignedInteger>() throws -> T {
+        let sequence = AnySequence { [stream] in
+            AnyIterator {
+                try? stream.consumeAny()
+            }
         }
-
-        switch UInt(first) {
-        case let n where n < p2(7) && n < p2(bits):
-            _ = try stream.consumeAny()
-            return UInt(first)
-        case let n where n >= p2(7) && bits > 7:
-            _ = try stream.consumeAny()
-            let m = try parseUnsigned(bits: bits - 7)
-            let result = p2(7) * m + (n - p2(7))
-            return result
-        default:
-            throw StreamError.unexpected(first, index: currentIndex, expected: nil)
-        }
+        return try T(LEB: sequence)
     }
 
-    func parseSigned(bits: Int) throws -> Int {
-        guard let first = stream.peek() else {
-            throw StreamError.unexpectedEnd(expected: nil)
+    func parseSigned<T: FixedWidthInteger & SignedInteger>() throws -> T {
+        let sequence = AnySequence { [stream] in
+            AnyIterator {
+                try? stream.consumeAny()
+            }
         }
-
-        switch Int(first) {
-        case let n where n < p2(6) && n < p2(bits - 1):
-            _ = try stream.consumeAny()
-            return n
-        case let n where p2(6) <= n && n < p2(7) && n >= (p2(7) - p2(bits - 1)):
-            _ = try stream.consumeAny()
-            return n - p2(7)
-        case let n where n >= p2(7) && bits > 7:
-            _ = try stream.consumeAny()
-            let m = try parseSigned(bits: bits - 7)
-            let result = m << 7 + (n - p2(7))
-            return result
-        default:
-            throw StreamError.unexpected(first, index: currentIndex, expected: nil)
-        }
+        return try T(LEB: sequence)
     }
 
-    func parseInteger(bits: Int) throws -> Int {
-        let i = try parseSigned(bits: bits)
-        switch i {
-        case ..<p2(bits - 1): return i
-        default: return i - p2(bits)
-        }
-    }
-}
-
-extension WASMParser {
-    func parseUnsigned32() throws -> UInt32 {
-        return UInt32(try parseUnsigned(bits: 32))
+    func parseInteger<T: FixedWidthInteger & SignedInteger>() throws -> T {
+        // FIXME:
+        return try parseSigned()
     }
 }
 
 /// - Note:
 /// <https://webassembly.github.io/spec/core/binary/values.html#floating-point>
 extension WASMParser {
-    func parseFloatingPoint(bits: Int) throws -> Double {
-        assert(bits == 32 || bits == 64)
-        let bytes = try (0 ..< (bits / 8))
-            .map { _ in try UInt64(stream.consumeAny()) }
-            .reduce(0) { acc, byte in acc << 8 + byte }
-        return Double(bitPattern: bytes)
-    }
-}
-
-extension WASMParser {
     func parseFloat() throws -> Float {
-        let bytes = try (0 ..< 4)
-            .map { _ in try UInt32(stream.consumeAny()) }
-            .reduce(0) { acc, byte in acc << 8 + byte }
+        let bytes = try stream.consume(count: 4).reduce(UInt32(0)) { acc, byte in acc << 8 + UInt32(byte) }
         return Float(bitPattern: bytes)
     }
 
     func parseDouble() throws -> Double {
-        let bytes = try (0 ..< 8)
-            .map { _ in try UInt64(stream.consumeAny()) }
-            .reduce(0) { acc, byte in acc << 8 + byte }
+        let bytes = try stream.consume(count: 8).reduce(UInt64(0)) { acc, byte in acc << 8 + UInt64(byte) }
         return Double(bitPattern: bytes)
     }
 }
@@ -206,9 +163,9 @@ extension WASMParser {
 
         switch b {
         case 0x00:
-            return try Limits(min: parseUnsigned32(), max: nil)
+            return try Limits(min: parseUnsigned(), max: nil)
         case 0x01:
-            return try Limits(min: parseUnsigned32(), max: parseUnsigned32())
+            return try Limits(min: parseUnsigned(), max: parseUnsigned())
         default:
             preconditionFailure("should never reach here")
         }
@@ -287,21 +244,21 @@ extension WASMParser {
         case 0x0B:
             return PseudoInstruction.end
         case 0x0C:
-            let label = try parseUnsigned32()
+            let label: UInt32 = try parseUnsigned()
             return ControlInstruction.br(label)
         case 0x0D:
-            let label = try parseUnsigned32()
+            let label: UInt32 = try parseUnsigned()
             return ControlInstruction.brIf(label)
         case 0x0E:
-            let labels = try parseVector { try parseUnsigned32() }
+            let labels: [UInt32] = try parseVector { try parseUnsigned() }
             return ControlInstruction.brTable(labels)
         case 0x0F:
             return ControlInstruction.return
         case 0x10:
-            let index = try parseUnsigned32()
+            let index: UInt32 = try parseUnsigned()
             return ControlInstruction.call(index)
         case 0x11:
-            let index = try parseUnsigned32()
+            let index: UInt32 = try parseUnsigned()
             return ControlInstruction.callIndirect(index)
 
         case 0x1A:
@@ -310,126 +267,132 @@ extension WASMParser {
             return ParametricInstruction.select
 
         case 0x20:
-            let index = try parseUnsigned32()
+            let index: UInt32 = try parseUnsigned()
             return VariableInstruction.getLocal(index)
         case 0x21:
-            let index = try parseUnsigned32()
+            let index: UInt32 = try parseUnsigned()
             return VariableInstruction.setLocal(index)
         case 0x22:
-            let index = try parseUnsigned32()
+            let index: UInt32 = try parseUnsigned()
             return VariableInstruction.teeLocal(index)
         case 0x23:
-            let index = try parseUnsigned32()
+            let index: UInt32 = try parseUnsigned()
             return VariableInstruction.getGlobal(index)
         case 0x24:
-            let index = try parseUnsigned32()
+            let index: UInt32 = try parseUnsigned()
             return VariableInstruction.setGlobal(index)
 
         case 0x28:
-            let align = try parseUnsigned32()
-            let offset = try parseUnsigned32()
+            let align: UInt32 = try parseUnsigned()
+            let offset: UInt32 = try parseUnsigned()
             return MemoryInstruction.load(Value.Int32.self, .init(min: align, max: offset))
         case 0x29:
-            let align = try parseUnsigned32()
-            let offset = try parseUnsigned32()
+            let align: UInt32 = try parseUnsigned()
+            let offset: UInt32 = try parseUnsigned()
             return MemoryInstruction.load(Value.Int64.self, .init(min: align, max: offset))
         case 0x2A:
-            let align = try parseUnsigned32()
-            let offset = try parseUnsigned32()
+            let align: UInt32 = try parseUnsigned()
+            let offset: UInt32 = try parseUnsigned()
             return MemoryInstruction.load(Value.Float32.self, .init(min: align, max: offset))
         case 0x2B:
-            let align = try parseUnsigned32()
-            let offset = try parseUnsigned32()
+            let align: UInt32 = try parseUnsigned()
+            let offset: UInt32 = try parseUnsigned()
             return MemoryInstruction.load(Value.Float64.self, .init(min: align, max: offset))
         case 0x2C:
-            let align = try parseUnsigned32()
-            let offset = try parseUnsigned32()
+            let align: UInt32 = try parseUnsigned()
+            let offset: UInt32 = try parseUnsigned()
             return MemoryInstruction.load8s(Value.Int32.self, .init(min: align, max: offset))
         case 0x2D:
-            let align = try parseUnsigned32()
-            let offset = try parseUnsigned32()
+            let align: UInt32 = try parseUnsigned()
+            let offset: UInt32 = try parseUnsigned()
             return MemoryInstruction.load8u(Value.Int64.self, .init(min: align, max: offset))
         case 0x2E:
-            let align = try parseUnsigned32()
-            let offset = try parseUnsigned32()
+            let align: UInt32 = try parseUnsigned()
+            let offset: UInt32 = try parseUnsigned()
             return MemoryInstruction.load16s(Value.Int32.self, .init(min: align, max: offset))
         case 0x2F:
-            let align = try parseUnsigned32()
-            let offset = try parseUnsigned32()
+            let align: UInt32 = try parseUnsigned()
+            let offset: UInt32 = try parseUnsigned()
             return MemoryInstruction.load16u(Value.Int32.self, .init(min: align, max: offset))
         case 0x30:
-            let align = try parseUnsigned32()
-            let offset = try parseUnsigned32()
+            let align: UInt32 = try parseUnsigned()
+            let offset: UInt32 = try parseUnsigned()
             return MemoryInstruction.load8s(Value.Int64.self, .init(min: align, max: offset))
         case 0x31:
-            let align = try parseUnsigned32()
-            let offset = try parseUnsigned32()
+            let align: UInt32 = try parseUnsigned()
+            let offset: UInt32 = try parseUnsigned()
             return MemoryInstruction.load8u(Value.Int64.self, .init(min: align, max: offset))
         case 0x32:
-            let align = try parseUnsigned32()
-            let offset = try parseUnsigned32()
+            let align: UInt32 = try parseUnsigned()
+            let offset: UInt32 = try parseUnsigned()
             return MemoryInstruction.load16s(Value.Int64.self, .init(min: align, max: offset))
         case 0x33:
-            let align = try parseUnsigned32()
-            let offset = try parseUnsigned32()
+            let align: UInt32 = try parseUnsigned()
+            let offset: UInt32 = try parseUnsigned()
             return MemoryInstruction.load16u(Value.Int64.self, .init(min: align, max: offset))
         case 0x34:
-            let align = try parseUnsigned32()
-            let offset = try parseUnsigned32()
+            let align: UInt32 = try parseUnsigned()
+            let offset: UInt32 = try parseUnsigned()
             return MemoryInstruction.load32s(Value.Int64.self, .init(min: align, max: offset))
         case 0x35:
-            let align = try parseUnsigned32()
-            let offset = try parseUnsigned32()
+            let align: UInt32 = try parseUnsigned()
+            let offset: UInt32 = try parseUnsigned()
             return MemoryInstruction.load32u(Value.Int64.self, .init(min: align, max: offset))
         case 0x36:
-            let align = try parseUnsigned32()
-            let offset = try parseUnsigned32()
+            let align: UInt32 = try parseUnsigned()
+            let offset: UInt32 = try parseUnsigned()
             return MemoryInstruction.store(Value.Int32.self, .init(min: align, max: offset))
         case 0x37:
-            let align = try parseUnsigned32()
-            let offset = try parseUnsigned32()
+            let align: UInt32 = try parseUnsigned()
+            let offset: UInt32 = try parseUnsigned()
             return MemoryInstruction.store(Value.Int64.self, .init(min: align, max: offset))
         case 0x38:
-            let align = try parseUnsigned32()
-            let offset = try parseUnsigned32()
+            let align: UInt32 = try parseUnsigned()
+            let offset: UInt32 = try parseUnsigned()
             return MemoryInstruction.store(Value.Float32.self, .init(min: align, max: offset))
         case 0x39:
-            let align = try parseUnsigned32()
-            let offset = try parseUnsigned32()
+            let align: UInt32 = try parseUnsigned()
+            let offset: UInt32 = try parseUnsigned()
             return MemoryInstruction.store(Value.Float64.self, .init(min: align, max: offset))
         case 0x3A:
-            let align = try parseUnsigned32()
-            let offset = try parseUnsigned32()
+            let align: UInt32 = try parseUnsigned()
+            let offset: UInt32 = try parseUnsigned()
             return MemoryInstruction.store8(Value.Int32.self, .init(min: align, max: offset))
         case 0x3B:
-            let align = try parseUnsigned32()
-            let offset = try parseUnsigned32()
+            let align: UInt32 = try parseUnsigned()
+            let offset: UInt32 = try parseUnsigned()
             return MemoryInstruction.store16(Value.Int32.self, .init(min: align, max: offset))
         case 0x3C:
-            let align = try parseUnsigned32()
-            let offset = try parseUnsigned32()
+            let align: UInt32 = try parseUnsigned()
+            let offset: UInt32 = try parseUnsigned()
             return MemoryInstruction.store8(Value.Int64.self, .init(min: align, max: offset))
         case 0x3D:
-            let align = try parseUnsigned32()
-            let offset = try parseUnsigned32()
+            let align: UInt32 = try parseUnsigned()
+            let offset: UInt32 = try parseUnsigned()
             return MemoryInstruction.store16(Value.Int64.self, .init(min: align, max: offset))
         case 0x3E:
-            let align = try parseUnsigned32()
-            let offset = try parseUnsigned32()
+            let align: UInt32 = try parseUnsigned()
+            let offset: UInt32 = try parseUnsigned()
             return MemoryInstruction.store32(Value.Int64.self, .init(min: align, max: offset))
         case 0x3F:
-            _ = try stream.consume(0x00)
+            let zero = try stream.consumeAny()
+            guard zero == 0x00 else {
+                throw WASMParserError.zeroExpected(actual: zero, index: currentIndex)
+            }
             return MemoryInstruction.currentMemory
         case 0x40:
-            _ = try stream.consume(0x00)
+            let zero = try stream.consumeAny()
+            guard zero == 0x00 else {
+                throw WASMParserError.zeroExpected(actual: zero, index: currentIndex)
+            }
             return MemoryInstruction.growMemory
 
         case 0x41:
-            let n = try parseInteger(bits: 32)
-            return NumericInstruction.Constant.const(Value.Int32(Int32(n)))
+            let n: Int32 = try parseInteger()
+            return NumericInstruction.Constant.const(Value.Int32(n))
         case 0x42:
-            let n = try parseInteger(bits: 64)
-            return NumericInstruction.Constant.const(Value.Int64(Int64(n)))
+            let n: Int64 = try parseInteger()
+            return NumericInstruction.Constant.const(Value.Int64(n))
         case 0x43:
             let n = try parseFloat()
             return NumericInstruction.Constant.const(Value.Float32(n))
@@ -716,7 +679,7 @@ extension WASMParser {
     /// <https://webassembly.github.io/spec/core/binary/modules.html#custom-section>
     func parseCustomSection() throws -> Section {
         _ = try stream.consume(0)
-        let size = try parseUnsigned32()
+        let size: UInt32 = try parseUnsigned()
 
         let name = try parseName()
         guard size > name.utf8.count else {
@@ -736,7 +699,7 @@ extension WASMParser {
     /// <https://webassembly.github.io/spec/core/binary/modules.html#type-section>
     func parseTypeSection() throws -> Section {
         _ = try stream.consume(1)
-        /* size */ _ = try parseUnsigned32()
+        /* size */ _ = try parseUnsigned() as UInt32
         return .type(try parseVector { try parseFunctionType() })
     }
 
@@ -744,7 +707,7 @@ extension WASMParser {
     /// <https://webassembly.github.io/spec/core/binary/modules.html#import-section>
     func parseImportSection() throws -> Section {
         _ = try stream.consume(2)
-        /* size */ _ = try parseUnsigned32()
+        /* size */ _ = try parseUnsigned() as UInt32
 
         let imports: [Import] = try parseVector {
             let module = try parseName()
@@ -761,7 +724,7 @@ extension WASMParser {
         let b = try stream.consume(Set(0x00 ... 0x03))
         switch b {
         case 0x00:
-            return try .function(parseUnsigned32())
+            return try .function(parseUnsigned())
         case 0x01:
             return try .table(parseTableType())
         case 0x02:
@@ -777,15 +740,15 @@ extension WASMParser {
     /// <https://webassembly.github.io/spec/core/binary/modules.html#function-section>
     func parseFunctionSection() throws -> Section {
         _ = try stream.consume(3)
-        /* size */ _ = try parseUnsigned32()
-        return .function(try parseVector { try parseUnsigned32() })
+        /* size */ _ = try parseUnsigned() as UInt32
+        return .function(try parseVector { try parseUnsigned() })
     }
 
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#table-section>
     func parseTableSection() throws -> Section {
         _ = try stream.consume(4)
-        /* size */ _ = try parseUnsigned32()
+        /* size */ _ = try parseUnsigned() as UInt32
 
         return .table(try parseVector { Table(type: try parseTableType()) })
     }
@@ -794,7 +757,7 @@ extension WASMParser {
     /// <https://webassembly.github.io/spec/core/binary/modules.html#memory-section>
     func parseMemorySection() throws -> Section {
         _ = try stream.consume(5)
-        /* size */ _ = try parseUnsigned32()
+        /* size */ _ = try parseUnsigned() as UInt32
 
         return .memory(try parseVector { Memory(type: try parseLimits()) })
     }
@@ -803,7 +766,7 @@ extension WASMParser {
     /// <https://webassembly.github.io/spec/core/binary/modules.html#global-section>
     func parseGlobalSection() throws -> Section {
         _ = try stream.consume(6)
-        /* size */ _ = try parseUnsigned32()
+        /* size */ _ = try parseUnsigned() as UInt32
 
         return .global(try parseVector {
             let type = try parseGlobalType()
@@ -816,7 +779,7 @@ extension WASMParser {
     /// <https://webassembly.github.io/spec/core/binary/modules.html#export-section>
     func parseExportSection() throws -> Section {
         _ = try stream.consume(7)
-        /* size */ _ = try parseUnsigned32()
+        /* size */ _ = try parseUnsigned() as UInt32
 
         return .export(try parseVector {
             let name = try parseName()
@@ -831,13 +794,13 @@ extension WASMParser {
         let b = try stream.consume(Set(0x00 ... 0x03))
         switch b {
         case 0x00:
-            return try .function(parseUnsigned32())
+            return try .function(parseUnsigned())
         case 0x01:
-            return try .table(parseUnsigned32())
+            return try .table(parseUnsigned())
         case 0x02:
-            return try .memory(parseUnsigned32())
+            return try .memory(parseUnsigned())
         case 0x03:
-            return try .global(parseUnsigned32())
+            return try .global(parseUnsigned())
         default:
             preconditionFailure("should never reach here")
         }
@@ -847,21 +810,21 @@ extension WASMParser {
     /// <https://webassembly.github.io/spec/core/binary/modules.html#start-section>
     func parseStartSection() throws -> Section {
         _ = try stream.consume(8)
-        /* size */ _ = try parseUnsigned32()
+        /* size */ _ = try parseUnsigned() as UInt32
 
-        return .start(try parseUnsigned32())
+        return .start(try parseUnsigned())
     }
 
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#element-section>
     func parseElementSection() throws -> Section {
         _ = try stream.consume(9)
-        /* size */ _ = try parseUnsigned32()
+        /* size */ _ = try parseUnsigned() as UInt32
 
         return .element(try parseVector {
-            let table = try parseUnsigned32()
+            let table: UInt32 = try parseUnsigned()
             let expression = try parseExpression()
-            let initializer = try parseVector { try parseUnsigned32() }
+            let initializer: [UInt32] = try parseVector { try parseUnsigned() }
             return Element(table: table, offset: expression, initializer: initializer)
         })
     }
@@ -870,12 +833,12 @@ extension WASMParser {
     /// <https://webassembly.github.io/spec/core/binary/modules.html#code-section>
     func parseCodeSection() throws -> Section {
         _ = try stream.consume(10)
-        /* size */ _ = try parseUnsigned32()
+        /* size */ _ = try parseUnsigned() as UInt32
 
         return .code(try parseVector {
-            /* size */ _ = try parseUnsigned32()
+            /* size */ _ = try parseUnsigned() as UInt32
             let locals = try parseVector { () -> [ValueType] in
-                let n = try parseUnsigned32()
+                let n: UInt32 = try parseUnsigned()
                 let t = try parseValueType()
                 return (0 ..< n).map { _ in t }
             }
@@ -888,10 +851,10 @@ extension WASMParser {
     /// <https://webassembly.github.io/spec/core/binary/modules.html#data-section>
     func parseDataSection() throws -> Section {
         _ = try stream.consume(11)
-        /* size */ _ = try parseUnsigned32()
+        /* size */ _ = try parseUnsigned() as UInt32
 
         return .data(try parseVector {
-            let data = try parseUnsigned32()
+            let data: UInt32 = try parseUnsigned()
             let offset = try parseExpression()
             let initializer = try parseVector { try stream.consumeAny() }
             return Data(data: data, offset: offset, initializer: initializer)
@@ -904,20 +867,26 @@ extension WASMParser {
 extension WASMParser {
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-magic>
-    func parseMagicNumbers() throws {
-        _ = try stream.consume(sequence: [0x00, 0x61, 0x73, 0x6D])
+    func parseMagicNumber() throws {
+        let magicNumber = try stream.consume(count: 4)
+        guard magicNumber == [0x00, 0x61, 0x73, 0x6D] else {
+            throw WASMParserError.invalidMagicNumber(magicNumber)
+        }
     }
 
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-version>
     func parseVersion() throws {
-        _ = try stream.consume(sequence: [0x01, 0x00, 0x00, 0x00])
+        let version = try stream.consume(count: 4)
+        guard version == [0x01, 0x00, 0x00, 0x00] else {
+            throw WASMParserError.unknownVersion(version)
+        }
     }
 
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-module>
-    public func parseModule() throws -> Module {
-        try parseMagicNumbers()
+    func parseModule() throws -> Module {
+        try parseMagicNumber()
         try parseVersion()
 
         var module = Module()
@@ -981,6 +950,13 @@ extension WASMParser {
             default:
                 continue
             }
+        }
+
+        guard typeIndices.count == codes.count else {
+            throw WASMParserError.inconsistentFunctionAndCodeLength(
+                functionCount: typeIndices.count,
+                codeCount: codes.count
+            )
         }
 
         let functions = codes.enumerated().map { index, code in

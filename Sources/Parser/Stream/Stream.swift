@@ -5,7 +5,7 @@ public protocol Stream {
 
     func consumeAny() throws -> Element
     func consume(_ expected: Set<Element>) throws -> Element
-    func consume(sequence expected: [Element]) throws -> [Element]
+    func consume(count: Int) throws -> [Element]
 
     func peek() -> Element?
 }
@@ -15,8 +15,8 @@ extension Stream {
         return try consume(Set([expected]))
     }
 
-    public func consume(sequence expected: [Element]) throws -> [Element] {
-        return try expected.map(consume)
+    public func consume(count: Int) throws -> [Element] {
+        return try (0 ..< count).map { _ in try consumeAny() }
     }
 
     public func hasReachedEnd() throws -> Bool {

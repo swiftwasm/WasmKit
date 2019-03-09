@@ -15,10 +15,6 @@ public final class FileHandleStream: ByteStream {
         self.bufferLength = bufferLength
     }
 
-    deinit {
-        fileHandle.closeFile()
-    }
-
     private func readMoreIfNeeded() {
         guard Int(endOffset) == currentIndex else { return }
         startOffset = currentIndex
