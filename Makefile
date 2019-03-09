@@ -16,7 +16,7 @@ bootstrap:
 	$(MINT) bootstrap
 
 .PHONY: project
-project: generate $(NAME).xcodeproj
+project: update generate $(NAME).xcodeproj
 
 $(NAME).xcodeproj: Package.swift FORCE
 	@swift package generate-xcodeproj \
@@ -38,6 +38,10 @@ format:
 clean:
 	@swift package clean
 	@$(RM) -r ./$(NAME).xcodeproj
+
+.PHONY: update
+update:
+	@swift package update
 
 .PHONY: generate
 generate: $(GENERATED_DIRS)
