@@ -5,10 +5,11 @@ final class ByteStreamTests: XCTestCase {
     func testStaticByteStream() {
         var stream = StaticByteStream(bytes: [1, 2])
         XCTAssertThrowsError(try stream.consume(3)) { error in
-            guard case let Parser.Error<UInt8>.unexpected(actual, expected: expected) = error else {
+            guard case let Parser.Error<UInt8>.unexpected(actual, index, expected: expected) = error else {
                 return XCTFail("Unexpected error: \(error)")
             }
             XCTAssertEqual(actual, 1)
+            XCTAssertEqual(index, 0)
             XCTAssertEqual(expected, [3])
             XCTAssertEqual(stream.currentIndex, 0)
         }
@@ -17,7 +18,7 @@ final class ByteStreamTests: XCTestCase {
         XCTAssertEqual(stream.bytes, [1, 2])
         XCTAssertEqual(stream.currentIndex, 0)
 
-        XCTAssertEqual(try stream.peek(), 1)
+        XCTAssertEqual(stream.peek(), 1)
         XCTAssertEqual(stream.currentIndex, 0)
         XCTAssertEqual(try stream.hasReachedEnd(), false)
 
@@ -25,7 +26,7 @@ final class ByteStreamTests: XCTestCase {
         XCTAssertEqual(stream.currentIndex, 1)
         XCTAssertEqual(try stream.hasReachedEnd(), false)
 
-        XCTAssertEqual(try stream.peek(), 2)
+        XCTAssertEqual(stream.peek(), 2)
         XCTAssertEqual(stream.currentIndex, 1)
         XCTAssertEqual(try stream.hasReachedEnd(), false)
 
@@ -33,13 +34,7 @@ final class ByteStreamTests: XCTestCase {
         XCTAssertEqual(stream.currentIndex, 2)
         XCTAssertEqual(try stream.hasReachedEnd(), true)
 
-        XCTAssertThrowsError(try stream.peek()) { error in
-            if case Parser.Error<UInt8>.unexpectedEnd = error {
-                XCTAssertEqual(stream.currentIndex, 2)
-            } else {
-                XCTFail("Unexpected error: \(error)")
-            }
-        }
+        XCTAssertEqual(stream.peek(), nil)
 
         XCTAssertThrowsError(try stream.consume(3)) { error in
             guard case Parser.Error<UInt8>.unexpectedEnd = error else {

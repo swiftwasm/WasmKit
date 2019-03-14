@@ -1,13 +1,26 @@
-.PHONY: all
-all: project build
-
 NAME := WAKit
 
+MINT = swift run --package-path Vendor/Mint mint
+SWIFTFORMAT = $(MINT) run swiftformat swiftformat
+SOURCERY = $(MINT) run sourcery sourcery
+
+MODULES = $(notdir $(wildcard Sources/*))
+TEMPLATES = $(wildcard Templates/*.stencil)
+GENERATED_DIRS = $(foreach MODULE, $(MODULES), Sources/$(MODULE)/Generated)
+
+.PHONY: all
+all: bootstrap project build
+
+.PHONY: bootstrap
+bootstrap:
+	$(MINT) bootstrap
+
 .PHONY: project
-project: $(NAME).xcodeproj
+project: update generate $(NAME).xcodeproj
 
 $(NAME).xcodeproj: Package.swift FORCE
-	@swift package generate-xcodeproj --enable-code-coverage
+	@swift package generate-xcodeproj \
+    --enable-code-coverage
 
 .PHONY: build
 build:
@@ -19,11 +32,24 @@ test:
 
 .PHONY: format
 format:
-	@swiftformat .
+	$(SWIFTFORMAT) Sources Tests --exclude **/Generated
 
 .PHONY: clean
 clean:
 	@swift package clean
 	@$(RM) -r ./$(NAME).xcodeproj
+
+.PHONY: update
+update:
+	@swift package update
+
+.PHONY: generate
+generate: $(GENERATED_DIRS)
+
+Sources/%/Generated: FORCE
+	$(SOURCERY) \
+    --sources $(dir $@) \
+    --templates $(TEMPLATES) \
+    --output $@
 
 FORCE:

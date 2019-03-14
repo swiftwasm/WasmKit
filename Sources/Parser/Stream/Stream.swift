@@ -1,30 +1,25 @@
 public protocol Stream {
     associatedtype Element: Hashable
-    associatedtype Index
 
-    var currentIndex: Index { get }
+    var currentIndex: Int { get }
 
-    @discardableResult
     func consumeAny() throws -> Element
-
-    @discardableResult
     func consume(_ expected: Set<Element>) throws -> Element
+    func consume(count: Int) throws -> [Element]
 
-    func peek() throws -> Element
+    func peek() -> Element?
 }
 
 extension Stream {
-    @discardableResult
     public func consume(_ expected: Element) throws -> Element {
         return try consume(Set([expected]))
     }
 
-    @discardableResult
-    public func consume(_ expected: [Element]) throws -> [Element] {
-        return try expected.map { try consume($0) }
+    public func consume(count: Int) throws -> [Element] {
+        return try (0 ..< count).map { _ in try consumeAny() }
     }
 
     public func hasReachedEnd() throws -> Bool {
-        return (try? peek()) == nil
+        return peek() == nil
     }
 }

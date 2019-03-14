@@ -1,7 +1,42 @@
 {
   "object": {
     "pins": [
-
+      {
+        "package": "Rainbow",
+        "repositoryURL": "https://github.com/onevcat/Rainbow",
+        "state": {
+          "branch": null,
+          "revision": "797a68d0a642609424b08f11eb56974a54d5f6e2",
+          "version": "3.1.4"
+        }
+      },
+      {
+        "package": "SwiftCLI",
+        "repositoryURL": "https://github.com/jakeheis/SwiftCLI",
+        "state": {
+          "branch": null,
+          "revision": "5318c37d3cacc8780f50b87a8840a6774320ebdf",
+          "version": "5.2.2"
+        }
+      },
+      {
+        "package": "SwiftLEB",
+        "repositoryURL": "https://github.com/akkyie/SwiftLEB",
+        "state": {
+          "branch": null,
+          "revision": "6321183d71945ddfbe77c3ef0af342c912bd5566",
+          "version": "0.1.0"
+        }
+      },
+      {
+        "package": "Willow",
+        "repositoryURL": "https://github.com/Nike-Inc/Willow.git",
+        "state": {
+          "branch": null,
+          "revision": "d1304b6374cace1e4008b5f5faec7ce973f54ede",
+          "version": "5.1.0"
+        }
+      }
     ]
   },
   "version": 1

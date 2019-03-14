@@ -19,11 +19,15 @@ let package = Package(
         ),
     ],
     dependencies: [
+        .package(url: "https://github.com/akkyie/SwiftLEB", from: "0.1.0"),
+        .package(url: "https://github.com/jakeheis/SwiftCLI", from: "5.0.0"),
+        .package(url: "https://github.com/onevcat/Rainbow", from: "3.1.4"),
+        .package(url: "https://github.com/Nike-Inc/Willow.git", from: "5.1.0"),
     ],
     targets: [
         .target(
             name: "WAKit",
-            dependencies: ["Parser"],
+            dependencies: ["Parser", "LEB"],
             path: "./Sources/WAKit"
         ),
         .testTarget(
@@ -43,13 +47,8 @@ let package = Package(
         ),
         .target(
             name: "CLI",
-            dependencies: ["WAKit"],
+            dependencies: ["WAKit", "SwiftCLI", "Rainbow", "Willow"],
             path: "./Sources/CLI"
-        ),
-        .testTarget(
-            name: "CLITests",
-            dependencies: ["CLI"],
-            path: "./Tests/CLITests"
         ),
     ],
     swiftLanguageVersions: [4]

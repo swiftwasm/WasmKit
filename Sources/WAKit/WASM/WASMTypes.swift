@@ -1,4 +1,5 @@
-// https://webassembly.github.io/spec/binary/modules.html#binary-code
+/// - Note:
+/// <https://webassembly.github.io/spec/core/binary/modules.html#binary-code>
 public struct Code {
     let locals: [ValueType]
     let expression: Expression
