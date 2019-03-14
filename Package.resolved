@@ -83,6 +83,15 @@
         }
       },
       {
+        "package": "Willow",
+        "repositoryURL": "https://github.com/Nike-Inc/Willow.git",
+        "state": {
+          "branch": null,
+          "revision": "d1304b6374cace1e4008b5f5faec7ce973f54ede",
+          "version": "5.1.0"
+        }
+      },
+      {
         "package": "XcodeGen",
         "repositoryURL": "https://github.com/yonaskolb/XcodeGen.git",
         "state": {

@@ -59,7 +59,7 @@ extension Store {
 
         for export in module.exports {
             let exportInstance = ExportInstance(export, moduleInstance: moduleInstance)
-            moduleInstance.exports.append(exportInstance)
+            moduleInstance.exportInstances.append(exportInstance)
         }
 
         return moduleInstance
@@ -101,12 +101,12 @@ extension Store {
         return address
     }
 
-    func initializeElements(stack _: Stack) {
-        preconditionFailure("unimplemented")
+    func initializeElements(stack _: Stack) throws {
+        throw Trap.unimplemented("initializeElements")
     }
 
-    func initializeData(stack _: Stack) {
-        preconditionFailure("unimplemented")
+    func initializeData(stack _: Stack) throws {
+        throw Trap.unimplemented("initializeData")
     }
 }
 

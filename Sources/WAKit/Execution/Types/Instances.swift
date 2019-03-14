@@ -7,7 +7,13 @@ public final class ModuleInstance {
     var tableAddresses: [TableAddress] = []
     var memoryAddresses: [MemoryAddress] = []
     var globalAddresses: [GlobalAddress] = []
-    var exports: [ExportInstance] = []
+    var exportInstances: [ExportInstance] = []
+
+    public var exports: [String: ExternalValue] {
+        return exportInstances.reduce(into: [:]) { exports, export in
+            exports[export.name] = export.value
+        }
+    }
 }
 
 /// - Note:

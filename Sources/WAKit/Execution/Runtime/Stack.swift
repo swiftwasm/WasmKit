@@ -53,15 +53,6 @@ extension Stack {
         return value
     }
 
-    @discardableResult
-    mutating func popValue<V: Value>(of _: V.Type) throws -> V {
-        let popped = pop()
-        guard let value = popped as? V else {
-            throw Trap.stackValueTypesMismatch(expected: V.self, actual: [type(of: popped)])
-        }
-        return value
-    }
-
     mutating func push(_ entries: [Stackable]) {
         for entry in entries {
             push(entry)
@@ -70,15 +61,24 @@ extension Stack {
 }
 
 extension Stack {
-    func getCurrent<T: Stackable>(_ type: T.Type) throws -> T {
+    func get<T: Stackable>(current type: T.Type) throws -> T {
+        return try get(type, index: 0)
+    }
+
+    func get<T: Stackable>(_ type: T.Type, index: Int) throws -> T {
+        var currentIndex: Int = -1
         var entry: Entry? = _top
         repeat {
             defer { entry = entry?.next }
-            if let value = entry?.value as? T {
+            guard let value = entry?.value as? T else {
+                continue
+            }
+            currentIndex += 1
+            if currentIndex == index {
                 return value
             }
         } while entry != nil
-        throw Trap.stackNoCurrent(type)
+        throw Trap.stackNotFound(type, index: index)
     }
 }
 
@@ -110,7 +110,7 @@ extension Value: Stackable {}
 // sourcery: AutoEquatable
 struct Label: Stackable {
     let arity: Int
-    let instrucions: [Instruction]
+    let continuation: [Instruction]
 }
 
 /// - Note:
@@ -129,14 +129,14 @@ final class Frame: Stackable {
 }
 
 extension Frame {
-    func getLocal(index: UInt32) throws -> Value {
+    func localGet(index: UInt32) throws -> Value {
         guard locals.indices.contains(Int(index)) else {
             throw Trap.localIndexOutOfRange(index: index)
         }
         return locals[Int(index)]
     }
 
-    func setLocal(index: UInt32, value: Value) throws {
+    func localSet(index: UInt32, value: Value) throws {
         guard locals.indices.contains(Int(index)) else {
             throw Trap.localIndexOutOfRange(index: index)
         }

@@ -10,7 +10,7 @@ struct Expression: Equatable {
     }
 }
 
-protocol Instruction {
+public protocol Instruction {
     func isEqual(to another: Instruction) -> Bool
 }
 
@@ -35,6 +35,7 @@ extension Array where Element == Instruction {
 
 /// Pseudo Instructions
 enum PseudoInstruction: Instruction, Equatable {
+    case `else`
     case end
 }
 
@@ -68,9 +69,9 @@ enum ParametricInstruction: Instruction, Equatable {
 /// - Note:
 /// <https://webassembly.github.io/spec/core/binary/instructions.html#variable-instructions>
 enum VariableInstruction: Instruction, Equatable {
-    case getLocal(LabelIndex)
-    case setLocal(LabelIndex)
-    case teeLocal(LabelIndex)
+    case localGet(LabelIndex)
+    case localSet(LabelIndex)
+    case localTee(LabelIndex)
     case getGlobal(GlobalIndex)
     case setGlobal(GlobalIndex)
 }
@@ -105,23 +106,43 @@ enum MemoryInstruction: Instruction {
 /// - Note:
 /// <https://webassembly.github.io/spec/core/binary/instructions.html#numeric-instructions>
 enum NumericInstruction {
-    enum Constant: Instruction, Equatable {
+    // sourcery: AutoEquatable
+    enum Constant: Instruction {
         case const(Value)
     }
 
     // sourcery: AutoEquatable
     enum Unary: Instruction {
-        case clz(IntValueType)
-        case ctz(IntValueType)
-        case popcnt(IntValueType)
+        case clz(ValueType)
+        case ctz(ValueType)
+        case popcnt(ValueType)
 
-        case abs(FloatValueType)
-        case neg(FloatValueType)
-        case ceil(FloatValueType)
-        case floor(FloatValueType)
-        case trunc(FloatValueType)
-        case nearest(FloatValueType)
-        case sqrt(FloatValueType)
+        case abs(ValueType)
+        case neg(ValueType)
+        case ceil(ValueType)
+        case floor(ValueType)
+        case trunc(ValueType)
+        case nearest(ValueType)
+        case sqrt(ValueType)
+
+        case eqz(ValueType)
+
+        var type: ValueType {
+            switch self {
+            case let .clz(type),
+                 let .ctz(type),
+                 let .popcnt(type),
+                 let .abs(type),
+                 let .neg(type),
+                 let .ceil(type),
+                 let .floor(type),
+                 let .trunc(type),
+                 let .nearest(type),
+                 let .sqrt(type),
+                 let .eqz(type):
+                return type
+            }
+        }
     }
 
     // sourcery: AutoEquatable
@@ -130,61 +151,108 @@ enum NumericInstruction {
         case sub(ValueType)
         case mul(ValueType)
 
-        case divS(IntValueType)
-        case divU(IntValueType)
-        case remS(IntValueType)
-        case remU(IntValueType)
-        case and(IntValueType)
-        case or(IntValueType)
-        case xor(IntValueType)
-        case shl(IntValueType)
-        case shrS(IntValueType)
-        case shrU(IntValueType)
-        case rotl(IntValueType)
-        case rotr(IntValueType)
+        case divS(ValueType)
+        case divU(ValueType)
+        case remS(ValueType)
+        case remU(ValueType)
+        case and(ValueType)
+        case or(ValueType)
+        case xor(ValueType)
+        case shl(ValueType)
+        case shrS(ValueType)
+        case shrU(ValueType)
+        case rotl(ValueType)
+        case rotr(ValueType)
 
-        case div(FloatValueType)
-        case min(FloatValueType)
-        case max(FloatValueType)
-        case copysign(FloatValueType)
-    }
+        case div(ValueType)
+        case min(ValueType)
+        case max(ValueType)
+        case copysign(ValueType)
 
-    // sourcery: AutoEquatable
-    enum Test: Instruction {
-        case eqz(IntValueType)
-    }
-
-    // sourcery: AutoEquatable
-    enum Comparison: Instruction {
         case eq(ValueType)
         case ne(ValueType)
 
-        case ltS(IntValueType)
-        case ltU(IntValueType)
-        case gtS(IntValueType)
-        case gtU(IntValueType)
-        case leS(IntValueType)
-        case leU(IntValueType)
-        case geS(IntValueType)
-        case geU(IntValueType)
+        case ltS(ValueType)
+        case ltU(ValueType)
+        case gtS(ValueType)
+        case gtU(ValueType)
+        case leS(ValueType)
+        case leU(ValueType)
+        case geS(ValueType)
+        case geU(ValueType)
 
-        case lt(FloatValueType)
-        case gt(FloatValueType)
-        case le(FloatValueType)
-        case ge(FloatValueType)
+        case lt(ValueType)
+        case gt(ValueType)
+        case le(ValueType)
+        case ge(ValueType)
+
+        var type: ValueType {
+            switch self {
+            case let .add(type),
+                 let .sub(type),
+                 let .mul(type),
+                 let .divS(type),
+                 let .divU(type),
+                 let .remS(type),
+                 let .remU(type),
+                 let .and(type),
+                 let .or(type),
+                 let .xor(type),
+                 let .shl(type),
+                 let .shrS(type),
+                 let .shrU(type),
+                 let .rotl(type),
+                 let .rotr(type),
+                 let .div(type),
+                 let .min(type),
+                 let .max(type),
+                 let .copysign(type),
+                 let .eq(type),
+                 let .ne(type),
+                 let .ltS(type),
+                 let .ltU(type),
+                 let .gtS(type),
+                 let .gtU(type),
+                 let .leS(type),
+                 let .leU(type),
+                 let .geS(type),
+                 let .geU(type),
+                 let .lt(type),
+                 let .gt(type),
+                 let .le(type),
+                 let .ge(type):
+                return type
+            }
+        }
     }
 
     // sourcery: AutoEquatable
     enum Conversion: Instruction {
-        case wrap(IntValueType, IntValueType)
-        case extendS(IntValueType, IntValueType)
-        case extendU(IntValueType, IntValueType)
-        case truncS(IntValueType, FloatValueType)
-        case truncU(IntValueType, FloatValueType)
-        case convertS(FloatValueType, IntValueType)
-        case convertU(FloatValueType, IntValueType)
-        case demote(FloatValueType, FloatValueType)
-        case promote(FloatValueType, FloatValueType)
+        case wrap(ValueType, ValueType)
+        case extendS(ValueType, ValueType)
+        case extendU(ValueType, ValueType)
+        case truncS(ValueType, ValueType)
+        case truncU(ValueType, ValueType)
+        case convertS(ValueType, ValueType)
+        case convertU(ValueType, ValueType)
+        case demote(ValueType, ValueType)
+        case promote(ValueType, ValueType)
         case reinterpret(ValueType, ValueType)
+
+        var types: (ValueType, ValueType) {
+            switch self {
+            case let .wrap(type1, type2),
+                 let .extendS(type1, type2),
+                 let .extendU(type1, type2),
+                 let .truncS(type1, type2),
+                 let .truncU(type1, type2),
+                 let .convertS(type1, type2),
+                 let .convertU(type1, type2),
+                 let .demote(type1, type2),
+                 let .promote(type1, type2),
+                 let .reinterpret(type1, type2):
+                return (type1, type2)
+            }
+        }
     }
 }

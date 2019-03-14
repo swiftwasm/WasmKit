@@ -1,158 +1,174 @@
 /// - Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#value-types>
-public class Value: Equatable {
-    internal required init() {
-        precondition(type(of: self) != Value.self, "\(Value.self) itself shouldn't be initialized")
-    }
-
+public class Value: Equatable, Hashable {
     public static func == (lhs: Value, rhs: Value) -> Bool {
-        return lhs.isEqual(to: rhs)
+        return lhs.hashValue == rhs.hashValue
     }
 
-    func isEqual(to _: Value) -> Bool {
-        preconditionFailure("Subclasses of \(Value.self) must override `isEqual:` method")
-    }
-}
-
-extension RawRepresentable where Self: Value {
-    public init(_ value: Self.RawValue) {
-        self.init(rawValue: value)!
-    }
-}
-
-public typealias IntValueType = Value.Int.Type
-public protocol IntValue: RawRepresentable where Self: Value, RawValue: UnsignedInteger & FixedWidthInteger {}
-
-extension Value {
-    public class Int: Value {
-        internal required init() {
-            super.init()
-            precondition(type(of: self) != Int.self, "\(Int.self) itself shouldn't be initialized")
-        }
-
-        override func isEqual(to _: Value) -> Bool {
-            preconditionFailure("Subclasses of \(Int.self) must override `isEqual:` method")
-        }
+    required init() {
+        precondition(type(of: self) != Value.self, "Subclasses of Value have to be used")
     }
 
-    public class Int32: Int, IntValue {
-        public let rawValue: Swift.UInt32
-
-        public required init() {
-            rawValue = 0
-        }
-
-        public required init(rawValue: UInt32) {
-            self.rawValue = rawValue
-        }
-
-        public convenience init(_ value: Swift.Int32) {
-            self.init(rawValue: UInt32(bitPattern: value))
-        }
-
-        public override func isEqual(to value: Value) -> Bool {
-            guard let value = value as? Value.Int32 else { return false }
-            return rawValue == value.rawValue
-        }
-    }
-
-    public class Int64: Int, IntValue {
-        public let rawValue: Swift.UInt64
-
-        public required init() {
-            rawValue = 0
-        }
-
-        public required init(rawValue: UInt64) {
-            self.rawValue = rawValue
-        }
-
-        public convenience init(_ value: Swift.Int64) {
-            self.init(rawValue: UInt64(bitPattern: value))
-        }
-
-        public override func isEqual(to value: Value) -> Bool {
-            guard let value = value as? Value.Int64 else { return false }
-            return rawValue == value.rawValue
-        }
-    }
-}
-
-extension Value.Int32: CustomStringConvertible {
-    public var description: String {
-        return "\(type(of: self))(\(rawValue)))"
-    }
-}
-
-extension Value.Int64: CustomStringConvertible {
-    public var description: String {
-        return "\(type(of: self))(\(rawValue)))"
-    }
-}
-
-public typealias FloatValueType = Value.Float.Type
-public protocol FloatValue: RawRepresentable where Self: Value, RawValue: BinaryFloatingPoint {}
-
-extension Value {
-    public class Float: Value {
-        internal required init() {
-            super.init()
-            precondition(type(of: self) != Float.self, "\(Float.self) itself shouldn't be initialized")
-        }
-
-        override func isEqual(to _: Value) -> Bool {
-            preconditionFailure("Subclasses of \(Float.self) must override `isEqual:` method")
-        }
-    }
-
-    public final class Float32: Float, FloatValue {
-        public let rawValue: Swift.Float32
-
-        public required init() {
-            rawValue = 0
-        }
-
-        public required init(rawValue: Swift.Float32) {
-            self.rawValue = rawValue
-        }
-
-        public override func isEqual(to value: Value) -> Bool {
-            guard let value = value as? Value.Float32 else { return false }
-            return rawValue == value.rawValue
-        }
-    }
-
-    public final class Float64: Float, FloatValue {
-        public let rawValue: Swift.Float64
-
-        public required init() {
-            rawValue = 0
-        }
-
-        public required init(rawValue: Swift.Float64) {
-            self.rawValue = rawValue
-        }
-
-        public override func isEqual(to value: Value) -> Bool {
-            guard let value = value as? Value.Float64 else { return false }
-            return rawValue == value.rawValue
-        }
-    }
-}
-
-extension Value.Float32: CustomStringConvertible {
-    public var description: String {
-        return "\(type(of: self))(\(rawValue)))"
-    }
-}
-
-extension Value.Float64: CustomStringConvertible {
-    public var description: String {
-        return "\(type(of: self))(\(rawValue)))"
+    public func hash(into _: inout Hasher) {
+        preconditionFailure("Subclasses of Value must override `hash(into:)`")
     }
 }
 
 public typealias ValueType = Value.Type
+
+// Integers
+/// - Note:
+/// <https://webassembly.github.io/spec/core/syntax/values.html#integers>
+
+public protocol RawUnsignedInteger: FixedWidthInteger & UnsignedInteger {
+    associatedtype Signed: RawSignedInteger where Signed.Unsigned == Self
+}
+
+public protocol RawSignedInteger: FixedWidthInteger & SignedInteger {
+    associatedtype Unsigned: RawUnsignedInteger
+    init(bitPattern: Unsigned)
+}
+
+extension UInt32: RawUnsignedInteger {
+    public typealias Signed = Int32
+}
+
+extension UInt64: RawUnsignedInteger {
+    public typealias Signed = Int64
+}
+
+extension Int32: RawSignedInteger {}
+extension Int64: RawSignedInteger {}
+
+extension RawUnsignedInteger {
+    var signed: Signed {
+        return self > Signed.max ? -Signed(Self.max - self) - 1 : Signed(self)
+    }
+}
+
+extension RawSignedInteger {
+    var unsigned: Unsigned {
+        return self < 0 ? Unsigned.max - Unsigned(-(self + 1)) : Unsigned(self)
+    }
+}
+
+// Floating-Point
+/// - Note:
+/// <https://webassembly.github.io/spec/core/syntax/values.html#floating-point>
+
+typealias RawFloatingPoint = BinaryFloatingPoint
+
+public protocol RawRepresentableValue where Self: Value {
+    associatedtype RawValue
+
+    var rawValue: RawValue { get }
+
+    init(_ rawValue: RawValue)
+}
+
+public final class I32: Value, RawRepresentableValue, CustomStringConvertible {
+    public let rawValue: UInt32
+
+    required init() {
+        rawValue = 0
+    }
+
+    public init(_ rawValue: UInt32) {
+        self.rawValue = rawValue
+    }
+
+    public var description: String {
+        return "\(type(of: self))(\(rawValue))"
+    }
+
+    public override func hash(into hasher: inout Hasher) {
+        rawValue.hash(into: &hasher)
+    }
+}
+
+public final class I64: Value, RawRepresentableValue, CustomStringConvertible {
+    public let rawValue: UInt64
+
+    required init() {
+        rawValue = 0
+    }
+
+    public init(_ rawValue: UInt64) {
+        self.rawValue = rawValue
+    }
+
+    public var description: String {
+        return "\(type(of: self))(\(rawValue))"
+    }
+
+    public override func hash(into hasher: inout Hasher) {
+        rawValue.hash(into: &hasher)
+    }
+}
+
+public final class F32: Value, RawRepresentableValue, CustomStringConvertible {
+    public let rawValue: Float32
+
+    required init() {
+        rawValue = 0
+    }
+
+    public init(_ rawValue: Float32) {
+        self.rawValue = rawValue
+    }
+
+    public var description: String {
+        return "\(type(of: self))(\(rawValue))"
+    }
+
+    public override func hash(into hasher: inout Hasher) {
+        rawValue.hash(into: &hasher)
+    }
+}
+
+public final class F64: Value, RawRepresentableValue, CustomStringConvertible {
+    public let rawValue: Float64
+
+    required init() {
+        rawValue = 0
+    }
+
+    public init(_ rawValue: Float64) {
+        self.rawValue = rawValue
+    }
+
+    public var description: String {
+        return "\(type(of: self))(\(rawValue))"
+    }
+
+    public override func hash(into hasher: inout Hasher) {
+        rawValue.hash(into: &hasher)
+    }
+}
+
+extension RawRepresentableValue where Self: Value, RawValue: RawUnsignedInteger {
+    var signed: RawValue.Signed {
+        return rawValue.signed
+    }
+
+    public init(_ value: RawValue.Signed) {
+        let rawValue: RawValue
+        if value < 0 {
+            rawValue = RawValue(~value)
+        } else {
+            rawValue = RawValue(value)
+        }
+        self.init(rawValue)
+    }
+
+    public static func == (lhs: Self, rhs: RawValue) -> Bool {
+        return lhs.rawValue == rhs
+    }
+
+    public static func != (lhs: Self, rhs: RawValue) -> Bool {
+        return lhs.rawValue != rhs
+    }
+}
 
 extension Array where Element == ValueType {
     static func == (lhs: [ValueType], rhs: [ValueType]) -> Bool {

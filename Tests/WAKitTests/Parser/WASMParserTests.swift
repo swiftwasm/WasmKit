@@ -1,3 +1,4 @@
+import LEB
 import Parser
 @testable import WAKit
 import XCTest
@@ -8,6 +9,42 @@ final class WASMParserTests: XCTestCase {
         let parser = WASMParser(stream: stream)
         XCTAssertEqual(parser.stream, stream)
         XCTAssertEqual(parser.currentIndex, 0)
+    }
+}
+
+extension WASMParserTests {
+    func testWASMParser_parseInteger() {
+        var stream: StaticByteStream!
+        var parser: WASMParser<StaticByteStream>!
+
+        stream = StaticByteStream(bytes: [0x01])
+        parser = WASMParser(stream: stream)
+        XCTAssertEqual(I32(try parser.parseInteger() as UInt32).signed, 1)
+        XCTAssertEqual(parser.currentIndex, stream.bytes.count)
+
+        stream = StaticByteStream(bytes: [0x7F])
+        parser = WASMParser(stream: stream)
+        XCTAssertEqual(I32(try parser.parseInteger() as UInt32).signed, -1)
+        XCTAssertEqual(parser.currentIndex, stream.bytes.count)
+
+        stream = StaticByteStream(bytes: [0xFF, 0x00])
+        parser = WASMParser(stream: stream)
+        XCTAssertEqual(I32(try parser.parseInteger() as UInt32).signed, 127)
+        XCTAssertEqual(parser.currentIndex, stream.bytes.count)
+
+        stream = StaticByteStream(bytes: [0x81, 0x7F])
+        parser = WASMParser(stream: stream)
+        XCTAssertEqual(I32(try parser.parseInteger() as UInt32).signed, -127)
+        XCTAssertEqual(parser.currentIndex, stream.bytes.count)
+
+        stream = StaticByteStream(bytes: [0x83])
+        parser = WASMParser(stream: stream)
+        XCTAssertThrowsError(_ = try parser.parseInteger() as UInt32) { error in
+            guard case LEBError.insufficientBytes = error else {
+                return XCTFail("Unexpected error: \(error)")
+            }
+            XCTAssertEqual(stream.currentIndex, 1)
+        }
     }
 }
 
@@ -43,22 +80,22 @@ extension WASMParserTests {
 
         stream = StaticByteStream(bytes: [0x7F])
         parser = WASMParser(stream: stream)
-        XCTAssert(try parser.parseValueType() == Value.Int32.self)
+        XCTAssert(try parser.parseValueType() == I32.self)
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
 
         stream = StaticByteStream(bytes: [0x7E])
         parser = WASMParser(stream: stream)
-        XCTAssert(try parser.parseValueType() == Value.Int64.self)
+        XCTAssert(try parser.parseValueType() == I64.self)
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
 
         stream = StaticByteStream(bytes: [0x7D])
         parser = WASMParser(stream: stream)
-        XCTAssert(try parser.parseValueType() == Value.Float32.self)
+        XCTAssert(try parser.parseValueType() == F32.self)
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
 
         stream = StaticByteStream(bytes: [0x7C])
         parser = WASMParser(stream: stream)
-        XCTAssert(try parser.parseValueType() == Value.Float64.self)
+        XCTAssert(try parser.parseValueType() == F64.self)
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
 
         stream = StaticByteStream(bytes: [0x7B])
@@ -83,7 +120,7 @@ extension WASMParserTests {
 
         stream = StaticByteStream(bytes: [0x7E])
         parser = WASMParser(stream: stream)
-        XCTAssert(try parser.parseResultType() == [Value.Int64.self])
+        XCTAssert(try parser.parseResultType() == [I64.self])
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
 
         stream = StaticByteStream(bytes: [0x7B])
@@ -108,7 +145,7 @@ extension WASMParserTests {
 
         stream = StaticByteStream(bytes: [0x60, 0x01, 0x7E, 0x01, 0x7D])
         parser = WASMParser(stream: stream)
-        XCTAssert(try parser.parseFunctionType() == .some(parameters: [Value.Int64.self], results: [Value.Float32.self]))
+        XCTAssert(try parser.parseFunctionType() == .some(parameters: [I64.self], results: [F32.self]))
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
     }
 
@@ -193,12 +230,12 @@ extension WASMParserTests {
 
         stream = StaticByteStream(bytes: [0x7F, 0x00])
         parser = WASMParser(stream: stream)
-        XCTAssertEqual(try parser.parseGlobalType(), GlobalType(mutability: .constant, valueType: Value.Int32.self))
+        XCTAssertEqual(try parser.parseGlobalType(), GlobalType(mutability: .constant, valueType: I32.self))
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
 
         stream = StaticByteStream(bytes: [0x7F, 0x01])
         parser = WASMParser(stream: stream)
-        XCTAssertEqual(try parser.parseGlobalType(), GlobalType(mutability: .variable, valueType: Value.Int32.self))
+        XCTAssertEqual(try parser.parseGlobalType(), GlobalType(mutability: .variable, valueType: I32.self))
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
 
         stream = StaticByteStream(bytes: [0x7B])
@@ -232,7 +269,6 @@ extension WASMParserTests {
         parser = WASMParser(stream: stream)
         XCTAssertEqual(try parser.parseExpression(), Expression(instructions: [
             ControlInstruction.nop,
-            PseudoInstruction.end,
         ]))
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
     }
@@ -296,8 +332,8 @@ extension WASMParserTests {
         ])
         parser = WASMParser(stream: stream)
         let expected = Section.type([
-            .some(parameters: [Value.Int32.self], results: [Value.Int64.self]),
-            .some(parameters: [Value.Float32.self], results: [Value.Float64.self]),
+            .some(parameters: [I32.self], results: [I64.self]),
+            .some(parameters: [F32.self], results: [F64.self]),
         ])
         XCTAssertEqual(try parser.parseTypeSection(), expected)
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
@@ -403,12 +439,12 @@ extension WASMParserTests {
         parser = WASMParser(stream: stream)
         let expected = Section.global([
             Global(
-                type: GlobalType(mutability: .constant, valueType: Value.Int32.self),
-                initializer: Expression(instructions: [PseudoInstruction.end])
+                type: GlobalType(mutability: .constant, valueType: I32.self),
+                initializer: Expression(instructions: [])
             ),
             Global(
-                type: GlobalType(mutability: .variable, valueType: Value.Int64.self),
-                initializer: Expression(instructions: [PseudoInstruction.end])
+                type: GlobalType(mutability: .variable, valueType: I64.self),
+                initializer: Expression(instructions: [])
             ),
         ])
 
@@ -469,8 +505,8 @@ extension WASMParserTests {
         ])
         parser = WASMParser(stream: stream)
         let expected = Section.element([
-            Element(table: 18, offset: Expression(instructions: [PseudoInstruction.end]), initializer: [52]),
-            Element(table: 86, offset: Expression(instructions: [PseudoInstruction.end]), initializer: [120]),
+            Element(table: 18, offset: Expression(instructions: []), initializer: [52]),
+            Element(table: 86, offset: Expression(instructions: []), initializer: [120]),
         ])
         XCTAssertEqual(try parser.parseElementSection(), expected)
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
@@ -500,12 +536,12 @@ extension WASMParserTests {
         parser = WASMParser(stream: stream)
         let expected = Section.code([
             Code(
-                locals: [Value.Int32.self, Value.Int32.self, Value.Int32.self],
-                expression: Expression(instructions: [PseudoInstruction.end])
+                locals: [I32.self, I32.self, I32.self],
+                expression: Expression(instructions: [])
             ),
             Code(
-                locals: [Value.Int64.self, Value.Float32.self, Value.Float32.self],
-                expression: Expression(instructions: [PseudoInstruction.end])
+                locals: [I64.self, F32.self, F32.self],
+                expression: Expression(instructions: [])
             ),
         ])
         XCTAssertEqual(try parser.parseCodeSection(), expected)
@@ -533,12 +569,12 @@ extension WASMParserTests {
         let expected = Section.data([
             Data(
                 data: 18,
-                offset: Expression(instructions: [PseudoInstruction.end]),
+                offset: Expression(instructions: []),
                 initializer: [0x01, 0x02, 0x03, 0x04]
             ),
             Data(
                 data: 52,
-                offset: Expression(instructions: [PseudoInstruction.end]),
+                offset: Expression(instructions: []),
                 initializer: [0x05, 0x06]
             ),
         ])

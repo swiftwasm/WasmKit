@@ -3,21 +3,21 @@
 extension Runtime {
     func execute(variable instruction: VariableInstruction) throws {
         switch instruction {
-        case let .getLocal(index):
-            let currentFrame = try stack.getCurrent(Frame.self)
-            let value = try currentFrame.getLocal(index: index)
+        case let .localGet(index):
+            let currentFrame = try stack.get(current: Frame.self)
+            let value = try currentFrame.localGet(index: index)
             stack.push(value)
 
-        case let .setLocal(index),
-             let .teeLocal(index):
-            let currentFrame = try stack.getCurrent(Frame.self)
+        case let .localSet(index),
+             let .localTee(index):
+            let currentFrame = try stack.get(current: Frame.self)
             let value: Value
-            if case .teeLocal = instruction {
+            if case .localTee = instruction {
                 value = try stack.peek(Value.self)
             } else {
                 value = try stack.pop(Value.self)
             }
-            try currentFrame.setLocal(index: index, value: value)
+            try currentFrame.localSet(index: index, value: value)
 
         case let .getGlobal(index):
             let value = try store.getGlobal(index: index)

@@ -58,7 +58,7 @@ public func == (lhs: GlobalType, rhs: GlobalType) -> Bool {
 extension Label: Equatable {}
 internal func == (lhs: Label, rhs: Label) -> Bool {
     guard lhs.arity == rhs.arity else { return false }
-    guard lhs.instrucions == rhs.instrucions else { return false }
+    guard lhs.continuation == rhs.continuation else { return false }
     return true
 }
 // MARK: - ModuleInstance AutoEquatable
@@ -69,7 +69,7 @@ public func == (lhs: ModuleInstance, rhs: ModuleInstance) -> Bool {
     guard lhs.tableAddresses == rhs.tableAddresses else { return false }
     guard lhs.memoryAddresses == rhs.memoryAddresses else { return false }
     guard lhs.globalAddresses == rhs.globalAddresses else { return false }
-    guard lhs.exports == rhs.exports else { return false }
+    guard lhs.exportInstances == rhs.exportInstances else { return false }
     return true
 }
 // MARK: - TableType AutoEquatable
@@ -242,13 +242,6 @@ internal func == (lhs: NumericInstruction.Binary, rhs: NumericInstruction.Binary
         return lhs == rhs
     case (.copysign(let lhs), .copysign(let rhs)):
         return lhs == rhs
-    default: return false
-    }
-}
-// MARK: - NumericInstruction.Comparison AutoEquatable
-extension NumericInstruction.Comparison: Equatable {}
-internal func == (lhs: NumericInstruction.Comparison, rhs: NumericInstruction.Comparison) -> Bool {
-    switch (lhs, rhs) {
     case (.eq(let lhs), .eq(let rhs)):
         return lhs == rhs
     case (.ne(let lhs), .ne(let rhs)):
@@ -278,6 +271,14 @@ internal func == (lhs: NumericInstruction.Comparison, rhs: NumericInstruction.Co
     case (.ge(let lhs), .ge(let rhs)):
         return lhs == rhs
     default: return false
+    }
+}
+// MARK: - NumericInstruction.Constant AutoEquatable
+extension NumericInstruction.Constant: Equatable {}
+internal func == (lhs: NumericInstruction.Constant, rhs: NumericInstruction.Constant) -> Bool {
+    switch (lhs, rhs) {
+    case (.const(let lhs), .const(let rhs)):
+        return lhs == rhs
     }
 }
 // MARK: - NumericInstruction.Conversion AutoEquatable
@@ -327,14 +328,6 @@ internal func == (lhs: NumericInstruction.Conversion, rhs: NumericInstruction.Co
     default: return false
     }
 }
-// MARK: - NumericInstruction.Test AutoEquatable
-extension NumericInstruction.Test: Equatable {}
-internal func == (lhs: NumericInstruction.Test, rhs: NumericInstruction.Test) -> Bool {
-    switch (lhs, rhs) {
-    case (.eqz(let lhs), .eqz(let rhs)):
-        return lhs == rhs
-    }
-}
 // MARK: - NumericInstruction.Unary AutoEquatable
 extension NumericInstruction.Unary: Equatable {}
 internal func == (lhs: NumericInstruction.Unary, rhs: NumericInstruction.Unary) -> Bool {
@@ -358,6 +351,8 @@ internal func == (lhs: NumericInstruction.Unary, rhs: NumericInstruction.Unary) 
     case (.nearest(let lhs), .nearest(let rhs)):
         return lhs == rhs
     case (.sqrt(let lhs), .sqrt(let rhs)):
+        return lhs == rhs
+    case (.eqz(let lhs), .eqz(let rhs)):
         return lhs == rhs
     default: return false
     }
