@@ -1,11 +1,9 @@
-import struct Tagged.Tagged
-
 /// - Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#addresses>
-public typealias FunctionAddress = Tagged<(Module, function: ()), Int>
-public typealias TableAddress = Tagged<(Module, table: ()), Int>
-public typealias MemoryAddress = Tagged<(Module, memory: ()), Int>
-public typealias GlobalAddress = Tagged<(Module, global: ()), Int>
+public typealias FunctionAddress = Int
+public typealias TableAddress = Int
+public typealias MemoryAddress = Int
+public typealias GlobalAddress = Int
 
 /// - Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#store>
@@ -68,7 +66,7 @@ extension Store {
     /// - Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-func>
     func allocate(function: Function, module: ModuleInstance) -> FunctionAddress {
-        let address = FunctionAddress(rawValue: functions.count)
+        let address = functions.count
         let instance = FunctionInstance(function, module: module)
         functions.append(instance)
         return address
@@ -77,7 +75,7 @@ extension Store {
     /// - Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-table>
     func allocate(tableType: TableType) -> TableAddress {
-        let address = TableAddress(rawValue: tables.count)
+        let address = tables.count
         let instance = TableInstance(tableType)
         tables.append(instance)
         return address
@@ -86,7 +84,7 @@ extension Store {
     /// - Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-mem>
     func allocate(memoryType: MemoryType) -> MemoryAddress {
-        let address = MemoryAddress(rawValue: memories.count)
+        let address = memories.count
         let instance = MemoryInstance(memoryType)
         memories.append(instance)
         return address
@@ -95,7 +93,7 @@ extension Store {
     /// - Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-global>
     func allocate(globalType: GlobalType) -> GlobalAddress {
-        let address = GlobalAddress(rawValue: globals.count)
+        let address = globals.count
         let instance = GlobalInstance(globalType: globalType)
         globals.append(instance)
         return address

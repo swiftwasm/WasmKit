@@ -30,7 +30,7 @@ extension Runtime {
     /// - Note:
     /// <https://webassembly.github.io/spec/core/exec/instructions.html#invocation-of-function-address>
     public func invoke(functionAddress address: FunctionAddress, with parameters: [Value]) throws -> [Value] {
-        let function = store.functions[address.rawValue]
+        let function = store.functions[address]
         guard case let .some(parameterTypes, _) = function.type else {
             throw Trap._raw("any type is not allowed here")
         }
@@ -56,7 +56,7 @@ extension Runtime {
     }
 
     func invoke(functionAddress address: FunctionAddress) throws {
-        let function = store.functions[address.rawValue]
+        let function = store.functions[address]
         guard case let .some(parameterTypes, resultTypes) = function.type else {
             throw Trap._raw("any type is not allowed here")
         }

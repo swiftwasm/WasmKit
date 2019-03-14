@@ -19,7 +19,6 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/pointfreeco/swift-tagged", from: "0.2.0"),
         .package(url: "https://github.com/akkyie/SwiftLEB", from: "0.1.0"),
         .package(url: "https://github.com/jakeheis/SwiftCLI", from: "5.0.0"),
         .package(url: "https://github.com/onevcat/Rainbow", from: "3.1.4"),
@@ -28,7 +27,7 @@ let package = Package(
     targets: [
         .target(
             name: "WAKit",
-            dependencies: ["Parser", "Tagged", "LEB"],
+            dependencies: ["Parser", "LEB"],
             path: "./Sources/WAKit"
         ),
         .testTarget(
