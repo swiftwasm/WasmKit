@@ -42,21 +42,3 @@ public final class StaticByteStream: ByteStream {
         return bytes[currentIndex]
     }
 }
-
-extension StaticByteStream: Equatable {
-    public static func == (lhs: StaticByteStream, rhs: StaticByteStream) -> Bool {
-        guard lhs.bytes == rhs.bytes else {
-            return false
-        }
-        guard lhs.currentIndex == rhs.currentIndex else {
-            return false
-        }
-        return true
-    }
-}
-
-extension String {
-    public var byteStream: StaticByteStream {
-        return StaticByteStream(bytes: Array(utf8))
-    }
-}

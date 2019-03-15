@@ -6,8 +6,11 @@ final class WASMParserTests: XCTestCase {
     func testWASMParser() {
         let stream = StaticByteStream(bytes: [1, 2, 3])
         let parser = WASMParser(stream: stream)
-        XCTAssertEqual(parser.stream, stream)
-        XCTAssertEqual(parser.currentIndex, 0)
+
+        XCTAssertEqual(parser.currentIndex, stream.currentIndex)
+
+        XCTAssertNoThrow(try stream.consumeAny())
+        XCTAssertEqual(parser.currentIndex, stream.currentIndex)
     }
 }
 
