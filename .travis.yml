@@ -5,10 +5,6 @@ osx_image: xcode10.1
 branches:
   only: [master]
 
-env:
-  - PLATFORM='macOS'
-  - PLATFORM='iOS'
-
 cache:
   directories: [/usr/local/lib/mint, Vendor/Mint/.build]
 
