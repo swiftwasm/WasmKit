@@ -1,3 +1,5 @@
 .build
-Packages
 *.xcodeproj
+
+/Tests/LinuxMain.swift
+/Tests/WAKitTests/XCTestManifests.swift

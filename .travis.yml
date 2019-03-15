@@ -1,6 +1,13 @@
 language: swift
-os: osx
+
+os: [osx, linux]
 osx_image: xcode10.1
+dist: xenial
+
+matrix:
+  allow_failures:
+    - os: linux
+  fast_finish: true
 
 branches:
   only: [master]
@@ -8,7 +15,22 @@ branches:
 cache:
   directories: [/usr/local/lib/mint, Vendor/Mint/.build]
 
+before_script:
+  - |
+    if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
+      make linux
+    fi
+
 script: make bootstrap test
+
+after_script:
+  - |
+    if [ -z "$(git status --porcelain)" ]; then
+      echo 'Working directory is clean'
+    else
+      echo 'Uncommitted changes'
+      exit 1
+    fi
 
 notifications:
   email: false
