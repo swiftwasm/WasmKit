@@ -1,5 +1,4 @@
 import LEB
-import Parser
 @testable import WAKit
 import XCTest
 
@@ -101,7 +100,7 @@ extension WASMParserTests {
         stream = StaticByteStream(bytes: [0x7B])
         parser = WASMParser(stream: stream)
         XCTAssertThrowsError(try parser.parseValueType()) { error in
-            guard case let Parser.Error<UInt8>.unexpected(0x7B, 0, expected: expected) = error else {
+            guard case let WAKit.StreamError<UInt8>.unexpected(0x7B, 0, expected: expected) = error else {
                 return XCTFail("Unexpected error: \(error)")
             }
             XCTAssertEqual(expected, Set(0x7C ... 0x7F))
@@ -126,7 +125,7 @@ extension WASMParserTests {
         stream = StaticByteStream(bytes: [0x7B])
         parser = WASMParser(stream: stream)
         XCTAssertThrowsError(try parser.parseValueType()) { error in
-            guard case let Parser.Error<UInt8>.unexpected(0x7B, 0, expected: expected) = error else {
+            guard case let WAKit.StreamError<UInt8>.unexpected(0x7B, 0, expected: expected) = error else {
                 return XCTFail("Unexpected error: \(error)")
             }
             XCTAssertEqual(expected, Set(0x7C ... 0x7F))
@@ -166,7 +165,7 @@ extension WASMParserTests {
         stream = StaticByteStream(bytes: [0x02])
         parser = WASMParser(stream: stream)
         XCTAssertThrowsError(try parser.parseLimits()) { error in
-            guard case let Parser.Error<UInt8>.unexpected(0x02, 0, expected: expected) = error else {
+            guard case let WAKit.StreamError<UInt8>.unexpected(0x02, 0, expected: expected) = error else {
                 return XCTFail("Unexpected error: \(error)")
             }
             XCTAssertEqual(expected, Set(0x00 ... 0x01))
@@ -191,7 +190,7 @@ extension WASMParserTests {
         stream = StaticByteStream(bytes: [0x02])
         parser = WASMParser(stream: stream)
         XCTAssertThrowsError(try parser.parseMemoryType()) { error in
-            guard case let Parser.Error<UInt8>.unexpected(0x02, 0, expected: expected) = error else {
+            guard case let WAKit.StreamError<UInt8>.unexpected(0x02, 0, expected: expected) = error else {
                 return XCTFail("Unexpected error: \(error)")
             }
             XCTAssertEqual(expected, Set(0x00 ... 0x01))
@@ -216,7 +215,7 @@ extension WASMParserTests {
         stream = StaticByteStream(bytes: [0x70, 0x02])
         parser = WASMParser(stream: stream)
         XCTAssertThrowsError(try parser.parseTableType()) { error in
-            guard case let Parser.Error<UInt8>.unexpected(0x02, 1, expected: expected) = error else {
+            guard case let WAKit.StreamError<UInt8>.unexpected(0x02, 1, expected: expected) = error else {
                 return XCTFail("Unexpected error: \(error)")
             }
             XCTAssertEqual(expected, Set(0x00 ... 0x01))
@@ -241,7 +240,7 @@ extension WASMParserTests {
         stream = StaticByteStream(bytes: [0x7B])
         parser = WASMParser(stream: stream)
         XCTAssertThrowsError(try parser.parseGlobalType()) { error in
-            guard case let Parser.Error<UInt8>.unexpected(0x7B, 0, expected: expected) = error else {
+            guard case let WAKit.StreamError<UInt8>.unexpected(0x7B, 0, expected: expected) = error else {
                 return XCTFail("Unexpected error: \(error)")
             }
             XCTAssertEqual(expected, Set(0x7C ... 0x7F))
@@ -251,7 +250,7 @@ extension WASMParserTests {
         stream = StaticByteStream(bytes: [0x7F, 0x02])
         parser = WASMParser(stream: stream)
         XCTAssertThrowsError(try parser.parseGlobalType()) { error in
-            guard case let Parser.Error<UInt8>.unexpected(0x02, 1, expected: expected) = error else {
+            guard case let WAKit.StreamError<UInt8>.unexpected(0x02, 1, expected: expected) = error else {
                 return XCTFail("Unexpected error: \(error)")
             }
             XCTAssertEqual(expected, Set(0x00 ... 0x01))
@@ -312,7 +311,7 @@ extension WASMParserTests {
         ])
         parser = WASMParser(stream: stream)
         XCTAssertThrowsError(_ = try parser.parseCustomSection()) { error in
-            guard case Parser.Error<UInt8>.unexpectedEnd = error else {
+            guard case WAKit.StreamError<UInt8>.unexpectedEnd = error else {
                 return XCTFail("Unexpected error: \(error)")
             }
             XCTAssertEqual(stream.currentIndex, 26)

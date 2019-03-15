@@ -1,5 +1,4 @@
 import LEB
-import Parser
 
 public final class WASMParser<Stream: ByteStream> {
     public let stream: Stream
@@ -28,10 +27,6 @@ public enum WASMParserError: Swift.Error {
     case invalidSectionSize(UInt32)
     case zeroExpected(actual: UInt8, index: Int)
     case inconsistentFunctionAndCodeLength(functionCount: Int, codeCount: Int)
-}
-
-extension WASMParser {
-    typealias StreamError = Parser.Error<Stream.Element>
 }
 
 /// - Note:
@@ -130,7 +125,7 @@ extension WASMParser {
         case 0x7C:
             return F64.self
         default:
-            throw StreamError.unexpected(b, index: currentIndex, expected: Set(0x7C ... 0x7F))
+            throw StreamError<Stream.Element>.unexpected(b, index: currentIndex, expected: Set(0x7C ... 0x7F))
         }
     }
 
@@ -657,7 +652,7 @@ extension WASMParser {
         case 0xBF:
             return NumericInstruction.Conversion.reinterpret(F64.self, I64.self)
         default:
-            throw StreamError.unexpected(code, index: currentIndex, expected: nil)
+            throw StreamError<Stream.Element>.unexpected(code, index: currentIndex, expected: nil)
         }
     }
 

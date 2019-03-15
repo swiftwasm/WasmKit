@@ -12,7 +12,7 @@ public final class StaticByteStream: ByteStream {
     @discardableResult
     public func consumeAny() throws -> UInt8 {
         guard bytes.indices.contains(currentIndex) else {
-            throw Error<Element>.unexpectedEnd(expected: nil)
+            throw StreamError<Element>.unexpectedEnd(expected: nil)
         }
 
         let consumed = bytes[currentIndex]
@@ -23,12 +23,12 @@ public final class StaticByteStream: ByteStream {
     @discardableResult
     public func consume(_ expected: Set<UInt8>) throws -> UInt8 {
         guard bytes.indices.contains(currentIndex) else {
-            throw Error<Element>.unexpectedEnd(expected: Set(expected))
+            throw StreamError<Element>.unexpectedEnd(expected: Set(expected))
         }
 
         let consumed = bytes[currentIndex]
         guard expected.contains(consumed) else {
-            throw Error<Element>.unexpected(consumed, index: currentIndex, expected: Set(expected))
+            throw StreamError<Element>.unexpected(consumed, index: currentIndex, expected: Set(expected))
         }
 
         currentIndex = bytes.index(after: currentIndex)
