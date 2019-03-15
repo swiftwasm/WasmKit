@@ -16,7 +16,8 @@ A WebAssembly runtime written in Swift.
 
 ```sh
 $ swift build # or prefix `swift run` before the command below
-$ wakit run ../fib.wasm/fib.wasm fib i32:10
+$ # Usage: wakit run <path> <functionName> [<arguments>] ...
+$ wakit run Examples/wasm/fib.wasm fib i32:10
 [I32(89)]
 ```
 
