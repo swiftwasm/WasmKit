@@ -9,10 +9,6 @@ let package = Package(
             name: "WAKit",
             targets: ["WAKit"]
         ),
-        .library(
-            name: "Parser",
-            targets: ["Parser"]
-        ),
         .executable(
             name: "wakit",
             targets: ["CLI"]
@@ -27,23 +23,13 @@ let package = Package(
     targets: [
         .target(
             name: "WAKit",
-            dependencies: ["Parser", "LEB"],
+            dependencies: ["LEB"],
             path: "./Sources/WAKit"
         ),
         .testTarget(
             name: "WAKitTests",
             dependencies: ["WAKit"],
             path: "./Tests/WAKitTests"
-        ),
-        .target(
-            name: "Parser",
-            dependencies: [],
-            path: "./Sources/Parser"
-        ),
-        .testTarget(
-            name: "ParserTests",
-            dependencies: ["Parser"],
-            path: "./Tests/ParserTests"
         ),
         .target(
             name: "CLI",

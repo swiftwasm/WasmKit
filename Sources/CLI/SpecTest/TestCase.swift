@@ -1,6 +1,5 @@
 import Foundation
 import LEB
-import Parser
 import Rainbow
 import WAKit
 
@@ -156,7 +155,7 @@ extension TestCase.Command {
 
 extension Swift.Error {
     var text: String {
-        if let error = self as? Parser.Error<UInt8> {
+        if let error = self as? StreamError<UInt8> {
             switch error {
             case .unexpectedEnd(expected: _):
                 return "unexpected end"

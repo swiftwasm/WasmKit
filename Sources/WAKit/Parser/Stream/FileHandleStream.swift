@@ -25,7 +25,7 @@ public final class FileHandleStream: ByteStream {
     @discardableResult
     public func consumeAny() throws -> UInt8 {
         guard let consumed = peek() else {
-            throw Error<UInt8>.unexpectedEnd(expected: nil)
+            throw StreamError<UInt8>.unexpectedEnd(expected: nil)
         }
         currentIndex = bytes.index(after: currentIndex)
         return consumed
@@ -34,10 +34,10 @@ public final class FileHandleStream: ByteStream {
     @discardableResult
     public func consume(_ expected: Set<UInt8>) throws -> UInt8 {
         guard let consumed = peek() else {
-            throw Error<UInt8>.unexpectedEnd(expected: Set(expected))
+            throw StreamError<UInt8>.unexpectedEnd(expected: Set(expected))
         }
         guard expected.contains(consumed) else {
-            throw Error<Element>.unexpected(consumed, index: currentIndex, expected: Set(expected))
+            throw StreamError<Element>.unexpected(consumed, index: currentIndex, expected: Set(expected))
         }
         currentIndex = bytes.index(after: currentIndex)
         return consumed

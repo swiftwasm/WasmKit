@@ -1,11 +1,11 @@
-@testable import Parser
+import WAKit
 import XCTest
 
 final class ByteStreamTests: XCTestCase {
     func testStaticByteStream() {
         var stream = StaticByteStream(bytes: [1, 2])
         XCTAssertThrowsError(try stream.consume(3)) { error in
-            guard case let Parser.Error<UInt8>.unexpected(actual, index, expected: expected) = error else {
+            guard case let WAKit.StreamError<UInt8>.unexpected(actual, index, expected: expected) = error else {
                 return XCTFail("Unexpected error: \(error)")
             }
             XCTAssertEqual(actual, 1)
@@ -37,7 +37,7 @@ final class ByteStreamTests: XCTestCase {
         XCTAssertEqual(stream.peek(), nil)
 
         XCTAssertThrowsError(try stream.consume(3)) { error in
-            guard case Parser.Error<UInt8>.unexpectedEnd = error else {
+            guard case WAKit.StreamError<UInt8>.unexpectedEnd = error else {
                 return XCTFail("Unexpected error: \(error)")
             }
             XCTAssertEqual(stream.currentIndex, 2)
