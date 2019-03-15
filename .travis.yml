@@ -10,8 +10,7 @@ env:
   - PLATFORM='iOS'
 
 cache:
-  directories:
-    - /usr/local/lib/mint
+  directories: [/usr/local/lib/mint, Vendor/Mint/.build]
 
 script: make bootstrap test
 
