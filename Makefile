@@ -52,4 +52,7 @@ Sources/%/Generated: FORCE
     --templates $(TEMPLATES) \
     --output $@
 
+linuxmain: FORCE
+	@swift test --generate-linuxmain
+
 FORCE:
