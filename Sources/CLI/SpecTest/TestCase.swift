@@ -35,11 +35,11 @@ struct TestCase: Decodable {
     let sourceFilename: String
     let commands: [Command]
 
-    static func load(specs: [String], in path: String) throws -> [TestCase] {
-        let specs = specs.map { name in name.hasSuffix(".json") ? name : name + ".json" }
+    static func load(specs specFilter: [String], in path: String) throws -> [TestCase] {
+        let specFilter = specFilter.map { name in name.hasSuffix(".json") ? name : name + ".json" }
 
         let fileManager = FileManager.default
-        let filePaths = try fileManager.contentsOfDirectory(atPath: path).filter { $0.hasSuffix("json") }
+        let filePaths = try fileManager.contentsOfDirectory(atPath: path).filter { $0.hasSuffix("json") }.sorted()
         guard !filePaths.isEmpty else {
             return []
         }
@@ -48,7 +48,7 @@ struct TestCase: Decodable {
         jsonDecoder.keyDecodingStrategy = .convertFromSnakeCase
 
         var testCases: [TestCase] = []
-        for filePath in filePaths where specs.isEmpty || specs.contains(filePath) {
+        for filePath in filePaths where specFilter.isEmpty || specFilter.contains(filePath) {
             print("loading \(filePath)")
             guard let data = fileManager.contents(atPath: path + "/" + filePath) else {
                 assertionFailure("failed to load \(filePath)")
