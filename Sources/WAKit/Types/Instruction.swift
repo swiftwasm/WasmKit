@@ -51,7 +51,7 @@ enum ControlInstruction: Instruction {
     case `if`(ResultType, Expression, Expression)
     case br(LabelIndex)
     case brIf(LabelIndex)
-    case brTable([LabelIndex])
+    case brTable([LabelIndex], LabelIndex)
     case `return`
     case call(FunctionIndex)
     case callIndirect(TypeIndex)

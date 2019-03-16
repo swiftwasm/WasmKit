@@ -29,7 +29,42 @@ extension Runtime {
 
     /// - Note:
     /// <https://webassembly.github.io/spec/core/exec/instructions.html#invocation-of-function-address>
-    public func invoke(functionAddress address: FunctionAddress, with parameters: [Value]) throws -> [Value] {
+    func invoke(functionAddress address: FunctionAddress) throws {
+        let function = store.functions[address]
+        guard case let .some(parameterTypes, resultTypes) = function.type else {
+            throw Trap._raw("any type is not allowed here")
+        }
+
+        let locals = function.code.locals.map { $0.init() }
+        let expression = function.code.body
+
+        let parameters = (0 ..< parameterTypes.count).compactMap { _ in stack.pop() as? Value }
+        assert(parameters.count == parameterTypes.count)
+
+        let frame = Frame(arity: resultTypes.count, module: function.module, locals: parameters + locals)
+        stack.push(frame)
+
+        let blockInstruction = ControlInstruction.block(resultTypes, expression)
+        _ = try execute(blockInstruction)
+
+        let values = try (0 ..< frame.arity).map { _ in try stack.pop(Value.self) }
+
+        assert((try? stack.get(current: Frame.self)) == frame)
+        _ = try stack.pop(Frame.self)
+
+        stack.push(values)
+    }
+}
+
+extension Runtime {
+    public func invoke(_ moduleInstance: ModuleInstance, function: String, with parameters: [Value] = []) throws -> [Value] {
+        guard case let .function(address)? = moduleInstance.exports[function] else {
+            throw Trap.exportedFunctionNotFound(moduleInstance, name: function)
+        }
+        return try invoke(functionAddress: address, with: parameters)
+    }
+
+    func invoke(functionAddress address: FunctionAddress, with parameters: [Value]) throws -> [Value] {
         let function = store.functions[address]
         guard case let .some(parameterTypes, _) = function.type else {
             throw Trap._raw("any type is not allowed here")
@@ -54,32 +89,6 @@ extension Runtime {
         }
         return results
     }
-
-    func invoke(functionAddress address: FunctionAddress) throws {
-        let function = store.functions[address]
-        guard case let .some(parameterTypes, resultTypes) = function.type else {
-            throw Trap._raw("any type is not allowed here")
-        }
-
-        let locals = function.code.locals.map { $0.init() }
-        let expression = function.code.body
-
-        let parameters = (0 ..< parameterTypes.count).compactMap { _ in stack.pop() as? Value }
-        assert(parameters.count == parameterTypes.count)
-
-        let frame = Frame(arity: resultTypes.count, module: function.module, locals: parameters + locals)
-        stack.push(frame)
-
-        let blockInstruction = ControlInstruction.block(parameterTypes, expression)
-        _ = try execute(blockInstruction)
-
-        let values = try (0 ..< frame.arity).map { _ in try stack.pop(Value.self) }
-
-        assert((try? stack.get(current: Frame.self)) == frame)
-        _ = try stack.pop(Frame.self)
-
-        stack.push(values)
-    }
 }
 
 extension Runtime {
@@ -93,8 +102,6 @@ extension Runtime {
         let result: ExecutionResult
 
         switch instruction {
-        case let instruction as ControlInstruction:
-            result = try execute(control: instruction)
         case let instruction as NumericInstruction.Constant:
             try execute(numeric: instruction)
             result = .continue
@@ -107,9 +114,14 @@ extension Runtime {
         case let instruction as NumericInstruction.Conversion:
             try execute(numeric: instruction)
             result = .continue
+        case let instruction as ParametricInstruction:
+            try execute(parametric: instruction)
+            result = .continue
         case let instruction as VariableInstruction:
             try execute(variable: instruction)
             result = .continue
+        case let instruction as ControlInstruction:
+            result = try execute(control: instruction)
         default:
             throw Trap.unimplemented("\(instruction)")
         }
@@ -138,7 +150,10 @@ extension Runtime {
 
         switch result {
         case .continue:
-            let values = try (0 ..< label.arity).map { _ in try stack.pop(Value.self) }
+            var values: [Value] = []
+            while stack.peek() is Value {
+                values.append(try stack.pop(Value.self))
+            }
             let _label = try stack.pop(Label.self)
             assert(label == _label)
             stack.push(values)

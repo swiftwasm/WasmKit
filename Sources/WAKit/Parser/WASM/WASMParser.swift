@@ -222,20 +222,24 @@ extension WASMParser {
             return ControlInstruction.nop
         case 0x02:
             let type = try parseResultType()
-            let expression = try parseExpression()
+            let (expression, _) = try parseExpression()
             return ControlInstruction.block(type, expression)
         case 0x03:
             let type = try parseResultType()
-            let expression = try parseExpression()
+            let (expression, _) = try parseExpression()
             return ControlInstruction.loop(type, expression)
         case 0x04:
             let type = try parseResultType()
-            let ifExpression = try parseExpression()
-            guard stream.peek() == 0x05 /* else */ else {
+            let (ifExpression, lastInstruction) = try parseExpression()
+            switch lastInstruction {
+            case PseudoInstruction.else:
+                let (elseExpression, _) = try parseExpression()
+                return ControlInstruction.if(type, ifExpression, elseExpression)
+            case PseudoInstruction.end:
                 return ControlInstruction.if(type, ifExpression, Expression())
+            default: preconditionFailure("should never reach here")
             }
-            let elseExpression = try parseExpression()
-            return ControlInstruction.if(type, ifExpression, elseExpression)
+
         case 0x05:
             return PseudoInstruction.else
         case 0x0B:
@@ -247,8 +251,9 @@ extension WASMParser {
             let label: UInt32 = try parseUnsigned()
             return ControlInstruction.brIf(label)
         case 0x0E:
-            let labels: [UInt32] = try parseVector { try parseUnsigned() }
-            return ControlInstruction.brTable(labels)
+            let labelIndices: [UInt32] = try parseVector { try parseUnsigned() }
+            let labelIndex: UInt32 = try parseUnsigned()
+            return ControlInstruction.brTable(labelIndices, labelIndex)
         case 0x0F:
             return ControlInstruction.return
         case 0x10:
@@ -656,7 +661,7 @@ extension WASMParser {
         }
     }
 
-    func parseExpression() throws -> Expression {
+    func parseExpression() throws -> (expression: Expression, lastInstruction: Instruction) {
         var instructions = [Instruction]()
         var instruction: Instruction
 
@@ -665,11 +670,9 @@ extension WASMParser {
             guard
                 !instruction.isEqual(to: PseudoInstruction.else),
                 !instruction.isEqual(to: PseudoInstruction.end)
-            else { break }
+            else { return (expression: Expression(instructions: instructions), lastInstruction: instruction) }
             instructions.append(instruction)
         }
-
-        return Expression(instructions: instructions)
     }
 }
 
@@ -771,7 +774,7 @@ extension WASMParser {
 
         return .global(try parseVector {
             let type = try parseGlobalType()
-            let expression = try parseExpression()
+            let (expression, _) = try parseExpression()
             return Global(type: type, initializer: expression)
         })
     }
@@ -824,7 +827,7 @@ extension WASMParser {
 
         return .element(try parseVector {
             let table: UInt32 = try parseUnsigned()
-            let expression = try parseExpression()
+            let (expression, _) = try parseExpression()
             let initializer: [UInt32] = try parseVector { try parseUnsigned() }
             return Element(table: table, offset: expression, initializer: initializer)
         })
@@ -837,13 +840,13 @@ extension WASMParser {
         /* size */ _ = try parseUnsigned() as UInt32
 
         return .code(try parseVector {
-            /* size */ _ = try parseUnsigned() as UInt32
+            _ = try parseUnsigned() as UInt32
             let locals = try parseVector { () -> [ValueType] in
                 let n: UInt32 = try parseUnsigned()
                 let t = try parseValueType()
                 return (0 ..< n).map { _ in t }
             }
-            let expression = try parseExpression()
+            let (expression, _) = try parseExpression()
             return Code(locals: locals.flatMap { $0 }, expression: expression)
         })
     }
@@ -856,7 +859,7 @@ extension WASMParser {
 
         return .data(try parseVector {
             let data: UInt32 = try parseUnsigned()
-            let offset = try parseExpression()
+            let (offset, _) = try parseExpression()
             let initializer = try parseVector { try stream.consumeAny() }
             return Data(data: data, offset: offset, initializer: initializer)
         })

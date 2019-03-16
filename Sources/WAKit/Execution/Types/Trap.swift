@@ -15,7 +15,8 @@ public enum Trap: Error {
     case globalIndexOutOfRange(index: UInt32)
     case globalImmutable(index: UInt32)
 
-    // Instruction
+    // Invocation
+    case exportedFunctionNotFound(ModuleInstance, name: String)
     case invalidTypeForInstruction(Any.Type, Instruction)
 
     static func unimplemented(_ description: String = "", file: StaticString = #file, line: UInt = #line) -> Trap {

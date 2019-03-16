@@ -107,7 +107,9 @@ internal func == (lhs: ControlInstruction, rhs: ControlInstruction) -> Bool {
     case (.brIf(let lhs), .brIf(let rhs)):
         return lhs == rhs
     case (.brTable(let lhs), .brTable(let rhs)):
-        return lhs == rhs
+        if lhs.0 != rhs.0 { return false }
+        if lhs.1 != rhs.1 { return false }
+        return true
     case (.`return`, .`return`):
         return true
     case (.call(let lhs), .call(let rhs)):

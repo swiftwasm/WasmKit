@@ -267,11 +267,30 @@ extension WASMParserTests {
         var stream: StaticByteStream!
         var parser: WASMParser<StaticByteStream>!
 
-        stream = StaticByteStream(bytes: [0x01, 0x0B])
+        stream = StaticByteStream(bytes: [0x41, 0x01, 0x04, 0x7F, 0x02, 0x7F, 0x41, 0x01, 0x0B, 0x05, 0x41, 0x02, 0x0B, 0x0B])
         parser = WASMParser(stream: stream)
-        XCTAssertEqual(try parser.parseExpression(), Expression(instructions: [
-            ControlInstruction.nop,
-        ]))
+        do {
+            let (expression, lastInstruction) = try parser.parseExpression()
+            XCTAssertEqual(expression, Expression(instructions: [
+                NumericInstruction.Constant.const(I32(1)),
+                ControlInstruction.if(
+                    [I32.self],
+                    Expression(instructions: [
+                        ControlInstruction.block(
+                            [I32.self],
+                            Expression(instructions: [
+                                NumericInstruction.Constant.const(I32(1))
+                                ]))
+                        ]),
+                    Expression(instructions: [
+                        NumericInstruction.Constant.const(I32(2))
+                        ])),
+                ])
+            )
+            XCTAssert(lastInstruction.isEqual(to: PseudoInstruction.end))
+        } catch let error {
+            XCTFail("\(error)")
+        }
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
     }
 }
