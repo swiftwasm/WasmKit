@@ -169,6 +169,8 @@ extension Swift.Error {
                 return "magic header not detected"
             case .unknownVersion:
                 return "unknown binary version"
+            case .invalidUTF8:
+                return "invalid UTF-8 encoding"
             case .zeroExpected:
                 return "zero flag expected"
             case .inconsistentFunctionAndCodeLength:

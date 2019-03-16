@@ -66,7 +66,7 @@ extension WASMParserTests {
         stream = StaticByteStream(bytes: [0x02, 0xDF, 0xFF])
         parser = WASMParser(stream: stream)
         XCTAssertThrowsError(_ = try parser.parseName()) { error in
-            guard case let WASMParserError.invalidUnicode(unicode) = error else {
+            guard case let WASMParserError.invalidUTF8(unicode) = error else {
                 return XCTFail("Unexpected error: \(error)")
             }
             XCTAssertEqual(unicode, [0xDF, 0xFF])

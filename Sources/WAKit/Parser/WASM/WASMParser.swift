@@ -23,7 +23,7 @@ extension WASMParser {
 public enum WASMParserError: Swift.Error {
     case invalidMagicNumber([UInt8])
     case unknownVersion([UInt8])
-    case invalidUnicode([UInt8])
+    case invalidUTF8([UInt8])
     case invalidSectionSize(UInt32)
     case zeroExpected(actual: UInt8, index: Int)
     case inconsistentFunctionAndCodeLength(functionCount: Int, codeCount: Int)
@@ -99,7 +99,7 @@ extension WASMParser {
             switch decoder.decode(&iterator) {
             case let .scalarValue(scalar): name.append(Character(scalar))
             case .emptyInput: break Decode
-            case .error: throw WASMParserError.invalidUnicode(bytes)
+            case .error: throw WASMParserError.invalidUTF8(bytes)
             }
         }
 
