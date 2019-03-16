@@ -42,12 +42,6 @@ final class RunCommand: Command {
         let runtime = Runtime()
         let moduleInstance = try runtime.instantiate(module: module, externalValues: [])
 
-        guard case let .function(address)? = moduleInstance.exports[functionName] else {
-            logger.errorMessage("Function with name \"\(functionName)\" not found")
-            dump(moduleInstance.exports)
-            return
-        }
-
         var parameters: [Value] = []
         for argument in arguments.value {
             let parameter: Value
@@ -66,7 +60,7 @@ final class RunCommand: Command {
         logger.eventMessage("Started invoking function \"\(functionName)\" with parameters: \(parameters)")
 
         let (results, invokeTime) = try measure(if: isVerbose) {
-            try runtime.invoke(functionAddress: address, with: parameters)
+            try runtime.invoke(moduleInstance, function: functionName, with: parameters)
         }
 
         logger.infoMessage("Ended invoking function \"\(functionName)\": \(invokeTime)")
