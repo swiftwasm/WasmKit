@@ -21,6 +21,7 @@ public enum Trap: Error {
     case importsAndExternalValuesMismatch
     case tableUninitialized
     case callIndirectFunctionTypeMismatch(actual: FunctionType, expected: FunctionType)
+    case memoryOverflow
 
     static func unimplemented(_ description: String = "", file: StaticString = #file, line: UInt = #line) -> Trap {
         return ._unimplemented(description: description, file: file, line: line)

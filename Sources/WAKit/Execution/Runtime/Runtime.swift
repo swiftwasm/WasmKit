@@ -181,6 +181,9 @@ extension Runtime {
         case let instruction as VariableInstruction:
             try execute(variable: instruction)
             result = .continue
+        case let instruction as MemoryInstruction:
+            try execute(memory: instruction)
+            result = .continue
         case let instruction as ControlInstruction:
             result = try execute(control: instruction)
         default:

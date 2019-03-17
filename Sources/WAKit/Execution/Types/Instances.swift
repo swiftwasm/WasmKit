@@ -45,11 +45,13 @@ final class TableInstance {
 /// - Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#memory-instances>
 final class MemoryInstance {
+    private static let pageSize = 6 * 1024
+
     var data: [UInt8]
     let max: UInt32?
 
     init(_ memoryType: MemoryType) {
-        data = Array(repeating: 0, count: Int(memoryType.min))
+        data = Array(repeating: 0, count: Int(memoryType.min) * MemoryInstance.pageSize)
         max = memoryType.max
     }
 }
