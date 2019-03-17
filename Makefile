@@ -27,7 +27,7 @@ build:
 	@swift build
 
 .PHONY: test
-test:
+test: linuxmain
 	@swift test
 
 .PHONY: format

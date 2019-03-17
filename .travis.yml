@@ -15,12 +15,6 @@ branches:
 cache:
   directories: [/usr/local/lib/mint, Vendor/Mint/.build]
 
-before_script:
-  - |
-    if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
-      make linux
-    fi
-
 script: make bootstrap test
 
 after_script:
