@@ -19,8 +19,6 @@ let package = Package(
         .package(url: "https://github.com/jakeheis/SwiftCLI", from: "5.0.0"),
         .package(url: "https://github.com/onevcat/Rainbow", from: "3.1.4"),
         .package(url: "https://github.com/Nike-Inc/Willow", from: "5.1.0"),
-        .package(url: "https://github.com/Quick/Quick", from: "2.0.0"),
-        .package(url: "https://github.com/Quick/Nimble", from: "8.0.0"),
     ],
     targets: [
         .target(
@@ -30,7 +28,7 @@ let package = Package(
         ),
         .testTarget(
             name: "WAKitTests",
-            dependencies: ["WAKit", "Quick", "Nimble"],
+            dependencies: ["WAKit"],
             path: "./Tests/WAKitTests"
         ),
         .target(
