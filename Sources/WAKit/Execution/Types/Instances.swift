@@ -33,12 +33,11 @@ final class FunctionInstance {
 /// - Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#table-instances>
 final class TableInstance {
-    var elements: [FunctionAddress]
+    var elements: [FunctionAddress?]
     let max: UInt32?
 
     init(_ tableType: TableType) {
-        elements = []
-        elements.reserveCapacity(Int(tableType.limits.min))
+        elements = Array(repeating: nil, count: Int(tableType.limits.min))
         max = tableType.limits.max
     }
 }
@@ -46,7 +45,7 @@ final class TableInstance {
 /// - Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#memory-instances>
 final class MemoryInstance {
-    let data: [UInt8]
+    var data: [UInt8]
     let max: UInt32?
 
     init(_ memoryType: MemoryType) {
@@ -61,8 +60,8 @@ final class GlobalInstance {
     var value: Value
     let mutability: Mutability
 
-    init(globalType: GlobalType) {
-        value = globalType.valueType.init()
+    init(globalType: GlobalType, initialValue: Value) {
+        value = initialValue
         mutability = globalType.mutability
     }
 }

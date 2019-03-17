@@ -12,19 +12,81 @@ extension Runtime {
     /// - Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#instantiation>
     public func instantiate(module: Module, externalValues: [ExternalValue]) throws -> ModuleInstance {
-        // TODO: validate module and external values
-        // TODO: initialize globals
+        guard module.imports.count == externalValues.count else {
+            throw Trap.importsAndExternalValuesMismatch
+        }
 
-        let instance = store.allocate(module: module, externalValues: externalValues)
+        let isValid = zip(module.imports, externalValues).map { (i, e) -> Bool in
+            switch (i.descripter, e) {
+            case (.function, .function),
+                 (.table, .table),
+                 (.memory, .memory),
+                 (.global, .global): return true
+            default: return false
+            }
+        }.reduce(true) { $0 && $1 }
 
-//        store.initializeElements(stack: stack)
-//        store.initializeData(stack: stack)
+        guard isValid else {
+            throw Trap.importsAndExternalValuesMismatch
+        }
+
+        let initialGlobals = try evaluateGlobals(module: module, externalValues: externalValues)
+
+        let instance = store.allocate(
+            module: module,
+            externalValues: externalValues,
+            initialGlobals: initialGlobals
+        )
+
+        let frame = Frame(arity: 0, module: instance, locals: [])
+        stack.push(frame)
+
+        assert(module.elements.count <= store.tables.count)
+        for (element, tableInstance) in zip(module.elements, store.tables) {
+            let offset = try Int(evaluate(expression: element.offset, resultType: I32.self).rawValue)
+            let end = offset + element.initializer.count
+            tableInstance.elements.replaceSubrange(offset ..< end, with: element.initializer.map { instance.functionAddresses[Int($0)] })
+        }
+
+        assert(module.data.count <= store.memories.count)
+        for (data, memoryInstance) in zip(module.data, store.memories) {
+            let offset = try Int(evaluate(expression: data.offset, resultType: I32.self).rawValue)
+            let end = Int(offset) + data.initializer.count
+
+            memoryInstance.data.replaceSubrange(offset ..< end, with: data.initializer)
+        }
+
+        try stack.pop(Frame.self)
 
         if let startIndex = module.start {
             try invoke(functionAddress: instance.functionAddresses[Int(startIndex)])
         }
 
         return instance
+    }
+
+    private func evaluateGlobals(module: Module, externalValues: [ExternalValue]) throws -> [Value] {
+        let globalModuleInstance = ModuleInstance()
+        globalModuleInstance.globalAddresses = externalValues.compactMap {
+            guard case let .global(address) = $0 else { return nil }
+            return address
+        }
+        let frame = Frame(arity: 0, module: globalModuleInstance, locals: [])
+        stack.push(frame)
+
+        let globalInitializers = try module.globals.map {
+            try evaluate(expression: $0.initializer, resultType: Value.self)
+        }
+
+        try stack.pop(Frame.self)
+
+        return globalInitializers
+    }
+
+    private func initializeElements(module: Module, instance: ModuleInstance) throws -> [Int] {
+        return try module.elements.map {
+            try Int(evaluate(expression: $0.offset, resultType: I32.self).rawValue)
+        }
     }
 
     /// - Note:
@@ -164,5 +226,10 @@ extension Runtime {
         case .return:
             throw Trap.unimplemented()
         }
+    }
+
+    func evaluate<V: Value>(expression: Expression, resultType: V.Type) throws -> V {
+        _ = try execute(expression.instructions)
+        return try stack.pop(V.self)
     }
 }
