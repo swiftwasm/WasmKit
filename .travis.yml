@@ -24,13 +24,7 @@ before_script:
 script: make bootstrap test
 
 after_script:
-  - |
-    if [ -z "$(git status --porcelain)" ]; then
-      echo 'Working directory is clean'
-    else
-      echo 'Uncommitted changes'
-      exit 1
-    fi
+  - make ensure_clean
 
 notifications:
   email: false

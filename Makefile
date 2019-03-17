@@ -55,4 +55,10 @@ Sources/%/Generated: FORCE
 linuxmain: FORCE
 	@swift test --generate-linuxmain
 
+GIT_STATUS = $(shell git status --porcelain)
+ensure_clean:
+	@[ -z "$(GIT_STATUS)" ] \
+    && echo Working directory is clean \
+	|| printf "Uncommitted changes: \n $(GIT_STATUS)\n"; exit 1;
+
 FORCE:
