@@ -53,6 +53,14 @@ extension Stack {
         return value
     }
 
+    mutating func pop<T: Stackable>(_ type: T.Type, count: Int) throws -> [T] {
+        var values: [T] = []
+        for _ in 0 ..< count {
+            values.insert(try pop(type), at: 0)
+        }
+        return values
+    }
+
     mutating func push(_ entries: [Stackable]) {
         for entry in entries {
             push(entry)

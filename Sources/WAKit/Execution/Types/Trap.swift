@@ -19,6 +19,8 @@ public enum Trap: Error {
     case exportedFunctionNotFound(ModuleInstance, name: String)
     case invalidTypeForInstruction(Any.Type, Instruction)
     case importsAndExternalValuesMismatch
+    case tableUninitialized
+    case callIndirectFunctionTypeMismatch(actual: FunctionType, expected: FunctionType)
 
     static func unimplemented(_ description: String = "", file: StaticString = #file, line: UInt = #line) -> Trap {
         return ._unimplemented(description: description, file: file, line: line)

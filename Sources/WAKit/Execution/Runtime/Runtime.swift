@@ -100,8 +100,7 @@ extension Runtime {
         let locals = function.code.locals.map { $0.init() }
         let expression = function.code.body
 
-        let parameters = (0 ..< parameterTypes.count).compactMap { _ in stack.pop() as? Value }
-        assert(parameters.count == parameterTypes.count)
+        let parameters = try stack.pop(Value.self, count: parameterTypes.count)
 
         let frame = Frame(arity: resultTypes.count, module: function.module, locals: parameters + locals)
         stack.push(frame)
@@ -109,7 +108,7 @@ extension Runtime {
         let blockInstruction = ControlInstruction.block(resultTypes, expression)
         _ = try execute(blockInstruction)
 
-        let values = try (0 ..< frame.arity).map { _ in try stack.pop(Value.self) }
+        let values = try stack.pop(Value.self, count: frame.arity)
 
         assert((try? stack.get(current: Frame.self)) == frame)
         _ = try stack.pop(Frame.self)

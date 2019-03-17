@@ -261,6 +261,10 @@ extension WASMParser {
             return ControlInstruction.call(index)
         case 0x11:
             let index: UInt32 = try parseUnsigned()
+            let zero = try stream.consumeAny()
+            guard zero == 0x00 else {
+                throw WASMParserError.zeroExpected(actual: zero, index: currentIndex)
+            }
             return ControlInstruction.callIndirect(index)
 
         case 0x1A:

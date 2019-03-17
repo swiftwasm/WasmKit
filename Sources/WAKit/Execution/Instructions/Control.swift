@@ -28,7 +28,7 @@ extension Runtime {
 
         case let .br(labelIndex):
             let label = try stack.get(Label.self, index: Int(labelIndex))
-            let values = try (0 ..< label.arity).map { _ in try stack.pop(Value.self) }
+            let values = try stack.pop(Value.self, count: label.arity)
             for _ in 0 ... labelIndex {
                 while stack.peek() is Value {
                     _ = stack.pop()
@@ -59,6 +59,22 @@ extension Runtime {
         case let .call(functionIndex):
             let frame = try stack.get(current: Frame.self)
             let functionAddress = frame.module.functionAddresses[Int(functionIndex)]
+            try invoke(functionAddress: functionAddress)
+
+        case let .callIndirect(typeIndex):
+            let frame = try stack.get(current: Frame.self)
+            let module = frame.module
+            let tableAddresses = module.tableAddresses[0]
+            let tableInstance = store.tables[tableAddresses]
+            let expectedType = module.types[Int(typeIndex)]
+            let value = try Int(stack.pop(I32.self).rawValue)
+            guard let functionAddress = tableInstance.elements[value] else {
+                throw Trap.tableUninitialized
+            }
+            let function = store.functions[functionAddress]
+            guard function.type == expectedType else {
+                throw Trap.callIndirectFunctionTypeMismatch(actual: function.type, expected: expectedType)
+            }
             try invoke(functionAddress: functionAddress)
 
         default:
