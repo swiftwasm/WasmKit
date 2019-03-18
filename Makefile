@@ -30,6 +30,10 @@ build:
 test: linuxmain
 	@swift test
 
+.PHONY: spectest
+spectest:
+	swift run wakit spectest $(SPECTEST_PATH)/generated
+
 .PHONY: format
 format:
 	$(SWIFTFORMAT) Sources Tests --exclude **/Generated

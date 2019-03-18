@@ -4,6 +4,9 @@ os: [osx, linux]
 osx_image: xcode10.1
 dist: xenial
 
+env:
+  - SPECTEST_PATH=/tmp/wast_wasm
+
 matrix:
   allow_failures:
     - os: linux
@@ -15,10 +18,13 @@ branches:
 cache:
   directories: [/usr/local/lib/mint, Vendor/Mint/.build]
 
-script: make bootstrap test
+before_script: git clone https://github.com/akkyie/wast-wasm $SPECTEST_PATH
 
-after_script:
-  - make ensure_clean
+script:
+  - make bootstrap test
+  - make spectest
+
+after_script: make ensure_clean
 
 notifications:
   email: false
