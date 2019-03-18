@@ -17,7 +17,7 @@ final class Store {
 extension Store {
     /// - Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-module>
-    func allocate(module: Module, externalValues: [ExternalValue]) -> ModuleInstance {
+    func allocate(module: Module, externalValues: [ExternalValue], initialGlobals: [Value]) -> ModuleInstance {
         let moduleInstance = ModuleInstance()
 
         moduleInstance.types = module.types
@@ -37,8 +37,9 @@ extension Store {
             moduleInstance.memoryAddresses.append(address)
         }
 
-        for global in module.globals {
-            let address = allocate(globalType: global.type)
+        assert(module.globals.count == initialGlobals.count)
+        for (global, initialValue) in zip(module.globals, initialGlobals) {
+            let address = allocate(globalType: global.type, initialValue: initialValue)
             moduleInstance.globalAddresses.append(address)
         }
 
@@ -92,19 +93,11 @@ extension Store {
 
     /// - Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-global>
-    func allocate(globalType: GlobalType) -> GlobalAddress {
+    func allocate(globalType: GlobalType, initialValue: Value) -> GlobalAddress {
         let address = globals.count
-        let instance = GlobalInstance(globalType: globalType)
+        let instance = GlobalInstance(globalType: globalType, initialValue: initialValue)
         globals.append(instance)
         return address
-    }
-
-    func initializeElements(stack _: Stack) throws {
-        throw Trap.unimplemented("initializeElements")
-    }
-
-    func initializeData(stack _: Stack) throws {
-        throw Trap.unimplemented("initializeData")
     }
 }
 

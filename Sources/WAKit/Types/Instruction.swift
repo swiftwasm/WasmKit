@@ -51,7 +51,7 @@ enum ControlInstruction: Instruction {
     case `if`(ResultType, Expression, Expression)
     case br(LabelIndex)
     case brIf(LabelIndex)
-    case brTable([LabelIndex])
+    case brTable([LabelIndex], LabelIndex)
     case `return`
     case call(FunctionIndex)
     case callIndirect(TypeIndex)
@@ -81,25 +81,20 @@ enum VariableInstruction: Instruction, Equatable {
 /// <https://webassembly.github.io/spec/core/binary/instructions.html#memory-instructions>
 // sourcery: AutoEquatable
 enum MemoryInstruction: Instruction {
-    struct MemoryArgument: Equatable {
-        let min: UInt32
-        let max: UInt32
-    }
-
     case currentMemory
     case growMemory
 
-    case load(ValueType, MemoryArgument)
-    case load8s(ValueType, MemoryArgument)
-    case load8u(ValueType, MemoryArgument)
-    case load16s(ValueType, MemoryArgument)
-    case load16u(ValueType, MemoryArgument)
-    case load32s(ValueType, MemoryArgument)
-    case load32u(ValueType, MemoryArgument)
-    case store(ValueType, MemoryArgument)
-    case store8(ValueType, MemoryArgument)
-    case store16(ValueType, MemoryArgument)
-    case store32(ValueType, MemoryArgument)
+    case load(ValueType, offset: UInt32, alignment: UInt32)
+    case load8s(ValueType, offset: UInt32, alignment: UInt32)
+    case load8u(ValueType, offset: UInt32, alignment: UInt32)
+    case load16s(ValueType, offset: UInt32, alignment: UInt32)
+    case load16u(ValueType, offset: UInt32, alignment: UInt32)
+    case load32s(ValueType, offset: UInt32, alignment: UInt32)
+    case load32u(ValueType, offset: UInt32, alignment: UInt32)
+    case store(ValueType, offset: UInt32, alignment: UInt32)
+    case store8(ValueType, offset: UInt32, alignment: UInt32)
+    case store16(ValueType, offset: UInt32, alignment: UInt32)
+    case store32(ValueType, offset: UInt32, alignment: UInt32)
 }
 
 /// Numeric Instructions

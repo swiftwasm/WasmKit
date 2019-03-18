@@ -4,6 +4,9 @@ os: [osx, linux]
 osx_image: xcode10.1
 dist: xenial
 
+env:
+  - SPECTEST_PATH=/tmp/wast_wasm
+
 matrix:
   allow_failures:
     - os: linux
@@ -15,22 +18,16 @@ branches:
 cache:
   directories: [/usr/local/lib/mint, Vendor/Mint/.build]
 
-before_script:
-  - |
-    if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
-      make linux
-    fi
+before_script: |
+  git clone --depth 1 https://github.com/akkyie/wast-wasm $SPECTEST_PATH
 
-script: make bootstrap test
+script:
+  - make bootstrap test
+  - make format
+  - make ensure_clean
 
-after_script:
-  - |
-    if [ -z "$(git status --porcelain)" ]; then
-      echo 'Working directory is clean'
-    else
-      echo 'Uncommitted changes'
-      exit 1
-    fi
+after_success:
+  - make spectest
 
 notifications:
   email: false

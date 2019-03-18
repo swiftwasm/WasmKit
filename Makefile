@@ -8,6 +8,8 @@ MODULES = $(notdir $(wildcard Sources/*))
 TEMPLATES = $(wildcard Templates/*.stencil)
 GENERATED_DIRS = $(foreach MODULE, $(MODULES), Sources/$(MODULE)/Generated)
 
+SWIFT_VERSION = $(shell cat .swift-version)
+
 .PHONY: all
 all: bootstrap project build
 
@@ -27,12 +29,16 @@ build:
 	@swift build
 
 .PHONY: test
-test:
+test: linuxmain
 	@swift test
+
+.PHONY: spectest
+spectest:
+	swift run wakit spectest $(SPECTEST_PATH)/generated
 
 .PHONY: format
 format:
-	$(SWIFTFORMAT) Sources Tests --exclude **/Generated
+	$(SWIFTFORMAT) --swiftversion $(SWIFT_VERSION) Sources Tests --exclude **/Generated
 
 .PHONY: clean
 clean:
@@ -54,5 +60,11 @@ Sources/%/Generated: FORCE
 
 linuxmain: FORCE
 	@swift test --generate-linuxmain
+
+GIT_STATUS = $(shell git status --porcelain)
+ensure_clean:
+	@[ -z "$(GIT_STATUS)" ] \
+    && echo Working directory is clean \
+	|| (printf "Uncommitted changes: \n $(GIT_STATUS)\n" && exit 1)
 
 FORCE:

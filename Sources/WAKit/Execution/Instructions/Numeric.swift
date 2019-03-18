@@ -31,7 +31,7 @@ extension Runtime {
         case let value as F64:
             result = try operate(F64.self, instruction, value)
         default:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         }
 
         stack.push(result)
@@ -52,7 +52,7 @@ extension Runtime {
         case let (value1, value2) as (F64, F64):
             result = try operate(F64.self, instruction, value1, value2)
         default:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         }
 
         stack.push(result)
@@ -73,7 +73,7 @@ extension Runtime {
         case let value as F64:
             result = try operate(F64.self, type2, instruction, value)
         default:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         }
 
         stack.push(result)
@@ -83,18 +83,18 @@ extension Runtime {
 extension Runtime {
     fileprivate func operate<V: RawRepresentableValue>(
         _: V.Type,
-        _: NumericInstruction.Unary,
+        _ instruction: NumericInstruction.Unary,
         _: V
     ) throws -> Value where V.RawValue: RawUnsignedInteger {
-        throw Trap.unimplemented()
+        throw Trap.unimplemented("\(instruction)")
     }
 
     fileprivate func operate<V: RawRepresentableValue>(
         _: V.Type,
-        _: NumericInstruction.Unary,
+        _ instruction: NumericInstruction.Unary,
         _: V
     ) throws -> Value where V.RawValue: RawFloatingPoint {
-        throw Trap.unimplemented()
+        throw Trap.unimplemented("\(instruction)")
     }
 }
 
@@ -109,78 +109,78 @@ extension Runtime {
             let (result, _) = value1.rawValue.addingReportingOverflow(value2.rawValue)
             return V(V.RawValue(result))
         case .sub:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         case .mul:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         case .divS:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         case .divU:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         case .remS:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         case .remU:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         case .and:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         case .or:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         case .xor:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         case .shl:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         case .shrS:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         case .shrU:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         case .rotl:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         case .rotr:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         case .div:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         case .min:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         case .max:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         case .copysign:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         case .eq:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         case .ne:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         case .ltS:
             return I32(value1.signed < value2.signed ? 1 : 0)
         case .ltU:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         case .gtS:
             return I32(value1.signed > value2.signed ? 1 : 0)
         case .gtU:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         case .leS:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         case .leU:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         case .geS:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         case .geU:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         case .lt:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         case .gt:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         case .le:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         case .ge:
-            throw Trap.unimplemented()
+            throw Trap.unimplemented("\(instruction)")
         }
     }
 
     fileprivate func operate<V: RawRepresentableValue>(
         _: V.Type,
-        _: NumericInstruction.Binary,
+        _ instruction: NumericInstruction.Binary,
         _: V, _: V
     ) throws -> Value where V.RawValue: RawFloatingPoint {
-        throw Trap.unimplemented()
+        throw Trap.unimplemented("\(instruction)")
     }
 }
 
@@ -188,9 +188,9 @@ extension Runtime {
     fileprivate func operate<V1: RawRepresentableValue, V2: Value>(
         _: V1.Type,
         _: V2.Type,
-        _: NumericInstruction.Conversion,
+        _ instruction: NumericInstruction.Conversion,
         _: V1
     ) throws -> V2 {
-        throw Trap.unimplemented()
+        throw Trap.unimplemented("\(instruction)")
     }
 }

@@ -17,9 +17,18 @@ extension Runtime {
             let label = Label(arity: 0, continuation: [instruction])
             try enterBlock(instructions: expression.instructions, label: label)
 
+        case let .if(type, trueExpression, falseExpression):
+            let condition = try stack.pop(I32.self)
+            let label = Label(arity: type.count, continuation: [])
+            if condition != 0 {
+                try enterBlock(instructions: trueExpression.instructions, label: label)
+            } else {
+                try enterBlock(instructions: falseExpression.instructions, label: label)
+            }
+
         case let .br(labelIndex):
             let label = try stack.get(Label.self, index: Int(labelIndex))
-            let values = try (0 ..< label.arity).map { _ in try stack.pop(Value.self) }
+            let values = try stack.pop(Value.self, count: label.arity)
             for _ in 0 ... labelIndex {
                 while stack.peek() is Value {
                     _ = stack.pop()
@@ -37,9 +46,35 @@ extension Runtime {
                 return try execute(control: .br(labelIndex))
             }
 
+        case let .brTable(labelIndices, defaultLabelIndex):
+            let value = try stack.pop(I32.self)
+            let labelIndex: LabelIndex
+            if labelIndices.indices.contains(Int(value.rawValue)) {
+                labelIndex = labelIndices[Int(value.rawValue)]
+            } else {
+                labelIndex = defaultLabelIndex
+            }
+            return try execute(control: .br(labelIndex))
+
         case let .call(functionIndex):
             let frame = try stack.get(current: Frame.self)
             let functionAddress = frame.module.functionAddresses[Int(functionIndex)]
+            try invoke(functionAddress: functionAddress)
+
+        case let .callIndirect(typeIndex):
+            let frame = try stack.get(current: Frame.self)
+            let module = frame.module
+            let tableAddresses = module.tableAddresses[0]
+            let tableInstance = store.tables[tableAddresses]
+            let expectedType = module.types[Int(typeIndex)]
+            let value = try Int(stack.pop(I32.self).rawValue)
+            guard let functionAddress = tableInstance.elements[value] else {
+                throw Trap.tableUninitialized
+            }
+            let function = store.functions[functionAddress]
+            guard function.type == expectedType else {
+                throw Trap.callIndirectFunctionTypeMismatch(actual: function.type, expected: expectedType)
+            }
             try invoke(functionAddress: functionAddress)
 
         default:

@@ -107,7 +107,9 @@ internal func == (lhs: ControlInstruction, rhs: ControlInstruction) -> Bool {
     case (.brIf(let lhs), .brIf(let rhs)):
         return lhs == rhs
     case (.brTable(let lhs), .brTable(let rhs)):
-        return lhs == rhs
+        if lhs.0 != rhs.0 { return false }
+        if lhs.1 != rhs.1 { return false }
+        return true
     case (.`return`, .`return`):
         return true
     case (.call(let lhs), .call(let rhs)):
@@ -155,47 +157,58 @@ internal func == (lhs: MemoryInstruction, rhs: MemoryInstruction) -> Bool {
         return true
     case (.load(let lhs), .load(let rhs)):
         if lhs.0 != rhs.0 { return false }
-        if lhs.1 != rhs.1 { return false }
+        if lhs.offset != rhs.offset { return false }
+        if lhs.alignment != rhs.alignment { return false }
         return true
     case (.load8s(let lhs), .load8s(let rhs)):
         if lhs.0 != rhs.0 { return false }
-        if lhs.1 != rhs.1 { return false }
+        if lhs.offset != rhs.offset { return false }
+        if lhs.alignment != rhs.alignment { return false }
         return true
     case (.load8u(let lhs), .load8u(let rhs)):
         if lhs.0 != rhs.0 { return false }
-        if lhs.1 != rhs.1 { return false }
+        if lhs.offset != rhs.offset { return false }
+        if lhs.alignment != rhs.alignment { return false }
         return true
     case (.load16s(let lhs), .load16s(let rhs)):
         if lhs.0 != rhs.0 { return false }
-        if lhs.1 != rhs.1 { return false }
+        if lhs.offset != rhs.offset { return false }
+        if lhs.alignment != rhs.alignment { return false }
         return true
     case (.load16u(let lhs), .load16u(let rhs)):
         if lhs.0 != rhs.0 { return false }
-        if lhs.1 != rhs.1 { return false }
+        if lhs.offset != rhs.offset { return false }
+        if lhs.alignment != rhs.alignment { return false }
         return true
     case (.load32s(let lhs), .load32s(let rhs)):
         if lhs.0 != rhs.0 { return false }
-        if lhs.1 != rhs.1 { return false }
+        if lhs.offset != rhs.offset { return false }
+        if lhs.alignment != rhs.alignment { return false }
         return true
     case (.load32u(let lhs), .load32u(let rhs)):
         if lhs.0 != rhs.0 { return false }
-        if lhs.1 != rhs.1 { return false }
+        if lhs.offset != rhs.offset { return false }
+        if lhs.alignment != rhs.alignment { return false }
         return true
     case (.store(let lhs), .store(let rhs)):
         if lhs.0 != rhs.0 { return false }
-        if lhs.1 != rhs.1 { return false }
+        if lhs.offset != rhs.offset { return false }
+        if lhs.alignment != rhs.alignment { return false }
         return true
     case (.store8(let lhs), .store8(let rhs)):
         if lhs.0 != rhs.0 { return false }
-        if lhs.1 != rhs.1 { return false }
+        if lhs.offset != rhs.offset { return false }
+        if lhs.alignment != rhs.alignment { return false }
         return true
     case (.store16(let lhs), .store16(let rhs)):
         if lhs.0 != rhs.0 { return false }
-        if lhs.1 != rhs.1 { return false }
+        if lhs.offset != rhs.offset { return false }
+        if lhs.alignment != rhs.alignment { return false }
         return true
     case (.store32(let lhs), .store32(let rhs)):
         if lhs.0 != rhs.0 { return false }
-        if lhs.1 != rhs.1 { return false }
+        if lhs.offset != rhs.offset { return false }
+        if lhs.alignment != rhs.alignment { return false }
         return true
     default: return false
     }

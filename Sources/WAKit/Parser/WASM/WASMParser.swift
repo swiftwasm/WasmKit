@@ -23,7 +23,7 @@ extension WASMParser {
 public enum WASMParserError: Swift.Error {
     case invalidMagicNumber([UInt8])
     case unknownVersion([UInt8])
-    case invalidUnicode([UInt8])
+    case invalidUTF8([UInt8])
     case invalidSectionSize(UInt32)
     case zeroExpected(actual: UInt8, index: Int)
     case inconsistentFunctionAndCodeLength(functionCount: Int, codeCount: Int)
@@ -99,7 +99,7 @@ extension WASMParser {
             switch decoder.decode(&iterator) {
             case let .scalarValue(scalar): name.append(Character(scalar))
             case .emptyInput: break Decode
-            case .error: throw WASMParserError.invalidUnicode(bytes)
+            case .error: throw WASMParserError.invalidUTF8(bytes)
             }
         }
 
@@ -222,20 +222,24 @@ extension WASMParser {
             return ControlInstruction.nop
         case 0x02:
             let type = try parseResultType()
-            let expression = try parseExpression()
+            let (expression, _) = try parseExpression()
             return ControlInstruction.block(type, expression)
         case 0x03:
             let type = try parseResultType()
-            let expression = try parseExpression()
+            let (expression, _) = try parseExpression()
             return ControlInstruction.loop(type, expression)
         case 0x04:
             let type = try parseResultType()
-            let ifExpression = try parseExpression()
-            guard stream.peek() == 0x05 /* else */ else {
+            let (ifExpression, lastInstruction) = try parseExpression()
+            switch lastInstruction {
+            case PseudoInstruction.else:
+                let (elseExpression, _) = try parseExpression()
+                return ControlInstruction.if(type, ifExpression, elseExpression)
+            case PseudoInstruction.end:
                 return ControlInstruction.if(type, ifExpression, Expression())
+            default: preconditionFailure("should never reach here")
             }
-            let elseExpression = try parseExpression()
-            return ControlInstruction.if(type, ifExpression, elseExpression)
+
         case 0x05:
             return PseudoInstruction.else
         case 0x0B:
@@ -247,8 +251,9 @@ extension WASMParser {
             let label: UInt32 = try parseUnsigned()
             return ControlInstruction.brIf(label)
         case 0x0E:
-            let labels: [UInt32] = try parseVector { try parseUnsigned() }
-            return ControlInstruction.brTable(labels)
+            let labelIndices: [UInt32] = try parseVector { try parseUnsigned() }
+            let labelIndex: UInt32 = try parseUnsigned()
+            return ControlInstruction.brTable(labelIndices, labelIndex)
         case 0x0F:
             return ControlInstruction.return
         case 0x10:
@@ -256,6 +261,10 @@ extension WASMParser {
             return ControlInstruction.call(index)
         case 0x11:
             let index: UInt32 = try parseUnsigned()
+            let zero = try stream.consumeAny()
+            guard zero == 0x00 else {
+                throw WASMParserError.zeroExpected(actual: zero, index: currentIndex)
+            }
             return ControlInstruction.callIndirect(index)
 
         case 0x1A:
@@ -282,95 +291,95 @@ extension WASMParser {
         case 0x28:
             let align: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return MemoryInstruction.load(I32.self, .init(min: align, max: offset))
+            return MemoryInstruction.load(I32.self, offset: offset, alignment: align)
         case 0x29:
             let align: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return MemoryInstruction.load(I64.self, .init(min: align, max: offset))
+            return MemoryInstruction.load(I64.self, offset: offset, alignment: align)
         case 0x2A:
             let align: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return MemoryInstruction.load(F32.self, .init(min: align, max: offset))
+            return MemoryInstruction.load(F32.self, offset: offset, alignment: align)
         case 0x2B:
             let align: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return MemoryInstruction.load(F64.self, .init(min: align, max: offset))
+            return MemoryInstruction.load(F64.self, offset: offset, alignment: align)
         case 0x2C:
             let align: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return MemoryInstruction.load8s(I32.self, .init(min: align, max: offset))
+            return MemoryInstruction.load8s(I32.self, offset: offset, alignment: align)
         case 0x2D:
             let align: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return MemoryInstruction.load8u(I64.self, .init(min: align, max: offset))
+            return MemoryInstruction.load8u(I64.self, offset: offset, alignment: align)
         case 0x2E:
             let align: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return MemoryInstruction.load16s(I32.self, .init(min: align, max: offset))
+            return MemoryInstruction.load16s(I32.self, offset: offset, alignment: align)
         case 0x2F:
             let align: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return MemoryInstruction.load16u(I32.self, .init(min: align, max: offset))
+            return MemoryInstruction.load16u(I32.self, offset: offset, alignment: align)
         case 0x30:
             let align: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return MemoryInstruction.load8s(I64.self, .init(min: align, max: offset))
+            return MemoryInstruction.load8s(I64.self, offset: offset, alignment: align)
         case 0x31:
             let align: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return MemoryInstruction.load8u(I64.self, .init(min: align, max: offset))
+            return MemoryInstruction.load8u(I64.self, offset: offset, alignment: align)
         case 0x32:
             let align: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return MemoryInstruction.load16s(I64.self, .init(min: align, max: offset))
+            return MemoryInstruction.load16s(I64.self, offset: offset, alignment: align)
         case 0x33:
             let align: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return MemoryInstruction.load16u(I64.self, .init(min: align, max: offset))
+            return MemoryInstruction.load16u(I64.self, offset: offset, alignment: align)
         case 0x34:
             let align: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return MemoryInstruction.load32s(I64.self, .init(min: align, max: offset))
+            return MemoryInstruction.load32s(I64.self, offset: offset, alignment: align)
         case 0x35:
             let align: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return MemoryInstruction.load32u(I64.self, .init(min: align, max: offset))
+            return MemoryInstruction.load32u(I64.self, offset: offset, alignment: align)
         case 0x36:
             let align: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return MemoryInstruction.store(I32.self, .init(min: align, max: offset))
+            return MemoryInstruction.store(I32.self, offset: offset, alignment: align)
         case 0x37:
             let align: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return MemoryInstruction.store(I64.self, .init(min: align, max: offset))
+            return MemoryInstruction.store(I64.self, offset: offset, alignment: align)
         case 0x38:
             let align: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return MemoryInstruction.store(F32.self, .init(min: align, max: offset))
+            return MemoryInstruction.store(F32.self, offset: offset, alignment: align)
         case 0x39:
             let align: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return MemoryInstruction.store(F64.self, .init(min: align, max: offset))
+            return MemoryInstruction.store(F64.self, offset: offset, alignment: align)
         case 0x3A:
             let align: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return MemoryInstruction.store8(I32.self, .init(min: align, max: offset))
+            return MemoryInstruction.store8(I32.self, offset: offset, alignment: align)
         case 0x3B:
             let align: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return MemoryInstruction.store16(I32.self, .init(min: align, max: offset))
+            return MemoryInstruction.store16(I32.self, offset: offset, alignment: align)
         case 0x3C:
             let align: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return MemoryInstruction.store8(I64.self, .init(min: align, max: offset))
+            return MemoryInstruction.store8(I64.self, offset: offset, alignment: align)
         case 0x3D:
             let align: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return MemoryInstruction.store16(I64.self, .init(min: align, max: offset))
+            return MemoryInstruction.store16(I64.self, offset: offset, alignment: align)
         case 0x3E:
-            let align: UInt32 = try parseUnsigned()
+            let alignment: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return MemoryInstruction.store32(I64.self, .init(min: align, max: offset))
+            return MemoryInstruction.store32(I64.self, offset: offset, alignment: alignment)
         case 0x3F:
             let zero = try stream.consumeAny()
             guard zero == 0x00 else {
@@ -656,7 +665,7 @@ extension WASMParser {
         }
     }
 
-    func parseExpression() throws -> Expression {
+    func parseExpression() throws -> (expression: Expression, lastInstruction: Instruction) {
         var instructions = [Instruction]()
         var instruction: Instruction
 
@@ -665,11 +674,9 @@ extension WASMParser {
             guard
                 !instruction.isEqual(to: PseudoInstruction.else),
                 !instruction.isEqual(to: PseudoInstruction.end)
-            else { break }
+            else { return (expression: Expression(instructions: instructions), lastInstruction: instruction) }
             instructions.append(instruction)
         }
-
-        return Expression(instructions: instructions)
     }
 }
 
@@ -771,7 +778,7 @@ extension WASMParser {
 
         return .global(try parseVector {
             let type = try parseGlobalType()
-            let expression = try parseExpression()
+            let (expression, _) = try parseExpression()
             return Global(type: type, initializer: expression)
         })
     }
@@ -823,10 +830,10 @@ extension WASMParser {
         /* size */ _ = try parseUnsigned() as UInt32
 
         return .element(try parseVector {
-            let table: UInt32 = try parseUnsigned()
-            let expression = try parseExpression()
+            let index: UInt32 = try parseUnsigned()
+            let (expression, _) = try parseExpression()
             let initializer: [UInt32] = try parseVector { try parseUnsigned() }
-            return Element(table: table, offset: expression, initializer: initializer)
+            return Element(index: index, offset: expression, initializer: initializer)
         })
     }
 
@@ -837,13 +844,13 @@ extension WASMParser {
         /* size */ _ = try parseUnsigned() as UInt32
 
         return .code(try parseVector {
-            /* size */ _ = try parseUnsigned() as UInt32
+            _ = try parseUnsigned() as UInt32
             let locals = try parseVector { () -> [ValueType] in
                 let n: UInt32 = try parseUnsigned()
                 let t = try parseValueType()
                 return (0 ..< n).map { _ in t }
             }
-            let expression = try parseExpression()
+            let (expression, _) = try parseExpression()
             return Code(locals: locals.flatMap { $0 }, expression: expression)
         })
     }
@@ -855,10 +862,10 @@ extension WASMParser {
         /* size */ _ = try parseUnsigned() as UInt32
 
         return .data(try parseVector {
-            let data: UInt32 = try parseUnsigned()
-            let offset = try parseExpression()
+            let index: UInt32 = try parseUnsigned()
+            let (offset, _) = try parseExpression()
             let initializer = try parseVector { try stream.consumeAny() }
-            return Data(data: data, offset: offset, initializer: initializer)
+            return Data(index: index, offset: offset, initializer: initializer)
         })
     }
 }

@@ -5,8 +5,11 @@ final class SpecTestCommand: Command {
 
     let path = Parameter()
     let specs = VariadicKey<String>("--specs")
+    let isVerbose = Flag("-v", "--verbose")
 
     func execute() throws {
+        let isVerbose = self.isVerbose.value
+
         let testCases: [TestCase]
         do {
             testCases = try TestCase.load(specs: specs.values, in: path.value)
@@ -16,9 +19,13 @@ final class SpecTestCommand: Command {
 
         for testCase in testCases {
             testCase.run(rootPath: path.value) { testCase, command, result in
-                print("\(testCase.sourceFilename):\(command.line):", result.banner)
-                if case let .failed(reason) = result {
-                    print(reason)
+                switch result {
+                case let .failed(reason):
+                    print("\(testCase.sourceFilename):\(command.line):", result.banner, reason)
+                case let .skipped(reason):
+                    if isVerbose { print("\(testCase.sourceFilename):\(command.line):", result.banner, reason) }
+                default:
+                    print("\(testCase.sourceFilename):\(command.line):", result.banner)
                 }
             }
         }

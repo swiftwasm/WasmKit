@@ -6,8 +6,11 @@ final class WASMParserTests: XCTestCase {
     func testWASMParser() {
         let stream = StaticByteStream(bytes: [1, 2, 3])
         let parser = WASMParser(stream: stream)
-        XCTAssertEqual(parser.stream, stream)
-        XCTAssertEqual(parser.currentIndex, 0)
+
+        XCTAssertEqual(parser.currentIndex, stream.currentIndex)
+
+        XCTAssertNoThrow(try stream.consumeAny())
+        XCTAssertEqual(parser.currentIndex, stream.currentIndex)
     }
 }
 
@@ -63,7 +66,7 @@ extension WASMParserTests {
         stream = StaticByteStream(bytes: [0x02, 0xDF, 0xFF])
         parser = WASMParser(stream: stream)
         XCTAssertThrowsError(_ = try parser.parseName()) { error in
-            guard case let WASMParserError.invalidUnicode(unicode) = error else {
+            guard case let WASMParserError.invalidUTF8(unicode) = error else {
                 return XCTFail("Unexpected error: \(error)")
             }
             XCTAssertEqual(unicode, [0xDF, 0xFF])
@@ -264,11 +267,31 @@ extension WASMParserTests {
         var stream: StaticByteStream!
         var parser: WASMParser<StaticByteStream>!
 
-        stream = StaticByteStream(bytes: [0x01, 0x0B])
+        stream = StaticByteStream(bytes: [0x41, 0x01, 0x04, 0x7F, 0x02, 0x7F, 0x41, 0x01, 0x0B, 0x05, 0x41, 0x02, 0x0B, 0x0B])
         parser = WASMParser(stream: stream)
-        XCTAssertEqual(try parser.parseExpression(), Expression(instructions: [
-            ControlInstruction.nop,
-        ]))
+        do {
+            let (expression, lastInstruction) = try parser.parseExpression()
+            XCTAssertEqual(expression, Expression(instructions: [
+                NumericInstruction.Constant.const(I32(1)),
+                ControlInstruction.if(
+                    [I32.self],
+                    Expression(instructions: [
+                        ControlInstruction.block(
+                            [I32.self],
+                            Expression(instructions: [
+                                NumericInstruction.Constant.const(I32(1)),
+                            ])
+                        ),
+                    ]),
+                    Expression(instructions: [
+                        NumericInstruction.Constant.const(I32(2)),
+                    ])
+                ),
+            ]))
+            XCTAssert(lastInstruction.isEqual(to: PseudoInstruction.end))
+        } catch {
+            XCTFail("\(error)")
+        }
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
     }
 }
@@ -504,8 +527,8 @@ extension WASMParserTests {
         ])
         parser = WASMParser(stream: stream)
         let expected = Section.element([
-            Element(table: 18, offset: Expression(instructions: []), initializer: [52]),
-            Element(table: 86, offset: Expression(instructions: []), initializer: [120]),
+            Element(index: 18, offset: Expression(instructions: []), initializer: [52]),
+            Element(index: 86, offset: Expression(instructions: []), initializer: [120]),
         ])
         XCTAssertEqual(try parser.parseElementSection(), expected)
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
@@ -567,12 +590,12 @@ extension WASMParserTests {
         parser = WASMParser(stream: stream)
         let expected = Section.data([
             Data(
-                data: 18,
+                index: 18,
                 offset: Expression(instructions: []),
                 initializer: [0x01, 0x02, 0x03, 0x04]
             ),
             Data(
-                data: 52,
+                index: 52,
                 offset: Expression(instructions: []),
                 initializer: [0x05, 0x06]
             ),
