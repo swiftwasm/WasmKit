@@ -8,6 +8,8 @@ MODULES = $(notdir $(wildcard Sources/*))
 TEMPLATES = $(wildcard Templates/*.stencil)
 GENERATED_DIRS = $(foreach MODULE, $(MODULES), Sources/$(MODULE)/Generated)
 
+SWIFT_VERSION = $(shell cat .swift-version)
+
 .PHONY: all
 all: bootstrap project build
 
@@ -36,7 +38,7 @@ spectest:
 
 .PHONY: format
 format:
-	$(SWIFTFORMAT) Sources Tests --exclude **/Generated
+	$(SWIFTFORMAT) --swiftversion $(SWIFT_VERSION) Sources Tests --exclude **/Generated
 
 .PHONY: clean
 clean:
@@ -63,6 +65,6 @@ GIT_STATUS = $(shell git status --porcelain)
 ensure_clean:
 	@[ -z "$(GIT_STATUS)" ] \
     && echo Working directory is clean \
-	|| printf "Uncommitted changes: \n $(GIT_STATUS)\n"; exit 1;
+	|| (printf "Uncommitted changes: \n $(GIT_STATUS)\n" && exit 1)
 
 FORCE:

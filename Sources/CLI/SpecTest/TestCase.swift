@@ -25,25 +25,32 @@ struct TestCase: Decodable {
             case text
         }
 
+        enum ValueType: String, Decodable {
+            case i32
+            case i64
+            case f32
+            case f64
+        }
+
         struct Value: Decodable {
-            enum ValueType: String, Decodable {
-                case i32
-                case i64
-                case f32
-                case f64
-            }
             let type: ValueType
             let value: String
+        }
+
+        struct Expectation: Decodable {
+            let type: ValueType
+            let value: String?
         }
 
         struct Action: Decodable {
             enum ActionType: String, Decodable {
                 case invoke
+                case get
             }
 
             let type: ActionType
             let field: String
-            let args: [Value]
+            let args: [Value]?
         }
 
         let type: CommandType
@@ -52,7 +59,7 @@ struct TestCase: Decodable {
         let text: String?
         let moduleType: ModuleType?
         let action: Action?
-        let expected: [Value]?
+        let expected: [Expectation]?
     }
 
     let sourceFilename: String
@@ -90,7 +97,6 @@ enum Result {
     case passed
     case failed(String)
     case skipped(String)
-    case timeout
     case `internal`(Swift.Error)
 
     var banner: String {
@@ -98,7 +104,6 @@ enum Result {
         case .passed: return "[PASSED]".green
         case .failed: return "[FAILED]".red
         case .skipped: return "[SKIPPED]".blue
-        case .timeout: return "[TIMEOUT]".yellow
         case .internal: return "[INTERNAL]".white.onRed
         }
     }
@@ -108,16 +113,19 @@ extension TestCase {
     func run(rootPath: String, handler: @escaping (TestCase, TestCase.Command, Result) -> Void) {
         let runtime = Runtime()
         var currentModuleInstance: ModuleInstance?
+        let queue = DispatchQueue(label: "sh.aky.WAKit.spectest")
+        let semaphore = DispatchSemaphore(value: 0)
         for command in commands {
-            let semaphore = DispatchSemaphore(value: 0)
-            DispatchQueue.global().async {
+            queue.async {
                 command.run(runtime: runtime, module: &currentModuleInstance, rootPath: rootPath) { command, result in
                     handler(self, command, result)
                     semaphore.signal()
                 }
             }
-            if semaphore.wait(timeout: .distantFuture /*.now() + 5*/) == .timedOut {
-                handler(self, command, .timeout)
+
+            guard semaphore.wait(timeout: .now() + 5) != .timedOut else {
+                semaphore.resume()
+                return handler(self, command, .failed("timed out"))
             }
         }
     }
@@ -138,14 +146,14 @@ extension TestCase.Command {
             let module: Module
             do {
                 module = try parseModule(rootPath: rootPath, filename: filename)
-            } catch let error {
+            } catch {
                 return handler(self, .failed("module could not be parsed: \(error)"))
             }
 
             do {
                 currentModuleInstance = try runtime.instantiate(module: module, externalValues: [])
-            } catch let error {
-                return handler(self, .failed("module could not be instanciated: \(error)"))
+            } catch {
+                return handler(self, .failed("module could not be instantiated: \(error)"))
             }
 
             return handler(self, .passed)
@@ -174,21 +182,23 @@ extension TestCase.Command {
             }
             switch action.type {
             case .invoke:
-                let args = parseValues(args: action.args)
+                let args = parseValues(args: action.args!)
                 let expected = parseValues(args: self.expected ?? [])
                 let result: [WAKit.Value]
                 do {
                     result = try runtime.invoke(moduleInstance, function: action.field, with: args)
-                } catch let error {
+                } catch {
                     return handler(self, .failed("\(error)"))
                 }
                 guard result == expected else {
                     return handler(self, .failed("result mismatch: expected: \(expected), actual: \(result)"))
                 }
                 handler(self, .passed)
+            default:
+                handler(self, .failed("action type \(action.type) has been not implemented"))
             }
         default:
-            return handler(self, .failed("nothing to test found"))
+            handler(self, .failed("type \(type) has been not implemented"))
         }
     }
 
@@ -210,6 +220,17 @@ extension TestCase.Command {
             case .i64: return I64(UInt64($0.value)!)
             case .f32: return F32(Float32($0.value)!)
             case .f64: return F64(Float64($0.value)!)
+            }
+        }
+    }
+
+    private func parseValues(args: [TestCase.Command.Expectation]) -> [WAKit.Value] {
+        return args.compactMap {
+            switch $0.type {
+            case .i32: return I32(UInt32($0.value!)!)
+            case .i64: return I64(UInt64($0.value!)!)
+            case .f32: return F32(Float32($0.value!)!)
+            case .f64: return F64(Float64($0.value!)!)
             }
         }
     }

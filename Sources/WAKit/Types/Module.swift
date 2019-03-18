@@ -93,7 +93,7 @@ public struct Global: Equatable {
 /// - Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#element-segments>
 public struct Element: Equatable {
-    let table: TableIndex
+    let index: TableIndex
     let offset: Expression
     let initializer: [FunctionIndex]
 }
@@ -101,7 +101,7 @@ public struct Element: Equatable {
 /// - Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#data-segments>
 public struct Data: Equatable {
-    let data: MemoryIndex
+    let index: MemoryIndex
     let offset: Expression
     let initializer: [UInt8]
 }

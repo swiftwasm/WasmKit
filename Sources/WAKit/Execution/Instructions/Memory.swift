@@ -36,7 +36,7 @@ extension Runtime {
         }
 
         let bytes = memoryInstance.data[address ..< address + length]
-        let value = V.init(bytes)
+        let value = V(bytes)
 
         stack.push(value)
     }

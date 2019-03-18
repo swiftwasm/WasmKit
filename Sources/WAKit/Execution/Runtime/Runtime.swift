@@ -41,18 +41,25 @@ extension Runtime {
         let frame = Frame(arity: 0, module: instance, locals: [])
         stack.push(frame)
 
-        assert(module.elements.count <= store.tables.count)
-        for (element, tableInstance) in zip(module.elements, store.tables) {
+        for element in module.elements {
+            let tableInstance = store.tables[Int(element.index)]
             let offset = try Int(evaluate(expression: element.offset, resultType: I32.self).rawValue)
             let end = offset + element.initializer.count
+            guard
+                tableInstance.elements.indices.contains(offset),
+                tableInstance.elements.indices.contains(end)
+            else { throw Trap.tableOutOfRange }
             tableInstance.elements.replaceSubrange(offset ..< end, with: element.initializer.map { instance.functionAddresses[Int($0)] })
         }
 
-        assert(module.data.count <= store.memories.count)
-        for (data, memoryInstance) in zip(module.data, store.memories) {
+        for data in module.data {
+            let memoryInstance = store.memories[Int(data.index)]
             let offset = try Int(evaluate(expression: data.offset, resultType: I32.self).rawValue)
             let end = Int(offset) + data.initializer.count
-
+            guard
+                memoryInstance.data.indices.contains(offset),
+                memoryInstance.data.indices.contains(end)
+            else { throw Trap.memoryOverflow }
             memoryInstance.data.replaceSubrange(offset ..< end, with: data.initializer)
         }
 
@@ -83,7 +90,7 @@ extension Runtime {
         return globalInitializers
     }
 
-    private func initializeElements(module: Module, instance: ModuleInstance) throws -> [Int] {
+    private func initializeElements(module: Module, instance _: ModuleInstance) throws -> [Int] {
         return try module.elements.map {
             try Int(evaluate(expression: $0.offset, resultType: I32.self).rawValue)
         }
@@ -219,7 +226,7 @@ extension Runtime {
                 values.append(try stack.pop(Value.self))
             }
             let _label = try stack.pop(Label.self)
-            assert(label == _label)
+            guard label == _label else { throw Trap.labelMismatch }
             stack.push(values)
 
         case .break:
@@ -232,6 +239,6 @@ extension Runtime {
 
     func evaluate<V: Value>(expression: Expression, resultType: V.Type) throws -> V {
         _ = try execute(expression.instructions)
-        return try stack.pop(V.self)
+        return try stack.pop(resultType)
     }
 }

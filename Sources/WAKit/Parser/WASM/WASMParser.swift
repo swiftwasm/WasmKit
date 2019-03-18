@@ -830,10 +830,10 @@ extension WASMParser {
         /* size */ _ = try parseUnsigned() as UInt32
 
         return .element(try parseVector {
-            let table: UInt32 = try parseUnsigned()
+            let index: UInt32 = try parseUnsigned()
             let (expression, _) = try parseExpression()
             let initializer: [UInt32] = try parseVector { try parseUnsigned() }
-            return Element(table: table, offset: expression, initializer: initializer)
+            return Element(index: index, offset: expression, initializer: initializer)
         })
     }
 
@@ -862,10 +862,10 @@ extension WASMParser {
         /* size */ _ = try parseUnsigned() as UInt32
 
         return .data(try parseVector {
-            let data: UInt32 = try parseUnsigned()
+            let index: UInt32 = try parseUnsigned()
             let (offset, _) = try parseExpression()
             let initializer = try parseVector { try stream.consumeAny() }
-            return Data(data: data, offset: offset, initializer: initializer)
+            return Data(index: index, offset: offset, initializer: initializer)
         })
     }
 }

@@ -279,16 +279,17 @@ extension WASMParserTests {
                         ControlInstruction.block(
                             [I32.self],
                             Expression(instructions: [
-                                NumericInstruction.Constant.const(I32(1))
-                                ]))
-                        ]),
+                                NumericInstruction.Constant.const(I32(1)),
+                            ])
+                        ),
+                    ]),
                     Expression(instructions: [
-                        NumericInstruction.Constant.const(I32(2))
-                        ])),
-                ])
-            )
+                        NumericInstruction.Constant.const(I32(2)),
+                    ])
+                ),
+            ]))
             XCTAssert(lastInstruction.isEqual(to: PseudoInstruction.end))
-        } catch let error {
+        } catch {
             XCTFail("\(error)")
         }
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
@@ -526,8 +527,8 @@ extension WASMParserTests {
         ])
         parser = WASMParser(stream: stream)
         let expected = Section.element([
-            Element(table: 18, offset: Expression(instructions: []), initializer: [52]),
-            Element(table: 86, offset: Expression(instructions: []), initializer: [120]),
+            Element(index: 18, offset: Expression(instructions: []), initializer: [52]),
+            Element(index: 86, offset: Expression(instructions: []), initializer: [120]),
         ])
         XCTAssertEqual(try parser.parseElementSection(), expected)
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
@@ -589,12 +590,12 @@ extension WASMParserTests {
         parser = WASMParser(stream: stream)
         let expected = Section.data([
             Data(
-                data: 18,
+                index: 18,
                 offset: Expression(instructions: []),
                 initializer: [0x01, 0x02, 0x03, 0x04]
             ),
             Data(
-                data: 52,
+                index: 52,
                 offset: Expression(instructions: []),
                 initializer: [0x05, 0x06]
             ),

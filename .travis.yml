@@ -18,13 +18,16 @@ branches:
 cache:
   directories: [/usr/local/lib/mint, Vendor/Mint/.build]
 
-before_script: git clone https://github.com/akkyie/wast-wasm $SPECTEST_PATH
+before_script: |
+  git clone --depth 1 https://github.com/akkyie/wast-wasm $SPECTEST_PATH
 
 script:
   - make bootstrap test
-  - make spectest
+  - make format
+  - make ensure_clean
 
-after_script: make ensure_clean
+after_success:
+  - make spectest
 
 notifications:
   email: false
