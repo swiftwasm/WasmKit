@@ -23,7 +23,6 @@ public enum Trap: Error {
     case tableOutOfRange
     case callIndirectFunctionTypeMismatch(actual: FunctionType, expected: FunctionType)
     case memoryOverflow
-    case labelMismatch
 
     static func unimplemented(_ description: String = "", file: StaticString = #file, line: UInt = #line) -> Trap {
         return ._unimplemented(description: description, file: file, line: line)

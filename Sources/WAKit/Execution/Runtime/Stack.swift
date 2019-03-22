@@ -48,7 +48,11 @@ extension Stack {
     mutating func pop<T: Stackable>(_: T.Type) throws -> T {
         let popped = pop()
         guard let value = popped as? T else {
-            throw Trap.stackTypeMismatch(expected: T.self, actual: Swift.type(of: popped))
+            if let popped = popped {
+                throw Trap.stackTypeMismatch(expected: T.self, actual: Swift.type(of: popped))
+            } else {
+                throw Trap.stackTypeMismatch(expected: T.self, actual: Void.self)
+            }
         }
         return value
     }
@@ -118,7 +122,9 @@ extension Value: Stackable {}
 // sourcery: AutoEquatable
 struct Label: Stackable {
     let arity: Int
-    let continuation: [Instruction]
+    let continuation: Int
+
+    let range: ClosedRange<Int>
 }
 
 /// - Note:
