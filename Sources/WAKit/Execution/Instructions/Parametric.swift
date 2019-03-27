@@ -1,12 +1,15 @@
 /// - Note:
 /// <https://webassembly.github.io/spec/core/syntax/instructions.html#variable-instructions>
-extension Runtime {
-    func execute(parametric instruction: ParametricInstruction) throws {
-        switch instruction {
-        case .drop:
+extension InstructionFactory {
+    var drop: Instruction {
+        return makeInstruction { pc, _, stack in
             _ = try stack.pop(Value.self)
+            return .jump(pc)
+        }
+    }
 
-        case .select:
+    var select: Instruction {
+        return makeInstruction { pc, _, stack in
             let flag = try stack.pop(I32.self)
             let value2 = try stack.pop(Value.self)
             let value1 = try stack.pop(Value.self)
@@ -15,6 +18,7 @@ extension Runtime {
             } else {
                 stack.push(value2)
             }
+            return .jump(pc)
         }
     }
 }

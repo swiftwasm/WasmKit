@@ -43,7 +43,7 @@ extension Runtime {
 
         for element in module.elements {
             let tableInstance = store.tables[Int(element.index)]
-            let offset = try Int(evaluate(expression: element.offset, resultType: I32.self).rawValue)
+            let offset = try Int(execute(element.offset, resultType: I32.self).rawValue)
             let end = offset + element.initializer.count
             guard
                 tableInstance.elements.indices.contains(offset),
@@ -54,7 +54,7 @@ extension Runtime {
 
         for data in module.data {
             let memoryInstance = store.memories[Int(data.index)]
-            let offset = try Int(evaluate(expression: data.offset, resultType: I32.self).rawValue)
+            let offset = try Int(execute(data.offset, resultType: I32.self).rawValue)
             let end = Int(offset) + data.initializer.count
             guard
                 memoryInstance.data.indices.contains(offset),
@@ -81,8 +81,8 @@ extension Runtime {
         let frame = Frame(arity: 0, module: globalModuleInstance, locals: [])
         stack.push(frame)
 
-        let globalInitializers = try module.globals.map {
-            try evaluate(expression: $0.initializer, resultType: Value.self)
+        let globalInitializers = try module.globals.map { global in
+            try execute(global.initializer, resultType: global.type.valueType)
         }
 
         try stack.pop(Frame.self)
@@ -90,32 +90,23 @@ extension Runtime {
         return globalInitializers
     }
 
-    private func initializeElements(module: Module, instance _: ModuleInstance) throws -> [Int] {
-        return try module.elements.map {
-            try Int(evaluate(expression: $0.offset, resultType: I32.self).rawValue)
-        }
-    }
-
     /// - Note:
     /// <https://webassembly.github.io/spec/core/exec/instructions.html#invocation-of-function-address>
     func invoke(functionAddress address: FunctionAddress) throws {
         let function = store.functions[address]
-        guard case let .some(parameterTypes, resultTypes) = function.type else {
+        guard case let .some(parameterType, resultType) = function.type else {
             throw Trap._raw("any type is not allowed here")
         }
 
         let locals = function.code.locals.map { $0.init() }
         let expression = function.code.body
 
-        let parameters = try stack.pop(Value.self, count: parameterTypes.count)
+        let parameters = try stack.pop(Value.self, count: parameterType.count)
 
-        let frame = Frame(arity: resultTypes.count, module: function.module, locals: parameters + locals)
+        let frame = Frame(arity: resultType.count, module: function.module, locals: parameters + locals)
         stack.push(frame)
 
-        let blockInstruction = ControlInstruction.block(resultTypes, expression)
-        _ = try execute(blockInstruction)
-
-        let values = try stack.pop(Value.self, count: frame.arity)
+        let values = try enterBlock(expression, resultType: resultType)
 
         assert((try? stack.get(current: Frame.self)) == frame)
         _ = try stack.pop(Frame.self)
@@ -160,85 +151,69 @@ extension Runtime {
 }
 
 extension Runtime {
-    enum ExecutionResult {
-        case `continue`
-        case `break`(LabelIndex)
-        case `return`
-    }
-
-    func execute(_ instruction: Instruction) throws -> ExecutionResult {
-        let result: ExecutionResult
-
-        switch instruction {
-        case let instruction as NumericInstruction.Constant:
-            try execute(numeric: instruction)
-            result = .continue
-        case let instruction as NumericInstruction.Unary:
-            try execute(numeric: instruction)
-            result = .continue
-        case let instruction as NumericInstruction.Binary:
-            try execute(numeric: instruction)
-            result = .continue
-        case let instruction as NumericInstruction.Conversion:
-            try execute(numeric: instruction)
-            result = .continue
-        case let instruction as ParametricInstruction:
-            try execute(parametric: instruction)
-            result = .continue
-        case let instruction as VariableInstruction:
-            try execute(variable: instruction)
-            result = .continue
-        case let instruction as MemoryInstruction:
-            try execute(memory: instruction)
-            result = .continue
-        case let instruction as ControlInstruction:
-            result = try execute(control: instruction)
-        default:
-            throw Trap.unimplemented("\(instruction)")
+    func enterBlock(_ expression: Expression, resultType: ResultType) throws -> [Value] {
+        guard !expression.instructions.isEmpty else {
+            return []
         }
 
-        return result
-    }
+        let label = Label(
+            arity: resultType.count,
+            continuation: expression.instructions.indices.upperBound,
+            range: ClosedRange(expression.instructions.indices)
+        )
 
-    private func execute(_ instructions: [Instruction]) throws -> ExecutionResult {
-        var result: ExecutionResult = .continue
-        RunLoop: for instruction in instructions {
-            result = try execute(instruction)
-            switch result {
-            case .continue:
-                continue
-            case .break, .return:
-                break RunLoop
-            }
-        }
-        return result
-    }
-
-    func enterBlock(instructions: [Instruction], label: Label) throws {
         stack.push(label)
 
-        let result = try execute(instructions)
-
-        switch result {
-        case .continue:
-            var values: [Value] = []
-            while stack.peek() is Value {
-                values.append(try stack.pop(Value.self))
+        var address: Int = 0
+        while address <= label.range.upperBound {
+            while let currentLabel = try? stack.get(current: Label.self), currentLabel.range.upperBound < address {
+                try exitBlock(label: currentLabel)
             }
-            let _label = try stack.pop(Label.self)
-            guard label == _label else { throw Trap.labelMismatch }
-            stack.push(values)
 
-        case .break:
-            _ = try execute(label.continuation)
+            let action = try expression.execute(address: address, store: store, stack: &stack)
 
-        case .return:
-            throw Trap.unimplemented()
+            switch action {
+            case let .jump(newAddress):
+                address = newAddress
+
+            case let .invoke(functionIndex):
+                let currentFrame = try stack.get(current: Frame.self)
+                guard currentFrame.module.functionAddresses.indices.contains(functionIndex) else {
+                    throw Trap.invalidFunctionIndex(functionIndex)
+                }
+                let functionAddress = currentFrame.module.functionAddresses[functionIndex]
+                try invoke(functionAddress: functionAddress)
+                address += 1
+            }
         }
+
+        let values = try (0 ..< resultType.count).map { _ in try stack.pop(Value.self) }
+
+        let _label = try stack.pop(Label.self)
+        guard label == _label else {
+            throw Trap.poppedLabelMismatch
+        }
+
+        return values
     }
 
-    func evaluate<V: Value>(expression: Expression, resultType: V.Type) throws -> V {
-        _ = try execute(expression.instructions)
-        return try stack.pop(resultType)
+    func execute<V: Value>(_ expression: Expression, resultType: V.Type) throws -> V {
+        let values = try enterBlock(expression, resultType: [resultType])
+        guard let value = values.first as? V, values.count == 1 else {
+            preconditionFailure()
+        }
+        return value
+    }
+
+    func exitBlock(label: Label) throws {
+        var values: [Value] = []
+        while stack.peek() is Value {
+            values.append(try stack.pop(Value.self))
+        }
+
+        let _label = try stack.pop(Label.self)
+        assert(label == _label)
+
+        stack.push(values)
     }
 }

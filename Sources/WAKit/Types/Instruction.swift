@@ -8,246 +8,232 @@ struct Expression: Equatable {
     static func == (lhs: Expression, rhs: Expression) -> Bool {
         return lhs.instructions == rhs.instructions
     }
-}
 
-public protocol Instruction {
-    func isEqual(to another: Instruction) -> Bool
-}
-
-extension Instruction where Self: Equatable {
-    func isEqual(to another: Instruction) -> Bool {
-        guard let another = another as? Self else { return false }
-        return self == another
+    func execute(address: Int, store: Store, stack: inout Stack) throws -> Instruction.Action {
+        return try instructions[address].implementation(address, store, &stack)
     }
 }
 
-extension Array where Element == Instruction {
-    static func == (lhs: [Instruction], rhs: [Instruction]) -> Bool {
-        guard lhs.count == rhs.count else {
-            return false
-        }
-        for (l, r) in zip(lhs, rhs) {
-            guard l.isEqual(to: r) else { return false }
-        }
-        return true
-    }
-}
-
-/// Pseudo Instructions
-enum PseudoInstruction: Instruction, Equatable {
-    case `else`
-    case end
-}
-
-/// Control Instructions
-/// - Note:
-/// <https://webassembly.github.io/spec/core/binary/instructions.html#control-instructions>
-// sourcery: AutoEquatable
-enum ControlInstruction: Instruction {
-    case unreachable
+public enum InstructionCode: UInt8 {
+    case unreachable = 0x00
     case nop
-    case block(ResultType, Expression)
-    case loop(ResultType, Expression)
-    case `if`(ResultType, Expression, Expression)
-    case br(LabelIndex)
-    case brIf(LabelIndex)
-    case brTable([LabelIndex], LabelIndex)
+    case block
+    case loop
+    case `if`
+    case `else`
+
+    case end = 0x0B
+    case br
+    case br_if
+    case br_table
     case `return`
-    case call(FunctionIndex)
-    case callIndirect(TypeIndex)
-}
+    case call
+    case call_indirect
 
-/// Parametric Instructions
-/// - Note:
-/// <https://webassembly.github.io/spec/core/binary/instructions.html#parametric-instructions>
-enum ParametricInstruction: Instruction, Equatable {
-    case drop
+    case drop = 0x1A
     case select
+
+    case local_get = 0x20
+    case local_set
+    case local_tee
+
+    case global_get
+    case global_set
+
+    case i32_load = 0x28
+    case i64_load
+    case f32_load
+    case f64_load
+
+    case i32_load8_s
+    case i32_load8_u
+    case i32_load16_s
+    case i32_load16_u
+    case i64_load8_s
+    case i64_load8_u
+    case i64_load16_s
+    case i64_load16_u
+    case i64_load32_s
+    case i64_load32_u
+
+    case i32_store
+    case i64_store
+    case f32_store
+    case f64_store
+    case i32_store8
+    case i32_store16
+    case i64_store8
+    case i64_store16
+    case i64_store32
+
+    case memory_size
+    case memory_grow
+
+    case i32_const
+    case i64_const
+    case f32_const
+    case f64_const
+
+    case i32_eqz
+    case i32_eq
+    case i32_ne
+    case i32_lt_s
+    case i32_lt_u
+    case i32_gt_s
+    case i32_gt_u
+    case i32_le_s
+    case i32_le_u
+    case i32_ge_s
+    case i32_ge_u
+
+    case i64_eqz
+    case i64_eq
+    case i64_ne
+    case i64_lt_s
+    case i64_lt_u
+    case i64_gt_s
+    case i64_gt_u
+    case i64_le_s
+    case i64_le_u
+    case i64_ge_s
+    case i64_ge_u
+
+    case f32_eq
+    case f32_ne
+    case f32_lt
+    case f32_gt
+    case f32_le
+    case f32_ge
+
+    case f64_eq
+    case f64_ne
+    case f64_lt
+    case f64_gt
+    case f64_le
+    case f64_ge
+
+    case i32_clz
+    case i32_ctz
+    case i32_popcnt
+    case i32_add
+    case i32_sub
+    case i32_mul
+    case i32_div_s
+    case i32_div_u
+    case i32_rem_s
+    case i32_rem_u
+    case i32_and
+    case i32_or
+    case i32_xor
+    case i32_shl
+    case i32_shr_s
+    case i32_shr_u
+    case i32_rotl
+    case i32_rotr
+
+    case i64_clz
+    case i64_ctz
+    case i64_popcnt
+    case i64_add
+    case i64_sub
+    case i64_mul
+    case i64_div_s
+    case i64_div_u
+    case i64_rem_s
+    case i64_rem_u
+    case i64_and
+    case i64_or
+    case i64_xor
+    case i64_shl
+    case i64_shr_s
+    case i64_shr_u
+    case i64_rotl
+    case i64_rotr
+
+    case f32_abs
+    case f32_neg
+    case f32_ceil
+    case f32_floor
+    case f32_trunc
+    case f32_nearest
+    case f32_sqrt
+    case f32_add
+    case f32_sub
+    case f32_mul
+    case f32_div
+    case f32_min
+    case f32_max
+    case f32_copysign
+
+    case f64_abs
+    case f64_neg
+    case f64_ceil
+    case f64_floor
+    case f64_trunc
+    case f64_nearest
+    case f64_sqrt
+    case f64_add
+    case f64_sub
+    case f64_mul
+    case f64_div
+    case f64_min
+    case f64_max
+    case f64_copysign
+
+    case i32_wrap_i64
+    case i32_trunc_f32_s
+    case i32_trunc_f32_u
+    case i32_trunc_f64_s
+    case i32_trunc_f64_u
+    case i64_extend_i32_s
+    case i64_extend_i32_u
+    case i64_trunc_f32_s
+    case i64_trunc_f32_u
+    case i64_trunc_f64_s
+    case i64_trunc_f64_u
+    case f32_convert_i32_s
+    case f32_convert_i32_u
+    case f32_convert_i64_s
+    case f32_convert_i64_u
+    case f32_demote_f64
+    case f64_convert_i32_s
+    case f64_convert_i32_u
+    case f64_convert_i64_s
+    case f64_convert_i64_u
+    case f64_promote_f32
+    case i32_reinterpret_f32
+    case i64_reinterpret_f64
+    case f32_reinterpret_i32
+    case f64_reinterpret_i64
 }
 
-/// Variable Instructions
-/// - Note:
-/// <https://webassembly.github.io/spec/core/binary/instructions.html#variable-instructions>
-enum VariableInstruction: Instruction, Equatable {
-    case localGet(LabelIndex)
-    case localSet(LabelIndex)
-    case localTee(LabelIndex)
-    case getGlobal(GlobalIndex)
-    case setGlobal(GlobalIndex)
+public struct Instruction {
+    enum Action: Equatable {
+        case jump(Int)
+        case invoke(Int)
+    }
+
+    typealias Implementation = (Int, Store, inout Stack) throws -> Action
+
+    public let code: InstructionCode
+    let implementation: Implementation
+
+    init(_ code: InstructionCode, implementation: @escaping Implementation) {
+        self.code = code
+        self.implementation = implementation
+    }
+
+    var isPseudo: Bool {
+        switch code {
+        case .end, .else: return true
+        default: return false
+        }
+    }
 }
 
-/// Memory Instructions
-/// - Note:
-/// <https://webassembly.github.io/spec/core/binary/instructions.html#memory-instructions>
-// sourcery: AutoEquatable
-enum MemoryInstruction: Instruction {
-    case currentMemory
-    case growMemory
-
-    case load(ValueType, offset: UInt32, alignment: UInt32)
-    case load8s(ValueType, offset: UInt32, alignment: UInt32)
-    case load8u(ValueType, offset: UInt32, alignment: UInt32)
-    case load16s(ValueType, offset: UInt32, alignment: UInt32)
-    case load16u(ValueType, offset: UInt32, alignment: UInt32)
-    case load32s(ValueType, offset: UInt32, alignment: UInt32)
-    case load32u(ValueType, offset: UInt32, alignment: UInt32)
-    case store(ValueType, offset: UInt32, alignment: UInt32)
-    case store8(ValueType, offset: UInt32, alignment: UInt32)
-    case store16(ValueType, offset: UInt32, alignment: UInt32)
-    case store32(ValueType, offset: UInt32, alignment: UInt32)
-}
-
-/// Numeric Instructions
-/// - Note:
-/// <https://webassembly.github.io/spec/core/binary/instructions.html#numeric-instructions>
-enum NumericInstruction {
-    // sourcery: AutoEquatable
-    enum Constant: Instruction {
-        case const(Value)
-    }
-
-    // sourcery: AutoEquatable
-    enum Unary: Instruction {
-        case clz(ValueType)
-        case ctz(ValueType)
-        case popcnt(ValueType)
-
-        case abs(ValueType)
-        case neg(ValueType)
-        case ceil(ValueType)
-        case floor(ValueType)
-        case trunc(ValueType)
-        case nearest(ValueType)
-        case sqrt(ValueType)
-
-        case eqz(ValueType)
-
-        var type: ValueType {
-            switch self {
-            case let .clz(type),
-                 let .ctz(type),
-                 let .popcnt(type),
-                 let .abs(type),
-                 let .neg(type),
-                 let .ceil(type),
-                 let .floor(type),
-                 let .trunc(type),
-                 let .nearest(type),
-                 let .sqrt(type),
-                 let .eqz(type):
-                return type
-            }
-        }
-    }
-
-    // sourcery: AutoEquatable
-    enum Binary: Instruction {
-        case add(ValueType)
-        case sub(ValueType)
-        case mul(ValueType)
-
-        case divS(ValueType)
-        case divU(ValueType)
-        case remS(ValueType)
-        case remU(ValueType)
-        case and(ValueType)
-        case or(ValueType)
-        case xor(ValueType)
-        case shl(ValueType)
-        case shrS(ValueType)
-        case shrU(ValueType)
-        case rotl(ValueType)
-        case rotr(ValueType)
-
-        case div(ValueType)
-        case min(ValueType)
-        case max(ValueType)
-        case copysign(ValueType)
-
-        case eq(ValueType)
-        case ne(ValueType)
-
-        case ltS(ValueType)
-        case ltU(ValueType)
-        case gtS(ValueType)
-        case gtU(ValueType)
-        case leS(ValueType)
-        case leU(ValueType)
-        case geS(ValueType)
-        case geU(ValueType)
-
-        case lt(ValueType)
-        case gt(ValueType)
-        case le(ValueType)
-        case ge(ValueType)
-
-        var type: ValueType {
-            switch self {
-            case let .add(type),
-                 let .sub(type),
-                 let .mul(type),
-                 let .divS(type),
-                 let .divU(type),
-                 let .remS(type),
-                 let .remU(type),
-                 let .and(type),
-                 let .or(type),
-                 let .xor(type),
-                 let .shl(type),
-                 let .shrS(type),
-                 let .shrU(type),
-                 let .rotl(type),
-                 let .rotr(type),
-                 let .div(type),
-                 let .min(type),
-                 let .max(type),
-                 let .copysign(type),
-                 let .eq(type),
-                 let .ne(type),
-                 let .ltS(type),
-                 let .ltU(type),
-                 let .gtS(type),
-                 let .gtU(type),
-                 let .leS(type),
-                 let .leU(type),
-                 let .geS(type),
-                 let .geU(type),
-                 let .lt(type),
-                 let .gt(type),
-                 let .le(type),
-                 let .ge(type):
-                return type
-            }
-        }
-    }
-
-    // sourcery: AutoEquatable
-    enum Conversion: Instruction {
-        case wrap(ValueType, ValueType)
-        case extendS(ValueType, ValueType)
-        case extendU(ValueType, ValueType)
-        case truncS(ValueType, ValueType)
-        case truncU(ValueType, ValueType)
-        case convertS(ValueType, ValueType)
-        case convertU(ValueType, ValueType)
-        case demote(ValueType, ValueType)
-        case promote(ValueType, ValueType)
-        case reinterpret(ValueType, ValueType)
-
-        var types: (ValueType, ValueType) {
-            switch self {
-            case let .wrap(type1, type2),
-                 let .extendS(type1, type2),
-                 let .extendU(type1, type2),
-                 let .truncS(type1, type2),
-                 let .truncU(type1, type2),
-                 let .convertS(type1, type2),
-                 let .convertU(type1, type2),
-                 let .demote(type1, type2),
-                 let .promote(type1, type2),
-                 let .reinterpret(type1, type2):
-                return (type1, type2)
-            }
-        }
+extension Instruction: Equatable {
+    public static func == (lhs: Instruction, rhs: Instruction) -> Bool {
+        // TODO: Compare with instruction arguments
+        return lhs.code == rhs.code
     }
 }
