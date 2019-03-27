@@ -152,6 +152,10 @@ extension Runtime {
 
 extension Runtime {
     func enterBlock(_ expression: Expression, resultType: ResultType) throws -> [Value] {
+        guard !expression.instructions.isEmpty else {
+            return []
+        }
+
         let label = Label(
             arity: resultType.count,
             continuation: expression.instructions.indices.upperBound,
@@ -174,6 +178,9 @@ extension Runtime {
 
             case let .invoke(functionIndex):
                 let currentFrame = try stack.get(current: Frame.self)
+                guard currentFrame.module.functionAddresses.indices.contains(functionIndex) else {
+                    throw Trap.invalidFunctionIndex(functionIndex)
+                }
                 let functionAddress = currentFrame.module.functionAddresses[functionIndex]
                 try invoke(functionAddress: functionAddress)
                 address += 1
@@ -183,7 +190,9 @@ extension Runtime {
         let values = try (0 ..< resultType.count).map { _ in try stack.pop(Value.self) }
 
         let _label = try stack.pop(Label.self)
-        assert(label == _label)
+        guard label == _label else {
+            throw Trap.poppedLabelMismatch
+        }
 
         return values
     }

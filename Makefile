@@ -32,9 +32,22 @@ build:
 test: linuxmain
 	@swift test
 
+WAST_ROOT = Vendor/spec/test/core
+SPECTEST_ROOT = ./spectest
+WAST_FILES = $(wildcard $(WAST_ROOT)/*.wast)
+JSON_FILES = $(WAST_FILES:$(WAST_ROOT)/%.wast=$(SPECTEST_ROOT)/%.json)
+
+.PHONY: spec
+spec: $(JSON_FILES)
+
+$(SPECTEST_ROOT)/%.json: $(WAST_ROOT)/%.wast
+	@mkdir -p $(SPECTEST_ROOT)
+	@echo $^ -> $@
+	wast2json $^ -o $@
+
 .PHONY: spectest
-spectest:
-	swift run wakit spectest $(SPECTEST_PATH)/generated
+spectest: spec
+	swift run wakit spectest $(SPECTEST_ROOT) --exclude fac,forward
 
 .PHONY: format
 format:

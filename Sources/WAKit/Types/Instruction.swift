@@ -210,7 +210,7 @@ public enum InstructionCode: UInt8 {
 public struct Instruction {
     enum Action: Equatable {
         case jump(Int)
-        case invoke(FunctionAddress)
+        case invoke(Int)
     }
 
     typealias Implementation = (Int, Store, inout Stack) throws -> Action

@@ -1,3 +1,6 @@
 [submodule "Vendor/Mint"]
 	path = Vendor/Mint
 	url = https://github.com/yonaskolb/Mint.git
+[submodule "Vendor/spec"]
+	path = Vendor/spec
+	url = https://github.com/WebAssembly/spec
