@@ -35,6 +35,6 @@ dependencies: [
 
 ```sh
 $ make bootstrap  # Install tools through Mint
-$ make generate   # Run Sourcery to enerate source code from templates
+$ make generate   # Run Sourcery to generate source code from templates
 $ make build      # or `swift build`
 ```
