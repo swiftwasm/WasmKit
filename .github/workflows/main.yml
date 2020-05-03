@@ -12,8 +12,6 @@ jobs:
         run: sudo xcode-select -switch /Applications/Xcode_11.4.1.app
       - name: Test in Debug
         run: swift test -c debug
-      - name: Test in Release
-        run: swift test -c release
 
   build-linux:
     runs-on: ubuntu-latest
