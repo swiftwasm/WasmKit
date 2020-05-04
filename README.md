@@ -4,7 +4,7 @@
 
 # WAKit
 
-[![Bitrise](https://img.shields.io/bitrise/245ae702db023bb5.svg?style=for-the-badge&token=YT7cvto4L9xPsTgPokfyDQ)](https://app.bitrise.io/app/245ae702db023bb5)
+![GitHub Workflow Status](https://img.shields.io/github/workflow/status/akkyie/WAKit/Build%20and%20test)
 
 A WebAssembly runtime written in Swift.
 
