@@ -1,0 +1,26 @@
+name: Build and test
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      # Checks-out the repo. More at: https://github.com/actions/checkout
+      - uses: actions/checkout@v2
+      - name: Select Xcode version
+        run: sudo xcode-select -switch /Applications/Xcode_11.4.1.app
+      - name: Test in Debug
+        run: swift test -c debug
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: Didstopia/SwiftAction@v1.0.2
+        with:
+          swift-action: test --enable-test-discovery

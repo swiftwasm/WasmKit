@@ -1,7 +1,9 @@
 import Foundation
+import Logging
 import SwiftCLI
 import WAKit
-import Willow
+
+private let logger = Logger(label: "com.WAKit.CLI")
 
 final class RunCommand: Command {
     let name = "run"
@@ -11,33 +13,33 @@ final class RunCommand: Command {
     let functionName = Parameter()
     let arguments = OptionalCollectedParameter()
 
-    lazy var logger: Logger = {
-        Logger(
-            logLevels: isVerbose.value ? [.error, .warn, .event, .info] : [.error, .warn],
-            writers: [ConsoleWriter()]
-        )
-    }()
-
     func execute() throws {
         let isVerbose = self.isVerbose.value
+
+        LoggingSystem.bootstrap {
+            var handler = StreamLogHandler.standardOutput(label: $0)
+            handler.logLevel = isVerbose ? .info : .warning
+            return handler
+        }
+
         let path = self.path.value
         let functionName = self.functionName.value
 
         guard let fileHandle = FileHandle(forReadingAtPath: path) else {
-            logger.errorMessage("File \"\(path)\" could not be opened")
+            logger.error("File \"\(path)\" could not be opened")
             return
         }
         defer { fileHandle.closeFile() }
 
         let stream = FileHandleStream(fileHandle: fileHandle)
 
-        logger.eventMessage("Started to parse module")
+        logger.info("Started to parse module")
 
         let (module, parseTime) = try measure(if: isVerbose) {
             try WASMParser.parse(stream: stream)
         }
 
-        logger.eventMessage("Ended to parse module: \(parseTime)")
+        logger.info("Ended to parse module: \(parseTime)")
 
         let runtime = Runtime()
         let moduleInstance = try runtime.instantiate(module: module, externalValues: [])
@@ -57,13 +59,13 @@ final class RunCommand: Command {
             parameters.append(parameter)
         }
 
-        logger.eventMessage("Started invoking function \"\(functionName)\" with parameters: \(parameters)")
+        logger.info("Started invoking function \"\(functionName)\" with parameters: \(parameters)")
 
         let (results, invokeTime) = try measure(if: isVerbose) {
             try runtime.invoke(moduleInstance, function: functionName, with: parameters)
         }
 
-        logger.infoMessage("Ended invoking function \"\(functionName)\": \(invokeTime)")
+        logger.info("Ended invoking function \"\(functionName)\": \(invokeTime)")
 
         stdout <<< results.description
     }
