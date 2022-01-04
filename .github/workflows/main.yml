@@ -1,0 +1,24 @@
+name: Build and test
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  build-macos:
+    runs-on: macos-11
+    steps:
+      # Checks-out the repo. More at: https://github.com/actions/checkout
+      - uses: actions/checkout@v2
+      - name: Select Xcode version
+        run: sudo xcode-select -switch /Applications/Xcode_13.2.1.app
+      - name: Test in Debug
+        run: swift test -c debug
+
+  build-linux:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: Test in Debug
+        run: swift test -c debug

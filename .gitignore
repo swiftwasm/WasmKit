@@ -1,5 +1,9 @@
 .build
 *.xcodeproj
+.swiftpm
 
 /Tests/LinuxMain.swift
 /Tests/WAKitTests/XCTestManifests.swift
+
+/spectest
+.vscode

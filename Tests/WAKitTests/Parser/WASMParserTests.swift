@@ -271,27 +271,10 @@ extension WASMParserTests {
         parser = WASMParser(stream: stream)
         do {
             let (expression, lastInstruction) = try parser.parseExpression()
-            XCTAssertEqual(expression, Expression(instructions: [
-                NumericInstruction.Constant.const(I32(1)),
-                ControlInstruction.if(
-                    [I32.self],
-                    Expression(instructions: [
-                        ControlInstruction.block(
-                            [I32.self],
-                            Expression(instructions: [
-                                NumericInstruction.Constant.const(I32(1)),
-                            ])
-                        ),
-                    ]),
-                    Expression(instructions: [
-                        NumericInstruction.Constant.const(I32(2)),
-                    ])
-                ),
-            ]))
-            XCTAssert(lastInstruction.isEqual(to: PseudoInstruction.end))
-        } catch {
-            XCTFail("\(error)")
-        }
+            // TODO: Compare with instruction arguments
+            XCTAssertEqual(expression.instructions.map { $0.code }, [.i32_const, .if, .block, .i32_const, .i32_const])
+            XCTAssertEqual(lastInstruction.code, .end)
+        } catch { XCTFail("\(error)") }
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
     }
 }

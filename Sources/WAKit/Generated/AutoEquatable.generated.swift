@@ -81,44 +81,6 @@ public func == (lhs: TableType, rhs: TableType) -> Bool {
 }
 
 // MARK: - AutoEquatable for Enums
-// MARK: - ControlInstruction AutoEquatable
-extension ControlInstruction: Equatable {}
-internal func == (lhs: ControlInstruction, rhs: ControlInstruction) -> Bool {
-    switch (lhs, rhs) {
-    case (.unreachable, .unreachable):
-        return true
-    case (.nop, .nop):
-        return true
-    case (.block(let lhs), .block(let rhs)):
-        if lhs.0 != rhs.0 { return false }
-        if lhs.1 != rhs.1 { return false }
-        return true
-    case (.loop(let lhs), .loop(let rhs)):
-        if lhs.0 != rhs.0 { return false }
-        if lhs.1 != rhs.1 { return false }
-        return true
-    case (.`if`(let lhs), .`if`(let rhs)):
-        if lhs.0 != rhs.0 { return false }
-        if lhs.1 != rhs.1 { return false }
-        if lhs.2 != rhs.2 { return false }
-        return true
-    case (.br(let lhs), .br(let rhs)):
-        return lhs == rhs
-    case (.brIf(let lhs), .brIf(let rhs)):
-        return lhs == rhs
-    case (.brTable(let lhs), .brTable(let rhs)):
-        if lhs.0 != rhs.0 { return false }
-        if lhs.1 != rhs.1 { return false }
-        return true
-    case (.`return`, .`return`):
-        return true
-    case (.call(let lhs), .call(let rhs)):
-        return lhs == rhs
-    case (.callIndirect(let lhs), .callIndirect(let rhs)):
-        return lhs == rhs
-    default: return false
-    }
-}
 // MARK: - ExternalType AutoEquatable
 extension ExternalType: Equatable {}
 public func == (lhs: ExternalType, rhs: ExternalType) -> Bool {
@@ -143,72 +105,6 @@ public func == (lhs: FunctionType, rhs: FunctionType) -> Bool {
     case (.some(let lhs), .some(let rhs)):
         if lhs.parameters != rhs.parameters { return false }
         if lhs.results != rhs.results { return false }
-        return true
-    default: return false
-    }
-}
-// MARK: - MemoryInstruction AutoEquatable
-extension MemoryInstruction: Equatable {}
-internal func == (lhs: MemoryInstruction, rhs: MemoryInstruction) -> Bool {
-    switch (lhs, rhs) {
-    case (.currentMemory, .currentMemory):
-        return true
-    case (.growMemory, .growMemory):
-        return true
-    case (.load(let lhs), .load(let rhs)):
-        if lhs.0 != rhs.0 { return false }
-        if lhs.offset != rhs.offset { return false }
-        if lhs.alignment != rhs.alignment { return false }
-        return true
-    case (.load8s(let lhs), .load8s(let rhs)):
-        if lhs.0 != rhs.0 { return false }
-        if lhs.offset != rhs.offset { return false }
-        if lhs.alignment != rhs.alignment { return false }
-        return true
-    case (.load8u(let lhs), .load8u(let rhs)):
-        if lhs.0 != rhs.0 { return false }
-        if lhs.offset != rhs.offset { return false }
-        if lhs.alignment != rhs.alignment { return false }
-        return true
-    case (.load16s(let lhs), .load16s(let rhs)):
-        if lhs.0 != rhs.0 { return false }
-        if lhs.offset != rhs.offset { return false }
-        if lhs.alignment != rhs.alignment { return false }
-        return true
-    case (.load16u(let lhs), .load16u(let rhs)):
-        if lhs.0 != rhs.0 { return false }
-        if lhs.offset != rhs.offset { return false }
-        if lhs.alignment != rhs.alignment { return false }
-        return true
-    case (.load32s(let lhs), .load32s(let rhs)):
-        if lhs.0 != rhs.0 { return false }
-        if lhs.offset != rhs.offset { return false }
-        if lhs.alignment != rhs.alignment { return false }
-        return true
-    case (.load32u(let lhs), .load32u(let rhs)):
-        if lhs.0 != rhs.0 { return false }
-        if lhs.offset != rhs.offset { return false }
-        if lhs.alignment != rhs.alignment { return false }
-        return true
-    case (.store(let lhs), .store(let rhs)):
-        if lhs.0 != rhs.0 { return false }
-        if lhs.offset != rhs.offset { return false }
-        if lhs.alignment != rhs.alignment { return false }
-        return true
-    case (.store8(let lhs), .store8(let rhs)):
-        if lhs.0 != rhs.0 { return false }
-        if lhs.offset != rhs.offset { return false }
-        if lhs.alignment != rhs.alignment { return false }
-        return true
-    case (.store16(let lhs), .store16(let rhs)):
-        if lhs.0 != rhs.0 { return false }
-        if lhs.offset != rhs.offset { return false }
-        if lhs.alignment != rhs.alignment { return false }
-        return true
-    case (.store32(let lhs), .store32(let rhs)):
-        if lhs.0 != rhs.0 { return false }
-        if lhs.offset != rhs.offset { return false }
-        if lhs.alignment != rhs.alignment { return false }
         return true
     default: return false
     }

@@ -11,6 +11,15 @@
         }
       },
       {
+        "package": "swift-log",
+        "repositoryURL": "https://github.com/apple/swift-log.git",
+        "state": {
+          "branch": null,
+          "revision": "74d7b91ceebc85daf387ebb206003f78813f71aa",
+          "version": "1.2.0"
+        }
+      },
+      {
         "package": "SwiftCLI",
         "repositoryURL": "https://github.com/jakeheis/SwiftCLI",
         "state": {
@@ -26,15 +35,6 @@
           "branch": null,
           "revision": "200c21588c0126c2d4cab89f2776ee5296a3b90a",
           "version": "0.1.1"
-        }
-      },
-      {
-        "package": "Willow",
-        "repositoryURL": "https://github.com/Nike-Inc/Willow.git",
-        "state": {
-          "branch": null,
-          "revision": "d1304b6374cace1e4008b5f5faec7ce973f54ede",
-          "version": "5.1.0"
         }
       }
     ]

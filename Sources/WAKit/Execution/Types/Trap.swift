@@ -23,6 +23,8 @@ public enum Trap: Error {
     case tableOutOfRange
     case callIndirectFunctionTypeMismatch(actual: FunctionType, expected: FunctionType)
     case memoryOverflow
+    case invalidFunctionIndex(Int)
+    case poppedLabelMismatch
     case labelMismatch
     case integerDividedByZero
     case integerOverflowed

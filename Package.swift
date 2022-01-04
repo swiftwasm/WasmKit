@@ -1,4 +1,4 @@
-// swift-tools-version:4.0
+// swift-tools-version:5.0
 
 import PackageDescription
 
@@ -18,7 +18,7 @@ let package = Package(
         .package(url: "https://github.com/akkyie/SwiftLEB", from: "0.1.0"),
         .package(url: "https://github.com/jakeheis/SwiftCLI", from: "5.0.0"),
         .package(url: "https://github.com/onevcat/Rainbow", from: "3.1.4"),
-        .package(url: "https://github.com/Nike-Inc/Willow", from: "5.1.0"),
+        .package(url: "https://github.com/apple/swift-log.git", from: "1.0.0"),
     ],
     targets: [
         .target(
@@ -33,9 +33,9 @@ let package = Package(
         ),
         .target(
             name: "CLI",
-            dependencies: ["WAKit", "SwiftCLI", "Rainbow", "Willow"],
+            dependencies: ["WAKit", "SwiftCLI", "Rainbow", "Logging"],
             path: "./Sources/CLI"
         ),
     ],
-    swiftLanguageVersions: [4]
+    swiftLanguageVersions: [.v5]
 )

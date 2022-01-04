@@ -112,7 +112,7 @@ extension RawSignedInteger {
     }
 }
 
-extension RawRepresentableValue where Self: Value, RawValue: RawUnsignedInteger {
+extension RawRepresentableValue where RawValue: RawUnsignedInteger {
     var signed: RawValue.Signed {
         return rawValue.signed
     }
@@ -194,7 +194,7 @@ public final class F64: FloatValue, RawRepresentableValue, CustomStringConvertib
     }
 }
 
-extension RawRepresentableValue where Self: Value, RawValue: RawFloatingPoint {
+extension RawRepresentableValue where RawValue: RawFloatingPoint {
     public static func == (lhs: Self, rhs: RawValue) -> Bool {
         return lhs.rawValue == rhs
     }

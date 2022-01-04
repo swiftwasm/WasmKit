@@ -65,20 +65,25 @@ struct TestCase: Decodable {
     let sourceFilename: String
     let commands: [Command]
 
-    static func load(specs specFilter: [String], in path: String) throws -> [TestCase] {
-        let specFilter = specFilter.map { name in name.hasSuffix(".json") ? name : name + ".json" }
-
+    static func load(include: [String], exclude: [String], in path: String) throws -> [TestCase] {
         let fileManager = FileManager.default
         let filePaths = try fileManager.contentsOfDirectory(atPath: path).filter { $0.hasSuffix("json") }.sorted()
         guard !filePaths.isEmpty else {
             return []
         }
 
+        let matchesPattern: (String) throws -> Bool = { filePath in
+            let filePath = filePath.hasSuffix(".json") ? String(filePath.dropLast(".json".count)) : filePath
+            guard !exclude.contains(filePath) else { return false }
+            guard !include.isEmpty else { return true }
+            return include.contains(filePath)
+        }
+
         let jsonDecoder = JSONDecoder()
         jsonDecoder.keyDecodingStrategy = .convertFromSnakeCase
 
         var testCases: [TestCase] = []
-        for filePath in filePaths where specFilter.isEmpty || specFilter.contains(filePath) {
+        for filePath in filePaths where try matchesPattern(filePath) {
             print("loading \(filePath)")
             guard let data = fileManager.contents(atPath: path + "/" + filePath) else {
                 assertionFailure("failed to load \(filePath)")
@@ -139,6 +144,8 @@ extension TestCase.Command {
 
         switch type {
         case .module:
+            currentModuleInstance = nil
+
             guard let filename = filename else {
                 return handler(self, .skipped("type is \(type), but no filename specified"))
             }
@@ -158,6 +165,8 @@ extension TestCase.Command {
 
             return handler(self, .passed)
         case .assertMalformed:
+            currentModuleInstance = nil
+
             guard let filename = filename else {
                 return handler(self, .skipped("type is \(type), but no filename specified"))
             }
