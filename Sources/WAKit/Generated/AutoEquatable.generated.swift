@@ -59,6 +59,7 @@ extension Label: Equatable {}
 internal func == (lhs: Label, rhs: Label) -> Bool {
     guard lhs.arity == rhs.arity else { return false }
     guard lhs.continuation == rhs.continuation else { return false }
+    guard lhs.range == rhs.range else { return false }
     return true
 }
 // MARK: - ModuleInstance AutoEquatable
