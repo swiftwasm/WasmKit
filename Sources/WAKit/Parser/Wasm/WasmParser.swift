@@ -1,6 +1,6 @@
 import LEB
 
-public final class WASMParser<Stream: ByteStream> {
+public final class WasmParser<Stream: ByteStream> {
     public let stream: Stream
 
     public var currentIndex: Int {
@@ -12,15 +12,15 @@ public final class WASMParser<Stream: ByteStream> {
     }
 }
 
-extension WASMParser {
+extension WasmParser {
     public static func parse(stream: Stream) throws -> Module {
-        let parser = WASMParser(stream: stream)
+        let parser = WasmParser(stream: stream)
         let module = try parser.parseModule()
         return module
     }
 }
 
-public enum WASMParserError: Swift.Error {
+public enum WasmParserError: Swift.Error {
     case invalidMagicNumber([UInt8])
     case unknownVersion([UInt8])
     case invalidUTF8([UInt8])
@@ -31,7 +31,7 @@ public enum WASMParserError: Swift.Error {
 
 /// - Note:
 /// <https://webassembly.github.io/spec/core/binary/conventions.html#vectors>
-extension WASMParser {
+extension WasmParser {
     func parseVector<Content>(content parser: () throws -> Content) throws -> [Content] {
         var contents = [Content]()
         let count: UInt32 = try parseUnsigned()
@@ -44,7 +44,7 @@ extension WASMParser {
 
 /// - Note:
 /// <https://webassembly.github.io/spec/core/binary/values.html#integers>
-extension WASMParser {
+extension WasmParser {
     func parseUnsigned<T: RawUnsignedInteger>() throws -> T {
         let sequence = AnySequence { [stream] in
             AnyIterator {
@@ -71,7 +71,7 @@ extension WASMParser {
 
 /// - Note:
 /// <https://webassembly.github.io/spec/core/binary/values.html#floating-point>
-extension WASMParser {
+extension WasmParser {
     func parseFloat() throws -> Float {
         let bytes = try stream.consume(count: 4).reduce(UInt32(0)) { acc, byte in acc << 8 + UInt32(byte) }
         return Float(bitPattern: bytes)
@@ -85,7 +85,7 @@ extension WASMParser {
 
 /// - Note:
 /// <https://webassembly.github.io/spec/core/binary/values.html#names>
-extension WASMParser {
+extension WasmParser {
     func parseName() throws -> String {
         let bytes = try parseVector { () -> UInt8 in
             try stream.consumeAny()
@@ -99,7 +99,7 @@ extension WASMParser {
             switch decoder.decode(&iterator) {
             case let .scalarValue(scalar): name.append(Character(scalar))
             case .emptyInput: break Decode
-            case .error: throw WASMParserError.invalidUTF8(bytes)
+            case .error: throw WasmParserError.invalidUTF8(bytes)
             }
         }
 
@@ -109,7 +109,7 @@ extension WASMParser {
 
 /// - Note:
 /// <https://webassembly.github.io/spec/core/binary/types.html#types>
-extension WASMParser {
+extension WasmParser {
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/types.html#value-types>
     func parseValueType() throws -> ValueType {
@@ -212,7 +212,7 @@ extension WASMParser {
 
 /// - Note:
 /// <https://webassembly.github.io/spec/core/binary/instructions.html>
-extension WASMParser {
+extension WasmParser {
     func parseInstruction() throws -> [Instruction] {
         let rawCode = try stream.consumeAny()
         guard let code = InstructionCode(rawValue: rawCode) else {
@@ -271,7 +271,7 @@ extension WASMParser {
             let index: UInt32 = try parseUnsigned()
             let zero = try stream.consumeAny()
             guard zero == 0x00 else {
-                throw WASMParserError.zeroExpected(actual: zero, index: currentIndex)
+                throw WasmParserError.zeroExpected(actual: zero, index: currentIndex)
             }
             return [factory.callIndirect(index)]
 
@@ -391,13 +391,13 @@ extension WASMParser {
         case .memory_size:
             let zero = try stream.consumeAny()
             guard zero == 0x00 else {
-                throw WASMParserError.zeroExpected(actual: zero, index: currentIndex)
+                throw WasmParserError.zeroExpected(actual: zero, index: currentIndex)
             }
             return [factory.memorySize]
         case .memory_grow:
             let zero = try stream.consumeAny()
             guard zero == 0x00 else {
-                throw WASMParserError.zeroExpected(actual: zero, index: currentIndex)
+                throw WasmParserError.zeroExpected(actual: zero, index: currentIndex)
             }
             return [factory.memoryGrow]
 
@@ -687,7 +687,7 @@ extension WASMParser {
 
 /// - Note:
 /// <https://webassembly.github.io/spec/core/binary/modules.html#sections>
-extension WASMParser {
+extension WasmParser {
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#custom-section>
     func parseCustomSection() throws -> Section {
@@ -696,7 +696,7 @@ extension WASMParser {
 
         let name = try parseName()
         guard size > name.utf8.count else {
-            throw WASMParserError.invalidSectionSize(size)
+            throw WasmParserError.invalidSectionSize(size)
         }
         let contentSize = Int(size) - name.utf8.count
 
@@ -877,13 +877,13 @@ extension WASMParser {
 
 /// - Note:
 /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-module>
-extension WASMParser {
+extension WasmParser {
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-magic>
     func parseMagicNumber() throws {
         let magicNumber = try stream.consume(count: 4)
         guard magicNumber == [0x00, 0x61, 0x73, 0x6D] else {
-            throw WASMParserError.invalidMagicNumber(magicNumber)
+            throw WasmParserError.invalidMagicNumber(magicNumber)
         }
     }
 
@@ -892,7 +892,7 @@ extension WASMParser {
     func parseVersion() throws {
         let version = try stream.consume(count: 4)
         guard version == [0x01, 0x00, 0x00, 0x00] else {
-            throw WASMParserError.unknownVersion(version)
+            throw WasmParserError.unknownVersion(version)
         }
     }
 
@@ -966,7 +966,7 @@ extension WASMParser {
         }
 
         guard typeIndices.count == codes.count else {
-            throw WASMParserError.inconsistentFunctionAndCodeLength(
+            throw WasmParserError.inconsistentFunctionAndCodeLength(
                 functionCount: typeIndices.count,
                 codeCount: codes.count
             )

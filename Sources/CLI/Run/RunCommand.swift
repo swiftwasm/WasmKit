@@ -36,7 +36,7 @@ final class RunCommand: Command {
         logger.info("Started to parse module")
 
         let (module, parseTime) = try measure(if: isVerbose) {
-            try WASMParser.parse(stream: stream)
+            try WasmParser.parse(stream: stream)
         }
 
         logger.info("Ended to parse module: \(parseTime)")

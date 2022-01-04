@@ -218,7 +218,7 @@ extension TestCase.Command {
 
         let stream = FileHandleStream(fileHandle: fileHandle)
 
-        let module = try WASMParser.parse(stream: stream)
+        let module = try WasmParser.parse(stream: stream)
         return module
     }
 
@@ -255,7 +255,7 @@ extension Swift.Error {
             }
         }
 
-        if let error = self as? WASMParserError {
+        if let error = self as? WasmParserError {
             switch error {
             case .invalidMagicNumber:
                 return "magic header not detected"
