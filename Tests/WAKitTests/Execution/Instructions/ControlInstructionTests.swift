@@ -249,4 +249,28 @@ final class ControlInstructionTests: XCTestCase {
             Instruction.Action.invoke(0)
         )
     }
+
+    func testLoad() {
+        let memory = MemoryInstance(.init(min: 1, max: nil))
+        memory.data[0..<3] = [97, 98, 99, 100] // ASCII "abcd"
+        store.memories.append(memory)
+
+        let module = ModuleInstance()
+        module.memoryAddresses = [0]
+
+        let frame = Frame(arity: 0, module: module, locals: [])
+        stack.push(frame)
+        stack.push(I32(0))
+
+        let instruction = InstructionFactory(code: .i32_load8_u).load(I32.self, bitWidth: 8, isSigned: false, 0)
+        XCTAssertEqual(instruction.code, .i32_load8_u)
+
+        let expression = Expression(instructions: [instruction])
+        XCTAssertEqual(
+            try expression.execute(address: 0, store: store, stack: &stack),
+            Instruction.Action.jump(1)
+        )
+
+        XCTAssertEqual(stack, [I32(97), frame])
+    }
 }
