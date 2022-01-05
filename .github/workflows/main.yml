@@ -14,11 +14,15 @@ jobs:
       - name: Select Xcode version
         run: sudo xcode-select -switch /Applications/Xcode_13.2.1.app
       - name: Test in Debug
-        run: swift test -c debug
+        run: |
+          swift test -c debug
+          make testspec
 
   build-linux:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
       - name: Test in Debug
-        run: swift test -c debug
+        run: |
+          swift test -c debug
+          make testspec
