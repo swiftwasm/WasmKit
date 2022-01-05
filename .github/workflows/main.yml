@@ -16,7 +16,7 @@ jobs:
       - name: Test in Debug
         run: |
           swift test -c debug
-          make testspec
+          make spectest
 
   build-linux:
     runs-on: ubuntu-20.04
@@ -25,4 +25,4 @@ jobs:
       - name: Test in Debug
         run: |
           swift test -c debug
-          make testspec
+          make spectest
