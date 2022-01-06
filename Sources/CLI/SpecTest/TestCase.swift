@@ -182,6 +182,7 @@ extension TestCase.Command {
                 return handler(self, .failed("module should not be parsed: expected \"\(text ?? "null")\""))
             }
             return handler(self, .passed)
+
         case .assertReturn:
             guard let action = action else {
                 return handler(self, .failed("type is \(type), but no action specified"))
@@ -189,25 +190,48 @@ extension TestCase.Command {
             guard let moduleInstance = currentModuleInstance else {
                 return handler(self, .failed("type is \(type), but no current module"))
             }
-            switch action.type {
-            case .invoke:
-                let args = parseValues(args: action.args!)
-                let expected = parseValues(args: self.expected ?? [])
-                let result: [WAKit.Value]
-                do {
-                    result = try runtime.invoke(moduleInstance, function: action.field, with: args)
-                } catch {
-                    return handler(self, .failed("\(error)"))
-                }
-                guard result == expected else {
-                    return handler(self, .failed("result mismatch: expected: \(expected), actual: \(result)"))
-                }
-                handler(self, .passed)
-            default:
-                handler(self, .failed("action type \(action.type) has been not implemented"))
+            guard case .invoke = action.type else {
+                return handler(self, .failed("action type \(action.type) has been not implemented for \(type.rawValue)"))
             }
+
+            let args = parseValues(args: action.args!)
+            let expected = parseValues(args: self.expected ?? [])
+            let result: [WAKit.Value]
+            do {
+                result = try runtime.invoke(moduleInstance, function: action.field, with: args)
+            } catch {
+                return handler(self, .failed("\(error)"))
+            }
+            guard result == expected else {
+                return handler(self, .failed("result mismatch: expected: \(expected), actual: \(result)"))
+            }
+            return handler(self, .passed)
+
+        case .assertTrap:
+            guard let action = action else {
+                return handler(self, .failed("type is \(type), but no action specified"))
+            }
+            guard let moduleInstance = currentModuleInstance else {
+                return handler(self, .failed("type is \(type), but no current module"))
+            }
+            guard case .invoke = action.type else {
+                return handler(self, .failed("action type \(action.type) has been not implemented for \(type.rawValue)"))
+            }
+
+            let args = parseValues(args: action.args!)
+            do {
+                _ = try runtime.invoke(moduleInstance, function: action.field, with: args)
+            } catch let trap as Trap {
+                guard trap.assertionText == text else {
+                    return handler(self, .failed("assertion mismatch: expected: \(text!), actual: \(trap.assertionText)"))
+                }
+            } catch {
+                return handler(self, .failed("\(error)"))
+            }
+            return handler(self, .passed)
+
         default:
-            handler(self, .failed("type \(type) has been not implemented"))
+            return handler(self, .failed("type \(type) has been not implemented"))
         }
     }
 

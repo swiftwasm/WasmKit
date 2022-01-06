@@ -13,10 +13,14 @@ extension InstructionFactory {
             let memoryAddress = frame.module.memoryAddresses[0]
             let memoryInstance = store.memories[memoryAddress]
             let i = try stack.pop(I32.self).rawValue
-            let address = Int(offset + i)
+            let (incrementedOffset, isOverflow) = offset.addingReportingOverflow(i)
+            guard !isOverflow else {
+                throw Trap.outOfBoundsMemoryAccess
+            }
+            let address = Int(incrementedOffset)
             let length = (bitWidth ?? type.bitWidth) / 8
             guard memoryInstance.data.indices.contains(address + length) else {
-                throw Trap.memoryOverflow
+                throw Trap.outOfBoundsMemoryAccess
             }
 
             let bytes = memoryInstance.data[address ..< address + length]
@@ -38,7 +42,7 @@ extension InstructionFactory {
             let address = Int(offset + i)
             let length = type.bitWidth / 8
             guard memoryInstance.data.indices.contains(address + length) else {
-                throw Trap.memoryOverflow
+                throw Trap.outOfBoundsMemoryAccess
             }
 
             memoryInstance.data.replaceSubrange(address ..< address + length, with: value.bytes())

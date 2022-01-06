@@ -59,7 +59,7 @@ extension Runtime {
             guard
                 memoryInstance.data.indices.contains(offset),
                 memoryInstance.data.indices.contains(end)
-            else { throw Trap.memoryOverflow }
+            else { throw Trap.outOfBoundsMemoryAccess }
             memoryInstance.data.replaceSubrange(offset ..< end, with: data.initializer)
         }
 
