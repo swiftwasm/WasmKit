@@ -53,7 +53,8 @@ extension Runtime {
         }
 
         for data in module.data {
-            let memoryInstance = store.memories[Int(data.index)]
+            let memoryIndex = instance.memoryAddresses[Int(data.index)]
+            let memoryInstance = store.memories[memoryIndex]
             let offset = try Int(execute(data.offset, resultType: I32.self).rawValue)
             let end = Int(offset) + data.initializer.count
             guard

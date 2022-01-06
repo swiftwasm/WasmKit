@@ -250,7 +250,7 @@ final class ControlInstructionTests: XCTestCase {
         )
     }
 
-    func testLoad() {
+    func testI32Load8() {
         let memory = MemoryInstance(.init(min: 1, max: nil))
         memory.data[0..<3] = [97, 98, 99, 100] // ASCII "abcd"
         store.memories.append(memory)

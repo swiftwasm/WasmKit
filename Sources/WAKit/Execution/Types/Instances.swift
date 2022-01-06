@@ -56,6 +56,12 @@ final class MemoryInstance {
     }
 }
 
+extension MemoryInstance: CustomStringConvertible {
+    public var description: String {
+        String(describing: ObjectIdentifier(self))
+    }
+}
+
 /// - Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#global-instances>
 final class GlobalInstance {
