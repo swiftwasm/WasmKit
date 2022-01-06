@@ -1,29 +1,29 @@
+import ArgumentParser
 import Foundation
 import Logging
-import SwiftCLI
 import WAKit
 
 private let logger = Logger(label: "com.WAKit.CLI")
 
-final class RunCommand: Command {
-    let name = "run"
+struct Run: ParsableCommand {
+    @Flag
+    var verbose = false
 
-    let isVerbose = Flag("-v")
-    let path = Parameter()
-    let functionName = Parameter()
-    let arguments = OptionalCollectedParameter()
+    @Argument
+    var path: String
 
-    func execute() throws {
-        let isVerbose = self.isVerbose.value
+    @Argument
+    var functionName: String
 
+    @Argument
+    var arguments: [String]
+
+    func run() throws {
         LoggingSystem.bootstrap {
             var handler = StreamLogHandler.standardOutput(label: $0)
-            handler.logLevel = isVerbose ? .info : .warning
+            handler.logLevel = verbose ? .info : .warning
             return handler
         }
-
-        let path = self.path.value
-        let functionName = self.functionName.value
 
         guard let fileHandle = FileHandle(forReadingAtPath: path) else {
             logger.error("File \"\(path)\" could not be opened")
@@ -35,7 +35,7 @@ final class RunCommand: Command {
 
         logger.info("Started to parse module")
 
-        let (module, parseTime) = try measure(if: isVerbose) {
+        let (module, parseTime) = try measure(if: verbose) {
             try WasmParser.parse(stream: stream)
         }
 
@@ -45,7 +45,7 @@ final class RunCommand: Command {
         let moduleInstance = try runtime.instantiate(module: module, externalValues: [])
 
         var parameters: [Value] = []
-        for argument in arguments.value {
+        for argument in arguments {
             let parameter: Value
             let type = argument.prefix { $0 != ":" }
             let value = argument.drop { $0 != ":" }.dropFirst()
@@ -61,13 +61,13 @@ final class RunCommand: Command {
 
         logger.info("Started invoking function \"\(functionName)\" with parameters: \(parameters)")
 
-        let (results, invokeTime) = try measure(if: isVerbose) {
+        let (results, invokeTime) = try measure(if: verbose) {
             try runtime.invoke(moduleInstance, function: functionName, with: parameters)
         }
 
         logger.info("Ended invoking function \"\(functionName)\": \(invokeTime)")
 
-        stdout <<< results.description
+        print(results.description)
     }
 
     func measure<Result>(
