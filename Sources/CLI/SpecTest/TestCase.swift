@@ -227,7 +227,9 @@ extension TestCase.Command {
             switch $0.type {
             case .i32: return I32(UInt32($0.value)!)
             case .i64: return I64(UInt64($0.value)!)
+            case .f32 where $0.value.starts(with: "nan:"): return F32(Float32.nan)
             case .f32: return F32(Float32($0.value)!)
+            case .f64 where $0.value.starts(with: "nan:"): return F64(Float64.nan)
             case .f64: return F64(Float64($0.value)!)
             }
         }
@@ -238,7 +240,9 @@ extension TestCase.Command {
             switch $0.type {
             case .i32: return I32(UInt32($0.value!)!)
             case .i64: return I64(UInt64($0.value!)!)
+            case .f32 where $0.value!.starts(with: "nan:"): return F32(Float32.nan)
             case .f32: return F32(Float32($0.value!)!)
+            case .f64 where $0.value!.starts(with: "nan:"): return F64(Float64.nan)
             case .f64: return F64(Float64($0.value!)!)
             }
         }

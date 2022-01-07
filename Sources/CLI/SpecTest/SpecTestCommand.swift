@@ -20,6 +20,7 @@ final class SpecTestCommand: Command {
             fatalError("failed to load test: \(error)")
         }
 
+        var results = [Result]()
         for testCase in testCases {
             testCase.run(rootPath: path.value) { testCase, command, result in
                 switch result {
@@ -30,7 +31,11 @@ final class SpecTestCommand: Command {
                 default:
                     print("\(testCase.sourceFilename):\(command.line):", result.banner)
                 }
+                results.append(result)
             }
         }
+
+        let passingCount = results.filter { if case .passed = $0 { return true } else { return false} }.count
+        print("\(passingCount)/\(results.count) \(Int(Double(passingCount)/Double(results.count) * 100))% passing")
     }
 }

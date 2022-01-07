@@ -11,14 +11,29 @@ jobs:
     steps:
       # Checks-out the repo. More at: https://github.com/actions/checkout
       - uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - name: Select Xcode version
         run: sudo xcode-select -switch /Applications/Xcode_13.2.1.app
       - name: Test in Debug
-        run: swift test -c debug
+        run: |
+          swift test -c debug
+
+          brew install wabt
+          make spectest
 
   build-linux:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - name: Test in Debug
-        run: swift test -c debug
+        run: |
+          swift test -c debug
+
+          # Disabled on Linux due to unexplained crashes.
+          # curl -L -v -o wabt.tar.gz https://github.com/WebAssembly/wabt/releases/download/1.0.24/wabt-1.0.24-ubuntu.tar.gz
+          # tar xzvf wabt.tar.gz
+          # cp wabt-1.0.24/bin/* /usr/local/bin
+          # make spectest
