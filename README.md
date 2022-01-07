@@ -42,5 +42,5 @@ $ make build      # or `swift build`
 To run the core spec test suite run this:
 
 ```sh
-$ make spectest   # Process core spec tests if needed and check their assertions with WAKit
+$ make spectest   # Prepare core spec tests and check their assertions with WAKit
 ```
