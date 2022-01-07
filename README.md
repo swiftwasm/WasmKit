@@ -27,7 +27,7 @@ $ wakit run Examples/wasm/fib.wasm fib i32:10
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/akkyie/WAKit", .branch("master")),
+    .package(url: "https://github.com/akkyie/WAKit", .branch("main")),
 ],
 ```
 
@@ -44,5 +44,3 @@ To run the core spec test suite run this:
 ```sh
 $ make spectest   # Process core spec tests if needed and check their assertions with WAKit
 ```
-
-
