@@ -1,14 +1,20 @@
 /// - Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#memory-instructions>
 extension InstructionFactory {
-    func load<V: Value & ByteConvertible>(_ type: V.Type, _ offset: UInt32) -> Instruction {
+    func load<V: Value & ByteConvertible>(
+        _ type: V.Type,
+        bitWidth: Int? = nil,
+        isSigned: Bool = true,
+        _ offset: UInt32
+    ) -> Instruction {
+        // FIXME: handle `isSigned`
         return makeInstruction { pc, store, stack in
             let frame = try stack.get(current: Frame.self)
             let memoryAddress = frame.module.memoryAddresses[0]
             let memoryInstance = store.memories[memoryAddress]
             let i = try stack.pop(I32.self).rawValue
             let address = Int(offset + i)
-            let length = type.bitWidth / 8
+            let length = (bitWidth ?? type.bitWidth) / 8
             guard memoryInstance.data.indices.contains(address + length) else {
                 throw Trap.memoryOverflow
             }

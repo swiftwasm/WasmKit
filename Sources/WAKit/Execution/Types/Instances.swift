@@ -45,7 +45,7 @@ final class TableInstance {
 /// - Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#memory-instances>
 final class MemoryInstance {
-    private static let pageSize = 6 * 1024
+    private static let pageSize = 64 * 1024
 
     var data: [UInt8]
     let max: UInt32?
