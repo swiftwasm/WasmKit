@@ -38,6 +38,8 @@ public enum Trap: Error {
         switch self {
         case .outOfBoundsMemoryAccess:
             return "out of bounds memory access"
+        case .integerDividedByZero:
+            return "integer divide by zero"
         default:
             return String(describing: self)
         }
