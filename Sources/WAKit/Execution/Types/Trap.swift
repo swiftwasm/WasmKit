@@ -25,6 +25,9 @@ public enum Trap: Error {
     case memoryOverflow
     case invalidFunctionIndex(Int)
     case poppedLabelMismatch
+    case labelMismatch
+    case integerDividedByZero
+    case integerOverflowed
 
     static func unimplemented(_ description: String = "", file: StaticString = #file, line: UInt = #line) -> Trap {
         return ._unimplemented(description: description, file: file, line: line)

@@ -1,6 +1,6 @@
 import LEB
 
-public final class WASMParser<Stream: ByteStream> {
+public final class WasmParser<Stream: ByteStream> {
     public let stream: Stream
 
     public var currentIndex: Int {
@@ -12,15 +12,15 @@ public final class WASMParser<Stream: ByteStream> {
     }
 }
 
-extension WASMParser {
+extension WasmParser {
     public static func parse(stream: Stream) throws -> Module {
-        let parser = WASMParser(stream: stream)
+        let parser = WasmParser(stream: stream)
         let module = try parser.parseModule()
         return module
     }
 }
 
-public enum WASMParserError: Swift.Error {
+public enum WasmParserError: Swift.Error {
     case invalidMagicNumber([UInt8])
     case unknownVersion([UInt8])
     case invalidUTF8([UInt8])
@@ -31,7 +31,7 @@ public enum WASMParserError: Swift.Error {
 
 /// - Note:
 /// <https://webassembly.github.io/spec/core/binary/conventions.html#vectors>
-extension WASMParser {
+extension WasmParser {
     func parseVector<Content>(content parser: () throws -> Content) throws -> [Content] {
         var contents = [Content]()
         let count: UInt32 = try parseUnsigned()
@@ -44,7 +44,7 @@ extension WASMParser {
 
 /// - Note:
 /// <https://webassembly.github.io/spec/core/binary/values.html#integers>
-extension WASMParser {
+extension WasmParser {
     func parseUnsigned<T: RawUnsignedInteger>() throws -> T {
         let sequence = AnySequence { [stream] in
             AnyIterator {
@@ -71,7 +71,7 @@ extension WASMParser {
 
 /// - Note:
 /// <https://webassembly.github.io/spec/core/binary/values.html#floating-point>
-extension WASMParser {
+extension WasmParser {
     func parseFloat() throws -> Float {
         let bytes = try stream.consume(count: 4).reduce(UInt32(0)) { acc, byte in acc << 8 + UInt32(byte) }
         return Float(bitPattern: bytes)
@@ -85,7 +85,7 @@ extension WASMParser {
 
 /// - Note:
 /// <https://webassembly.github.io/spec/core/binary/values.html#names>
-extension WASMParser {
+extension WasmParser {
     func parseName() throws -> String {
         let bytes = try parseVector { () -> UInt8 in
             try stream.consumeAny()
@@ -99,7 +99,7 @@ extension WASMParser {
             switch decoder.decode(&iterator) {
             case let .scalarValue(scalar): name.append(Character(scalar))
             case .emptyInput: break Decode
-            case .error: throw WASMParserError.invalidUTF8(bytes)
+            case .error: throw WasmParserError.invalidUTF8(bytes)
             }
         }
 
@@ -109,7 +109,7 @@ extension WASMParser {
 
 /// - Note:
 /// <https://webassembly.github.io/spec/core/binary/types.html#types>
-extension WASMParser {
+extension WasmParser {
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/types.html#value-types>
     func parseValueType() throws -> ValueType {
@@ -212,7 +212,7 @@ extension WASMParser {
 
 /// - Note:
 /// <https://webassembly.github.io/spec/core/binary/instructions.html>
-extension WASMParser {
+extension WasmParser {
     func parseInstruction() throws -> [Instruction] {
         let rawCode = try stream.consumeAny()
         guard let code = InstructionCode(rawValue: rawCode) else {
@@ -271,7 +271,7 @@ extension WASMParser {
             let index: UInt32 = try parseUnsigned()
             let zero = try stream.consumeAny()
             guard zero == 0x00 else {
-                throw WASMParserError.zeroExpected(actual: zero, index: currentIndex)
+                throw WasmParserError.zeroExpected(actual: zero, index: currentIndex)
             }
             return [factory.callIndirect(index)]
 
@@ -391,13 +391,13 @@ extension WASMParser {
         case .memory_size:
             let zero = try stream.consumeAny()
             guard zero == 0x00 else {
-                throw WASMParserError.zeroExpected(actual: zero, index: currentIndex)
+                throw WasmParserError.zeroExpected(actual: zero, index: currentIndex)
             }
             return [factory.memorySize]
         case .memory_grow:
             let zero = try stream.consumeAny()
             guard zero == 0x00 else {
-                throw WASMParserError.zeroExpected(actual: zero, index: currentIndex)
+                throw WasmParserError.zeroExpected(actual: zero, index: currentIndex)
             }
             return [factory.memoryGrow]
 
@@ -415,259 +415,261 @@ extension WASMParser {
             return [factory.const(F64(n))]
 
         case .i32_eqz:
-            return [factory.operate(I32.self, ==, I32(0))]
+            return [factory.numeric(unary: .eqz(I32.self))]
         case .i32_eq:
-            return [factory.operate(I32.self, ==)]
+            return [factory.numeric(binary: .eq(I32.self))]
         case .i32_ne:
-            return [factory.operate(I32.self, !=)]
+            return [factory.numeric(binary: .ne(I32.self))]
         case .i32_lt_s:
-            return [factory.operate(signed: I32.self, <)]
+            return [factory.numeric(binary: .ltS(I32.self))]
         case .i32_lt_u:
-            return [factory.operate(I32.self, <)]
+            return [factory.numeric(binary: .ltU(I32.self))]
         case .i32_gt_s:
-            return [factory.operate(signed: I32.self, >)]
+            return [factory.numeric(binary: .gtS(I32.self))]
         case .i32_gt_u:
-            return [factory.operate(I32.self, >)]
+            return [factory.numeric(binary: .gtU(I32.self))]
         case .i32_le_s:
-            return [factory.operate(signed: I32.self, <=)]
+            return [factory.numeric(binary: .leS(I32.self))]
         case .i32_le_u:
-            return [factory.operate(I32.self, <=)]
+            return [factory.numeric(binary: .leU(I32.self))]
         case .i32_ge_s:
-            return [factory.operate(signed: I32.self, >=)]
+            return [factory.numeric(binary: .geS(I32.self))]
         case .i32_ge_u:
-            return [factory.operate(I32.self, >=)]
+            return [factory.numeric(binary: .geU(I32.self))]
 
         case .i64_eqz:
-            return [factory.operate(I64.self, ==, I64(0))]
+            return [factory.numeric(unary: .eqz(I64.self))]
         case .i64_eq:
-            return [factory.operate(I64.self, ==)]
+            return [factory.numeric(binary: .eq(I64.self))]
         case .i64_ne:
-            return [factory.operate(I64.self, !=)]
+            return [factory.numeric(binary: .ne(I64.self))]
         case .i64_lt_s:
-            return [factory.operate(signed: I64.self, <)]
+            return [factory.numeric(binary: .ltS(I64.self))]
         case .i64_lt_u:
-            return [factory.operate(I64.self, <)]
+            return [factory.numeric(binary: .ltU(I64.self))]
         case .i64_gt_s:
-            return [factory.operate(signed: I64.self, >)]
+            return [factory.numeric(binary: .gtS(I64.self))]
         case .i64_gt_u:
-            return [factory.operate(I64.self, >)]
+            return [factory.numeric(binary: .gtU(I64.self))]
         case .i64_le_s:
-            return [factory.operate(signed: I64.self, <=)]
+            return [factory.numeric(binary: .leS(I64.self))]
         case .i64_le_u:
-            return [factory.operate(I64.self, <=)]
+            return [factory.numeric(binary: .leU(I64.self))]
         case .i64_ge_s:
-            return [factory.operate(signed: I64.self, >=)]
+            return [factory.numeric(binary: .geS(I64.self))]
         case .i64_ge_u:
-            return [factory.operate(I64.self, >=)]
+            return [factory.numeric(binary: .geU(I64.self))]
 
         case .f32_eq:
-            return [factory.operate(F32.self, ==)]
+            return [factory.numeric(binary: .eq(F32.self))]
         case .f32_ne:
-            return [factory.operate(F32.self, !=)]
+            return [factory.numeric(binary: .ne(F32.self))]
         case .f32_lt:
-            return [factory.operate(F32.self, <)]
+            return [factory.numeric(binary: .lt(F32.self))]
         case .f32_gt:
-            return [factory.operate(F32.self, >)]
+            return [factory.numeric(binary: .gt(F32.self))]
         case .f32_le:
-            return [factory.operate(F32.self, <=)]
+            return [factory.numeric(binary: .le(F32.self))]
         case .f32_ge:
-            return [factory.operate(F32.self, >=)]
+            return [factory.numeric(binary: .ge(F32.self))]
 
         case .f64_eq:
-            return [factory.operate(F64.self, ==)]
+            return [factory.numeric(binary: .eq(F64.self))]
         case .f64_ne:
-            return [factory.operate(F64.self, !=)]
+            return [factory.numeric(binary: .ne(F64.self))]
         case .f64_lt:
-            return [factory.operate(F64.self, <)]
+            return [factory.numeric(binary: .lt(F64.self))]
         case .f64_gt:
-            return [factory.operate(F64.self, >)]
+            return [factory.numeric(binary: .gt(F64.self))]
         case .f64_le:
-            return [factory.operate(F64.self, <=)]
+            return [factory.numeric(binary: .le(F64.self))]
         case .f64_ge:
-            return [factory.operate(F64.self, >=)]
+            return [factory.numeric(binary: .ge(F64.self))]
 
         case .i32_clz:
-            return [factory.operate(I32.self) { UInt32($0.leadingZeroBitCount) }]
+            return [factory.numeric(unary: .clz(I32.self))]
         case .i32_ctz:
-            return [factory.operate(I32.self) { UInt32($0.trailingZeroBitCount) }]
+            return [factory.numeric(unary: .ctz(I32.self))]
         case .i32_popcnt:
-            return [factory.operate(I32.self) { UInt32($0.nonzeroBitCount) }]
+            return [factory.numeric(unary: .popcnt(I32.self))]
         case .i32_add:
-            return [factory.operate(I32.self, &+)]
+            return [factory.numeric(binary: .add(I32.self))]
         case .i32_sub:
-            return [factory.operate(I32.self, &-)]
+            return [factory.numeric(binary: .sub(I32.self))]
         case .i32_mul:
-            return []
+            return [factory.numeric(binary: .mul(I32.self))]
         case .i32_div_s:
-            return []
+            return [factory.numeric(binary: .divS(I32.self))]
         case .i32_div_u:
-            return []
+            return [factory.numeric(binary: .divU(I32.self))]
         case .i32_rem_s:
-            return []
+            return [factory.numeric(binary: .remS(I32.self))]
         case .i32_rem_u:
-            return []
+            return [factory.numeric(binary: .remU(I32.self))]
         case .i32_and:
-            return []
+            return [factory.numeric(binary: .and(I32.self))]
         case .i32_or:
-            return []
+            return [factory.numeric(binary: .or(I32.self))]
         case .i32_xor:
-            return []
+            return [factory.numeric(binary: .xor(I32.self))]
         case .i32_shl:
-            return []
+            return [factory.numeric(binary: .shl(I32.self))]
         case .i32_shr_s:
-            return []
+            return [factory.numeric(binary: .shrS(I32.self))]
         case .i32_shr_u:
-            return []
+            return [factory.numeric(binary: .shrU(I32.self))]
         case .i32_rotl:
-            return []
+            return [factory.numeric(binary: .rotl(I32.self))]
         case .i32_rotr:
-            return []
+            return [factory.numeric(binary: .rotr(I32.self))]
 
         case .i64_clz:
-            return []
+            return [factory.numeric(unary: .clz(I64.self))]
         case .i64_ctz:
-            return []
+            return [factory.numeric(unary: .ctz(I64.self))]
         case .i64_popcnt:
-            return []
+            return [factory.numeric(unary: .popcnt(I64.self))]
         case .i64_add:
-            return []
+            return [factory.numeric(binary: .add(I64.self))]
         case .i64_sub:
-            return []
+            return [factory.numeric(binary: .sub(I64.self))]
         case .i64_mul:
-            return []
+            return [factory.numeric(binary: .mul(I64.self))]
         case .i64_div_s:
-            return []
+            return [factory.numeric(binary: .divS(I64.self))]
         case .i64_div_u:
-            return []
+            return [factory.numeric(binary: .divU(I64.self))]
         case .i64_rem_s:
-            return []
+            return [factory.numeric(binary: .remS(I64.self))]
         case .i64_rem_u:
-            return []
+            return [factory.numeric(binary: .remU(I64.self))]
         case .i64_and:
-            return []
+            return [factory.numeric(binary: .and(I64.self))]
         case .i64_or:
-            return []
+            return [factory.numeric(binary: .or(I64.self))]
         case .i64_xor:
-            return []
+            return [factory.numeric(binary: .xor(I64.self))]
         case .i64_shl:
-            return []
+            return [factory.numeric(binary: .shl(I64.self))]
         case .i64_shr_s:
-            return []
+            return [factory.numeric(binary: .shrS(I64.self))]
         case .i64_shr_u:
-            return []
+            return [factory.numeric(binary: .shrU(I64.self))]
         case .i64_rotl:
-            return []
+            return [factory.numeric(binary: .rotl(I64.self))]
         case .i64_rotr:
-            return []
+            return [factory.numeric(binary: .rotr(I64.self))]
 
         case .f32_abs:
-            return []
+            return [factory.numeric(unary: .abs(F32.self))]
         case .f32_neg:
-            return []
+            return [factory.numeric(unary: .neg(F32.self))]
         case .f32_ceil:
-            return []
+            return [factory.numeric(unary: .ceil(F32.self))]
         case .f32_floor:
-            return []
+            return [factory.numeric(unary: .floor(F32.self))]
         case .f32_trunc:
-            return []
+            return [factory.numeric(unary: .trunc(F32.self))]
         case .f32_nearest:
-            return []
+            return [factory.numeric(unary: .nearest(F32.self))]
         case .f32_sqrt:
-            return []
+            return [factory.numeric(unary: .sqrt(F32.self))]
+
         case .f32_add:
-            return []
+            return [factory.numeric(binary: .add(F32.self))]
         case .f32_sub:
-            return []
+            return [factory.numeric(binary: .sub(F32.self))]
         case .f32_mul:
-            return []
+            return [factory.numeric(binary: .mul(F32.self))]
         case .f32_div:
-            return []
+            return [factory.numeric(binary: .div(F32.self))]
         case .f32_min:
-            return []
+            return [factory.numeric(binary: .min(F32.self))]
         case .f32_max:
-            return []
+            return [factory.numeric(binary: .max(F32.self))]
         case .f32_copysign:
-            return []
+            return [factory.numeric(binary: .copysign(F32.self))]
 
         case .f64_abs:
-            return []
+            return [factory.numeric(unary: .abs(F64.self))]
         case .f64_neg:
-            return []
+            return [factory.numeric(unary: .neg(F64.self))]
         case .f64_ceil:
-            return []
+            return [factory.numeric(unary: .ceil(F64.self))]
         case .f64_floor:
-            return []
+            return [factory.numeric(unary: .floor(F64.self))]
         case .f64_trunc:
-            return []
+            return [factory.numeric(unary: .trunc(F64.self))]
         case .f64_nearest:
-            return []
+            return [factory.numeric(unary: .nearest(F64.self))]
         case .f64_sqrt:
-            return []
+            return [factory.numeric(unary: .sqrt(F64.self))]
+
         case .f64_add:
-            return []
+            return [factory.numeric(binary: .add(F64.self))]
         case .f64_sub:
-            return []
+            return [factory.numeric(binary: .sub(F64.self))]
         case .f64_mul:
-            return []
+            return [factory.numeric(binary: .mul(F64.self))]
         case .f64_div:
-            return []
+            return [factory.numeric(binary: .div(F64.self))]
         case .f64_min:
-            return []
+            return [factory.numeric(binary: .min(F64.self))]
         case .f64_max:
-            return []
+            return [factory.numeric(binary: .max(F64.self))]
         case .f64_copysign:
-            return []
+            return [factory.numeric(binary: .copysign(F64.self))]
 
         case .i32_wrap_i64:
-            return []
+            return [factory.numeric(conversion: .wrap(I32.self, I64.self))]
         case .i32_trunc_f32_s:
-            return []
+            return [factory.numeric(conversion: .truncS(I32.self, F32.self))]
         case .i32_trunc_f32_u:
-            return []
+            return [factory.numeric(conversion: .truncU(I32.self, F32.self))]
         case .i32_trunc_f64_s:
-            return []
+            return [factory.numeric(conversion: .truncS(I32.self, F64.self))]
         case .i32_trunc_f64_u:
-            return []
+            return [factory.numeric(conversion: .truncU(I32.self, F64.self))]
         case .i64_extend_i32_s:
-            return []
+            return [factory.numeric(conversion: .extendS(I64.self, I32.self))]
         case .i64_extend_i32_u:
-            return []
+            return [factory.numeric(conversion: .extendU(I64.self, I32.self))]
         case .i64_trunc_f32_s:
-            return []
+            return [factory.numeric(conversion: .truncS(I64.self, F32.self))]
         case .i64_trunc_f32_u:
-            return []
+            return [factory.numeric(conversion: .truncU(I64.self, F32.self))]
         case .i64_trunc_f64_s:
-            return []
+            return [factory.numeric(conversion: .truncS(I64.self, F64.self))]
         case .i64_trunc_f64_u:
-            return []
+            return [factory.numeric(conversion: .truncU(I64.self, F64.self))]
         case .f32_convert_i32_s:
-            return []
+            return [factory.numeric(conversion: .convertS(F32.self, I32.self))]
         case .f32_convert_i32_u:
-            return []
+            return [factory.numeric(conversion: .convertU(F32.self, I32.self))]
         case .f32_convert_i64_s:
-            return []
+            return [factory.numeric(conversion: .convertS(F32.self, I64.self))]
         case .f32_convert_i64_u:
-            return []
+            return [factory.numeric(conversion: .convertU(F32.self, I64.self))]
         case .f32_demote_f64:
-            return []
+            return [factory.numeric(conversion: .demote(F32.self, F64.self))]
         case .f64_convert_i32_s:
-            return []
+            return [factory.numeric(conversion: .convertS(F64.self, I32.self))]
         case .f64_convert_i32_u:
-            return []
+            return [factory.numeric(conversion: .convertU(F64.self, I32.self))]
         case .f64_convert_i64_s:
-            return []
+            return [factory.numeric(conversion: .convertS(F64.self, I64.self))]
         case .f64_convert_i64_u:
-            return []
+            return [factory.numeric(conversion: .convertU(F64.self, I64.self))]
         case .f64_promote_f32:
-            return []
+            return [factory.numeric(conversion: .promote(F64.self, F32.self))]
         case .i32_reinterpret_f32:
-            return []
+            return [factory.numeric(conversion: .reinterpret(I32.self, F32.self))]
         case .i64_reinterpret_f64:
-            return []
+            return [factory.numeric(conversion: .reinterpret(I64.self, F64.self))]
         case .f32_reinterpret_i32:
-            return []
+            return [factory.numeric(conversion: .reinterpret(F32.self, I32.self))]
         case .f64_reinterpret_i64:
-            return []
+            return [factory.numeric(conversion: .reinterpret(F64.self, I64.self))]
         }
     }
 
@@ -685,7 +687,7 @@ extension WASMParser {
 
 /// - Note:
 /// <https://webassembly.github.io/spec/core/binary/modules.html#sections>
-extension WASMParser {
+extension WasmParser {
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#custom-section>
     func parseCustomSection() throws -> Section {
@@ -694,7 +696,7 @@ extension WASMParser {
 
         let name = try parseName()
         guard size > name.utf8.count else {
-            throw WASMParserError.invalidSectionSize(size)
+            throw WasmParserError.invalidSectionSize(size)
         }
         let contentSize = Int(size) - name.utf8.count
 
@@ -875,13 +877,13 @@ extension WASMParser {
 
 /// - Note:
 /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-module>
-extension WASMParser {
+extension WasmParser {
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-magic>
     func parseMagicNumber() throws {
         let magicNumber = try stream.consume(count: 4)
         guard magicNumber == [0x00, 0x61, 0x73, 0x6D] else {
-            throw WASMParserError.invalidMagicNumber(magicNumber)
+            throw WasmParserError.invalidMagicNumber(magicNumber)
         }
     }
 
@@ -890,7 +892,7 @@ extension WASMParser {
     func parseVersion() throws {
         let version = try stream.consume(count: 4)
         guard version == [0x01, 0x00, 0x00, 0x00] else {
-            throw WASMParserError.unknownVersion(version)
+            throw WasmParserError.unknownVersion(version)
         }
     }
 
@@ -964,7 +966,7 @@ extension WASMParser {
         }
 
         guard typeIndices.count == codes.count else {
-            throw WASMParserError.inconsistentFunctionAndCodeLength(
+            throw WasmParserError.inconsistentFunctionAndCodeLength(
                 functionCount: typeIndices.count,
                 codeCount: codes.count
             )

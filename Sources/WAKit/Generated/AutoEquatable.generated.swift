@@ -110,3 +110,160 @@ public func == (lhs: FunctionType, rhs: FunctionType) -> Bool {
     default: return false
     }
 }
+// MARK: - NumericInstruction.Binary AutoEquatable
+extension NumericInstruction.Binary: Equatable {}
+internal func == (lhs: NumericInstruction.Binary, rhs: NumericInstruction.Binary) -> Bool {
+    switch (lhs, rhs) {
+    case (.add(let lhs), .add(let rhs)):
+        return lhs == rhs
+    case (.sub(let lhs), .sub(let rhs)):
+        return lhs == rhs
+    case (.mul(let lhs), .mul(let rhs)):
+        return lhs == rhs
+    case (.eq(let lhs), .eq(let rhs)):
+        return lhs == rhs
+    case (.ne(let lhs), .ne(let rhs)):
+        return lhs == rhs
+    case (.divS(let lhs), .divS(let rhs)):
+        return lhs == rhs
+    case (.divU(let lhs), .divU(let rhs)):
+        return lhs == rhs
+    case (.remS(let lhs), .remS(let rhs)):
+        return lhs == rhs
+    case (.remU(let lhs), .remU(let rhs)):
+        return lhs == rhs
+    case (.and(let lhs), .and(let rhs)):
+        return lhs == rhs
+    case (.or(let lhs), .or(let rhs)):
+        return lhs == rhs
+    case (.xor(let lhs), .xor(let rhs)):
+        return lhs == rhs
+    case (.shl(let lhs), .shl(let rhs)):
+        return lhs == rhs
+    case (.shrS(let lhs), .shrS(let rhs)):
+        return lhs == rhs
+    case (.shrU(let lhs), .shrU(let rhs)):
+        return lhs == rhs
+    case (.rotl(let lhs), .rotl(let rhs)):
+        return lhs == rhs
+    case (.rotr(let lhs), .rotr(let rhs)):
+        return lhs == rhs
+    case (.ltS(let lhs), .ltS(let rhs)):
+        return lhs == rhs
+    case (.ltU(let lhs), .ltU(let rhs)):
+        return lhs == rhs
+    case (.gtS(let lhs), .gtS(let rhs)):
+        return lhs == rhs
+    case (.gtU(let lhs), .gtU(let rhs)):
+        return lhs == rhs
+    case (.leS(let lhs), .leS(let rhs)):
+        return lhs == rhs
+    case (.leU(let lhs), .leU(let rhs)):
+        return lhs == rhs
+    case (.geS(let lhs), .geS(let rhs)):
+        return lhs == rhs
+    case (.geU(let lhs), .geU(let rhs)):
+        return lhs == rhs
+    case (.div(let lhs), .div(let rhs)):
+        return lhs == rhs
+    case (.min(let lhs), .min(let rhs)):
+        return lhs == rhs
+    case (.max(let lhs), .max(let rhs)):
+        return lhs == rhs
+    case (.copysign(let lhs), .copysign(let rhs)):
+        return lhs == rhs
+    case (.lt(let lhs), .lt(let rhs)):
+        return lhs == rhs
+    case (.gt(let lhs), .gt(let rhs)):
+        return lhs == rhs
+    case (.le(let lhs), .le(let rhs)):
+        return lhs == rhs
+    case (.ge(let lhs), .ge(let rhs)):
+        return lhs == rhs
+    default: return false
+    }
+}
+// MARK: - NumericInstruction.Constant AutoEquatable
+extension NumericInstruction.Constant: Equatable {}
+internal func == (lhs: NumericInstruction.Constant, rhs: NumericInstruction.Constant) -> Bool {
+    switch (lhs, rhs) {
+    case (.const(let lhs), .const(let rhs)):
+        return lhs == rhs
+    }
+}
+// MARK: - NumericInstruction.Conversion AutoEquatable
+extension NumericInstruction.Conversion: Equatable {}
+internal func == (lhs: NumericInstruction.Conversion, rhs: NumericInstruction.Conversion) -> Bool {
+    switch (lhs, rhs) {
+    case (.wrap(let lhs), .wrap(let rhs)):
+        if lhs.0 != rhs.0 { return false }
+        if lhs.1 != rhs.1 { return false }
+        return true
+    case (.extendS(let lhs), .extendS(let rhs)):
+        if lhs.0 != rhs.0 { return false }
+        if lhs.1 != rhs.1 { return false }
+        return true
+    case (.extendU(let lhs), .extendU(let rhs)):
+        if lhs.0 != rhs.0 { return false }
+        if lhs.1 != rhs.1 { return false }
+        return true
+    case (.truncS(let lhs), .truncS(let rhs)):
+        if lhs.0 != rhs.0 { return false }
+        if lhs.1 != rhs.1 { return false }
+        return true
+    case (.truncU(let lhs), .truncU(let rhs)):
+        if lhs.0 != rhs.0 { return false }
+        if lhs.1 != rhs.1 { return false }
+        return true
+    case (.convertS(let lhs), .convertS(let rhs)):
+        if lhs.0 != rhs.0 { return false }
+        if lhs.1 != rhs.1 { return false }
+        return true
+    case (.convertU(let lhs), .convertU(let rhs)):
+        if lhs.0 != rhs.0 { return false }
+        if lhs.1 != rhs.1 { return false }
+        return true
+    case (.demote(let lhs), .demote(let rhs)):
+        if lhs.0 != rhs.0 { return false }
+        if lhs.1 != rhs.1 { return false }
+        return true
+    case (.promote(let lhs), .promote(let rhs)):
+        if lhs.0 != rhs.0 { return false }
+        if lhs.1 != rhs.1 { return false }
+        return true
+    case (.reinterpret(let lhs), .reinterpret(let rhs)):
+        if lhs.0 != rhs.0 { return false }
+        if lhs.1 != rhs.1 { return false }
+        return true
+    default: return false
+    }
+}
+// MARK: - NumericInstruction.Unary AutoEquatable
+extension NumericInstruction.Unary: Equatable {}
+internal func == (lhs: NumericInstruction.Unary, rhs: NumericInstruction.Unary) -> Bool {
+    switch (lhs, rhs) {
+    case (.clz(let lhs), .clz(let rhs)):
+        return lhs == rhs
+    case (.ctz(let lhs), .ctz(let rhs)):
+        return lhs == rhs
+    case (.popcnt(let lhs), .popcnt(let rhs)):
+        return lhs == rhs
+    case (.eqz(let lhs), .eqz(let rhs)):
+        return lhs == rhs
+    case (.abs(let lhs), .abs(let rhs)):
+        return lhs == rhs
+    case (.neg(let lhs), .neg(let rhs)):
+        return lhs == rhs
+    case (.ceil(let lhs), .ceil(let rhs)):
+        return lhs == rhs
+    case (.floor(let lhs), .floor(let rhs)):
+        return lhs == rhs
+    case (.trunc(let lhs), .trunc(let rhs)):
+        return lhs == rhs
+    case (.nearest(let lhs), .nearest(let rhs)):
+        return lhs == rhs
+    case (.sqrt(let lhs), .sqrt(let rhs)):
+        return lhs == rhs
+    default: return false
+    }
+}
