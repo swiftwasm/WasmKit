@@ -22,7 +22,7 @@ public enum Trap: Error {
     case tableUninitialized
     case tableOutOfRange
     case callIndirectFunctionTypeMismatch(actual: FunctionType, expected: FunctionType)
-    case memoryOverflow
+    case outOfBoundsMemoryAccess
     case invalidFunctionIndex(Int)
     case poppedLabelMismatch
     case labelMismatch
@@ -31,5 +31,15 @@ public enum Trap: Error {
 
     static func unimplemented(_ description: String = "", file: StaticString = #file, line: UInt = #line) -> Trap {
         return ._unimplemented(description: description, file: file, line: line)
+    }
+
+    /// Human-readable text representation of the trap that `.wast` text format expects in assertions
+    public var assertionText: String {
+        switch self {
+        case .outOfBoundsMemoryAccess:
+            return "out of bounds memory access"
+        default:
+            return String(describing: self)
+        }
     }
 }
