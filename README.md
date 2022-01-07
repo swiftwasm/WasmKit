@@ -38,3 +38,11 @@ $ make bootstrap  # Install tools through Mint
 $ make generate   # Run Sourcery to generate source code from templates
 $ make build      # or `swift build`
 ```
+
+To run the core spec test suite run this:
+
+```sh
+$ make spectest   # Process core spec tests if needed and check their assertions with WAKit
+```
+
+
