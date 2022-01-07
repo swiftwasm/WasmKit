@@ -351,7 +351,7 @@ extension WasmParser {
         case .i64_load32_u:
             let _: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return [factory.load(I64.self, bitWidth: 16, isSigned: false, offset)]
+            return [factory.load(I64.self, bitWidth: 32, isSigned: false, offset)]
         case .i32_store:
             let _: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
