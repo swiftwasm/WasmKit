@@ -27,7 +27,7 @@ $ wakit run Examples/wasm/fib.wasm fib i32:10
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/akkyie/WAKit", .branch("main")),
+    .package(url: "https://github.com/swiftwasm/WAKit", .branch("main")),
 ],
 ```
 
