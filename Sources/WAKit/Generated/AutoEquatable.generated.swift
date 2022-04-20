@@ -76,7 +76,6 @@ public func == (lhs: ModuleInstance, rhs: ModuleInstance) -> Bool {
 // MARK: - TableType AutoEquatable
 extension TableType: Equatable {}
 public func == (lhs: TableType, rhs: TableType) -> Bool {
-    guard lhs.elementType == rhs.elementType else { return false }
     guard lhs.limits == rhs.limits else { return false }
     return true
 }
@@ -100,15 +99,9 @@ public func == (lhs: ExternalType, rhs: ExternalType) -> Bool {
 // MARK: - FunctionType AutoEquatable
 extension FunctionType: Equatable {}
 public func == (lhs: FunctionType, rhs: FunctionType) -> Bool {
-    switch (lhs, rhs) {
-    case (.any, .any):
-        return true
-    case (.some(let lhs), .some(let rhs)):
-        if lhs.parameters != rhs.parameters { return false }
-        if lhs.results != rhs.results { return false }
-        return true
-    default: return false
-    }
+    if lhs.parameters != rhs.parameters { return false }
+    if lhs.results != rhs.results { return false }
+    return true
 }
 // MARK: - NumericInstruction.Binary AutoEquatable
 extension NumericInstruction.Binary: Equatable {}

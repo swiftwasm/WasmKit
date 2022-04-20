@@ -148,7 +148,7 @@ extension WasmParser {
 
         let parameters = try parseVector { try parseValueType() }
         let results = try parseVector { try parseValueType() }
-        return FunctionType.some(parameters: parameters, results: results)
+        return FunctionType(parameters: parameters, results: results)
     }
 
     /// - Note:
@@ -175,18 +175,17 @@ extension WasmParser {
     /// - Note:
     /// <https://webassembly.github.io/spec/core/binary/types.html#table-types>
     func parseTableType() throws -> TableType {
-        let elementType: FunctionType
         let b = try stream.consume(0x70)
 
         switch b {
         case 0x70:
-            elementType = .any
+            break
         default:
             preconditionFailure("should never reach here")
         }
 
         let limits = try parseLimits()
-        return TableType(elementType: elementType, limits: limits)
+        return TableType(limits: limits)
     }
 
     /// - Note:

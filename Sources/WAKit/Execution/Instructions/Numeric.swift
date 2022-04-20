@@ -3,10 +3,12 @@
 
 extension InstructionFactory {
     func const<V: RawRepresentableValue>(_ value: V) -> Instruction {
-        makeInstruction { pc, _, stack in
+        makeInstruction(implementation: { pc, _, stack in
             stack.push(value)
             return .jump(pc + 1)
-        }
+        }, validator: { validator, _, _ in
+            validator.pushValue(V.self)
+        })
     }
 
     func numeric(unary instruction: NumericInstruction.Unary) -> Instruction {
@@ -33,7 +35,7 @@ extension InstructionFactory {
     }
 
     func numeric(binary instruction: NumericInstruction.Binary) -> Instruction {
-        makeInstruction { pc, _, stack in
+        makeInstruction(implementation: { pc, _, stack in
             let value2 = try stack.pop(instruction.type)
             let value1 = try stack.pop(instruction.type)
 
@@ -53,7 +55,11 @@ extension InstructionFactory {
 
             stack.push(result)
             return .jump(pc + 1)
-        }
+        }, validator: { validator, _, _ in
+            try validator.popValue(instruction.type)
+            try validator.popValue(instruction.type)
+            validator.pushValue(instruction.type)
+        })
     }
 
     func numeric(conversion instruction: NumericInstruction.Conversion) -> Instruction {

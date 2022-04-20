@@ -18,6 +18,9 @@ struct Run: ParsableCommand {
     @Argument
     var arguments: [String]
 
+    @Flag
+    var validate: Bool = false
+
     func run() throws {
         LoggingSystem.bootstrap {
             var handler = StreamLogHandler.standardOutput(label: $0)
@@ -40,6 +43,14 @@ struct Run: ParsableCommand {
         }
 
         logger.info("Ended to parse module: \(parseTime)")
+
+        if validate {
+            logger.info("Started to validate module")
+            let (_, validationTime) = try measure(if: verbose) {
+                try module.validate(context: module)
+            }
+            logger.info("End to validate module: \(validationTime)")
+        }
 
         let runtime = Runtime()
         let moduleInstance = try runtime.instantiate(module: module, externalValues: [])

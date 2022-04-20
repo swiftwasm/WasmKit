@@ -95,19 +95,16 @@ extension Runtime {
     /// <https://webassembly.github.io/spec/core/exec/instructions.html#invocation-of-function-address>
     func invoke(functionAddress address: FunctionAddress) throws {
         let function = store.functions[address]
-        guard case let .some(parameterType, resultType) = function.type else {
-            throw Trap._raw("any type is not allowed here")
-        }
 
         let locals = function.code.locals.map { $0.init() }
         let expression = function.code.body
 
-        let parameters = try stack.pop(Value.self, count: parameterType.count)
+        let parameters = try stack.pop(Value.self, count: function.type.parameters.count)
 
-        let frame = Frame(arity: resultType.count, module: function.module, locals: parameters + locals)
+        let frame = Frame(arity: function.type.results.count, module: function.module, locals: parameters + locals)
         stack.push(frame)
 
-        let values = try enterBlock(expression, resultType: resultType)
+        let values = try enterBlock(expression, resultType: function.type.results)
 
         assert((try? stack.get(current: Frame.self)) == frame)
         _ = try stack.pop(Frame.self)
@@ -126,9 +123,7 @@ extension Runtime {
 
     func invoke(functionAddress address: FunctionAddress, with parameters: [Value]) throws -> [Value] {
         let function = store.functions[address]
-        guard case let .some(parameterTypes, _) = function.type else {
-            throw Trap._raw("any type is not allowed here")
-        }
+        let parameterTypes = function.type.parameters
 
         guard parameterTypes.count == parameters.count else {
             throw Trap._raw("numbers of parameters don't match")

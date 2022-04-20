@@ -226,7 +226,7 @@ final class ControlInstructionTests: XCTestCase {
 
     func testCall() {
         let moduleInstance = ModuleInstance()
-        moduleInstance.types = [FunctionType.some(parameters: [], results: [I32.self])]
+        moduleInstance.types = [FunctionType(parameters: [], results: [I32.self])]
         moduleInstance.functionAddresses = [0]
 
         let funcExpression = Expression(instructions: [

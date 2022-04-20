@@ -142,12 +142,12 @@ extension WasmParserTests {
 
         stream = StaticByteStream(bytes: [0x60, 0x00, 0x00])
         parser = WasmParser(stream: stream)
-        XCTAssert(try parser.parseFunctionType() == .some(parameters: [], results: []))
+        XCTAssert(try parser.parseFunctionType() == .init(parameters: [], results: []))
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
 
         stream = StaticByteStream(bytes: [0x60, 0x01, 0x7E, 0x01, 0x7D])
         parser = WasmParser(stream: stream)
-        XCTAssert(try parser.parseFunctionType() == .some(parameters: [I64.self], results: [F32.self]))
+        XCTAssert(try parser.parseFunctionType() == .init(parameters: [I64.self], results: [F32.self]))
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
     }
 
@@ -207,12 +207,12 @@ extension WasmParserTests {
 
         stream = StaticByteStream(bytes: [0x70, 0x00, 0x01])
         parser = WasmParser(stream: stream)
-        XCTAssertEqual(try parser.parseTableType(), TableType(elementType: .any, limits: Limits(min: 1, max: nil)))
+        XCTAssertEqual(try parser.parseTableType(), TableType(limits: Limits(min: 1, max: nil)))
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
 
         stream = StaticByteStream(bytes: [0x70, 0x01, 0x02, 0x03])
         parser = WasmParser(stream: stream)
-        XCTAssertEqual(try parser.parseTableType(), TableType(elementType: .any, limits: Limits(min: 2, max: 3)))
+        XCTAssertEqual(try parser.parseTableType(), TableType(limits: Limits(min: 2, max: 3)))
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
 
         stream = StaticByteStream(bytes: [0x70, 0x02])
@@ -337,8 +337,8 @@ extension WasmParserTests {
         ])
         parser = WasmParser(stream: stream)
         let expected = Section.type([
-            .some(parameters: [I32.self], results: [I64.self]),
-            .some(parameters: [F32.self], results: [F64.self]),
+            .init(parameters: [I32.self], results: [I64.self]),
+            .init(parameters: [F32.self], results: [F64.self]),
         ])
         XCTAssertEqual(try parser.parseTypeSection(), expected)
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
@@ -399,8 +399,8 @@ extension WasmParserTests {
         ])
         parser = WasmParser(stream: stream)
         let expected = Section.table([
-            Table(type: TableType(elementType: .any, limits: Limits(min: 18, max: nil))),
-            Table(type: TableType(elementType: .any, limits: Limits(min: 52, max: 86))),
+            Table(type: TableType(limits: Limits(min: 18, max: nil))),
+            Table(type: TableType(limits: Limits(min: 52, max: 86))),
         ])
         XCTAssertEqual(try parser.parseTableSection(), expected)
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)

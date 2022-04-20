@@ -5,9 +5,9 @@ typealias ResultType = [ValueType]
 /// - Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#function-types>
 // sourcery: AutoEquatable
-public enum FunctionType {
-    case any
-    case some(parameters: [ValueType], results: [ValueType])
+public struct FunctionType {
+    let parameters: [ValueType]
+    let results: [ValueType]
 }
 
 /// - Note:
@@ -27,7 +27,6 @@ public typealias MemoryType = Limits
 /// <https://webassembly.github.io/spec/core/syntax/types.html#table-types>
 // sourcery: AutoEquatable
 public struct TableType {
-    let elementType: FunctionType
     let limits: Limits
 }
 

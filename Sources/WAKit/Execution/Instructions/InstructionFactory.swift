@@ -5,7 +5,12 @@ final class InstructionFactory {
         self.code = code
     }
 
-    func makeInstruction(_ implementation: @escaping Instruction.Implementation) -> Instruction {
-        return Instruction(code, implementation: implementation)
+    func makeInstruction(
+        implementation: @escaping Instruction.Implementation,
+        validator: @escaping Instruction.Validator = {
+            _, instr, _ in throw ValidationError(diagnostic: "unsupported: \(instr.code)")
+        }
+    ) -> Instruction {
+        return Instruction(code, implementation: implementation, validator: validator)
     }
 }

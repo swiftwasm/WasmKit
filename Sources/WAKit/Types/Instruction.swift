@@ -214,13 +214,18 @@ public struct Instruction {
     }
 
     typealias Implementation = (Int, Store, inout Stack) throws -> Action
+    typealias Validator = (inout ExpressionValidator, Instruction, ValidationContext) throws -> Void
 
     public let code: InstructionCode
     let implementation: Implementation
+    let validator: Validator
 
-    init(_ code: InstructionCode, implementation: @escaping Implementation) {
+    init(_ code: InstructionCode, implementation: @escaping Implementation,
+         validator: @escaping Validator)
+    {
         self.code = code
         self.implementation = implementation
+        self.validator = validator
     }
 
     var isPseudo: Bool {
