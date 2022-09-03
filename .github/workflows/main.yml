@@ -10,9 +10,6 @@ jobs:
     strategy:
       matrix:
         include:
-          # Swift 5.2
-          - os: macos-11
-            xcode: Xcode_11.7
           # Swift 5.3
           - os: macos-11
             xcode: Xcode_12.4
