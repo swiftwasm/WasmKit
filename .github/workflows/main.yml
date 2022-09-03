@@ -53,10 +53,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-        with:
-          submodules: recursive
       - name: Test in Debug
         run: |
+          git submodule update --init --recursive
           swift test -c debug
 
           # Disabled on Linux due to unexplained crashes.
