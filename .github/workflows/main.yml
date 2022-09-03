@@ -26,7 +26,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       # Checks-out the repo. More at: https://github.com/actions/checkout
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: recursive
       - name: Select Xcode version
@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-20.04
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Test in Debug
         run: |
           git submodule update --init --recursive
