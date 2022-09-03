@@ -7,14 +7,33 @@ on:
 
 jobs:
   build-macos:
-    runs-on: macos-11
+    strategy:
+      matrix:
+        include:
+          # Swift 5.2
+          - os: macos-11
+            xcode: Xcode_11.7
+          # Swift 5.3
+          - os: macos-11
+            xcode: Xcode_12.4
+          # Swift 5.4
+          - os: macos-11
+            xcode: Xcode_12.5.1
+          # Swift 5.5
+          - os: macos-12
+            xcode: Xcode_13.2.1
+          # Swift 5.6
+          - os: macos-12
+            xcode: Xcode_13.4.1
+
+    runs-on: ${{ matrix.os }}
     steps:
       # Checks-out the repo. More at: https://github.com/actions/checkout
       - uses: actions/checkout@v2
         with:
           submodules: recursive
       - name: Select Xcode version
-        run: sudo xcode-select -switch /Applications/Xcode_13.2.1.app
+        run: sudo xcode-select -switch /Applications/${{ matrix.xcode }}.app
       - name: Test in Debug
         run: |
           swift test -c debug
