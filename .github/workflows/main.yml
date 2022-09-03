@@ -57,7 +57,7 @@ jobs:
           submodules: recursive
       - name: Test in Debug
         run: |
-          swift test -c debug
+          swift test -c debug --enable-test-discovery
 
           # Disabled on Linux due to unexplained crashes.
           # curl -L -v -o wabt.tar.gz https://github.com/WebAssembly/wabt/releases/download/1.0.24/wabt-1.0.24-ubuntu.tar.gz
