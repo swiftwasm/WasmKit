@@ -7,14 +7,30 @@ on:
 
 jobs:
   build-macos:
-    runs-on: macos-11
+    strategy:
+      matrix:
+        include:
+          # Swift 5.3
+          - os: macos-11
+            xcode: Xcode_12.4
+          # Swift 5.4
+          - os: macos-11
+            xcode: Xcode_12.5.1
+          # Swift 5.5
+          - os: macos-12
+            xcode: Xcode_13.2.1
+          # Swift 5.6
+          - os: macos-12
+            xcode: Xcode_13.4.1
+
+    runs-on: ${{ matrix.os }}
     steps:
       # Checks-out the repo. More at: https://github.com/actions/checkout
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: recursive
       - name: Select Xcode version
-        run: sudo xcode-select -switch /Applications/Xcode_13.2.1.app
+        run: sudo xcode-select -switch /Applications/${{ matrix.xcode }}.app
       - name: Test in Debug
         run: |
           swift test -c debug
@@ -23,14 +39,25 @@ jobs:
           make spectest
 
   build-linux:
+    strategy:
+      matrix:
+        swift:
+          - "5.3-focal"
+          - "5.4-focal"
+          - "5.5-focal"
+          - "5.6-focal"
+
+    container:
+      image: swift:${{ matrix.swift }}
     runs-on: ubuntu-20.04
+
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: recursive
       - name: Test in Debug
         run: |
-          swift test -c debug
+          swift test -c debug --enable-test-discovery
 
           # Disabled on Linux due to unexplained crashes.
           # curl -L -v -o wabt.tar.gz https://github.com/WebAssembly/wabt/releases/download/1.0.24/wabt-1.0.24-ubuntu.tar.gz
