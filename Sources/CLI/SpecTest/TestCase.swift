@@ -30,6 +30,8 @@ struct TestCase: Decodable {
             case i64
             case f32
             case f64
+            case externref
+            case funcref
         }
 
         struct Value: Decodable {
@@ -255,6 +257,10 @@ extension TestCase.Command {
             case .f32: return F32(Float32(bitPattern: UInt32($0.value)!))
             case .f64 where $0.value.starts(with: "nan:"): return F64(Float64.nan)
             case .f64: return F64(Float64(bitPattern: UInt64($0.value)!))
+            case .externref:
+                fatalError("externref is not currently supported")
+            case .funcref:
+                fatalError("funcref is not currently supported")
             }
         }
     }
@@ -268,6 +274,10 @@ extension TestCase.Command {
             case .f32: return F32(Float32(bitPattern: UInt32($0.value!)!))
             case .f64 where $0.value!.starts(with: "nan:"): return F64(Float64.nan)
             case .f64: return F64(Float64(bitPattern: UInt64($0.value!)!))
+            case .externref:
+                fatalError("externref is not currently supported")
+            case .funcref:
+                fatalError("funcref is not currently supported")
             }
         }
     }
