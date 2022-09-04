@@ -64,8 +64,7 @@ public typealias LabelIndex = UInt32
 
 /// - Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#functions>
-// sourcery: AutoEquatable
-public struct Function {
+public struct Function: Equatable {
     let type: TypeIndex
     let locals: [ValueType]
     let body: Expression

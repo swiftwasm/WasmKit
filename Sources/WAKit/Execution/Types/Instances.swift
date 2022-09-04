@@ -85,8 +85,7 @@ public enum ExternalValue: Equatable {
 
 /// - Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#export-instances>
-// sourcery: AutoEquatable
-final class ExportInstance {
+struct ExportInstance: Equatable {
     let name: String
     let value: ExternalValue
 

@@ -221,7 +221,7 @@ extension TestCase.Command {
             } catch {
                 return handler(self, .failed("\(error)"))
             }
-            guard result == expected else {
+            guard result.isTestEquivalent(to: expected) else {
                 return handler(self, .failed("result mismatch: expected: \(expected), actual: \(result)"))
             }
             return handler(self, .passed)
@@ -268,12 +268,12 @@ extension TestCase.Command {
     private func parseValues(args: [TestCase.Command.Value]) -> [WAKit.Value] {
         return args.map {
             switch $0.type {
-            case .i32: return I32(UInt32($0.value)!)
-            case .i64: return I64(UInt64($0.value)!)
-            case .f32 where $0.value.starts(with: "nan:"): return F32(Float32.nan)
-            case .f32: return F32(Float32(bitPattern: UInt32($0.value)!))
-            case .f64 where $0.value.starts(with: "nan:"): return F64(Float64.nan)
-            case .f64: return F64(Float64(bitPattern: UInt64($0.value)!))
+            case .i32: return .i32(UInt32($0.value)!)
+            case .i64: return .i64(UInt64($0.value)!)
+            case .f32 where $0.value.starts(with: "nan:"): return .f32(Float32.nan)
+            case .f32: return .f32(Float32(bitPattern: UInt32($0.value)!))
+            case .f64 where $0.value.starts(with: "nan:"): return .f64(Float64.nan)
+            case .f64: return .f64(Float64(bitPattern: UInt64($0.value)!))
             case .externref:
                 fatalError("externref is not currently supported")
             case .funcref:
@@ -285,12 +285,12 @@ extension TestCase.Command {
     private func parseValues(args: [TestCase.Command.Expectation]) -> [WAKit.Value] {
         return args.compactMap {
             switch $0.type {
-            case .i32: return I32(UInt32($0.value!)!)
-            case .i64: return I64(UInt64($0.value!)!)
-            case .f32 where $0.value!.starts(with: "nan:"): return F32(Float32.nan)
-            case .f32: return F32(Float32(bitPattern: UInt32($0.value!)!))
-            case .f64 where $0.value!.starts(with: "nan:"): return F64(Float64.nan)
-            case .f64: return F64(Float64(bitPattern: UInt64($0.value!)!))
+            case .i32: return .i32(UInt32($0.value!)!)
+            case .i64: return .i64(UInt64($0.value!)!)
+            case .f32 where $0.value!.starts(with: "nan:"): return .f32(Float32.nan)
+            case .f32: return .f32(Float32(bitPattern: UInt32($0.value!)!))
+            case .f64 where $0.value!.starts(with: "nan:"): return .f64(Float64.nan)
+            case .f64: return .f64(Float64(bitPattern: UInt64($0.value!)!))
             case .externref:
                 fatalError("externref is not currently supported")
             case .funcref:

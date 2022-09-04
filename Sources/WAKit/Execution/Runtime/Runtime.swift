@@ -43,7 +43,7 @@ extension Runtime {
 
         for element in module.elements {
             let tableInstance = store.tables[Int(element.index)]
-            let offset = try Int(execute(element.offset, resultType: I32.self).rawValue)
+            let offset = try Int(execute(element.offset, resultType: .int(.i32)).i32)
             let end = offset + element.initializer.count
             guard
                 tableInstance.elements.indices.contains(offset),
@@ -55,7 +55,7 @@ extension Runtime {
         for data in module.data {
             let memoryIndex = instance.memoryAddresses[Int(data.index)]
             let memoryInstance = store.memories[memoryIndex]
-            let offset = try Int(execute(data.offset, resultType: I32.self).rawValue)
+            let offset = try Int(execute(data.offset, resultType: .int(.i32)).i32)
             let end = Int(offset) + data.initializer.count
             guard
                 memoryInstance.data.indices.contains(offset),
@@ -99,7 +99,7 @@ extension Runtime {
             throw Trap._raw("any type is not allowed here")
         }
 
-        let locals = function.code.locals.map { $0.init() }
+        let locals = function.code.locals.map { $0.defaultValue }
         let expression = function.code.body
 
         let parameters = try stack.pop(Value.self, count: parameterType.count)
@@ -135,7 +135,7 @@ extension Runtime {
         }
 
         assert(zip(parameterTypes, parameters).reduce(true) { acc, types in
-            acc && type(of: types.1) == types.0
+            acc && types.1.type == types.0
         })
 
         stack.push(parameters)
@@ -198,9 +198,9 @@ extension Runtime {
         return values
     }
 
-    func execute<V: Value>(_ expression: Expression, resultType: V.Type) throws -> V {
+    func execute(_ expression: Expression, resultType: ValueType) throws -> Value {
         let values = try enterBlock(expression, resultType: [resultType])
-        guard let value = values.first as? V, values.count == 1 else {
+        guard let value = values.first, values.count == 1 else {
             preconditionFailure()
         }
         return value

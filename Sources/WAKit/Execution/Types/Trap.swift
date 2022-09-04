@@ -7,7 +7,7 @@ public enum Trap: Error {
 
     // Stack
     case stackTypeMismatch(expected: Any.Type, actual: Any.Type)
-    case stackValueTypesMismatch(expected: ValueType, actual: [Any.Type])
+    case stackValueTypesMismatch(expected: ValueType, actual: ValueType)
     case stackNotFound(Any.Type, index: Int)
     case localIndexOutOfRange(index: UInt32)
 

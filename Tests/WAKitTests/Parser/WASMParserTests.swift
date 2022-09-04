@@ -21,22 +21,22 @@ extension WasmParserTests {
 
         stream = StaticByteStream(bytes: [0x01])
         parser = WasmParser(stream: stream)
-        XCTAssertEqual(I32(try parser.parseInteger() as UInt32).signed, 1)
+        XCTAssertEqual((try parser.parseInteger() as UInt32).signed, 1)
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
 
         stream = StaticByteStream(bytes: [0x7F])
         parser = WasmParser(stream: stream)
-        XCTAssertEqual(I32(try parser.parseInteger() as UInt32).signed, -1)
+        XCTAssertEqual((try parser.parseInteger() as UInt32).signed, -1)
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
 
         stream = StaticByteStream(bytes: [0xFF, 0x00])
         parser = WasmParser(stream: stream)
-        XCTAssertEqual(I32(try parser.parseInteger() as UInt32).signed, 127)
+        XCTAssertEqual((try parser.parseInteger() as UInt32).signed, 127)
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
 
         stream = StaticByteStream(bytes: [0x81, 0x7F])
         parser = WasmParser(stream: stream)
-        XCTAssertEqual(I32(try parser.parseInteger() as UInt32).signed, -127)
+        XCTAssertEqual((try parser.parseInteger() as UInt32).signed, -127)
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
 
         stream = StaticByteStream(bytes: [0x83])
@@ -82,22 +82,22 @@ extension WasmParserTests {
 
         stream = StaticByteStream(bytes: [0x7F])
         parser = WasmParser(stream: stream)
-        XCTAssert(try parser.parseValueType() == I32.self)
+        XCTAssert(try parser.parseValueType() == .int(.i32))
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
 
         stream = StaticByteStream(bytes: [0x7E])
         parser = WasmParser(stream: stream)
-        XCTAssert(try parser.parseValueType() == I64.self)
+        XCTAssert(try parser.parseValueType() == .int(.i64))
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
 
         stream = StaticByteStream(bytes: [0x7D])
         parser = WasmParser(stream: stream)
-        XCTAssert(try parser.parseValueType() == F32.self)
+        XCTAssert(try parser.parseValueType() == .float(.f32))
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
 
         stream = StaticByteStream(bytes: [0x7C])
         parser = WasmParser(stream: stream)
-        XCTAssert(try parser.parseValueType() == F64.self)
+        XCTAssert(try parser.parseValueType() == .float(.f64))
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
 
         stream = StaticByteStream(bytes: [0x7B])
@@ -122,7 +122,7 @@ extension WasmParserTests {
 
         stream = StaticByteStream(bytes: [0x7E])
         parser = WasmParser(stream: stream)
-        XCTAssert(try parser.parseResultType() == [I64.self])
+        XCTAssert(try parser.parseResultType() == [.int(.i64)])
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
 
         stream = StaticByteStream(bytes: [0x7B])
@@ -147,7 +147,7 @@ extension WasmParserTests {
 
         stream = StaticByteStream(bytes: [0x60, 0x01, 0x7E, 0x01, 0x7D])
         parser = WasmParser(stream: stream)
-        XCTAssert(try parser.parseFunctionType() == .some(parameters: [I64.self], results: [F32.self]))
+        XCTAssert(try parser.parseFunctionType() == .some(parameters: [.int(.i64)], results: [.float(.f32)]))
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
     }
 
@@ -232,12 +232,12 @@ extension WasmParserTests {
 
         stream = StaticByteStream(bytes: [0x7F, 0x00])
         parser = WasmParser(stream: stream)
-        XCTAssertEqual(try parser.parseGlobalType(), GlobalType(mutability: .constant, valueType: I32.self))
+        XCTAssertEqual(try parser.parseGlobalType(), GlobalType(mutability: .constant, valueType: .int(.i32)))
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
 
         stream = StaticByteStream(bytes: [0x7F, 0x01])
         parser = WasmParser(stream: stream)
-        XCTAssertEqual(try parser.parseGlobalType(), GlobalType(mutability: .variable, valueType: I32.self))
+        XCTAssertEqual(try parser.parseGlobalType(), GlobalType(mutability: .variable, valueType: .int(.i32)))
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
 
         stream = StaticByteStream(bytes: [0x7B])
@@ -337,8 +337,8 @@ extension WasmParserTests {
         ])
         parser = WasmParser(stream: stream)
         let expected = Section.type([
-            .some(parameters: [I32.self], results: [I64.self]),
-            .some(parameters: [F32.self], results: [F64.self]),
+            .some(parameters: [.int(.i32)], results: [.int(.i64)]),
+            .some(parameters: [.float(.f32)], results: [.float(.f64)]),
         ])
         XCTAssertEqual(try parser.parseTypeSection(), expected)
         XCTAssertEqual(parser.currentIndex, stream.bytes.count)
@@ -444,11 +444,11 @@ extension WasmParserTests {
         parser = WasmParser(stream: stream)
         let expected = Section.global([
             Global(
-                type: GlobalType(mutability: .constant, valueType: I32.self),
+                type: GlobalType(mutability: .constant, valueType: .int(.i32)),
                 initializer: Expression(instructions: [])
             ),
             Global(
-                type: GlobalType(mutability: .variable, valueType: I64.self),
+                type: GlobalType(mutability: .variable, valueType: .int(.i64)),
                 initializer: Expression(instructions: [])
             ),
         ])
@@ -541,11 +541,11 @@ extension WasmParserTests {
         parser = WasmParser(stream: stream)
         let expected = Section.code([
             Code(
-                locals: [I32.self, I32.self, I32.self],
+                locals: [.int(.i32), .int(.i32), .int(.i32)],
                 expression: Expression(instructions: [])
             ),
             Code(
-                locals: [I64.self, F32.self, F32.self],
+                locals: [.int(.i64), .float(.f32), .float(.f32)],
                 expression: Expression(instructions: [])
             ),
         ])
