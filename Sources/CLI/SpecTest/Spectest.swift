@@ -1,4 +1,6 @@
 import ArgumentParser
+import Foundation
+import SystemPackage
 
 struct Spectest: ParsableCommand {
     @Argument
@@ -24,9 +26,17 @@ struct Spectest: ParsableCommand {
             fatalError("failed to load test: \(error)")
         }
 
+        let rootPath: String
+        let filePath = FilePath(path)
+        if (try? FileDescriptor.open(filePath, FileDescriptor.AccessMode.readOnly, options: .directory)) != nil {
+            rootPath = path
+        } else {
+            rootPath = URL(fileURLWithPath: path).deletingLastPathComponent().path
+        }
+
         var results = [Result]()
         for testCase in testCases {
-            testCase.run(rootPath: path) { testCase, command, result in
+            testCase.run(rootPath: rootPath) { testCase, command, result in
                 switch result {
                 case let .failed(reason):
                     print("\(testCase.sourceFilename):\(command.line):", result.banner, reason)

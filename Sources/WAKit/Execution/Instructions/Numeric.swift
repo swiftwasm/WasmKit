@@ -61,19 +61,7 @@ extension InstructionFactory {
             let (type1, type2) = instruction.types
             let value = try stack.pop(type1)
 
-            let result: Value
-            switch value {
-            case let value as I32:
-                result = try operate(I32.self, type2, instruction, value)
-            case let value as I64:
-                result = try operate(I64.self, type2, instruction, value)
-            case let value as F32:
-                result = try operate(F32.self, type2, instruction, value)
-            case let value as F64:
-                result = try operate(F64.self, type2, instruction, value)
-            default:
-                fatalError("Invalid type \(value) for instruction \(instruction)")
-            }
+            let result = try operate(type1, type2, instruction, value)
 
             stack.push(result)
             return .jump(pc + 1)
@@ -252,11 +240,66 @@ fileprivate func operate<V: RawRepresentableValue>(
     }
 }
 
-fileprivate func operate<V1: RawRepresentableValue, V2: Value>(
-    _: V1.Type,
-    _: V2.Type,
+fileprivate func operate<Source: Value, Target: Value>(
+    _ target: Source.Type,
+    _ source: Target.Type,
     _ instruction: NumericInstruction.Conversion,
-    _: V1
-) throws -> V2 {
-    throw Trap.unimplemented("\(instruction)")
+    _ value: Source
+) throws -> Value {
+    switch instruction {
+    case .truncS:
+        switch value {
+        case let value as F32 where target is I32.Type:
+            guard !value.rawValue.isNaN else {
+                throw Trap.invalidConversionToInteger
+            }
+            return I32(Int32(value.rawValue))
+        case let value as F64 where target is I32.Type:
+            guard !value.rawValue.isNaN else {
+                throw Trap.invalidConversionToInteger
+            }
+            return I32(Int32(value.rawValue))
+        case let value as F32 where target is I64.Type:
+            guard !value.rawValue.isNaN else {
+                throw Trap.invalidConversionToInteger
+            }
+            return I64(Int64(value.rawValue))
+        case let value as F64 where target is I64.Type:
+            guard !value.rawValue.isNaN else {
+                throw Trap.invalidConversionToInteger
+            }
+            return I64(Int64(value.rawValue))
+        default:
+            fatalError("unsupported operand types passed to truncS")
+        }
+
+    case .truncU:
+        switch value {
+        case let value as F32 where target is I32.Type:
+            guard !value.rawValue.isNaN else {
+                throw Trap.invalidConversionToInteger
+            }
+            return I32(UInt32(value.rawValue))
+        case let value as F64 where target is I32.Type:
+            guard !value.rawValue.isNaN else {
+                throw Trap.invalidConversionToInteger
+            }
+            return I32(UInt32(value.rawValue))
+        case let value as F32 where target is I64.Type:
+            guard !value.rawValue.isNaN else {
+                throw Trap.invalidConversionToInteger
+            }
+            return I64(UInt64(value.rawValue))
+        case let value as F64 where target is I64.Type:
+            guard !value.rawValue.isNaN else {
+                throw Trap.invalidConversionToInteger
+            }
+            return I64(UInt64(value.rawValue))
+        default:
+            fatalError("unsupported operand types passed to truncS")
+        }
+        
+    default:
+        throw Trap.unimplemented("\(instruction)")
+    }
 }

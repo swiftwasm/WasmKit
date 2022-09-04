@@ -1,9 +1,13 @@
 import Foundation
 import LEB
 import Rainbow
+import SystemPackage
 import WAKit
 
 struct TestCase: Decodable {
+    enum Error: Swift.Error {
+        case invalidPath
+    }
     struct Command: Decodable {
         enum CommandType: String, Decodable {
             case module
@@ -69,7 +73,20 @@ struct TestCase: Decodable {
 
     static func load(include: [String], exclude: [String], in path: String) throws -> [TestCase] {
         let fileManager = FileManager.default
-        let filePaths = try fileManager.contentsOfDirectory(atPath: path).filter { $0.hasSuffix("json") }.sorted()
+        let filePath = FilePath(path)
+        let dirPath: String
+        let filePaths: [String]
+        if (try? FileDescriptor.open(filePath, FileDescriptor.AccessMode.readOnly, options: .directory)) != nil {
+            dirPath = path
+            filePaths = try fileManager.contentsOfDirectory(atPath: path).filter { $0.hasSuffix("json") }.sorted()
+        } else if fileManager.isReadableFile(atPath: path) {
+            let url = URL(fileURLWithPath: path)
+            dirPath = url.deletingLastPathComponent().path
+            filePaths = [url.lastPathComponent]
+        } else {
+            throw Error.invalidPath
+        }
+
         guard !filePaths.isEmpty else {
             return []
         }
@@ -87,7 +104,7 @@ struct TestCase: Decodable {
         var testCases: [TestCase] = []
         for filePath in filePaths where try matchesPattern(filePath) {
             print("loading \(filePath)")
-            guard let data = fileManager.contents(atPath: path + "/" + filePath) else {
+            guard let data = fileManager.contents(atPath: dirPath + "/" + filePath) else {
                 assertionFailure("failed to load \(filePath)")
                 continue
             }
