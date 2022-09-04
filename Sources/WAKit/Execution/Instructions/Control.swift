@@ -38,7 +38,7 @@ extension InstructionFactory {
         let elseCount = `else`.instructions.count
         let instructions = then.instructions + `else`.instructions
         let `if` = makeInstruction { pc, _, stack in
-            let isTrue = try stack.pop(I32.self) != 0
+            let isTrue = try stack.pop(Value.self).i32 != 0
 
             if !isTrue, elseCount == 0 {
                 return .jump(pc + thenCount + 1)
@@ -81,7 +81,7 @@ extension InstructionFactory {
 
     func brIf(_ labelIndex: LabelIndex) -> Instruction {
         return makeInstruction { pc, _, stack in
-            guard try stack.pop(I32.self) != 0 else {
+            guard try stack.pop(Value.self).i32 != 0 else {
                 return .jump(pc + 1)
             }
 
@@ -103,10 +103,10 @@ extension InstructionFactory {
 
     func brTable(_ labelIndices: [LabelIndex], default defaultLabelIndex: LabelIndex) -> Instruction {
         return makeInstruction { _, _, stack in
-            let value = try stack.pop(I32.self)
+            let value = try stack.pop(Value.self).i32
             let labelIndex: LabelIndex
-            if labelIndices.indices.contains(Int(value.rawValue)) {
-                labelIndex = labelIndices[Int(value.rawValue)]
+            if labelIndices.indices.contains(Int(value)) {
+                labelIndex = labelIndices[Int(value)]
             } else {
                 labelIndex = defaultLabelIndex
             }
@@ -148,7 +148,7 @@ extension InstructionFactory {
             let tableAddresses = module.tableAddresses[0]
             let tableInstance = store.tables[tableAddresses]
             let expectedType = module.types[Int(typeIndex)]
-            let value = try Int(stack.pop(I32.self).rawValue)
+            let value = try Int(stack.pop(Value.self).i32)
             guard let functionAddress = tableInstance.elements[value] else {
                 throw Trap.tableUninitialized
             }

@@ -36,7 +36,7 @@ final class ControlInstructionTests: XCTestCase {
         ])
 
         let instructions = InstructionFactory(code: .block).block(
-            type: [I32.self],
+            type: [.int(.i32)],
             expression: dummyExpression
         )
         XCTAssertEqual(instructions.map { $0.code }, [.block, .unreachable])
@@ -56,7 +56,7 @@ final class ControlInstructionTests: XCTestCase {
         ])
 
         let instructions = InstructionFactory(code: .loop).loop(
-            type: [I32.self],
+            type: [.int(.i32)],
             expression: dummyExpression
         )
         XCTAssertEqual(instructions.map { $0.code }, [.loop, .unreachable])
@@ -80,12 +80,12 @@ final class ControlInstructionTests: XCTestCase {
         ])
 
         let instructions = InstructionFactory(code: .if).if(
-            type: [I32.self],
+            type: [.int(.i32)],
             then: thenExpression,
             else: elseExpression
         )
 
-        stack.push(I32(1))
+        stack.push(Value.i32(1))
         XCTAssertEqual(instructions.map { $0.code }, [.if, .unreachable, .unreachable])
 
         let expression = Expression(instructions: instructions)
@@ -107,14 +107,14 @@ final class ControlInstructionTests: XCTestCase {
         ])
 
         let instructions = InstructionFactory(code: .if).if(
-            type: [I32.self],
+            type: [.int(.i32)],
             then: thenExpression,
             else: elseExpression
         )
 
         stack = Stack()
 
-        stack.push(I32(0))
+        stack.push(Value.i32(0))
         XCTAssertEqual(instructions.map { $0.code }, [.if, .unreachable, .unreachable])
 
         let expression = Expression(instructions: instructions)
@@ -134,14 +134,14 @@ final class ControlInstructionTests: XCTestCase {
         let elseExpression = Expression(instructions: [])
 
         let instructions = InstructionFactory(code: .if).if(
-            type: [I32.self],
+            type: [.int(.i32)],
             then: thenExpression,
             else: elseExpression
         )
 
         stack = Stack()
 
-        stack.push(I32(0))
+        stack.push(Value.i32(0))
         XCTAssertEqual(instructions.map { $0.code }, [.if, .unreachable])
 
         let expression = Expression(instructions: instructions)
@@ -194,7 +194,7 @@ final class ControlInstructionTests: XCTestCase {
 
     func testBrIf_true() {
         stack.push(Label(arity: 0, continuation: 123, range: 0 ... 0))
-        stack.push(I32(1))
+        stack.push(Value.i32(1))
 
         let instruction = InstructionFactory(code: .br).brIf(0)
         XCTAssertEqual(instruction.code, .br)
@@ -210,7 +210,7 @@ final class ControlInstructionTests: XCTestCase {
 
     func testBrIf_false() {
         stack.push(Label(arity: 0, continuation: 123, range: 0 ... 0))
-        stack.push(I32(0))
+        stack.push(Value.i32(0))
 
         let instruction = InstructionFactory(code: .br).brIf(0)
         XCTAssertEqual(instruction.code, .br)
@@ -226,11 +226,11 @@ final class ControlInstructionTests: XCTestCase {
 
     func testCall() {
         let moduleInstance = ModuleInstance()
-        moduleInstance.types = [FunctionType.some(parameters: [], results: [I32.self])]
+        moduleInstance.types = [FunctionType.some(parameters: [], results: [.int(.i32)])]
         moduleInstance.functionAddresses = [0]
 
         let funcExpression = Expression(instructions: [
-            InstructionFactory(code: .i32_const).const(I32(0)),
+            InstructionFactory(code: .i32_const).const(.i32(0)),
         ])
 
         store.functions = [
@@ -260,9 +260,9 @@ final class ControlInstructionTests: XCTestCase {
 
         let frame = Frame(arity: 0, module: module, locals: [])
         stack.push(frame)
-        stack.push(I32(0))
+        stack.push(Value.i32(0))
 
-        let instruction = InstructionFactory(code: .i32_load8_u).load(I32.self, bitWidth: 8, isSigned: false, 0)
+        let instruction = InstructionFactory(code: .i32_load8_u).load(.int(.i32), bitWidth: 8, isSigned: false, 0)
         XCTAssertEqual(instruction.code, .i32_load8_u)
 
         let expression = Expression(instructions: [instruction])
@@ -271,6 +271,6 @@ final class ControlInstructionTests: XCTestCase {
             Instruction.Action.jump(1)
         )
 
-        XCTAssertEqual(stack, [I32(97), frame])
+        XCTAssertEqual(stack, [Value.i32(97), frame])
     }
 }

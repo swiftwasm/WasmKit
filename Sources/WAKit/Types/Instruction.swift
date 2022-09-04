@@ -235,13 +235,11 @@ public struct Instruction {
 /// - Note:
 /// <https://webassembly.github.io/spec/core/binary/instructions.html#numeric-instructions>
 enum NumericInstruction {
-    // sourcery: AutoEquatable
     enum Constant {
         case const(Value)
     }
 
-    // sourcery: AutoEquatable
-    enum Unary {
+    enum IntUnary {
         // iunop
         case clz(IntValueType)
         case ctz(IntValueType)
@@ -250,6 +248,32 @@ enum NumericInstruction {
         /// itestop
         case eqz(IntValueType)
 
+        var type: ValueType {
+            switch self {
+            case let .clz(type),
+                 let .ctz(type),
+                 let .popcnt(type),
+                 let .eqz(type):
+                return .int(type)
+            }
+        }
+
+        func callAsFunction(_ value: Value) -> Value {
+            switch self {
+            case .clz:
+                return value.leadingZeroBitCount
+            case .ctz:
+                return value.trailingZeroBitCount
+            case .popcnt:
+                return value.nonzeroBitCount
+
+            case .eqz:
+                return value.isZero ? true : false
+            }
+        }
+    }
+
+    enum FloatUnary {
         // funop
         case abs(FloatValueType)
         case neg(FloatValueType)
@@ -261,11 +285,6 @@ enum NumericInstruction {
 
         var type: ValueType {
             switch self {
-            case let .clz(type),
-                 let .ctz(type),
-                 let .popcnt(type),
-                 let .eqz(type):
-                return type
 
             case let .abs(type),
                  let .neg(type),
@@ -274,12 +293,33 @@ enum NumericInstruction {
                  let .trunc(type),
                  let .nearest(type),
                  let .sqrt(type):
-                return type
+                return .float(type)
             }
         }
+
+        func callAsFunction(
+            _ value: Value
+        ) -> Value {
+            switch self {
+            case .abs:
+                return value.abs
+            case .neg:
+                return -value
+            case .ceil:
+                return value.ceil
+            case .floor:
+                return value.floor
+            case .trunc:
+                return value.truncate
+            case .nearest:
+                return value.nearest
+            case .sqrt:
+                return value.squareRoot
+            }
+        }
+
     }
 
-    // sourcery: AutoEquatable
     enum Binary {
         // binop
         case add(ValueType)
@@ -290,6 +330,35 @@ enum NumericInstruction {
         case eq(ValueType)
         case ne(ValueType)
 
+        var type: ValueType {
+            switch self {
+            case let .add(type),
+                 let .sub(type),
+                 let .mul(type),
+                 let .eq(type),
+                 let .ne(type):
+                return type
+            }
+        }
+
+        func callAsFunction(_ value1: Value, _ value2: Value) -> Value {
+            switch self {
+            case .add:
+                return value1 + value2
+            case .sub:
+                return value1 - value2
+            case .mul:
+                return value1 * value2
+
+            case .eq:
+                return value1 == value2 ? true : false
+            case .ne:
+                return value1 == value2 ? false : true
+            }
+        }
+    }
+
+    enum IntBinary {
         // ibinop
         case divS(IntValueType)
         case divU(IntValueType)
@@ -314,26 +383,8 @@ enum NumericInstruction {
         case geS(IntValueType)
         case geU(IntValueType)
 
-        // fbinop
-        case div(FloatValueType)
-        case min(FloatValueType)
-        case max(FloatValueType)
-        case copysign(FloatValueType)
-
-        // frelop
-        case lt(FloatValueType)
-        case gt(FloatValueType)
-        case le(FloatValueType)
-        case ge(FloatValueType)
-
         var type: ValueType {
             switch self {
-            case let .add(type),
-                 let .sub(type),
-                 let .mul(type),
-                 let .eq(type),
-                 let .ne(type):
-                return type
             case let .divS(type),
                  let .divU(type),
                  let .remS(type),
@@ -354,7 +405,100 @@ enum NumericInstruction {
                  let .leU(type),
                  let .geS(type),
                  let .geU(type):
-                return type
+                return .int(type)
+            }
+        }
+
+        func callAsFunction(
+            _ type: ValueType,
+            _ value1: Value,
+            _ value2: Value
+        ) throws -> Value {
+            switch (self, type) {
+            case (.divS, _):
+                guard !value2.isZero else { throw Trap.integerDividedByZero }
+                return try Value.divisionSigned(value1, value2)
+            case (.divU, _):
+                guard !value2.isZero else { throw Trap.integerDividedByZero }
+                return try Value.divisionUnsigned(value1, value2)
+            case (.remS, _):
+                guard !value2.isZero else { throw Trap.integerDividedByZero }
+                return try Value.remainderSigned(value1, value2)
+            case (.remU, _):
+                guard !value2.isZero else { throw Trap.integerDividedByZero }
+                return try Value.remainderUnsigned(value1, value2)
+            case (.and, _):
+                return value1 & value2
+            case (.or, _):
+                return value1 | value2
+            case (.xor, _):
+                return value1 ^ value2
+            case (.shl, _):
+                return value1 << value2
+            case (.shrS, _):
+                return Value.rightShiftSigned(value1, value2)
+            case (.shrU, _):
+                return Value.rightShiftUnsigned(value1, value2)
+            case (.rotl, _):
+                return value1.rotr(value2)
+            case (.rotr, _):
+                return value1.rotr(value2)
+
+            case (.ltS, .int(.i32)):
+                return value1.i32.signed < value2.i32.signed ? true : false
+            case (.ltU, .int(.i32)):
+                return value1.i32 < value2.i32 ? true : false
+            case (.gtS, .int(.i32)):
+                return value1.i32.signed > value2.i32.signed ? true : false
+            case (.gtU, .int(.i32)):
+                return value1.i32 > value2.i32 ? true : false
+            case (.leS, .int(.i32)):
+                return value1.i32.signed <= value2.i32.signed ? true : false
+            case (.leU, .int(.i32)):
+                return value1.i32 <= value2.i32 ? true : false
+            case (.geS, .int(.i32)):
+                return value1.i32.signed >= value2.i32.signed ? true : false
+            case (.geU, .int(.i32)):
+                return value1.i32 >= value2.i32 ? true : false
+
+            case (.ltS, .int(.i64)):
+                return value1.i64.signed < value2.i64.signed ? true : false
+            case (.ltU, .int(.i64)):
+                return value1.i64 < value2.i64 ? true : false
+            case (.gtS, .int(.i64)):
+                return value1.i64.signed > value2.i32.signed ? true : false
+            case (.gtU, .int(.i64)):
+                return value1.i64 > value2.i64 ? true : false
+            case (.leS, .int(.i64)):
+                return value1.i64.signed <= value2.i64.signed ? true : false
+            case (.leU, .int(.i64)):
+                return value1.i64 <= value2.i64 ? true : false
+            case (.geS, .int(.i64)):
+                return value1.i32.signed >= value2.i32.signed ? true : false
+            case (.geU, .int(.i64)):
+                return value1.i64 >= value2.i64 ? true : false
+
+            default:
+                fatalError("Invalid type \(type) for instruction \(self)")
+            }
+        }
+    }
+
+    enum FloatBinary {
+        // fbinop
+        case div(FloatValueType)
+        case min(FloatValueType)
+        case max(FloatValueType)
+        case copysign(FloatValueType)
+
+        // frelop
+        case lt(FloatValueType)
+        case gt(FloatValueType)
+        case le(FloatValueType)
+        case ge(FloatValueType)
+
+        var type: ValueType {
+            switch self {
             case let .div(type),
                  let .min(type),
                  let .max(type),
@@ -363,7 +507,29 @@ enum NumericInstruction {
                  let .gt(type),
                  let .le(type),
                  let .ge(type):
-                return type
+                return .float(type)
+            }
+        }
+
+        func callAsFunction(_ value1: Value, _ value2: Value) throws -> Value {
+            switch self {
+            case .div:
+                guard !value2.isZero else { throw Trap.integerDividedByZero }
+                return value1 / value2
+            case .min:
+                return Swift.min(value1, value2)
+            case .max:
+                return Swift.max(value1, value2)
+            case .copysign:
+                return .copySign(value1, value2)
+            case .lt:
+                return value1 < value2 ? true : false
+            case .gt:
+                return value1 > value2 ? true : false
+            case .le:
+                return value1 <= value2 ? true : false
+            case .ge:
+                return value1 >= value2 ? true : false
             }
         }
     }
@@ -377,41 +543,107 @@ extension Instruction: Equatable {
 }
 
 extension NumericInstruction {
-    // sourcery: AutoEquatable
     enum Conversion {
-        case wrap(I32.Type, I64.Type)
-        case extendS(I64.Type, I32.Type)
-        case extendU(I64.Type, I32.Type)
+        case wrap
+        case extendS
+        case extendU
         case truncS(IntValueType, FloatValueType)
         case truncU(IntValueType, FloatValueType)
         case convertS(FloatValueType, IntValueType)
         case convertU(FloatValueType, IntValueType)
-        case demote(F32.Type, F64.Type)
-        case promote(F64.Type, F32.Type)
+        case demote
+        case promote
         case reinterpret(ValueType, ValueType)
 
         var types: (ValueType, ValueType) {
             switch self {
-            case let .wrap(type1, type2):
-                return (type1, type2)
-            case let .extendS(type1, type2):
-                return (type1, type2)
-            case let .extendU(type1, type2):
-                return (type1, type2)
+            case .wrap:
+                return (.int(.i32), .int(.i64))
+            case .extendS:
+                return (.int(.i64), .int(.i32))
+            case .extendU:
+                return (.int(.i64), .int(.i32))
             case let .truncS(type1, type2):
-                return (type1, type2)
+                return (.int(type1), .float(type2))
             case let .truncU(type1, type2):
-                return (type1, type2)
+                return (.int(type1), .float(type2))
             case let .convertS(type1, type2):
-                return (type1, type2)
+                return (.float(type1), .int(type2))
             case let .convertU(type1, type2):
-                return (type1, type2)
-            case let .demote(type1, type2):
-                return (type1, type2)
-            case let .promote(type1, type2):
-                return (type1, type2)
+                return (.float(type1), .int(type2))
+            case .demote:
+                return (.float(.f32), .float(.f64))
+            case .promote:
+                return (.float(.f64), .float(.f32))
             case let .reinterpret(type1, type2):
                 return (type1, type2)
+            }
+        }
+
+        func callAsFunction(
+            _ value: Value
+        ) throws -> Value {
+            switch self {
+            case let .truncS(target, _):
+                switch (target, value) {
+                case (.i32, let .f32(rawValue)):
+                    guard !rawValue.isNaN else {
+                        throw Trap.invalidConversionToInteger
+                    }
+                    return Value(signed: Int32(rawValue))
+
+                case (.i32, let .f64(rawValue)):
+                    guard !rawValue.isNaN else {
+                        throw Trap.invalidConversionToInteger
+                    }
+                    return Value(signed: Int32(rawValue))
+
+                case (.i64, let .f32(rawValue)):
+                    guard !rawValue.isNaN else {
+                        throw Trap.invalidConversionToInteger
+                    }
+                    return Value(signed: Int64(rawValue))
+
+                case (.i64, let .f64(rawValue)):
+                    guard !rawValue.isNaN else {
+                        throw Trap.invalidConversionToInteger
+                    }
+                    return Value(signed: Int64(rawValue))
+                default:
+                    fatalError("unsupported operand types passed to instruction \(self)")
+                }
+
+            case let .truncU(target, _):
+                switch (target, value) {
+                case (.i32, let .f32(rawValue)):
+                    guard !rawValue.isNaN else {
+                        throw Trap.invalidConversionToInteger
+                    }
+                    return Value(UInt32(rawValue))
+
+                case (.i32, let .f64(rawValue)):
+                    guard !rawValue.isNaN else {
+                        throw Trap.invalidConversionToInteger
+                    }
+                    return Value(UInt32(rawValue))
+
+                case (.i64, let .f32(rawValue)):
+                    guard !rawValue.isNaN else {
+                        throw Trap.invalidConversionToInteger
+                    }
+                    return Value(UInt64(rawValue))
+
+                case (.i64, let .f64(rawValue)):
+                    guard !rawValue.isNaN else {
+                        throw Trap.invalidConversionToInteger
+                    }
+                    return Value(UInt64(rawValue))
+                default:
+                    fatalError("unsupported operand types passed to instruction \(self)")
+                }
+
+            default:
+                throw Trap.unimplemented("\(self)")
             }
         }
     }

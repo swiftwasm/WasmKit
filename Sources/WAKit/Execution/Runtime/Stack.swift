@@ -119,8 +119,7 @@ extension Value: Stackable {}
 
 /// - Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#labels>
-// sourcery: AutoEquatable
-struct Label: Stackable {
+struct Label: Equatable, Stackable {
     let arity: Int
     let continuation: Int
 

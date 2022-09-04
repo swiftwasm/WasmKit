@@ -117,13 +117,13 @@ extension WasmParser {
 
         switch b {
         case 0x7F:
-            return I32.self
+            return .int(.i32)
         case 0x7E:
-            return I64.self
+            return .int(.i64)
         case 0x7D:
-            return F32.self
+            return .float(.f32)
         case 0x7C:
-            return F64.self
+            return .float(.f64)
         default:
             throw StreamError<Stream.Element>.unexpected(b, index: currentIndex, expected: Set(0x7C ... 0x7F))
         }
@@ -299,95 +299,95 @@ extension WasmParser {
         case .i32_load:
             let _: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return [factory.load(I32.self, offset)]
+            return [factory.load(.int(.i32), offset)]
         case .i64_load:
             let _: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return [factory.load(I64.self, offset)]
+            return [factory.load(.int(.i64), offset)]
         case .f32_load:
             let _: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return [factory.load(F32.self, offset)]
+            return [factory.load(.float(.f32), offset)]
         case .f64_load:
             let _: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return [factory.load(F64.self, offset)]
+            return [factory.load(.float(.f64), offset)]
         case .i32_load8_s:
             let _: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return [factory.load(I32.self, bitWidth: 8, isSigned: true, offset)]
+            return [factory.load(.int(.i32), bitWidth: 8, isSigned: true, offset)]
         case .i32_load8_u:
             let _: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return [factory.load(I32.self, bitWidth: 8, isSigned: false, offset)]
+            return [factory.load(.int(.i32), bitWidth: 8, isSigned: false, offset)]
         case .i32_load16_s:
             let _: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return [factory.load(I32.self, bitWidth: 16, isSigned: true, offset)]
+            return [factory.load(.int(.i32), bitWidth: 16, isSigned: true, offset)]
         case .i32_load16_u:
             let _: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return [factory.load(I32.self, bitWidth: 16, isSigned: false, offset)]
+            return [factory.load(.int(.i32), bitWidth: 16, isSigned: false, offset)]
         case .i64_load8_s:
             let _: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return [factory.load(I64.self, bitWidth: 8, isSigned: true, offset)]
+            return [factory.load(.int(.i64), bitWidth: 8, isSigned: true, offset)]
         case .i64_load8_u:
             let _: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return [factory.load(I64.self, bitWidth: 8, isSigned: false, offset)]
+            return [factory.load(.int(.i64), bitWidth: 8, isSigned: false, offset)]
         case .i64_load16_s:
             let _: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return [factory.load(I64.self, bitWidth: 16, isSigned: true, offset)]
+            return [factory.load(.int(.i64), bitWidth: 16, isSigned: true, offset)]
         case .i64_load16_u:
             let _: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return [factory.load(I64.self, bitWidth: 16, isSigned: false, offset)]
+            return [factory.load(.int(.i64), bitWidth: 16, isSigned: false, offset)]
         case .i64_load32_s:
             let _: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return [factory.load(I64.self, bitWidth: 32, isSigned: true, offset)]
+            return [factory.load(.int(.i64), bitWidth: 32, isSigned: true, offset)]
         case .i64_load32_u:
             let _: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return [factory.load(I64.self, bitWidth: 32, isSigned: false, offset)]
+            return [factory.load(.int(.i64), bitWidth: 32, isSigned: false, offset)]
         case .i32_store:
             let _: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return [factory.store(I32.self, offset)]
+            return [factory.store(.int(.i32), offset)]
         case .i64_store:
             let _: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return [factory.store(I64.self, offset)]
+            return [factory.store(.int(.i64), offset)]
         case .f32_store:
             let _: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return [factory.store(I32.self, offset)]
+            return [factory.store(.int(.i32), offset)]
         case .f64_store:
             let _: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return [factory.store(I64.self, offset)]
+            return [factory.store(.int(.i64), offset)]
         case .i32_store8:
             let _: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return [factory.store(I32.self, offset)]
+            return [factory.store(.int(.i32), offset)]
         case .i32_store16:
             let _: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return [factory.store(I32.self, offset)]
+            return [factory.store(.int(.i32), offset)]
         case .i64_store8:
             let _: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return [factory.store(I64.self, offset)]
+            return [factory.store(.int(.i64), offset)]
         case .i64_store16:
             let _: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return [factory.store(I64.self, offset)]
+            return [factory.store(.int(.i64), offset)]
         case .i64_store32:
             let _: UInt32 = try parseUnsigned()
             let offset: UInt32 = try parseUnsigned()
-            return [factory.store(I64.self, offset)]
+            return [factory.store(.int(.i64), offset)]
         case .memory_size:
             let zero = try stream.consumeAny()
             guard zero == 0x00 else {
@@ -403,273 +403,273 @@ extension WasmParser {
 
         case .i32_const:
             let n: UInt32 = try parseInteger()
-            return [factory.const(I32(n))]
+            return [factory.const(.i32(n))]
         case .i64_const:
             let n: UInt64 = try parseInteger()
-            return [factory.const(I64(n))]
+            return [factory.const(.i64(n))]
         case .f32_const:
             let n = try parseFloat()
-            return [factory.const(F32(n))]
+            return [factory.const(.f32(n))]
         case .f64_const:
             let n = try parseDouble()
-            return [factory.const(F64(n))]
+            return [factory.const(.f64(n))]
 
         case .i32_eqz:
-            return [factory.numeric(unary: .eqz(I32.self))]
+            return [factory.numeric(intUnary: .eqz(.i32))]
         case .i32_eq:
-            return [factory.numeric(binary: .eq(I32.self))]
+            return [factory.numeric(binary: .eq(.int(.i32)))]
         case .i32_ne:
-            return [factory.numeric(binary: .ne(I32.self))]
+            return [factory.numeric(binary: .ne(.int(.i32)))]
         case .i32_lt_s:
-            return [factory.numeric(binary: .ltS(I32.self))]
+            return [factory.numeric(intBinary: .ltS(.i32))]
         case .i32_lt_u:
-            return [factory.numeric(binary: .ltU(I32.self))]
+            return [factory.numeric(intBinary: .ltU(.i32))]
         case .i32_gt_s:
-            return [factory.numeric(binary: .gtS(I32.self))]
+            return [factory.numeric(intBinary: .gtS(.i32))]
         case .i32_gt_u:
-            return [factory.numeric(binary: .gtU(I32.self))]
+            return [factory.numeric(intBinary: .gtU(.i32))]
         case .i32_le_s:
-            return [factory.numeric(binary: .leS(I32.self))]
+            return [factory.numeric(intBinary: .leS(.i32))]
         case .i32_le_u:
-            return [factory.numeric(binary: .leU(I32.self))]
+            return [factory.numeric(intBinary: .leU(.i32))]
         case .i32_ge_s:
-            return [factory.numeric(binary: .geS(I32.self))]
+            return [factory.numeric(intBinary: .geS(.i32))]
         case .i32_ge_u:
-            return [factory.numeric(binary: .geU(I32.self))]
+            return [factory.numeric(intBinary: .geU(.i32))]
 
         case .i64_eqz:
-            return [factory.numeric(unary: .eqz(I64.self))]
+            return [factory.numeric(intUnary: .eqz(.i64))]
         case .i64_eq:
-            return [factory.numeric(binary: .eq(I64.self))]
+            return [factory.numeric(binary: .eq(.int(.i64)))]
         case .i64_ne:
-            return [factory.numeric(binary: .ne(I64.self))]
+            return [factory.numeric(binary: .ne(.int(.i64)))]
         case .i64_lt_s:
-            return [factory.numeric(binary: .ltS(I64.self))]
+            return [factory.numeric(intBinary: .ltS(.i64))]
         case .i64_lt_u:
-            return [factory.numeric(binary: .ltU(I64.self))]
+            return [factory.numeric(intBinary: .ltU(.i64))]
         case .i64_gt_s:
-            return [factory.numeric(binary: .gtS(I64.self))]
+            return [factory.numeric(intBinary: .gtS(.i64))]
         case .i64_gt_u:
-            return [factory.numeric(binary: .gtU(I64.self))]
+            return [factory.numeric(intBinary: .gtU(.i64))]
         case .i64_le_s:
-            return [factory.numeric(binary: .leS(I64.self))]
+            return [factory.numeric(intBinary: .leS(.i64))]
         case .i64_le_u:
-            return [factory.numeric(binary: .leU(I64.self))]
+            return [factory.numeric(intBinary: .leU(.i64))]
         case .i64_ge_s:
-            return [factory.numeric(binary: .geS(I64.self))]
+            return [factory.numeric(intBinary: .geS(.i64))]
         case .i64_ge_u:
-            return [factory.numeric(binary: .geU(I64.self))]
+            return [factory.numeric(intBinary: .geU(.i64))]
 
         case .f32_eq:
-            return [factory.numeric(binary: .eq(F32.self))]
+            return [factory.numeric(binary: .eq(.float(.f32)))]
         case .f32_ne:
-            return [factory.numeric(binary: .ne(F32.self))]
+            return [factory.numeric(binary: .ne(.float(.f32)))]
         case .f32_lt:
-            return [factory.numeric(binary: .lt(F32.self))]
+            return [factory.numeric(floatBinary: .lt(.f32))]
         case .f32_gt:
-            return [factory.numeric(binary: .gt(F32.self))]
+            return [factory.numeric(floatBinary: .gt(.f32))]
         case .f32_le:
-            return [factory.numeric(binary: .le(F32.self))]
+            return [factory.numeric(floatBinary: .le(.f32))]
         case .f32_ge:
-            return [factory.numeric(binary: .ge(F32.self))]
+            return [factory.numeric(floatBinary: .ge(.f32))]
 
         case .f64_eq:
-            return [factory.numeric(binary: .eq(F64.self))]
+            return [factory.numeric(binary: .eq(.float(.f64)))]
         case .f64_ne:
-            return [factory.numeric(binary: .ne(F64.self))]
+            return [factory.numeric(binary: .ne(.float(.f64)))]
         case .f64_lt:
-            return [factory.numeric(binary: .lt(F64.self))]
+            return [factory.numeric(floatBinary: .lt(.f64))]
         case .f64_gt:
-            return [factory.numeric(binary: .gt(F64.self))]
+            return [factory.numeric(floatBinary: .gt(.f64))]
         case .f64_le:
-            return [factory.numeric(binary: .le(F64.self))]
+            return [factory.numeric(floatBinary: .le(.f64))]
         case .f64_ge:
-            return [factory.numeric(binary: .ge(F64.self))]
+            return [factory.numeric(floatBinary: .ge(.f64))]
 
         case .i32_clz:
-            return [factory.numeric(unary: .clz(I32.self))]
+            return [factory.numeric(intUnary: .clz(.i32))]
         case .i32_ctz:
-            return [factory.numeric(unary: .ctz(I32.self))]
+            return [factory.numeric(intUnary: .ctz(.i32))]
         case .i32_popcnt:
-            return [factory.numeric(unary: .popcnt(I32.self))]
+            return [factory.numeric(intUnary: .popcnt(.i32))]
         case .i32_add:
-            return [factory.numeric(binary: .add(I32.self))]
+            return [factory.numeric(binary: .add(.int(.i32)))]
         case .i32_sub:
-            return [factory.numeric(binary: .sub(I32.self))]
+            return [factory.numeric(binary: .sub(.int(.i32)))]
         case .i32_mul:
-            return [factory.numeric(binary: .mul(I32.self))]
+            return [factory.numeric(binary: .mul(.int(.i32)))]
         case .i32_div_s:
-            return [factory.numeric(binary: .divS(I32.self))]
+            return [factory.numeric(intBinary: .divS(.i32))]
         case .i32_div_u:
-            return [factory.numeric(binary: .divU(I32.self))]
+            return [factory.numeric(intBinary: .divU(.i32))]
         case .i32_rem_s:
-            return [factory.numeric(binary: .remS(I32.self))]
+            return [factory.numeric(intBinary: .remS(.i32))]
         case .i32_rem_u:
-            return [factory.numeric(binary: .remU(I32.self))]
+            return [factory.numeric(intBinary: .remU(.i32))]
         case .i32_and:
-            return [factory.numeric(binary: .and(I32.self))]
+            return [factory.numeric(intBinary: .and(.i32))]
         case .i32_or:
-            return [factory.numeric(binary: .or(I32.self))]
+            return [factory.numeric(intBinary: .or(.i32))]
         case .i32_xor:
-            return [factory.numeric(binary: .xor(I32.self))]
+            return [factory.numeric(intBinary: .xor(.i32))]
         case .i32_shl:
-            return [factory.numeric(binary: .shl(I32.self))]
+            return [factory.numeric(intBinary: .shl(.i32))]
         case .i32_shr_s:
-            return [factory.numeric(binary: .shrS(I32.self))]
+            return [factory.numeric(intBinary: .shrS(.i32))]
         case .i32_shr_u:
-            return [factory.numeric(binary: .shrU(I32.self))]
+            return [factory.numeric(intBinary: .shrU(.i32))]
         case .i32_rotl:
-            return [factory.numeric(binary: .rotl(I32.self))]
+            return [factory.numeric(intBinary: .rotl(.i32))]
         case .i32_rotr:
-            return [factory.numeric(binary: .rotr(I32.self))]
+            return [factory.numeric(intBinary: .rotr(.i32))]
 
         case .i64_clz:
-            return [factory.numeric(unary: .clz(I64.self))]
+            return [factory.numeric(intUnary: .clz(.i64))]
         case .i64_ctz:
-            return [factory.numeric(unary: .ctz(I64.self))]
+            return [factory.numeric(intUnary: .ctz(.i64))]
         case .i64_popcnt:
-            return [factory.numeric(unary: .popcnt(I64.self))]
+            return [factory.numeric(intUnary: .popcnt(.i64))]
         case .i64_add:
-            return [factory.numeric(binary: .add(I64.self))]
+            return [factory.numeric(binary: .add(.int(.i64)))]
         case .i64_sub:
-            return [factory.numeric(binary: .sub(I64.self))]
+            return [factory.numeric(binary: .sub(.int(.i64)))]
         case .i64_mul:
-            return [factory.numeric(binary: .mul(I64.self))]
+            return [factory.numeric(binary: .mul(.int(.i64)))]
         case .i64_div_s:
-            return [factory.numeric(binary: .divS(I64.self))]
+            return [factory.numeric(intBinary: .divS(.i64))]
         case .i64_div_u:
-            return [factory.numeric(binary: .divU(I64.self))]
+            return [factory.numeric(intBinary: .divU(.i64))]
         case .i64_rem_s:
-            return [factory.numeric(binary: .remS(I64.self))]
+            return [factory.numeric(intBinary: .remS(.i64))]
         case .i64_rem_u:
-            return [factory.numeric(binary: .remU(I64.self))]
+            return [factory.numeric(intBinary: .remU(.i64))]
         case .i64_and:
-            return [factory.numeric(binary: .and(I64.self))]
+            return [factory.numeric(intBinary: .and(.i64))]
         case .i64_or:
-            return [factory.numeric(binary: .or(I64.self))]
+            return [factory.numeric(intBinary: .or(.i64))]
         case .i64_xor:
-            return [factory.numeric(binary: .xor(I64.self))]
+            return [factory.numeric(intBinary: .xor(.i64))]
         case .i64_shl:
-            return [factory.numeric(binary: .shl(I64.self))]
+            return [factory.numeric(intBinary: .shl(.i64))]
         case .i64_shr_s:
-            return [factory.numeric(binary: .shrS(I64.self))]
+            return [factory.numeric(intBinary: .shrS(.i64))]
         case .i64_shr_u:
-            return [factory.numeric(binary: .shrU(I64.self))]
+            return [factory.numeric(intBinary: .shrU(.i64))]
         case .i64_rotl:
-            return [factory.numeric(binary: .rotl(I64.self))]
+            return [factory.numeric(intBinary: .rotl(.i64))]
         case .i64_rotr:
-            return [factory.numeric(binary: .rotr(I64.self))]
+            return [factory.numeric(intBinary: .rotr(.i64))]
 
         case .f32_abs:
-            return [factory.numeric(unary: .abs(F32.self))]
+            return [factory.numeric(floatUnary: .abs(.f32))]
         case .f32_neg:
-            return [factory.numeric(unary: .neg(F32.self))]
+            return [factory.numeric(floatUnary: .neg(.f32))]
         case .f32_ceil:
-            return [factory.numeric(unary: .ceil(F32.self))]
+            return [factory.numeric(floatUnary: .ceil(.f32))]
         case .f32_floor:
-            return [factory.numeric(unary: .floor(F32.self))]
+            return [factory.numeric(floatUnary: .floor(.f32))]
         case .f32_trunc:
-            return [factory.numeric(unary: .trunc(F32.self))]
+            return [factory.numeric(floatUnary: .trunc(.f32))]
         case .f32_nearest:
-            return [factory.numeric(unary: .nearest(F32.self))]
+            return [factory.numeric(floatUnary: .nearest(.f32))]
         case .f32_sqrt:
-            return [factory.numeric(unary: .sqrt(F32.self))]
+            return [factory.numeric(floatUnary: .sqrt(.f32))]
 
         case .f32_add:
-            return [factory.numeric(binary: .add(F32.self))]
+            return [factory.numeric(binary: .add(.float(.f32)))]
         case .f32_sub:
-            return [factory.numeric(binary: .sub(F32.self))]
+            return [factory.numeric(binary: .sub(.float(.f32)))]
         case .f32_mul:
-            return [factory.numeric(binary: .mul(F32.self))]
+            return [factory.numeric(binary: .mul(.float(.f32)))]
         case .f32_div:
-            return [factory.numeric(binary: .div(F32.self))]
+            return [factory.numeric(floatBinary: .div(.f32))]
         case .f32_min:
-            return [factory.numeric(binary: .min(F32.self))]
+            return [factory.numeric(floatBinary: .min(.f32))]
         case .f32_max:
-            return [factory.numeric(binary: .max(F32.self))]
+            return [factory.numeric(floatBinary: .max(.f32))]
         case .f32_copysign:
-            return [factory.numeric(binary: .copysign(F32.self))]
+            return [factory.numeric(floatBinary: .copysign(.f32))]
 
         case .f64_abs:
-            return [factory.numeric(unary: .abs(F64.self))]
+            return [factory.numeric(floatUnary: .abs(.f64))]
         case .f64_neg:
-            return [factory.numeric(unary: .neg(F64.self))]
+            return [factory.numeric(floatUnary: .neg(.f64))]
         case .f64_ceil:
-            return [factory.numeric(unary: .ceil(F64.self))]
+            return [factory.numeric(floatUnary: .ceil(.f64))]
         case .f64_floor:
-            return [factory.numeric(unary: .floor(F64.self))]
+            return [factory.numeric(floatUnary: .floor(.f64))]
         case .f64_trunc:
-            return [factory.numeric(unary: .trunc(F64.self))]
+            return [factory.numeric(floatUnary: .trunc(.f64))]
         case .f64_nearest:
-            return [factory.numeric(unary: .nearest(F64.self))]
+            return [factory.numeric(floatUnary: .nearest(.f64))]
         case .f64_sqrt:
-            return [factory.numeric(unary: .sqrt(F64.self))]
+            return [factory.numeric(floatUnary: .sqrt(.f64))]
 
         case .f64_add:
-            return [factory.numeric(binary: .add(F64.self))]
+            return [factory.numeric(binary: .add(.float(.f64)))]
         case .f64_sub:
-            return [factory.numeric(binary: .sub(F64.self))]
+            return [factory.numeric(binary: .sub(.float(.f64)))]
         case .f64_mul:
-            return [factory.numeric(binary: .mul(F64.self))]
+            return [factory.numeric(binary: .mul(.float(.f64)))]
         case .f64_div:
-            return [factory.numeric(binary: .div(F64.self))]
+            return [factory.numeric(floatBinary: .div(.f64))]
         case .f64_min:
-            return [factory.numeric(binary: .min(F64.self))]
+            return [factory.numeric(floatBinary: .min(.f64))]
         case .f64_max:
-            return [factory.numeric(binary: .max(F64.self))]
+            return [factory.numeric(floatBinary: .max(.f64))]
         case .f64_copysign:
-            return [factory.numeric(binary: .copysign(F64.self))]
+            return [factory.numeric(floatBinary: .copysign(.f64))]
 
         case .i32_wrap_i64:
-            return [factory.numeric(conversion: .wrap(I32.self, I64.self))]
+            return [factory.numeric(conversion: .wrap)]
         case .i32_trunc_f32_s:
-            return [factory.numeric(conversion: .truncS(I32.self, F32.self))]
+            return [factory.numeric(conversion: .truncS(.i32, .f32))]
         case .i32_trunc_f32_u:
-            return [factory.numeric(conversion: .truncU(I32.self, F32.self))]
+            return [factory.numeric(conversion: .truncU(.i32, .f32))]
         case .i32_trunc_f64_s:
-            return [factory.numeric(conversion: .truncS(I32.self, F64.self))]
+            return [factory.numeric(conversion: .truncS(.i32, .f64))]
         case .i32_trunc_f64_u:
-            return [factory.numeric(conversion: .truncU(I32.self, F64.self))]
+            return [factory.numeric(conversion: .truncU(.i32, .f64))]
         case .i64_extend_i32_s:
-            return [factory.numeric(conversion: .extendS(I64.self, I32.self))]
+            return [factory.numeric(conversion: .extendS)]
         case .i64_extend_i32_u:
-            return [factory.numeric(conversion: .extendU(I64.self, I32.self))]
+            return [factory.numeric(conversion: .extendU)]
         case .i64_trunc_f32_s:
-            return [factory.numeric(conversion: .truncS(I64.self, F32.self))]
+            return [factory.numeric(conversion: .truncS(.i64, .f32))]
         case .i64_trunc_f32_u:
-            return [factory.numeric(conversion: .truncU(I64.self, F32.self))]
+            return [factory.numeric(conversion: .truncU(.i64, .f32))]
         case .i64_trunc_f64_s:
-            return [factory.numeric(conversion: .truncS(I64.self, F64.self))]
+            return [factory.numeric(conversion: .truncS(.i64, .f64))]
         case .i64_trunc_f64_u:
-            return [factory.numeric(conversion: .truncU(I64.self, F64.self))]
+            return [factory.numeric(conversion: .truncU(.i64, .f64))]
         case .f32_convert_i32_s:
-            return [factory.numeric(conversion: .convertS(F32.self, I32.self))]
+            return [factory.numeric(conversion: .convertS(.f32, .i32))]
         case .f32_convert_i32_u:
-            return [factory.numeric(conversion: .convertU(F32.self, I32.self))]
+            return [factory.numeric(conversion: .convertU(.f32, .i32))]
         case .f32_convert_i64_s:
-            return [factory.numeric(conversion: .convertS(F32.self, I64.self))]
+            return [factory.numeric(conversion: .convertS(.f32, .i64))]
         case .f32_convert_i64_u:
-            return [factory.numeric(conversion: .convertU(F32.self, I64.self))]
+            return [factory.numeric(conversion: .convertU(.f32, .i64))]
         case .f32_demote_f64:
-            return [factory.numeric(conversion: .demote(F32.self, F64.self))]
+            return [factory.numeric(conversion: .demote)]
         case .f64_convert_i32_s:
-            return [factory.numeric(conversion: .convertS(F64.self, I32.self))]
+            return [factory.numeric(conversion: .convertS(.f64, .i32))]
         case .f64_convert_i32_u:
-            return [factory.numeric(conversion: .convertU(F64.self, I32.self))]
+            return [factory.numeric(conversion: .convertU(.f64, .i32))]
         case .f64_convert_i64_s:
-            return [factory.numeric(conversion: .convertS(F64.self, I64.self))]
+            return [factory.numeric(conversion: .convertS(.f64, .i64))]
         case .f64_convert_i64_u:
-            return [factory.numeric(conversion: .convertU(F64.self, I64.self))]
+            return [factory.numeric(conversion: .convertU(.f64, .i64))]
         case .f64_promote_f32:
-            return [factory.numeric(conversion: .promote(F64.self, F32.self))]
+            return [factory.numeric(conversion: .promote)]
         case .i32_reinterpret_f32:
-            return [factory.numeric(conversion: .reinterpret(I32.self, F32.self))]
+            return [factory.numeric(conversion: .reinterpret(.int(.i32), .float(.f32)))]
         case .i64_reinterpret_f64:
-            return [factory.numeric(conversion: .reinterpret(I64.self, F64.self))]
+            return [factory.numeric(conversion: .reinterpret(.int(.i64), .float(.f64)))]
         case .f32_reinterpret_i32:
-            return [factory.numeric(conversion: .reinterpret(F32.self, I32.self))]
+            return [factory.numeric(conversion: .reinterpret(.float(.f32), .int(.i32)))]
         case .f64_reinterpret_i64:
-            return [factory.numeric(conversion: .reinterpret(F64.self, I64.self))]
+            return [factory.numeric(conversion: .reinterpret(.float(.f64), .int(.i64)))]
         }
     }
 

@@ -4,8 +4,7 @@ typealias ResultType = [ValueType]
 
 /// - Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#function-types>
-// sourcery: AutoEquatable
-public enum FunctionType {
+public enum FunctionType: Equatable {
     case any
     case some(parameters: [ValueType], results: [ValueType])
 }
@@ -25,23 +24,21 @@ public typealias MemoryType = Limits
 
 /// - Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#table-types>
-// sourcery: AutoEquatable
-public struct TableType {
+public struct TableType: Equatable {
     let elementType: FunctionType
     let limits: Limits
 }
 
 /// - Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#global-types>
-public enum Mutability {
+public enum Mutability: Equatable {
     case constant
     case variable
 }
 
 /// - Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#global-types>
-// sourcery: AutoEquatable
-public struct GlobalType {
+public struct GlobalType: Equatable {
     let mutability: Mutability
     let valueType: ValueType
 }

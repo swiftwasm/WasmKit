@@ -10,7 +10,10 @@ extension InstructionFactory {
 
     var select: Instruction {
         return makeInstruction { pc, _, stack in
-            let flag = try stack.pop(I32.self)
+            let flagValue = try stack.pop(Value.self)
+            guard case let .i32(flag) = flagValue else {
+                throw Trap.stackValueTypesMismatch(expected: .int(.i32), actual: flagValue.type)
+            }
             let value2 = try stack.pop(Value.self)
             let value1 = try stack.pop(Value.self)
             if flag != 0 {

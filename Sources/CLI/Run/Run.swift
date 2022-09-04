@@ -50,10 +50,10 @@ struct Run: ParsableCommand {
             let type = argument.prefix { $0 != ":" }
             let value = argument.drop { $0 != ":" }.dropFirst()
             switch type {
-            case "i32": parameter = I32(Int32(value)!)
-            case "i64": parameter = I64(Int64(value)!)
-            case "f32": parameter = F32(Float(value)!)
-            case "f64": parameter = F64(Double(value)!)
+            case "i32": parameter = Value(signed: Int32(value)!)
+            case "i64": parameter = Value(signed: Int64(value)!)
+            case "f32": parameter = .f32(Float(value)!)
+            case "f64": parameter = .f64(Double(value)!)
             default: fatalError("unknown type")
             }
             parameters.append(parameter)
