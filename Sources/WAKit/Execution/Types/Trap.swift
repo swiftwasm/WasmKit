@@ -28,6 +28,7 @@ public enum Trap: Error {
     case labelMismatch
     case integerDividedByZero
     case integerOverflowed
+    case invalidConversionToInteger
 
     static func unimplemented(_ description: String = "", file: StaticString = #file, line: UInt = #line) -> Trap {
         return ._unimplemented(description: description, file: file, line: line)
@@ -40,6 +41,10 @@ public enum Trap: Error {
             return "out of bounds memory access"
         case .integerDividedByZero:
             return "integer divide by zero"
+        case .integerOverflowed:
+            return "integer overflow"
+        case .invalidConversionToInteger:
+            return "invalid conversion to integer"
         default:
             return String(describing: self)
         }
