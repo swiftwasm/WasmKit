@@ -1,5 +1,6 @@
 import ArgumentParser
 import Foundation
+import SystemPackage
 
 struct Spectest: ParsableCommand {
     @Argument
@@ -26,7 +27,8 @@ struct Spectest: ParsableCommand {
         }
 
         let rootPath: String
-        if try FileWrapper(url: URL(fileURLWithPath: path)).isDirectory {
+        let filePath = FilePath(path)
+        if (try? FileDescriptor.open(filePath, FileDescriptor.AccessMode.readOnly, options: .directory)) != nil {
             rootPath = path
         } else {
             rootPath = URL(fileURLWithPath: path).deletingLastPathComponent().path

@@ -1,6 +1,7 @@
 import Foundation
 import LEB
 import Rainbow
+import SystemPackage
 import WAKit
 
 struct TestCase: Decodable {
@@ -72,13 +73,14 @@ struct TestCase: Decodable {
 
     static func load(include: [String], exclude: [String], in path: String) throws -> [TestCase] {
         let fileManager = FileManager.default
-        let url = URL(fileURLWithPath: path)
+        let filePath = FilePath(path)
         let dirPath: String
         let filePaths: [String]
-        if try FileWrapper(url: url).isDirectory {
+        if (try? FileDescriptor.open(filePath, FileDescriptor.AccessMode.readOnly, options: .directory)) != nil {
             dirPath = path
             filePaths = try fileManager.contentsOfDirectory(atPath: path).filter { $0.hasSuffix("json") }.sorted()
         } else if fileManager.isReadableFile(atPath: path) {
+            let url = URL(fileURLWithPath: path)
             dirPath = url.deletingLastPathComponent().path
             filePaths = [url.lastPathComponent]
         } else {
