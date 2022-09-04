@@ -76,6 +76,32 @@ public enum Value: Equatable, Hashable {
         guard case let .i64(result) = self else { fatalError() }
         return result
     }
+
+    public func isTestEquivalent(to value: Self) -> Bool {
+        switch (self, value) {
+        case let (.i32(lhs), .i32(rhs)): return lhs == rhs
+        case let (.i64(lhs), .i64(rhs)): return lhs == rhs
+        case let (.f32(lhs), .f32(rhs)): return lhs.isNaN && rhs.isNaN || lhs == rhs
+        case let (.f64(lhs), .f64(rhs)): return lhs.isNaN && rhs.isNaN || lhs == rhs
+        default: return false
+        }
+    }
+}
+
+extension Array where Element == Value {
+    public func isTestEquivalent(to arrayOfValues: Self) -> Bool {
+        guard count == arrayOfValues.count else {
+            return false
+        }
+
+        for (i, value) in enumerated() {
+            if !value.isTestEquivalent(to: arrayOfValues[i]) {
+                return false
+            }
+        }
+
+        return true
+    }
 }
 
 extension Value: Comparable {

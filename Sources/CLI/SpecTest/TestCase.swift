@@ -221,7 +221,7 @@ extension TestCase.Command {
             } catch {
                 return handler(self, .failed("\(error)"))
             }
-            guard result == expected else {
+            guard result.isTestEquivalent(to: expected) else {
                 return handler(self, .failed("result mismatch: expected: \(expected), actual: \(result)"))
             }
             return handler(self, .passed)
