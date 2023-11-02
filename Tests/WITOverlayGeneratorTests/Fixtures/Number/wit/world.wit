@@ -1,0 +1,28 @@
+package test:number-check
+
+world number-test-world {
+    export roundtrip-bool: func(v: bool) -> bool
+
+    export roundtrip-u8: func(v: u8) -> u8
+    export roundtrip-u16: func(v: u16) -> u16
+    export roundtrip-u32: func(v: u32) -> u32
+    export roundtrip-u64: func(v: u64) -> u64
+
+    export roundtrip-s8: func(v: s8) -> s8
+    export roundtrip-s16: func(v: s16) -> s16
+    export roundtrip-s32: func(v: s32) -> s32
+    export roundtrip-s64: func(v: s64) -> s64
+
+    export roundtrip-float32: func(v: float32) -> float32
+    export roundtrip-float64: func(v: float64) -> float64
+
+    export retptr-u8: func() -> tuple<u8, u8>
+    export retptr-u16: func() -> tuple<u16, u16>
+    export retptr-u32: func() -> tuple<u32, u32>
+    export retptr-u64: func() -> tuple<u64, u64>
+
+    export retptr-s8: func() -> tuple<s8, s8>
+    export retptr-s16: func() -> tuple<s16, s16>
+    export retptr-s32: func() -> tuple<s32, s32>
+    export retptr-s64: func() -> tuple<s64, s64>
+}

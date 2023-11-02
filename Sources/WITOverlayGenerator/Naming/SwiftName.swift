@@ -1,0 +1,235 @@
+import WIT
+
+enum SwiftName {
+    static let keywordSet = Set(Keyword.allCases.map(\.rawValue))
+
+    /// Make a Swift-safe name from the given text.
+    static func makeName(_ text: String) -> String {
+        if keywordSet.contains(text) {
+            return "`\(text)`"
+        } else {
+            return text
+        }
+    }
+
+    static func makeName(_ identifier: Identifier) throws -> String {
+        try makeName(ConvertCase.camelCase(identifier))
+    }
+
+    static func makeName(kebab: String) -> String {
+        makeName(ConvertCase.camelCase(kebab: kebab))
+    }
+}
+
+/// List of Swift keywords.
+/// Copied from https://github.com/apple/swift-syntax/blob/8c1977d8acb7b308082d2cc82f3e9b26674545b1/CodeGeneration/Sources/SyntaxSupport/KeywordSpec.swift#L77-L284
+enum Keyword: String, CaseIterable {
+    case __consuming
+    case __owned
+    case __setter_access
+    case __shared
+    case _alignment
+    case _backDeploy
+    case _borrow
+    case _borrowing
+    case _cdecl
+    case _Class
+    case _compilerInitialized
+    case _const
+    case _consuming
+    case _documentation
+    case _dynamicReplacement
+    case _effects
+    case _expose
+    case _forward
+    case _implements
+    case _linear
+    case _local
+    case _modify
+    case _move
+    case _mutating
+    case _NativeClass
+    case _NativeRefCountedObject
+    case _noMetadata
+    case _nonSendable
+    case _objcImplementation
+    case _objcRuntimeName
+    case _opaqueReturnTypeOf
+    case _optimize
+    case _originallyDefinedIn
+    case _PackageDescription
+    case _private
+    case _projectedValueProperty
+    case _read
+    case _RefCountedObject
+    case _semantics
+    case _specialize
+    case _spi
+    case _spi_available
+    case _swift_native_objc_runtime_base
+    case _Trivial
+    case _TrivialAtMost
+    case _typeEraser
+    case _unavailableFromAsync
+    case _underlyingVersion
+    case _UnknownLayout
+    case _version
+    case accesses
+    case actor
+    case addressWithNativeOwner
+    case addressWithOwner
+    case any
+    case `Any`
+    case `as`
+    case assignment
+    case `associatedtype`
+    case associativity
+    case async
+    case attached
+    case autoclosure
+    case availability
+    case available
+    case await
+    case backDeployed
+    case before
+    case block
+    case borrowing
+    case `break`
+    case canImport
+    case `case`
+    case `catch`
+    case `class`
+    case compiler
+    case consume
+    case copy
+    case consuming
+    case `continue`
+    case convenience
+    case convention
+    case cType
+    case `default`
+    case `defer`
+    case `deinit`
+    case deprecated
+    case derivative
+    case didSet
+    case differentiable
+    case distributed
+    case `do`
+    case dynamic
+    case each
+    case `else`
+    case `enum`
+    case escaping
+    case exclusivity
+    case exported
+    case `extension`
+    case `fallthrough`
+    case `false`
+    case file
+    case `fileprivate`
+    case final
+    case `for`
+    case discard
+    case forward
+    case `func`
+    case get
+    case `guard`
+    case higherThan
+    case `if`
+    case `import`
+    case `in`
+    case indirect
+    case infix
+    case `init`
+    case initializes
+    case inline
+    case `inout`
+    case `internal`
+    case introduced
+    case `is`
+    case isolated
+    case kind
+    case lazy
+    case left
+    case `let`
+    case line
+    case linear
+    case lowerThan
+    case macro
+    case message
+    case metadata
+    case module
+    case mutableAddressWithNativeOwner
+    case mutableAddressWithOwner
+    case mutating
+    case `nil`
+    case noasync
+    case noDerivative
+    case noescape
+    case none
+    case nonisolated
+    case nonmutating
+    case objc
+    case obsoleted
+    case of
+    case open
+    case `operator`
+    case optional
+    case override
+    case package
+    case postfix
+    case `precedencegroup`
+    case prefix
+    case `private`
+    case `Protocol`
+    case `protocol`
+    case `public`
+    case reasync
+    case renamed
+    case `repeat`
+    case required
+    case `rethrows`
+    case `return`
+    case reverse
+    case right
+    case safe
+    case `self`
+    case `Self`
+    case Sendable
+    case set
+    case some
+    case sourceFile
+    case spi
+    case spiModule
+    case `static`
+    case `struct`
+    case `subscript`
+    case `super`
+    case swift
+    case `switch`
+    case target
+    case then
+    case `throw`
+    case `throws`
+    case transpose
+    case `true`
+    case `try`
+    case `Type`
+    case `typealias`
+    case unavailable
+    case unchecked
+    case unowned
+    case unsafe
+    case unsafeAddress
+    case unsafeMutableAddress
+    case `var`
+    case visibility
+    case weak
+    case `where`
+    case `while`
+    case willSet
+    case witness_method
+    case wrt
+    case yield
+}

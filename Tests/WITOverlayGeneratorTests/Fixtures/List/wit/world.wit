@@ -1,0 +1,8 @@
+package test:list-check
+
+world list-test-world {
+    export return-empty: func() -> list<u32>
+    export roundtrip: func(v: list<u8>) -> list<u8>
+    export roundtrip-non-pod: func(v: list<string>) -> list<string>
+    export roundtrip-list-list: func(v: list<list<string>>) -> list<list<string>>
+}

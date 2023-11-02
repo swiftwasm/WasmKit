@@ -1,9 +1,13 @@
+.DS_Store
+
 .build
 *.xcodeproj
 .swiftpm
 
-/Tests/LinuxMain.swift
-/Tests/WAKitTests/XCTestManifests.swift
-
 /spectest
 .vscode
+
+/Tests/default.json
+/Tests/WITOverlayGeneratorTests/Compiled/
+/Tests/WITOverlayGeneratorTests/Generated/
+Tests/WITExtractorPluginTests/Fixtures/*/Package.resolved

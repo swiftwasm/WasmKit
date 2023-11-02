@@ -1,23 +1,20 @@
-<a href="https://github.com/akkyie/wakit">
 <img alt="WAKit Icon" src="https://raw.github.com/wiki/akkyie/wakit/images/wakit_icon.png" width="100px">
-</a>
 
-# WAKit
-
-![GitHub Workflow Status](https://img.shields.io/github/workflow/status/akkyie/WAKit/Build%20and%20test)
+# WasmKit
 
 A WebAssembly runtime written in Swift. Originally developed and maintained by [@akkyie](https://github.com/akkyie).
 
-🚧 Highly experimental. Do not expect to work.
+Implements all of WebAssembly 2.0 binary parsing and execution core spec, with an exclusion of SIMD instructions. The validation and text format parts of the spec are not implemented yet.
+
+It also has rudimentary support for [WASI](https://wasi.dev) with only a few WASI imports implemented currently, with a goal of eventual full support for `wasi_snapshot_preview1`. See `WASI` module for more details.
 
 ## Usage
 
 ### Command Line Tool
 
 ```sh
-$ swift build # or prefix `swift run` before the command below
-$ # Usage: wakit run <path> <functionName> [<arguments>] ...
-$ wakit run Examples/wasm/fib.wasm fib i32:10
+$ # Usage: wasmkit-cli run <path> <functionName> [<arguments>] ...
+$ swift run wasmkit-cli run Examples/wasm/fib.wasm fib i32:10
 [I32(89)]
 ```
 
@@ -25,22 +22,12 @@ $ wakit run Examples/wasm/fib.wasm fib i32:10
 
 #### Swift Package Manager
 
-```swift
-dependencies: [
-    .package(url: "https://github.com/swiftwasm/WAKit", .branch("main")),
-],
-```
+Add the URL of this repository to your `Package.swift` manifest. Then add the `WasmKit` library product as dependency to the target you'd like to use it with.
 
-## Development
-
-```sh
-$ make bootstrap  # Install tools through Mint
-$ make generate   # Run Sourcery to generate source code from templates
-$ make build      # or `swift build`
-```
+## Testing
 
 To run the core spec test suite run this:
 
 ```sh
-$ make spectest   # Prepare core spec tests and check their assertions with WAKit
+$ make spectest   # Prepare core spec tests and check their assertions with WasmKit
 ```

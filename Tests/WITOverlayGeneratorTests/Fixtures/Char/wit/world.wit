@@ -1,0 +1,5 @@
+package test:char-check
+
+world char-test-world {
+    export roundtrip: func(v: char) -> char
+}

@@ -1,0 +1,5 @@
+package test:tuple-check
+
+world tuple-test-world {
+    export roundtrip: func(v: tuple<bool, u32>) -> tuple<bool, u32>
+}
