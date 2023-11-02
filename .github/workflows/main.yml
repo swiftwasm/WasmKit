@@ -10,42 +10,31 @@ jobs:
     strategy:
       matrix:
         include:
-          # Swift 5.3
-          - os: macos-11
-            xcode: Xcode_12.4
-          # Swift 5.4
-          - os: macos-11
-            xcode: Xcode_12.5.1
-          # Swift 5.5
-          - os: macos-12
-            xcode: Xcode_13.2.1
-          # Swift 5.6
-          - os: macos-12
-            xcode: Xcode_13.4.1
+          # Swift 5.8.1
+          - os: macos-13
+            xcode: Xcode_14.3.1
+          # Swift 5.9.0
+          - os: macos-13
+            xcode: Xcode_15.0.1
 
     runs-on: ${{ matrix.os }}
     steps:
-      # Checks-out the repo. More at: https://github.com/actions/checkout
       - uses: actions/checkout@v3
         with:
           submodules: recursive
       - name: Select Xcode version
         run: sudo xcode-select -switch /Applications/${{ matrix.xcode }}.app
-      - name: Test in Debug
-        run: |
-          swift test -c debug
-
-          brew install wabt
-          make spectest
+      - run: swift test
+      # TODO: Enable spectest and wasi-testsuite checks
 
   build-linux:
     strategy:
       matrix:
         swift:
-          - "5.3-focal"
-          - "5.4-focal"
-          - "5.5-focal"
-          - "5.6-focal"
+          - "5.8-focal"
+          - "5.8-amazonlinux2"
+          - "5.9-focal"
+          - "5.9-amazonlinux2"
 
     container:
       image: swift:${{ matrix.swift }}
@@ -55,12 +44,6 @@ jobs:
       - uses: actions/checkout@v3
         with:
           submodules: recursive
-      - name: Test in Debug
-        run: |
-          swift test -c debug --enable-test-discovery
-
-          # Disabled on Linux due to unexplained crashes.
-          # curl -L -v -o wabt.tar.gz https://github.com/WebAssembly/wabt/releases/download/1.0.24/wabt-1.0.24-ubuntu.tar.gz
-          # tar xzvf wabt.tar.gz
-          # cp wabt-1.0.24/bin/* /usr/local/bin
-          # make spectest
+      - run: swift test
+      - run: ./CI/check-spectest.sh
+      - run: ./CI/check-wasi-testsuite.sh
