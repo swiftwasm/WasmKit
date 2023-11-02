@@ -1,0 +1,26 @@
+package test:record-check
+
+world record-test-world {
+    record record-empty {}
+    export return-empty: func() -> record-empty
+    export roundtrip-empty: func(v: record-empty) -> record-empty
+
+    record record-padded {
+        f1: u8,
+        f2: u32,
+    }
+    export return-padded: func() -> record-padded
+    export roundtrip-padded: func(v: record-padded) -> record-padded
+
+    record record-ident-flat {
+        my-field: u8,
+    }
+
+    export check-ident-flat: func(v: record-ident-flat) -> record-ident-flat
+
+    record record-ident-loadstore {
+        my-field: u8,
+    }
+
+    export check-ident-loadstore: func(v: record-ident-loadstore) -> record-ident-loadstore
+}

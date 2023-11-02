@@ -1,0 +1,6 @@
+package test:string-check
+
+world string-test-world {
+    export return-empty: func() -> string
+    export roundtrip: func(v: string) -> string
+}

@@ -1,0 +1,17 @@
+package test:interface-check
+
+interface types {
+    type my-type = u8
+}
+
+interface iface-funcs {
+    roundtrip-u8: func(v: u8) -> u8
+}
+
+world interface-test-world {
+    use types.{my-type}
+    type t1 = my-type
+
+    export roundtrip-t1: func(v: t1) -> t1
+    export iface-funcs
+}

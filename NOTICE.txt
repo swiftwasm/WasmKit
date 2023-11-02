@@ -1,0 +1,15 @@
+-------------------------------------------------------------------------------
+This product contains a derivation of the utility code from Swift System.
+
+  * LICENSE (Apache License 2.0):
+    * https://www.apache.org/licenses/LICENSE-2.0
+  * HOMEPAGE:
+    * https://github.com/apple/swift-system
+
+-------------------------------------------------------------------------------
+This product contains a derivation of the list of Swift keywords from Swift Syntax.
+
+  * LICENSE (Apache License 2.0):
+    * https://www.apache.org/licenses/LICENSE-2.0
+  * HOMEPAGE:
+    * https://github.com/apple/swift-syntax

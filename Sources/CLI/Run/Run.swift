@@ -1,22 +1,46 @@
 import ArgumentParser
 import Foundation
 import Logging
-import WAKit
+import SystemPackage
+import WASI
+import WasmKit
 
-private let logger = Logger(label: "com.WAKit.CLI")
+private let logger = Logger(label: "com.WasmKit.CLI")
 
 struct Run: ParsableCommand {
     @Flag
     var verbose = false
 
+    @Option
+    var profileOutput: String?
+
+    struct EnvOption: ExpressibleByArgument {
+        let key: String
+        let value: String
+        init?(argument: String) {
+            var parts = argument.split(separator: "=", maxSplits: 2).makeIterator()
+            guard let key = parts.next(), let value = parts.next() else { return nil }
+            self.key = String(key)
+            self.value = String(value)
+        }
+    }
+
+    @Option(
+        name: .customLong("env"),
+        help: ArgumentHelp(
+            "Pass an environment variable to the WASI program",
+            valueName: "key=value"
+        ))
+    var environment: [EnvOption] = []
+
+    @Option(name: .customLong("dir"), help: "Grant access to the given host directory")
+    var directories: [String] = []
+
     @Argument
     var path: String
 
     @Argument
-    var functionName: String
-
-    @Argument
-    var arguments: [String]
+    var arguments: [String] = []
 
     func run() throws {
         LoggingSystem.bootstrap {
@@ -25,24 +49,76 @@ struct Run: ParsableCommand {
             return handler
         }
 
-        guard let fileHandle = FileHandle(forReadingAtPath: path) else {
-            logger.error("File \"\(path)\" could not be opened")
-            return
+        logger.info("Started parsing module")
+
+        let module: Module
+        if verbose {
+            let (parsedModule, parseTime) = try measure {
+                try parseWasm(filePath: FilePath(path))
+            }
+            logger.info("Finished parsing module: \(parseTime)")
+            module = parsedModule
+        } else {
+            module = try parseWasm(filePath: FilePath(path))
         }
-        defer { fileHandle.closeFile() }
 
-        let stream = FileHandleStream(fileHandle: fileHandle)
+        let interceptor = try deriveInterceptor()
+        defer { interceptor?.finalize() }
 
-        logger.info("Started to parse module")
-
-        let (module, parseTime) = try measure(if: verbose) {
-            try WasmParser.parse(stream: stream)
+        let invoke: () throws -> Void
+        if module.exports.contains(where: { $0.name == "_start" }) {
+            invoke = try instantiateWASI(module: module, interceptor: interceptor?.interceptor)
+        } else {
+            guard let entry = try instantiateNonWASI(module: module, interceptor: interceptor?.interceptor) else {
+                return
+            }
+            invoke = entry
         }
 
-        logger.info("Ended to parse module: \(parseTime)")
+        let (_, invokeTime) = try measure(execution: invoke)
 
-        let runtime = Runtime()
-        let moduleInstance = try runtime.instantiate(module: module, externalValues: [])
+        logger.info("Finished invoking function \"\(path)\": \(invokeTime)")
+    }
+
+    func deriveInterceptor() throws -> (interceptor: GuestTimeProfiler, finalize: () -> Void)? {
+        guard let outputPath = self.profileOutput else { return nil }
+        FileManager.default.createFile(atPath: outputPath, contents: nil)
+        let fileHandle = try FileHandle(forWritingTo: URL(fileURLWithPath: outputPath))
+        let profiler = GuestTimeProfiler { data in
+            try? fileHandle.write(contentsOf: data)
+        }
+        return (
+            profiler,
+            {
+                profiler.finalize()
+                try! fileHandle.synchronize()
+                try! fileHandle.close()
+
+                print("\nProfile Completed: \(outputPath) can be viewed using https://ui.perfetto.dev/")
+            }
+        )
+    }
+
+    func instantiateWASI(module: Module, interceptor: RuntimeInterceptor?) throws -> () throws -> Void {
+        // Flatten environment variables into a dictionary (Respect the last value if a key is duplicated)
+        let environment = environment.reduce(into: [String: String]()) {
+            $0[$1.key] = $1.value
+        }
+        let preopens = directories.reduce(into: [String: String]()) {
+            $0[$1] = $1
+        }
+        let wasi = try WASIBridgeToHost(args: [path] + arguments, environment: environment, preopens: preopens)
+        let runtime = Runtime(hostModules: wasi.hostModules, interceptor: interceptor)
+        let moduleInstance = try runtime.instantiate(module: module)
+        return {
+            let exitCode = try wasi.start(moduleInstance, runtime: runtime)
+            throw ExitCode(Int32(exitCode))
+        }
+    }
+
+    func instantiateNonWASI(module: Module, interceptor: RuntimeInterceptor?) throws -> (() throws -> Void)? {
+        var arguments = arguments
+        let functionName = arguments.popLast()
 
         var parameters: [Value] = []
         for argument in arguments {
@@ -52,26 +128,27 @@ struct Run: ParsableCommand {
             switch type {
             case "i32": parameter = Value(signed: Int32(value)!)
             case "i64": parameter = Value(signed: Int64(value)!)
-            case "f32": parameter = .f32(Float(value)!)
-            case "f64": parameter = .f64(Double(value)!)
+            case "f32": parameter = .f32(Float32(value)!.bitPattern)
+            case "f64": parameter = .f64(Float64(value)!.bitPattern)
             default: fatalError("unknown type")
             }
             parameters.append(parameter)
         }
-
-        logger.info("Started invoking function \"\(functionName)\" with parameters: \(parameters)")
-
-        let (results, invokeTime) = try measure(if: verbose) {
-            try runtime.invoke(moduleInstance, function: functionName, with: parameters)
+        guard let functionName else {
+            logger.error("No function specified to run in a given module.")
+            return nil
         }
 
-        logger.info("Ended invoking function \"\(functionName)\": \(invokeTime)")
-
-        print(results.description)
+        let runtime = Runtime(interceptor: interceptor)
+        let moduleInstance = try runtime.instantiate(module: module)
+        return {
+            logger.info("Started invoking function \"\(functionName)\" with parameters: \(parameters)")
+            let results = try runtime.invoke(moduleInstance, function: functionName, with: parameters)
+            print(results.description)
+        }
     }
 
     func measure<Result>(
-        if _: @autoclosure () -> Bool,
         execution: () throws -> Result
     ) rethrows -> (Result, String) {
         let start = DispatchTime.now()

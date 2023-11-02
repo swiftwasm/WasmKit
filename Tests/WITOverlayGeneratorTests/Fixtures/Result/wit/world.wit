@@ -1,0 +1,8 @@
+package test:result-check
+
+world result-test-world {
+    export roundtrip-result: func(v: result) -> result
+    export roundtrip-result-ok: func(v: result<u32>) -> result<u32>
+    export roundtrip-result-ok-error: func(v: result<u32, string>) -> result<u32, string>
+    export roundtrip-result-error: func(v: result<_, string>) -> result<_, string>
+}

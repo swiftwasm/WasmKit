@@ -1,0 +1,14 @@
+package test:option-check
+
+world option-test-world {
+    export return-none: func() -> option<u8>
+    export return-option-f32: func() -> option<float32>
+
+    type option-typedef = option<u32>
+    export return-option-typedef: func() -> option-typedef
+
+    export return-some-none: func() -> option<option<u32>>
+    export return-some-some: func() -> option<option<u32>>
+
+    export roundtrip: func(v: option<u32>) -> option<u32>
+}
