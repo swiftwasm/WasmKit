@@ -2,8 +2,8 @@ version: 1
 builder:
   configs:
     - documentation_targets: 
-        - WASI
         - WasmKit
+        - WASI
         - WIT
         - WITExtractor
         - WITOverlayGenerator
