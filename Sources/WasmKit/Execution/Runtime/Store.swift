@@ -10,13 +10,21 @@ public typealias ExternAddress = Int
 
 /// A collection of globals and functions that are exported from a host module.
 public struct HostModule {
-    public init(globals: [String: GlobalInstance] = [:], functions: [String: HostFunction] = [:]) {
+    public init(
+        globals: [String: GlobalInstance] = [:],
+        memories: [String: MemoryAddress] = [:],
+        functions: [String: HostFunction] = [:]
+    ) {
         self.globals = globals
+        self.memories = memories
         self.functions = functions
     }
 
     /// Names of globals exported by this module mapped to corresponding global instances.
     public let globals: [String: GlobalInstance]
+
+    /// Names of memories exported by this module mapped to corresponding addresses of memory instances.
+    public let memories: [String: MemoryAddress]
 
     /// Names of functions exported by this module mapped to corresponding host functions.
     public let functions: [String: HostFunction]
@@ -45,19 +53,7 @@ public final class Store {
 
     init(_ hostModules: [String: HostModule]) {
         for (moduleName, hostModule) in hostModules {
-            var moduleExports = ModuleInstance.Exports()
-
-            for (globalName, global) in hostModule.globals {
-                moduleExports[globalName] = .global(-hostGlobals.count - 1)
-                hostGlobals.append(global)
-            }
-
-            for (functionName, function) in hostModule.functions {
-                moduleExports[functionName] = .function(-hostFunctions.count - 1)
-                hostFunctions.append(function)
-            }
-
-            availableExports[moduleName] = moduleExports
+            registerUniqueHostModule(hostModule, as: moduleName)
         }
     }
 }
@@ -119,6 +115,40 @@ extension Store {
         }
 
         availableExports[name] = moduleInstance.exports
+    }
+
+    /// Register the given host module in this store with the given name.
+    ///
+    /// - Parameters:
+    ///   - hostModule: A host module to register.
+    ///   - name: A name to register the given host module.
+    public func register(_ hostModule: HostModule, as name: String) throws {
+        guard availableExports[name] == nil else {
+            throw ImportError.moduleInstanceAlreadyRegistered(name)
+        }
+
+        registerUniqueHostModule(hostModule, as: name)
+    }
+
+    /// Register the given host module assuming that the given name is not registered yet.
+    func registerUniqueHostModule(_ hostModule: HostModule, as name: String) {
+        var moduleExports = ModuleInstance.Exports()
+
+        for (globalName, global) in hostModule.globals {
+            moduleExports[globalName] = .global(-hostGlobals.count - 1)
+            hostGlobals.append(global)
+        }
+
+        for (functionName, function) in hostModule.functions {
+            moduleExports[functionName] = .function(-hostFunctions.count - 1)
+            hostFunctions.append(function)
+        }
+
+        for (memoryName, memoryAddr) in hostModule.memories {
+            moduleExports[memoryName] = .memory(memoryAddr)
+        }
+
+        availableExports[name] = moduleExports
     }
 
     public func memory(at address: MemoryAddress) -> MemoryInstance {
@@ -309,7 +339,7 @@ extension Store {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-mem>
-    func allocate(memoryType: MemoryType) -> MemoryAddress {
+    public func allocate(memoryType: MemoryType) -> MemoryAddress {
         let address = memories.count
         let instance = MemoryInstance(memoryType)
         memories.append(instance)
