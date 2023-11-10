@@ -1,11 +1,8 @@
 import ArgumentParser
 import Foundation
-import Logging
 import SystemPackage
 import WASI
 import WasmKit
-
-private let logger = Logger(label: "com.WasmKit.CLI")
 
 struct Run: ParsableCommand {
     @Flag
@@ -43,20 +40,14 @@ struct Run: ParsableCommand {
     var arguments: [String] = []
 
     func run() throws {
-        LoggingSystem.bootstrap {
-            var handler = StreamLogHandler.standardOutput(label: $0)
-            handler.logLevel = verbose ? .info : .warning
-            return handler
-        }
-
-        logger.info("Started parsing module")
+        log("Started parsing module", verbose: true)
 
         let module: Module
         if verbose {
             let (parsedModule, parseTime) = try measure {
                 try parseWasm(filePath: FilePath(path))
             }
-            logger.info("Finished parsing module: \(parseTime)")
+            log("Finished parsing module: \(parseTime)", verbose: true)
             module = parsedModule
         } else {
             module = try parseWasm(filePath: FilePath(path))
@@ -77,7 +68,7 @@ struct Run: ParsableCommand {
 
         let (_, invokeTime) = try measure(execution: invoke)
 
-        logger.info("Finished invoking function \"\(path)\": \(invokeTime)")
+        log("Finished invoking function \"\(path)\": \(invokeTime)", verbose: true)
     }
 
     func deriveInterceptor() throws -> (interceptor: GuestTimeProfiler, finalize: () -> Void)? {
@@ -135,14 +126,14 @@ struct Run: ParsableCommand {
             parameters.append(parameter)
         }
         guard let functionName else {
-            logger.error("No function specified to run in a given module.")
+            log("Error: No function specified to run in a given module.")
             return nil
         }
 
         let runtime = Runtime(interceptor: interceptor)
         let moduleInstance = try runtime.instantiate(module: module)
         return {
-            logger.info("Started invoking function \"\(functionName)\" with parameters: \(parameters)")
+            log("Started invoking function \"\(functionName)\" with parameters: \(parameters)", verbose: true)
             let results = try runtime.invoke(moduleInstance, function: functionName, with: parameters)
             print(results.description)
         }
@@ -160,5 +151,11 @@ struct Run: ParsableCommand {
         let nanoseconds = NSNumber(value: end.uptimeNanoseconds - start.uptimeNanoseconds)
         let formattedTime = numberFormatter.string(from: nanoseconds)! + " ns"
         return (result, formattedTime)
+    }
+
+    @Sendable func log(_ message: String, verbose: Bool = false) {
+        if !verbose || self.verbose {
+            fputs(message + "\n", stderr)
+        }
     }
 }

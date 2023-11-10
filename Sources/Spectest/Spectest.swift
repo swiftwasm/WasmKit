@@ -1,6 +1,5 @@
 import ArgumentParser
 import Foundation
-import Logging
 import SystemPackage
 import WasmKit
 
@@ -22,20 +21,19 @@ struct Spectest: AsyncParsableCommand {
     var parallel: Bool = true
 
     func run() async throws {
-        LoggingSystem.bootstrap {
-            var handler = StreamLogHandler.standardOutput(label: $0)
-            handler.logLevel = verbose ? .info : .warning
-            return handler
+        let printVerbose = self.verbose
+        @Sendable func log(_ message: String, verbose: Bool = false) {
+            if !verbose || printVerbose {
+                fputs(message + "\n", stderr)
+            }
         }
-
-        let logger = Logger(label: "com.WasmKit.CLI.Spectest")
 
         let include = self.include.flatMap { $0.split(separator: ",").map(String.init) } ?? []
         let exclude = self.exclude.flatMap { $0.split(separator: ",").map(String.init) } ?? []
 
         let testCases: [TestCase]
         do {
-            testCases = try TestCase.load(include: include, exclude: exclude, in: path, logger: logger)
+            testCases = try TestCase.load(include: include, exclude: exclude, in: path, log: { log($0) })
         } catch {
             fatalError("failed to load test: \(error)")
         }
@@ -57,13 +55,13 @@ struct Spectest: AsyncParsableCommand {
             try testCase.run(spectestModule: hostModule) { testCase, command, result in
                 switch result {
                 case let .failed(reason):
-                    logger.warning("\(testCase.content.sourceFilename):\(command.line): \(result.banner) \(reason)")
+                    log("\(testCase.content.sourceFilename):\(command.line): \(result.banner) \(reason)")
                 case let .skipped(reason):
-                    logger.info("\(testCase.content.sourceFilename):\(command.line): \(result.banner) \(reason)")
+                    log("\(testCase.content.sourceFilename):\(command.line): \(result.banner) \(reason)", verbose: true)
                 case .passed:
-                    logger.info("\(testCase.content.sourceFilename):\(command.line): \(result.banner)")
+                    log("\(testCase.content.sourceFilename):\(command.line): \(result.banner)", verbose: true)
                 default:
-                    logger.warning("\(testCase.content.sourceFilename):\(command.line): \(result.banner)")
+                    log("\(testCase.content.sourceFilename):\(command.line): \(result.banner)")
                 }
                 testCaseResults.append(result)
             }
