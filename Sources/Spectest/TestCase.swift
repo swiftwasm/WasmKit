@@ -1,5 +1,4 @@
 import Foundation
-import Logging
 import SystemPackage
 import WasmKit
 
@@ -86,7 +85,7 @@ struct TestCase {
         return isDirectory
     }
 
-    static func load(include: [String], exclude: [String], in path: String, logger: Logger? = nil) throws -> [TestCase] {
+    static func load(include: [String], exclude: [String], in path: String, log: ((String) -> Void)? = nil) throws -> [TestCase] {
         let fileManager = FileManager.default
         let filePath = FilePath(path)
         let dirPath: String
@@ -126,7 +125,7 @@ struct TestCase {
 
         var testCases: [TestCase] = []
         for filePath in filePaths where try matchesPattern(filePath) {
-            logger?.info("loading \(filePath)")
+            log?("loading \(filePath)")
             let path = dirPath + "/" + filePath
             guard let data = fileManager.contents(atPath: path) else {
                 assertionFailure("failed to load \(filePath)")
