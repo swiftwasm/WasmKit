@@ -32,7 +32,7 @@ jobs:
         run: |
           cat <<EOS > Tests/default.json
           {
-            "swiftExecutablePath": "${{ steps.setup-swiftwasm.outputs.toolchain-path }}",
+            "swiftExecutablePath": "${{ steps.setup-swiftwasm.outputs.toolchain-path }}/usr/bin/swift",
             "hostSwiftExecutablePath": "$(xcrun --find swift)",
             "hostSdkRootPath": "$(xcrun --show-sdk-path --sdk macosx)"
           }
@@ -65,7 +65,7 @@ jobs:
         run: |
           cat <<EOS > Tests/default.json
           {
-            "swiftExecutablePath": "${{ steps.setup-swiftwasm.outputs.toolchain-path }}",
+            "swiftExecutablePath": "${{ steps.setup-swiftwasm.outputs.toolchain-path }}/usr/bin/swift",
             "hostSwiftExecutablePath": "/usr/bin/swift"
           }
           EOS
