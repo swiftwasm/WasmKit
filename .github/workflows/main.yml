@@ -37,7 +37,7 @@ jobs:
             "hostSdkRootPath": "$(xcrun --show-sdk-path --sdk macosx)"
           }
           EOS
-      - run: swift test
+      - run: env PATH=/usr/bin:$PATH swift test
       # TODO: Enable spectest and wasi-testsuite checks
 
   build-linux:
@@ -69,6 +69,6 @@ jobs:
             "hostSwiftExecutablePath": "/usr/bin/swift"
           }
           EOS
-      - run: swift test
+      - run: env PATH=/usr/bin:$PATH swift test
       - run: ./CI/check-spectest.sh
       - run: ./CI/check-wasi-testsuite.sh
