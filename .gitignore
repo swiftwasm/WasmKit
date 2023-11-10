@@ -8,6 +8,8 @@
 .vscode
 
 /Tests/default.json
-/Tests/WITOverlayGeneratorTests/Compiled/
-/Tests/WITOverlayGeneratorTests/Generated/
+/Tests/WITOverlayGeneratorTests/Compiled/**
+/Tests/WITOverlayGeneratorTests/Generated/**
 Tests/WITExtractorPluginTests/Fixtures/*/Package.resolved
+
+!**/.gitkeep
