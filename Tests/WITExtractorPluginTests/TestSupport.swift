@@ -76,6 +76,11 @@ func assertSwiftPackage(fixturePackage: String, _ trailingArguments: [String]) t
             )
         }
         guard let stdoutBytes = try stdoutPipe.fileHandleForReading.readToEnd() else { return "" }
-        return String(data: stdoutBytes, encoding: .utf8) ?? ""
+        struct Output: Codable {
+            let witOutputPath: String
+            let swiftOutputPath: String
+        }
+        let jsonOutput = try JSONDecoder().decode(Output.self, from: stdoutBytes)
+        return try String(contentsOfFile: jsonOutput.witOutputPath)
     }
 }

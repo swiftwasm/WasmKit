@@ -23,8 +23,12 @@ struct Plugin: CommandPlugin {
         guard buildResult.succeeded else {
             throw PluginError(description: "Failed to build \(target): \(buildResult.logText)")
         }
-        // FIXME: Don't assume build directory to be ".build" because it can be configured --scratch-path
-        let dataPath = context.package.directory.appending([".build"])
+        // TODO: Add proper API to PackagePlugin to get data directory
+        let dataPath = context.pluginWorkDirectory // output
+            .removingLastComponent() // WITExtractorPlugin
+            .removingLastComponent() // plugins
+            .removingLastComponent() // .build (by default)
+
         let buildPath = dataPath.appending([parameters.configuration.rawValue])
         let llbuildManifest = dataPath.appending([parameters.configuration.rawValue + ".yaml"])
         guard let swiftcExecutable = ProcessInfo.processInfo.environment["WIT_EXTRACTOR_SWIFTC_PATH"]
@@ -32,12 +36,18 @@ struct Plugin: CommandPlugin {
             throw PluginError(description: "Cloudn't infer `swiftc` command path from build directory. Please specify WIT_EXTRACTOR_SWIFTC_PATH")
         }
         let digesterExecutable = Path(swiftcExecutable).removingLastComponent().appending(["swift-api-digester"])
+
+        let witOutputPath = context.pluginWorkDirectory.appending([target + ".wit"])
+        let swiftOutputPath = context.pluginWorkDirectory.appending([target + "_WITOverlay.swift"])
+
         let tool = try context.tool(named: "WITTool")
         var arguments =  [
             "extract-wit",
             "--swift-api-digester", digesterExecutable.string,
             "--module-name", target,
             "--package-name", context.package.displayName,
+            "--wit-output-path", witOutputPath.string,
+            "--swift-output-path", swiftOutputPath.string,
             "-I", buildPath.string
         ]
         if let sdk {
@@ -50,6 +60,12 @@ struct Plugin: CommandPlugin {
                 description: "Failed to run \(([tool.path.string] + arguments).joined(separator: " "))"
             )
         }
+        print("""
+        {
+            "witOutputPath": "\(witOutputPath)",
+            "swiftOutputPath": "\(swiftOutputPath)"
+        }
+        """)
     }
 
     func inferSwiftcExecutablePath(llbuildManifest: Path) -> String? {
