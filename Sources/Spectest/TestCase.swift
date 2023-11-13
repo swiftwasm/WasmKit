@@ -192,7 +192,6 @@ extension TestCase {
             ) { command, result in
                 handler(self, command, result)
             }
-            assert(runtime.isStackEmpty)
         }
     }
 }

@@ -18,17 +18,18 @@ final class VariableInstructionTests: XCTestCase {
             ]
         )
 
+        var execution = ExecutionState()
         let runtime = Runtime()
 
         _ = try runtime.instantiate(module: module)
 
-        try runtime.invoke(functionAddress: 0)
+        try execution.invoke(functionAddress: 0, runtime: runtime)
 
-        try runtime.step()
-        try runtime.step()
+        try execution.step(runtime: runtime)
+        try execution.step(runtime: runtime)
 
-        XCTAssertEqual(runtime.stack.top, .label(.init(arity: 1, expression: expression, continuation: 1, exit: 1)))
-        XCTAssertEqual(runtime.stack.currentFrame.locals, [.i32(42)])
+        XCTAssertEqual(execution.stack.top, .label(.init(arity: 1, expression: expression, continuation: 1, exit: 1)))
+        XCTAssertEqual(execution.stack.currentFrame.locals, [.i32(42)])
     }
 
     func testLocalGet() throws {
@@ -47,18 +48,19 @@ final class VariableInstructionTests: XCTestCase {
             ]
         )
 
+        var execution = ExecutionState()
         let runtime = Runtime()
 
         _ = try runtime.instantiate(module: module)
 
-        try runtime.invoke(functionAddress: 0)
+        try execution.invoke(functionAddress: 0, runtime: runtime)
 
-        try runtime.step()
-        try runtime.step()
-        try runtime.step()
+        try execution.step(runtime: runtime)
+        try execution.step(runtime: runtime)
+        try execution.step(runtime: runtime)
 
-        XCTAssertEqual(runtime.stack.top, .value(.i32(42)))
-        XCTAssertEqual(runtime.stack.currentFrame.locals, [.i32(42)])
+        XCTAssertEqual(execution.stack.top, .value(.i32(42)))
+        XCTAssertEqual(execution.stack.currentFrame.locals, [.i32(42)])
     }
 
     func testLocalTee() throws {
@@ -76,16 +78,17 @@ final class VariableInstructionTests: XCTestCase {
             ]
         )
 
+        var execution = ExecutionState()
         let runtime = Runtime()
 
         _ = try runtime.instantiate(module: module)
 
-        try runtime.invoke(functionAddress: 0)
+        try execution.invoke(functionAddress: 0, runtime: runtime)
 
-        try runtime.step()
-        try runtime.step()
+        try execution.step(runtime: runtime)
+        try execution.step(runtime: runtime)
 
-        XCTAssertEqual(runtime.stack.top, .value(.i32(42)))
-        XCTAssertEqual(runtime.stack.currentFrame.locals, [.i32(42)])
+        XCTAssertEqual(execution.stack.top, .value(.i32(42)))
+        XCTAssertEqual(execution.stack.currentFrame.locals, [.i32(42)])
     }
 }

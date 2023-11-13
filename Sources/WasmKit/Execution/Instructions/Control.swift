@@ -13,28 +13,28 @@ enum ControlInstruction: Equatable {
     case call(functionIndex: UInt32)
     case callIndirect(tableIndex: TableIndex, typeIndex: TypeIndex)
 
-    func execute(runtime: Runtime) throws {
+    func execute(runtime: Runtime, execution: inout ExecutionState) throws {
         switch self {
         case .unreachable:
             throw Trap.unreachable
 
         case .nop:
-            runtime.programCounter += 1
+            execution.programCounter += 1
 
         case let .block(expression, type):
-            let (paramSize, resultSize) = type.arity(typeSection: { runtime.stack.currentFrame.module.types })
-            let values = try runtime.stack.popValues(count: paramSize)
-            runtime.enter(expression, continuation: runtime.programCounter + 1, arity: resultSize)
-            runtime.stack.push(values: values)
+            let (paramSize, resultSize) = type.arity(typeSection: { execution.stack.currentFrame.module.types })
+            let values = try execution.stack.popValues(count: paramSize)
+            execution.enter(expression, continuation: execution.programCounter + 1, arity: resultSize)
+            execution.stack.push(values: values)
 
         case let .loop(expression, type):
-            let (paramSize, _) = type.arity(typeSection: { runtime.stack.currentFrame.module.types })
-            let values = try runtime.stack.popValues(count: paramSize)
-            runtime.enter(expression, continuation: runtime.programCounter, arity: paramSize)
-            runtime.stack.push(values: values)
+            let (paramSize, _) = type.arity(typeSection: { execution.stack.currentFrame.module.types })
+            let values = try execution.stack.popValues(count: paramSize)
+            execution.enter(expression, continuation: execution.programCounter, arity: paramSize)
+            execution.stack.push(values: values)
 
         case let .if(then, `else`, type):
-            let isTrue = try runtime.stack.popValue().i32 != 0
+            let isTrue = try execution.stack.popValue().i32 != 0
 
             let expression: Expression
             if isTrue {
@@ -45,24 +45,24 @@ enum ControlInstruction: Equatable {
 
             if !expression.instructions.isEmpty {
                 let derived = ControlInstruction.block(expression: expression, type: type)
-                try derived.execute(runtime: runtime)
+                try derived.execute(runtime: runtime, execution: &execution)
             } else {
-                runtime.programCounter += 1
+                execution.programCounter += 1
             }
 
         case let .brIf(labelIndex):
-            guard try runtime.stack.popValue().i32 != 0 else {
-                runtime.programCounter += 1
+            guard try execution.stack.popValue().i32 != 0 else {
+                execution.programCounter += 1
                 return
             }
 
             fallthrough
 
         case let .br(labelIndex):
-            try runtime.branch(labelIndex: Int(labelIndex))
+            try execution.branch(labelIndex: Int(labelIndex))
 
         case let .brTable(labelIndices, defaultLabelIndex):
-            let value = try runtime.stack.popValue().i32
+            let value = try execution.stack.popValue().i32
             let labelIndex: LabelIndex
             if labelIndices.indices.contains(Int(value)) {
                 labelIndex = labelIndices[Int(value)]
@@ -70,37 +70,37 @@ enum ControlInstruction: Equatable {
                 labelIndex = defaultLabelIndex
             }
 
-            try runtime.branch(labelIndex: Int(labelIndex))
+            try execution.branch(labelIndex: Int(labelIndex))
 
         case .return:
-            let values = try runtime.stack.popValues(count: runtime.stack.currentFrame.arity)
+            let values = try execution.stack.popValues(count: execution.stack.currentFrame.arity)
 
-            let currentFrame = Stack.Element.frame(runtime.stack.currentFrame)
+            let currentFrame = Stack.Element.frame(execution.stack.currentFrame)
             var lastLabel: Label?
-            while runtime.stack.top != currentFrame {
-                runtime.stack.discardTopValues()
-                lastLabel = try runtime.stack.popLabel()
+            while execution.stack.top != currentFrame {
+                execution.stack.discardTopValues()
+                lastLabel = try execution.stack.popLabel()
             }
             if let lastLabel {
-                runtime.programCounter = lastLabel.continuation
+                execution.programCounter = lastLabel.continuation
             }
-            runtime.stack.push(values: values)
+            execution.stack.push(values: values)
 
         case let .call(functionIndex):
-            let functionAddresses = runtime.stack.currentFrame.module.functionAddresses
+            let functionAddresses = execution.stack.currentFrame.module.functionAddresses
 
             guard functionAddresses.indices.contains(Int(functionIndex)) else {
                 throw Trap.invalidFunctionIndex(functionIndex)
             }
 
-            try runtime.invoke(functionAddress: functionAddresses[Int(functionIndex)])
+            try execution.invoke(functionAddress: functionAddresses[Int(functionIndex)], runtime: runtime)
 
         case let .callIndirect(tableIndex, typeIndex):
-            let moduleInstance = runtime.stack.currentFrame.module
+            let moduleInstance = execution.stack.currentFrame.module
             let tableAddresses = moduleInstance.tableAddresses[Int(tableIndex)]
             let tableInstance = runtime.store.tables[tableAddresses]
             let expectedType = moduleInstance.types[Int(typeIndex)]
-            let value = try runtime.stack.popValue().i32
+            let value = try execution.stack.popValue().i32
             let elementIndex = Int(value)
             guard elementIndex < tableInstance.elements.count else {
                 throw Trap.undefinedElement
@@ -114,7 +114,7 @@ enum ControlInstruction: Equatable {
                 throw Trap.callIndirectFunctionTypeMismatch(actual: function.type, expected: expectedType)
             }
 
-            try runtime.invoke(functionAddress: functionAddress)
+            try execution.invoke(functionAddress: functionAddress, runtime: runtime)
         }
     }
 }
