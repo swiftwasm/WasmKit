@@ -37,9 +37,9 @@ public final class ModuleInstance {
 public struct FunctionInstance {
     public let type: FunctionType
     public let module: ModuleInstance
-    public var code: Function
+    var code: GuestFunction
 
-    init(_ function: Function, module: ModuleInstance) {
+    init(_ function: GuestFunction, module: ModuleInstance) {
         type = module.types[Int(function.type)]
         self.module = module
         code = function

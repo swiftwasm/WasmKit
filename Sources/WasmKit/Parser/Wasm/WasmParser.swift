@@ -1265,7 +1265,7 @@ extension WasmParser {
         }
 
         let functions = codes.enumerated().map { [hasDataCount, features] index, code in
-            Function(
+            GuestFunction(
                 type: typeIndices[index], locals: code.locals,
                 body: {
                     let stream = StaticByteStream(bytes: Array(code.expression))

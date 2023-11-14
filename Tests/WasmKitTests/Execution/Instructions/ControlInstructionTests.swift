@@ -398,7 +398,7 @@ final class ControlInstructionTests: XCTestCase {
     }
 }
 
-extension Function {
+extension GuestFunction {
     init(type: TypeIndex, locals: [ValueType], body: Expression) {
         self.init(type: type, locals: locals, body: { body })
     }
