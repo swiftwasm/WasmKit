@@ -321,7 +321,7 @@ extension Store {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-func>
-    func allocate(function: Function, module: ModuleInstance) -> FunctionAddress {
+    func allocate(function: GuestFunction, module: ModuleInstance) -> FunctionAddress {
         let address = functions.count
         let instance = FunctionInstance(function, module: module)
         functions.append(instance)

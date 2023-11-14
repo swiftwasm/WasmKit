@@ -4,7 +4,7 @@
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#modules>
 public struct Module {
     public internal(set) var types: [FunctionType]
-    public internal(set) var functions: [Function]
+    var functions: [GuestFunction]
     public internal(set) var tables: [Table]
     public internal(set) var memories: [Memory]
     public internal(set) var globals: [Global]
@@ -16,9 +16,9 @@ public struct Module {
     public internal(set) var exports: [Export]
     public internal(set) var customSections = [CustomSection]()
 
-    public init(
+    init(
         types: [FunctionType] = [],
-        functions: [Function] = [],
+        functions: [GuestFunction] = [],
         tables: [Table] = [],
         memories: [Memory] = [],
         globals: [Global] = [],
@@ -67,7 +67,7 @@ public typealias LabelIndex = UInt32
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#functions>
-public struct Function {
+struct GuestFunction {
     init(type: TypeIndex, locals: [ValueType], body: @escaping () throws -> Expression) {
         self.type = type
         self.locals = locals
