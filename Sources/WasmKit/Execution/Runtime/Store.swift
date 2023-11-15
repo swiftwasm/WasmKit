@@ -60,8 +60,11 @@ public final class Store {
 
 /// A caller context passed to host functions
 public struct Caller {
-    public let store: Store
+    public let runtime: Runtime
     public let instance: ModuleInstance
+    public var store: Store {
+        runtime.store
+    }
 }
 
 /// A host-defined function which can be imported by a WebAssembly module instance.
