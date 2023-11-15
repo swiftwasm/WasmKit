@@ -84,7 +84,7 @@ extension ExecutionState {
         switch try runtime.store.function(at: address) {
         case let .host(function):
             let parameters = try stack.popValues(count: function.type.parameters.count)
-            let caller = Caller(store: runtime.store, instance: stack.currentFrame.module)
+            let caller = Caller(runtime: runtime, instance: stack.currentFrame.module)
             stack.push(values: try function.implementation(caller, parameters))
 
             programCounter += 1

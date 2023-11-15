@@ -1,3 +1,4 @@
+/// A WebAssembly guest function or host function
 public struct Function: Equatable {
     internal let address: FunctionAddress
 
@@ -16,7 +17,7 @@ public struct Function: Equatable {
 
             let parameters = try execution.stack.popValues(count: function.type.parameters.count)
 
-            let caller = Caller(store: runtime.store, instance: execution.stack.currentFrame.module)
+            let caller = Caller(runtime: runtime, instance: execution.stack.currentFrame.module)
             let results = try function.implementation(caller, parameters)
             try check(functionType: function.type, results: results)
             execution.stack.push(values: results)
