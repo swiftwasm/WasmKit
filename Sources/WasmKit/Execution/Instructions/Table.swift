@@ -10,55 +10,55 @@ enum TableInstruction: Equatable {
     case `init`(TableIndex, ElementIndex)
     case elementDrop(ElementIndex)
 
-    func execute(runtime: Runtime) throws {
+    func execute(runtime: Runtime, execution: inout ExecutionState) throws {
         switch self {
         case let .get(tableIndex):
-            let (_, table) = try runtime.getTable(tableIndex)
+            let (_, table) = try execution.getTable(tableIndex, store: runtime.store)
 
-            let elementIndex = try runtime.getElementIndex(table)
+            let elementIndex = try execution.getElementIndex(table)
 
             guard let reference = table.elements[Int(elementIndex)] else {
                 throw Trap.readingDroppedReference(index: elementIndex)
             }
 
-            runtime.stack.push(value: .ref(reference))
+            execution.stack.push(value: .ref(reference))
 
         case let .set(tableIndex):
-            let (tableAddress, table) = try runtime.getTable(tableIndex)
+            let (tableAddress, table) = try execution.getTable(tableIndex, store: runtime.store)
 
-            let reference = try runtime.stack.getReference()
-            let elementIndex = try runtime.getElementIndex(table)
-            runtime.setTableElement(tableAddress: tableAddress, elementIndex, reference)
+            let reference = try execution.stack.getReference()
+            let elementIndex = try execution.getElementIndex(table)
+            setTableElement(store: runtime.store, tableAddress: tableAddress, elementIndex, reference)
 
         case let .size(tableIndex):
-            let (_, table) = try runtime.getTable(tableIndex)
+            let (_, table) = try execution.getTable(tableIndex, store: runtime.store)
 
-            runtime.stack.push(value: .i32(UInt32(table.elements.count)))
+            execution.stack.push(value: .i32(UInt32(table.elements.count)))
 
         case let .grow(tableIndex):
-            let (tableAddress, table) = try runtime.getTable(tableIndex)
+            let (tableAddress, table) = try execution.getTable(tableIndex, store: runtime.store)
 
-            let growthSize = try runtime.stack.popValue()
+            let growthSize = try execution.stack.popValue()
 
             guard case let .i32(growthSize) = growthSize else {
                 fatalError("invalid value at the top of the stack \(growthSize)")
             }
 
-            let growthValue = try runtime.stack.getReference()
+            let growthValue = try execution.stack.getReference()
 
             let oldSize = UInt32(table.elements.count)
             guard runtime.store.tables[tableAddress].grow(by: growthSize, value: growthValue) else {
-                runtime.stack.push(value: .i32(Int32(-1).unsigned))
+                execution.stack.push(value: .i32(Int32(-1).unsigned))
                 break
             }
 
-            runtime.stack.push(value: .i32(oldSize))
+            execution.stack.push(value: .i32(oldSize))
 
         case let .fill(tableIndex):
-            let (tableAddress, table) = try runtime.getTable(tableIndex)
-            let fillCounter = try runtime.stack.popValue().i32
-            let fillValue = try runtime.stack.getReference()
-            let startIndex = try runtime.stack.popValue().i32
+            let (tableAddress, table) = try execution.getTable(tableIndex, store: runtime.store)
+            let fillCounter = try execution.stack.popValue().i32
+            let fillValue = try execution.stack.getReference()
+            let startIndex = try execution.stack.popValue().i32
 
             guard fillCounter > 0 else {
                 break
@@ -69,16 +69,16 @@ enum TableInstruction: Equatable {
             }
 
             for i in 0..<fillCounter {
-                runtime.setTableElement(tableAddress: tableAddress, startIndex + i, fillValue)
+                setTableElement(store: runtime.store, tableAddress: tableAddress, startIndex + i, fillValue)
             }
 
         case let .copy(destinationTableIndex, sourceTableIndex):
-            let (_, sourceTable) = try runtime.getTable(sourceTableIndex)
-            let (destinationTableAddress, destinationTable) = try runtime.getTable(destinationTableIndex)
+            let (_, sourceTable) = try execution.getTable(sourceTableIndex, store: runtime.store)
+            let (destinationTableAddress, destinationTable) = try execution.getTable(destinationTableIndex, store: runtime.store)
 
-            let copyCounter = try runtime.stack.popValue().i32
-            let sourceIndex = try runtime.stack.popValue().i32
-            let destinationIndex = try runtime.stack.popValue().i32
+            let copyCounter = try execution.stack.popValue().i32
+            let sourceIndex = try execution.stack.popValue().i32
+            let destinationIndex = try execution.stack.popValue().i32
 
             guard copyCounter > 0 else {
                 break
@@ -97,7 +97,8 @@ enum TableInstruction: Equatable {
             }
 
             for i in 0..<copyCounter {
-                runtime.setTableElement(
+                setTableElement(
+                    store: runtime.store,
                     tableAddress: destinationTableAddress,
                     destinationIndex + i,
                     sourceTable.elements[Int(sourceIndex + i)]
@@ -105,13 +106,13 @@ enum TableInstruction: Equatable {
             }
 
         case let .`init`(tableIndex, elementIndex):
-            let (destinationTableAddress, destinationTable) = try runtime.getTable(tableIndex)
-            let elementAddress = runtime.stack.currentFrame.module.elementAddresses[Int(elementIndex)]
+            let (destinationTableAddress, destinationTable) = try execution.getTable(tableIndex, store: runtime.store)
+            let elementAddress = execution.stack.currentFrame.module.elementAddresses[Int(elementIndex)]
             let sourceElement = runtime.store.elements[elementAddress]
 
-            let copyCounter = try runtime.stack.popValue().i32
-            let sourceIndex = try runtime.stack.popValue().i32
-            let destinationIndex = try runtime.stack.popValue().i32
+            let copyCounter = try execution.stack.popValue().i32
+            let sourceIndex = try execution.stack.popValue().i32
+            let destinationIndex = try execution.stack.popValue().i32
 
             guard copyCounter > 0 else {
                 break
@@ -133,23 +134,37 @@ enum TableInstruction: Equatable {
             for i in 0..<copyCounter {
                 let reference = sourceElement.references[Int(sourceIndex + i)]
 
-                runtime.setTableElement(tableAddress: destinationTableAddress, destinationIndex + i, reference)
+                setTableElement(
+                    store: runtime.store,
+                    tableAddress: destinationTableAddress,
+                    destinationIndex + i,
+                    reference
+                )
             }
 
         case let .elementDrop(elementIndex):
-            let elementAddress = runtime.stack.currentFrame.module.elementAddresses[Int(elementIndex)]
+            let elementAddress = execution.stack.currentFrame.module.elementAddresses[Int(elementIndex)]
             runtime.store.elements[elementAddress].drop()
         }
     }
+
+    fileprivate func setTableElement(
+        store: Store,
+        tableAddress: TableAddress,
+        _ elementIndex: ElementIndex,
+        _ reference: Reference?
+    ) {
+        store.tables[tableAddress].elements[Int(elementIndex)] = reference
+    }
 }
 
-extension Runtime {
-    fileprivate func getTable(_ tableIndex: UInt32) throws -> (TableAddress, TableInstance) {
+extension ExecutionState {
+    fileprivate func getTable(_ tableIndex: UInt32, store: Store) throws -> (TableAddress, TableInstance) {
         let address = stack.currentFrame.module.tableAddresses[Int(tableIndex)]
         return (address, store.tables[address])
     }
 
-    fileprivate func getElementIndex(_ table: TableInstance) throws -> ElementIndex {
+    fileprivate mutating func getElementIndex(_ table: TableInstance) throws -> ElementIndex {
         let elementIndex = try stack.popValue().i32
 
         guard elementIndex < table.elements.count else {
@@ -157,10 +172,6 @@ extension Runtime {
         }
 
         return elementIndex
-    }
-
-    fileprivate func setTableElement(tableAddress: TableAddress, _ elementIndex: ElementIndex, _ reference: Reference?) {
-        store.tables[tableAddress].elements[Int(elementIndex)] = reference
     }
 }
 

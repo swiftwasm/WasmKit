@@ -5,8 +5,8 @@ import XCTest
 final class ControlInstructionTests: XCTestCase {
     func testUnreachable() {
         let instruction = Instruction.control(.unreachable)
-        let runtime = Runtime()
-        XCTAssertThrowsError(try runtime.execute(instruction)) { error in
+        var execution = ExecutionState()
+        XCTAssertThrowsError(try execution.execute(instruction, runtime: Runtime())) { error in
             guard case Trap.unreachable = error else {
                 return XCTFail("unknown error thrown: \(error)")
             }
@@ -15,9 +15,9 @@ final class ControlInstructionTests: XCTestCase {
 
     func testNop() throws {
         let instruction = Instruction.control(.nop)
-        let runtime = Runtime()
-        try runtime.execute(instruction)
-        XCTAssertEqual(runtime.programCounter, 1)
+        var execution = ExecutionState()
+        try execution.execute(instruction, runtime: Runtime())
+        XCTAssertEqual(execution.programCounter, 1)
     }
 
     func testBlock() throws {
@@ -31,14 +31,14 @@ final class ControlInstructionTests: XCTestCase {
             )
         )
 
-        let runtime = Runtime()
-        try runtime.execute(instruction)
+        var execution = ExecutionState()
+        try execution.execute(instruction, runtime: Runtime())
 
         XCTAssertEqual(
-            runtime.stack.top,
+            execution.stack.top,
             .label(.init(arity: 1, expression: dummyExpression, continuation: 1, exit: 1))
         )
-        XCTAssertEqual(runtime.programCounter, 0)
+        XCTAssertEqual(execution.programCounter, 0)
     }
 
     func testLoop() throws {
@@ -52,13 +52,13 @@ final class ControlInstructionTests: XCTestCase {
             )
         )
 
-        let runtime = Runtime()
-        try runtime.execute(instruction)
+        var execution = ExecutionState()
+        try execution.execute(instruction, runtime: Runtime())
         XCTAssertEqual(
-            runtime.stack.top,
+            execution.stack.top,
             .label(.init(arity: 0, expression: dummyExpression, continuation: 0, exit: 1))
         )
-        XCTAssertEqual(runtime.programCounter, 0)
+        XCTAssertEqual(execution.programCounter, 0)
     }
 
     func testIf_true() throws {
@@ -78,13 +78,12 @@ final class ControlInstructionTests: XCTestCase {
             )
         )
 
-        let runtime = Runtime()
-        runtime.stack.push(value: .i32(1))
-
-        try runtime.execute(instruction)
+        var execution = ExecutionState()
+        execution.stack.push(value: .i32(1))
+        try execution.execute(instruction, runtime: Runtime())
 
         XCTAssertEqual(
-            runtime.stack.top,
+            execution.stack.top,
             .label(.init(arity: 1, expression: thenExpression, continuation: 1, exit: 1))
         )
     }
@@ -106,13 +105,14 @@ final class ControlInstructionTests: XCTestCase {
             )
         )
 
+        var execution = ExecutionState()
         let runtime = Runtime()
-        runtime.stack.push(value: .i32(0))
+        execution.stack.push(value: .i32(0))
 
-        try runtime.execute(instruction)
+        try execution.execute(instruction, runtime: runtime)
 
         XCTAssertEqual(
-            runtime.stack.top,
+            execution.stack.top,
             .label(.init(arity: 1, expression: elseExpression, continuation: 1, exit: 1))
         )
     }
@@ -132,20 +132,21 @@ final class ControlInstructionTests: XCTestCase {
             )
         )
 
+        var execution = ExecutionState()
         let runtime = Runtime()
-        runtime.stack.push(value: .i32(0))
+        execution.stack.push(value: .i32(0))
 
-        try runtime.execute(instruction)
+        try execution.execute(instruction, runtime: runtime)
 
-        XCTAssertEqual(runtime.stack.top, nil)
+        XCTAssertEqual(execution.stack.top, nil)
 
-        runtime.stack.push(value: .i32(1))
-        runtime.programCounter = 0
+        execution.stack.push(value: .i32(1))
+        execution.programCounter = 0
 
-        try runtime.execute(instruction)
+        try execution.execute(instruction, runtime: runtime)
 
         XCTAssertEqual(
-            runtime.stack.top,
+            execution.stack.top,
             .label(.init(arity: 1, expression: thenExpression, continuation: 1, exit: 1))
         )
     }
@@ -170,24 +171,25 @@ final class ControlInstructionTests: XCTestCase {
             ]
         )
 
+        var execution = ExecutionState()
         let runtime = Runtime()
         _ = try runtime.instantiate(module: module)
 
-        try runtime.invoke(functionAddress: 0)
+        try execution.invoke(functionAddress: 0, runtime: runtime)
 
         // Step a limited number of times to avoid infinite loops in case of test failure.
         for _ in 0..<5 {
-            try runtime.step()
+            try execution.step(runtime: runtime)
         }
 
-        XCTAssertEqual(runtime.stack.elements, [])
+        XCTAssertEqual(execution.stack.elements, [])
     }
 
     func testElse() throws {
         let instruction = Instruction.pseudo(.else)
 
-        let runtime = Runtime()
-        XCTAssertThrowsError(try runtime.execute(instruction)) { error in
+        var execution = ExecutionState()
+        XCTAssertThrowsError(try execution.execute(instruction, runtime: Runtime())) { error in
             guard case Trap.unreachable = error else {
                 return XCTFail("unknown error thrown: \(error)")
             }
@@ -197,8 +199,8 @@ final class ControlInstructionTests: XCTestCase {
     func testEnd() {
         let instruction = Instruction.pseudo(.end)
 
-        let runtime = Runtime()
-        XCTAssertThrowsError(try runtime.execute(instruction)) { error in
+        var execution = ExecutionState()
+        XCTAssertThrowsError(try execution.execute(instruction, runtime: Runtime())) { error in
             guard case Trap.unreachable = error else {
                 return XCTFail("unknown error thrown: \(error)")
             }
@@ -208,76 +210,80 @@ final class ControlInstructionTests: XCTestCase {
     func testBr0() throws {
         let instruction = Instruction.control(.br(0))
         let arity0 = Label(arity: 0, expression: [instruction], continuation: 123, exit: 0)
+        var execution = ExecutionState()
         let runtime = Runtime()
-        runtime.stack.push(label: arity0)
+        execution.stack.push(label: arity0)
 
-        try runtime.execute(instruction)
+        try execution.execute(instruction, runtime: runtime)
 
-        XCTAssertNil(runtime.stack.top)
-        XCTAssertEqual(runtime.programCounter, 123)
+        XCTAssertNil(execution.stack.top)
+        XCTAssertEqual(execution.programCounter, 123)
 
         let arity1 = Label(arity: 1, expression: [instruction], continuation: 321, exit: 0)
-        runtime.stack.push(label: arity1)
-        runtime.stack.push(value: .i32(42))
-        try runtime.execute(instruction)
+        execution.stack.push(label: arity1)
+        execution.stack.push(value: .i32(42))
+        try execution.execute(instruction, runtime: runtime)
 
-        XCTAssertEqual(runtime.stack.top, .value(.i32(42)))
-        XCTAssertEqual(runtime.programCounter, 321)
+        XCTAssertEqual(execution.stack.top, .value(.i32(42)))
+        XCTAssertEqual(execution.programCounter, 321)
     }
 
     func testBr1() throws {
         let instruction = Instruction.control(.br(1))
         let arity0 = Label(arity: 0, expression: [instruction], continuation: 123, exit: 0)
+        var execution = ExecutionState()
         let runtime = Runtime()
-        runtime.stack.push(label: arity0)
-        runtime.stack.push(label: arity0)
+        execution.stack.push(label: arity0)
+        execution.stack.push(label: arity0)
 
-        try runtime.execute(instruction)
+        try execution.execute(instruction, runtime: runtime)
 
-        XCTAssertNil(runtime.stack.top)
-        XCTAssertEqual(runtime.programCounter, 123)
+        XCTAssertNil(execution.stack.top)
+        XCTAssertEqual(execution.programCounter, 123)
 
         let arity1 = Label(arity: 1, expression: [instruction], continuation: 321, exit: 0)
-        runtime.stack.push(label: arity1)
-        runtime.stack.push(label: arity1)
-        runtime.stack.push(value: .i32(42))
-        try runtime.execute(instruction)
+        execution.stack.push(label: arity1)
+        execution.stack.push(label: arity1)
+        execution.stack.push(value: .i32(42))
+        try execution.execute(instruction, runtime: runtime)
 
-        XCTAssertEqual(runtime.stack.top, .value(.i32(42)))
-        XCTAssertEqual(runtime.programCounter, 321)
+        XCTAssertEqual(execution.stack.top, .value(.i32(42)))
+        XCTAssertEqual(execution.programCounter, 321)
     }
 
     func testBrIf_true() throws {
         let instruction = Instruction.control(.brIf(0))
         let label = Label(arity: 0, expression: [instruction], continuation: 123, exit: 0)
+        var execution = ExecutionState()
         let runtime = Runtime()
-        runtime.stack.push(label: label)
-        runtime.stack.push(value: .i32(1))
-        try runtime.execute(instruction)
+        execution.stack.push(label: label)
+        execution.stack.push(value: .i32(1))
+        try execution.execute(instruction, runtime: runtime)
 
-        XCTAssertNil(runtime.stack.top)
-        XCTAssertEqual(runtime.programCounter, 123)
+        XCTAssertNil(execution.stack.top)
+        XCTAssertEqual(execution.programCounter, 123)
 
         let arity1 = Label(arity: 1, expression: [instruction], continuation: 321, exit: 0)
-        runtime.stack.push(label: arity1)
-        runtime.stack.push(value: .i32(42))
-        runtime.stack.push(value: .i32(1))
-        try runtime.execute(instruction)
+        execution.stack.push(label: arity1)
+        execution.stack.push(value: .i32(42))
+        execution.stack.push(value: .i32(1))
+        try execution.execute(instruction, runtime: runtime)
 
-        XCTAssertEqual(runtime.stack.top, .value(.i32(42)))
-        XCTAssertEqual(runtime.programCounter, 321)
+        XCTAssertEqual(execution.stack.top, .value(.i32(42)))
+        XCTAssertEqual(execution.programCounter, 321)
     }
 
     func testBrIf_false() throws {
         let instruction = Instruction.control(.brIf(0))
         let label = Label(arity: 0, expression: [instruction], continuation: 123, exit: 0)
+        var execution = ExecutionState()
         let runtime = Runtime()
-        runtime.stack.push(label: label)
-        runtime.stack.push(value: .i32(0))
-        try runtime.execute(instruction)
+        execution.stack.push(label: label)
+        execution.stack.push(value: .i32(0))
+        try execution.execute(instruction, runtime: runtime)
 
-        XCTAssertEqual(runtime.stack.top, .label(label))
-        XCTAssertEqual(runtime.programCounter, 1)
+        XCTAssertEqual(execution.stack.top, .label(label))
+        XCTAssertEqual(execution.programCounter, 1)
     }
 
     func testCall() throws {
@@ -355,31 +361,33 @@ final class ControlInstructionTests: XCTestCase {
             ]
         )
 
+        var execution = ExecutionState()
         let runtime = Runtime()
         _ = try runtime.instantiate(module: module)
 
-        try runtime.invoke(functionAddress: 0)
+        try execution.invoke(functionAddress: 0, runtime: runtime)
 
         // Step a limited number of times to avoid infinite loops in case of test failure.
         for _ in 0..<6 {
-            try runtime.step()
+            try execution.step(runtime: runtime)
         }
 
-        XCTAssertEqual(runtime.stack.elements, [])
+        XCTAssertEqual(execution.stack.elements, [])
 
-        try runtime.invoke(functionAddress: 1)
+        try execution.invoke(functionAddress: 1, runtime: runtime)
 
         // Step a limited number of times to avoid infinite loops in case of test failure.
         for _ in 0..<(loopRange * 8 + 4) {
-            try runtime.step()
+            try execution.step(runtime: runtime)
         }
 
-        XCTAssertEqual(runtime.stack.elements, [.value(loopRangeValue)])
+        XCTAssertEqual(execution.stack.elements, [.value(loopRangeValue)])
     }
 
     func testI32Load8() throws {
         var memory = MemoryInstance(.init(min: 1, max: nil))
         memory.data[0..<3] = [97, 98, 99, 100]  // ASCII "abcd"
+        var execution = ExecutionState()
         let runtime = Runtime()
         runtime.store.memories.append(memory)
 
@@ -387,14 +395,14 @@ final class ControlInstructionTests: XCTestCase {
         module.memoryAddresses = [0]
 
         let frame = Frame(arity: 0, module: module, locals: [])
-        try runtime.stack.push(frame: frame)
-        runtime.stack.push(value: .i32(0))
+        try execution.stack.push(frame: frame)
+        execution.stack.push(value: .i32(0))
 
         let instruction = Instruction.memory(.load(.init(offset: 0, align: 1), bitWidth: 8, .i32, isSigned: false))
 
-        try runtime.execute(instruction)
-        XCTAssertEqual(runtime.programCounter, 1)
-        XCTAssertEqual(runtime.stack.elements, [.frame(frame), .value(.i32(97))])
+        try execution.execute(instruction, runtime: runtime)
+        XCTAssertEqual(execution.programCounter, 1)
+        XCTAssertEqual(execution.stack.elements, [.frame(frame), .value(.i32(97))])
     }
 }
 

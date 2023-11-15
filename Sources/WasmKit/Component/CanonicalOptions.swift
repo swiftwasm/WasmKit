@@ -18,13 +18,13 @@ public struct CanonicalOptions {
     /// The string encoding used for lifting or lowering string values.
     public let stringEncoding: StringEncoding
     /// The realloc function address used for lifting or lowering values.
-    public let realloc: FunctionAddress?
+    public let realloc: Function?
     /// The function address called when a lifted/lowered function returns.
-    public let postReturn: FunctionAddress?
+    public let postReturn: Function?
 
     public init(
         memory: MemoryAddress, stringEncoding: StringEncoding,
-        realloc: FunctionAddress?, postReturn: FunctionAddress?
+        realloc: Function?, postReturn: Function?
     ) {
         self.memory = memory
         self.stringEncoding = stringEncoding

@@ -34,7 +34,7 @@ public struct HostModule {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#store>
 public final class Store {
-    private var hostFunctions: [HostFunction] = []
+    var hostFunctions: [HostFunction] = []
     private var hostGlobals: [GlobalInstance] = []
     var nameRegistry = NameRegistry()
 
@@ -140,7 +140,7 @@ extension Store {
         }
 
         for (functionName, function) in hostModule.functions {
-            moduleExports[functionName] = .function(-hostFunctions.count - 1)
+            moduleExports[functionName] = .function(Function(address: -hostFunctions.count - 1))
             hostFunctions.append(function)
         }
 
@@ -177,9 +177,9 @@ extension Store {
             }
 
             switch (i.descriptor, external) {
-            case let (.function(typeIndex), .function(functionAddress)):
+            case let (.function(typeIndex), .function(externalFunc)):
                 let type: FunctionType
-                switch try function(at: functionAddress) {
+                switch try function(at: externalFunc.address) {
                 case let .host(function):
                     type = function.type
 
@@ -234,7 +234,7 @@ extension Store {
             switch external {
             case let .function(address):
                 // Step 14.
-                moduleInstance.functionAddresses.append(address)
+                moduleInstance.functionAddresses.append(address.address)
             case let .table(address):
                 // Step 15.
                 moduleInstance.tableAddresses.append(address)

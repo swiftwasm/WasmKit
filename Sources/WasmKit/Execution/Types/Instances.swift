@@ -4,7 +4,7 @@
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#module-instances>
 public final class ModuleInstance {
     public internal(set) var types: [FunctionType] = []
-    public internal(set) var functionAddresses: [FunctionAddress] = []
+    var functionAddresses: [FunctionAddress] = []
     public internal(set) var tableAddresses: [TableAddress] = []
     public internal(set) var memoryAddresses: [MemoryAddress] = []
     public internal(set) var globalAddresses: [GlobalAddress] = []
@@ -24,9 +24,9 @@ public final class ModuleInstance {
     ///
     /// - Parameter name: The name of the exported function.
     /// - Returns: The address of the exported function if found, otherwise `nil`.
-    func exportedFunction(name: String) -> FunctionAddress? {
+    func exportedFunction(name: String) -> Function? {
         switch exports[name] {
-        case .function(let address): return address
+        case .function(let function): return function
         default: return nil
         }
     }
@@ -170,7 +170,7 @@ public struct DataInstance {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#syntax-externval>
 public enum ExternalValue: Equatable {
-    case function(FunctionAddress)
+    case function(Function)
     case table(TableAddress)
     case memory(MemoryAddress)
     case global(GlobalAddress)
@@ -186,7 +186,9 @@ public struct ExportInstance: Equatable {
         name = export.name
         switch export.descriptor {
         case let .function(index):
-            value = ExternalValue.function(moduleInstance.functionAddresses[Int(index)])
+            value = ExternalValue.function(
+                Function(address: moduleInstance.functionAddresses[Int(index)])
+            )
         case let .table(index):
             value = ExternalValue.table(moduleInstance.tableAddresses[Int(index)])
         case let .memory(index):
