@@ -197,3 +197,40 @@ extension Frame {
         locals[Int(index)] = value
     }
 }
+
+extension Frame: CustomDebugStringConvertible {
+    public var debugDescription: String {
+        "[A=\(arity), L=\(locals), BA=\(baseStackAddress), F=\(address?.description ?? "nil")]"
+    }
+}
+
+extension Label: CustomDebugStringConvertible {
+    public var debugDescription: String {
+        "[A=\(arity), E=\(expression), C=\(continuation), X=\(exit), BVI=\(baseValueIndex)]"
+    }
+}
+
+extension Stack: CustomDebugStringConvertible {
+    public var debugDescription: String {
+        var result = ""
+
+        result += "==================================================\n"
+        for (index, frame) in frames.enumerated() {
+            result += "FRAME[\(index)]: \(frame.debugDescription)\n"
+        }
+        result += "==================================================\n"
+
+        for (index, label) in labels.enumerated() {
+            result += "LABEL[\(index)]: \(label.debugDescription)\n"
+        }
+
+        result += "==================================================\n"
+
+        for (index, value) in values.enumerated() {
+            result += "VALUE[\(index)]: \(value)\n"
+        }
+        result += "==================================================\n"
+
+        return result
+    }
+}

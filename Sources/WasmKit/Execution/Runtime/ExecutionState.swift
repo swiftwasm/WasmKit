@@ -12,6 +12,15 @@ struct ExecutionState {
     }
 }
 
+extension ExecutionState: CustomStringConvertible {
+    var description: String {
+        var result = "======== PC=\(programCounter) =========\n"
+        result += "\n\(stack.debugDescription)"
+
+        return result
+    }
+}
+
 extension ExecutionState {
     mutating func execute(_ instruction: Instruction, runtime: Runtime) throws {
         switch instruction {
