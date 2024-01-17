@@ -394,7 +394,8 @@ final class ControlInstructionTests: XCTestCase {
         let module = ModuleInstance()
         module.memoryAddresses = [0]
 
-        let frame = try execution.stack.pushFrame(arity: 0, module: module, locals: [])
+        let frame = Frame(arity: 0, module: module, locals: [])
+        try execution.stack.push(frame: frame)
         execution.stack.push(value: .i32(0))
 
         let instruction = Instruction.memory(.load(.init(offset: 0, align: 1), bitWidth: 8, .i32, isSigned: false))
