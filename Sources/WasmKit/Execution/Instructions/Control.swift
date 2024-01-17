@@ -75,12 +75,8 @@ enum ControlInstruction: Equatable {
         case .return:
             let values = try execution.stack.popValues(count: execution.stack.currentFrame.arity)
 
-            let currentFrame = Stack.Element.frame(execution.stack.currentFrame)
-            var lastLabel: Label?
-            while execution.stack.top != currentFrame {
-                execution.stack.discardTopValues()
-                lastLabel = try execution.stack.popLabel()
-            }
+            let currentFrame = execution.stack.currentFrame!
+            let lastLabel = execution.stack.discardFrameStack(frame: currentFrame)
             if let lastLabel {
                 execution.programCounter = lastLabel.continuation
             }

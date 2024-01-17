@@ -12,22 +12,22 @@ public struct Stack {
     private var values = [Value]()
     private var labels = [Label]()
     private var frames = [Frame]()
-    private(set) var elements = [Element]()
-    private(set) var currentFrame: Frame!
-    private(set) var currentLabel: Label!
-
-    var top: Element? { elements.last }
+    var currentFrame: Frame! {
+        self.frames.last
+    }
+    var currentLabel: Label! {
+        self.labels.last
+    }
     var topValue: Value {
-        get throws {
-            guard case let .value(value) = elements.last else {
-                throw Trap.stackTypeMismatch(expected: Value.self, actual: elements.last)
-            }
-            return value
-        }
+        values.last!
+    }
+
+    var isEmpty: Bool {
+        self.frames.isEmpty && self.labels.isEmpty && self.values.isEmpty
     }
 
     mutating func push(value: Value) {
-        elements.append(.value(value))
+        values.append(value)
     }
 
     mutating func push(values: some Sequence<Value>) {
@@ -36,9 +36,16 @@ public struct Stack {
         }
     }
 
-    mutating func push(label: Label) {
-        currentLabel = label
-        elements.append(.label(label))
+    mutating func pushLabel(arity: Int, expression: Expression, continuation: Int, exit: Int) -> Label {
+        let label = Label(
+            arity: arity,
+            expression: expression,
+            continuation: continuation,
+            exit: exit,
+            baseValueIndex: self.values.count
+        )
+        labels.append(label)
+        return label
     }
 
     @discardableResult
@@ -46,139 +53,84 @@ public struct Stack {
         arity: Int, module: ModuleInstance, locals: [Value], address: FunctionAddress? = nil
     ) throws -> Frame {
         // TODO: Stack overflow check can be done at the entry of expression
-        guard elements.count < limit else {
+        guard (frames.count + labels.count + values.count) < limit else {
             throw Trap.callStackExhausted
         }
 
         let baseStackAddress = BaseStackAddress(valueIndex: self.values.endIndex, labelIndex: self.labels.endIndex)
         let frame = Frame(arity: arity, module: module, locals: locals, baseStackAddress: baseStackAddress, address: address)
-        currentFrame = frame
-        elements.append(.frame(frame))
+        frames.append(frame)
         return frame
     }
 
+    func numberOfLabelsInCurrentFrame() -> Int {
+        self.labels.count - currentFrame.baseStackAddress.labelIndex
+    }
+
     @discardableResult
-    mutating func pop() -> Element? {
-        guard !elements.isEmpty else { return nil }
-
-        return elements.removeLast()
+    mutating func unwindLabels(upto labelIndex: Int) -> Label? {
+        if self.labels.count == labelIndex + 1 {
+            self.labels.removeAll()
+            self.values.removeAll()
+            return nil
+        }
+        // labelIndex = 0 means jumping to the current head label
+        let labelToRemove = self.labels[self.labels.count - labelIndex - 1]
+        self.labels.removeLast(labelIndex + 1)
+        if self.values.count > labelToRemove.baseValueIndex {
+            self.values.removeLast(self.values.count - labelToRemove.baseValueIndex)
+        }
+        return labelToRemove
     }
 
-    mutating func popLabel() throws -> Label {
-        guard let popped = pop() else {
-            throw Trap.stackOverflow
+    mutating func discardFrameStack(frame: Frame) -> Label? {
+        if frame.baseStackAddress.labelIndex == 0 {
+            // The end of top level execution
+            self.labels.removeAll()
+            self.values.removeAll()
+            return nil
         }
-
-        guard case let .label(label) = popped else {
-            throw Trap.stackTypeMismatch(expected: Label.self, actual: popped)
-        }
-
-        // Check if more labels are left on the stack, and a single element left can't be a label, it must be a frame.
-        guard elements.count > 1 else {
-            currentLabel = nil
-            return label
-        }
-
-        loop: for i in stride(from: elements.count - 1, to: 0, by: -1) {
-            switch elements[i] {
-            case .frame:
-                currentLabel = nil
-                break loop
-
-            case let .label(l):
-                currentLabel = l
-                break loop
-
-            case .value:
-                continue
-            }
-        }
-
-        return label
-    }
-
-    mutating func discardTopValues() {
-        while case .value = top {
-            pop()
-        }
+        let labelToRemove = self.labels[frame.baseStackAddress.labelIndex]
+        self.labels.removeLast(self.labels.count - frame.baseStackAddress.labelIndex)
+        self.values.removeLast(self.values.count - frame.baseStackAddress.valueIndex)
+        return labelToRemove
     }
 
     mutating func popValue() throws -> Value {
-        if case let .value(v) = top {
-            elements.removeLast()
-            return v
-        } else {
-            guard
-                let i = elements.lastIndex(where: { if case .value = $0 { return true } else { return false } }),
-                case let .value(v) = elements.remove(at: i)
-            else {
-                throw Trap.stackOverflow
-            }
-
-            return v
-        }
+        // TODO: Check too many pop
+        return self.values.removeLast()
     }
 
     mutating func popTopValues() throws -> [Value] {
-        var values = [Value]()
-        while case .value = top {
-            try values.insert(popValue(), at: 0)
+        guard let currentLabel = self.currentLabel else {
+            let values = self.values
+            self.values = []
+            return values
         }
-
-        return values
+        guard currentLabel.baseValueIndex < self.values.endIndex else {
+            return []
+        }
+        let values = self.values[currentLabel.baseValueIndex..<self.values.endIndex]
+        self.values.removeLast(self.values.count - currentLabel.baseValueIndex)
+        return Array(values)
     }
 
     mutating func popValues(count: Int) throws -> [Value] {
-        var values = [Value]()
-        for _ in 0..<count {
-            try values.insert(popValue(), at: 0)
-        }
+        guard count > 0 else { return [] }
+        let values = Array(self.values[self.values.endIndex-count..<self.values.endIndex])
+        self.values.removeLast(count)
         return values
     }
 
     mutating func popFrame() throws {
-        guard let popped = pop() else {
+        guard let popped = self.frames.popLast() else {
             throw Trap.stackOverflow
         }
-
-        guard case .frame = popped else {
-            throw Trap.stackTypeMismatch(expected: Frame.self, actual: popped)
-        }
-
-        for i in stride(from: elements.count - 1, to: -1, by: -1) {
-            switch elements[i] {
-            case let .frame(f):
-                currentFrame = f
-                return
-
-            case let .label(l):
-                if currentLabel == nil {
-                    currentLabel = l
-                }
-
-            case .value:
-                continue
-            }
-        }
-
-        currentLabel = nil
-        currentFrame = nil
+        // _ = discardFrameStack(frame: popped)
     }
 
     func getLabel(index: Int) throws -> Label {
-        var currentIndex: Int = -1
-        var entryIndex = elements.endIndex - 1
-        repeat {
-            defer { entryIndex -= 1 }
-            guard case let .label(label) = elements[entryIndex] else {
-                continue
-            }
-            currentIndex += 1
-            if currentIndex == index {
-                return label
-            }
-        } while entryIndex >= 0
-        throw Trap.stackElementNotFound(Label.self, index: index)
+        return self.labels[self.labels.count - index - 1]
     }
 }
 
@@ -194,6 +146,8 @@ public struct Label: Equatable {
 
     /// The index after the  of the structured control instruction associated with the label
     let exit: Int
+
+    let baseValueIndex: Int
 }
 
 struct BaseStackAddress {

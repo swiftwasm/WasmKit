@@ -120,7 +120,7 @@ extension Runtime {
         // Step 17.
         if let startIndex = module.start {
             try initExecution.invoke(functionAddress: instance.functionAddresses[Int(startIndex)], runtime: self)
-            while initExecution.stack.elements.count != 1 || initExecution.stack.currentFrame != frame {
+            while initExecution.stack.currentLabel != nil || initExecution.stack.currentFrame != frame {
                 try initExecution.step(runtime: self)
             }
         }

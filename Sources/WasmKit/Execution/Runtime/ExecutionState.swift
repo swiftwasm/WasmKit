@@ -8,7 +8,7 @@ struct ExecutionState {
     var programCounter = 0
 
     var isStackEmpty: Bool {
-        stack.top == nil
+        stack.isEmpty
     }
 }
 
@@ -47,22 +47,22 @@ extension ExecutionState {
         let label = try stack.getLabel(index: Int(labelIndex))
         let values = try stack.popValues(count: label.arity)
 
-        var lastLabel: Label?
-        for _ in 0...labelIndex {
-            stack.discardTopValues()
-            lastLabel = try stack.popLabel()
-        }
+        stack.unwindLabels(upto: labelIndex)
 
         stack.push(values: values)
-        programCounter = lastLabel!.continuation
+        programCounter = label.continuation
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/instructions.html#entering-xref-syntax-instructions-syntax-instr-mathit-instr-ast-with-label-l>
     mutating func enter(_ expression: Expression, continuation: Int, arity: Int) {
         let exit = programCounter + 1
-        let label = Label(arity: arity, expression: expression, continuation: continuation, exit: exit)
-        stack.push(label: label)
+        let label = stack.pushLabel(
+            arity: arity,
+            expression: expression,
+            continuation: continuation,
+            exit: exit
+        )
         programCounter = label.expression.instructions.startIndex
     }
 
@@ -70,8 +70,7 @@ extension ExecutionState {
     /// <https://webassembly.github.io/spec/core/exec/instructions.html#exiting-xref-syntax-instructions-syntax-instr-mathit-instr-ast-with-label-l>
     mutating func exit(label: Label) throws {
         let values = try stack.popTopValues()
-        let lastLabel = try stack.popLabel()
-        assert(lastLabel == label)
+        self.stack.unwindLabels(upto: 0)
         stack.push(values: values)
         programCounter = label.exit
     }
@@ -111,13 +110,16 @@ extension ExecutionState {
     }
 
     public mutating func step(runtime: Runtime) throws {
-        if let label = stack.currentLabel {
+        if let label = stack.currentLabel, stack.numberOfLabelsInCurrentFrame() > 0 {
             if programCounter < label.expression.instructions.count {
+                // Regular path
                 try execute(stack.currentLabel.expression.instructions[programCounter], runtime: runtime)
             } else {
+                // When reached at "end" of "block" or "loop"
                 try self.exit(label: label)
             }
         } else {
+            // When reached at "end" of function
             if let address = stack.currentFrame.address {
                 runtime.interceptor?.onExitFunction(address, store: runtime.store)
             }
