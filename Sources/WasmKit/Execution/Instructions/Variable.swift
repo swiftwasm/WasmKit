@@ -18,9 +18,7 @@ enum VariableInstruction: Equatable {
             try stack.currentFrame.localSet(index: index, value: value)
 
         case let .localTee(index):
-            guard case let .value(value) = stack.top else {
-                throw Trap.stackTypeMismatch(expected: Value.self, actual: stack.top)
-            }
+            let value = try stack.topValue
             try stack.currentFrame.localSet(index: index, value: value)
 
         case let .globalGet(index):

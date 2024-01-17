@@ -64,12 +64,9 @@ extension Runtime {
             initialGlobals: initialGlobals
         )
 
-        // Step 12.
-        let frame = Frame(arity: 0, module: instance, locals: [])
-
-        // Step 13.
+        // Step 12-13.
         var initExecution = ExecutionState()
-        try initExecution.stack.push(frame: frame)
+        let frame = try initExecution.stack.pushFrame(arity: 0, module: instance, locals: [])
 
         // Steps 14-15.
         do {
@@ -156,7 +153,9 @@ extension Runtime {
         }
 
         var initExecution = ExecutionState()
-        try initExecution.stack.push(frame: .init(arity: 0, module: globalModuleInstance, locals: []))
+        try initExecution.stack.pushFrame(
+            arity: 0, module: globalModuleInstance, locals: []
+        )
 
         let globalInitializers = try module.globals.map { global in
             for i in global.initializer.instructions {

@@ -9,11 +9,22 @@ public struct Stack {
     }
 
     private(set) var limit = UInt16.max
+    private var values = [Value]()
+    private var labels = [Label]()
+    private var frames = [Frame]()
     private(set) var elements = [Element]()
     private(set) var currentFrame: Frame!
     private(set) var currentLabel: Label!
 
     var top: Element? { elements.last }
+    var topValue: Value {
+        get throws {
+            guard case let .value(value) = elements.last else {
+                throw Trap.stackTypeMismatch(expected: Value.self, actual: elements.last)
+            }
+            return value
+        }
+    }
 
     mutating func push(value: Value) {
         elements.append(.value(value))
@@ -30,13 +41,20 @@ public struct Stack {
         elements.append(.label(label))
     }
 
-    mutating func push(frame: Frame) throws {
+    @discardableResult
+    mutating func pushFrame(
+        arity: Int, module: ModuleInstance, locals: [Value], address: FunctionAddress? = nil
+    ) throws -> Frame {
+        // TODO: Stack overflow check can be done at the entry of expression
         guard elements.count < limit else {
             throw Trap.callStackExhausted
         }
 
+        let baseStackAddress = BaseStackAddress(valueIndex: self.values.endIndex, labelIndex: self.labels.endIndex)
+        let frame = Frame(arity: arity, module: module, locals: locals, baseStackAddress: baseStackAddress, address: address)
         currentFrame = frame
         elements.append(.frame(frame))
+        return frame
     }
 
     @discardableResult
@@ -178,19 +196,28 @@ public struct Label: Equatable {
     let exit: Int
 }
 
+struct BaseStackAddress {
+    /// The base index of Wasm value stack
+    let valueIndex: Int
+    /// The base index of Wasm label stack
+    let labelIndex: Int
+}
+
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#frames>
 public final class Frame {
     let arity: Int
     let module: ModuleInstance
+    let baseStackAddress: BaseStackAddress
     var locals: [Value]
     /// An optional function address for debugging/profiling purpose
     let address: FunctionAddress?
 
-    init(arity: Int, module: ModuleInstance, locals: [Value], address: FunctionAddress? = nil) {
+    init(arity: Int, module: ModuleInstance, locals: [Value], baseStackAddress: BaseStackAddress, address: FunctionAddress? = nil) {
         self.arity = arity
         self.module = module
         self.locals = locals
+        self.baseStackAddress = baseStackAddress
         self.address = address
     }
 }

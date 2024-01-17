@@ -96,7 +96,12 @@ extension ExecutionState {
             let arguments = try stack.popValues(count: function.type.parameters.count)
 
             let arity = function.type.results.count
-            try stack.push(frame: .init(arity: arity, module: function.module, locals: arguments + locals, address: address))
+            try stack.pushFrame(
+                arity: arity,
+                module: function.module,
+                locals: arguments + locals,
+                address: address
+            )
 
             self.enter(
                 expression, continuation: programCounter + 1,
