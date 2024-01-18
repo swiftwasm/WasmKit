@@ -7,7 +7,7 @@ public struct Function: Equatable {
         var execution = ExecutionState()
         try invoke(execution: &execution, with: arguments, runtime: runtime)
         try execution.run(runtime: runtime)
-        return try execution.stack.popTopValues()
+        return try Array(execution.stack.popTopValues())
     }
 
     private func invoke(execution: inout ExecutionState, with arguments: [Value], runtime: Runtime) throws {
@@ -18,7 +18,7 @@ public struct Function: Equatable {
             let parameters = try execution.stack.popValues(count: function.type.parameters.count)
 
             let caller = Caller(runtime: runtime, instance: execution.stack.currentFrame.module)
-            let results = try function.implementation(caller, parameters)
+            let results = try function.implementation(caller, Array(parameters))
             try check(functionType: function.type, results: results)
             execution.stack.push(values: results)
 

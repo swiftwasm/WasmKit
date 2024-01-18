@@ -78,9 +78,7 @@ extension ExecutionState {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/instructions.html#exiting-xref-syntax-instructions-syntax-instr-mathit-instr-ast-with-label-l>
     mutating func exit(label: Label) throws {
-        let values = try stack.popTopValues()
-        self.stack.unwindLabels(upto: 0)
-        stack.push(values: values)
+        stack.exit(label: label)
         programCounter = label.exit
     }
 
@@ -93,7 +91,7 @@ extension ExecutionState {
         case let .host(function):
             let parameters = try stack.popValues(count: function.type.parameters.count)
             let caller = Caller(runtime: runtime, instance: stack.currentFrame.module)
-            stack.push(values: try function.implementation(caller, parameters))
+            stack.push(values: try function.implementation(caller, Array(parameters)))
 
             programCounter += 1
 

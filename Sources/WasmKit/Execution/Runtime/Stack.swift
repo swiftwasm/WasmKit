@@ -10,14 +10,18 @@ public struct Stack {
 
     private(set) var limit = UInt16.max
     private var values = [Value]()
-    private var labels = [Label]()
-    private var frames = [Frame]()
-    var currentFrame: Frame! {
-        self.frames.last
+    private var labels = [Label]() {
+        didSet {
+            self.currentLabel = self.labels.last
+        }
     }
-    var currentLabel: Label! {
-        self.labels.last
+    private var frames = [Frame]() {
+        didSet {
+            self.currentFrame = self.frames.last
+        }
     }
+    var currentFrame: Frame!
+    var currentLabel: Label!
     var topValue: Value {
         values.last!
     }
@@ -31,9 +35,7 @@ public struct Stack {
     }
 
     mutating func push(values: some Sequence<Value>) {
-        for value in values {
-            push(value: value)
-        }
+        self.values.append(contentsOf: values)
     }
 
     mutating func pushLabel(arity: Int, expression: Expression, continuation: Int, exit: Int) -> Label {
@@ -65,6 +67,15 @@ public struct Stack {
 
     func numberOfLabelsInCurrentFrame() -> Int {
         self.labels.count - currentFrame.baseStackAddress.labelIndex
+    }
+
+    func numberOfValuesInCurrentLabel() -> Int {
+        self.values.count - currentLabel.baseValueIndex
+    }
+
+    mutating func exit(label: Label) {
+        // labelIndex = 0 means jumping to the current head label
+        self.labels.removeLast()
     }
 
     @discardableResult
@@ -101,29 +112,29 @@ public struct Stack {
         return self.values.removeLast()
     }
 
-    mutating func popTopValues() throws -> [Value] {
+    mutating func popTopValues() throws -> ArraySlice<Value> {
         guard let currentLabel = self.currentLabel else {
             let values = self.values
             self.values = []
-            return values
+            return ArraySlice(values)
         }
         guard currentLabel.baseValueIndex < self.values.endIndex else {
             return []
         }
         let values = self.values[currentLabel.baseValueIndex..<self.values.endIndex]
         self.values.removeLast(self.values.count - currentLabel.baseValueIndex)
-        return Array(values)
+        return values
     }
 
-    mutating func popValues(count: Int) throws -> [Value] {
+    mutating func popValues(count: Int) throws -> ArraySlice<Value> {
         guard count > 0 else { return [] }
-        let values = Array(self.values[self.values.endIndex-count..<self.values.endIndex])
+        let values = self.values[self.values.endIndex-count..<self.values.endIndex]
         self.values.removeLast(count)
         return values
     }
 
     mutating func popFrame() throws {
-        guard let popped = self.frames.popLast() else {
+        guard self.frames.popLast() != nil else {
             throw Trap.stackOverflow
         }
         // _ = discardFrameStack(frame: popped)
