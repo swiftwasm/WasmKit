@@ -70,12 +70,12 @@ public typealias LabelIndex = UInt32
 struct GuestFunction {
     init(type: TypeIndex, locals: [ValueType], body: @escaping () throws -> Expression) {
         self.type = type
-        self.locals = locals
+        self.defaultLocals = locals.map { $0.defaultValue }
         self.materializer = body
     }
 
     public let type: TypeIndex
-    public let locals: [ValueType]
+    public let defaultLocals: [Value]
     private var _bodyStorage: Expression? = nil
     private let materializer: () throws -> Expression
     var body: Expression {

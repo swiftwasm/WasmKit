@@ -96,7 +96,7 @@ extension ExecutionState {
             programCounter += 1
 
         case let .wasm(function, body: body):
-            let locals = function.code.locals.map { $0.defaultValue }
+            let locals = function.code.defaultLocals
             let expression = body
 
             let arguments = try stack.popValues(count: function.type.parameters.count)
