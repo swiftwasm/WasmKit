@@ -71,7 +71,7 @@ public struct Stack {
         arity: Int, module: ModuleInstance, locals: [Value], address: FunctionAddress? = nil
     ) throws -> Frame {
         // TODO: Stack overflow check can be done at the entry of expression
-        guard (frames.count + labels.count + values.count) < limit else {
+        guard (frames.count + labels.count + numberOfValues) < limit else {
             throw Trap.callStackExhausted
         }
 
@@ -92,6 +92,24 @@ public struct Stack {
     mutating func exit(label: Label) {
         // labelIndex = 0 means jumping to the current head label
         self.labels.removeLast()
+    }
+
+    mutating func exit(frame: Frame) -> Label? {
+        if numberOfValuesInCurrentLabel() == frame.arity {
+            // Skip pop/push traffic
+        } else {
+            let results = popValues(count: frame.arity)
+            self.numberOfValues = frame.baseStackAddress.valueIndex
+            push(values: results)
+        }
+        if frame.baseStackAddress.labelIndex == 0 {
+            self.labels.removeAll()
+            self.numberOfValues = 0
+            return nil
+        }
+        let labelToRemove = self.labels[frame.baseStackAddress.labelIndex]
+        self.labels.removeLast(self.labels.count - frame.baseStackAddress.labelIndex)
+        return labelToRemove
     }
 
     @discardableResult
@@ -144,7 +162,7 @@ public struct Stack {
         return values
     }
 
-    mutating func popValues(count: Int) throws -> ArraySlice<Value> {
+    mutating func popValues(count: Int) -> ArraySlice<Value> {
         guard count > 0 else { return [] }
         let values = self.values[self.numberOfValues-count..<self.numberOfValues]
         self.numberOfValues -= count

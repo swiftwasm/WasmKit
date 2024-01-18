@@ -54,7 +54,7 @@ extension ExecutionState {
 
     mutating func branch(labelIndex: Int) throws {
         let label = try stack.getLabel(index: Int(labelIndex))
-        let values = try stack.popValues(count: label.arity)
+        let values = stack.popValues(count: label.arity)
 
         stack.unwindLabels(upto: labelIndex)
 
@@ -89,7 +89,7 @@ extension ExecutionState {
 
         switch try runtime.store.function(at: address) {
         case let .host(function):
-            let parameters = try stack.popValues(count: function.type.parameters.count)
+            let parameters = stack.popValues(count: function.type.parameters.count)
             let caller = Caller(runtime: runtime, instance: stack.currentFrame.module)
             stack.push(values: try function.implementation(caller, Array(parameters)))
 
@@ -99,7 +99,7 @@ extension ExecutionState {
             let locals = function.code.defaultLocals
             let expression = body
 
-            let arguments = try stack.popValues(count: function.type.parameters.count)
+            let arguments = stack.popValues(count: function.type.parameters.count)
 
             let arity = function.type.results.count
             try stack.pushFrame(
@@ -130,7 +130,7 @@ extension ExecutionState {
             if let address = stack.currentFrame.address {
                 runtime.interceptor?.onExitFunction(address, store: runtime.store)
             }
-            let values = try stack.popValues(count: stack.currentFrame.arity)
+            let values = stack.popValues(count: stack.currentFrame.arity)
             try stack.popFrame()
             stack.push(values: values)
         }

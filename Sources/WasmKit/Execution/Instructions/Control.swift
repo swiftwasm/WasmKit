@@ -23,13 +23,13 @@ enum ControlInstruction: Equatable {
 
         case let .block(expression, type):
             let (paramSize, resultSize) = type.arity(typeSection: { execution.stack.currentFrame.module.types })
-            let values = try execution.stack.popValues(count: paramSize)
+            let values = execution.stack.popValues(count: paramSize)
             execution.enter(expression, continuation: execution.programCounter + 1, arity: resultSize)
             execution.stack.push(values: values)
 
         case let .loop(expression, type):
             let (paramSize, _) = type.arity(typeSection: { execution.stack.currentFrame.module.types })
-            let values = try execution.stack.popValues(count: paramSize)
+            let values = execution.stack.popValues(count: paramSize)
             execution.enter(expression, continuation: execution.programCounter, arity: paramSize)
             execution.stack.push(values: values)
 
@@ -73,14 +73,11 @@ enum ControlInstruction: Equatable {
             try execution.branch(labelIndex: Int(labelIndex))
 
         case .return:
-            let values = try execution.stack.popValues(count: execution.stack.currentFrame.arity)
-
             let currentFrame = execution.stack.currentFrame!
-            let lastLabel = execution.stack.discardFrameStack(frame: currentFrame)
+            let lastLabel = execution.stack.exit(frame: currentFrame)
             if let lastLabel {
                 execution.programCounter = lastLabel.continuation
             }
-            execution.stack.push(values: values)
 
         case let .call(functionIndex):
             let functionAddresses = execution.stack.currentFrame.module.functionAddresses
