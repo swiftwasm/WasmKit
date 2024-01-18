@@ -10,16 +10,16 @@ enum VariableInstruction: Equatable {
     func execute(_ stack: inout Stack, _ globals: inout [GlobalInstance]) throws {
         switch self {
         case let .localGet(index):
-            let value = try stack.currentFrame.localGet(index: index)
+            let value = try stack.localGet(index: index)
             stack.push(value: value)
 
         case let .localSet(index):
             let value = try stack.popValue()
-            try stack.currentFrame.localSet(index: index, value: value)
+            try stack.localSet(index: index, value: value)
 
         case let .localTee(index):
             let value = stack.topValue
-            try stack.currentFrame.localSet(index: index, value: value)
+            try stack.localSet(index: index, value: value)
 
         case let .globalGet(index):
             let address = Int(stack.currentFrame.module.globalAddresses[Int(index)])

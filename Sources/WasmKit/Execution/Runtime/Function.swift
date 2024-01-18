@@ -15,7 +15,7 @@ public struct Function: Equatable {
         case let .host(function):
             try check(functionType: function.type, parameters: arguments)
 
-            let parameters = try execution.stack.popValues(count: function.type.parameters.count)
+            let parameters = execution.stack.popValues(count: function.type.parameters.count)
 
             let caller = Caller(runtime: runtime, instance: execution.stack.currentFrame.module)
             let results = try function.implementation(caller, Array(parameters))

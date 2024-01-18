@@ -21,6 +21,7 @@ public struct Stack {
             self.currentFrame = self.frames.last
         }
     }
+    private var locals = [Value]()
     var currentFrame: Frame!
     var currentLabel: Label!
     var topValue: Value {
@@ -75,9 +76,14 @@ public struct Stack {
             throw Trap.callStackExhausted
         }
 
-        let baseStackAddress = BaseStackAddress(valueIndex: self.numberOfValues, labelIndex: self.labels.endIndex)
-        let frame = Frame(arity: arity, module: module, locals: locals, baseStackAddress: baseStackAddress, address: address)
+        let baseStackAddress = BaseStackAddress(
+            valueIndex: self.numberOfValues,
+            labelIndex: self.labels.endIndex,
+            localIndex: self.locals.endIndex
+        )
+        let frame = Frame(arity: arity, module: module, baseStackAddress: baseStackAddress, address: address)
         frames.append(frame)
+        self.locals.append(contentsOf: locals)
         return frame
     }
 
@@ -109,6 +115,7 @@ public struct Stack {
         }
         let labelToRemove = self.labels[frame.baseStackAddress.labelIndex]
         self.labels.removeLast(self.labels.count - frame.baseStackAddress.labelIndex)
+        self.locals.removeLast(self.locals.count - frame.baseStackAddress.localIndex)
         return labelToRemove
     }
 
@@ -170,9 +177,10 @@ public struct Stack {
     }
 
     mutating func popFrame() throws {
-        guard self.frames.popLast() != nil else {
+        guard let popped = self.frames.popLast() else {
             throw Trap.stackOverflow
         }
+        self.locals.removeLast(self.locals.count - popped.baseStackAddress.localIndex)
         // _ = discardFrameStack(frame: popped)
     }
 
@@ -202,22 +210,22 @@ struct BaseStackAddress {
     let valueIndex: Int
     /// The base index of Wasm label stack
     let labelIndex: Int
+
+    let localIndex: Int
 }
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#frames>
-public final class Frame {
+public struct Frame {
     let arity: Int
     let module: ModuleInstance
     let baseStackAddress: BaseStackAddress
-    var locals: [Value]
     /// An optional function address for debugging/profiling purpose
     let address: FunctionAddress?
 
-    init(arity: Int, module: ModuleInstance, locals: [Value], baseStackAddress: BaseStackAddress, address: FunctionAddress? = nil) {
+    init(arity: Int, module: ModuleInstance, baseStackAddress: BaseStackAddress, address: FunctionAddress? = nil) {
         self.arity = arity
         self.module = module
-        self.locals = locals
         self.baseStackAddress = baseStackAddress
         self.address = address
     }
@@ -225,29 +233,32 @@ public final class Frame {
 
 extension Frame: Equatable {
     public static func == (_ lhs: Frame, _ rhs: Frame) -> Bool {
-        lhs.module === rhs.module && lhs.arity == rhs.arity && lhs.locals == rhs.locals
+        lhs.module === rhs.module && lhs.arity == rhs.arity &&
+            lhs.baseStackAddress.localIndex == rhs.baseStackAddress.localIndex
     }
 }
 
-extension Frame {
+extension Stack {
     func localGet(index: UInt32) throws -> Value {
-        guard locals.indices.contains(Int(index)) else {
+        let base = currentFrame.baseStackAddress.localIndex
+        guard base + Int(index) < locals.count else {
             throw Trap.localIndexOutOfRange(index: index)
         }
-        return locals[Int(index)]
+        return locals[base + Int(index)]
     }
 
-    func localSet(index: UInt32, value: Value) throws {
-        guard locals.indices.contains(Int(index)) else {
+    mutating func localSet(index: UInt32, value: Value) throws {
+        let base = currentFrame.baseStackAddress.localIndex
+        guard base + Int(index) < locals.count else {
             throw Trap.localIndexOutOfRange(index: index)
         }
-        locals[Int(index)] = value
+        locals[base + Int(index)] = value
     }
 }
 
 extension Frame: CustomDebugStringConvertible {
     public var debugDescription: String {
-        "[A=\(arity), L=\(locals), BA=\(baseStackAddress), F=\(address?.description ?? "nil")]"
+        "[A=\(arity), BA=\(baseStackAddress), F=\(address?.description ?? "nil")]"
     }
 }
 
