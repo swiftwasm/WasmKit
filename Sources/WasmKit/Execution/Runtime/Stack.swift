@@ -9,8 +9,8 @@ public struct Stack {
     }
 
     private(set) var limit = UInt16.max
-    private var values = [Value]()
-    private var numberOfValues: Int = 0
+    private var valueStack = ValueStack()
+    private var numberOfValues: Int { valueStack.count }
     private var labels = [Label]() {
         didSet {
             self.currentLabel = self.labels.last
@@ -20,35 +20,9 @@ public struct Stack {
     private var locals = [Value]()
     var currentFrame: Frame!
     var currentLabel: Label!
-    var topValue: Value {
-        values[numberOfValues - 1]
-    }
 
     var isEmpty: Bool {
         self.frames.isEmpty && self.labels.isEmpty && self.numberOfValues == 0
-    }
-
-    mutating func push(value: Value) {
-        if self.numberOfValues < self.values.count {
-            self.values[self.numberOfValues] = value
-        } else {
-            self.values.append(value)
-        }
-        self.numberOfValues += 1
-    }
-
-    mutating func push(values: some RandomAccessCollection<Value>) {
-        let numberOfReplaceableSlots = self.values.count - self.numberOfValues
-        if numberOfReplaceableSlots >= values.count {
-            self.values.replaceSubrange(self.numberOfValues..<self.numberOfValues+values.count, with: values)
-        } else if numberOfReplaceableSlots > 0 {
-            let rangeToReplace = self.numberOfValues..<self.values.count
-            self.values.replaceSubrange(rangeToReplace, with: values.prefix(numberOfReplaceableSlots))
-            self.values.append(contentsOf: values.dropFirst(numberOfReplaceableSlots))
-        } else {
-            self.values.append(contentsOf: values)
-        }
-        self.numberOfValues += values.count
     }
 
     mutating func pushLabel(arity: Int, expression: Expression, continuation: Int, exit: Int) -> Label {
@@ -102,9 +76,9 @@ public struct Stack {
         if numberOfValuesInCurrentLabel() == frame.arity {
             // Skip pop/push traffic
         } else {
-            let results = popValues(count: frame.arity)
-            self.numberOfValues = frame.baseStackAddress.valueIndex
-            push(values: results)
+            let results = valueStack.popValues(count: frame.arity)
+            self.valueStack.truncate(length: frame.baseStackAddress.valueIndex)
+            valueStack.push(values: results)
         }
         let labelToRemove = self.labels[frame.baseStackAddress.labelIndex]
         self.labels.removeLast(self.labels.count - frame.baseStackAddress.labelIndex)
@@ -116,14 +90,14 @@ public struct Stack {
     mutating func unwindLabels(upto labelIndex: Int) -> Label? {
         if self.labels.count == labelIndex + 1 {
             self.labels.removeAll()
-            self.numberOfValues = 0
+            self.valueStack.truncate(length: 0)
             return nil
         }
         // labelIndex = 0 means jumping to the current head label
         let labelToRemove = self.labels[self.labels.count - labelIndex - 1]
         self.labels.removeLast(labelIndex + 1)
         if self.numberOfValues > labelToRemove.baseValueIndex {
-            self.numberOfValues = labelToRemove.baseValueIndex
+            self.valueStack.truncate(length: labelToRemove.baseValueIndex)
         }
         return labelToRemove
     }
@@ -132,40 +106,23 @@ public struct Stack {
         if frame.baseStackAddress.labelIndex == 0 {
             // The end of top level execution
             self.labels.removeAll()
-            self.numberOfValues = 0
+            self.valueStack.truncate(length: 0)
             return nil
         }
         let labelToRemove = self.labels[frame.baseStackAddress.labelIndex]
         self.labels.removeLast(self.labels.count - frame.baseStackAddress.labelIndex)
-        self.numberOfValues = frame.baseStackAddress.valueIndex
+        self.valueStack.truncate(length: frame.baseStackAddress.valueIndex)
         return labelToRemove
-    }
-
-    mutating func popValue() throws -> Value {
-        // TODO: Check too many pop
-        let value = self.values[self.numberOfValues-1]
-        self.numberOfValues -= 1
-        return value
     }
 
     mutating func popTopValues() throws -> ArraySlice<Value> {
         guard let currentLabel = self.currentLabel else {
-            let values = self.values[..<self.numberOfValues]
-            self.numberOfValues = 0
-            return values
+            return self.valueStack.popValues(count: self.valueStack.count)
         }
         guard currentLabel.baseValueIndex < self.numberOfValues else {
             return []
         }
-        let values = self.values[currentLabel.baseValueIndex..<self.numberOfValues]
-        self.numberOfValues = currentLabel.baseValueIndex
-        return values
-    }
-
-    mutating func popValues(count: Int) -> ArraySlice<Value> {
-        guard count > 0 else { return [] }
-        let values = self.values[self.numberOfValues-count..<self.numberOfValues]
-        self.numberOfValues -= count
+        let values = self.valueStack.popValues(count: self.numberOfValues - currentLabel.baseValueIndex)
         return values
     }
 
@@ -181,10 +138,80 @@ public struct Stack {
     func getLabel(index: Int) throws -> Label {
         return self.labels[self.labels.count - index - 1]
     }
+
+    mutating func popValues(count: Int) -> ArraySlice<Value> {
+        self.valueStack.popValues(count: count)
+    }
+    mutating func popValue() throws -> Value {
+        self.valueStack.popValue()
+    }
+    mutating func push(values: some RandomAccessCollection<Value>) {
+        self.valueStack.push(values: values)
+    }
+    mutating func push(value: Value) {
+        self.valueStack.push(value: value)
+    }
+
+    var topValue: Value {
+        self.valueStack.topValue
+    }
 }
 
 struct ValueStack {
-    private var slots: [Value] = []
+    private var values: [Value] = []
+    private var numberOfValues: Int = 0
+
+    var count: Int { numberOfValues }
+
+    var topValue: Value {
+        values[numberOfValues - 1]
+    }
+
+    mutating func push(value: Value) {
+        if self.numberOfValues < self.values.count {
+            self.values[self.numberOfValues] = value
+        } else {
+            self.values.append(value)
+        }
+        self.numberOfValues += 1
+    }
+
+    mutating func push(values: some RandomAccessCollection<Value>) {
+        let numberOfReplaceableSlots = self.values.count - self.numberOfValues
+        if numberOfReplaceableSlots >= values.count {
+            self.values.replaceSubrange(self.numberOfValues..<self.numberOfValues+values.count, with: values)
+        } else if numberOfReplaceableSlots > 0 {
+            let rangeToReplace = self.numberOfValues..<self.values.count
+            self.values.replaceSubrange(rangeToReplace, with: values.prefix(numberOfReplaceableSlots))
+            self.values.append(contentsOf: values.dropFirst(numberOfReplaceableSlots))
+        } else {
+            self.values.append(contentsOf: values)
+        }
+        self.numberOfValues += values.count
+    }
+
+    mutating func popValue() -> Value {
+        // TODO: Check too many pop
+        let value = self.values[self.numberOfValues-1]
+        self.numberOfValues -= 1
+        return value
+    }
+
+    mutating func truncate(length: Int) {
+        self.numberOfValues = length
+    }
+    mutating func popValues(count: Int) -> ArraySlice<Value> {
+        guard count > 0 else { return [] }
+        let values = self.values[self.numberOfValues-count..<self.numberOfValues]
+        self.numberOfValues -= count
+        return values
+    }
+}
+
+extension ValueStack: Sequence {
+    func makeIterator() -> some IteratorProtocol {
+        self.values[..<numberOfValues].makeIterator()
+    }
 }
 
 /// > Note:
@@ -282,7 +309,7 @@ extension Stack: CustomDebugStringConvertible {
 
         result += "==================================================\n"
 
-        for (index, value) in values[..<numberOfValues].enumerated() {
+        for (index, value) in valueStack.enumerated() {
             result += "VALUE[\(index)]: \(value)\n"
         }
         result += "==================================================\n"
