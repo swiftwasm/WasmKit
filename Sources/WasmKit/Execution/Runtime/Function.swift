@@ -17,7 +17,8 @@ public struct Function: Equatable {
 
             let parameters = execution.stack.popValues(count: function.type.parameters.count)
 
-            let caller = Caller(runtime: runtime, instance: execution.stack.currentFrame.module)
+            let moduleInstance = runtime.store.module(address: execution.stack.currentFrame.module)
+            let caller = Caller(runtime: runtime, instance: moduleInstance)
             let results = try function.implementation(caller, Array(parameters))
             try check(functionType: function.type, results: results)
             execution.stack.push(values: results)

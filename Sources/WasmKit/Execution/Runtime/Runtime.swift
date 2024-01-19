@@ -66,7 +66,7 @@ extension Runtime {
 
         // Step 12-13.
         var initExecution = ExecutionState()
-        try initExecution.stack.pushFrame(arity: 0, module: instance, argc: 0, defaultLocals: [])
+        try initExecution.stack.pushFrame(arity: 0, module: instance.selfAddress, argc: 0, defaultLocals: [])
 
         // Steps 14-15.
         do {
@@ -131,42 +131,42 @@ extension Runtime {
     }
 
     private func evaluateGlobals(module: Module, externalValues: [ExternalValue]) throws -> [Value] {
-        let globalModuleInstance = ModuleInstance()
-
-        for externalValue in externalValues {
-            switch externalValue {
-            case let .global(address):
-                globalModuleInstance.globalAddresses.append(address)
-            case let .function(address):
-                globalModuleInstance.functionAddresses.append(address.address)
-            default:
-                continue
+        try store.withTemporaryModuleInstance { globalModuleInstance in
+            for externalValue in externalValues {
+                switch externalValue {
+                case let .global(address):
+                    globalModuleInstance.globalAddresses.append(address)
+                case let .function(address):
+                    globalModuleInstance.functionAddresses.append(address.address)
+                default:
+                    continue
+                }
             }
-        }
-
-        globalModuleInstance.types = module.types
-
-        for function in module.functions {
-            let address = store.allocate(function: function, module: globalModuleInstance)
-            globalModuleInstance.functionAddresses.append(address)
-        }
-
-        var initExecution = ExecutionState()
-        try initExecution.stack.pushFrame(
-            arity: 0, module: globalModuleInstance, argc: 0, defaultLocals: []
-        )
-
-        let globalInitializers = try module.globals.map { global in
-            for i in global.initializer.instructions {
-                try initExecution.execute(i, runtime: self)
+            
+            globalModuleInstance.types = module.types
+            
+            for function in module.functions {
+                let address = store.allocate(function: function, module: globalModuleInstance)
+                globalModuleInstance.functionAddresses.append(address)
             }
-
-            return try initExecution.stack.popValue()
+            
+            var initExecution = ExecutionState()
+            try initExecution.stack.pushFrame(
+                arity: 0, module: globalModuleInstance.selfAddress, argc: 0, defaultLocals: []
+            )
+            
+            let globalInitializers = try module.globals.map { global in
+                for i in global.initializer.instructions {
+                    try initExecution.execute(i, runtime: self)
+                }
+                
+                return try initExecution.stack.popValue()
+            }
+            
+            try initExecution.stack.popFrame()
+            
+            return globalInitializers
         }
-
-        try initExecution.stack.popFrame()
-
-        return globalInitializers
     }
 }
 

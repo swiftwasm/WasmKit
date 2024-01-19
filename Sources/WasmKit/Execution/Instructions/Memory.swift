@@ -2,7 +2,7 @@
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#memory-instructions>
 extension ExecutionState {
     mutating func memoryLoad(runtime: Runtime, memarg: Instruction.Memarg, bitWidth: UInt8, type: NumericType, isSigned: Bool) throws {
-        let moduleInstance = stack.currentFrame.module
+        let moduleInstance = currentModule(store: runtime.store)
         let store = runtime.store
 
         let memoryAddress = moduleInstance.memoryAddresses[0]
@@ -25,7 +25,7 @@ extension ExecutionState {
     }
     /// `[type].store[bitWidth]`
     mutating func memoryStore(runtime: Runtime, memarg: Instruction.Memarg, bitWidth: UInt8, type: ValueType) throws {
-        let moduleInstance = stack.currentFrame.module
+        let moduleInstance = currentModule(store: runtime.store)
         let store = runtime.store
 
         let value = try stack.popValue()
@@ -95,7 +95,7 @@ extension ExecutionState {
     }
 
     mutating func memorySize(runtime: Runtime) throws {
-        let moduleInstance = stack.currentFrame.module
+        let moduleInstance = currentModule(store: runtime.store)
         let store = runtime.store
 
         let memoryAddress = moduleInstance.memoryAddresses[0]
@@ -105,7 +105,7 @@ extension ExecutionState {
         stack.push(value: memoryInstance.limit.isMemory64 ? .i64(UInt64(pageCount)) : .i32(UInt32(pageCount)))
     }
     mutating func memoryGrow(runtime: Runtime) throws {
-        let moduleInstance = stack.currentFrame.module
+        let moduleInstance = currentModule(store: runtime.store)
         let store = runtime.store
 
         let memoryAddress = moduleInstance.memoryAddresses[0]
@@ -127,7 +127,7 @@ extension ExecutionState {
         stack.push(value: oldPageCount)
     }
     mutating func memoryInit(runtime: Runtime, dataIndex: DataIndex) throws {
-        let moduleInstance = stack.currentFrame.module
+        let moduleInstance = currentModule(store: runtime.store)
         let store = runtime.store
 
         let memoryAddress = moduleInstance.memoryAddresses[0]
@@ -157,13 +157,13 @@ extension ExecutionState {
         }
     }
     mutating func memoryDataDrop(runtime: Runtime, dataIndex: DataIndex) throws {
-        let moduleInstance = stack.currentFrame.module
+        let moduleInstance = currentModule(store: runtime.store)
         let store = runtime.store
         let dataAddress = moduleInstance.dataAddresses[Int(dataIndex)]
         store.datas[dataAddress] = DataInstance(data: [])
     }
     mutating func memoryCopy(runtime: Runtime) throws {
-        let moduleInstance = stack.currentFrame.module
+        let moduleInstance = currentModule(store: runtime.store)
         let store = runtime.store
 
         let memoryAddress = moduleInstance.memoryAddresses[0]
@@ -196,7 +196,7 @@ extension ExecutionState {
         }
     }
     mutating func memoryFill(runtime: Runtime) throws {
-        let moduleInstance = stack.currentFrame.module
+        let moduleInstance = currentModule(store: runtime.store)
         let store = runtime.store
 
         let memoryAddress = moduleInstance.memoryAddresses[0]

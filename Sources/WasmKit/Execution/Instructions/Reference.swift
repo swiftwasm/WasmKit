@@ -22,7 +22,8 @@ extension ExecutionState {
         }
     }
     mutating func refFunc(runtime: Runtime, functionIndex: FunctionIndex) throws {
-        let functionAddress = stack.currentFrame.module.functionAddresses[Int(functionIndex)]
+        let module = runtime.store.module(address: stack.currentFrame.module)
+        let functionAddress = module.functionAddresses[Int(functionIndex)]
 
         stack.push(value: .ref(.function(functionAddress)))
     }

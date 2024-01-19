@@ -7,14 +7,17 @@ extension ExecutionState {
     mutating func nop(runtime: Runtime) throws {
         programCounter += 1
     }
+    private func getTypeSection(store: Store) -> [FunctionType] {
+        store.module(address: stack.currentFrame.module).types
+    }
     mutating func block(runtime: Runtime, expression: Expression, type: ResultType) throws {
-        let (paramSize, resultSize) = type.arity(typeSection: { stack.currentFrame.module.types })
+        let (paramSize, resultSize) = type.arity(typeSection: { getTypeSection(store: runtime.store) })
         let values = stack.popValues(count: paramSize)
         enter(expression, continuation: programCounter + 1, arity: resultSize)
         stack.push(values: values)
     }
     mutating func loop(runtime: Runtime, expression: Expression, type: ResultType) throws {
-        let (paramSize, _) = type.arity(typeSection: { stack.currentFrame.module.types })
+        let (paramSize, _) = type.arity(typeSection: { getTypeSection(store: runtime.store) })
         let values = stack.popValues(count: paramSize)
         enter(expression, continuation: programCounter, arity: paramSize)
         stack.push(values: values)
@@ -64,7 +67,7 @@ extension ExecutionState {
         }
     }
     mutating func call(runtime: Runtime, functionIndex: UInt32) throws {
-        let functionAddresses = stack.currentFrame.module.functionAddresses
+        let functionAddresses = runtime.store.module(address: stack.currentFrame.module).functionAddresses
 
         guard functionAddresses.indices.contains(Int(functionIndex)) else {
             throw Trap.invalidFunctionIndex(functionIndex)
@@ -74,7 +77,7 @@ extension ExecutionState {
     }
 
     mutating func callIndirect(runtime: Runtime, tableIndex: TableIndex, typeIndex: TypeIndex) throws {
-        let moduleInstance = stack.currentFrame.module
+        let moduleInstance = runtime.store.module(address: stack.currentFrame.module)
         let tableAddresses = moduleInstance.tableAddresses[Int(tableIndex)]
         let tableInstance = runtime.store.tables[tableAddresses]
         let expectedType = moduleInstance.types[Int(typeIndex)]

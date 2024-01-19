@@ -96,7 +96,7 @@ extension ExecutionState {
     }
     mutating func tableInit(runtime: Runtime, tableIndex: TableIndex, elementIndex: ElementIndex) throws {
         let (destinationTableAddress, destinationTable) = try getTable(tableIndex, store: runtime.store)
-        let elementAddress = stack.currentFrame.module.elementAddresses[Int(elementIndex)]
+        let elementAddress = currentModule(store: runtime.store).elementAddresses[Int(elementIndex)]
         let sourceElement = runtime.store.elements[elementAddress]
 
         let copyCounter = try stack.popValue().i32
@@ -132,7 +132,7 @@ extension ExecutionState {
         }
     }
     mutating func tableElementDrop(runtime: Runtime, elementIndex: ElementIndex) throws {
-        let elementAddress = stack.currentFrame.module.elementAddresses[Int(elementIndex)]
+        let elementAddress = currentModule(store: runtime.store).elementAddresses[Int(elementIndex)]
         runtime.store.elements[elementAddress].drop()
     }
     
@@ -148,7 +148,7 @@ extension ExecutionState {
 
 extension ExecutionState {
     fileprivate func getTable(_ tableIndex: UInt32, store: Store) throws -> (TableAddress, TableInstance) {
-        let address = stack.currentFrame.module.tableAddresses[Int(tableIndex)]
+        let address = currentModule(store: store).tableAddresses[Int(tableIndex)]
         return (address, store.tables[address])
     }
 

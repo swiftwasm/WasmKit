@@ -37,7 +37,7 @@ public struct Stack {
     }
 
     mutating func pushFrame(
-        arity: Int, module: ModuleInstance, argc: Int, defaultLocals: [Value], address: FunctionAddress? = nil
+        arity: Int, module: ModuleAddress, argc: Int, defaultLocals: [Value], address: FunctionAddress? = nil
     ) throws {
         // TODO: Stack overflow check can be done at the entry of expression
         guard (frames.count + labels.count + numberOfValues) < limit else {
@@ -255,12 +255,12 @@ struct BaseStackAddress {
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#frames>
 public struct Frame {
     let arity: Int
-    let module: ModuleInstance
+    let module: ModuleAddress
     let baseStackAddress: BaseStackAddress
     /// An optional function address for debugging/profiling purpose
     let address: FunctionAddress?
 
-    init(arity: Int, module: ModuleInstance, baseStackAddress: BaseStackAddress, address: FunctionAddress? = nil) {
+    init(arity: Int, module: ModuleAddress, baseStackAddress: BaseStackAddress, address: FunctionAddress? = nil) {
         self.arity = arity
         self.module = module
         self.baseStackAddress = baseStackAddress
@@ -270,7 +270,7 @@ public struct Frame {
 
 extension Frame: Equatable {
     public static func == (_ lhs: Frame, _ rhs: Frame) -> Bool {
-        lhs.module === rhs.module && lhs.arity == rhs.arity
+        lhs.module == rhs.module && lhs.arity == rhs.arity
     }
 }
 
