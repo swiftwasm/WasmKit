@@ -106,11 +106,6 @@ public struct Stack {
             self.numberOfValues = frame.baseStackAddress.valueIndex
             push(values: results)
         }
-        if frame.baseStackAddress.labelIndex == 0 {
-            self.labels.removeAll()
-            self.numberOfValues = 0
-            return nil
-        }
         let labelToRemove = self.labels[frame.baseStackAddress.labelIndex]
         self.labels.removeLast(self.labels.count - frame.baseStackAddress.labelIndex)
         self.locals.removeLast(self.locals.count - frame.baseStackAddress.localIndex)
@@ -186,6 +181,10 @@ public struct Stack {
     func getLabel(index: Int) throws -> Label {
         return self.labels[self.labels.count - index - 1]
     }
+}
+
+struct ValueStack {
+    private var slots: [Value] = []
 }
 
 /// > Note:
