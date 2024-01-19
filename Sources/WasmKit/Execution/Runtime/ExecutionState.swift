@@ -96,7 +96,6 @@ extension ExecutionState {
             programCounter += 1
 
         case let .wasm(function, body: body):
-            let locals = function.code.defaultLocals
             let expression = body
 
             let arguments = stack.popValues(count: function.type.parameters.count)
@@ -105,7 +104,8 @@ extension ExecutionState {
             try stack.pushFrame(
                 arity: arity,
                 module: function.module,
-                locals: arguments + locals,
+                arguments: arguments,
+                defaultLocals: function.code.defaultLocals,
                 address: address
             )
 

@@ -16,11 +16,7 @@ public struct Stack {
             self.currentLabel = self.labels.last
         }
     }
-    private var frames = [Frame]() {
-        didSet {
-            self.currentFrame = self.frames.last
-        }
-    }
+    private var frames = [Frame]()
     private var locals = [Value]()
     var currentFrame: Frame!
     var currentLabel: Label!
@@ -69,7 +65,7 @@ public struct Stack {
 
     @discardableResult
     mutating func pushFrame(
-        arity: Int, module: ModuleInstance, locals: [Value], address: FunctionAddress? = nil
+        arity: Int, module: ModuleInstance, arguments: ArraySlice<Value>, defaultLocals: [Value], address: FunctionAddress? = nil
     ) throws -> Frame {
         // TODO: Stack overflow check can be done at the entry of expression
         guard (frames.count + labels.count + numberOfValues) < limit else {
@@ -83,7 +79,9 @@ public struct Stack {
         )
         let frame = Frame(arity: arity, module: module, baseStackAddress: baseStackAddress, address: address)
         frames.append(frame)
-        self.locals.append(contentsOf: locals)
+        self.currentFrame = frame
+        self.locals.append(contentsOf: arguments)
+        self.locals.append(contentsOf: defaultLocals)
         return frame
     }
 
@@ -180,6 +178,7 @@ public struct Stack {
         guard let popped = self.frames.popLast() else {
             throw Trap.stackOverflow
         }
+        self.currentFrame = self.frames.last
         self.locals.removeLast(self.locals.count - popped.baseStackAddress.localIndex)
         // _ = discardFrameStack(frame: popped)
     }
