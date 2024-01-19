@@ -109,7 +109,7 @@ public struct Stack {
         return labelToRemove
     }
 
-    mutating func popTopValues() throws -> ArraySlice<Value> {
+    mutating func popTopValues() throws -> Array<Value> {
         guard let currentLabel = self.currentLabel else {
             return self.valueStack.popValues(count: self.valueStack.count)
         }
@@ -132,7 +132,7 @@ public struct Stack {
         return self.labels[self.labels.count - index - 1]
     }
 
-    mutating func popValues(count: Int) -> ArraySlice<Value> {
+    mutating func popValues(count: Int) -> Array<Value> {
         self.valueStack.popValues(count: count)
     }
     mutating func popValue() throws -> Value {
@@ -179,10 +179,13 @@ struct ValueStack {
     mutating func push(values: some RandomAccessCollection<Value>) {
         let numberOfReplaceableSlots = self.values.count - self.numberOfValues
         if numberOfReplaceableSlots >= values.count {
-            self.values.replaceSubrange(self.numberOfValues..<self.numberOfValues+values.count, with: values)
+            for (offset, value) in values.enumerated() {
+                self.values[self.numberOfValues + offset] = value
+            }
         } else if numberOfReplaceableSlots > 0 {
-            let rangeToReplace = self.numberOfValues..<self.values.count
-            self.values.replaceSubrange(rangeToReplace, with: values.prefix(numberOfReplaceableSlots))
+            for (offset, value) in values.prefix(numberOfReplaceableSlots).enumerated() {
+                self.values[self.numberOfValues + offset] = value
+            }
             self.values.append(contentsOf: values.dropFirst(numberOfReplaceableSlots))
         } else {
             self.values.append(contentsOf: values)
@@ -200,9 +203,13 @@ struct ValueStack {
     mutating func truncate(length: Int) {
         self.numberOfValues = length
     }
-    mutating func popValues(count: Int) -> ArraySlice<Value> {
+    mutating func popValues(count: Int) -> Array<Value> {
         guard count > 0 else { return [] }
-        let values = self.values[self.numberOfValues-count..<self.numberOfValues]
+        var values = [Value]()
+        values.reserveCapacity(count)
+        for idx in self.numberOfValues-count..<self.numberOfValues {
+            values.append(self.values[idx])
+        }
         self.numberOfValues -= count
         return values
     }
