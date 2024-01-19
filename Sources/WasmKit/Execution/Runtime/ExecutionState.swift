@@ -98,13 +98,11 @@ extension ExecutionState {
         case let .wasm(function, body: body):
             let expression = body
 
-            let arguments = stack.popValues(count: function.type.parameters.count)
-
             let arity = function.type.results.count
             try stack.pushFrame(
                 arity: arity,
                 module: function.module,
-                arguments: arguments,
+                argc: function.type.parameters.count,
                 defaultLocals: function.code.defaultLocals,
                 address: address
             )

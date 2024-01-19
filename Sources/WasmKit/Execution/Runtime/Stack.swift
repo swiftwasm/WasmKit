@@ -17,7 +17,6 @@ public struct Stack {
         }
     }
     private var frames = [Frame]()
-    private var locals = [Value]()
     var currentFrame: Frame!
     var currentLabel: Label!
 
@@ -39,23 +38,23 @@ public struct Stack {
 
     @discardableResult
     mutating func pushFrame(
-        arity: Int, module: ModuleInstance, arguments: ArraySlice<Value>, defaultLocals: [Value], address: FunctionAddress? = nil
+        arity: Int, module: ModuleInstance, argc: Int, defaultLocals: [Value], address: FunctionAddress? = nil
     ) throws -> Frame {
         // TODO: Stack overflow check can be done at the entry of expression
         guard (frames.count + labels.count + numberOfValues) < limit else {
             throw Trap.callStackExhausted
         }
-
+        let valueFrameIndex = self.numberOfValues - argc
+        valueStack.push(values: defaultLocals)
         let baseStackAddress = BaseStackAddress(
+            valueFrameIndex: valueFrameIndex,
+            // Consume argment values from value stack
             valueIndex: self.numberOfValues,
-            labelIndex: self.labels.endIndex,
-            localIndex: self.locals.endIndex
+            labelIndex: self.labels.endIndex
         )
         let frame = Frame(arity: arity, module: module, baseStackAddress: baseStackAddress, address: address)
         frames.append(frame)
         self.currentFrame = frame
-        self.locals.append(contentsOf: arguments)
-        self.locals.append(contentsOf: defaultLocals)
         return frame
     }
 
@@ -73,16 +72,11 @@ public struct Stack {
     }
 
     mutating func exit(frame: Frame) -> Label? {
-        if numberOfValuesInCurrentLabel() == frame.arity {
-            // Skip pop/push traffic
-        } else {
-            let results = valueStack.popValues(count: frame.arity)
-            self.valueStack.truncate(length: frame.baseStackAddress.valueIndex)
-            valueStack.push(values: results)
-        }
+        let results = valueStack.popValues(count: frame.arity)
+        self.valueStack.truncate(length: frame.baseStackAddress.valueFrameIndex)
+        valueStack.push(values: results)
         let labelToRemove = self.labels[frame.baseStackAddress.labelIndex]
         self.labels.removeLast(self.labels.count - frame.baseStackAddress.labelIndex)
-        self.locals.removeLast(self.locals.count - frame.baseStackAddress.localIndex)
         return labelToRemove
     }
 
@@ -131,8 +125,7 @@ public struct Stack {
             throw Trap.stackOverflow
         }
         self.currentFrame = self.frames.last
-        self.locals.removeLast(self.locals.count - popped.baseStackAddress.localIndex)
-        // _ = discardFrameStack(frame: popped)
+        self.valueStack.truncate(length: popped.baseStackAddress.valueFrameIndex)
     }
 
     func getLabel(index: Int) throws -> Label {
@@ -165,6 +158,13 @@ struct ValueStack {
 
     var topValue: Value {
         values[numberOfValues - 1]
+    }
+
+    subscript(_ index: Int) -> Value {
+        get { values[index] }
+        set {
+            values[index] = newValue
+        }
     }
 
     mutating func push(value: Value) {
@@ -231,12 +231,12 @@ public struct Label: Equatable {
 }
 
 struct BaseStackAddress {
+    /// Locals are placed between `valueFrameIndex..<valueIndex`
+    let valueFrameIndex: Int
     /// The base index of Wasm value stack
     let valueIndex: Int
     /// The base index of Wasm label stack
     let labelIndex: Int
-
-    let localIndex: Int
 }
 
 /// > Note:
@@ -258,26 +258,25 @@ public struct Frame {
 
 extension Frame: Equatable {
     public static func == (_ lhs: Frame, _ rhs: Frame) -> Bool {
-        lhs.module === rhs.module && lhs.arity == rhs.arity &&
-            lhs.baseStackAddress.localIndex == rhs.baseStackAddress.localIndex
+        lhs.module === rhs.module && lhs.arity == rhs.arity
     }
 }
 
 extension Stack {
     func localGet(index: UInt32) throws -> Value {
-        let base = currentFrame.baseStackAddress.localIndex
-        guard base + Int(index) < locals.count else {
+        let base = currentFrame.baseStackAddress.valueFrameIndex
+        guard base + Int(index) < valueStack.count else {
             throw Trap.localIndexOutOfRange(index: index)
         }
-        return locals[base + Int(index)]
+        return valueStack[base + Int(index)]
     }
 
     mutating func localSet(index: UInt32, value: Value) throws {
-        let base = currentFrame.baseStackAddress.localIndex
-        guard base + Int(index) < locals.count else {
+        let base = currentFrame.baseStackAddress.valueFrameIndex
+        guard base + Int(index) < valueStack.count else {
             throw Trap.localIndexOutOfRange(index: index)
         }
-        locals[base + Int(index)] = value
+        valueStack[base + Int(index)] = value
     }
 }
 
