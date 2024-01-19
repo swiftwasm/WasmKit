@@ -136,7 +136,7 @@ public struct Stack {
     mutating func popValue() throws -> Value {
         self.valueStack.popValue()
     }
-    mutating func push(values: some RandomAccessCollection<Value>) {
+    mutating func push(values: [Value]) {
         self.valueStack.push(values: values)
     }
     mutating func push(value: Value) {
@@ -174,11 +174,18 @@ struct ValueStack {
         self.numberOfValues += 1
     }
 
-    mutating func push(values: some RandomAccessCollection<Value>) {
+    mutating func push(values: [Value]) {
         let numberOfReplaceableSlots = self.values.count - self.numberOfValues
         if numberOfReplaceableSlots >= values.count {
-            for (offset, value) in values.enumerated() {
-                self.values[self.numberOfValues + offset] = value
+            self.values.withUnsafeMutableBufferPointer { buffer in
+                let baseAddress = UnsafeMutableRawPointer(buffer.baseAddress!.advanced(by: self.numberOfValues))
+                let rawBuffer = UnsafeMutableRawBufferPointer(
+                    start: baseAddress,
+                    count: MemoryLayout<Value>.stride * values.count
+                )
+                values.withUnsafeBufferPointer { copyingBuffer in
+                    rawBuffer.copyMemory(from: UnsafeRawBufferPointer(copyingBuffer))
+                }
             }
         } else if numberOfReplaceableSlots > 0 {
             for (offset, value) in values.prefix(numberOfReplaceableSlots).enumerated() {
