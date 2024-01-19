@@ -18,9 +18,50 @@ extension ExecutionState {
             throw Trap.outOfBoundsMemoryAccess
         }
 
-        let bytes = memoryInstance.data[Int(address)..<Int(endAddress)]
+        @inline(__always)
+        func memoryLoad<T: FixedWidthInteger>(_ type: T.Type) -> T {
+            let address = Int(address)
+            return memoryInstance.data.withUnsafeBufferPointer { buffer in
+                let rawBuffer = UnsafeRawBufferPointer(buffer)
+                return rawBuffer.loadUnaligned(fromByteOffset: address, as: T.self)
+            }
+        }
 
-        stack.push(value: Value(bytes, .numeric(type), isSigned: isSigned)!)
+        let value: Value
+        switch (type, isSigned, bitWidth) {
+        case (.i32, _, 32):
+            value = .i32(memoryLoad(UInt32.self))
+        case (.i32, true, 16):
+            value = .init(signed: Int32(memoryLoad(Int16.self)))
+        case (.i32, true, 8):
+            value = .init(signed: Int32(memoryLoad(Int8.self)))
+        case (.i32, false, 16):
+            value = .i32(UInt32(memoryLoad(UInt16.self)))
+        case (.i32, false, 8):
+            value = .i32(UInt32(memoryLoad(UInt8.self)))
+        case (.i64, _, 64):
+            value = .i64(memoryLoad(UInt64.self))
+        case (.i64, true, 32):
+            value = .init(signed: Int64(memoryLoad(Int32.self)))
+        case (.i64, true, 16):
+            value = .init(signed: Int64(memoryLoad(Int16.self)))
+        case (.i64, true, 8):
+            value = .init(signed: Int64(memoryLoad(Int8.self)))
+        case (.i64, false, 32):
+            value = .i64(UInt64(memoryLoad(UInt32.self)))
+        case (.i64, false, 16):
+            value = .i64(UInt64(memoryLoad(UInt16.self)))
+        case (.i64, false, 8):
+            value = .i64(UInt64(memoryLoad(UInt8.self)))
+        case (.f32, _, 32):
+            value = .f32(memoryLoad(UInt32.self))
+        case (.f64, _, 64):
+            value = .f64(memoryLoad(UInt64.self))
+        default:
+            fatalError("unexpected value and bitWidth combination. type: \(type), isSigned: \(isSigned), bitWidth: \(bitWidth)")
+        }
+
+        stack.push(value: value)
 
     }
     /// `[type].store[bitWidth]`
