@@ -279,12 +279,12 @@ extension Store {
         for element in module.elements {
             let references = element.initializer.map { expression -> Reference in
                 switch expression.instructions[0] {
-                case let .reference(.refFunc(index)):
+                case let .refFunc(index):
                     let addr = moduleInstance.functionAddresses[Int(index)]
                     return .function(addr)
-                case .reference(.refNull(.funcRef)):
+                case .refNull(.funcRef):
                     return .function(nil)
-                case .reference(.refNull(.externRef)):
+                case .refNull(.externRef):
                     return .extern(nil)
                 default:
                     fatalError("Unexpected element initializer expression: \(expression)")

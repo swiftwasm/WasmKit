@@ -1,54 +1,45 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#numeric-instructions>
-enum NumericInstruction: Equatable {
-    case const(Value)
-    case intUnary(IntUnary)
-    case floatUnary(FloatUnary)
-    case binary(Binary)
-    case intBinary(IntBinary)
-    case floatBinary(FloatBinary)
-    case conversion(Conversion)
+extension ExecutionState {
+    mutating func numericConst(runtime: Runtime, value: Value) throws {
+        stack.push(value: value)
+    }
+    mutating func numericIntUnary(runtime: Runtime, intUnary: NumericInstruction.IntUnary) throws {
+        let value = try stack.popValue()
 
-    func execute(_ stack: inout Stack) throws {
-        switch self {
-        case let .const(value):
-            stack.push(value: value)
+        stack.push(value: intUnary(value))
+    }
+    mutating func numericFloatUnary(runtime: Runtime, floatUnary: NumericInstruction.FloatUnary) throws {
+        let value = try stack.popValue()
 
-        case let .intUnary(instruction):
-            let value = try stack.popValue()
+        stack.push(value: floatUnary(value))
+    }
+    mutating func numericBinary(runtime: Runtime, binary: NumericInstruction.Binary) throws {
+        let value2 = try stack.popValue()
+        let value1 = try stack.popValue()
 
-            stack.push(value: instruction(value))
+        stack.push(value: binary(value1, value2))
+    }
+    mutating func numericIntBinary(runtime: Runtime, intBinary: NumericInstruction.IntBinary) throws {
+        let value2 = try stack.popValue()
+        let value1 = try stack.popValue()
 
-        case let .floatUnary(instruction):
-            let value = try stack.popValue()
+        try stack.push(value: intBinary(value1, value2))
+    }
+    mutating func numericFloatBinary(runtime: Runtime, floatBinary: NumericInstruction.FloatBinary) throws {
+        let value2 = try stack.popValue()
+        let value1 = try stack.popValue()
 
-            stack.push(value: instruction(value))
+        try stack.push(value: floatBinary(value1, value2))
+    }
+    mutating func numericConversion(runtime: Runtime, conversion: NumericInstruction.Conversion) throws {
+        let value = try stack.popValue()
 
-        case let .binary(instruction):
-            let value2 = try stack.popValue()
-            let value1 = try stack.popValue()
-
-            stack.push(value: instruction(value1, value2))
-
-        case let .intBinary(instruction):
-            let value2 = try stack.popValue()
-            let value1 = try stack.popValue()
-
-            try stack.push(value: instruction(value1, value2))
-
-        case let .floatBinary(instruction):
-            let value2 = try stack.popValue()
-            let value1 = try stack.popValue()
-
-            try stack.push(value: instruction(value1, value2))
-
-        case let .conversion(instruction):
-            let value = try stack.popValue()
-
-            try stack.push(value: instruction(value))
-        }
+        try stack.push(value: conversion(value))
     }
 }
+
+enum NumericInstruction {}
 
 /// Numeric Instructions
 extension NumericInstruction {
@@ -816,72 +807,72 @@ extension NumericInstruction {
         }
     }
 }
-
-extension NumericInstruction: CustomStringConvertible {
-    public var description: String {
-        switch self {
-        case let .const(v):
-            switch v {
-            case let .f32(f32): return "f32.const \(f32)"
-            case let .f64(f64): return "f64.const \(f64)"
-            case let .i32(i32): return "i32.const \(i32.signed)"
-            case let .i64(i64): return "i64.const \(i64.signed)"
-            case let .ref(.function(f?)): return "ref.func \(f)"
-            case .ref(.function(nil)): return "ref.null funcref"
-            case .ref(.extern(nil)): return "ref.null externref"
-            default: fatalError("unsuppported const instruction for value \(v)")
-            }
-
-        case let .binary(b):
-            switch b {
-            case let .add(t):
-                return "\(t).add"
-
-            case let .eq(t):
-                return "\(t).eq"
-
-            case let .mul(t):
-                return "\(t).mul"
-
-            case let .ne(t):
-                return "\(t).ne"
-
-            case let .sub(t):
-                return "\(t).sub"
-            }
-
-        case let .intBinary(ib):
-            switch ib {
-            case let .and(it): return "\(it).and"
-            case let .xor(it): return "\(it).xor"
-            case let .or(it): return "\(it).or"
-            case let .shl(it): return "\(it).shl"
-            case let .shrS(it): return "\(it).shr_s"
-            case let .shrU(it): return "\(it).shr_u"
-            case let .rotl(it): return "\(it).rotl"
-            case let .rotr(it): return "\(it).rotr"
-            case let .remS(it): return "\(it).rem_s"
-            case let .remU(it): return "\(it).rem_u"
-            case let .divS(it): return "\(it).div_s"
-            case let .divU(it): return "\(it).div_u"
-            case let .ltS(it): return "\(it).lt_s"
-            case let .ltU(it): return "\(it).lt_u"
-            case let .gtS(it): return "\(it).gt_s"
-            case let .gtU(it): return "\(it).gt_u"
-            case let .leS(it): return "\(it).le_s"
-            case let .leU(it): return "\(it).le_u"
-            case let .geS(it): return "\(it).ge_s"
-            case let .geU(it): return "\(it).ge_u"
-            }
-
-        case let .conversion(c):
-            return String(reflecting: c)
-        case let .intUnary(iu):
-            return String(reflecting: iu)
-        case let .floatUnary(fu):
-            return String(reflecting: fu)
-        case let .floatBinary(fb):
-            return String(reflecting: fb)
-        }
-    }
-}
+//
+//extension NumericInstruction: CustomStringConvertible {
+//    public var description: String {
+//        switch self {
+//        case let .const(v):
+//            switch v {
+//            case let .f32(f32): return "f32.const \(f32)"
+//            case let .f64(f64): return "f64.const \(f64)"
+//            case let .i32(i32): return "i32.const \(i32.signed)"
+//            case let .i64(i64): return "i64.const \(i64.signed)"
+//            case let .ref(.function(f?)): return "ref.func \(f)"
+//            case .ref(.function(nil)): return "ref.null funcref"
+//            case .ref(.extern(nil)): return "ref.null externref"
+//            default: fatalError("unsuppported const instruction for value \(v)")
+//            }
+//
+//        case let .binary(b):
+//            switch b {
+//            case let .add(t):
+//                return "\(t).add"
+//
+//            case let .eq(t):
+//                return "\(t).eq"
+//
+//            case let .mul(t):
+//                return "\(t).mul"
+//
+//            case let .ne(t):
+//                return "\(t).ne"
+//
+//            case let .sub(t):
+//                return "\(t).sub"
+//            }
+//
+//        case let .intBinary(ib):
+//            switch ib {
+//            case let .and(it): return "\(it).and"
+//            case let .xor(it): return "\(it).xor"
+//            case let .or(it): return "\(it).or"
+//            case let .shl(it): return "\(it).shl"
+//            case let .shrS(it): return "\(it).shr_s"
+//            case let .shrU(it): return "\(it).shr_u"
+//            case let .rotl(it): return "\(it).rotl"
+//            case let .rotr(it): return "\(it).rotr"
+//            case let .remS(it): return "\(it).rem_s"
+//            case let .remU(it): return "\(it).rem_u"
+//            case let .divS(it): return "\(it).div_s"
+//            case let .divU(it): return "\(it).div_u"
+//            case let .ltS(it): return "\(it).lt_s"
+//            case let .ltU(it): return "\(it).lt_u"
+//            case let .gtS(it): return "\(it).gt_s"
+//            case let .gtU(it): return "\(it).gt_u"
+//            case let .leS(it): return "\(it).le_s"
+//            case let .leU(it): return "\(it).le_u"
+//            case let .geS(it): return "\(it).ge_s"
+//            case let .geU(it): return "\(it).ge_u"
+//            }
+//
+//        case let .conversion(c):
+//            return String(reflecting: c)
+//        case let .intUnary(iu):
+//            return String(reflecting: iu)
+//        case let .floatUnary(fu):
+//            return String(reflecting: fu)
+//        case let .floatBinary(fb):
+//            return String(reflecting: fb)
+//        }
+//    }
+//}

@@ -76,16 +76,16 @@ extension Runtime {
                 switch element.mode {
                 case let .active(tableIndex, offsetExpression):
                     for i in offsetExpression.instructions + [
-                        .numeric(.const(.i32(0))),
-                        .numeric(.const(.i32(UInt32(element.initializer.count)))),
-                        .table(.`init`(tableIndex, elementIndex)),
-                        .table(.elementDrop(elementIndex)),
+                        .numericConst(.i32(0)),
+                        .numericConst(.i32(UInt32(element.initializer.count))),
+                        .tableInit(tableIndex, elementIndex),
+                        .tableElementDrop(elementIndex),
                     ] {
                         try initExecution.execute(i, runtime: self)
                     }
 
                 case .declarative:
-                    try initExecution.execute(.table(.elementDrop(elementIndex)), runtime: self)
+                    try initExecution.execute(.tableElementDrop(elementIndex), runtime: self)
 
                 case .passive:
                     continue
@@ -103,10 +103,10 @@ extension Runtime {
                 assert(data.index == 0)
 
                 for i in data.offset.instructions + [
-                    .numeric(.const(.i32(0))),
-                    .numeric(.const(.i32(UInt32(data.initializer.count)))),
-                    .memory(.`init`(UInt32(dataIndex))),
-                    .memory(.dataDrop(UInt32(dataIndex))),
+                    .numericConst(.i32(0)),
+                    .numericConst(.i32(UInt32(data.initializer.count))),
+                    .memoryInit(UInt32(dataIndex)),
+                    .memoryDataDrop(UInt32(dataIndex)),
                 ] {
                     try initExecution.execute(i, runtime: self)
                 }
