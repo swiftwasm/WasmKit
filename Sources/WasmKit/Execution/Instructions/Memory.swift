@@ -23,6 +23,7 @@ extension ExecutionState {
         stack.push(value: Value(bytes, .numeric(type), isSigned: isSigned)!)
 
     }
+    /// `[type].store[bitWidth]`
     mutating func memoryStore(runtime: Runtime, memarg: Instruction.Memarg, bitWidth: UInt8, type: ValueType) throws {
         let moduleInstance = stack.currentFrame.module
         let store = runtime.store
@@ -48,10 +49,51 @@ extension ExecutionState {
             }
         }
 
-        // NOTE: Swift.Array can't allocate 2^64-1 bytes, so we actually support 2^63-1 bytes at most
-        store.memories[memoryAddress].data
-            .replaceSubrange(Int(address)..<Int(endAddress), with: value.bytes![0..<Int(length)])
+        @inline(__always)
+        func memoryStore<T: FixedWidthInteger>(value: T) {
+            let address = Int(address)
+            store.memories[memoryAddress].data.withUnsafeMutableBufferPointer { buffer in
+                let rawBuffer = UnsafeMutableRawBufferPointer(buffer)
+                rawBuffer.baseAddress!.advanced(by: address).bindMemory(to: T.self, capacity: 1).pointee = value.littleEndian
+            }
+        }
+
+        // TODO: Switch on those parameters at instruction dispatching time
+        switch (value, bitWidth) {
+        case (.i32(let v), 32):
+            memoryStore(value: v)
+        case (.i32(let v), 16):
+            memoryStore(value: UInt16(truncatingIfNeeded: v))
+        case (.i32(let v), 8):
+            memoryStore(value: UInt8(truncatingIfNeeded: v))
+        case (.i64(let v), 64):
+            memoryStore(value: v)
+        case (.i64(let v), 32):
+            memoryStore(value: UInt32(truncatingIfNeeded: v))
+        case (.i64(let v), 16):
+            memoryStore(value: UInt16(truncatingIfNeeded: v))
+        case (.i64(let v), 8):
+            memoryStore(value: UInt8(truncatingIfNeeded: v))
+
+        case (.f32(let v), 32):
+            memoryStore(value: v)
+        case (.f32(let v), 16):
+            memoryStore(value: UInt16(truncatingIfNeeded: v))
+        case (.f32(let v), 8):
+            memoryStore(value: UInt8(truncatingIfNeeded: v))
+        case (.f64(let v), 64):
+            memoryStore(value: v)
+        case (.f64(let v), 32):
+            memoryStore(value: UInt32(truncatingIfNeeded: v))
+        case (.f64(let v), 16):
+            memoryStore(value: UInt16(truncatingIfNeeded: v))
+        case (.f64(let v), 8):
+            memoryStore(value: UInt8(truncatingIfNeeded: v))
+        default:
+            fatalError("unexpected value and bitWidth combination. value: \(value), bitWidth: \(bitWidth)")
+        }
     }
+
     mutating func memorySize(runtime: Runtime) throws {
         let moduleInstance = stack.currentFrame.module
         let store = runtime.store
