@@ -66,7 +66,7 @@ extension Runtime {
 
         // Step 12-13.
         var initExecution = ExecutionState()
-        let frame = try initExecution.stack.pushFrame(arity: 0, module: instance, argc: 0, defaultLocals: [])
+        try initExecution.stack.pushFrame(arity: 0, module: instance, argc: 0, defaultLocals: [])
 
         // Steps 14-15.
         do {
@@ -117,16 +117,15 @@ extension Runtime {
             throw error
         }
 
+        try initExecution.stack.popFrame()
+
         // Step 17.
         if let startIndex = module.start {
             try initExecution.invoke(functionAddress: instance.functionAddresses[Int(startIndex)], runtime: self)
-            while initExecution.stack.currentLabel != nil || initExecution.stack.currentFrame != frame {
+            while initExecution.stack.currentLabel != nil {
                 try initExecution.step(runtime: self)
             }
         }
-
-        // Steps 18-19.
-        try initExecution.stack.popFrame()
 
         return instance
     }

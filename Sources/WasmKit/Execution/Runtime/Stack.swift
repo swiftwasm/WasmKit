@@ -36,10 +36,9 @@ public struct Stack {
         return label
     }
 
-    @discardableResult
     mutating func pushFrame(
         arity: Int, module: ModuleInstance, argc: Int, defaultLocals: [Value], address: FunctionAddress? = nil
-    ) throws -> Frame {
+    ) throws {
         // TODO: Stack overflow check can be done at the entry of expression
         guard (frames.count + labels.count + numberOfValues) < limit else {
             throw Trap.callStackExhausted
@@ -55,7 +54,6 @@ public struct Stack {
         let frame = Frame(arity: arity, module: module, baseStackAddress: baseStackAddress, address: address)
         frames.append(frame)
         self.currentFrame = frame
-        return frame
     }
 
     func numberOfLabelsInCurrentFrame() -> Int {
