@@ -151,51 +151,54 @@ extension ExecutionState {
         let store = runtime.store
 
         let memoryAddress = moduleInstance.memoryAddresses[0]
-        let isMemory64 = store.memories[memoryAddress].limit.isMemory64
-
-        let value = try stack.popValue()
-        let pageCount: UInt64
-        switch (isMemory64, value) {
-        case let (true, .i64(value)):
-            pageCount = value
-        case let (false, .i32(value)):
-            pageCount = UInt64(value)
-        default:
-            throw Trap.stackValueTypesMismatch(
-                expected: isMemory64 ? .i64 : .i32, actual: value.type
-            )
+        try store.withMemory(at: memoryAddress) { memoryInstance in
+            let isMemory64 = memoryInstance.limit.isMemory64
+            
+            let value = try stack.popValue()
+            let pageCount: UInt64
+            switch (isMemory64, value) {
+            case let (true, .i64(value)):
+                pageCount = value
+            case let (false, .i32(value)):
+                pageCount = UInt64(value)
+            default:
+                throw Trap.stackValueTypesMismatch(
+                    expected: isMemory64 ? .i64 : .i32, actual: value.type
+                )
+            }
+            let oldPageCount = memoryInstance.grow(by: Int(pageCount))
+            stack.push(value: oldPageCount)
         }
-        let oldPageCount = store.memories[memoryAddress].grow(by: Int(pageCount))
-        stack.push(value: oldPageCount)
     }
     mutating func memoryInit(runtime: Runtime, dataIndex: DataIndex) throws {
         let moduleInstance = currentModule(store: runtime.store)
         let store = runtime.store
 
         let memoryAddress = moduleInstance.memoryAddresses[0]
-        let dataAddress = moduleInstance.dataAddresses[Int(dataIndex)]
-        let dataInstance = store.datas[dataAddress]
-        let memoryInstance = store.memories[memoryAddress]
-
-        let copyCounter = try stack.popValue().i32
-        let sourceIndex = try stack.popValue().i32
-        let destinationIndex = try stack.popValue().asAddressOffset(memoryInstance.limit.isMemory64)
-
-        guard copyCounter > 0 else { return }
-
-        guard
-            !sourceIndex.addingReportingOverflow(copyCounter).overflow
-                && !destinationIndex.addingReportingOverflow(UInt64(copyCounter)).overflow
-                && memoryInstance.data.count >= destinationIndex + UInt64(copyCounter)
-                && dataInstance.data.count >= sourceIndex + copyCounter
-        else {
-            throw Trap.outOfBoundsMemoryAccess
-        }
-
-        // FIXME: benchmark if using `replaceSubrange` is faster than this loop
-        for i in 0..<copyCounter {
-            store.memories[memoryAddress].data[Int(destinationIndex + UInt64(i))] =
+        try store.withMemory(at: memoryAddress) { memoryInstance in
+            let dataAddress = moduleInstance.dataAddresses[Int(dataIndex)]
+            let dataInstance = store.datas[dataAddress]
+            
+            let copyCounter = try stack.popValue().i32
+            let sourceIndex = try stack.popValue().i32
+            let destinationIndex = try stack.popValue().asAddressOffset(memoryInstance.limit.isMemory64)
+            
+            guard copyCounter > 0 else { return }
+            
+            guard
+                !sourceIndex.addingReportingOverflow(copyCounter).overflow
+                    && !destinationIndex.addingReportingOverflow(UInt64(copyCounter)).overflow
+                    && memoryInstance.data.count >= destinationIndex + UInt64(copyCounter)
+                    && dataInstance.data.count >= sourceIndex + copyCounter
+            else {
+                throw Trap.outOfBoundsMemoryAccess
+            }
+            
+            // FIXME: benchmark if using `replaceSubrange` is faster than this loop
+            for i in 0..<copyCounter {
+                memoryInstance.data[Int(destinationIndex + UInt64(i))] =
                 dataInstance.data[Int(sourceIndex + i)]
+            }
         }
     }
     mutating func memoryDataDrop(runtime: Runtime, dataIndex: DataIndex) throws {
@@ -209,54 +212,53 @@ extension ExecutionState {
         let store = runtime.store
 
         let memoryAddress = moduleInstance.memoryAddresses[0]
+        try store.withMemory(at: memoryAddress) { memoryInstance in
+            let copyCounter = try stack.popValue().i32
+            let sourceIndex = try stack.popValue().i32
+            let destinationIndex = try stack.popValue().i32
 
-        let copyCounter = try stack.popValue().i32
-        let sourceIndex = try stack.popValue().i32
-        let destinationIndex = try stack.popValue().i32
+            guard copyCounter > 0 else { return }
 
-        guard copyCounter > 0 else { return }
-
-        guard
-            !sourceIndex.addingReportingOverflow(copyCounter).overflow
-                && !destinationIndex.addingReportingOverflow(copyCounter).overflow
-                && store.memories[memoryAddress].data.count >= destinationIndex + copyCounter
-                && store.memories[memoryAddress].data.count >= sourceIndex + copyCounter
-        else {
-            throw Trap.outOfBoundsMemoryAccess
-        }
-
-        if destinationIndex <= sourceIndex {
-            for i in 0..<copyCounter {
-                store.memories[memoryAddress].data[Int(destinationIndex + i)] =
-                    store.memories[memoryAddress].data[Int(sourceIndex + i)]
+            guard
+                !sourceIndex.addingReportingOverflow(copyCounter).overflow
+                    && !destinationIndex.addingReportingOverflow(copyCounter).overflow
+                    && memoryInstance.data.count >= destinationIndex + copyCounter
+                    && memoryInstance.data.count >= sourceIndex + copyCounter
+            else {
+                throw Trap.outOfBoundsMemoryAccess
             }
-        } else {
-            for i in 1...copyCounter {
-                store.memories[memoryAddress].data[Int(destinationIndex + copyCounter - i)] =
-                    store.memories[memoryAddress].data[Int(sourceIndex + copyCounter - i)]
+
+            if destinationIndex <= sourceIndex {
+                for i in 0..<copyCounter {
+                    memoryInstance.data[Int(destinationIndex + i)] = memoryInstance.data[Int(sourceIndex + i)]
+                }
+            } else {
+                for i in 1...copyCounter {
+                    memoryInstance.data[Int(destinationIndex + copyCounter - i)] = memoryInstance.data[Int(sourceIndex + copyCounter - i)]
+                }
             }
         }
     }
     mutating func memoryFill(runtime: Runtime) throws {
         let moduleInstance = currentModule(store: runtime.store)
         let store = runtime.store
-
         let memoryAddress = moduleInstance.memoryAddresses[0]
-
-        let copyCounter = try Int(stack.popValue().i32)
-        let value = try stack.popValue()
-        let destinationIndex = try Int(stack.popValue().i32)
-
-        guard
-            !destinationIndex.addingReportingOverflow(copyCounter).overflow
-                && store.memories[memoryAddress].data.count >= destinationIndex + copyCounter
-        else {
-            throw Trap.outOfBoundsMemoryAccess
+        try store.withMemory(at: memoryAddress) { memoryInstance in
+            let copyCounter = try Int(stack.popValue().i32)
+            let value = try stack.popValue()
+            let destinationIndex = try Int(stack.popValue().i32)
+            
+            guard
+                !destinationIndex.addingReportingOverflow(copyCounter).overflow
+                    && memoryInstance.data.count >= destinationIndex + copyCounter
+            else {
+                throw Trap.outOfBoundsMemoryAccess
+            }
+            
+            memoryInstance.data.replaceSubrange(
+                destinationIndex..<destinationIndex + copyCounter,
+                with: [UInt8](repeating: value.bytes![0], count: copyCounter)
+            )
         }
-
-        store.memories[memoryAddress].data.replaceSubrange(
-            destinationIndex..<destinationIndex + copyCounter,
-            with: [UInt8](repeating: value.bytes![0], count: copyCounter)
-        )
     }
 }
