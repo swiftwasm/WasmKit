@@ -177,6 +177,7 @@ extension Store {
         try body(&self.memories[address])
     }
 
+    @_transparent
     func function(at address: FunctionAddress) throws -> StoreFunction {
         if address < 0 {
             return .host(hostFunctions[-address - 1])
