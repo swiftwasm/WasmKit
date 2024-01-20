@@ -10,6 +10,7 @@ enum Instruction: Equatable {
     case `return`
     case call(functionIndex: UInt32)
     case callIndirect(tableIndex: TableIndex, typeIndex: TypeIndex)
+    case endExpr
     case i32Load(memarg: Memarg)
     case i64Load(memarg: Memarg)
     case f32Load(memarg: Memarg)

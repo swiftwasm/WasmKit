@@ -75,15 +75,16 @@ extension Runtime {
 
                 switch element.mode {
                 case let .active(tableIndex, offsetExpression):
-                    for i in offsetExpression.instructions + [
+                    var offsetExecution = try evaluateConstExpr(offsetExpression, arity: 1, instance: instance)
+                    let initExpr = try Expression(instructions: [
+                        .numericConst(offsetExecution.stack.popValue()),
                         .numericConst(.i32(0)),
                         .numericConst(.i32(UInt32(element.initializer.count))),
                         .tableInit(tableIndex, elementIndex),
-                        .tableElementDrop(elementIndex),
-                    ] {
-                        try initExecution.doExecute(i, runtime: self)
-                    }
-
+                        .tableElementDrop(elementIndex)
+                    ])
+                    _ = try evaluateConstExpr(initExpr, arity: 0, instance: instance)
+                    initExpr.deallocate()
                 case .declarative:
                     try initExecution.doExecute(.tableElementDrop(elementIndex), runtime: self)
 
@@ -102,14 +103,16 @@ extension Runtime {
             for case let (dataIndex, .active(data)) in module.data.enumerated() {
                 assert(data.index == 0)
 
-                for i in data.offset.instructions + [
+                var offsetExecution = try evaluateConstExpr(data.offset, arity: 1, instance: instance)
+                let initExpr = try Expression(instructions: [
+                    .numericConst(offsetExecution.stack.popValue()),
                     .numericConst(.i32(0)),
                     .numericConst(.i32(UInt32(data.initializer.count))),
                     .memoryInit(UInt32(dataIndex)),
                     .memoryDataDrop(UInt32(dataIndex)),
-                ] {
-                    try initExecution.doExecute(i, runtime: self)
-                }
+                ])
+                _ = try evaluateConstExpr(initExpr, arity: 0, instance: instance)
+                initExpr.deallocate()
             }
         } catch Trap.outOfBoundsMemoryAccess {
             throw InstantiationError.outOfBoundsMemoryAccess
@@ -150,23 +153,23 @@ extension Runtime {
                 globalModuleInstance.functionAddresses.append(address)
             }
             
-            var initExecution = ExecutionState()
-            try initExecution.stack.pushFrame(
-                arity: 0, module: globalModuleInstance.selfAddress, argc: 0, defaultLocals: nil
-            )
-            
             let globalInitializers = try module.globals.map { global in
-                for i in global.initializer.instructions {
-                    try initExecution.doExecute(i, runtime: self)
-                }
-                
+                var initExecution = try evaluateConstExpr(global.initializer, arity: 1, instance: globalModuleInstance)
                 return try initExecution.stack.popValue()
             }
             
-            try initExecution.stack.popFrame()
-            
             return globalInitializers
         }
+    }
+
+    private func evaluateConstExpr(_ expr: Expression, arity: Int, instance: ModuleInstance) throws -> ExecutionState {
+        var initExecution = ExecutionState()
+        try initExecution.stack.pushFrame(
+            arity: arity, module: instance.selfAddress, argc: 0, defaultLocals: nil
+        )
+        initExecution.enter(expr, continuation: 0, arity: arity)
+        try initExecution.run(runtime: self)
+        return initExecution
     }
 }
 

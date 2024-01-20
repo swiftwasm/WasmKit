@@ -50,6 +50,7 @@ let instructions = [
         Immediate(name: "tableIndex", type: "TableIndex"),
         Immediate(name: "typeIndex", type: "TypeIndex")
     ]),
+    Instruction(name: "endExpr", isControl: true, immediates: []),
 ]
 // Memory
 + [
