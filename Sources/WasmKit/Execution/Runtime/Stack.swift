@@ -325,17 +325,11 @@ extension Frame: Equatable {
 extension Stack {
     func localGet(index: UInt32) throws -> Value {
         let base = currentFrame.baseStackAddress.valueFrameIndex
-        guard base + Int(index) < valueStack.count else {
-            throw Trap.localIndexOutOfRange(index: index)
-        }
         return valueStack[base + Int(index)]
     }
 
     mutating func localSet(index: UInt32, value: Value) throws {
         let base = currentFrame.baseStackAddress.valueFrameIndex
-        guard base + Int(index) < valueStack.count else {
-            throw Trap.localIndexOutOfRange(index: index)
-        }
         valueStack[base + Int(index)] = value
     }
 }
