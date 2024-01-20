@@ -6,7 +6,7 @@ enum Instruction: Equatable {
     case `if`(thenExpr: Expression, elseExpr: Expression, type: ResultType)
     case br(labelIndex: LabelIndex)
     case brIf(labelIndex: LabelIndex)
-    case brTable(labelIndices: [LabelIndex], defaultIndex: LabelIndex)
+    case brTable(BrTable)
     case `return`
     case call(functionIndex: UInt32)
     case callIndirect(tableIndex: TableIndex, typeIndex: TypeIndex)
@@ -27,7 +27,6 @@ enum Instruction: Equatable {
     case numericConversion(NumericInstruction.Conversion)
     case drop
     case select
-    case typedSelect(types: [ValueType])
     case refNull(ReferenceType)
     case refIsNull
     case refFunc(FunctionIndex)

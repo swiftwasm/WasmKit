@@ -23,8 +23,8 @@ extension ExecutionState {
         case .brIf(let labelIndex):
             try self.brIf(runtime: runtime, labelIndex: labelIndex)
             return
-        case .brTable(let labelIndices, let defaultIndex):
-            try self.brTable(runtime: runtime, labelIndices: labelIndices, defaultIndex: defaultIndex)
+        case .brTable(let brTable):
+            try self.brTable(runtime: runtime, brTable: brTable)
             return
         case .`return`:
             try self.`return`(runtime: runtime)
@@ -69,8 +69,6 @@ extension ExecutionState {
             try self.drop(runtime: runtime)
         case .select:
             try self.select(runtime: runtime)
-        case .typedSelect(let types):
-            try self.typedSelect(runtime: runtime, types: types)
         case .refNull(let referenceType):
             try self.refNull(runtime: runtime, referenceType: referenceType)
         case .refIsNull:
@@ -141,7 +139,6 @@ extension Instruction {
         case .numericConversion: return "numericConversion"
         case .drop: return "drop"
         case .select: return "select"
-        case .typedSelect: return "typedSelect"
         case .refNull: return "refNull"
         case .refIsNull: return "refIsNull"
         case .refFunc: return "refFunc"

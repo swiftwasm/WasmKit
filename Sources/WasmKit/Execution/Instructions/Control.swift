@@ -44,7 +44,9 @@ extension ExecutionState {
         }
         try br(runtime: runtime, labelIndex: labelIndex)
     }
-    mutating func brTable(runtime: Runtime, labelIndices: [LabelIndex], defaultIndex: LabelIndex) throws {
+    mutating func brTable(runtime: Runtime, brTable: Instruction.BrTable) throws {
+        let labelIndices = brTable.labelIndices
+        let defaultIndex = brTable.defaultIndex
         let value = try stack.popValue().i32
         let labelIndex: LabelIndex
         if labelIndices.indices.contains(Int(value)) {

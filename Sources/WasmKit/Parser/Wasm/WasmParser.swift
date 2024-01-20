@@ -369,7 +369,7 @@ extension WasmParser {
         case .br_table:
             let labelIndices: [UInt32] = try parseVector { try parseUnsigned() }
             let labelIndex: UInt32 = try parseUnsigned()
-            return .value(.control(.brTable(labelIndices: labelIndices, defaultIndex: labelIndex)))
+            return .value(.control(.brTable(.init(labelIndices: labelIndices, defaultIndex: labelIndex))))
         case .return:
             return .value(.control(.return))
         case .call:
@@ -389,7 +389,9 @@ extension WasmParser {
         case .select:
             return .value(.parametric(.select))
         case .typed_select:
-            return .value(try .parametric(.typedSelect(types: parseVector { try parseValueType() })))
+            // Just discard since our executor doesn't use it
+            _ = try parseVector { try parseValueType() }
+            return .value(.parametric(.select))
 
         case .local_get:
             let index: UInt32 = try parseUnsigned()

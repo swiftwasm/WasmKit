@@ -40,8 +40,7 @@ let instructions = [
         Immediate(name: "labelIndex", type: "LabelIndex")
     ]),
     Instruction(name: "brTable", isControl: true, immediates: [
-        Immediate(name: "labelIndices", type: "[LabelIndex]"),
-        Immediate(name: "defaultIndex", type: "LabelIndex")
+        Immediate(name: nil, type: "BrTable"),
     ]),
     Instruction(name: "`return`", isControl: true, immediates: []),
     Instruction(name: "call", isControl: true, immediates: [
@@ -71,7 +70,6 @@ let instructions = [
     // Parametric
     Instruction(name: "drop", immediates: []),
     Instruction(name: "select", immediates: []),
-    Instruction(name: "typedSelect", immediates: [Immediate(name: "types", type: "[ValueType]")]),
     // Reference
     Instruction(name: "refNull", immediates: [Immediate(name: nil, type: "ReferenceType")]),
     Instruction(name: "refIsNull", immediates: []),

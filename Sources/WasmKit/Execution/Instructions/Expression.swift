@@ -17,10 +17,18 @@ enum PseudoInstruction {
 /// <https://webassembly.github.io/spec/core/syntax/instructions.html#expressions>
 struct Expression: Equatable {
     /// Note that `end` or `else` pseudo instructions are omitted in this array
-    let instructions: [Instruction]
+    let instructions: UnsafeBufferPointer<Instruction>
 
     init(instructions: [Instruction]) {
-        self.instructions = instructions
+        assert(_isPOD(Instruction.self))
+        let buffer = UnsafeMutableBufferPointer<Instruction>.allocate(capacity: instructions.count)
+        for (idx, instruction) in instructions.enumerated() {
+            buffer[idx] = instruction
+        }
+        self.instructions = UnsafeBufferPointer(buffer)
+    }
+    static func == (lhs: Expression, rhs: Expression) -> Bool {
+        lhs.instructions.baseAddress == rhs.instructions.baseAddress
     }
 }
 

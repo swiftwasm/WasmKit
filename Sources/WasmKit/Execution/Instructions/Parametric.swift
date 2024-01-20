@@ -7,9 +7,6 @@ extension ExecutionState {
     mutating func select(runtime: Runtime) throws {
         try doSelect()
     }
-    mutating func typedSelect(runtime: Runtime, types: [ValueType]) throws {
-        try doSelect()
-    }
 
     private mutating func doSelect() throws {
         let flagValue = try stack.popValue()
