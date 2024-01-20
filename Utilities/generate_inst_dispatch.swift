@@ -6,114 +6,105 @@ struct Immediate {
 }
 struct Instruction {
     let name: String
+    let isControl: Bool
     let immediates: [Immediate]
 
- 
-    /// Parse as follows:
-    ///
-    /// "`if`(then: Expression, else: Expression, type: ResultType)"
-    ///    -> Instruction(name: "`if`", immediates: [
-    ///         Immediate(name: "then", type: "Expression"),
-    ///         Immediate(name: "else", type: "Expression"),
-    ///         Immediate(name: "type", type: "ResultType"),
-    ///       ])
-    /// "`return`"
-    ///    -> Instruction(name: "return", immediates: [])
-    /// "memoryInit(DataIndex)"
-    ///    -> Instruction(name: "memoryInit", immediates: [
-    ///         Immediate(name: nil, type: "DataIndex")
-    ///       ])
-    static func parse(line: String) -> Instruction {
-        var cursor = line.startIndex
-        var head: Character { line[cursor] }
-        func advance(_ n: Int = 1) {
-            cursor = line.index(after: cursor)
-        }
-        func skipWhitespace() {
-            while cursor < line.endIndex && head.isWhitespace {
-                advance()
-            }
-        }
-        func eatChar(_ ch: Character) {
-            assert(head == ch)
-            advance()
-        }
-        func eatIdentifier() -> String {
-            var identifier = ""
-            while cursor < line.endIndex && (head.isLetter || head.isHexDigit || head == "`" || head == ".") {
-                identifier.append(head)
-                advance()
-            }
-            return identifier
-        }
-        func eatType() -> String {
-            if head == "[" {
-                var id = "["
-                eatChar("[")
-                id += eatType()
-                eatChar("]")
-                id += "]"
-                return id
-            }
-            return eatIdentifier()
-        }
-
-        let name = eatIdentifier()
-        guard cursor < line.endIndex, head == "(" else {
-            return Instruction(name: name, immediates: [])
-        }
-        eatChar("(")
-        var immediates: [Immediate] = []
-        while head != ")" {
-            let immediateName: String?
-            let immediateType: String
-            let firstId = eatIdentifier()
-            skipWhitespace()
-            if head == ":" {
-                eatChar(":")
-                immediateName = firstId
-                skipWhitespace()
-                immediateType = eatType()
-            } else {
-                immediateName = nil
-                immediateType = firstId
-            }
-            skipWhitespace()
-            if head == "=" {
-                eatChar("=")
-                skipWhitespace()
-                _ = eatIdentifier()
-            }
-            immediates.append(Immediate(name: immediateName, type: immediateType))
-            if head == "," {
-                advance()
-            }
-            skipWhitespace()
-        }
-        eatChar(")")
-        return Instruction(name: name, immediates: immediates)
+    init(name: String, isControl: Bool = false, immediates: [Immediate]) {
+        self.name = name
+        self.isControl = isControl
+        self.immediates = immediates
     }
 }
+
+let instructions = [
+    // Controls
+    Instruction(name: "unreachable", isControl: true, immediates: []),
+    Instruction(name: "nop", isControl: true, immediates: []),
+    Instruction(name: "block", isControl: true, immediates: [
+        Immediate(name: "expression", type: "Expression"),
+        Immediate(name: "type", type: "ResultType")
+    ]),
+    Instruction(name: "loop", isControl: true, immediates: [
+        Immediate(name: "expression", type: "Expression"),
+        Immediate(name: "type", type: "ResultType")
+    ]),
+    Instruction(name: "`if`", isControl: true, immediates: [
+        Immediate(name: "thenExpr", type: "Expression"),
+        Immediate(name: "elseExpr", type: "Expression"),
+        Immediate(name: "type", type: "ResultType")
+    ]),
+    Instruction(name: "br", isControl: true, immediates: [
+        Immediate(name: "labelIndex", type: "LabelIndex")
+    ]),
+    Instruction(name: "brIf", isControl: true, immediates: [
+        Immediate(name: "labelIndex", type: "LabelIndex")
+    ]),
+    Instruction(name: "brTable", isControl: true, immediates: [
+        Immediate(name: "labelIndices", type: "[LabelIndex]"),
+        Immediate(name: "defaultIndex", type: "LabelIndex")
+    ]),
+    Instruction(name: "`return`", isControl: true, immediates: []),
+    Instruction(name: "call", isControl: true, immediates: [
+        Immediate(name: "functionIndex", type: "UInt32")
+    ]),
+    Instruction(name: "callIndirect", isControl: true, immediates: [
+        Immediate(name: "tableIndex", type: "TableIndex"),
+        Immediate(name: "typeIndex", type: "TypeIndex")
+    ]),
+    // Memory
+    Instruction(name: "memoryLoad", immediates: [Immediate(name: "memarg", type: "Memarg"), Immediate(name: "bitWidth", type: "UInt8"), Immediate(name: "type", type: "NumericType"), Immediate(name: "isSigned", type: "Bool")]),
+    Instruction(name: "memoryStore", immediates: [Immediate(name: "memarg", type: "Memarg"), Immediate(name: "bitWidth", type: "UInt8"), Immediate(name: "type", type: "ValueType")]),
+    Instruction(name: "memorySize", immediates: []),
+    Instruction(name: "memoryGrow", immediates: []),
+    Instruction(name: "memoryInit", immediates: [Immediate(name: nil, type: "DataIndex")]),
+    Instruction(name: "memoryDataDrop", immediates: [Immediate(name: nil, type: "DataIndex")]),
+    Instruction(name: "memoryCopy", immediates: []),
+    Instruction(name: "memoryFill", immediates: []),
+    // Numeric
+    Instruction(name: "numericConst", immediates: [Immediate(name: nil, type: "Value")]),
+    Instruction(name: "numericIntUnary", immediates: [Immediate(name: nil, type: "NumericInstruction.IntUnary")]),
+    Instruction(name: "numericFloatUnary", immediates: [Immediate(name: nil, type: "NumericInstruction.FloatUnary")]),
+    Instruction(name: "numericBinary", immediates: [Immediate(name: nil, type: "NumericInstruction.Binary")]),
+    Instruction(name: "numericIntBinary", immediates: [Immediate(name: nil, type: "NumericInstruction.IntBinary")]),
+    Instruction(name: "numericFloatBinary", immediates: [Immediate(name: nil, type: "NumericInstruction.FloatBinary")]),
+    Instruction(name: "numericConversion", immediates: [Immediate(name: nil, type: "NumericInstruction.Conversion")]),
+    // Parametric
+    Instruction(name: "drop", immediates: []),
+    Instruction(name: "select", immediates: []),
+    Instruction(name: "typedSelect", immediates: [Immediate(name: "types", type: "[ValueType]")]),
+    // Reference
+    Instruction(name: "refNull", immediates: [Immediate(name: nil, type: "ReferenceType")]),
+    Instruction(name: "refIsNull", immediates: []),
+    Instruction(name: "refFunc", immediates: [Immediate(name: nil, type: "FunctionIndex")]),
+    // Table
+    Instruction(name: "tableGet", immediates: [Immediate(name: nil, type: "TableIndex")]),
+    Instruction(name: "tableSet", immediates: [Immediate(name: nil, type: "TableIndex")]),
+    Instruction(name: "tableSize", immediates: [Immediate(name: nil, type: "TableIndex")]),
+    Instruction(name: "tableGrow", immediates: [Immediate(name: nil, type: "TableIndex")]),
+    Instruction(name: "tableFill", immediates: [Immediate(name: nil, type: "TableIndex")]),
+    Instruction(name: "tableCopy", immediates: [Immediate(name: "dest", type: "TableIndex"), Immediate(name: "src", type: "TableIndex")]),
+    Instruction(name: "tableInit", immediates: [Immediate(name: nil, type: "TableIndex"), Immediate(name: nil, type: "ElementIndex")]),
+    Instruction(name: "tableElementDrop", immediates: [Immediate(name: nil, type: "ElementIndex")]),
+    // Variable
+    Instruction(name: "localGet", immediates: [Immediate(name: "index", type: "LocalIndex")]),
+    Instruction(name: "localSet", immediates: [Immediate(name: "index", type: "LocalIndex")]),
+    Instruction(name: "localTee", immediates: [Immediate(name: "index", type: "LocalIndex")]),
+    Instruction(name: "globalGet", immediates: [Immediate(name: "index", type: "GlobalIndex")]),
+    Instruction(name: "globalSet", immediates: [Immediate(name: "index", type: "GlobalIndex")]),
+    Instruction(name: "pseudo", immediates: [Immediate(name: nil, type: "PseudoInstruction")])
+]
 
 func camelCase(pascalCase: String) -> String {
     let first = pascalCase.first!.lowercased()
     return first + pascalCase.dropFirst()
 }
 
-func generateDispatcher(instructions: [Instruction]) {
+func generateDispatcher(instructions: [Instruction]) -> String {
     var output = """
-    // This file is generated by Utilities/generate_inst_dispatch.swift
-    // swiftlint:disable all
-    import Foundation
-
     extension ExecutionState {
         mutating func doExecute(_ instruction: Instruction, runtime: Runtime) throws {
             switch instruction {
     """
-
-    let controlInsts = [
-        "unreachable", "nop", "block", "loop", "`if`", "br", "brIf", "brTable", "`return`", "call", "callIndirect"
-    ]
 
     for inst in instructions {
         if inst.immediates.isEmpty {
@@ -132,7 +123,7 @@ func generateDispatcher(instructions: [Instruction]) {
                         try self.\(inst.name)(runtime: runtime, \(labels.map { "\($0): \($0)" }.joined(separator: ", ")))
             """
         }
-        if controlInsts.contains(inst.name) {
+        if inst.isControl {
             output += """
 
                         return
@@ -146,14 +137,11 @@ func generateDispatcher(instructions: [Instruction]) {
         }
     }
     """
-    print(output)
+    return output
 }
 
-func generatePrototype(instructions: [Instruction]) {
+func generatePrototype(instructions: [Instruction]) -> String {
     var output = """
-    // This file is generated by Utilities/generate_inst_dispatch.swift
-    // swiftlint:disable all
-    import Foundation
 
     extension ExecutionState {
     """
@@ -181,11 +169,12 @@ func generatePrototype(instructions: [Instruction]) {
     output += """
 
     }
+
     """
-    print(output)
+    return output
 }
 
-func generateInstName(instructions: [Instruction]) {
+func generateInstName(instructions: [Instruction]) -> String {
     var output = """
     extension Instruction {
         var name: String {
@@ -194,8 +183,7 @@ func generateInstName(instructions: [Instruction]) {
     for inst in instructions {
         output += """
 
-            case .\(inst.name):
-                return "\(inst.name)"
+                case .\(inst.name): return "\(inst.name)"
         """
     }
     output += """
@@ -203,36 +191,63 @@ func generateInstName(instructions: [Instruction]) {
             }
         }
     }
+
     """
-    print(output)
+    return output
+}
+
+func generateEnumDefinition(instructions: [Instruction]) -> String {
+    var output = "enum Instruction: Equatable {\n"
+    for inst in instructions {
+        output += "    case \(inst.name)"
+        if !inst.immediates.isEmpty {
+            output += "("
+            output += inst.immediates.map { immediate in
+                if let name = immediate.name {
+                    return name + ": " + immediate.type
+                } else {
+                    return immediate.type
+                }
+            }.joined(separator: ", ")
+            output += ")"
+        }
+        output += "\n"
+    }
+    output += "}\n"
+    return output
 }
 
 func main(arguments: [String]) throws {
     let sourceRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-    let inputFile = sourceRoot.appending(path: "Sources/WasmKit/Execution/Instructions/Instruction.swift")
-
-    let input = try! String(contentsOf: inputFile)
-    let lines = input.components(separatedBy: .newlines)
-
-    let instructions = lines.compactMap { line -> Instruction? in
-        guard line.contains("  case ") else { return nil }
-        let caseLine = line.split(separator: "  case ", maxSplits: 1)[1]
-        return Instruction.parse(line: String(caseLine))
-    }
 
     if arguments.count > 1 {
         switch arguments[1] {
         case "prototype":
-            generatePrototype(instructions: instructions)
-            return
-        case "inst-name":
-            generateInstName(instructions: instructions)
+            print(generatePrototype(instructions: instructions))
             return
         default: break
         }
     }
 
-    generateDispatcher(instructions: instructions)
+    do {
+        var output = """
+        // This file is generated by Utilities/generate_inst_dispatch.swift
+
+        """
+
+        output += generateDispatcher(instructions: instructions)
+        output += "\n\n"
+        output += generateInstName(instructions: instructions)
+
+        let outputFile = sourceRoot.appending(path: "Sources/WasmKit/Execution/Runtime/InstDispatch.swift")
+        try output.write(to: outputFile, atomically: true, encoding: .utf8)
+    }
+
+    do {
+        let outputFile = sourceRoot.appending(path: "Sources/WasmKit/Execution/Instructions/Instruction.swift")
+        let output = generateEnumDefinition(instructions: instructions)
+        try output.write(to: outputFile, atomically: true, encoding: .utf8)
+    }
 }
 
 try main(arguments: CommandLine.arguments)
