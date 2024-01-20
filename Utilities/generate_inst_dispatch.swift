@@ -107,9 +107,14 @@ func generateDispatcher(instructions: [Instruction]) {
     import Foundation
 
     extension ExecutionState {
-        mutating func execute(_ instruction: Instruction, runtime: Runtime) throws {
+        mutating func doExecute(_ instruction: Instruction, runtime: Runtime) throws {
             switch instruction {
     """
+
+    let controlInsts = [
+        "unreachable", "nop", "block", "loop", "`if`", "br", "brIf", "brTable", "`return`", "call", "callIndirect"
+    ]
+
     for inst in instructions {
         if inst.immediates.isEmpty {
             output += """
@@ -127,10 +132,17 @@ func generateDispatcher(instructions: [Instruction]) {
                         try self.\(inst.name)(runtime: runtime, \(labels.map { "\($0): \($0)" }.joined(separator: ", ")))
             """
         }
+        if controlInsts.contains(inst.name) {
+            output += """
+
+                        return
+            """
+        }
     }
     output += """
 
             }
+            programCounter += 1
         }
     }
     """
