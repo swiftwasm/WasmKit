@@ -10,7 +10,20 @@ enum Instruction: Equatable {
     case `return`
     case call(functionIndex: UInt32)
     case callIndirect(tableIndex: TableIndex, typeIndex: TypeIndex)
-    case memoryLoad(memarg: Memarg, bitWidth: UInt8, type: NumericType, isSigned: Bool)
+    case i32Load(memarg: Memarg)
+    case i64Load(memarg: Memarg)
+    case f32Load(memarg: Memarg)
+    case f64Load(memarg: Memarg)
+    case i32Load8S(memarg: Memarg)
+    case i32Load8U(memarg: Memarg)
+    case i32Load16S(memarg: Memarg)
+    case i32Load16U(memarg: Memarg)
+    case i64Load8S(memarg: Memarg)
+    case i64Load8U(memarg: Memarg)
+    case i64Load16S(memarg: Memarg)
+    case i64Load16U(memarg: Memarg)
+    case i64Load32S(memarg: Memarg)
+    case i64Load32U(memarg: Memarg)
     case memoryStore(memarg: Memarg, bitWidth: UInt8, type: ValueType)
     case memorySize
     case memoryGrow

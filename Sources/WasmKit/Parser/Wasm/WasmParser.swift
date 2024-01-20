@@ -410,33 +410,33 @@ extension WasmParser {
             return .value(.variable(.globalSet(index: index)))
 
         case .i32_load:
-            return .value(try .memoryLoad(memarg: parseMemarg(), bitWidth: 32, type: .i32, isSigned: true))
+            return .value(try .i32Load(memarg: parseMemarg()))
         case .i64_load:
-            return .value(try .memoryLoad(memarg: parseMemarg(), bitWidth: 64, type: .i64, isSigned: true))
+            return .value(try .i64Load(memarg: parseMemarg()))
         case .f32_load:
-            return .value(try .memoryLoad(memarg: parseMemarg(), bitWidth: 32, type: .f32, isSigned: true))
+            return .value(try .f32Load(memarg: parseMemarg()))
         case .f64_load:
-            return .value(try .memoryLoad(memarg: parseMemarg(), bitWidth: 64, type: .f64, isSigned: true))
+            return .value(try .f64Load(memarg: parseMemarg()))
         case .i32_load8_s:
-            return .value(try .memoryLoad(memarg: parseMemarg(), bitWidth: 8, type: .i32, isSigned: true))
+            return .value(try .i32Load8S(memarg: parseMemarg()))
         case .i32_load8_u:
-            return .value(try .memoryLoad(memarg: parseMemarg(), bitWidth: 8, type: .i32, isSigned: false))
+            return .value(try .i32Load8U(memarg: parseMemarg()))
         case .i32_load16_s:
-            return .value(try .memoryLoad(memarg: parseMemarg(), bitWidth: 16, type: .i32, isSigned: true))
+            return .value(try .i32Load16S(memarg: parseMemarg()))
         case .i32_load16_u:
-            return .value(try .memoryLoad(memarg: parseMemarg(), bitWidth: 16, type: .i32, isSigned: false))
+            return .value(try .i32Load16U(memarg: parseMemarg()))
         case .i64_load8_s:
-            return .value(try .memoryLoad(memarg: parseMemarg(), bitWidth: 8, type: .i64, isSigned: true))
+            return .value(try .i64Load8S(memarg: parseMemarg()))
         case .i64_load8_u:
-            return .value(try .memoryLoad(memarg: parseMemarg(), bitWidth: 8, type: .i64, isSigned: false))
+            return .value(try .i64Load8U(memarg: parseMemarg()))
         case .i64_load16_s:
-            return .value(try .memoryLoad(memarg: parseMemarg(), bitWidth: 16, type: .i64, isSigned: true))
+            return .value(try .i64Load16S(memarg: parseMemarg()))
         case .i64_load16_u:
-            return .value(try .memoryLoad(memarg: parseMemarg(), bitWidth: 16, type: .i64, isSigned: false))
+            return .value(try .i64Load16U(memarg: parseMemarg()))
         case .i64_load32_s:
-            return .value(try .memoryLoad(memarg: parseMemarg(), bitWidth: 32, type: .i64, isSigned: true))
+            return .value(try .i64Load32S(memarg: parseMemarg()))
         case .i64_load32_u:
-            return .value(try .memoryLoad(memarg: parseMemarg(), bitWidth: 32, type: .i64, isSigned: false))
+            return .value(try .i64Load32U(memarg: parseMemarg()))
         case .i32_store:
             return .value(try .memoryStore(memarg: parseMemarg(), bitWidth: 32, type: .i32))
         case .i64_store:

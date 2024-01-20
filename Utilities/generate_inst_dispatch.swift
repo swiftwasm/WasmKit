@@ -50,8 +50,27 @@ let instructions = [
         Immediate(name: "tableIndex", type: "TableIndex"),
         Immediate(name: "typeIndex", type: "TypeIndex")
     ]),
-    // Memory
-    Instruction(name: "memoryLoad", immediates: [Immediate(name: "memarg", type: "Memarg"), Immediate(name: "bitWidth", type: "UInt8"), Immediate(name: "type", type: "NumericType"), Immediate(name: "isSigned", type: "Bool")]),
+]
+// Memory
++ [
+        "i32Load",
+        "i64Load",
+        "f32Load",
+        "f64Load",
+        "i32Load8S",
+        "i32Load8U",
+        "i32Load16S",
+        "i32Load16U",
+        "i64Load8S",
+        "i64Load8U",
+        "i64Load16S",
+        "i64Load16U",
+        "i64Load32S",
+        "i64Load32U",
+    ].map {
+        Instruction(name: $0, immediates: [Immediate(name: "memarg", type: "Memarg")])
+    }
++ [
     Instruction(name: "memoryStore", immediates: [Immediate(name: "memarg", type: "Memarg"), Immediate(name: "bitWidth", type: "UInt8"), Immediate(name: "type", type: "ValueType")]),
     Instruction(name: "memorySize", immediates: []),
     Instruction(name: "memoryGrow", immediates: []),

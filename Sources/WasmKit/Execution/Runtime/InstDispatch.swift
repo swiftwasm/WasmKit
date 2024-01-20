@@ -35,8 +35,34 @@ extension ExecutionState {
         case .callIndirect(let tableIndex, let typeIndex):
             try self.callIndirect(runtime: runtime, tableIndex: tableIndex, typeIndex: typeIndex)
             return
-        case .memoryLoad(let memarg, let bitWidth, let type, let isSigned):
-            try self.memoryLoad(runtime: runtime, memarg: memarg, bitWidth: bitWidth, type: type, isSigned: isSigned)
+        case .i32Load(let memarg):
+            try self.i32Load(runtime: runtime, memarg: memarg)
+        case .i64Load(let memarg):
+            try self.i64Load(runtime: runtime, memarg: memarg)
+        case .f32Load(let memarg):
+            try self.f32Load(runtime: runtime, memarg: memarg)
+        case .f64Load(let memarg):
+            try self.f64Load(runtime: runtime, memarg: memarg)
+        case .i32Load8S(let memarg):
+            try self.i32Load8S(runtime: runtime, memarg: memarg)
+        case .i32Load8U(let memarg):
+            try self.i32Load8U(runtime: runtime, memarg: memarg)
+        case .i32Load16S(let memarg):
+            try self.i32Load16S(runtime: runtime, memarg: memarg)
+        case .i32Load16U(let memarg):
+            try self.i32Load16U(runtime: runtime, memarg: memarg)
+        case .i64Load8S(let memarg):
+            try self.i64Load8S(runtime: runtime, memarg: memarg)
+        case .i64Load8U(let memarg):
+            try self.i64Load8U(runtime: runtime, memarg: memarg)
+        case .i64Load16S(let memarg):
+            try self.i64Load16S(runtime: runtime, memarg: memarg)
+        case .i64Load16U(let memarg):
+            try self.i64Load16U(runtime: runtime, memarg: memarg)
+        case .i64Load32S(let memarg):
+            try self.i64Load32S(runtime: runtime, memarg: memarg)
+        case .i64Load32U(let memarg):
+            try self.i64Load32U(runtime: runtime, memarg: memarg)
         case .memoryStore(let memarg, let bitWidth, let type):
             try self.memoryStore(runtime: runtime, memarg: memarg, bitWidth: bitWidth, type: type)
         case .memorySize:
@@ -122,7 +148,20 @@ extension Instruction {
         case .`return`: return "`return`"
         case .call: return "call"
         case .callIndirect: return "callIndirect"
-        case .memoryLoad: return "memoryLoad"
+        case .i32Load: return "i32Load"
+        case .i64Load: return "i64Load"
+        case .f32Load: return "f32Load"
+        case .f64Load: return "f64Load"
+        case .i32Load8S: return "i32Load8S"
+        case .i32Load8U: return "i32Load8U"
+        case .i32Load16S: return "i32Load16S"
+        case .i32Load16U: return "i32Load16U"
+        case .i64Load8S: return "i64Load8S"
+        case .i64Load8U: return "i64Load8U"
+        case .i64Load16S: return "i64Load16S"
+        case .i64Load16U: return "i64Load16U"
+        case .i64Load32S: return "i64Load32S"
+        case .i64Load32U: return "i64Load32U"
         case .memoryStore: return "memoryStore"
         case .memorySize: return "memorySize"
         case .memoryGrow: return "memoryGrow"

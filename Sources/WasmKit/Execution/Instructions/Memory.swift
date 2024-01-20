@@ -1,7 +1,55 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#memory-instructions>
 extension ExecutionState {
-    mutating func memoryLoad(runtime: Runtime, memarg: Instruction.Memarg, bitWidth: UInt8, type: NumericType, isSigned: Bool) throws {
+    typealias Memarg = Instruction.Memarg
+
+    mutating func i32Load(runtime: Runtime, memarg: Memarg) throws {
+        try memoryLoad(runtime: runtime, memarg: memarg, loadAs: UInt32.self, castToValue: { .i32($0) })
+    }
+    mutating func i64Load(runtime: Runtime, memarg: Memarg) throws {
+        try memoryLoad(runtime: runtime, memarg: memarg, loadAs: UInt64.self, castToValue: { .i64($0) })
+    }
+    mutating func f32Load(runtime: Runtime, memarg: Memarg) throws {
+        try memoryLoad(runtime: runtime, memarg: memarg, loadAs: UInt32.self, castToValue: { .f32($0) })
+    }
+    mutating func f64Load(runtime: Runtime, memarg: Memarg) throws {
+        try memoryLoad(runtime: runtime, memarg: memarg, loadAs: UInt64.self, castToValue: { .f64($0) })
+    }
+    mutating func i32Load8S(runtime: Runtime, memarg: Memarg) throws {
+        try memoryLoad(runtime: runtime, memarg: memarg, loadAs: Int8.self, castToValue: { .init(signed: Int32($0)) })
+    }
+    mutating func i32Load8U(runtime: Runtime, memarg: Memarg) throws {
+        try memoryLoad(runtime: runtime, memarg: memarg, loadAs: UInt8.self, castToValue: { .i32(UInt32($0)) })
+    }
+    mutating func i32Load16S(runtime: Runtime, memarg: Memarg) throws {
+        try memoryLoad(runtime: runtime, memarg: memarg, loadAs: Int16.self, castToValue: { .init(signed: Int32($0)) })
+    }
+    mutating func i32Load16U(runtime: Runtime, memarg: Memarg) throws {
+        try memoryLoad(runtime: runtime, memarg: memarg, loadAs: UInt16.self, castToValue: { .i32(UInt32($0)) })
+    }
+    mutating func i64Load8S(runtime: Runtime, memarg: Memarg) throws {
+        try memoryLoad(runtime: runtime, memarg: memarg, loadAs: Int8.self, castToValue: { .init(signed: Int64($0)) })
+    }
+    mutating func i64Load8U(runtime: Runtime, memarg: Memarg) throws {
+        try memoryLoad(runtime: runtime, memarg: memarg, loadAs: UInt8.self, castToValue: { .i64(UInt64($0)) })
+    }
+    mutating func i64Load16S(runtime: Runtime, memarg: Memarg) throws {
+        try memoryLoad(runtime: runtime, memarg: memarg, loadAs: Int16.self, castToValue: { .init(signed: Int64($0)) })
+    }
+    mutating func i64Load16U(runtime: Runtime, memarg: Memarg) throws {
+        try memoryLoad(runtime: runtime, memarg: memarg, loadAs: UInt16.self, castToValue: { .i64(UInt64($0)) })
+    }
+    mutating func i64Load32S(runtime: Runtime, memarg: Memarg) throws {
+        try memoryLoad(runtime: runtime, memarg: memarg, loadAs: Int32.self, castToValue: { .init(signed: Int64($0)) })
+    }
+    mutating func i64Load32U(runtime: Runtime, memarg: Memarg) throws {
+        try memoryLoad(runtime: runtime, memarg: memarg, loadAs: UInt32.self, castToValue: { .i64(UInt64($0)) })
+    }
+
+    @_transparent
+    private mutating func memoryLoad<T: FixedWidthInteger>(
+        runtime: Runtime, memarg: Instruction.Memarg, loadAs _: T.Type = T.self, castToValue: (T) -> Value
+    ) throws {
         let moduleInstance = currentModule(store: runtime.store)
         let store = runtime.store
 
@@ -12,56 +60,17 @@ extension ExecutionState {
         guard !isOverflow else {
             throw Trap.outOfBoundsMemoryAccess
         }
-        let length = UInt64(bitWidth) / 8
+        let length = UInt64(T.bitWidth) / 8
         let (endAddress, isEndOverflow) = address.addingReportingOverflow(length)
         guard !isEndOverflow, endAddress <= memoryInstance.data.count else {
             throw Trap.outOfBoundsMemoryAccess
         }
 
-        @inline(__always)
-        func memoryLoad<T: FixedWidthInteger>(_ type: T.Type) -> T {
-            let address = Int(address)
-            return memoryInstance.data.withUnsafeBufferPointer { buffer in
-                let rawBuffer = UnsafeRawBufferPointer(buffer)
-                return rawBuffer.loadUnaligned(fromByteOffset: address, as: T.self)
-            }
+        let loaded = memoryInstance.data.withUnsafeBufferPointer { buffer in
+            let rawBuffer = UnsafeRawBufferPointer(buffer)
+            return rawBuffer.loadUnaligned(fromByteOffset: Int(address), as: T.self)
         }
-
-        let value: Value
-        switch (type, isSigned, bitWidth) {
-        case (.i32, _, 32):
-            value = .i32(memoryLoad(UInt32.self))
-        case (.i32, true, 16):
-            value = .init(signed: Int32(memoryLoad(Int16.self)))
-        case (.i32, true, 8):
-            value = .init(signed: Int32(memoryLoad(Int8.self)))
-        case (.i32, false, 16):
-            value = .i32(UInt32(memoryLoad(UInt16.self)))
-        case (.i32, false, 8):
-            value = .i32(UInt32(memoryLoad(UInt8.self)))
-        case (.i64, _, 64):
-            value = .i64(memoryLoad(UInt64.self))
-        case (.i64, true, 32):
-            value = .init(signed: Int64(memoryLoad(Int32.self)))
-        case (.i64, true, 16):
-            value = .init(signed: Int64(memoryLoad(Int16.self)))
-        case (.i64, true, 8):
-            value = .init(signed: Int64(memoryLoad(Int8.self)))
-        case (.i64, false, 32):
-            value = .i64(UInt64(memoryLoad(UInt32.self)))
-        case (.i64, false, 16):
-            value = .i64(UInt64(memoryLoad(UInt16.self)))
-        case (.i64, false, 8):
-            value = .i64(UInt64(memoryLoad(UInt8.self)))
-        case (.f32, _, 32):
-            value = .f32(memoryLoad(UInt32.self))
-        case (.f64, _, 64):
-            value = .f64(memoryLoad(UInt64.self))
-        default:
-            fatalError("unexpected value and bitWidth combination. type: \(type), isSigned: \(isSigned), bitWidth: \(bitWidth)")
-        }
-
-        stack.push(value: value)
+        stack.push(value: castToValue(loaded))
 
     }
     /// `[type].store[bitWidth]`
