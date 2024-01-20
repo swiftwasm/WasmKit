@@ -64,11 +64,6 @@ extension ExecutionState {
             programCounter = lastLabel.continuation
         }
     }
-
-    mutating func endExpr(runtime: Runtime) throws {
-        try self.exit(label: stack.currentLabel)
-    }
-
     mutating func call(runtime: Runtime, functionIndex: UInt32) throws {
         let functionAddresses = runtime.store.module(address: stack.currentFrame.module).functionAddresses
 

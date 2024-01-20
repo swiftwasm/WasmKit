@@ -89,8 +89,13 @@ extension ExecutionState {
 
     mutating func step(runtime: Runtime) throws {
         if let label = stack.currentLabel, stack.numberOfLabelsInCurrentFrame() > 0 {
-            // Regular path
-            try doExecute(label.expression.instructions[programCounter], runtime: runtime)
+            if programCounter < label.expression.instructions.count {
+                // Regular path
+                try doExecute(label.expression.instructions[programCounter], runtime: runtime)
+            } else {
+                // When reached at "end" of "block" or "loop"
+                try self.exit(label: label)
+            }
         } else {
             // When reached at "end" of function
             if let address = stack.currentFrame.address {

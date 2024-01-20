@@ -21,18 +21,12 @@ struct Expression: Equatable {
 
     init(instructions: [Instruction]) {
         assert(_isPOD(Instruction.self))
-        let buffer = UnsafeMutableBufferPointer<Instruction>.allocate(capacity: instructions.count + 1)
+        let buffer = UnsafeMutableBufferPointer<Instruction>.allocate(capacity: instructions.count)
         for (idx, instruction) in instructions.enumerated() {
             buffer[idx] = instruction
         }
-        buffer[instructions.count] = .endExpr
         self.instructions = UnsafeBufferPointer(buffer)
     }
-
-    func deallocate() {
-        instructions.deallocate()
-    }
-
     static func == (lhs: Expression, rhs: Expression) -> Bool {
         lhs.instructions.baseAddress == rhs.instructions.baseAddress
     }
