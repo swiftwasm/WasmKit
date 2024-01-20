@@ -8,20 +8,26 @@ public struct Stack {
         case frame(Frame)
     }
 
-    private(set) var limit = UInt16.max
-    private var valueStack = ValueStack()
+    private let limit = UInt16.max
+    private var valueStack: ValueStack
     private var numberOfValues: Int { valueStack.count }
-    private var labels = [Label]() {
+    private var labels: FixedSizeStack<Label> {
         didSet {
-            self.currentLabel = self.labels.last
+            self.currentLabel = self.labels.peek()
         }
     }
-    private var frames = [Frame]()
+    private var frames: FixedSizeStack<Frame>
     var currentFrame: Frame!
     var currentLabel: Label!
 
     var isEmpty: Bool {
         self.frames.isEmpty && self.labels.isEmpty && self.numberOfValues == 0
+    }
+
+    init() {
+        self.valueStack = ValueStack(capacity: Int(self.limit))
+        self.frames = FixedSizeStack(capacity: Int(self.limit))
+        self.labels = FixedSizeStack(capacity: Int(self.limit))
     }
 
     mutating func pushLabel(arity: Int, expression: Expression, continuation: Int, exit: Int) -> Label {
@@ -32,7 +38,7 @@ public struct Stack {
             exit: exit,
             baseValueIndex: self.numberOfValues
         )
-        labels.append(label)
+        labels.push(label)
         return label
     }
 
@@ -49,10 +55,10 @@ public struct Stack {
             valueFrameIndex: valueFrameIndex,
             // Consume argment values from value stack
             valueIndex: self.numberOfValues,
-            labelIndex: self.labels.endIndex
+            labelIndex: self.labels.count
         )
         let frame = Frame(arity: arity, module: module, baseStackAddress: baseStackAddress, address: address)
-        frames.append(frame)
+        frames.push(frame)
         self.currentFrame = frame
     }
 
@@ -66,7 +72,7 @@ public struct Stack {
 
     mutating func exit(label: Label) {
         // labelIndex = 0 means jumping to the current head label
-        self.labels.removeLast()
+        self.labels.pop()
     }
 
     mutating func exit(frame: Frame) -> Label? {
@@ -74,20 +80,20 @@ public struct Stack {
         self.valueStack.truncate(length: frame.baseStackAddress.valueFrameIndex)
         valueStack.push(values: results)
         let labelToRemove = self.labels[frame.baseStackAddress.labelIndex]
-        self.labels.removeLast(self.labels.count - frame.baseStackAddress.labelIndex)
+        self.labels.pop(self.labels.count - frame.baseStackAddress.labelIndex)
         return labelToRemove
     }
 
     @discardableResult
     mutating func unwindLabels(upto labelIndex: Int) -> Label? {
         if self.labels.count == labelIndex + 1 {
-            self.labels.removeAll()
+            self.labels.popAll()
             self.valueStack.truncate(length: 0)
             return nil
         }
         // labelIndex = 0 means jumping to the current head label
         let labelToRemove = self.labels[self.labels.count - labelIndex - 1]
-        self.labels.removeLast(labelIndex + 1)
+        self.labels.pop(labelIndex + 1)
         if self.numberOfValues > labelToRemove.baseValueIndex {
             self.valueStack.truncate(length: labelToRemove.baseValueIndex)
         }
@@ -97,12 +103,12 @@ public struct Stack {
     mutating func discardFrameStack(frame: Frame) -> Label? {
         if frame.baseStackAddress.labelIndex == 0 {
             // The end of top level execution
-            self.labels.removeAll()
+            self.labels.popAll()
             self.valueStack.truncate(length: 0)
             return nil
         }
         let labelToRemove = self.labels[frame.baseStackAddress.labelIndex]
-        self.labels.removeLast(self.labels.count - frame.baseStackAddress.labelIndex)
+        self.labels.pop(self.labels.count - frame.baseStackAddress.labelIndex)
         self.valueStack.truncate(length: frame.baseStackAddress.valueIndex)
         return labelToRemove
     }
@@ -119,10 +125,8 @@ public struct Stack {
     }
 
     mutating func popFrame() throws {
-        guard let popped = self.frames.popLast() else {
-            throw Trap.stackOverflow
-        }
-        self.currentFrame = self.frames.last
+        let popped = self.frames.pop()
+        self.currentFrame = self.frames.peek()
         self.valueStack.truncate(length: popped.baseStackAddress.valueFrameIndex)
     }
 
@@ -149,8 +153,18 @@ public struct Stack {
 }
 
 struct ValueStack {
-    private var values: [Value] = []
+    private let values: UnsafeMutableBufferPointer<Value>
     private var numberOfValues: Int = 0
+    private let capacity: Int
+
+    init(capacity: Int) {
+        self.values = .allocate(capacity: capacity)
+        self.capacity = capacity
+    }
+
+    func deallocate() {
+        self.values.deallocate()
+    }
 
     var count: Int { numberOfValues }
 
@@ -166,34 +180,17 @@ struct ValueStack {
     }
 
     mutating func push(value: Value) {
-        if self.numberOfValues < self.values.count {
-            self.values[self.numberOfValues] = value
-        } else {
-            self.values.append(value)
-        }
+        self.values[self.numberOfValues] = value
         self.numberOfValues += 1
     }
 
     mutating func push(values: [Value]) {
-        let numberOfReplaceableSlots = self.values.count - self.numberOfValues
-        if numberOfReplaceableSlots >= values.count {
-            self.values.withUnsafeMutableBufferPointer { buffer in
-                let baseAddress = UnsafeMutableRawPointer(buffer.baseAddress!.advanced(by: self.numberOfValues))
-                let rawBuffer = UnsafeMutableRawBufferPointer(
-                    start: baseAddress,
-                    count: MemoryLayout<Value>.stride * values.count
-                )
-                values.withUnsafeBufferPointer { copyingBuffer in
-                    rawBuffer.copyMemory(from: UnsafeRawBufferPointer(copyingBuffer))
-                }
-            }
-        } else if numberOfReplaceableSlots > 0 {
-            for (offset, value) in values.prefix(numberOfReplaceableSlots).enumerated() {
-                self.values[self.numberOfValues + offset] = value
-            }
-            self.values.append(contentsOf: values.dropFirst(numberOfReplaceableSlots))
-        } else {
-            self.values.append(contentsOf: values)
+        let rawBuffer = UnsafeMutableRawBufferPointer(
+            start: self.values.baseAddress!.advanced(by: numberOfValues),
+            count: MemoryLayout<Value>.stride * values.count
+        )
+        values.withUnsafeBufferPointer { copyingBuffer in
+            rawBuffer.copyMemory(from: UnsafeRawBufferPointer(copyingBuffer))
         }
         self.numberOfValues += values.count
     }
@@ -223,6 +220,56 @@ struct ValueStack {
 extension ValueStack: Sequence {
     func makeIterator() -> some IteratorProtocol {
         self.values[..<numberOfValues].makeIterator()
+    }
+}
+
+struct FixedSizeStack<Element> {
+    private let buffer: UnsafeMutableBufferPointer<Element>
+    private var numberOfElements: Int = 0
+
+    var isEmpty: Bool {
+        numberOfElements == 0
+    }
+
+    var count: Int { numberOfElements }
+
+    init(capacity: Int) {
+        self.buffer = .allocate(capacity: capacity)
+    }
+
+    mutating func push(_ element: Element) {
+        self.buffer[numberOfElements] = element
+        self.numberOfElements += 1
+    }
+
+    @discardableResult
+    mutating func pop() -> Element {
+        let element = self.buffer[self.numberOfElements - 1]
+        self.numberOfElements -= 1
+        return element
+    }
+
+    mutating func pop(_ n: Int) {
+        self.numberOfElements -= n
+    }
+
+    mutating func popAll() {
+        self.numberOfElements = 0
+    }
+
+    func peek() -> Element! {
+        guard self.numberOfElements > 0 else { return nil }
+        return self.buffer[self.numberOfElements - 1]
+    }
+
+    subscript(_ index: Int) -> Element {
+        self.buffer[index]
+    }
+}
+
+extension FixedSizeStack: Sequence {
+    func makeIterator() -> some IteratorProtocol<Element> {
+        self.buffer[..<numberOfElements].makeIterator()
     }
 }
 
