@@ -38,13 +38,15 @@ extension ExecutionState {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/instructions.html#entering-xref-syntax-instructions-syntax-instr-mathit-instr-ast-with-label-l>
-    mutating func enter(_ expression: Expression, continuation: Int, arity: Int) {
+    @inline(__always)
+    mutating func enter(_ expression: Expression, continuation: Int, arity: Int, pushPopValues: Int = 0) {
         let exit = programCounter + 1
         let label = stack.pushLabel(
             arity: arity,
             expression: expression,
             continuation: continuation,
-            exit: exit
+            exit: exit,
+            popPushValues: pushPopValues
         )
         programCounter = label.expression.instructions.startIndex
     }

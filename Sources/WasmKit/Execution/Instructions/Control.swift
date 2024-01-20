@@ -12,15 +12,11 @@ extension ExecutionState {
     }
     mutating func block(runtime: Runtime, expression: Expression, type: ResultType) throws {
         let (paramSize, resultSize) = type.arity(typeSection: { getTypeSection(store: runtime.store) })
-        let values = stack.popValues(count: paramSize)
-        enter(expression, continuation: programCounter + 1, arity: resultSize)
-        stack.push(values: values)
+        enter(expression, continuation: programCounter + 1, arity: resultSize, pushPopValues: paramSize)
     }
     mutating func loop(runtime: Runtime, expression: Expression, type: ResultType) throws {
         let (paramSize, _) = type.arity(typeSection: { getTypeSection(store: runtime.store) })
-        let values = stack.popValues(count: paramSize)
-        enter(expression, continuation: programCounter, arity: paramSize)
-        stack.push(values: values)
+        enter(expression, continuation: programCounter, arity: paramSize, pushPopValues: paramSize)
     }
     mutating func `if`(runtime: Runtime, thenExpr: Expression, elseExpr: Expression, type: ResultType) throws {
         let isTrue = try stack.popValue().i32 != 0

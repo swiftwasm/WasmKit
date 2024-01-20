@@ -30,13 +30,14 @@ public struct Stack {
         self.labels = FixedSizeStack(capacity: Int(self.limit))
     }
 
-    mutating func pushLabel(arity: Int, expression: Expression, continuation: Int, exit: Int) -> Label {
+    @inline(__always)
+    mutating func pushLabel(arity: Int, expression: Expression, continuation: Int, exit: Int, popPushValues: Int = 0) -> Label {
         let label = Label(
             arity: arity,
             expression: expression,
             continuation: continuation,
             exit: exit,
-            baseValueIndex: self.numberOfValues
+            baseValueIndex: self.numberOfValues - popPushValues
         )
         labels.push(label)
         return label
