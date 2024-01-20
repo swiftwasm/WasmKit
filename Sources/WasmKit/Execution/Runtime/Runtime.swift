@@ -81,11 +81,11 @@ extension Runtime {
                         .tableInit(tableIndex, elementIndex),
                         .tableElementDrop(elementIndex),
                     ] {
-                        try initExecution.execute(i, runtime: self)
+                        try initExecution.doExecute(i, runtime: self)
                     }
 
                 case .declarative:
-                    try initExecution.execute(.tableElementDrop(elementIndex), runtime: self)
+                    try initExecution.doExecute(.tableElementDrop(elementIndex), runtime: self)
 
                 case .passive:
                     continue
@@ -108,7 +108,7 @@ extension Runtime {
                     .memoryInit(UInt32(dataIndex)),
                     .memoryDataDrop(UInt32(dataIndex)),
                 ] {
-                    try initExecution.execute(i, runtime: self)
+                    try initExecution.doExecute(i, runtime: self)
                 }
             }
         } catch Trap.outOfBoundsMemoryAccess {
@@ -157,7 +157,7 @@ extension Runtime {
             
             let globalInitializers = try module.globals.map { global in
                 for i in global.initializer.instructions {
-                    try initExecution.execute(i, runtime: self)
+                    try initExecution.doExecute(i, runtime: self)
                 }
                 
                 return try initExecution.stack.popValue()

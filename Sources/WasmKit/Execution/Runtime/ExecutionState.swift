@@ -22,10 +22,6 @@ extension ExecutionState: CustomStringConvertible {
 }
 
 extension ExecutionState {
-    mutating func execute(_ instruction: Instruction, runtime: Runtime) throws {
-        try doExecute(instruction, runtime: runtime)
-    }
-
     mutating func branch(labelIndex: Int) throws {
         let label = try stack.getLabel(index: Int(labelIndex))
         let values = stack.popValues(count: label.arity)
@@ -95,7 +91,7 @@ extension ExecutionState {
         if let label = stack.currentLabel, stack.numberOfLabelsInCurrentFrame() > 0 {
             if programCounter < label.expression.instructions.count {
                 // Regular path
-                try execute(stack.currentLabel.expression.instructions[programCounter], runtime: runtime)
+                try doExecute(stack.currentLabel.expression.instructions[programCounter], runtime: runtime)
             } else {
                 // When reached at "end" of "block" or "loop"
                 try self.exit(label: label)
