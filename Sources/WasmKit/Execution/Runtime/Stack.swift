@@ -44,14 +44,16 @@ public struct Stack {
     }
 
     mutating func pushFrame(
-        arity: Int, module: ModuleAddress, argc: Int, defaultLocals: [Value], address: FunctionAddress? = nil
+        arity: Int, module: ModuleAddress, argc: Int, defaultLocals: UnsafeBufferPointer<Value>?, address: FunctionAddress? = nil
     ) throws {
         // TODO: Stack overflow check can be done at the entry of expression
         guard (frames.count + labels.count + numberOfValues) < limit else {
             throw Trap.callStackExhausted
         }
         let valueFrameIndex = self.numberOfValues - argc
-        valueStack.push(values: defaultLocals)
+        if let defaultLocals {
+            valueStack.push(values: defaultLocals)
+        }
         let baseStackAddress = BaseStackAddress(
             valueFrameIndex: valueFrameIndex,
             // Consume argment values from value stack
@@ -186,14 +188,18 @@ struct ValueStack {
     }
 
     mutating func push(values: [Value]) {
+        values.withUnsafeBufferPointer { copyingBuffer in
+            self.push(values: copyingBuffer)
+        }
+    }
+
+    mutating func push(values copyingBuffer: UnsafeBufferPointer<Value>) {
         let rawBuffer = UnsafeMutableRawBufferPointer(
             start: self.values.baseAddress!.advanced(by: numberOfValues),
             count: MemoryLayout<Value>.stride * values.count
         )
-        values.withUnsafeBufferPointer { copyingBuffer in
-            rawBuffer.copyMemory(from: UnsafeRawBufferPointer(copyingBuffer))
-        }
-        self.numberOfValues += values.count
+        rawBuffer.copyMemory(from: UnsafeRawBufferPointer(copyingBuffer))
+        self.numberOfValues += copyingBuffer.count
     }
 
     mutating func popValue() -> Value {
