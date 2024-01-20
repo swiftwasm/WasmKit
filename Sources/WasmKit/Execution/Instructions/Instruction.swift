@@ -24,7 +24,15 @@ enum Instruction: Equatable {
     case i64Load16U(memarg: Memarg)
     case i64Load32S(memarg: Memarg)
     case i64Load32U(memarg: Memarg)
-    case memoryStore(memarg: Memarg, bitWidth: UInt8, type: ValueType)
+    case i32Store(memarg: Memarg)
+    case i64Store(memarg: Memarg)
+    case f32Store(memarg: Memarg)
+    case f64Store(memarg: Memarg)
+    case i32Store8(memarg: Memarg)
+    case i32Store16(memarg: Memarg)
+    case i64Store8(memarg: Memarg)
+    case i64Store16(memarg: Memarg)
+    case i64Store32(memarg: Memarg)
     case memorySize
     case memoryGrow
     case memoryInit(DataIndex)

@@ -63,8 +63,24 @@ extension ExecutionState {
             try self.i64Load32S(runtime: runtime, memarg: memarg)
         case .i64Load32U(let memarg):
             try self.i64Load32U(runtime: runtime, memarg: memarg)
-        case .memoryStore(let memarg, let bitWidth, let type):
-            try self.memoryStore(runtime: runtime, memarg: memarg, bitWidth: bitWidth, type: type)
+        case .i32Store(let memarg):
+            try self.i32Store(runtime: runtime, memarg: memarg)
+        case .i64Store(let memarg):
+            try self.i64Store(runtime: runtime, memarg: memarg)
+        case .f32Store(let memarg):
+            try self.f32Store(runtime: runtime, memarg: memarg)
+        case .f64Store(let memarg):
+            try self.f64Store(runtime: runtime, memarg: memarg)
+        case .i32Store8(let memarg):
+            try self.i32Store8(runtime: runtime, memarg: memarg)
+        case .i32Store16(let memarg):
+            try self.i32Store16(runtime: runtime, memarg: memarg)
+        case .i64Store8(let memarg):
+            try self.i64Store8(runtime: runtime, memarg: memarg)
+        case .i64Store16(let memarg):
+            try self.i64Store16(runtime: runtime, memarg: memarg)
+        case .i64Store32(let memarg):
+            try self.i64Store32(runtime: runtime, memarg: memarg)
         case .memorySize:
             try self.memorySize(runtime: runtime)
         case .memoryGrow:
@@ -162,7 +178,15 @@ extension Instruction {
         case .i64Load16U: return "i64Load16U"
         case .i64Load32S: return "i64Load32S"
         case .i64Load32U: return "i64Load32U"
-        case .memoryStore: return "memoryStore"
+        case .i32Store: return "i32Store"
+        case .i64Store: return "i64Store"
+        case .f32Store: return "f32Store"
+        case .f64Store: return "f64Store"
+        case .i32Store8: return "i32Store8"
+        case .i32Store16: return "i32Store16"
+        case .i64Store8: return "i64Store8"
+        case .i64Store16: return "i64Store16"
+        case .i64Store32: return "i64Store32"
         case .memorySize: return "memorySize"
         case .memoryGrow: return "memoryGrow"
         case .memoryInit: return "memoryInit"

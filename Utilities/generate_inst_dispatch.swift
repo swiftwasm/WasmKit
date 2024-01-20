@@ -67,11 +67,19 @@ let instructions = [
         "i64Load16U",
         "i64Load32S",
         "i64Load32U",
+        "i32Store",
+        "i64Store",
+        "f32Store",
+        "f64Store",
+        "i32Store8",
+        "i32Store16",
+        "i64Store8",
+        "i64Store16",
+        "i64Store32",
     ].map {
         Instruction(name: $0, immediates: [Immediate(name: "memarg", type: "Memarg")])
     }
 + [
-    Instruction(name: "memoryStore", immediates: [Immediate(name: "memarg", type: "Memarg"), Immediate(name: "bitWidth", type: "UInt8"), Immediate(name: "type", type: "ValueType")]),
     Instruction(name: "memorySize", immediates: []),
     Instruction(name: "memoryGrow", immediates: []),
     Instruction(name: "memoryInit", immediates: [Immediate(name: nil, type: "DataIndex")]),

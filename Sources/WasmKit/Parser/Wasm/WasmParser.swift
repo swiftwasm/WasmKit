@@ -438,23 +438,23 @@ extension WasmParser {
         case .i64_load32_u:
             return .value(try .i64Load32U(memarg: parseMemarg()))
         case .i32_store:
-            return .value(try .memoryStore(memarg: parseMemarg(), bitWidth: 32, type: .i32))
+            return .value(try .i32Store(memarg: parseMemarg()))
         case .i64_store:
-            return .value(try .memoryStore(memarg: parseMemarg(), bitWidth: 64, type: .i64))
+            return .value(try .i64Store(memarg: parseMemarg()))
         case .f32_store:
-            return .value(try .memoryStore(memarg: parseMemarg(), bitWidth: 32, type: .i32))
+            return .value(try .f32Store(memarg: parseMemarg()))
         case .f64_store:
-            return .value(try .memoryStore(memarg: parseMemarg(), bitWidth: 64, type: .i64))
+            return .value(try .f64Store(memarg: parseMemarg()))
         case .i32_store8:
-            return .value(try .memoryStore(memarg: parseMemarg(), bitWidth: 8, type: .i32))
+            return .value(try .i32Store8(memarg: parseMemarg()))
         case .i32_store16:
-            return .value(try .memoryStore(memarg: parseMemarg(), bitWidth: 16, type: .i32))
+            return .value(try .i32Store16(memarg: parseMemarg()))
         case .i64_store8:
-            return .value(try .memoryStore(memarg: parseMemarg(), bitWidth: 8, type: .i64))
+            return .value(try .i64Store8(memarg: parseMemarg()))
         case .i64_store16:
-            return .value(try .memoryStore(memarg: parseMemarg(), bitWidth: 16, type: .i64))
+            return .value(try .i64Store16(memarg: parseMemarg()))
         case .i64_store32:
-            return .value(try .memoryStore(memarg: parseMemarg(), bitWidth: 32, type: .i64))
+            return .value(try .i64Store32(memarg: parseMemarg()))
         case .memory_size:
             let zero = try stream.consumeAny()
             guard zero == 0x00 else {
