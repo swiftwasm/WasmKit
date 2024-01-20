@@ -185,6 +185,28 @@ func generatePrototype(instructions: [Instruction]) {
     print(output)
 }
 
+func generateInstName(instructions: [Instruction]) {
+    var output = """
+    extension Instruction {
+        var name: String {
+            switch self {
+    """
+    for inst in instructions {
+        output += """
+
+            case .\(inst.name):
+                return "\(inst.name)"
+        """
+    }
+    output += """
+
+            }
+        }
+    }
+    """
+    print(output)
+}
+
 func main(arguments: [String]) throws {
     let sourceRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
     let inputFile = sourceRoot.appending(path: "Sources/WasmKit/Execution/Instructions/Instruction.swift")
@@ -198,9 +220,16 @@ func main(arguments: [String]) throws {
         return Instruction.parse(line: String(caseLine))
     }
 
-    if arguments.count > 1, arguments[1] == "prototype" {
-        generatePrototype(instructions: instructions)
-        return
+    if arguments.count > 1 {
+        switch arguments[1] {
+        case "prototype":
+            generatePrototype(instructions: instructions)
+            return
+        case "inst-name":
+            generateInstName(instructions: instructions)
+            return
+        default: break
+        }
     }
 
     generateDispatcher(instructions: instructions)
