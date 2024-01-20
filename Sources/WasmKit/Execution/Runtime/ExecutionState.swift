@@ -91,7 +91,7 @@ extension ExecutionState {
         if let label = stack.currentLabel, stack.numberOfLabelsInCurrentFrame() > 0 {
             if programCounter < label.expression.instructions.count {
                 // Regular path
-                try doExecute(stack.currentLabel.expression.instructions[programCounter], runtime: runtime)
+                try doExecute(label.expression.instructions[programCounter], runtime: runtime)
             } else {
                 // When reached at "end" of "block" or "loop"
                 try self.exit(label: label)
