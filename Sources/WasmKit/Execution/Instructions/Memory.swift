@@ -55,7 +55,7 @@ extension ExecutionState {
 
         let memoryAddress = moduleInstance.memoryAddresses[0]
         let memoryInstance = store.memories[memoryAddress]
-        let i = try stack.popValue().asAddressOffset(memoryInstance.limit.isMemory64)
+        let i = stack.popValue().asAddressOffset(memoryInstance.limit.isMemory64)
         let (address, isOverflow) = memarg.offset.addingReportingOverflow(i)
         guard !isOverflow else {
             throw Trap.outOfBoundsMemoryAccess
@@ -108,7 +108,7 @@ extension ExecutionState {
         let moduleInstance = currentModule(store: runtime.store)
         let store = runtime.store
 
-        let value = try stack.popValue()
+        let value = stack.popValue()
 
         let memoryAddress = moduleInstance.memoryAddresses[0]
         let address: UInt64
@@ -116,7 +116,7 @@ extension ExecutionState {
         let length: UInt64
         do {
             let memoryInstance = store.memories[memoryAddress]
-            let i = try stack.popValue().asAddressOffset(memoryInstance.limit.isMemory64)
+            let i = stack.popValue().asAddressOffset(memoryInstance.limit.isMemory64)
             var isOverflow: Bool
             (address, isOverflow) = memarg.offset.addingReportingOverflow(i)
             guard !isOverflow else {
@@ -136,7 +136,7 @@ extension ExecutionState {
         }
     }
 
-    mutating func memorySize(runtime: Runtime) throws {
+    mutating func memorySize(runtime: Runtime) {
         let moduleInstance = currentModule(store: runtime.store)
         let store = runtime.store
 
@@ -154,7 +154,7 @@ extension ExecutionState {
         try store.withMemory(at: memoryAddress) { memoryInstance in
             let isMemory64 = memoryInstance.limit.isMemory64
             
-            let value = try stack.popValue()
+            let value = stack.popValue()
             let pageCount: UInt64
             switch (isMemory64, value) {
             case let (true, .i64(value)):
@@ -179,9 +179,9 @@ extension ExecutionState {
             let dataAddress = moduleInstance.dataAddresses[Int(dataIndex)]
             let dataInstance = store.datas[dataAddress]
             
-            let copyCounter = try stack.popValue().i32
-            let sourceIndex = try stack.popValue().i32
-            let destinationIndex = try stack.popValue().asAddressOffset(memoryInstance.limit.isMemory64)
+            let copyCounter = stack.popValue().i32
+            let sourceIndex = stack.popValue().i32
+            let destinationIndex = stack.popValue().asAddressOffset(memoryInstance.limit.isMemory64)
             
             guard copyCounter > 0 else { return }
             
@@ -201,7 +201,7 @@ extension ExecutionState {
             }
         }
     }
-    mutating func memoryDataDrop(runtime: Runtime, dataIndex: DataIndex) throws {
+    mutating func memoryDataDrop(runtime: Runtime, dataIndex: DataIndex) {
         let moduleInstance = currentModule(store: runtime.store)
         let store = runtime.store
         let dataAddress = moduleInstance.dataAddresses[Int(dataIndex)]
@@ -213,9 +213,9 @@ extension ExecutionState {
 
         let memoryAddress = moduleInstance.memoryAddresses[0]
         try store.withMemory(at: memoryAddress) { memoryInstance in
-            let copyCounter = try stack.popValue().i32
-            let sourceIndex = try stack.popValue().i32
-            let destinationIndex = try stack.popValue().i32
+            let copyCounter = stack.popValue().i32
+            let sourceIndex = stack.popValue().i32
+            let destinationIndex = stack.popValue().i32
 
             guard copyCounter > 0 else { return }
 
@@ -244,9 +244,9 @@ extension ExecutionState {
         let store = runtime.store
         let memoryAddress = moduleInstance.memoryAddresses[0]
         try store.withMemory(at: memoryAddress) { memoryInstance in
-            let copyCounter = try Int(stack.popValue().i32)
-            let value = try stack.popValue()
-            let destinationIndex = try Int(stack.popValue().i32)
+            let copyCounter = Int(stack.popValue().i32)
+            let value = stack.popValue()
+            let destinationIndex = Int(stack.popValue().i32)
             
             guard
                 !destinationIndex.addingReportingOverflow(copyCounter).overflow

@@ -150,7 +150,7 @@ extension Runtime {
                 let iseq = InstructionSequence(instructions: global.initializer)
                 defer { iseq.deallocate() }
                 return try evaluateConstExpr(iseq, instance: globalModuleInstance, arity: 1) { initExecution in
-                    return try initExecution.stack.popValue()
+                    return initExecution.stack.popValue()
                 }
             }
             

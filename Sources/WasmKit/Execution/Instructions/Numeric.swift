@@ -1,121 +1,121 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#numeric-instructions>
 extension ExecutionState {
-    mutating func numericConst(runtime: Runtime, value: Value) throws {
+    mutating func numericConst(runtime: Runtime, value: Value) {
         stack.push(value: value)
     }
-    mutating func numericIntUnary(runtime: Runtime, intUnary: NumericInstruction.IntUnary) throws {
-        let value = try stack.popValue()
+    mutating func numericIntUnary(runtime: Runtime, intUnary: NumericInstruction.IntUnary) {
+        let value = stack.popValue()
 
         stack.push(value: intUnary(value))
     }
-    mutating func numericFloatUnary(runtime: Runtime, floatUnary: NumericInstruction.FloatUnary) throws {
-        let value = try stack.popValue()
+    mutating func numericFloatUnary(runtime: Runtime, floatUnary: NumericInstruction.FloatUnary) {
+        let value = stack.popValue()
 
         stack.push(value: floatUnary(value))
     }
     @inline(__always)
-    private mutating func numericBinary<T>(castTo: (Value) -> T, binary: (T, T) -> Value) throws {
-        let value2 = try stack.popValue()
-        let value1 = try stack.popValue()
+    private mutating func numericBinary<T>(castTo: (Value) -> T, binary: (T, T) -> Value) {
+        let value2 = stack.popValue()
+        let value1 = stack.popValue()
 
         stack.push(value: binary(castTo(value1), castTo(value2)))
     }
 
-    mutating func i32Add(runtime: Runtime) throws {
-        try numericBinary(castTo: \.i32, binary: { .i32($0 &+ $1) })
+    mutating func i32Add(runtime: Runtime) {
+        numericBinary(castTo: \.i32, binary: { .i32($0 &+ $1) })
     }
 
-    mutating func i64Add(runtime: Runtime) throws {
-        try numericBinary(castTo: \.i64, binary: { .i64($0 &+ $1) })
+    mutating func i64Add(runtime: Runtime) {
+        numericBinary(castTo: \.i64, binary: { .i64($0 &+ $1) })
     }
 
-    mutating func f32Add(runtime: Runtime) throws {
-        try numericBinary(castTo: \.f32, binary: { .f32((Float32(bitPattern: $0) + Float32(bitPattern: $1)).bitPattern) })
+    mutating func f32Add(runtime: Runtime) {
+        numericBinary(castTo: \.f32, binary: { .f32((Float32(bitPattern: $0) + Float32(bitPattern: $1)).bitPattern) })
     }
 
-    mutating func f64Add(runtime: Runtime) throws {
-        try numericBinary(castTo: \.f64, binary: { .f64((Float64(bitPattern: $0) + Float64(bitPattern: $1)).bitPattern) })
+    mutating func f64Add(runtime: Runtime) {
+        numericBinary(castTo: \.f64, binary: { .f64((Float64(bitPattern: $0) + Float64(bitPattern: $1)).bitPattern) })
     }
 
-    mutating func i32Sub(runtime: Runtime) throws {
-        try numericBinary(castTo: \.i32, binary: { .i32($0 &- $1) })
+    mutating func i32Sub(runtime: Runtime) {
+        numericBinary(castTo: \.i32, binary: { .i32($0 &- $1) })
     }
 
-    mutating func i64Sub(runtime: Runtime) throws {
-        try numericBinary(castTo: \.i64, binary: { .i64($0 &- $1) })
+    mutating func i64Sub(runtime: Runtime) {
+        numericBinary(castTo: \.i64, binary: { .i64($0 &- $1) })
     }
 
-    mutating func f32Sub(runtime: Runtime) throws {
-        try numericBinary(castTo: \.f32, binary: { .f32((Float32(bitPattern: $0) - Float32(bitPattern: $1)).bitPattern) })
+    mutating func f32Sub(runtime: Runtime) {
+        numericBinary(castTo: \.f32, binary: { .f32((Float32(bitPattern: $0) - Float32(bitPattern: $1)).bitPattern) })
     }
 
-    mutating func f64Sub(runtime: Runtime) throws {
-        try numericBinary(castTo: \.f64, binary: { .f64((Float64(bitPattern: $0) - Float64(bitPattern: $1)).bitPattern) })
+    mutating func f64Sub(runtime: Runtime) {
+        numericBinary(castTo: \.f64, binary: { .f64((Float64(bitPattern: $0) - Float64(bitPattern: $1)).bitPattern) })
     }
 
-    mutating func i32Mul(runtime: Runtime) throws {
-        try numericBinary(castTo: \.i32, binary: { .i32($0 &* $1) })
+    mutating func i32Mul(runtime: Runtime) {
+        numericBinary(castTo: \.i32, binary: { .i32($0 &* $1) })
     }
 
-    mutating func i64Mul(runtime: Runtime) throws {
-        try numericBinary(castTo: \.i64, binary: { .i64($0 &* $1) })
+    mutating func i64Mul(runtime: Runtime) {
+        numericBinary(castTo: \.i64, binary: { .i64($0 &* $1) })
     }
 
-    mutating func f32Mul(runtime: Runtime) throws {
-        try numericBinary(castTo: \.f32, binary: { .f32((Float32(bitPattern: $0) * Float32(bitPattern: $1)).bitPattern) })
+    mutating func f32Mul(runtime: Runtime) {
+        numericBinary(castTo: \.f32, binary: { .f32((Float32(bitPattern: $0) * Float32(bitPattern: $1)).bitPattern) })
     }
 
-    mutating func f64Mul(runtime: Runtime) throws {
-        try numericBinary(castTo: \.f64, binary: { .f64((Float64(bitPattern: $0) * Float64(bitPattern: $1)).bitPattern) })
+    mutating func f64Mul(runtime: Runtime) {
+        numericBinary(castTo: \.f64, binary: { .f64((Float64(bitPattern: $0) * Float64(bitPattern: $1)).bitPattern) })
     }
 
-    mutating func i32Eq(runtime: Runtime) throws {
-        try numericBinary(castTo: \.i32, binary: { $0 == $1 ? true : false })
+    mutating func i32Eq(runtime: Runtime) {
+        numericBinary(castTo: \.i32, binary: { $0 == $1 ? true : false })
     }
 
-    mutating func i64Eq(runtime: Runtime) throws {
-        try numericBinary(castTo: \.i64, binary: { $0 == $1 ? true : false })
+    mutating func i64Eq(runtime: Runtime) {
+        numericBinary(castTo: \.i64, binary: { $0 == $1 ? true : false })
     }
 
-    mutating func f32Eq(runtime: Runtime) throws {
-        try numericBinary(castTo: \.f32, binary: { Float32(bitPattern: $0) == Float32(bitPattern: $1) ? true : false })
+    mutating func f32Eq(runtime: Runtime) {
+        numericBinary(castTo: \.f32, binary: { Float32(bitPattern: $0) == Float32(bitPattern: $1) ? true : false })
     }
 
-    mutating func f64Eq(runtime: Runtime) throws {
-        try numericBinary(castTo: \.f64, binary: { Float64(bitPattern: $0) == Float64(bitPattern: $1) ? true : false })
+    mutating func f64Eq(runtime: Runtime) {
+        numericBinary(castTo: \.f64, binary: { Float64(bitPattern: $0) == Float64(bitPattern: $1) ? true : false })
     }
 
-    mutating func i32Ne(runtime: Runtime) throws {
-        try numericBinary(castTo: \.i32, binary: { $0 == $1 ? false : true })
+    mutating func i32Ne(runtime: Runtime) {
+        numericBinary(castTo: \.i32, binary: { $0 == $1 ? false : true })
     }
 
-    mutating func i64Ne(runtime: Runtime) throws {
-        try numericBinary(castTo: \.i64, binary: { $0 == $1 ? false : true })
+    mutating func i64Ne(runtime: Runtime) {
+        numericBinary(castTo: \.i64, binary: { $0 == $1 ? false : true })
     }
 
-    mutating func f32Ne(runtime: Runtime) throws {
-        try numericBinary(castTo: \.f32, binary: { Float32(bitPattern: $0) == Float32(bitPattern: $1) ? false : true })
+    mutating func f32Ne(runtime: Runtime) {
+        numericBinary(castTo: \.f32, binary: { Float32(bitPattern: $0) == Float32(bitPattern: $1) ? false : true })
     }
 
-    mutating func f64Ne(runtime: Runtime) throws {
-        try numericBinary(castTo: \.f64, binary: { Float64(bitPattern: $0) == Float64(bitPattern: $1) ? false : true })
+    mutating func f64Ne(runtime: Runtime) {
+        numericBinary(castTo: \.f64, binary: { Float64(bitPattern: $0) == Float64(bitPattern: $1) ? false : true })
     }
 
     mutating func numericIntBinary(runtime: Runtime, intBinary: NumericInstruction.IntBinary) throws {
-        let value2 = try stack.popValue()
-        let value1 = try stack.popValue()
+        let value2 = stack.popValue()
+        let value1 = stack.popValue()
 
         try stack.push(value: intBinary(value1, value2))
     }
-    mutating func numericFloatBinary(runtime: Runtime, floatBinary: NumericInstruction.FloatBinary) throws {
-        let value2 = try stack.popValue()
-        let value1 = try stack.popValue()
+    mutating func numericFloatBinary(runtime: Runtime, floatBinary: NumericInstruction.FloatBinary) {
+        let value2 = stack.popValue()
+        let value1 = stack.popValue()
 
-        try stack.push(value: floatBinary(value1, value2))
+        stack.push(value: floatBinary(value1, value2))
     }
     mutating func numericConversion(runtime: Runtime, conversion: NumericInstruction.Conversion) throws {
-        let value = try stack.popValue()
+        let value = stack.popValue()
 
         try stack.push(value: conversion(value))
     }
@@ -402,7 +402,7 @@ extension NumericInstruction {
             }
         }
 
-        func callAsFunction(_ value1: Value, _ value2: Value) throws -> Value {
+        func callAsFunction(_ value1: Value, _ value2: Value) -> Value {
             switch self {
             case .div:
                 guard !value1.isNan && !value2.isNan else {

@@ -7,12 +7,14 @@ struct Immediate {
 struct Instruction {
     let name: String
     let isControl: Bool
+    let mayThrow: Bool
     let mayUpdateFrame: Bool
     let immediates: [Immediate]
 
-    init(name: String, isControl: Bool = false, mayUpdateFrame: Bool = false, immediates: [Immediate]) {
+    init(name: String, isControl: Bool = false, mayThrow: Bool = false, mayUpdateFrame: Bool = false, immediates: [Immediate]) {
         self.name = name
         self.isControl = isControl
+        self.mayThrow = mayThrow
         self.mayUpdateFrame = mayUpdateFrame
         self.immediates = immediates
         assert(isControl || !mayUpdateFrame, "non-control instruction should not update frame")
@@ -23,8 +25,8 @@ let valueTypes = ["i32", "i64", "f32", "f64"]
 
 let instructions = [
     // Controls
-    Instruction(name: "unreachable", isControl: true, immediates: []),
-    Instruction(name: "nop", isControl: true, immediates: []),
+    Instruction(name: "unreachable", isControl: true, mayThrow: true, immediates: []),
+    Instruction(name: "nop", isControl: true, mayThrow: true, immediates: []),
     Instruction(name: "block", isControl: true, immediates: [
         Immediate(name: "endRef", type: "ExpressionRef"),
         Immediate(name: "type", type: "BlockType")
@@ -44,25 +46,25 @@ let instructions = [
     Instruction(name: "end", isControl: true, immediates: []),
     Instruction(name: "`else`", isControl: true, immediates: []),
     // NOTE: A branch can unwind a frame by "br 0"
-    Instruction(name: "br", isControl: true, mayUpdateFrame: true, immediates: [
+    Instruction(name: "br", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: [
         Immediate(name: "labelIndex", type: "LabelIndex")
     ]),
-    Instruction(name: "brIf", isControl: true, mayUpdateFrame: true, immediates: [
+    Instruction(name: "brIf", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: [
         Immediate(name: "labelIndex", type: "LabelIndex")
     ]),
-    Instruction(name: "brTable", isControl: true, mayUpdateFrame: true, immediates: [
+    Instruction(name: "brTable", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: [
         Immediate(name: nil, type: "BrTable"),
     ]),
-    Instruction(name: "`return`", isControl: true, mayUpdateFrame: true, immediates: []),
-    Instruction(name: "call", isControl: true, mayUpdateFrame: true, immediates: [
+    Instruction(name: "`return`", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: []),
+    Instruction(name: "call", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: [
         Immediate(name: "functionIndex", type: "UInt32")
     ]),
-    Instruction(name: "callIndirect", isControl: true, mayUpdateFrame: true, immediates: [
+    Instruction(name: "callIndirect", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: [
         Immediate(name: "tableIndex", type: "TableIndex"),
         Immediate(name: "typeIndex", type: "TypeIndex")
     ]),
-    Instruction(name: "endOfFunction", isControl: true, mayUpdateFrame: true, immediates: []),
-    Instruction(name: "endOfExecution", isControl: true, mayUpdateFrame: true, immediates: []),
+    Instruction(name: "endOfFunction", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: []),
+    Instruction(name: "endOfExecution", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: []),
 ]
 // Memory
 + [
@@ -90,22 +92,22 @@ let instructions = [
         "i64Store16",
         "i64Store32",
     ].map {
-        Instruction(name: $0, immediates: [Immediate(name: "memarg", type: "Memarg")])
+        Instruction(name: $0, mayThrow: true, immediates: [Immediate(name: "memarg", type: "Memarg")])
     }
 + [
     Instruction(name: "memorySize", immediates: []),
-    Instruction(name: "memoryGrow", immediates: []),
-    Instruction(name: "memoryInit", immediates: [Immediate(name: nil, type: "DataIndex")]),
+    Instruction(name: "memoryGrow", mayThrow: true, immediates: []),
+    Instruction(name: "memoryInit", mayThrow: true, immediates: [Immediate(name: nil, type: "DataIndex")]),
     Instruction(name: "memoryDataDrop", immediates: [Immediate(name: nil, type: "DataIndex")]),
-    Instruction(name: "memoryCopy", immediates: []),
-    Instruction(name: "memoryFill", immediates: []),
+    Instruction(name: "memoryCopy", mayThrow: true, immediates: []),
+    Instruction(name: "memoryFill", mayThrow: true, immediates: []),
     // Numeric
     Instruction(name: "numericConst", immediates: [Immediate(name: nil, type: "Value")]),
     Instruction(name: "numericIntUnary", immediates: [Immediate(name: nil, type: "NumericInstruction.IntUnary")]),
     Instruction(name: "numericFloatUnary", immediates: [Immediate(name: nil, type: "NumericInstruction.FloatUnary")]),
-    Instruction(name: "numericIntBinary", immediates: [Immediate(name: nil, type: "NumericInstruction.IntBinary")]),
+    Instruction(name: "numericIntBinary", mayThrow: true, immediates: [Immediate(name: nil, type: "NumericInstruction.IntBinary")]),
     Instruction(name: "numericFloatBinary", immediates: [Immediate(name: nil, type: "NumericInstruction.FloatBinary")]),
-    Instruction(name: "numericConversion", immediates: [Immediate(name: nil, type: "NumericInstruction.Conversion")]),
+    Instruction(name: "numericConversion", mayThrow: true, immediates: [Immediate(name: nil, type: "NumericInstruction.Conversion")]),
 ] + ["Add", "Sub", "Mul", "Eq", "Ne"].flatMap { op -> [Instruction] in
     valueTypes.map { type in
         Instruction(name: "\(type)\(op)", immediates: [])
@@ -114,26 +116,26 @@ let instructions = [
 + [
     // Parametric
     Instruction(name: "drop", immediates: []),
-    Instruction(name: "select", immediates: []),
+    Instruction(name: "select", mayThrow: true, immediates: []),
     // Reference
     Instruction(name: "refNull", immediates: [Immediate(name: nil, type: "ReferenceType")]),
     Instruction(name: "refIsNull", immediates: []),
     Instruction(name: "refFunc", immediates: [Immediate(name: nil, type: "FunctionIndex")]),
     // Table
-    Instruction(name: "tableGet", immediates: [Immediate(name: nil, type: "TableIndex")]),
-    Instruction(name: "tableSet", immediates: [Immediate(name: nil, type: "TableIndex")]),
+    Instruction(name: "tableGet", mayThrow: true, immediates: [Immediate(name: nil, type: "TableIndex")]),
+    Instruction(name: "tableSet", mayThrow: true, immediates: [Immediate(name: nil, type: "TableIndex")]),
     Instruction(name: "tableSize", immediates: [Immediate(name: nil, type: "TableIndex")]),
     Instruction(name: "tableGrow", immediates: [Immediate(name: nil, type: "TableIndex")]),
-    Instruction(name: "tableFill", immediates: [Immediate(name: nil, type: "TableIndex")]),
-    Instruction(name: "tableCopy", immediates: [Immediate(name: "dest", type: "TableIndex"), Immediate(name: "src", type: "TableIndex")]),
-    Instruction(name: "tableInit", immediates: [Immediate(name: nil, type: "TableIndex"), Immediate(name: nil, type: "ElementIndex")]),
+    Instruction(name: "tableFill", mayThrow: true, immediates: [Immediate(name: nil, type: "TableIndex")]),
+    Instruction(name: "tableCopy", mayThrow: true, immediates: [Immediate(name: "dest", type: "TableIndex"), Immediate(name: "src", type: "TableIndex")]),
+    Instruction(name: "tableInit", mayThrow: true, immediates: [Immediate(name: nil, type: "TableIndex"), Immediate(name: nil, type: "ElementIndex")]),
     Instruction(name: "tableElementDrop", immediates: [Immediate(name: nil, type: "ElementIndex")]),
     // Variable
     Instruction(name: "localGet", immediates: [Immediate(name: "index", type: "LocalIndex")]),
     Instruction(name: "localSet", immediates: [Immediate(name: "index", type: "LocalIndex")]),
     Instruction(name: "localTee", immediates: [Immediate(name: "index", type: "LocalIndex")]),
-    Instruction(name: "globalGet", immediates: [Immediate(name: "index", type: "GlobalIndex")]),
-    Instruction(name: "globalSet", immediates: [Immediate(name: "index", type: "GlobalIndex")]),
+    Instruction(name: "globalGet", mayThrow: true, immediates: [Immediate(name: "index", type: "GlobalIndex")]),
+    Instruction(name: "globalSet", mayThrow: true, immediates: [Immediate(name: "index", type: "GlobalIndex")]),
 ]
 
 func camelCase(pascalCase: String) -> String {
@@ -150,11 +152,12 @@ func generateDispatcher(instructions: [Instruction]) -> String {
     """
 
     for inst in instructions {
+        let tryPrefix = inst.mayThrow ? "try " : ""
         if inst.immediates.isEmpty {
             output += """
 
                     case .\(inst.name):
-                        try self.\(inst.name)(runtime: runtime)
+                        \(tryPrefix)self.\(inst.name)(runtime: runtime)
             """
         } else {
             let labels = inst.immediates.map {
@@ -163,7 +166,7 @@ func generateDispatcher(instructions: [Instruction]) -> String {
             output += """
 
                     case .\(inst.name)(\(labels.map { "let \($0)" }.joined(separator: ", "))):
-                        try self.\(inst.name)(runtime: runtime, \(labels.map { "\($0): \($0)" }.joined(separator: ", ")))
+                        \(tryPrefix)self.\(inst.name)(runtime: runtime, \(labels.map { "\($0): \($0)" }.joined(separator: ", ")))
             """
         }
         if inst.isControl {

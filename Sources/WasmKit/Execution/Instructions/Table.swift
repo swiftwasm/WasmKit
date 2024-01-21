@@ -2,7 +2,7 @@
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#table-instructions>
 extension ExecutionState {
     mutating func tableGet(runtime: Runtime, tableIndex: TableIndex) throws {
-        let (_, table) = try getTable(tableIndex, store: runtime.store)
+        let (_, table) = getTable(tableIndex, store: runtime.store)
 
         let elementIndex = try getElementIndex(table)
 
@@ -13,27 +13,27 @@ extension ExecutionState {
         stack.push(value: .ref(reference))
     }
     mutating func tableSet(runtime: Runtime, tableIndex: TableIndex) throws {
-        let (tableAddress, table) = try getTable(tableIndex, store: runtime.store)
+        let (tableAddress, table) = getTable(tableIndex, store: runtime.store)
 
-        let reference = try stack.getReference()
+        let reference = stack.getReference()
         let elementIndex = try getElementIndex(table)
         setTableElement(store: runtime.store, tableAddress: tableAddress, elementIndex, reference)
 
     }
-    mutating func tableSize(runtime: Runtime, tableIndex: TableIndex) throws {
-        let (_, table) = try getTable(tableIndex, store: runtime.store)
+    mutating func tableSize(runtime: Runtime, tableIndex: TableIndex) {
+        let (_, table) = getTable(tableIndex, store: runtime.store)
         stack.push(value: .i32(UInt32(table.elements.count)))
     }
-    mutating func tableGrow(runtime: Runtime, tableIndex: TableIndex) throws {
-        let (tableAddress, table) = try getTable(tableIndex, store: runtime.store)
+    mutating func tableGrow(runtime: Runtime, tableIndex: TableIndex) {
+        let (tableAddress, table) = getTable(tableIndex, store: runtime.store)
 
-        let growthSize = try stack.popValue()
+        let growthSize = stack.popValue()
 
         guard case let .i32(growthSize) = growthSize else {
             fatalError("invalid value at the top of the stack \(growthSize)")
         }
 
-        let growthValue = try stack.getReference()
+        let growthValue = stack.getReference()
 
         let oldSize = UInt32(table.elements.count)
         guard runtime.store.tables[tableAddress].grow(by: growthSize, value: growthValue) else {
@@ -44,10 +44,10 @@ extension ExecutionState {
         stack.push(value: .i32(oldSize))
     }
     mutating func tableFill(runtime: Runtime, tableIndex: TableIndex) throws {
-        let (tableAddress, table) = try getTable(tableIndex, store: runtime.store)
-        let fillCounter = try stack.popValue().i32
-        let fillValue = try stack.getReference()
-        let startIndex = try stack.popValue().i32
+        let (tableAddress, table) = getTable(tableIndex, store: runtime.store)
+        let fillCounter = stack.popValue().i32
+        let fillValue = stack.getReference()
+        let startIndex = stack.popValue().i32
 
         guard fillCounter > 0 else {
             return
@@ -62,12 +62,12 @@ extension ExecutionState {
         }
     }
     mutating func tableCopy(runtime: Runtime, dest destinationTableIndex: TableIndex, src sourceTableIndex: TableIndex) throws {
-        let (_, sourceTable) = try getTable(sourceTableIndex, store: runtime.store)
-        let (destinationTableAddress, destinationTable) = try getTable(destinationTableIndex, store: runtime.store)
+        let (_, sourceTable) = getTable(sourceTableIndex, store: runtime.store)
+        let (destinationTableAddress, destinationTable) = getTable(destinationTableIndex, store: runtime.store)
 
-        let copyCounter = try stack.popValue().i32
-        let sourceIndex = try stack.popValue().i32
-        let destinationIndex = try stack.popValue().i32
+        let copyCounter = stack.popValue().i32
+        let sourceIndex = stack.popValue().i32
+        let destinationIndex = stack.popValue().i32
 
         guard copyCounter > 0 else {
             return
@@ -95,13 +95,13 @@ extension ExecutionState {
         }
     }
     mutating func tableInit(runtime: Runtime, tableIndex: TableIndex, elementIndex: ElementIndex) throws {
-        let (destinationTableAddress, destinationTable) = try getTable(tableIndex, store: runtime.store)
+        let (destinationTableAddress, destinationTable) = getTable(tableIndex, store: runtime.store)
         let elementAddress = currentModule(store: runtime.store).elementAddresses[Int(elementIndex)]
         let sourceElement = runtime.store.elements[elementAddress]
 
-        let copyCounter = try stack.popValue().i32
-        let sourceIndex = try stack.popValue().i32
-        let destinationIndex = try stack.popValue().i32
+        let copyCounter = stack.popValue().i32
+        let sourceIndex = stack.popValue().i32
+        let destinationIndex = stack.popValue().i32
 
         guard copyCounter > 0 else {
             return
@@ -131,7 +131,7 @@ extension ExecutionState {
             )
         }
     }
-    mutating func tableElementDrop(runtime: Runtime, elementIndex: ElementIndex) throws {
+    mutating func tableElementDrop(runtime: Runtime, elementIndex: ElementIndex) {
         let elementAddress = currentModule(store: runtime.store).elementAddresses[Int(elementIndex)]
         runtime.store.elements[elementAddress].drop()
     }
@@ -147,13 +147,13 @@ extension ExecutionState {
 }
 
 extension ExecutionState {
-    fileprivate func getTable(_ tableIndex: UInt32, store: Store) throws -> (TableAddress, TableInstance) {
+    fileprivate func getTable(_ tableIndex: UInt32, store: Store) -> (TableAddress, TableInstance) {
         let address = currentModule(store: store).tableAddresses[Int(tableIndex)]
         return (address, store.tables[address])
     }
 
     fileprivate mutating func getElementIndex(_ table: TableInstance) throws -> ElementIndex {
-        let elementIndex = try stack.popValue().i32
+        let elementIndex = stack.popValue().i32
 
         guard elementIndex < table.elements.count else {
             throw Trap.outOfBoundsTableAccess(index: elementIndex)
@@ -164,8 +164,8 @@ extension ExecutionState {
 }
 
 extension Stack {
-    fileprivate mutating func getReference() throws -> Reference {
-        let value = try popValue()
+    fileprivate mutating func getReference() -> Reference {
+        let value = popValue()
 
         guard case let .ref(reference) = value else {
             fatalError("invalid value at the top of the stack \(value)")

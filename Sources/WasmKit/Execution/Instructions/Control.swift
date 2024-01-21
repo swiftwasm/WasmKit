@@ -13,7 +13,7 @@ extension ExecutionState {
 
     typealias BlockType = Instruction.BlockType
 
-    mutating func block(runtime: Runtime, endRef: ExpressionRef, type: BlockType) throws {
+    mutating func block(runtime: Runtime, endRef: ExpressionRef, type: BlockType) {
         enter(
             jumpTo: programCounter + 1,
             continuation: programCounter + endRef.relativeOffset,
@@ -21,13 +21,13 @@ extension ExecutionState {
             pushPopValues: Int(type.parameters)
         )
     }
-    mutating func loop(runtime: Runtime, type: BlockType) throws {
+    mutating func loop(runtime: Runtime, type: BlockType) {
         let paramSize = Int(type.parameters)
         enter(jumpTo: programCounter + 1, continuation: programCounter, arity: paramSize, pushPopValues: paramSize)
     }
 
-    mutating func ifThen(runtime: Runtime, endRef: ExpressionRef, type: BlockType) throws {
-        let isTrue = try stack.popValue().i32 != 0
+    mutating func ifThen(runtime: Runtime, endRef: ExpressionRef, type: BlockType) {
+        let isTrue = stack.popValue().i32 != 0
         if isTrue {
             enter(
                 jumpTo: programCounter + 1,
@@ -40,8 +40,8 @@ extension ExecutionState {
         }
     }
 
-    mutating func ifThenElse(runtime: Runtime, elseRef: ExpressionRef, endRef: ExpressionRef, type: BlockType) throws {
-        let isTrue = try stack.popValue().i32 != 0
+    mutating func ifThenElse(runtime: Runtime, elseRef: ExpressionRef, endRef: ExpressionRef, type: BlockType) {
+        let isTrue = stack.popValue().i32 != 0
         let addendToPC: Int
         if isTrue {
             addendToPC = 1
@@ -55,13 +55,13 @@ extension ExecutionState {
             pushPopValues: Int(type.parameters)
         )
     }
-    mutating func end(runtime: Runtime) throws {
+    mutating func end(runtime: Runtime) {
         if let currentLabel = self.stack.currentLabel {
             stack.exit(label: currentLabel)
         }
         programCounter += 1
     }
-    mutating func `else`(runtime: Runtime) throws {
+    mutating func `else`(runtime: Runtime) {
         let label = self.stack.currentLabel!
         stack.exit(label: label)
         programCounter = label.continuation // if-then-else's continuation points the "end"
@@ -72,7 +72,7 @@ extension ExecutionState {
             try self.return(runtime: runtime)
             return
         }
-        let label = try stack.getLabel(index: Int(labelIndex))
+        let label = stack.getLabel(index: Int(labelIndex))
         let values = stack.popValues(count: label.arity)
 
         stack.unwindLabels(upto: labelIndex)
@@ -84,7 +84,7 @@ extension ExecutionState {
         try branch(labelIndex: Int(labelIndex), runtime: runtime)
     }
     mutating func brIf(runtime: Runtime, labelIndex: LabelIndex) throws {
-        guard try stack.popValue().i32 != 0 else {
+        guard stack.popValue().i32 != 0 else {
             programCounter += 1
             return
         }
@@ -93,7 +93,7 @@ extension ExecutionState {
     mutating func brTable(runtime: Runtime, brTable: Instruction.BrTable) throws {
         let labelIndices = brTable.labelIndices
         let defaultIndex = brTable.defaultIndex
-        let value = try stack.popValue().i32
+        let value = stack.popValue().i32
         let labelIndex: LabelIndex
         if labelIndices.indices.contains(Int(value)) {
             labelIndex = labelIndices[Int(value)]
@@ -123,7 +123,7 @@ extension ExecutionState {
 //            runtime.interceptor?.onExitFunction(address, store: runtime.store)
 //        }
         let values = stack.popValues(count: currentFrame.arity)
-        try stack.popFrame()
+        stack.popFrame()
         stack.push(values: values)
         programCounter = currentFrame.returnPC
     }
@@ -143,7 +143,7 @@ extension ExecutionState {
         let tableAddresses = moduleInstance.tableAddresses[Int(tableIndex)]
         let tableInstance = runtime.store.tables[tableAddresses]
         let expectedType = moduleInstance.types[Int(typeIndex)]
-        let value = try stack.popValue().i32
+        let value = stack.popValue().i32
         let elementIndex = Int(value)
         guard elementIndex < tableInstance.elements.count else {
             throw Trap.undefinedElement

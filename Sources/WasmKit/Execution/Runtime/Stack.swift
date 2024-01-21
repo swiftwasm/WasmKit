@@ -112,20 +112,20 @@ public struct Stack {
         return values
     }
 
-    mutating func popFrame() throws {
+    mutating func popFrame() {
         let popped = self.frames.pop()
         self.currentFrame = self.frames.peek()
         self.valueStack.truncate(length: popped.baseStackAddress.valueFrameIndex)
     }
 
-    func getLabel(index: Int) throws -> Label {
+    func getLabel(index: Int) -> Label {
         return self.labels[self.labels.count - index - 1]
     }
 
     mutating func popValues(count: Int) -> Array<Value> {
         self.valueStack.popValues(count: count)
     }
-    mutating func popValue() throws -> Value {
+    mutating func popValue() -> Value {
         self.valueStack.popValue()
     }
     mutating func push(values: [Value]) {
@@ -321,12 +321,12 @@ extension Frame: Equatable {
 }
 
 extension Stack {
-    func localGet(index: UInt32) throws -> Value {
+    func localGet(index: UInt32) -> Value {
         let base = currentFrame.baseStackAddress.valueFrameIndex
         return valueStack[base + Int(index)]
     }
 
-    mutating func localSet(index: UInt32, value: Value) throws {
+    mutating func localSet(index: UInt32, value: Value) {
         let base = currentFrame.baseStackAddress.valueFrameIndex
         valueStack[base + Int(index)] = value
     }

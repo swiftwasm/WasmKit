@@ -10,22 +10,22 @@ extension ExecutionState {
             try self.nop(runtime: runtime)
             return true
         case .block(let endRef, let type):
-            try self.block(runtime: runtime, endRef: endRef, type: type)
+            self.block(runtime: runtime, endRef: endRef, type: type)
             return true
         case .loop(let type):
-            try self.loop(runtime: runtime, type: type)
+            self.loop(runtime: runtime, type: type)
             return true
         case .ifThen(let endRef, let type):
-            try self.ifThen(runtime: runtime, endRef: endRef, type: type)
+            self.ifThen(runtime: runtime, endRef: endRef, type: type)
             return true
         case .ifThenElse(let elseRef, let endRef, let type):
-            try self.ifThenElse(runtime: runtime, elseRef: elseRef, endRef: endRef, type: type)
+            self.ifThenElse(runtime: runtime, elseRef: elseRef, endRef: endRef, type: type)
             return true
         case .end:
-            try self.end(runtime: runtime)
+            self.end(runtime: runtime)
             return true
         case .`else`:
-            try self.`else`(runtime: runtime)
+            self.`else`(runtime: runtime)
             return true
         case .br(let labelIndex):
             try self.br(runtime: runtime, labelIndex: labelIndex)
@@ -98,87 +98,87 @@ extension ExecutionState {
         case .i64Store32(let memarg):
             try self.i64Store32(runtime: runtime, memarg: memarg)
         case .memorySize:
-            try self.memorySize(runtime: runtime)
+            self.memorySize(runtime: runtime)
         case .memoryGrow:
             try self.memoryGrow(runtime: runtime)
         case .memoryInit(let dataIndex):
             try self.memoryInit(runtime: runtime, dataIndex: dataIndex)
         case .memoryDataDrop(let dataIndex):
-            try self.memoryDataDrop(runtime: runtime, dataIndex: dataIndex)
+            self.memoryDataDrop(runtime: runtime, dataIndex: dataIndex)
         case .memoryCopy:
             try self.memoryCopy(runtime: runtime)
         case .memoryFill:
             try self.memoryFill(runtime: runtime)
         case .numericConst(let value):
-            try self.numericConst(runtime: runtime, value: value)
+            self.numericConst(runtime: runtime, value: value)
         case .numericIntUnary(let intUnary):
-            try self.numericIntUnary(runtime: runtime, intUnary: intUnary)
+            self.numericIntUnary(runtime: runtime, intUnary: intUnary)
         case .numericFloatUnary(let floatUnary):
-            try self.numericFloatUnary(runtime: runtime, floatUnary: floatUnary)
+            self.numericFloatUnary(runtime: runtime, floatUnary: floatUnary)
         case .numericIntBinary(let intBinary):
             try self.numericIntBinary(runtime: runtime, intBinary: intBinary)
         case .numericFloatBinary(let floatBinary):
-            try self.numericFloatBinary(runtime: runtime, floatBinary: floatBinary)
+            self.numericFloatBinary(runtime: runtime, floatBinary: floatBinary)
         case .numericConversion(let conversion):
             try self.numericConversion(runtime: runtime, conversion: conversion)
         case .i32Add:
-            try self.i32Add(runtime: runtime)
+            self.i32Add(runtime: runtime)
         case .i64Add:
-            try self.i64Add(runtime: runtime)
+            self.i64Add(runtime: runtime)
         case .f32Add:
-            try self.f32Add(runtime: runtime)
+            self.f32Add(runtime: runtime)
         case .f64Add:
-            try self.f64Add(runtime: runtime)
+            self.f64Add(runtime: runtime)
         case .i32Sub:
-            try self.i32Sub(runtime: runtime)
+            self.i32Sub(runtime: runtime)
         case .i64Sub:
-            try self.i64Sub(runtime: runtime)
+            self.i64Sub(runtime: runtime)
         case .f32Sub:
-            try self.f32Sub(runtime: runtime)
+            self.f32Sub(runtime: runtime)
         case .f64Sub:
-            try self.f64Sub(runtime: runtime)
+            self.f64Sub(runtime: runtime)
         case .i32Mul:
-            try self.i32Mul(runtime: runtime)
+            self.i32Mul(runtime: runtime)
         case .i64Mul:
-            try self.i64Mul(runtime: runtime)
+            self.i64Mul(runtime: runtime)
         case .f32Mul:
-            try self.f32Mul(runtime: runtime)
+            self.f32Mul(runtime: runtime)
         case .f64Mul:
-            try self.f64Mul(runtime: runtime)
+            self.f64Mul(runtime: runtime)
         case .i32Eq:
-            try self.i32Eq(runtime: runtime)
+            self.i32Eq(runtime: runtime)
         case .i64Eq:
-            try self.i64Eq(runtime: runtime)
+            self.i64Eq(runtime: runtime)
         case .f32Eq:
-            try self.f32Eq(runtime: runtime)
+            self.f32Eq(runtime: runtime)
         case .f64Eq:
-            try self.f64Eq(runtime: runtime)
+            self.f64Eq(runtime: runtime)
         case .i32Ne:
-            try self.i32Ne(runtime: runtime)
+            self.i32Ne(runtime: runtime)
         case .i64Ne:
-            try self.i64Ne(runtime: runtime)
+            self.i64Ne(runtime: runtime)
         case .f32Ne:
-            try self.f32Ne(runtime: runtime)
+            self.f32Ne(runtime: runtime)
         case .f64Ne:
-            try self.f64Ne(runtime: runtime)
+            self.f64Ne(runtime: runtime)
         case .drop:
-            try self.drop(runtime: runtime)
+            self.drop(runtime: runtime)
         case .select:
             try self.select(runtime: runtime)
         case .refNull(let referenceType):
-            try self.refNull(runtime: runtime, referenceType: referenceType)
+            self.refNull(runtime: runtime, referenceType: referenceType)
         case .refIsNull:
-            try self.refIsNull(runtime: runtime)
+            self.refIsNull(runtime: runtime)
         case .refFunc(let functionIndex):
-            try self.refFunc(runtime: runtime, functionIndex: functionIndex)
+            self.refFunc(runtime: runtime, functionIndex: functionIndex)
         case .tableGet(let tableIndex):
             try self.tableGet(runtime: runtime, tableIndex: tableIndex)
         case .tableSet(let tableIndex):
             try self.tableSet(runtime: runtime, tableIndex: tableIndex)
         case .tableSize(let tableIndex):
-            try self.tableSize(runtime: runtime, tableIndex: tableIndex)
+            self.tableSize(runtime: runtime, tableIndex: tableIndex)
         case .tableGrow(let tableIndex):
-            try self.tableGrow(runtime: runtime, tableIndex: tableIndex)
+            self.tableGrow(runtime: runtime, tableIndex: tableIndex)
         case .tableFill(let tableIndex):
             try self.tableFill(runtime: runtime, tableIndex: tableIndex)
         case .tableCopy(let dest, let src):
@@ -186,13 +186,13 @@ extension ExecutionState {
         case .tableInit(let tableIndex, let elementIndex):
             try self.tableInit(runtime: runtime, tableIndex: tableIndex, elementIndex: elementIndex)
         case .tableElementDrop(let elementIndex):
-            try self.tableElementDrop(runtime: runtime, elementIndex: elementIndex)
+            self.tableElementDrop(runtime: runtime, elementIndex: elementIndex)
         case .localGet(let index):
-            try self.localGet(runtime: runtime, index: index)
+            self.localGet(runtime: runtime, index: index)
         case .localSet(let index):
-            try self.localSet(runtime: runtime, index: index)
+            self.localSet(runtime: runtime, index: index)
         case .localTee(let index):
-            try self.localTee(runtime: runtime, index: index)
+            self.localTee(runtime: runtime, index: index)
         case .globalGet(let index):
             try self.globalGet(runtime: runtime, index: index)
         case .globalSet(let index):
