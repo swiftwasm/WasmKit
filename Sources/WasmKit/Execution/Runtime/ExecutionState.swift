@@ -20,6 +20,7 @@ struct ExecutionState {
     }
 }
 
+@_transparent
 func withExecution<Return>(_ body: (inout ExecutionState) throws -> Return) rethrows -> Return {
     try withUnsafeTemporaryAllocation(of: Instruction.self, capacity: 1) { rootISeq in
         rootISeq.baseAddress?.pointee = .endOfExecution
