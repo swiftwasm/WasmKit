@@ -4,10 +4,11 @@ public struct Function: Equatable {
 
     /// Invokes a function of the given address with the given parameters.
     public func invoke(_ arguments: [Value] = [], runtime: Runtime) throws -> [Value] {
-        var execution = ExecutionState()
-        try invoke(execution: &execution, with: arguments, runtime: runtime)
-        try execution.run(runtime: runtime)
-        return try Array(execution.stack.popTopValues())
+        try withExecution { execution in
+            try invoke(execution: &execution, with: arguments, runtime: runtime)
+            try execution.run(runtime: runtime)
+            return try Array(execution.stack.popTopValues())
+        }
     }
 
     private func invoke(execution: inout ExecutionState, with arguments: [Value], runtime: Runtime) throws {

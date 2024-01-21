@@ -7,17 +7,31 @@ typealias ProgramCounter = UnsafePointer<Instruction>
 struct ExecutionState {
     var stack = Stack()
     /// Index of an instruction to be executed in the current function.
-    var programCounter: ProgramCounter!
+    var programCounter: ProgramCounter
+    var reachedEndOfExecution: Bool = false
 
     var isStackEmpty: Bool {
         stack.isEmpty
+    }
+
+    fileprivate init(stack: Stack = Stack(), programCounter: ProgramCounter) {
+        self.stack = stack
+        self.programCounter = programCounter
+    }
+}
+
+func withExecution<Return>(_ body: (inout ExecutionState) throws -> Return) rethrows -> Return {
+    try [Instruction.endOfExecution].withUnsafeBufferPointer {
+        // NOTE: unwinding a function jump into previous frame's PC + 1, so initial PC is -1ed
+        var execution = ExecutionState(programCounter: $0.baseAddress! - 1)
+        return try body(&execution)
     }
 }
 
 extension ExecutionState: CustomStringConvertible {
     var description: String {
-        var result = "======== PC=\(programCounter?.debugDescription ?? "null") =========\n"
-        result += "\n\(stack.debugDescription)"
+        var result = "======== PC=\(programCounter) =========\n"
+        result += "\(stack.debugDescription)"
 
         return result
     }
@@ -67,15 +81,15 @@ extension ExecutionState {
                 module: function.module,
                 argc: function.type.parameters.count,
                 defaultLocals: function.code.defaultLocals,
-                returnPC: programCounter?.advanced(by: 1),
+                returnPC: programCounter.advanced(by: 1),
                 address: address
             )
-            programCounter = expression.instructions.baseAddress!
+            programCounter = expression.baseAddress
         }
     }
 
     mutating func run(runtime: Runtime) throws {
-        while stack.currentFrame != nil {
+        while !reachedEndOfExecution {
             // Regular path
             var inst: Instruction
             // `doExecute` returns false when current frame *may* be updated

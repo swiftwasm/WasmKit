@@ -108,6 +108,10 @@ extension ExecutionState {
         try self.endOfFunction(runtime: runtime, currentFrame: stack.currentFrame)
     }
 
+    mutating func endOfExecution(runtime: Runtime) throws {
+        reachedEndOfExecution = true
+    }
+
     private mutating func endOfFunction(runtime: Runtime, currentFrame: Frame) throws {
         // When reached at "end" of function
 //        if let address = currentFrame.address {

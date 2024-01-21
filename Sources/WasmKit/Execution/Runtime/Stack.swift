@@ -46,7 +46,7 @@ public struct Stack {
         module: ModuleAddress,
         argc: Int,
         defaultLocals: UnsafeBufferPointer<Value>?,
-        returnPC: ProgramCounter?,
+        returnPC: ProgramCounter,
         address: FunctionAddress? = nil
     ) throws {
         // TODO: Stack overflow check can be done at the entry of expression
@@ -292,7 +292,7 @@ public struct Frame {
     let module: ModuleAddress
     let baseStackAddress: BaseStackAddress
     let iseq: InstructionSequence
-    let returnPC: ProgramCounter?
+    let returnPC: ProgramCounter
     /// An optional function address for debugging/profiling purpose
     let address: FunctionAddress?
 
@@ -301,7 +301,7 @@ public struct Frame {
         module: ModuleAddress,
         baseStackAddress: BaseStackAddress,
         iseq: InstructionSequence,
-        returnPC: ProgramCounter?,
+        returnPC: ProgramCounter,
         address: FunctionAddress? = nil
     ) {
         self.arity = arity

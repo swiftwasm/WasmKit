@@ -30,6 +30,10 @@ struct InstructionSequence: Equatable {
         instructions.deallocate()
     }
 
+    var baseAddress: UnsafePointer<Instruction> {
+        self.instructions.baseAddress!
+    }
+
     static func == (lhs: InstructionSequence, rhs: InstructionSequence) -> Bool {
         lhs.instructions.baseAddress == rhs.instructions.baseAddress
     }

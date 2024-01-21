@@ -79,22 +79,12 @@ extension Runtime {
                         .tableElementDrop(elementIndex),
                     ])
                     defer { initIseq.deallocate() }
-                    var initExecution = ExecutionState(programCounter: initIseq.instructions.baseAddress)
-                    try initExecution.stack.pushFrame(
-                        iseq: initIseq,
-                        arity: 0, module: instance.selfAddress, argc: 0, defaultLocals: nil, returnPC: nil
-                    )
-                    try initExecution.run(runtime: self)
+                    try evaluateConstExpr(initIseq, instance: instance)
 
                 case .declarative:
                     let initIseq: InstructionSequence = [.tableElementDrop(elementIndex)]
                     defer { initIseq.deallocate() }
-                    var initExecution = ExecutionState(programCounter: initIseq.instructions.baseAddress)
-                    try initExecution.stack.pushFrame(
-                        iseq: initIseq,
-                        arity: 0, module: instance.selfAddress, argc: 0, defaultLocals: nil, returnPC: nil
-                    )
-                    try initExecution.run(runtime: self)
+                    try evaluateConstExpr(initIseq, instance: instance)
 
                 case .passive:
                     continue
@@ -117,12 +107,7 @@ extension Runtime {
                     .memoryDataDrop(UInt32(dataIndex)),
                 ])
                 defer { iseq.deallocate() }
-                var initExecution = ExecutionState(programCounter: iseq.instructions.baseAddress)
-                try initExecution.stack.pushFrame(
-                    iseq: iseq,
-                    arity: 0, module: instance.selfAddress, argc: 0, defaultLocals: nil, returnPC: nil
-                )
-                try initExecution.run(runtime: self)
+                try evaluateConstExpr(iseq, instance: instance)
             }
         } catch Trap.outOfBoundsMemoryAccess {
             throw InstantiationError.outOfBoundsMemoryAccess
@@ -132,9 +117,10 @@ extension Runtime {
 
         // Step 17.
         if let startIndex = module.start {
-            var initExecution = ExecutionState()
-            try initExecution.invoke(functionAddress: instance.functionAddresses[Int(startIndex)], runtime: self)
-            try initExecution.run(runtime: self)
+            try withExecution { initExecution in
+                try initExecution.invoke(functionAddress: instance.functionAddresses[Int(startIndex)], runtime: self)
+                try initExecution.run(runtime: self)
+            }
         }
 
         return instance
@@ -163,17 +149,37 @@ extension Runtime {
             let globalInitializers = try module.globals.map { global in
                 let iseq = InstructionSequence(instructions: global.initializer)
                 defer { iseq.deallocate() }
-                var initExecution = ExecutionState(programCounter: iseq.instructions.baseAddress)
-                try initExecution.stack.pushFrame(
-                    iseq: iseq,
-                    arity: 1, module: globalModuleInstance.selfAddress, argc: 0, defaultLocals: nil, returnPC: nil
-                )
-                try initExecution.run(runtime: self)
-                
-                return try initExecution.stack.popValue()
+                return try evaluateConstExpr(iseq, instance: globalModuleInstance, arity: 1) { initExecution in
+                    return try initExecution.stack.popValue()
+                }
             }
             
             return globalInitializers
+        }
+    }
+
+    func evaluateConstExpr(_ iseq: InstructionSequence, instance: ModuleInstance, arity: Int = 0) throws {
+        try evaluateConstExpr(iseq, instance: instance, arity: arity, body: { _ in })
+    }
+
+    func evaluateConstExpr<T>(
+        _ iseq: InstructionSequence,
+        instance: ModuleInstance,
+        arity: Int = 0,
+        body: (inout ExecutionState) throws -> T
+    ) throws -> T {
+        try withExecution { initExecution in
+            try initExecution.stack.pushFrame(
+                iseq: iseq,
+                arity: arity,
+                module: instance.selfAddress,
+                argc: 0,
+                defaultLocals: nil,
+                returnPC: initExecution.programCounter + 1
+            )
+            initExecution.programCounter = iseq.baseAddress
+            try initExecution.run(runtime: self)
+            return try body(&initExecution)
         }
     }
 }

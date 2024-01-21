@@ -60,6 +60,7 @@ let instructions = [
         Immediate(name: "typeIndex", type: "TypeIndex")
     ]),
     Instruction(name: "endOfFunction", isControl: true, mayUpdateFrame: true, immediates: []),
+    Instruction(name: "endOfExecution", isControl: true, mayUpdateFrame: true, immediates: []),
 ]
 // Memory
 + [

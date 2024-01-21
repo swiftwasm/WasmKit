@@ -48,6 +48,9 @@ extension ExecutionState {
         case .endOfFunction:
             try self.endOfFunction(runtime: runtime)
             return false
+        case .endOfExecution:
+            try self.endOfExecution(runtime: runtime)
+            return false
         case .i32Load(let memarg):
             try self.i32Load(runtime: runtime, memarg: memarg)
         case .i64Load(let memarg):
@@ -180,6 +183,7 @@ extension Instruction {
         case .call: return "call"
         case .callIndirect: return "callIndirect"
         case .endOfFunction: return "endOfFunction"
+        case .endOfExecution: return "endOfExecution"
         case .i32Load: return "i32Load"
         case .i64Load: return "i64Load"
         case .f32Load: return "f32Load"
