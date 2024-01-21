@@ -161,6 +161,38 @@ extension ExecutionState {
             self.f32Ne(runtime: runtime)
         case .f64Ne:
             self.f64Ne(runtime: runtime)
+        case .i32LtS:
+            self.i32LtS(runtime: runtime)
+        case .i64LtS:
+            self.i64LtS(runtime: runtime)
+        case .i32LtU:
+            self.i32LtU(runtime: runtime)
+        case .i64LtU:
+            self.i64LtU(runtime: runtime)
+        case .i32GtS:
+            self.i32GtS(runtime: runtime)
+        case .i64GtS:
+            self.i64GtS(runtime: runtime)
+        case .i32GtU:
+            self.i32GtU(runtime: runtime)
+        case .i64GtU:
+            self.i64GtU(runtime: runtime)
+        case .i32LeS:
+            self.i32LeS(runtime: runtime)
+        case .i64LeS:
+            self.i64LeS(runtime: runtime)
+        case .i32LeU:
+            self.i32LeU(runtime: runtime)
+        case .i64LeU:
+            self.i64LeU(runtime: runtime)
+        case .i32GeS:
+            self.i32GeS(runtime: runtime)
+        case .i64GeS:
+            self.i64GeS(runtime: runtime)
+        case .i32GeU:
+            self.i32GeU(runtime: runtime)
+        case .i64GeU:
+            self.i64GeU(runtime: runtime)
         case .drop:
             self.drop(runtime: runtime)
         case .select:
@@ -277,6 +309,22 @@ extension Instruction {
         case .i64Ne: return "i64Ne"
         case .f32Ne: return "f32Ne"
         case .f64Ne: return "f64Ne"
+        case .i32LtS: return "i32LtS"
+        case .i64LtS: return "i64LtS"
+        case .i32LtU: return "i32LtU"
+        case .i64LtU: return "i64LtU"
+        case .i32GtS: return "i32GtS"
+        case .i64GtS: return "i64GtS"
+        case .i32GtU: return "i32GtU"
+        case .i64GtU: return "i64GtU"
+        case .i32LeS: return "i32LeS"
+        case .i64LeS: return "i64LeS"
+        case .i32LeU: return "i32LeU"
+        case .i64LeU: return "i64LeU"
+        case .i32GeS: return "i32GeS"
+        case .i64GeS: return "i64GeS"
+        case .i32GeU: return "i32GeU"
+        case .i64GeU: return "i64GeU"
         case .drop: return "drop"
         case .select: return "select"
         case .refNull: return "refNull"

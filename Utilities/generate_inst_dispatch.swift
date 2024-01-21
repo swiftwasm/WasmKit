@@ -21,7 +21,18 @@ struct Instruction {
     }
 }
 
-let valueTypes = ["i32", "i64", "f32", "f64"]
+let intValueTypes = ["i32", "i64"]
+let valueTypes = intValueTypes + ["f32", "f64"]
+let numericBinaryInsts: [Instruction] = ["Add", "Sub", "Mul", "Eq", "Ne"].flatMap { op -> [Instruction] in
+    valueTypes.map { type in
+        Instruction(name: "\(type)\(op)", immediates: [])
+    }
+}
+let numericIntBinaryInsts: [Instruction] = ["LtS", "LtU", "GtS", "GtU", "LeS", "LeU", "GeS", "GeU"].flatMap { op -> [Instruction] in
+    intValueTypes.map { type in
+        Instruction(name: "\(type)\(op)", immediates: [])
+    }
+}
 
 let instructions = [
     // Controls
@@ -108,11 +119,9 @@ let instructions = [
     Instruction(name: "numericIntBinary", mayThrow: true, immediates: [Immediate(name: nil, type: "NumericInstruction.IntBinary")]),
     Instruction(name: "numericFloatBinary", immediates: [Immediate(name: nil, type: "NumericInstruction.FloatBinary")]),
     Instruction(name: "numericConversion", mayThrow: true, immediates: [Immediate(name: nil, type: "NumericInstruction.Conversion")]),
-] + ["Add", "Sub", "Mul", "Eq", "Ne"].flatMap { op -> [Instruction] in
-    valueTypes.map { type in
-        Instruction(name: "\(type)\(op)", immediates: [])
-    }
-}
+]
++ numericBinaryInsts
++ numericIntBinaryInsts
 + [
     // Parametric
     Instruction(name: "drop", immediates: []),
@@ -193,10 +202,11 @@ func generatePrototype(instructions: [Instruction]) -> String {
     extension ExecutionState {
     """
     for inst in instructions {
+        let throwsKwd = inst.mayThrow ? " throws" : ""
         if inst.immediates.isEmpty {
             output += """
 
-            mutating func \(inst.name)(runtime: Runtime) throws {
+            mutating func \(inst.name)(runtime: Runtime)\(throwsKwd) {
                 fatalError("Unimplemented instruction: \(inst.name)")
             }
         """
@@ -207,7 +217,7 @@ func generatePrototype(instructions: [Instruction]) -> String {
             }
             output += """
 
-            mutating func \(inst.name)(runtime: Runtime, \(labelTypes.map { "\($0): \($1)" }.joined(separator: ", "))) throws {
+            mutating func \(inst.name)(runtime: Runtime, \(labelTypes.map { "\($0): \($1)" }.joined(separator: ", ")))\(throwsKwd) {
                 fatalError("Unimplemented instruction: \(inst.name)")
             }
         """

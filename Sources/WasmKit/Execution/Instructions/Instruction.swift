@@ -70,6 +70,22 @@ enum Instruction: Equatable {
     case i64Ne
     case f32Ne
     case f64Ne
+    case i32LtS
+    case i64LtS
+    case i32LtU
+    case i64LtU
+    case i32GtS
+    case i64GtS
+    case i32GtU
+    case i64GtU
+    case i32LeS
+    case i64LeS
+    case i32LeU
+    case i64LeU
+    case i32GeS
+    case i64GeS
+    case i32GeU
+    case i64GeU
     case drop
     case select
     case refNull(ReferenceType)

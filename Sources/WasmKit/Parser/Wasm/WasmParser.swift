@@ -499,21 +499,21 @@ extension WasmParser {
         case .i32_ne:
             return .value(.i32Ne)
         case .i32_lt_s:
-            return .value(.numericIntBinary((.ltS(.i32))))
+            return .value(.i32LtS)
         case .i32_lt_u:
-            return .value(.numericIntBinary((.ltU(.i32))))
+            return .value(.i32LtU)
         case .i32_gt_s:
-            return .value(.numericIntBinary((.gtS(.i32))))
+            return .value(.i32GtS)
         case .i32_gt_u:
-            return .value(.numericIntBinary((.gtU(.i32))))
+            return .value(.i32GtU)
         case .i32_le_s:
-            return .value(.numericIntBinary((.leS(.i32))))
+            return .value(.i32LeS)
         case .i32_le_u:
-            return .value(.numericIntBinary((.leU(.i32))))
+            return .value(.i32LeU)
         case .i32_ge_s:
-            return .value(.numericIntBinary((.geS(.i32))))
+            return .value(.i32GeS)
         case .i32_ge_u:
-            return .value(.numericIntBinary((.geU(.i32))))
+            return .value(.i32GeU)
 
         case .i64_eqz:
             return .value(.numericIntUnary((.eqz(.i64))))
@@ -522,21 +522,21 @@ extension WasmParser {
         case .i64_ne:
             return .value(.i64Ne)
         case .i64_lt_s:
-            return .value(.numericIntBinary((.ltS(.i64))))
+            return .value(.i64LtS)
         case .i64_lt_u:
-            return .value(.numericIntBinary((.ltU(.i64))))
+            return .value(.i64LtU)
         case .i64_gt_s:
-            return .value(.numericIntBinary((.gtS(.i64))))
+            return .value(.i64GtS)
         case .i64_gt_u:
-            return .value(.numericIntBinary((.gtU(.i64))))
+            return .value(.i64GtU)
         case .i64_le_s:
-            return .value(.numericIntBinary((.leS(.i64))))
+            return .value(.i64LeS)
         case .i64_le_u:
-            return .value(.numericIntBinary((.leU(.i64))))
+            return .value(.i64LeU)
         case .i64_ge_s:
-            return .value(.numericIntBinary((.geS(.i64))))
+            return .value(.i64GeS)
         case .i64_ge_u:
-            return .value(.numericIntBinary((.geU(.i64))))
+            return .value(.i64GeU)
 
         case .f32_eq:
             return .value(.f32Eq)

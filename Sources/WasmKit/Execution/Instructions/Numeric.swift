@@ -102,6 +102,55 @@ extension ExecutionState {
         numericBinary(castTo: \.f64, binary: { Float64(bitPattern: $0) == Float64(bitPattern: $1) ? false : true })
     }
 
+    mutating func i32LtS(runtime: Runtime) {
+        numericBinary(castTo: \.i32, binary: { $0.signed < $1.signed ? true : false })
+    }
+    mutating func i64LtS(runtime: Runtime) {
+        numericBinary(castTo: \.i64, binary: { $0.signed < $1.signed ? true : false })
+    }
+    mutating func i32LtU(runtime: Runtime) {
+        numericBinary(castTo: \.i32, binary: { $0 < $1 ? true : false })
+    }
+    mutating func i64LtU(runtime: Runtime) {
+        numericBinary(castTo: \.i64, binary: { $0 < $1 ? true : false })
+    }
+    mutating func i32GtS(runtime: Runtime) {
+        numericBinary(castTo: \.i32, binary: { $0.signed > $1.signed ? true : false })
+    }
+    mutating func i64GtS(runtime: Runtime) {
+        numericBinary(castTo: \.i64, binary: { $0.signed > $1.signed ? true : false })
+    }
+    mutating func i32GtU(runtime: Runtime) {
+        numericBinary(castTo: \.i32, binary: { $0 > $1 ? true : false })
+    }
+    mutating func i64GtU(runtime: Runtime) {
+        numericBinary(castTo: \.i64, binary: { $0 > $1 ? true : false })
+    }
+    mutating func i32LeS(runtime: Runtime) {
+        numericBinary(castTo: \.i32, binary: { $0.signed <= $1.signed ? true : false })
+    }
+    mutating func i64LeS(runtime: Runtime) {
+        numericBinary(castTo: \.i64, binary: { $0.signed <= $1.signed ? true : false })
+    }
+    mutating func i32LeU(runtime: Runtime) {
+        numericBinary(castTo: \.i32, binary: { $0 <= $1 ? true : false })
+    }
+    mutating func i64LeU(runtime: Runtime) {
+        numericBinary(castTo: \.i64, binary: { $0 <= $1 ? true : false })
+    }
+    mutating func i32GeS(runtime: Runtime) {
+        numericBinary(castTo: \.i32, binary: { $0.signed >= $1.signed ? true : false })
+    }
+    mutating func i64GeS(runtime: Runtime) {
+        numericBinary(castTo: \.i64, binary: { $0.signed >= $1.signed ? true : false })
+    }
+    mutating func i32GeU(runtime: Runtime) {
+        numericBinary(castTo: \.i32, binary: { $0 >= $1 ? true : false })
+    }
+    mutating func i64GeU(runtime: Runtime) {
+        numericBinary(castTo: \.i64, binary: { $0 >= $1 ? true : false })
+    }
+
     mutating func numericIntBinary(runtime: Runtime, intBinary: NumericInstruction.IntBinary) throws {
         let value2 = stack.popValue()
         let value1 = stack.popValue()
@@ -261,16 +310,6 @@ extension NumericInstruction {
         case rotl(IntValueType)
         case rotr(IntValueType)
 
-        // irelop
-        case ltS(IntValueType)
-        case ltU(IntValueType)
-        case gtS(IntValueType)
-        case gtU(IntValueType)
-        case leS(IntValueType)
-        case leU(IntValueType)
-        case geS(IntValueType)
-        case geU(IntValueType)
-
         var type: NumericType {
             switch self {
             case let .divS(type),
@@ -284,15 +323,7 @@ extension NumericInstruction {
                 let .shrS(type),
                 let .shrU(type),
                 let .rotl(type),
-                let .rotr(type),
-                let .ltS(type),
-                let .ltU(type),
-                let .gtS(type),
-                let .gtU(type),
-                let .leS(type),
-                let .leU(type),
-                let .geS(type),
-                let .geU(type):
+                let .rotr(type):
                 return .int(type)
             }
         }
@@ -334,43 +365,6 @@ extension NumericInstruction {
                 return value1.rotl(value2)
             case (.rotr, _):
                 return value1.rotr(value2)
-
-            case (.ltS, .int(.i32)):
-                return value1.i32.signed < value2.i32.signed ? true : false
-            case (.ltU, .int(.i32)):
-                return value1.i32 < value2.i32 ? true : false
-            case (.gtS, .int(.i32)):
-                return value1.i32.signed > value2.i32.signed ? true : false
-            case (.gtU, .int(.i32)):
-                return value1.i32 > value2.i32 ? true : false
-            case (.leS, .int(.i32)):
-                return value1.i32.signed <= value2.i32.signed ? true : false
-            case (.leU, .int(.i32)):
-                return value1.i32 <= value2.i32 ? true : false
-            case (.geS, .int(.i32)):
-                return value1.i32.signed >= value2.i32.signed ? true : false
-            case (.geU, .int(.i32)):
-                return value1.i32 >= value2.i32 ? true : false
-
-            case (.ltS, .int(.i64)):
-                return value1.i64.signed < value2.i64.signed ? true : false
-            case (.ltU, .int(.i64)):
-                return value1.i64 < value2.i64 ? true : false
-            case (.gtS, .int(.i64)):
-                return value1.i64.signed > value2.i64.signed ? true : false
-            case (.gtU, .int(.i64)):
-                return value1.i64 > value2.i64 ? true : false
-            case (.leS, .int(.i64)):
-                return value1.i64.signed <= value2.i64.signed ? true : false
-            case (.leU, .int(.i64)):
-                return value1.i64 <= value2.i64 ? true : false
-            case (.geS, .int(.i64)):
-                return value1.i64.signed >= value2.i64.signed ? true : false
-            case (.geU, .int(.i64)):
-                return value1.i64 >= value2.i64 ? true : false
-
-            default:
-                fatalError("Invalid type \(type) for instruction \(self)")
             }
         }
     }
