@@ -7,12 +7,15 @@ struct Immediate {
 struct Instruction {
     let name: String
     let isControl: Bool
+    let mayUpdateFrame: Bool
     let immediates: [Immediate]
 
-    init(name: String, isControl: Bool = false, immediates: [Immediate]) {
+    init(name: String, isControl: Bool = false, mayUpdateFrame: Bool = false, immediates: [Immediate]) {
         self.name = name
         self.isControl = isControl
+        self.mayUpdateFrame = mayUpdateFrame
         self.immediates = immediates
+        assert(isControl || !mayUpdateFrame, "non-control instruction should not update frame")
     }
 }
 
@@ -38,24 +41,25 @@ let instructions = [
     ]),
     Instruction(name: "end", isControl: true, immediates: []),
     Instruction(name: "`else`", isControl: true, immediates: []),
-    Instruction(name: "br", isControl: true, immediates: [
+    // NOTE: A branch can unwind a frame by "br 0"
+    Instruction(name: "br", isControl: true, mayUpdateFrame: true, immediates: [
         Immediate(name: "labelIndex", type: "LabelIndex")
     ]),
-    Instruction(name: "brIf", isControl: true, immediates: [
+    Instruction(name: "brIf", isControl: true, mayUpdateFrame: true, immediates: [
         Immediate(name: "labelIndex", type: "LabelIndex")
     ]),
-    Instruction(name: "brTable", isControl: true, immediates: [
+    Instruction(name: "brTable", isControl: true, mayUpdateFrame: true, immediates: [
         Immediate(name: nil, type: "BrTable"),
     ]),
-    Instruction(name: "`return`", isControl: true, immediates: []),
-    Instruction(name: "call", isControl: true, immediates: [
+    Instruction(name: "`return`", isControl: true, mayUpdateFrame: true, immediates: []),
+    Instruction(name: "call", isControl: true, mayUpdateFrame: true, immediates: [
         Immediate(name: "functionIndex", type: "UInt32")
     ]),
-    Instruction(name: "callIndirect", isControl: true, immediates: [
+    Instruction(name: "callIndirect", isControl: true, mayUpdateFrame: true, immediates: [
         Immediate(name: "tableIndex", type: "TableIndex"),
         Immediate(name: "typeIndex", type: "TypeIndex")
     ]),
-    Instruction(name: "endOfFunction", isControl: true, immediates: []),
+    Instruction(name: "endOfFunction", isControl: true, mayUpdateFrame: true, immediates: []),
 ]
 // Memory
 + [
@@ -133,7 +137,7 @@ func generateDispatcher(instructions: [Instruction]) -> String {
     var output = """
     extension ExecutionState {
         @_transparent
-        mutating func doExecute(_ instruction: Instruction, runtime: Runtime) throws {
+        mutating func doExecute(_ instruction: Instruction, runtime: Runtime) throws -> Bool {
             switch instruction {
     """
 
@@ -157,7 +161,7 @@ func generateDispatcher(instructions: [Instruction]) -> String {
         if inst.isControl {
             output += """
 
-                        return
+                        return \(!inst.mayUpdateFrame)
             """
         }
     }
@@ -165,6 +169,7 @@ func generateDispatcher(instructions: [Instruction]) -> String {
 
             }
             programCounter += 1
+            return true
         }
     }
     """

@@ -75,8 +75,11 @@ extension ExecutionState {
     mutating func run(runtime: Runtime) throws {
         while let frame = stack.currentFrame {
             // Regular path
-            let inst = frame.iseq.instructions[programCounter]
-            try doExecute(inst, runtime: runtime)
+            var inst: Instruction
+            // `doExecute` returns false when current frame *may* be updated
+            repeat {
+                inst = frame.iseq.instructions[programCounter]
+            } while try doExecute(inst, runtime: runtime)
         }
     }
 
