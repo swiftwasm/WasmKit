@@ -76,6 +76,7 @@ public enum WasmParserError: Swift.Error {
     case dataCountSectionRequired
     case malformedLimit(UInt8)
     case malformedIndirectCall
+    case invalidTypeSectionReference
 }
 
 /// > Note:
@@ -323,7 +324,7 @@ extension WasmParser {
         case multiValue([Instruction])
     }
 
-    func parseInstruction() throws -> ParseInstructionResult {
+    func parseInstruction(typeSection: [FunctionType]?) throws -> ParseInstructionResult {
         let rawCode = try stream.consumeAny()
         guard let code = InstructionCode(rawValue: rawCode) else {
             throw WasmParserError.illegalOpcode(rawCode)
@@ -337,11 +338,13 @@ extension WasmParser {
         case .block:
             let type = try parseResultType()
             return .requestExpression { expr, _ in
+                let type = try type.arity(typeSection: typeSection)
                 return .multiValue([.block(endRef: ExpressionRef(expr.count + 1 + 1), type: type)] + expr + [.end])
             }
         case .loop:
             let type = try parseResultType()
             return .requestExpression { expr, _ in
+                let type = try type.arity(typeSection: typeSection)
                 return .multiValue([.loop(type: type)] + expr + [.end])
             }
         case .if:
@@ -350,6 +353,7 @@ extension WasmParser {
                 switch end {
                 case .else:
                     return .requestExpression { (elseExpr: [Instruction], end2: PseudoInstruction) -> ParseInstructionResult in
+                        let type = try type.arity(typeSection: typeSection)
                         let control = Instruction.ifThenElse(
                             elseRef: ExpressionRef(thenExpr.count + 1 + 1),
                             endRef: ExpressionRef(thenExpr.count + 1 + elseExpr.count + 1 + 1),
@@ -358,6 +362,7 @@ extension WasmParser {
                         return .multiValue([control] + thenExpr + [.else] + elseExpr + [.end])
                     }
                 case .end:
+                    let type = try type.arity(typeSection: typeSection)
                     let control = Instruction.ifThen(endRef: ExpressionRef(thenExpr.count + 2), type: type)
                     return .multiValue([control] + thenExpr + [.end])
                 }
@@ -861,7 +866,7 @@ extension WasmParser {
         }
     }
 
-    func parseExpression() throws -> (result: Expression, end: PseudoInstruction) {
+    func parseExpression(typeSection: [FunctionType]? = nil) throws -> (result: Expression, end: PseudoInstruction) {
         typealias PendingWork = (
             instructions: [Instruction],
             resume: ([Instruction], PseudoInstruction) throws -> ParseInstructionResult
@@ -869,7 +874,10 @@ extension WasmParser {
         var pendingWorks: [PendingWork] = []
         var instructions: [Instruction] = []
 
-        var nextResult = try parseInstruction()
+        func parseSingleInst() throws -> ParseInstructionResult {
+            return try parseInstruction(typeSection: typeSection)
+        }
+        var nextResult = try parseSingleInst()
 
         while true {
             switch nextResult {
@@ -886,21 +894,21 @@ extension WasmParser {
                 }
             case let .value(nextInstruction):
                 instructions.append(nextInstruction)
-                nextResult = try parseInstruction()
+                nextResult = try parseSingleInst()
             case let .multiValue(nextInsts):
                 instructions.append(contentsOf: nextInsts)
-                nextResult = try parseInstruction()
+                nextResult = try parseSingleInst()
             case let .requestExpression(resume):
                 // If nested expression is requested, stop parsing the current expression
                 // and start parsing the nested one
                 pendingWorks.append((instructions, resume))
                 instructions = []
-                nextResult = try parseInstruction()
+                nextResult = try parseSingleInst()
             }
         }
     }
-    func parseInstructionSequence() throws -> (result: InstructionSequence, end: PseudoInstruction) {
-        let (instructions, end) = try parseExpression()
+    func parseInstructionSequence(typeSection: [FunctionType]) throws -> (result: InstructionSequence, end: PseudoInstruction) {
+        let (instructions, end) = try parseExpression(typeSection: typeSection)
         return (InstructionSequence(instructions: instructions), end)
     }
 }
@@ -1280,10 +1288,10 @@ extension WasmParser {
         let functions = codes.enumerated().map { [hasDataCount, features] index, code in
             GuestFunction(
                 type: typeIndices[index], locals: code.locals,
-                body: {
+                body: { [types = module.types] in
                     let stream = StaticByteStream(bytes: Array(code.expression))
                     let parser = WasmParser<StaticByteStream>(stream: stream, features: features, hasDataCount: hasDataCount)
-                    let (result, end) = try parser.parseInstructionSequence()
+                    let (result, end) = try parser.parseInstructionSequence(typeSection: types)
                     guard end == .end else {
                         throw WasmParserError.endOpcodeExpected
                     }

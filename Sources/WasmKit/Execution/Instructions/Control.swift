@@ -10,33 +10,38 @@ extension ExecutionState {
     private func getTypeSection(store: Store) -> [FunctionType] {
         store.module(address: stack.currentFrame.module).types
     }
-    mutating func block(runtime: Runtime, endRef: ExpressionRef, type: ResultType) throws {
-        let (paramSize, resultSize) = type.arity(typeSection: { getTypeSection(store: runtime.store) })
-        enter(jumpTo: programCounter + 1, continuation: programCounter + endRef.relativeOffset, arity: resultSize, pushPopValues: paramSize)
+
+    typealias BlockType = Instruction.BlockType
+
+    mutating func block(runtime: Runtime, endRef: ExpressionRef, type: BlockType) throws {
+        enter(
+            jumpTo: programCounter + 1,
+            continuation: programCounter + endRef.relativeOffset,
+            arity: Int(type.results),
+            pushPopValues: Int(type.parameters)
+        )
     }
-    mutating func loop(runtime: Runtime, type: ResultType) throws {
-        let (paramSize, _) = type.arity(typeSection: { getTypeSection(store: runtime.store) })
+    mutating func loop(runtime: Runtime, type: BlockType) throws {
+        let paramSize = Int(type.parameters)
         enter(jumpTo: programCounter + 1, continuation: programCounter, arity: paramSize, pushPopValues: paramSize)
     }
 
-    mutating func ifThen(runtime: Runtime, endRef: ExpressionRef, type: ResultType) throws {
+    mutating func ifThen(runtime: Runtime, endRef: ExpressionRef, type: BlockType) throws {
         let isTrue = try stack.popValue().i32 != 0
-        let (paramSize, resultSize) = type.arity(typeSection: { getTypeSection(store: runtime.store) })
         if isTrue {
             enter(
                 jumpTo: programCounter + 1,
                 continuation: programCounter.advanced(by: endRef.relativeOffset),
-                arity: resultSize,
-                pushPopValues: paramSize
+                arity: Int(type.results),
+                pushPopValues: Int(type.parameters)
             )
         } else {
             programCounter += endRef.relativeOffset
         }
     }
 
-    mutating func ifThenElse(runtime: Runtime, elseRef: ExpressionRef, endRef: ExpressionRef, type: ResultType) throws {
+    mutating func ifThenElse(runtime: Runtime, elseRef: ExpressionRef, endRef: ExpressionRef, type: BlockType) throws {
         let isTrue = try stack.popValue().i32 != 0
-        let (paramSize, resultSize) = type.arity(typeSection: { getTypeSection(store: runtime.store) })
         let addendToPC: Int
         if isTrue {
             addendToPC = 1
@@ -46,8 +51,8 @@ extension ExecutionState {
         enter(
             jumpTo: programCounter + addendToPC,
             continuation: programCounter + endRef.relativeOffset,
-            arity: resultSize,
-            pushPopValues: paramSize
+            arity: Int(type.results),
+            pushPopValues: Int(type.parameters)
         )
     }
     mutating func end(runtime: Runtime) throws {

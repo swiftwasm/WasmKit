@@ -1,10 +1,10 @@
 enum Instruction: Equatable {
     case unreachable
     case nop
-    case block(endRef: ExpressionRef, type: ResultType)
-    case loop(type: ResultType)
-    case ifThen(endRef: ExpressionRef, type: ResultType)
-    case ifThenElse(elseRef: ExpressionRef, endRef: ExpressionRef, type: ResultType)
+    case block(endRef: ExpressionRef, type: BlockType)
+    case loop(type: BlockType)
+    case ifThen(endRef: ExpressionRef, type: BlockType)
+    case ifThenElse(elseRef: ExpressionRef, endRef: ExpressionRef, type: BlockType)
     case end
     case `else`
     case br(labelIndex: LabelIndex)

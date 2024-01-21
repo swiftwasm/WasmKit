@@ -25,19 +25,19 @@ let instructions = [
     Instruction(name: "nop", isControl: true, immediates: []),
     Instruction(name: "block", isControl: true, immediates: [
         Immediate(name: "endRef", type: "ExpressionRef"),
-        Immediate(name: "type", type: "ResultType")
+        Immediate(name: "type", type: "BlockType")
     ]),
     Instruction(name: "loop", isControl: true, immediates: [
-        Immediate(name: "type", type: "ResultType")
+        Immediate(name: "type", type: "BlockType")
     ]),
     Instruction(name: "ifThen", isControl: true, immediates: [
         Immediate(name: "endRef", type: "ExpressionRef"),
-        Immediate(name: "type", type: "ResultType")
+        Immediate(name: "type", type: "BlockType")
     ]),
     Instruction(name: "ifThenElse", isControl: true, immediates: [
         Immediate(name: "elseRef", type: "ExpressionRef"),
         Immediate(name: "endRef", type: "ExpressionRef"),
-        Immediate(name: "type", type: "ResultType")
+        Immediate(name: "type", type: "BlockType")
     ]),
     Instruction(name: "end", isControl: true, immediates: []),
     Instruction(name: "`else`", isControl: true, immediates: []),

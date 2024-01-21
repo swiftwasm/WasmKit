@@ -4,6 +4,11 @@ extension Instruction {
         let align: UInt32
     }
 
+    struct BlockType: Equatable {
+        let parameters: UInt16
+        let results: UInt16
+    }
+
     struct BrTable: Equatable {
         let labelIndices: UnsafeBufferPointer<LabelIndex>
         let defaultIndex: LabelIndex
