@@ -218,41 +218,41 @@ extension ValueStack: Sequence {
 
 struct FixedSizeStack<Element> {
     private let buffer: UnsafeMutableBufferPointer<Element>
-    private var nextPointer: UnsafeMutablePointer<Element>
+    private var numberOfElements: Int = 0
 
     var isEmpty: Bool {
-        nextPointer == buffer.baseAddress
+        numberOfElements == 0
     }
 
-    var count: Int { nextPointer - buffer.baseAddress! }
+    var count: Int { numberOfElements }
 
     init(capacity: Int) {
         self.buffer = .allocate(capacity: capacity)
-        self.nextPointer = self.buffer.baseAddress!
     }
 
     mutating func push(_ element: Element) {
-        self.nextPointer.pointee = element
-        self.nextPointer = self.nextPointer.advanced(by: 1)
+        self.buffer[numberOfElements] = element
+        self.numberOfElements += 1
     }
 
     @discardableResult
     mutating func pop() -> Element {
-        self.nextPointer = self.nextPointer.advanced(by: -1)
-        return self.nextPointer.pointee
+        let element = self.buffer[self.numberOfElements - 1]
+        self.numberOfElements -= 1
+        return element
     }
 
     mutating func pop(_ n: Int) {
-        self.nextPointer = self.nextPointer.advanced(by: -n)
+        self.numberOfElements -= n
     }
 
     mutating func popAll() {
-        self.nextPointer = self.buffer.baseAddress!
+        self.numberOfElements = 0
     }
 
     func peek() -> Element! {
-        guard self.count > 0 else { return nil }
-        return self.nextPointer.advanced(by: -1).pointee
+        guard self.numberOfElements > 0 else { return nil }
+        return self.buffer[self.numberOfElements - 1]
     }
 
     subscript(_ index: Int) -> Element {
@@ -262,7 +262,7 @@ struct FixedSizeStack<Element> {
 
 extension FixedSizeStack: Sequence {
     func makeIterator() -> some IteratorProtocol<Element> {
-        self.buffer[..<count].makeIterator()
+        self.buffer[..<numberOfElements].makeIterator()
     }
 }
 
