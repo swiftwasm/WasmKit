@@ -142,11 +142,12 @@ public struct Stack {
 
 struct ValueStack {
     private let values: UnsafeMutableBufferPointer<Value>
-    private var numberOfValues: Int = 0
+    private var nextPointer: UnsafeMutablePointer<Value>
     private let capacity: Int
 
     init(capacity: Int) {
         self.values = .allocate(capacity: capacity)
+        self.nextPointer = self.values.baseAddress!
         self.capacity = capacity
     }
 
@@ -154,10 +155,10 @@ struct ValueStack {
         self.values.deallocate()
     }
 
-    var count: Int { numberOfValues }
+    var count: Int { nextPointer - values.baseAddress! }
 
     var topValue: Value {
-        values[numberOfValues - 1]
+        nextPointer.advanced(by: -1).pointee
     }
 
     subscript(_ index: Int) -> Value {
@@ -168,8 +169,8 @@ struct ValueStack {
     }
 
     mutating func push(value: Value) {
-        self.values[self.numberOfValues] = value
-        self.numberOfValues &+= 1
+        self.nextPointer.pointee = value
+        self.nextPointer = self.nextPointer.advanced(by: 1)
     }
 
     mutating func push(values: [Value]) {
@@ -180,38 +181,38 @@ struct ValueStack {
 
     mutating func push(values copyingBuffer: UnsafeBufferPointer<Value>) {
         let rawBuffer = UnsafeMutableRawBufferPointer(
-            start: self.values.baseAddress!.advanced(by: numberOfValues),
-            count: MemoryLayout<Value>.stride * values.count
+            start: self.nextPointer,
+            count: MemoryLayout<Value>.stride * copyingBuffer.count
         )
         rawBuffer.copyMemory(from: UnsafeRawBufferPointer(copyingBuffer))
-        self.numberOfValues &+= copyingBuffer.count
+        self.nextPointer = nextPointer.advanced(by: copyingBuffer.count)
     }
 
     mutating func popValue() -> Value {
         // TODO: Check too many pop
-        let value = self.values[self.numberOfValues-1]
-        self.numberOfValues &-= 1
+        self.nextPointer = nextPointer.advanced(by: -1)
+        let value = self.nextPointer.pointee
         return value
     }
 
     mutating func truncate(length: Int) {
-        self.numberOfValues = length
+        self.nextPointer = self.values.baseAddress!.advanced(by: length)
     }
     mutating func popValues(count: Int) -> Array<Value> {
         guard count > 0 else { return [] }
         var values = [Value]()
         values.reserveCapacity(count)
-        for idx in self.numberOfValues-count..<self.numberOfValues {
+        for idx in self.count-count..<self.count {
             values.append(self.values[idx])
         }
-        self.numberOfValues &-= count
+        self.nextPointer = self.nextPointer.advanced(by: -count)
         return values
     }
 }
 
 extension ValueStack: Sequence {
     func makeIterator() -> some IteratorProtocol {
-        self.values[..<numberOfValues].makeIterator()
+        self.values[..<count].makeIterator()
     }
 }
 
