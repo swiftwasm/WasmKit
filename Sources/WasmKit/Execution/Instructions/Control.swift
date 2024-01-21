@@ -10,29 +10,56 @@ extension ExecutionState {
     private func getTypeSection(store: Store) -> [FunctionType] {
         store.module(address: stack.currentFrame.module).types
     }
-    mutating func block(runtime: Runtime, expression: Expression, type: ResultType) throws {
+    mutating func block(runtime: Runtime, endRef: ExpressionRef, type: ResultType) throws {
         let (paramSize, resultSize) = type.arity(typeSection: { getTypeSection(store: runtime.store) })
-        enter(expression, continuation: programCounter + 1, arity: resultSize, pushPopValues: paramSize)
+        enter(jumpTo: programCounter + 1, continuation: programCounter + endRef.relativeOffset, arity: resultSize, pushPopValues: paramSize)
     }
-    mutating func loop(runtime: Runtime, expression: Expression, type: ResultType) throws {
+    mutating func loop(runtime: Runtime, type: ResultType) throws {
         let (paramSize, _) = type.arity(typeSection: { getTypeSection(store: runtime.store) })
-        enter(expression, continuation: programCounter, arity: paramSize, pushPopValues: paramSize)
+        enter(jumpTo: programCounter + 1, continuation: programCounter, arity: paramSize, pushPopValues: paramSize)
     }
-    mutating func `if`(runtime: Runtime, thenExpr: Expression, elseExpr: Expression, type: ResultType) throws {
+
+    mutating func ifThen(runtime: Runtime, endRef: ExpressionRef, type: ResultType) throws {
         let isTrue = try stack.popValue().i32 != 0
-
-        let expression: Expression
+        let (paramSize, resultSize) = type.arity(typeSection: { getTypeSection(store: runtime.store) })
         if isTrue {
-            expression = thenExpr
+            enter(
+                jumpTo: programCounter + 1,
+                continuation: programCounter + endRef.relativeOffset,
+                arity: resultSize,
+                pushPopValues: paramSize
+            )
         } else {
-            expression = elseExpr
+            programCounter += endRef.relativeOffset
         }
+    }
 
-        if !expression.instructions.isEmpty {
-            try block(runtime: runtime, expression: expression, type: type)
+    mutating func ifThenElse(runtime: Runtime, elseRef: ExpressionRef, endRef: ExpressionRef, type: ResultType) throws {
+        let isTrue = try stack.popValue().i32 != 0
+        let (paramSize, resultSize) = type.arity(typeSection: { getTypeSection(store: runtime.store) })
+        let addendToPC: Int
+        if isTrue {
+            addendToPC = 1
         } else {
-            programCounter += 1
+            addendToPC = elseRef.relativeOffset
         }
+        enter(
+            jumpTo: programCounter + addendToPC,
+            continuation: programCounter + endRef.relativeOffset,
+            arity: resultSize,
+            pushPopValues: paramSize
+        )
+    }
+    mutating func end(runtime: Runtime) throws {
+        if let currentLabel = self.stack.currentLabel {
+            stack.exit(label: currentLabel)
+        }
+        programCounter += 1
+    }
+    mutating func `else`(runtime: Runtime) throws {
+        let label = self.stack.currentLabel!
+        stack.exit(label: label)
+        programCounter = label.continuation // if-then-else's continuation points the "end"
     }
     mutating func br(runtime: Runtime, labelIndex: LabelIndex) throws {
         try branch(labelIndex: Int(labelIndex))
@@ -59,10 +86,8 @@ extension ExecutionState {
     }
     mutating func `return`(runtime: Runtime) throws {
         let currentFrame = stack.currentFrame!
-        let lastLabel = stack.exit(frame: currentFrame)
-        if let lastLabel {
-            programCounter = lastLabel.continuation
-        }
+        _ = stack.exit(frame: currentFrame)
+        programCounter = currentFrame.iseq.instructions.count
     }
     mutating func call(runtime: Runtime, functionIndex: UInt32) throws {
         let functionAddresses = runtime.store.module(address: stack.currentFrame.module).functionAddresses

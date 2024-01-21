@@ -13,10 +13,7 @@ enum PseudoInstruction {
     case end
 }
 
-/// > Note:
-/// <https://webassembly.github.io/spec/core/syntax/instructions.html#expressions>
-struct Expression: Equatable {
-    /// Note that `end` or `else` pseudo instructions are omitted in this array
+struct InstructionSequence: Equatable {
     let instructions: UnsafeBufferPointer<Instruction>
 
     init(instructions: [Instruction]) {
@@ -27,10 +24,23 @@ struct Expression: Equatable {
         }
         self.instructions = UnsafeBufferPointer(buffer)
     }
-    static func == (lhs: Expression, rhs: Expression) -> Bool {
+    static func == (lhs: InstructionSequence, rhs: InstructionSequence) -> Bool {
         lhs.instructions.baseAddress == rhs.instructions.baseAddress
     }
 }
+
+struct ExpressionRef: Equatable {
+    let relativeOffset: Int
+
+    init(_ relativeOffset: Int) {
+        self.relativeOffset = relativeOffset
+    }
+}
+
+/// > Note:
+/// <https://webassembly.github.io/spec/core/syntax/instructions.html#expressions>
+
+typealias Expression = InstructionSequence
 
 extension Expression: ExpressibleByArrayLiteral {
     init(arrayLiteral elements: Instruction...) {

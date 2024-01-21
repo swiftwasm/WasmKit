@@ -23,6 +23,12 @@ extension ExecutionState: CustomStringConvertible {
 
 extension ExecutionState {
     mutating func branch(labelIndex: Int) throws {
+        if stack.numberOfLabelsInCurrentFrame() == labelIndex {
+            let currentFrame = stack.currentFrame!
+            _ = stack.exit(frame: currentFrame)
+            programCounter = currentFrame.iseq.instructions.count
+            return
+        }
         let label = try stack.getLabel(index: Int(labelIndex))
         let values = stack.popValues(count: label.arity)
 
@@ -35,23 +41,20 @@ extension ExecutionState {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/instructions.html#entering-xref-syntax-instructions-syntax-instr-mathit-instr-ast-with-label-l>
     @inline(__always)
-    mutating func enter(_ expression: Expression, continuation: Int, arity: Int, pushPopValues: Int = 0) {
-        let exit = programCounter + 1
-        let label = stack.pushLabel(
+    mutating func enter(jumpTo targetPC: Int, continuation: Int, arity: Int, pushPopValues: Int = 0) {
+        stack.pushLabel(
             arity: arity,
-            expression: expression,
             continuation: continuation,
-            exit: exit,
             popPushValues: pushPopValues
         )
-        programCounter = label.expression.instructions.startIndex
+        programCounter = targetPC
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/instructions.html#exiting-xref-syntax-instructions-syntax-instr-mathit-instr-ast-with-label-l>
     mutating func exit(label: Label) throws {
         stack.exit(label: label)
-        programCounter = label.exit
+        programCounter += 1
     }
 
     /// > Note:
@@ -73,43 +76,34 @@ extension ExecutionState {
 
             let arity = function.type.results.count
             try stack.pushFrame(
+                iseq: expression,
                 arity: arity,
                 module: function.module,
                 argc: function.type.parameters.count,
                 defaultLocals: function.code.defaultLocals,
+                returnPC: programCounter + 1,
                 address: address
             )
-
-            self.enter(
-                expression, continuation: programCounter + 1,
-                arity: arity
-            )
-        }
-    }
-
-    mutating func step(runtime: Runtime) throws {
-        if let label = stack.currentLabel, stack.numberOfLabelsInCurrentFrame() > 0 {
-            if programCounter < label.expression.instructions.count {
-                // Regular path
-                try doExecute(label.expression.instructions[programCounter], runtime: runtime)
-            } else {
-                // When reached at "end" of "block" or "loop"
-                try self.exit(label: label)
-            }
-        } else {
-            // When reached at "end" of function
-            if let address = stack.currentFrame.address {
-                runtime.interceptor?.onExitFunction(address, store: runtime.store)
-            }
-            let values = stack.popValues(count: stack.currentFrame.arity)
-            try stack.popFrame()
-            stack.push(values: values)
+            programCounter = 0
         }
     }
 
     mutating func run(runtime: Runtime) throws {
-        while stack.currentFrame != nil {
-            try step(runtime: runtime)
+        while let frame = stack.currentFrame {
+            if programCounter < frame.iseq.instructions.count {
+                // Regular path
+                let inst = frame.iseq.instructions[programCounter]
+                try doExecute(inst, runtime: runtime)
+            } else {
+                // When reached at "end" of function
+                if let address = frame.address {
+                    runtime.interceptor?.onExitFunction(address, store: runtime.store)
+                }
+                let values = stack.popValues(count: frame.arity)
+                try stack.popFrame()
+                stack.push(values: values)
+                programCounter = frame.returnPC
+            }
         }
     }
 

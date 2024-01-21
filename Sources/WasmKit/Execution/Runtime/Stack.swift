@@ -31,20 +31,23 @@ public struct Stack {
     }
 
     @inline(__always)
-    mutating func pushLabel(arity: Int, expression: Expression, continuation: Int, exit: Int, popPushValues: Int = 0) -> Label {
+    mutating func pushLabel(arity: Int, continuation: Int, popPushValues: Int = 0) {
         let label = Label(
             arity: arity,
-            expression: expression,
             continuation: continuation,
-            exit: exit,
             baseValueIndex: self.numberOfValues - popPushValues
         )
         labels.push(label)
-        return label
     }
 
     mutating func pushFrame(
-        arity: Int, module: ModuleAddress, argc: Int, defaultLocals: UnsafeBufferPointer<Value>?, address: FunctionAddress? = nil
+        iseq: InstructionSequence,
+        arity: Int,
+        module: ModuleAddress,
+        argc: Int,
+        defaultLocals: UnsafeBufferPointer<Value>?,
+        returnPC: Int,
+        address: FunctionAddress? = nil
     ) throws {
         // TODO: Stack overflow check can be done at the entry of expression
         guard (frames.count + labels.count + numberOfValues) < limit else {
@@ -60,7 +63,7 @@ public struct Stack {
             valueIndex: self.numberOfValues,
             labelIndex: self.labels.count
         )
-        let frame = Frame(arity: arity, module: module, baseStackAddress: baseStackAddress, address: address)
+        let frame = Frame(arity: arity, module: module, baseStackAddress: baseStackAddress, iseq: iseq, returnPC: returnPC, address: address)
         frames.push(frame)
         self.currentFrame = frame
     }
@@ -89,30 +92,12 @@ public struct Stack {
 
     @discardableResult
     mutating func unwindLabels(upto labelIndex: Int) -> Label? {
-        if self.labels.count == labelIndex + 1 {
-            self.labels.popAll()
-            self.valueStack.truncate(length: 0)
-            return nil
-        }
         // labelIndex = 0 means jumping to the current head label
         let labelToRemove = self.labels[self.labels.count - labelIndex - 1]
         self.labels.pop(labelIndex + 1)
         if self.numberOfValues > labelToRemove.baseValueIndex {
             self.valueStack.truncate(length: labelToRemove.baseValueIndex)
         }
-        return labelToRemove
-    }
-
-    mutating func discardFrameStack(frame: Frame) -> Label? {
-        if frame.baseStackAddress.labelIndex == 0 {
-            // The end of top level execution
-            self.labels.popAll()
-            self.valueStack.truncate(length: 0)
-            return nil
-        }
-        let labelToRemove = self.labels[frame.baseStackAddress.labelIndex]
-        self.labels.pop(self.labels.count - frame.baseStackAddress.labelIndex)
-        self.valueStack.truncate(length: frame.baseStackAddress.valueIndex)
         return labelToRemove
     }
 
@@ -285,13 +270,8 @@ extension FixedSizeStack: Sequence {
 public struct Label: Equatable {
     let arity: Int
 
-    let expression: Expression
-
     /// Index of an instruction to jump to when this label is popped off the stack.
     let continuation: Int
-
-    /// The index after the  of the structured control instruction associated with the label
-    let exit: Int
 
     let baseValueIndex: Int
 }
@@ -311,13 +291,24 @@ public struct Frame {
     let arity: Int
     let module: ModuleAddress
     let baseStackAddress: BaseStackAddress
+    let iseq: InstructionSequence
+    let returnPC: Int
     /// An optional function address for debugging/profiling purpose
     let address: FunctionAddress?
 
-    init(arity: Int, module: ModuleAddress, baseStackAddress: BaseStackAddress, address: FunctionAddress? = nil) {
+    init(
+        arity: Int,
+        module: ModuleAddress,
+        baseStackAddress: BaseStackAddress,
+        iseq: InstructionSequence,
+        returnPC: Int,
+        address: FunctionAddress? = nil
+    ) {
         self.arity = arity
         self.module = module
         self.baseStackAddress = baseStackAddress
+        self.iseq = iseq
+        self.returnPC = returnPC
         self.address = address
     }
 }
@@ -348,7 +339,7 @@ extension Frame: CustomDebugStringConvertible {
 
 extension Label: CustomDebugStringConvertible {
     public var debugDescription: String {
-        "[A=\(arity), E=\(expression), C=\(continuation), X=\(exit), BVI=\(baseValueIndex)]"
+        "[A=\(arity), C=\(continuation), BVI=\(baseValueIndex)]"
     }
 }
 

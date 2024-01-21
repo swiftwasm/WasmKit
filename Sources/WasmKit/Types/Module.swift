@@ -68,7 +68,7 @@ public typealias LabelIndex = UInt32
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#functions>
 struct GuestFunction {
-    init(type: TypeIndex, locals: [ValueType], body: @escaping () throws -> Expression) {
+    init(type: TypeIndex, locals: [ValueType], body: @escaping () throws -> InstructionSequence) {
         self.type = type
         // TODO: Deallocate const default locals after the module is deallocated
         let defaultLocals = UnsafeMutableBufferPointer<Value>.allocate(capacity: locals.count)
@@ -81,9 +81,9 @@ struct GuestFunction {
 
     public let type: TypeIndex
     public let defaultLocals: UnsafeBufferPointer<Value>
-    private var _bodyStorage: Expression? = nil
-    private let materializer: () throws -> Expression
-    var body: Expression {
+    private var _bodyStorage: InstructionSequence? = nil
+    private let materializer: () throws -> InstructionSequence
+    var body: InstructionSequence {
         mutating get throws {
             if let materialized = _bodyStorage {
                 return materialized
@@ -139,7 +139,7 @@ public struct ElementSegment: Equatable {
     }
 
     enum Mode: Equatable {
-        case active(table: TableIndex, offset: Expression)
+        case active(table: TableIndex, offset: InstructionSequence)
         case declarative
         case passive
     }
@@ -154,7 +154,7 @@ public struct ElementSegment: Equatable {
 public enum DataSegment: Equatable {
     public struct Active: Equatable {
         let index: MemoryIndex
-        let offset: Expression
+        let offset: InstructionSequence
         let initializer: ArraySlice<UInt8>
     }
 

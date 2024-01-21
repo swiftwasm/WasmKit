@@ -318,8 +318,9 @@ extension WasmParser {
 
     enum ParseInstructionResult {
         /// The instruction is not fully parsed yet but need expression to continue
-        case requestExpression(resume: (Expression, PseudoInstruction) throws -> ParseInstructionResult)
+        case requestExpression(resume: ([Instruction], PseudoInstruction) throws -> ParseInstructionResult)
         case `value`(Instruction)
+        case multiValue([Instruction])
     }
 
     func parseInstruction() throws -> ParseInstructionResult {
@@ -336,30 +337,35 @@ extension WasmParser {
         case .block:
             let type = try parseResultType()
             return .requestExpression { expr, _ in
-                return .value(.control(.block(expression: expr, type: type)))
+                return .multiValue([.block(endRef: ExpressionRef(expr.count + 1 + 1), type: type)] + expr + [.end])
             }
         case .loop:
             let type = try parseResultType()
             return .requestExpression { expr, _ in
-                return .value(.control(.loop(expression: expr, type: type)))
+                return .multiValue([.loop(type: type)] + expr + [.end])
             }
         case .if:
             let type = try parseResultType()
-            return .requestExpression { then, end in
+            return ParseInstructionResult.requestExpression { (thenExpr: [Instruction], end: PseudoInstruction) -> ParseInstructionResult in
                 switch end {
                 case .else:
-                    return .requestExpression { `else`, _ in
-                        return .value(.control(.if(thenExpr: then, elseExpr: `else`, type: type)))
+                    return .requestExpression { (elseExpr: [Instruction], end2: PseudoInstruction) -> ParseInstructionResult in
+                        let control = Instruction.ifThenElse(
+                            elseRef: ExpressionRef(thenExpr.count + 1 + 1),
+                            endRef: ExpressionRef(thenExpr.count + 1 + elseExpr.count + 1 + 1),
+                            type: type
+                        )
+                        return .multiValue([control] + thenExpr + [.else] + elseExpr + [.end])
                     }
                 case .end:
-                    let `else` = Expression(instructions: [])
-                    return .value(.control(.if(thenExpr: then, elseExpr: `else`, type: type)))
+                    let control = Instruction.ifThen(endRef: ExpressionRef(thenExpr.count + 2), type: type)
+                    return .multiValue([control] + thenExpr + [.end])
                 }
             }
         case .else:
-            return .value(.pseudo(.else))
+            return .value(.else)
         case .end:
-            return .value(.pseudo(.end))
+            return .value(.end)
         case .br:
             let label: UInt32 = try parseUnsigned()
             return .value(.control(.br(labelIndex: label)))
@@ -855,10 +861,10 @@ extension WasmParser {
         }
     }
 
-    func parseExpression() throws -> (result: Expression, end: PseudoInstruction) {
+    func parseInstructionSequence() throws -> (result: InstructionSequence, end: PseudoInstruction) {
         typealias PendingWork = (
             instructions: [Instruction],
-            resume: (Expression, PseudoInstruction) throws -> ParseInstructionResult
+            resume: ([Instruction], PseudoInstruction) throws -> ParseInstructionResult
         )
         var pendingWorks: [PendingWork] = []
         var instructions: [Instruction] = []
@@ -867,19 +873,22 @@ extension WasmParser {
 
         while true {
             switch nextResult {
-            case .value(.pseudo(let end)):
-                let expr = Expression(instructions: instructions)
+            case .value(let end) where end == .end || end == .else:
+                let end: PseudoInstruction = end == .end ? .end : .else
                 if let nextWork = pendingWorks.popLast() {
                     // If there is a pending parse, then restore the parsing
                     // state and resume the rest of the work
+                    nextResult = try nextWork.resume(instructions, end)
                     instructions = nextWork.instructions
-                    nextResult = try nextWork.resume(expr, end)
                 } else {
                     // If no more pending expression, the expression is top-level
-                    return (expr, end)
+                    return (InstructionSequence(instructions: instructions), end)
                 }
             case let .value(nextInstruction):
                 instructions.append(nextInstruction)
+                nextResult = try parseInstruction()
+            case let .multiValue(nextInsts):
+                instructions.append(contentsOf: nextInsts)
                 nextResult = try parseInstruction()
             case let .requestExpression(resume):
                 // If nested expression is requested, stop parsing the current expression
@@ -970,7 +979,7 @@ extension WasmParser {
     func parseGlobalSection() throws -> [Global] {
         return try parseVector {
             let type = try parseGlobalType()
-            let (expression, _) = try parseExpression()
+            let (expression, _) = try parseInstructionSequence()
             return Global(type: type, initializer: expression)
         }
     }
@@ -1034,7 +1043,7 @@ extension WasmParser {
                     table = 0
                 }
 
-                let (offset, _) = try parseExpression()
+                let (offset, _) = try parseInstructionSequence()
                 mode = .active(table: table, offset: offset)
             }
 
@@ -1059,7 +1068,7 @@ extension WasmParser {
             }
 
             if flag.contains(.usesExpressions) {
-                initializer = try parseVector { try parseExpression().result }
+                initializer = try parseVector { try parseInstructionSequence().result }
             } else {
                 initializer = try parseVector {
                     try Expression(
@@ -1105,7 +1114,7 @@ extension WasmParser {
             let kind: UInt32 = try parseUnsigned()
             switch kind {
             case 0:
-                let (offset, _) = try parseExpression()
+                let (offset, _) = try parseInstructionSequence()
                 let initializer = try parseVectorBytes()
                 return .active(.init(index: 0, offset: offset, initializer: initializer))
 
@@ -1114,7 +1123,7 @@ extension WasmParser {
 
             case 2:
                 let index: UInt32 = try parseUnsigned()
-                let (offset, _) = try parseExpression()
+                let (offset, _) = try parseInstructionSequence()
                 let initializer = try parseVectorBytes()
                 return .active(.init(index: index, offset: offset, initializer: initializer))
             default:
@@ -1272,7 +1281,7 @@ extension WasmParser {
                 body: {
                     let stream = StaticByteStream(bytes: Array(code.expression))
                     let parser = WasmParser<StaticByteStream>(stream: stream, features: features, hasDataCount: hasDataCount)
-                    let (result, end) = try parser.parseExpression()
+                    let (result, end) = try parser.parseInstructionSequence()
                     guard end == .end else {
                         throw WasmParserError.endOpcodeExpected
                     }

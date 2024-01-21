@@ -65,27 +65,31 @@ extension Runtime {
         )
 
         // Step 12-13.
-        var initExecution = ExecutionState()
-        try initExecution.stack.pushFrame(arity: 0, module: instance.selfAddress, argc: 0, defaultLocals: nil)
 
         // Steps 14-15.
         do {
             for (elementIndex, element) in module.elements.enumerated() {
                 let elementIndex = UInt32(elementIndex)
-
+                var initExecution = ExecutionState()
                 switch element.mode {
                 case let .active(tableIndex, offsetExpression):
-                    for i in offsetExpression.instructions + [
-                        .numericConst(.i32(0)),
-                        .numericConst(.i32(UInt32(element.initializer.count))),
-                        .tableInit(tableIndex, elementIndex),
-                        .tableElementDrop(elementIndex),
-                    ] {
-                        try initExecution.doExecute(i, runtime: self)
-                    }
+                    try initExecution.stack.pushFrame(
+                        iseq: InstructionSequence(instructions: offsetExpression.instructions + [
+                            .numericConst(.i32(0)),
+                            .numericConst(.i32(UInt32(element.initializer.count))),
+                            .tableInit(tableIndex, elementIndex),
+                            .tableElementDrop(elementIndex),
+                        ]),
+                        arity: 0, module: instance.selfAddress, argc: 0, defaultLocals: nil, returnPC: 0
+                    )
+                    try initExecution.run(runtime: self)
 
                 case .declarative:
-                    try initExecution.doExecute(.tableElementDrop(elementIndex), runtime: self)
+                    try initExecution.stack.pushFrame(
+                        iseq: [.tableElementDrop(elementIndex)],
+                        arity: 0, module: instance.selfAddress, argc: 0, defaultLocals: nil, returnPC: 0
+                    )
+                    try initExecution.run(runtime: self)
 
                 case .passive:
                     continue
@@ -101,15 +105,17 @@ extension Runtime {
         do {
             for case let (dataIndex, .active(data)) in module.data.enumerated() {
                 assert(data.index == 0)
-
-                for i in data.offset.instructions + [
-                    .numericConst(.i32(0)),
-                    .numericConst(.i32(UInt32(data.initializer.count))),
-                    .memoryInit(UInt32(dataIndex)),
-                    .memoryDataDrop(UInt32(dataIndex)),
-                ] {
-                    try initExecution.doExecute(i, runtime: self)
-                }
+                var initExecution = ExecutionState()
+                try initExecution.stack.pushFrame(
+                    iseq: InstructionSequence(instructions: data.offset.instructions + [
+                        .numericConst(.i32(0)),
+                        .numericConst(.i32(UInt32(data.initializer.count))),
+                        .memoryInit(UInt32(dataIndex)),
+                        .memoryDataDrop(UInt32(dataIndex)),
+                    ]),
+                    arity: 0, module: instance.selfAddress, argc: 0, defaultLocals: nil, returnPC: 0
+                )
+                try initExecution.run(runtime: self)
             }
         } catch Trap.outOfBoundsMemoryAccess {
             throw InstantiationError.outOfBoundsMemoryAccess
@@ -117,14 +123,11 @@ extension Runtime {
             throw error
         }
 
-        try initExecution.stack.popFrame()
-
         // Step 17.
         if let startIndex = module.start {
+            var initExecution = ExecutionState()
             try initExecution.invoke(functionAddress: instance.functionAddresses[Int(startIndex)], runtime: self)
-            while initExecution.stack.currentLabel != nil {
-                try initExecution.step(runtime: self)
-            }
+            try initExecution.run(runtime: self)
         }
 
         return instance
@@ -150,20 +153,16 @@ extension Runtime {
                 globalModuleInstance.functionAddresses.append(address)
             }
             
-            var initExecution = ExecutionState()
-            try initExecution.stack.pushFrame(
-                arity: 0, module: globalModuleInstance.selfAddress, argc: 0, defaultLocals: nil
-            )
-            
             let globalInitializers = try module.globals.map { global in
-                for i in global.initializer.instructions {
-                    try initExecution.doExecute(i, runtime: self)
-                }
+                var initExecution = ExecutionState()
+                try initExecution.stack.pushFrame(
+                    iseq: global.initializer,
+                    arity: 1, module: globalModuleInstance.selfAddress, argc: 0, defaultLocals: nil, returnPC: 0
+                )
+                try initExecution.run(runtime: self)
                 
                 return try initExecution.stack.popValue()
             }
-            
-            try initExecution.stack.popFrame()
             
             return globalInitializers
         }

@@ -21,18 +21,23 @@ let instructions = [
     Instruction(name: "unreachable", isControl: true, immediates: []),
     Instruction(name: "nop", isControl: true, immediates: []),
     Instruction(name: "block", isControl: true, immediates: [
-        Immediate(name: "expression", type: "Expression"),
+        Immediate(name: "endRef", type: "ExpressionRef"),
         Immediate(name: "type", type: "ResultType")
     ]),
     Instruction(name: "loop", isControl: true, immediates: [
-        Immediate(name: "expression", type: "Expression"),
         Immediate(name: "type", type: "ResultType")
     ]),
-    Instruction(name: "`if`", isControl: true, immediates: [
-        Immediate(name: "thenExpr", type: "Expression"),
-        Immediate(name: "elseExpr", type: "Expression"),
+    Instruction(name: "ifThen", isControl: true, immediates: [
+        Immediate(name: "endRef", type: "ExpressionRef"),
         Immediate(name: "type", type: "ResultType")
     ]),
+    Instruction(name: "ifThenElse", isControl: true, immediates: [
+        Immediate(name: "elseRef", type: "ExpressionRef"),
+        Immediate(name: "endRef", type: "ExpressionRef"),
+        Immediate(name: "type", type: "ResultType")
+    ]),
+    Instruction(name: "end", isControl: true, immediates: []),
+    Instruction(name: "`else`", isControl: true, immediates: []),
     Instruction(name: "br", isControl: true, immediates: [
         Immediate(name: "labelIndex", type: "LabelIndex")
     ]),
@@ -116,7 +121,6 @@ let instructions = [
     Instruction(name: "localTee", immediates: [Immediate(name: "index", type: "LocalIndex")]),
     Instruction(name: "globalGet", immediates: [Immediate(name: "index", type: "GlobalIndex")]),
     Instruction(name: "globalSet", immediates: [Immediate(name: "index", type: "GlobalIndex")]),
-    Instruction(name: "pseudo", immediates: [Immediate(name: nil, type: "PseudoInstruction")])
 ]
 
 func camelCase(pascalCase: String) -> String {

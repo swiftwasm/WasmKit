@@ -9,14 +9,23 @@ extension ExecutionState {
         case .nop:
             try self.nop(runtime: runtime)
             return
-        case .block(let expression, let type):
-            try self.block(runtime: runtime, expression: expression, type: type)
+        case .block(let endRef, let type):
+            try self.block(runtime: runtime, endRef: endRef, type: type)
             return
-        case .loop(let expression, let type):
-            try self.loop(runtime: runtime, expression: expression, type: type)
+        case .loop(let type):
+            try self.loop(runtime: runtime, type: type)
             return
-        case .`if`(let thenExpr, let elseExpr, let type):
-            try self.`if`(runtime: runtime, thenExpr: thenExpr, elseExpr: elseExpr, type: type)
+        case .ifThen(let endRef, let type):
+            try self.ifThen(runtime: runtime, endRef: endRef, type: type)
+            return
+        case .ifThenElse(let elseRef, let endRef, let type):
+            try self.ifThenElse(runtime: runtime, elseRef: elseRef, endRef: endRef, type: type)
+            return
+        case .end:
+            try self.end(runtime: runtime)
+            return
+        case .`else`:
+            try self.`else`(runtime: runtime)
             return
         case .br(let labelIndex):
             try self.br(runtime: runtime, labelIndex: labelIndex)
@@ -144,8 +153,6 @@ extension ExecutionState {
             try self.globalGet(runtime: runtime, index: index)
         case .globalSet(let index):
             try self.globalSet(runtime: runtime, index: index)
-        case .pseudo(let pseudoInstruction):
-            try self.pseudo(runtime: runtime, pseudoInstruction: pseudoInstruction)
         }
         programCounter += 1
     }
@@ -158,7 +165,10 @@ extension Instruction {
         case .nop: return "nop"
         case .block: return "block"
         case .loop: return "loop"
-        case .`if`: return "`if`"
+        case .ifThen: return "ifThen"
+        case .ifThenElse: return "ifThenElse"
+        case .end: return "end"
+        case .`else`: return "`else`"
         case .br: return "br"
         case .brIf: return "brIf"
         case .brTable: return "brTable"
@@ -219,7 +229,6 @@ extension Instruction {
         case .localTee: return "localTee"
         case .globalGet: return "globalGet"
         case .globalSet: return "globalSet"
-        case .pseudo: return "pseudo"
         }
     }
 }

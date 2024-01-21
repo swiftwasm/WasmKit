@@ -1,9 +1,12 @@
 enum Instruction: Equatable {
     case unreachable
     case nop
-    case block(expression: Expression, type: ResultType)
-    case loop(expression: Expression, type: ResultType)
-    case `if`(thenExpr: Expression, elseExpr: Expression, type: ResultType)
+    case block(endRef: ExpressionRef, type: ResultType)
+    case loop(type: ResultType)
+    case ifThen(endRef: ExpressionRef, type: ResultType)
+    case ifThenElse(elseRef: ExpressionRef, endRef: ExpressionRef, type: ResultType)
+    case end
+    case `else`
     case br(labelIndex: LabelIndex)
     case brIf(labelIndex: LabelIndex)
     case brTable(BrTable)
@@ -64,5 +67,4 @@ enum Instruction: Equatable {
     case localTee(index: LocalIndex)
     case globalGet(index: GlobalIndex)
     case globalSet(index: GlobalIndex)
-    case pseudo(PseudoInstruction)
 }
