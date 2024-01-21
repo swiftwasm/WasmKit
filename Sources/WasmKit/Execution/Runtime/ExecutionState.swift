@@ -21,9 +21,10 @@ struct ExecutionState {
 }
 
 func withExecution<Return>(_ body: (inout ExecutionState) throws -> Return) rethrows -> Return {
-    try [Instruction.endOfExecution].withUnsafeBufferPointer {
+    try withUnsafeTemporaryAllocation(of: Instruction.self, capacity: 1) { rootISeq in
+        rootISeq.baseAddress?.pointee = .endOfExecution
         // NOTE: unwinding a function jump into previous frame's PC + 1, so initial PC is -1ed
-        var execution = ExecutionState(programCounter: $0.baseAddress! - 1)
+        var execution = ExecutionState(programCounter: rootISeq.baseAddress! - 1)
         return try body(&execution)
     }
 }
