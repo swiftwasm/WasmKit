@@ -169,7 +169,7 @@ struct ValueStack {
 
     mutating func push(value: Value) {
         self.values[self.numberOfValues] = value
-        self.numberOfValues += 1
+        self.numberOfValues &+= 1
     }
 
     mutating func push(values: [Value]) {
@@ -184,13 +184,13 @@ struct ValueStack {
             count: MemoryLayout<Value>.stride * values.count
         )
         rawBuffer.copyMemory(from: UnsafeRawBufferPointer(copyingBuffer))
-        self.numberOfValues += copyingBuffer.count
+        self.numberOfValues &+= copyingBuffer.count
     }
 
     mutating func popValue() -> Value {
         // TODO: Check too many pop
         let value = self.values[self.numberOfValues-1]
-        self.numberOfValues -= 1
+        self.numberOfValues &-= 1
         return value
     }
 
@@ -204,7 +204,7 @@ struct ValueStack {
         for idx in self.numberOfValues-count..<self.numberOfValues {
             values.append(self.values[idx])
         }
-        self.numberOfValues -= count
+        self.numberOfValues &-= count
         return values
     }
 }
