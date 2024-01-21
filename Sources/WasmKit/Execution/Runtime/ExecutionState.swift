@@ -1,3 +1,5 @@
+typealias ProgramCounter = UnsafePointer<Instruction>
+
 /// An execution state of an invocation of exported function.
 ///
 /// Each new invocation through exported function has a separate ``ExecutionState``
@@ -5,7 +7,7 @@
 struct ExecutionState {
     var stack = Stack()
     /// Index of an instruction to be executed in the current function.
-    var programCounter = 0
+    var programCounter: ProgramCounter!
 
     var isStackEmpty: Bool {
         stack.isEmpty
@@ -14,7 +16,7 @@ struct ExecutionState {
 
 extension ExecutionState: CustomStringConvertible {
     var description: String {
-        var result = "======== PC=\(programCounter) =========\n"
+        var result = "======== PC=\(programCounter?.debugDescription ?? "null") =========\n"
         result += "\n\(stack.debugDescription)"
 
         return result
@@ -25,7 +27,7 @@ extension ExecutionState {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/instructions.html#entering-xref-syntax-instructions-syntax-instr-mathit-instr-ast-with-label-l>
     @inline(__always)
-    mutating func enter(jumpTo targetPC: Int, continuation: Int, arity: Int, pushPopValues: Int = 0) {
+    mutating func enter(jumpTo targetPC: ProgramCounter, continuation: ProgramCounter, arity: Int, pushPopValues: Int = 0) {
         stack.pushLabel(
             arity: arity,
             continuation: continuation,
@@ -65,20 +67,20 @@ extension ExecutionState {
                 module: function.module,
                 argc: function.type.parameters.count,
                 defaultLocals: function.code.defaultLocals,
-                returnPC: programCounter + 1,
+                returnPC: programCounter?.advanced(by: 1),
                 address: address
             )
-            programCounter = 0
+            programCounter = expression.instructions.baseAddress!
         }
     }
 
     mutating func run(runtime: Runtime) throws {
-        while let frame = stack.currentFrame {
+        while stack.currentFrame != nil {
             // Regular path
             var inst: Instruction
             // `doExecute` returns false when current frame *may* be updated
             repeat {
-                inst = frame.iseq.instructions[programCounter]
+                inst = programCounter.pointee
             } while try doExecute(inst, runtime: runtime)
         }
     }

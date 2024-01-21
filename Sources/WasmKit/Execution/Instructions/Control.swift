@@ -25,7 +25,7 @@ extension ExecutionState {
         if isTrue {
             enter(
                 jumpTo: programCounter + 1,
-                continuation: programCounter + endRef.relativeOffset,
+                continuation: programCounter.advanced(by: endRef.relativeOffset),
                 arity: resultSize,
                 pushPopValues: paramSize
             )

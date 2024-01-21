@@ -31,7 +31,7 @@ public struct Stack {
     }
 
     @inline(__always)
-    mutating func pushLabel(arity: Int, continuation: Int, popPushValues: Int = 0) {
+    mutating func pushLabel(arity: Int, continuation: ProgramCounter, popPushValues: Int = 0) {
         let label = Label(
             arity: arity,
             continuation: continuation,
@@ -46,7 +46,7 @@ public struct Stack {
         module: ModuleAddress,
         argc: Int,
         defaultLocals: UnsafeBufferPointer<Value>?,
-        returnPC: Int,
+        returnPC: ProgramCounter?,
         address: FunctionAddress? = nil
     ) throws {
         // TODO: Stack overflow check can be done at the entry of expression
@@ -271,7 +271,7 @@ public struct Label: Equatable {
     let arity: Int
 
     /// Index of an instruction to jump to when this label is popped off the stack.
-    let continuation: Int
+    let continuation: ProgramCounter
 
     let baseValueIndex: Int
 }
@@ -292,7 +292,7 @@ public struct Frame {
     let module: ModuleAddress
     let baseStackAddress: BaseStackAddress
     let iseq: InstructionSequence
-    let returnPC: Int
+    let returnPC: ProgramCounter?
     /// An optional function address for debugging/profiling purpose
     let address: FunctionAddress?
 
@@ -301,7 +301,7 @@ public struct Frame {
         module: ModuleAddress,
         baseStackAddress: BaseStackAddress,
         iseq: InstructionSequence,
-        returnPC: Int,
+        returnPC: ProgramCounter?,
         address: FunctionAddress? = nil
     ) {
         self.arity = arity

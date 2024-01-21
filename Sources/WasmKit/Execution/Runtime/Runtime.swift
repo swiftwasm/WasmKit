@@ -70,7 +70,6 @@ extension Runtime {
         do {
             for (elementIndex, element) in module.elements.enumerated() {
                 let elementIndex = UInt32(elementIndex)
-                var initExecution = ExecutionState()
                 switch element.mode {
                 case let .active(tableIndex, offsetExpression):
                     let initIseq = InstructionSequence(instructions: offsetExpression + [
@@ -80,18 +79,20 @@ extension Runtime {
                         .tableElementDrop(elementIndex),
                     ])
                     defer { initIseq.deallocate() }
+                    var initExecution = ExecutionState(programCounter: initIseq.instructions.baseAddress)
                     try initExecution.stack.pushFrame(
                         iseq: initIseq,
-                        arity: 0, module: instance.selfAddress, argc: 0, defaultLocals: nil, returnPC: 0
+                        arity: 0, module: instance.selfAddress, argc: 0, defaultLocals: nil, returnPC: nil
                     )
                     try initExecution.run(runtime: self)
 
                 case .declarative:
                     let initIseq: InstructionSequence = [.tableElementDrop(elementIndex)]
                     defer { initIseq.deallocate() }
+                    var initExecution = ExecutionState(programCounter: initIseq.instructions.baseAddress)
                     try initExecution.stack.pushFrame(
                         iseq: initIseq,
-                        arity: 0, module: instance.selfAddress, argc: 0, defaultLocals: nil, returnPC: 0
+                        arity: 0, module: instance.selfAddress, argc: 0, defaultLocals: nil, returnPC: nil
                     )
                     try initExecution.run(runtime: self)
 
@@ -109,15 +110,17 @@ extension Runtime {
         do {
             for case let (dataIndex, .active(data)) in module.data.enumerated() {
                 assert(data.index == 0)
-                var initExecution = ExecutionState()
+                let iseq = InstructionSequence(instructions: data.offset + [
+                    .numericConst(.i32(0)),
+                    .numericConst(.i32(UInt32(data.initializer.count))),
+                    .memoryInit(UInt32(dataIndex)),
+                    .memoryDataDrop(UInt32(dataIndex)),
+                ])
+                defer { iseq.deallocate() }
+                var initExecution = ExecutionState(programCounter: iseq.instructions.baseAddress)
                 try initExecution.stack.pushFrame(
-                    iseq: InstructionSequence(instructions: data.offset + [
-                        .numericConst(.i32(0)),
-                        .numericConst(.i32(UInt32(data.initializer.count))),
-                        .memoryInit(UInt32(dataIndex)),
-                        .memoryDataDrop(UInt32(dataIndex)),
-                    ]),
-                    arity: 0, module: instance.selfAddress, argc: 0, defaultLocals: nil, returnPC: 0
+                    iseq: iseq,
+                    arity: 0, module: instance.selfAddress, argc: 0, defaultLocals: nil, returnPC: nil
                 )
                 try initExecution.run(runtime: self)
             }
@@ -158,12 +161,12 @@ extension Runtime {
             }
             
             let globalInitializers = try module.globals.map { global in
-                var initExecution = ExecutionState()
                 let iseq = InstructionSequence(instructions: global.initializer)
                 defer { iseq.deallocate() }
+                var initExecution = ExecutionState(programCounter: iseq.instructions.baseAddress)
                 try initExecution.stack.pushFrame(
                     iseq: iseq,
-                    arity: 1, module: globalModuleInstance.selfAddress, argc: 0, defaultLocals: nil, returnPC: 0
+                    arity: 1, module: globalModuleInstance.selfAddress, argc: 0, defaultLocals: nil, returnPC: nil
                 )
                 try initExecution.run(runtime: self)
                 
