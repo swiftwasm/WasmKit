@@ -9,13 +9,15 @@ struct Instruction {
     let isControl: Bool
     let mayThrow: Bool
     let mayUpdateFrame: Bool
+    let hasLocals: Bool
     let immediates: [Immediate]
 
-    init(name: String, isControl: Bool = false, mayThrow: Bool = false, mayUpdateFrame: Bool = false, immediates: [Immediate]) {
+    init(name: String, isControl: Bool = false, mayThrow: Bool = false, mayUpdateFrame: Bool = false, hasLocals: Bool = false, immediates: [Immediate]) {
         self.name = name
         self.isControl = isControl
         self.mayThrow = mayThrow
         self.mayUpdateFrame = mayUpdateFrame
+        self.hasLocals = hasLocals
         self.immediates = immediates
         assert(isControl || !mayUpdateFrame, "non-control instruction should not update frame")
     }
@@ -140,9 +142,9 @@ let instructions = [
     Instruction(name: "tableInit", mayThrow: true, immediates: [Immediate(name: nil, type: "TableIndex"), Immediate(name: nil, type: "ElementIndex")]),
     Instruction(name: "tableElementDrop", immediates: [Immediate(name: nil, type: "ElementIndex")]),
     // Variable
-    Instruction(name: "localGet", immediates: [Immediate(name: "index", type: "LocalIndex")]),
-    Instruction(name: "localSet", immediates: [Immediate(name: "index", type: "LocalIndex")]),
-    Instruction(name: "localTee", immediates: [Immediate(name: "index", type: "LocalIndex")]),
+    Instruction(name: "localGet", hasLocals: true, immediates: [Immediate(name: "index", type: "LocalIndex")]),
+    Instruction(name: "localSet", hasLocals: true, immediates: [Immediate(name: "index", type: "LocalIndex")]),
+    Instruction(name: "localTee", hasLocals: true, immediates: [Immediate(name: "index", type: "LocalIndex")]),
     Instruction(name: "globalGet", mayThrow: true, immediates: [Immediate(name: "index", type: "GlobalIndex")]),
     Instruction(name: "globalSet", mayThrow: true, immediates: [Immediate(name: "index", type: "GlobalIndex")]),
 ]
@@ -156,17 +158,20 @@ func generateDispatcher(instructions: [Instruction]) -> String {
     var output = """
     extension ExecutionState {
         @inline(__always)
-        mutating func doExecute(_ instruction: Instruction, runtime: Runtime) throws -> Bool {
+        mutating func doExecute(_ instruction: Instruction, runtime: Runtime, locals: UnsafeMutablePointer<Value>) throws -> Bool {
             switch instruction {
     """
 
     for inst in instructions {
         let tryPrefix = inst.mayThrow ? "try " : ""
+        let labels = inst.immediates.map {
+            $0.name ?? camelCase(pascalCase: String($0.type.split(separator: ".").last!))
+        }
+        let args = (["runtime"] + (inst.hasLocals ? ["locals"] : []) + labels).map { "\($0): \($0)" }
         if inst.immediates.isEmpty {
             output += """
 
                     case .\(inst.name):
-                        \(tryPrefix)self.\(inst.name)(runtime: runtime)
             """
         } else {
             let labels = inst.immediates.map {
@@ -175,9 +180,12 @@ func generateDispatcher(instructions: [Instruction]) -> String {
             output += """
 
                     case .\(inst.name)(\(labels.map { "let \($0)" }.joined(separator: ", "))):
-                        \(tryPrefix)self.\(inst.name)(runtime: runtime, \(labels.map { "\($0): \($0)" }.joined(separator: ", ")))
             """
         }
+        output += """
+
+                    \(tryPrefix)self.\(inst.name)(\(args.joined(separator: ", ")))
+        """
         if inst.isControl {
             output += """
 
