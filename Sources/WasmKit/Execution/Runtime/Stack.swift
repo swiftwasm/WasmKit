@@ -8,7 +8,7 @@ public struct Stack {
         case frame(Frame)
     }
 
-    private let limit = UInt16.max
+    private var limit: UInt16 { UInt16.max }
     private var valueStack: ValueStack
     private var numberOfValues: Int { valueStack.count }
     private var labels: FixedSizeStack<Label> {
@@ -25,9 +25,10 @@ public struct Stack {
     }
 
     init() {
-        self.valueStack = ValueStack(capacity: Int(self.limit))
-        self.frames = FixedSizeStack(capacity: Int(self.limit))
-        self.labels = FixedSizeStack(capacity: Int(self.limit))
+        let limit = UInt16.max
+        self.valueStack = ValueStack(capacity: Int(limit))
+        self.frames = FixedSizeStack(capacity: Int(limit))
+        self.labels = FixedSizeStack(capacity: Int(limit))
     }
 
     @inline(__always)
