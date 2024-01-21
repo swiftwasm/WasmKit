@@ -16,10 +16,6 @@ extension ExecutionState {
     mutating func globalGet(runtime: Runtime, index: GlobalIndex) throws {
         let address = Int(currentModule(store: runtime.store).globalAddresses[Int(index)])
         let globals = runtime.store.globals
-
-        guard globals.indices.contains(address) else {
-            throw Trap.globalAddressOutOfRange(index: address)
-        }
         let value = globals[address].value
         stack.push(value: value)
     }
@@ -30,16 +26,6 @@ extension ExecutionState {
     }
     mutating func doGlobalSet(address: GlobalAddress, _ globals: inout [GlobalInstance]) throws {
         let value = stack.popValue()
-
-        guard globals.indices.contains(address) else {
-            throw Trap.globalAddressOutOfRange(index: address)
-        }
-
-        let mutability = globals[address].globalType.mutability
-        guard mutability == .variable else {
-            throw Trap.globalImmutable(index: address)
-        }
-
         globals[address].value = value
     }
 }
