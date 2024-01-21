@@ -122,7 +122,7 @@ public struct HostFunction {
 }
 
 enum StoreFunction {
-    case wasm(FunctionInstance, body: Expression)
+    case wasm(FunctionInstance, body: InstructionSequence)
     case host(HostFunction)
 }
 
@@ -294,7 +294,7 @@ extension Store {
         // Step 6.
         for element in module.elements {
             let references = element.initializer.map { expression -> Reference in
-                switch expression.instructions[0] {
+                switch expression[0] {
                 case let .refFunc(index):
                     let addr = moduleInstance.functionAddresses[Int(index)]
                     return .function(addr)

@@ -18,14 +18,26 @@ struct InstructionSequence: Equatable {
 
     init(instructions: [Instruction]) {
         assert(_isPOD(Instruction.self))
-        let buffer = UnsafeMutableBufferPointer<Instruction>.allocate(capacity: instructions.count)
+        let buffer = UnsafeMutableBufferPointer<Instruction>.allocate(capacity: instructions.count + 1)
         for (idx, instruction) in instructions.enumerated() {
             buffer[idx] = instruction
         }
+        buffer[instructions.count] = .endOfFunction
         self.instructions = UnsafeBufferPointer(buffer)
     }
+
+    func deallocate() {
+        instructions.deallocate()
+    }
+
     static func == (lhs: InstructionSequence, rhs: InstructionSequence) -> Bool {
         lhs.instructions.baseAddress == rhs.instructions.baseAddress
+    }
+}
+
+extension InstructionSequence: ExpressibleByArrayLiteral {
+    init(arrayLiteral elements: Instruction...) {
+        self.init(instructions: elements)
     }
 }
 
@@ -40,10 +52,4 @@ struct ExpressionRef: Equatable {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/instructions.html#expressions>
 
-typealias Expression = InstructionSequence
-
-extension Expression: ExpressibleByArrayLiteral {
-    init(arrayLiteral elements: Instruction...) {
-        self.init(instructions: elements)
-    }
-}
+typealias Expression = [Instruction]

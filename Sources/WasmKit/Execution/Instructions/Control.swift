@@ -61,8 +61,22 @@ extension ExecutionState {
         stack.exit(label: label)
         programCounter = label.continuation // if-then-else's continuation points the "end"
     }
+
+    private mutating func branch(labelIndex: Int, runtime: Runtime) throws {
+        if stack.numberOfLabelsInCurrentFrame() == labelIndex {
+            try self.return(runtime: runtime)
+            return
+        }
+        let label = try stack.getLabel(index: Int(labelIndex))
+        let values = stack.popValues(count: label.arity)
+
+        stack.unwindLabels(upto: labelIndex)
+
+        stack.push(values: values)
+        programCounter = label.continuation
+    }
     mutating func br(runtime: Runtime, labelIndex: LabelIndex) throws {
-        try branch(labelIndex: Int(labelIndex))
+        try branch(labelIndex: Int(labelIndex), runtime: runtime)
     }
     mutating func brIf(runtime: Runtime, labelIndex: LabelIndex) throws {
         guard try stack.popValue().i32 != 0 else {
@@ -82,13 +96,29 @@ extension ExecutionState {
             labelIndex = defaultIndex
         }
 
-        try branch(labelIndex: Int(labelIndex))
+        try branch(labelIndex: Int(labelIndex), runtime: runtime)
     }
     mutating func `return`(runtime: Runtime) throws {
         let currentFrame = stack.currentFrame!
         _ = stack.exit(frame: currentFrame)
-        programCounter = currentFrame.iseq.instructions.count
+        try endOfFunction(runtime: runtime, currentFrame: currentFrame)
     }
+
+    mutating func endOfFunction(runtime: Runtime) throws {
+        try self.endOfFunction(runtime: runtime, currentFrame: stack.currentFrame)
+    }
+
+    private mutating func endOfFunction(runtime: Runtime, currentFrame: Frame) throws {
+        // When reached at "end" of function
+        if let address = currentFrame.address {
+            runtime.interceptor?.onExitFunction(address, store: runtime.store)
+        }
+        let values = stack.popValues(count: currentFrame.arity)
+        try stack.popFrame()
+        stack.push(values: values)
+        programCounter = currentFrame.returnPC
+    }
+
     mutating func call(runtime: Runtime, functionIndex: UInt32) throws {
         let functionAddresses = runtime.store.module(address: stack.currentFrame.module).functionAddresses
 

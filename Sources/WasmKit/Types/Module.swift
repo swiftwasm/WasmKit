@@ -139,7 +139,7 @@ public struct ElementSegment: Equatable {
     }
 
     enum Mode: Equatable {
-        case active(table: TableIndex, offset: InstructionSequence)
+        case active(table: TableIndex, offset: Expression)
         case declarative
         case passive
     }
@@ -154,7 +154,7 @@ public struct ElementSegment: Equatable {
 public enum DataSegment: Equatable {
     public struct Active: Equatable {
         let index: MemoryIndex
-        let offset: InstructionSequence
+        let offset: Expression
         let initializer: ArraySlice<UInt8>
     }
 

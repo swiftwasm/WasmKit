@@ -22,22 +22,6 @@ extension ExecutionState: CustomStringConvertible {
 }
 
 extension ExecutionState {
-    mutating func branch(labelIndex: Int) throws {
-        if stack.numberOfLabelsInCurrentFrame() == labelIndex {
-            let currentFrame = stack.currentFrame!
-            _ = stack.exit(frame: currentFrame)
-            programCounter = currentFrame.iseq.instructions.count
-            return
-        }
-        let label = try stack.getLabel(index: Int(labelIndex))
-        let values = stack.popValues(count: label.arity)
-
-        stack.unwindLabels(upto: labelIndex)
-
-        stack.push(values: values)
-        programCounter = label.continuation
-    }
-
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/instructions.html#entering-xref-syntax-instructions-syntax-instr-mathit-instr-ast-with-label-l>
     @inline(__always)
@@ -90,20 +74,9 @@ extension ExecutionState {
 
     mutating func run(runtime: Runtime) throws {
         while let frame = stack.currentFrame {
-            if programCounter < frame.iseq.instructions.count {
-                // Regular path
-                let inst = frame.iseq.instructions[programCounter]
-                try doExecute(inst, runtime: runtime)
-            } else {
-                // When reached at "end" of function
-                if let address = frame.address {
-                    runtime.interceptor?.onExitFunction(address, store: runtime.store)
-                }
-                let values = stack.popValues(count: frame.arity)
-                try stack.popFrame()
-                stack.push(values: values)
-                programCounter = frame.returnPC
-            }
+            // Regular path
+            let inst = frame.iseq.instructions[programCounter]
+            try doExecute(inst, runtime: runtime)
         }
     }
 

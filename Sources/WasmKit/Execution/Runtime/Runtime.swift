@@ -73,20 +73,24 @@ extension Runtime {
                 var initExecution = ExecutionState()
                 switch element.mode {
                 case let .active(tableIndex, offsetExpression):
+                    let initIseq = InstructionSequence(instructions: offsetExpression + [
+                        .numericConst(.i32(0)),
+                        .numericConst(.i32(UInt32(element.initializer.count))),
+                        .tableInit(tableIndex, elementIndex),
+                        .tableElementDrop(elementIndex),
+                    ])
+                    defer { initIseq.deallocate() }
                     try initExecution.stack.pushFrame(
-                        iseq: InstructionSequence(instructions: offsetExpression.instructions + [
-                            .numericConst(.i32(0)),
-                            .numericConst(.i32(UInt32(element.initializer.count))),
-                            .tableInit(tableIndex, elementIndex),
-                            .tableElementDrop(elementIndex),
-                        ]),
+                        iseq: initIseq,
                         arity: 0, module: instance.selfAddress, argc: 0, defaultLocals: nil, returnPC: 0
                     )
                     try initExecution.run(runtime: self)
 
                 case .declarative:
+                    let initIseq: InstructionSequence = [.tableElementDrop(elementIndex)]
+                    defer { initIseq.deallocate() }
                     try initExecution.stack.pushFrame(
-                        iseq: [.tableElementDrop(elementIndex)],
+                        iseq: initIseq,
                         arity: 0, module: instance.selfAddress, argc: 0, defaultLocals: nil, returnPC: 0
                     )
                     try initExecution.run(runtime: self)
@@ -107,7 +111,7 @@ extension Runtime {
                 assert(data.index == 0)
                 var initExecution = ExecutionState()
                 try initExecution.stack.pushFrame(
-                    iseq: InstructionSequence(instructions: data.offset.instructions + [
+                    iseq: InstructionSequence(instructions: data.offset + [
                         .numericConst(.i32(0)),
                         .numericConst(.i32(UInt32(data.initializer.count))),
                         .memoryInit(UInt32(dataIndex)),
@@ -155,8 +159,10 @@ extension Runtime {
             
             let globalInitializers = try module.globals.map { global in
                 var initExecution = ExecutionState()
+                let iseq = InstructionSequence(instructions: global.initializer)
+                defer { iseq.deallocate() }
                 try initExecution.stack.pushFrame(
-                    iseq: global.initializer,
+                    iseq: iseq,
                     arity: 1, module: globalModuleInstance.selfAddress, argc: 0, defaultLocals: nil, returnPC: 0
                 )
                 try initExecution.run(runtime: self)

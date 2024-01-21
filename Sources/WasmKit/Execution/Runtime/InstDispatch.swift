@@ -45,6 +45,9 @@ extension ExecutionState {
         case .callIndirect(let tableIndex, let typeIndex):
             try self.callIndirect(runtime: runtime, tableIndex: tableIndex, typeIndex: typeIndex)
             return
+        case .endOfFunction:
+            try self.endOfFunction(runtime: runtime)
+            return
         case .i32Load(let memarg):
             try self.i32Load(runtime: runtime, memarg: memarg)
         case .i64Load(let memarg):
@@ -175,6 +178,7 @@ extension Instruction {
         case .`return`: return "`return`"
         case .call: return "call"
         case .callIndirect: return "callIndirect"
+        case .endOfFunction: return "endOfFunction"
         case .i32Load: return "i32Load"
         case .i64Load: return "i64Load"
         case .f32Load: return "f32Load"

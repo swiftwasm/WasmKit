@@ -861,7 +861,7 @@ extension WasmParser {
         }
     }
 
-    func parseInstructionSequence() throws -> (result: InstructionSequence, end: PseudoInstruction) {
+    func parseExpression() throws -> (result: Expression, end: PseudoInstruction) {
         typealias PendingWork = (
             instructions: [Instruction],
             resume: ([Instruction], PseudoInstruction) throws -> ParseInstructionResult
@@ -882,7 +882,7 @@ extension WasmParser {
                     instructions = nextWork.instructions
                 } else {
                     // If no more pending expression, the expression is top-level
-                    return (InstructionSequence(instructions: instructions), end)
+                    return (instructions, end)
                 }
             case let .value(nextInstruction):
                 instructions.append(nextInstruction)
@@ -898,6 +898,10 @@ extension WasmParser {
                 nextResult = try parseInstruction()
             }
         }
+    }
+    func parseInstructionSequence() throws -> (result: InstructionSequence, end: PseudoInstruction) {
+        let (instructions, end) = try parseExpression()
+        return (InstructionSequence(instructions: instructions), end)
     }
 }
 
@@ -979,7 +983,7 @@ extension WasmParser {
     func parseGlobalSection() throws -> [Global] {
         return try parseVector {
             let type = try parseGlobalType()
-            let (expression, _) = try parseInstructionSequence()
+            let (expression, _) = try parseExpression()
             return Global(type: type, initializer: expression)
         }
     }
@@ -1043,7 +1047,7 @@ extension WasmParser {
                     table = 0
                 }
 
-                let (offset, _) = try parseInstructionSequence()
+                let (offset, _) = try parseExpression()
                 mode = .active(table: table, offset: offset)
             }
 
@@ -1068,12 +1072,10 @@ extension WasmParser {
             }
 
             if flag.contains(.usesExpressions) {
-                initializer = try parseVector { try parseInstructionSequence().result }
+                initializer = try parseVector { try parseExpression().result }
             } else {
                 initializer = try parseVector {
-                    try Expression(
-                        instructions: [.reference(.refFunc(parseUnsigned() as UInt32))]
-                    )
+                    try [.reference(.refFunc(parseUnsigned() as UInt32))]
                 }
             }
 
@@ -1114,7 +1116,7 @@ extension WasmParser {
             let kind: UInt32 = try parseUnsigned()
             switch kind {
             case 0:
-                let (offset, _) = try parseInstructionSequence()
+                let (offset, _) = try parseExpression()
                 let initializer = try parseVectorBytes()
                 return .active(.init(index: 0, offset: offset, initializer: initializer))
 
@@ -1123,7 +1125,7 @@ extension WasmParser {
 
             case 2:
                 let index: UInt32 = try parseUnsigned()
-                let (offset, _) = try parseInstructionSequence()
+                let (offset, _) = try parseExpression()
                 let initializer = try parseVectorBytes()
                 return .active(.init(index: index, offset: offset, initializer: initializer))
             default:
