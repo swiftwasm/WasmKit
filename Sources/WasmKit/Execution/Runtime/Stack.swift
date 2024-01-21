@@ -139,12 +139,19 @@ public struct Stack {
     var topValue: Value {
         self.valueStack.topValue
     }
+
+    var currentLocalsPointer: UnsafeMutablePointer<Value> {
+        self.valueStack.baseAddress.advanced(by: currentFrame?.baseStackAddress.valueFrameIndex ?? 0)
+    }
 }
 
 struct ValueStack {
     private let values: UnsafeMutableBufferPointer<Value>
     private var nextPointer: UnsafeMutablePointer<Value>
     private let capacity: Int
+    var baseAddress: UnsafeMutablePointer<Value> {
+        values.baseAddress!
+    }
 
     init(capacity: Int) {
         self.values = .allocate(capacity: capacity)
