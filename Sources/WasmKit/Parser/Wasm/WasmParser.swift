@@ -495,9 +495,9 @@ extension WasmParser {
         case .i32_eqz:
             return .value(.numericIntUnary((.eqz(.i32))))
         case .i32_eq:
-            return .value(.numericBinary((.eq(.int(.i32)))))
+            return .value(.i32Eq)
         case .i32_ne:
-            return .value(.numericBinary((.ne(.int(.i32)))))
+            return .value(.i32Ne)
         case .i32_lt_s:
             return .value(.numericIntBinary((.ltS(.i32))))
         case .i32_lt_u:
@@ -518,9 +518,9 @@ extension WasmParser {
         case .i64_eqz:
             return .value(.numericIntUnary((.eqz(.i64))))
         case .i64_eq:
-            return .value(.numericBinary((.eq(.int(.i64)))))
+            return .value(.i64Eq)
         case .i64_ne:
-            return .value(.numericBinary((.ne(.int(.i64)))))
+            return .value(.i64Ne)
         case .i64_lt_s:
             return .value(.numericIntBinary((.ltS(.i64))))
         case .i64_lt_u:
@@ -539,9 +539,9 @@ extension WasmParser {
             return .value(.numericIntBinary((.geU(.i64))))
 
         case .f32_eq:
-            return .value(.numericBinary((.eq(.float(.f32)))))
+            return .value(.f32Eq)
         case .f32_ne:
-            return .value(.numericBinary((.ne(.float(.f32)))))
+            return .value(.f32Ne)
         case .f32_lt:
             return .value(.numericFloatBinary((.lt(.f32))))
         case .f32_gt:
@@ -552,9 +552,9 @@ extension WasmParser {
             return .value(.numericFloatBinary((.ge(.f32))))
 
         case .f64_eq:
-            return .value(.numericBinary((.eq(.float(.f64)))))
+            return .value(.f64Eq)
         case .f64_ne:
-            return .value(.numericBinary((.ne(.float(.f64)))))
+            return .value(.f64Ne)
         case .f64_lt:
             return .value(.numericFloatBinary((.lt(.f64))))
         case .f64_gt:
@@ -571,11 +571,11 @@ extension WasmParser {
         case .i32_popcnt:
             return .value(.numericIntUnary((.popcnt(.i32))))
         case .i32_add:
-            return .value(.numericBinary((.add(.int(.i32)))))
+            return .value(.i32Add)
         case .i32_sub:
-            return .value(.numericBinary((.sub(.int(.i32)))))
+            return .value(.i32Sub)
         case .i32_mul:
-            return .value(.numericBinary((.mul(.int(.i32)))))
+            return .value(.i32Mul)
         case .i32_div_s:
             return .value(.numericIntBinary((.divS(.i32))))
         case .i32_div_u:
@@ -608,11 +608,11 @@ extension WasmParser {
         case .i64_popcnt:
             return .value(.numericIntUnary((.popcnt(.i64))))
         case .i64_add:
-            return .value(.numericBinary((.add(.int(.i64)))))
+            return .value(.i64Add)
         case .i64_sub:
-            return .value(.numericBinary((.sub(.int(.i64)))))
+            return .value(.i64Sub)
         case .i64_mul:
-            return .value(.numericBinary((.mul(.int(.i64)))))
+            return .value(.i64Mul)
         case .i64_div_s:
             return .value(.numericIntBinary((.divS(.i64))))
         case .i64_div_u:
@@ -654,11 +654,11 @@ extension WasmParser {
             return .value(.numericFloatUnary((.sqrt(.f32))))
 
         case .f32_add:
-            return .value(.numericBinary((.add(.float(.f32)))))
+            return .value(.f32Add)
         case .f32_sub:
-            return .value(.numericBinary((.sub(.float(.f32)))))
+            return .value(.f32Sub)
         case .f32_mul:
-            return .value(.numericBinary((.mul(.float(.f32)))))
+            return .value(.f32Mul)
         case .f32_div:
             return .value(.numericFloatBinary((.div(.f32))))
         case .f32_min:
@@ -684,11 +684,11 @@ extension WasmParser {
             return .value(.numericFloatUnary((.sqrt(.f64))))
 
         case .f64_add:
-            return .value(.numericBinary((.add(.float(.f64)))))
+            return .value(.f64Add)
         case .f64_sub:
-            return .value(.numericBinary((.sub(.float(.f64)))))
+            return .value(.f64Sub)
         case .f64_mul:
-            return .value(.numericBinary((.mul(.float(.f64)))))
+            return .value(.f64Mul)
         case .f64_div:
             return .value(.numericFloatBinary((.div(.f64))))
         case .f64_min:

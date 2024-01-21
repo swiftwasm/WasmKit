@@ -47,10 +47,29 @@ enum Instruction: Equatable {
     case numericConst(Value)
     case numericIntUnary(NumericInstruction.IntUnary)
     case numericFloatUnary(NumericInstruction.FloatUnary)
-    case numericBinary(NumericInstruction.Binary)
     case numericIntBinary(NumericInstruction.IntBinary)
     case numericFloatBinary(NumericInstruction.FloatBinary)
     case numericConversion(NumericInstruction.Conversion)
+    case i32Add
+    case i64Add
+    case f32Add
+    case f64Add
+    case i32Sub
+    case i64Sub
+    case f32Sub
+    case f64Sub
+    case i32Mul
+    case i64Mul
+    case f32Mul
+    case f64Mul
+    case i32Eq
+    case i64Eq
+    case f32Eq
+    case f64Eq
+    case i32Ne
+    case i64Ne
+    case f32Ne
+    case f64Ne
     case drop
     case select
     case refNull(ReferenceType)

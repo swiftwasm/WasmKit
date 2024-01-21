@@ -19,6 +19,8 @@ struct Instruction {
     }
 }
 
+let valueTypes = ["i32", "i64", "f32", "f64"]
+
 let instructions = [
     // Controls
     Instruction(name: "unreachable", isControl: true, immediates: []),
@@ -101,10 +103,15 @@ let instructions = [
     Instruction(name: "numericConst", immediates: [Immediate(name: nil, type: "Value")]),
     Instruction(name: "numericIntUnary", immediates: [Immediate(name: nil, type: "NumericInstruction.IntUnary")]),
     Instruction(name: "numericFloatUnary", immediates: [Immediate(name: nil, type: "NumericInstruction.FloatUnary")]),
-    Instruction(name: "numericBinary", immediates: [Immediate(name: nil, type: "NumericInstruction.Binary")]),
     Instruction(name: "numericIntBinary", immediates: [Immediate(name: nil, type: "NumericInstruction.IntBinary")]),
     Instruction(name: "numericFloatBinary", immediates: [Immediate(name: nil, type: "NumericInstruction.FloatBinary")]),
     Instruction(name: "numericConversion", immediates: [Immediate(name: nil, type: "NumericInstruction.Conversion")]),
+] + ["Add", "Sub", "Mul", "Eq", "Ne"].flatMap { op -> [Instruction] in
+    valueTypes.map { type in
+        Instruction(name: "\(type)\(op)", immediates: [])
+    }
+}
++ [
     // Parametric
     Instruction(name: "drop", immediates: []),
     Instruction(name: "select", immediates: []),

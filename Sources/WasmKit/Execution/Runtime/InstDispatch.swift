@@ -115,14 +115,52 @@ extension ExecutionState {
             try self.numericIntUnary(runtime: runtime, intUnary: intUnary)
         case .numericFloatUnary(let floatUnary):
             try self.numericFloatUnary(runtime: runtime, floatUnary: floatUnary)
-        case .numericBinary(let binary):
-            try self.numericBinary(runtime: runtime, binary: binary)
         case .numericIntBinary(let intBinary):
             try self.numericIntBinary(runtime: runtime, intBinary: intBinary)
         case .numericFloatBinary(let floatBinary):
             try self.numericFloatBinary(runtime: runtime, floatBinary: floatBinary)
         case .numericConversion(let conversion):
             try self.numericConversion(runtime: runtime, conversion: conversion)
+        case .i32Add:
+            try self.i32Add(runtime: runtime)
+        case .i64Add:
+            try self.i64Add(runtime: runtime)
+        case .f32Add:
+            try self.f32Add(runtime: runtime)
+        case .f64Add:
+            try self.f64Add(runtime: runtime)
+        case .i32Sub:
+            try self.i32Sub(runtime: runtime)
+        case .i64Sub:
+            try self.i64Sub(runtime: runtime)
+        case .f32Sub:
+            try self.f32Sub(runtime: runtime)
+        case .f64Sub:
+            try self.f64Sub(runtime: runtime)
+        case .i32Mul:
+            try self.i32Mul(runtime: runtime)
+        case .i64Mul:
+            try self.i64Mul(runtime: runtime)
+        case .f32Mul:
+            try self.f32Mul(runtime: runtime)
+        case .f64Mul:
+            try self.f64Mul(runtime: runtime)
+        case .i32Eq:
+            try self.i32Eq(runtime: runtime)
+        case .i64Eq:
+            try self.i64Eq(runtime: runtime)
+        case .f32Eq:
+            try self.f32Eq(runtime: runtime)
+        case .f64Eq:
+            try self.f64Eq(runtime: runtime)
+        case .i32Ne:
+            try self.i32Ne(runtime: runtime)
+        case .i64Ne:
+            try self.i64Ne(runtime: runtime)
+        case .f32Ne:
+            try self.f32Ne(runtime: runtime)
+        case .f64Ne:
+            try self.f64Ne(runtime: runtime)
         case .drop:
             try self.drop(runtime: runtime)
         case .select:
@@ -216,10 +254,29 @@ extension Instruction {
         case .numericConst: return "numericConst"
         case .numericIntUnary: return "numericIntUnary"
         case .numericFloatUnary: return "numericFloatUnary"
-        case .numericBinary: return "numericBinary"
         case .numericIntBinary: return "numericIntBinary"
         case .numericFloatBinary: return "numericFloatBinary"
         case .numericConversion: return "numericConversion"
+        case .i32Add: return "i32Add"
+        case .i64Add: return "i64Add"
+        case .f32Add: return "f32Add"
+        case .f64Add: return "f64Add"
+        case .i32Sub: return "i32Sub"
+        case .i64Sub: return "i64Sub"
+        case .f32Sub: return "f32Sub"
+        case .f64Sub: return "f64Sub"
+        case .i32Mul: return "i32Mul"
+        case .i64Mul: return "i64Mul"
+        case .f32Mul: return "f32Mul"
+        case .f64Mul: return "f64Mul"
+        case .i32Eq: return "i32Eq"
+        case .i64Eq: return "i64Eq"
+        case .f32Eq: return "f32Eq"
+        case .f64Eq: return "f64Eq"
+        case .i32Ne: return "i32Ne"
+        case .i64Ne: return "i64Ne"
+        case .f32Ne: return "f32Ne"
+        case .f64Ne: return "f64Ne"
         case .drop: return "drop"
         case .select: return "select"
         case .refNull: return "refNull"
