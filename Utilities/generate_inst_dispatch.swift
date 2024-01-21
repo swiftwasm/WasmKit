@@ -137,7 +137,6 @@ func camelCase(pascalCase: String) -> String {
 func generateDispatcher(instructions: [Instruction]) -> String {
     var output = """
     extension ExecutionState {
-        @_transparent
         mutating func doExecute(_ instruction: Instruction, runtime: Runtime) throws -> Bool {
             switch instruction {
     """
