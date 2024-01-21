@@ -46,10 +46,13 @@ extension InstructionSequence: ExpressibleByArrayLiteral {
 }
 
 struct ExpressionRef: Equatable {
-    let relativeOffset: Int
+    let _relativeOffset: UInt32
+    var relativeOffset: Int {
+        Int(_relativeOffset)
+    }
 
     init(_ relativeOffset: Int) {
-        self.relativeOffset = relativeOffset
+        self._relativeOffset = UInt32(relativeOffset)
     }
 }
 

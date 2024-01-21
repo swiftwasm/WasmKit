@@ -10,19 +10,27 @@ extension Instruction {
     }
 
     struct BrTable: Equatable {
-        let labelIndices: UnsafeBufferPointer<LabelIndex>
-        let defaultIndex: LabelIndex
+        private let bufferBase: UnsafePointer<LabelIndex>
+        private let bufferCount: UInt32
+        var labelIndices: UnsafeBufferPointer<LabelIndex> {
+            UnsafeBufferPointer(start: bufferBase, count: Int(bufferCount - 1))
+        }
+        var defaultIndex: LabelIndex {
+            bufferBase[Int(bufferCount - 1)]
+        }
 
         init(labelIndices: [LabelIndex], defaultIndex: LabelIndex) {
-            let buffer = UnsafeMutableBufferPointer<LabelIndex>.allocate(capacity: labelIndices.count)
+            let buffer = UnsafeMutableBufferPointer<LabelIndex>.allocate(capacity: labelIndices.count + 1)
             for (index, labelindex) in labelIndices.enumerated() {
                 buffer[index] = labelindex
             }
-            self.labelIndices = UnsafeBufferPointer(buffer)
-            self.defaultIndex = defaultIndex
+            buffer[labelIndices.count] = defaultIndex
+            self.bufferBase = UnsafePointer(buffer.baseAddress!)
+            self.bufferCount = UInt32(buffer.count)
         }
+
         static func == (lhs: Instruction.BrTable, rhs: Instruction.BrTable) -> Bool {
-            lhs.defaultIndex == rhs.defaultIndex && lhs.labelIndices.baseAddress == rhs.labelIndices.baseAddress
+            lhs.labelIndices.baseAddress == rhs.labelIndices.baseAddress
         }
     }
 
