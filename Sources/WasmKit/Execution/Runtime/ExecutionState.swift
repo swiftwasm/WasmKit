@@ -62,7 +62,9 @@ extension ExecutionState {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/instructions.html#invocation-of-function-address>
     mutating func invoke(functionAddress address: FunctionAddress, runtime: Runtime) throws {
-        // runtime.interceptor?.onEnterFunction(address, store: runtime.store)
+        #if DEBUG
+        runtime.interceptor?.onEnterFunction(address, store: runtime.store)
+        #endif
 
         switch try runtime.store.function(at: address) {
         case let .host(function):

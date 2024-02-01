@@ -119,9 +119,11 @@ extension ExecutionState {
 
     private mutating func endOfFunction(runtime: Runtime, currentFrame: Frame) throws {
         // When reached at "end" of function
-//        if let address = currentFrame.address {
-//            runtime.interceptor?.onExitFunction(address, store: runtime.store)
-//        }
+        #if DEBUG
+        if let address = currentFrame.address {
+            runtime.interceptor?.onExitFunction(address, store: runtime.store)
+        }
+        #endif
         let values = stack.popValues(count: currentFrame.arity)
         stack.popFrame()
         stack.push(values: values)
