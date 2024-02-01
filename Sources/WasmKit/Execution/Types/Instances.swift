@@ -11,6 +11,11 @@ public final class ModuleInstance {
     public internal(set) var elementAddresses: [ElementAddress] = []
     public internal(set) var dataAddresses: [DataAddress] = []
     public internal(set) var exportInstances: [ExportInstance] = []
+    internal let selfAddress: ModuleAddress
+
+    init(selfAddress: ModuleAddress) {
+        self.selfAddress = selfAddress
+    }
 
     public typealias Exports = [String: ExternalValue]
 
@@ -36,11 +41,15 @@ public final class ModuleInstance {
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#function-instances>
 public struct FunctionInstance {
     public let type: FunctionType
-    public let module: ModuleInstance
+    let module: ModuleAddress
     var code: GuestFunction
 
     init(_ function: GuestFunction, module: ModuleInstance) {
-        type = module.types[Int(function.type)]
+        self.init(function, module: module.selfAddress, type: module.types[Int(function.type)])
+    }
+
+    init(_ function: GuestFunction, module: ModuleAddress, type: FunctionType) {
+        self.type = type
         self.module = module
         code = function
     }

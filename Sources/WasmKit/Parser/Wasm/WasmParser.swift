@@ -76,6 +76,7 @@ public enum WasmParserError: Swift.Error {
     case dataCountSectionRequired
     case malformedLimit(UInt8)
     case malformedIndirectCall
+    case invalidTypeSectionReference
 }
 
 /// > Note:
@@ -300,10 +301,10 @@ extension WasmParser {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/instructions.html#memory-instructions>
-    func parseMemarg() throws -> MemoryInstruction.Memarg {
+    func parseMemarg() throws -> Instruction.Memarg {
         let align: UInt32 = try parseUnsigned()
         let offset: UInt64 = try features.contains(.memory64) ? parseUnsigned(UInt64.self) : UInt64(parseUnsigned(UInt32.self))
-        return MemoryInstruction.Memarg(offset: offset, align: align)
+        return Instruction.Memarg(offset: offset, align: align)
     }
 
     func parseVectorBytes() throws -> ArraySlice<UInt8> {
@@ -318,11 +319,12 @@ extension WasmParser {
 
     enum ParseInstructionResult {
         /// The instruction is not fully parsed yet but need expression to continue
-        case requestExpression(resume: (Expression, PseudoInstruction) throws -> ParseInstructionResult)
+        case requestExpression(resume: ([Instruction], PseudoInstruction) throws -> ParseInstructionResult)
         case `value`(Instruction)
+        case multiValue([Instruction])
     }
 
-    func parseInstruction() throws -> ParseInstructionResult {
+    func parseInstruction(typeSection: [FunctionType]?) throws -> ParseInstructionResult {
         let rawCode = try stream.consumeAny()
         guard let code = InstructionCode(rawValue: rawCode) else {
             throw WasmParserError.illegalOpcode(rawCode)
@@ -336,40 +338,49 @@ extension WasmParser {
         case .block:
             let type = try parseResultType()
             return .requestExpression { expr, _ in
-                return .value(.control(.block(expression: expr, type: type)))
+                let type = try type.arity(typeSection: typeSection)
+                return .multiValue([.block(endRef: ExpressionRef(expr.count + 1 + 1), type: type)] + expr + [.end])
             }
         case .loop:
             let type = try parseResultType()
             return .requestExpression { expr, _ in
-                return .value(.control(.loop(expression: expr, type: type)))
+                let type = try type.arity(typeSection: typeSection)
+                return .multiValue([.loop(type: type)] + expr + [.end])
             }
         case .if:
             let type = try parseResultType()
-            return .requestExpression { then, end in
+            return ParseInstructionResult.requestExpression { (thenExpr: [Instruction], end: PseudoInstruction) -> ParseInstructionResult in
                 switch end {
                 case .else:
-                    return .requestExpression { `else`, _ in
-                        return .value(.control(.if(then: then, else: `else`, type: type)))
+                    return .requestExpression { (elseExpr: [Instruction], end2: PseudoInstruction) -> ParseInstructionResult in
+                        let type = try type.arity(typeSection: typeSection)
+                        let control = Instruction.ifThenElse(
+                            elseRef: ExpressionRef(thenExpr.count + 1 + 1),
+                            endRef: ExpressionRef(thenExpr.count + 1 + elseExpr.count + 1 + 1),
+                            type: type
+                        )
+                        return .multiValue([control] + thenExpr + [.else] + elseExpr + [.end])
                     }
                 case .end:
-                    let `else` = Expression(instructions: [])
-                    return .value(.control(.if(then: then, else: `else`, type: type)))
+                    let type = try type.arity(typeSection: typeSection)
+                    let control = Instruction.ifThen(endRef: ExpressionRef(thenExpr.count + 2), type: type)
+                    return .multiValue([control] + thenExpr + [.end])
                 }
             }
         case .else:
-            return .value(.pseudo(.else))
+            return .value(.else)
         case .end:
-            return .value(.pseudo(.end))
+            return .value(.end)
         case .br:
             let label: UInt32 = try parseUnsigned()
-            return .value(.control(.br(label)))
+            return .value(.control(.br(labelIndex: label)))
         case .br_if:
             let label: UInt32 = try parseUnsigned()
-            return .value(.control(.brIf(label)))
+            return .value(.control(.brIf(labelIndex: label)))
         case .br_table:
             let labelIndices: [UInt32] = try parseVector { try parseUnsigned() }
             let labelIndex: UInt32 = try parseUnsigned()
-            return .value(.control(.brTable(labelIndices, default: labelIndex)))
+            return .value(.control(.brTable(.init(labelIndices: labelIndices, defaultIndex: labelIndex))))
         case .return:
             return .value(.control(.return))
         case .call:
@@ -389,7 +400,9 @@ extension WasmParser {
         case .select:
             return .value(.parametric(.select))
         case .typed_select:
-            return .value(try .parametric(.typedSelect(parseVector { try parseValueType() })))
+            // Just discard since our executor doesn't use it
+            _ = try parseVector { try parseValueType() }
+            return .value(.parametric(.select))
 
         case .local_get:
             let index: UInt32 = try parseUnsigned()
@@ -408,344 +421,344 @@ extension WasmParser {
             return .value(.variable(.globalSet(index: index)))
 
         case .i32_load:
-            return .value(try .memory(.load(parseMemarg(), bitWidth: 32, .i32)))
+            return .value(try .i32Load(memarg: parseMemarg()))
         case .i64_load:
-            return .value(try .memory(.load(parseMemarg(), bitWidth: 64, .i64)))
+            return .value(try .i64Load(memarg: parseMemarg()))
         case .f32_load:
-            return .value(try .memory(.load(parseMemarg(), bitWidth: 32, .f32)))
+            return .value(try .f32Load(memarg: parseMemarg()))
         case .f64_load:
-            return .value(try .memory(.load(parseMemarg(), bitWidth: 64, .f64)))
+            return .value(try .f64Load(memarg: parseMemarg()))
         case .i32_load8_s:
-            return .value(try .memory(.load(parseMemarg(), bitWidth: 8, .i32, isSigned: true)))
+            return .value(try .i32Load8S(memarg: parseMemarg()))
         case .i32_load8_u:
-            return .value(try .memory(.load(parseMemarg(), bitWidth: 8, .i32, isSigned: false)))
+            return .value(try .i32Load8U(memarg: parseMemarg()))
         case .i32_load16_s:
-            return .value(try .memory(.load(parseMemarg(), bitWidth: 16, .i32, isSigned: true)))
+            return .value(try .i32Load16S(memarg: parseMemarg()))
         case .i32_load16_u:
-            return .value(try .memory(.load(parseMemarg(), bitWidth: 16, .i32, isSigned: false)))
+            return .value(try .i32Load16U(memarg: parseMemarg()))
         case .i64_load8_s:
-            return .value(try .memory(.load(parseMemarg(), bitWidth: 8, .i64, isSigned: true)))
+            return .value(try .i64Load8S(memarg: parseMemarg()))
         case .i64_load8_u:
-            return .value(try .memory(.load(parseMemarg(), bitWidth: 8, .i64, isSigned: false)))
+            return .value(try .i64Load8U(memarg: parseMemarg()))
         case .i64_load16_s:
-            return .value(try .memory(.load(parseMemarg(), bitWidth: 16, .i64, isSigned: true)))
+            return .value(try .i64Load16S(memarg: parseMemarg()))
         case .i64_load16_u:
-            return .value(try .memory(.load(parseMemarg(), bitWidth: 16, .i64, isSigned: false)))
+            return .value(try .i64Load16U(memarg: parseMemarg()))
         case .i64_load32_s:
-            return .value(try .memory(.load(parseMemarg(), bitWidth: 32, .i64, isSigned: true)))
+            return .value(try .i64Load32S(memarg: parseMemarg()))
         case .i64_load32_u:
-            return .value(try .memory(.load(parseMemarg(), bitWidth: 32, .i64, isSigned: false)))
+            return .value(try .i64Load32U(memarg: parseMemarg()))
         case .i32_store:
-            return .value(try .memory(.store(parseMemarg(), bitWidth: 32, .i32)))
+            return .value(try .i32Store(memarg: parseMemarg()))
         case .i64_store:
-            return .value(try .memory(.store(parseMemarg(), bitWidth: 64, .i64)))
+            return .value(try .i64Store(memarg: parseMemarg()))
         case .f32_store:
-            return .value(try .memory(.store(parseMemarg(), bitWidth: 32, .i32)))
+            return .value(try .f32Store(memarg: parseMemarg()))
         case .f64_store:
-            return .value(try .memory(.store(parseMemarg(), bitWidth: 64, .i64)))
+            return .value(try .f64Store(memarg: parseMemarg()))
         case .i32_store8:
-            return .value(try .memory(.store(parseMemarg(), bitWidth: 8, .i32)))
+            return .value(try .i32Store8(memarg: parseMemarg()))
         case .i32_store16:
-            return .value(try .memory(.store(parseMemarg(), bitWidth: 16, .i32)))
+            return .value(try .i32Store16(memarg: parseMemarg()))
         case .i64_store8:
-            return .value(try .memory(.store(parseMemarg(), bitWidth: 8, .i64)))
+            return .value(try .i64Store8(memarg: parseMemarg()))
         case .i64_store16:
-            return .value(try .memory(.store(parseMemarg(), bitWidth: 16, .i64)))
+            return .value(try .i64Store16(memarg: parseMemarg()))
         case .i64_store32:
-            return .value(try .memory(.store(parseMemarg(), bitWidth: 32, .i64)))
+            return .value(try .i64Store32(memarg: parseMemarg()))
         case .memory_size:
             let zero = try stream.consumeAny()
             guard zero == 0x00 else {
                 throw WasmParserError.zeroExpected(actual: zero, index: currentIndex)
             }
-            return .value(.memory(.size))
+            return .value(.memorySize)
         case .memory_grow:
             let zero = try stream.consumeAny()
             guard zero == 0x00 else {
                 throw WasmParserError.zeroExpected(actual: zero, index: currentIndex)
             }
-            return .value(.memory(.grow))
+            return .value(.memoryGrow)
 
         case .i32_const:
             let n: UInt32 = try parseInteger()
-            return .value(.numeric(.const(.i32(n))))
+            return .value(.numericConst((.i32(n))))
         case .i64_const:
             let n: UInt64 = try parseInteger()
-            return .value(.numeric(.const(.i64(n))))
+            return .value(.numericConst((.i64(n))))
         case .f32_const:
             let n = try parseFloat()
-            return .value(.numeric(.const(.f32(n))))
+            return .value(.numericConst((.f32(n))))
         case .f64_const:
             let n = try parseDouble()
-            return .value(.numeric(.const(.f64(n))))
+            return .value(.numericConst((.f64(n))))
 
         case .i32_eqz:
-            return .value(.numeric(.intUnary(.eqz(.i32))))
+            return .value(.numericIntUnary((.eqz(.i32))))
         case .i32_eq:
-            return .value(.numeric(.binary(.eq(.int(.i32)))))
+            return .value(.i32Eq)
         case .i32_ne:
-            return .value(.numeric(.binary(.ne(.int(.i32)))))
+            return .value(.i32Ne)
         case .i32_lt_s:
-            return .value(.numeric(.intBinary(.ltS(.i32))))
+            return .value(.i32LtS)
         case .i32_lt_u:
-            return .value(.numeric(.intBinary(.ltU(.i32))))
+            return .value(.i32LtU)
         case .i32_gt_s:
-            return .value(.numeric(.intBinary(.gtS(.i32))))
+            return .value(.i32GtS)
         case .i32_gt_u:
-            return .value(.numeric(.intBinary(.gtU(.i32))))
+            return .value(.i32GtU)
         case .i32_le_s:
-            return .value(.numeric(.intBinary(.leS(.i32))))
+            return .value(.i32LeS)
         case .i32_le_u:
-            return .value(.numeric(.intBinary(.leU(.i32))))
+            return .value(.i32LeU)
         case .i32_ge_s:
-            return .value(.numeric(.intBinary(.geS(.i32))))
+            return .value(.i32GeS)
         case .i32_ge_u:
-            return .value(.numeric(.intBinary(.geU(.i32))))
+            return .value(.i32GeU)
 
         case .i64_eqz:
-            return .value(.numeric(.intUnary(.eqz(.i64))))
+            return .value(.numericIntUnary((.eqz(.i64))))
         case .i64_eq:
-            return .value(.numeric(.binary(.eq(.int(.i64)))))
+            return .value(.i64Eq)
         case .i64_ne:
-            return .value(.numeric(.binary(.ne(.int(.i64)))))
+            return .value(.i64Ne)
         case .i64_lt_s:
-            return .value(.numeric(.intBinary(.ltS(.i64))))
+            return .value(.i64LtS)
         case .i64_lt_u:
-            return .value(.numeric(.intBinary(.ltU(.i64))))
+            return .value(.i64LtU)
         case .i64_gt_s:
-            return .value(.numeric(.intBinary(.gtS(.i64))))
+            return .value(.i64GtS)
         case .i64_gt_u:
-            return .value(.numeric(.intBinary(.gtU(.i64))))
+            return .value(.i64GtU)
         case .i64_le_s:
-            return .value(.numeric(.intBinary(.leS(.i64))))
+            return .value(.i64LeS)
         case .i64_le_u:
-            return .value(.numeric(.intBinary(.leU(.i64))))
+            return .value(.i64LeU)
         case .i64_ge_s:
-            return .value(.numeric(.intBinary(.geS(.i64))))
+            return .value(.i64GeS)
         case .i64_ge_u:
-            return .value(.numeric(.intBinary(.geU(.i64))))
+            return .value(.i64GeU)
 
         case .f32_eq:
-            return .value(.numeric(.binary(.eq(.float(.f32)))))
+            return .value(.f32Eq)
         case .f32_ne:
-            return .value(.numeric(.binary(.ne(.float(.f32)))))
+            return .value(.f32Ne)
         case .f32_lt:
-            return .value(.numeric(.floatBinary(.lt(.f32))))
+            return .value(.numericFloatBinary((.lt(.f32))))
         case .f32_gt:
-            return .value(.numeric(.floatBinary(.gt(.f32))))
+            return .value(.numericFloatBinary((.gt(.f32))))
         case .f32_le:
-            return .value(.numeric(.floatBinary(.le(.f32))))
+            return .value(.numericFloatBinary((.le(.f32))))
         case .f32_ge:
-            return .value(.numeric(.floatBinary(.ge(.f32))))
+            return .value(.numericFloatBinary((.ge(.f32))))
 
         case .f64_eq:
-            return .value(.numeric(.binary(.eq(.float(.f64)))))
+            return .value(.f64Eq)
         case .f64_ne:
-            return .value(.numeric(.binary(.ne(.float(.f64)))))
+            return .value(.f64Ne)
         case .f64_lt:
-            return .value(.numeric(.floatBinary(.lt(.f64))))
+            return .value(.numericFloatBinary((.lt(.f64))))
         case .f64_gt:
-            return .value(.numeric(.floatBinary(.gt(.f64))))
+            return .value(.numericFloatBinary((.gt(.f64))))
         case .f64_le:
-            return .value(.numeric(.floatBinary(.le(.f64))))
+            return .value(.numericFloatBinary((.le(.f64))))
         case .f64_ge:
-            return .value(.numeric(.floatBinary(.ge(.f64))))
+            return .value(.numericFloatBinary((.ge(.f64))))
 
         case .i32_clz:
-            return .value(.numeric(.intUnary(.clz(.i32))))
+            return .value(.numericIntUnary((.clz(.i32))))
         case .i32_ctz:
-            return .value(.numeric(.intUnary(.ctz(.i32))))
+            return .value(.numericIntUnary((.ctz(.i32))))
         case .i32_popcnt:
-            return .value(.numeric(.intUnary(.popcnt(.i32))))
+            return .value(.numericIntUnary((.popcnt(.i32))))
         case .i32_add:
-            return .value(.numeric(.binary(.add(.int(.i32)))))
+            return .value(.i32Add)
         case .i32_sub:
-            return .value(.numeric(.binary(.sub(.int(.i32)))))
+            return .value(.i32Sub)
         case .i32_mul:
-            return .value(.numeric(.binary(.mul(.int(.i32)))))
+            return .value(.i32Mul)
         case .i32_div_s:
-            return .value(.numeric(.intBinary(.divS(.i32))))
+            return .value(.numericIntBinary((.divS(.i32))))
         case .i32_div_u:
-            return .value(.numeric(.intBinary(.divU(.i32))))
+            return .value(.numericIntBinary((.divU(.i32))))
         case .i32_rem_s:
-            return .value(.numeric(.intBinary(.remS(.i32))))
+            return .value(.numericIntBinary((.remS(.i32))))
         case .i32_rem_u:
-            return .value(.numeric(.intBinary(.remU(.i32))))
+            return .value(.numericIntBinary((.remU(.i32))))
         case .i32_and:
-            return .value(.numeric(.intBinary(.and(.i32))))
+            return .value(.numericIntBinary((.and(.i32))))
         case .i32_or:
-            return .value(.numeric(.intBinary(.or(.i32))))
+            return .value(.numericIntBinary((.or(.i32))))
         case .i32_xor:
-            return .value(.numeric(.intBinary(.xor(.i32))))
+            return .value(.numericIntBinary((.xor(.i32))))
         case .i32_shl:
-            return .value(.numeric(.intBinary(.shl(.i32))))
+            return .value(.numericIntBinary((.shl(.i32))))
         case .i32_shr_s:
-            return .value(.numeric(.intBinary(.shrS(.i32))))
+            return .value(.numericIntBinary((.shrS(.i32))))
         case .i32_shr_u:
-            return .value(.numeric(.intBinary(.shrU(.i32))))
+            return .value(.numericIntBinary((.shrU(.i32))))
         case .i32_rotl:
-            return .value(.numeric(.intBinary(.rotl(.i32))))
+            return .value(.numericIntBinary((.rotl(.i32))))
         case .i32_rotr:
-            return .value(.numeric(.intBinary(.rotr(.i32))))
+            return .value(.numericIntBinary((.rotr(.i32))))
 
         case .i64_clz:
-            return .value(.numeric(.intUnary(.clz(.i64))))
+            return .value(.numericIntUnary((.clz(.i64))))
         case .i64_ctz:
-            return .value(.numeric(.intUnary(.ctz(.i64))))
+            return .value(.numericIntUnary((.ctz(.i64))))
         case .i64_popcnt:
-            return .value(.numeric(.intUnary(.popcnt(.i64))))
+            return .value(.numericIntUnary((.popcnt(.i64))))
         case .i64_add:
-            return .value(.numeric(.binary(.add(.int(.i64)))))
+            return .value(.i64Add)
         case .i64_sub:
-            return .value(.numeric(.binary(.sub(.int(.i64)))))
+            return .value(.i64Sub)
         case .i64_mul:
-            return .value(.numeric(.binary(.mul(.int(.i64)))))
+            return .value(.i64Mul)
         case .i64_div_s:
-            return .value(.numeric(.intBinary(.divS(.i64))))
+            return .value(.numericIntBinary((.divS(.i64))))
         case .i64_div_u:
-            return .value(.numeric(.intBinary(.divU(.i64))))
+            return .value(.numericIntBinary((.divU(.i64))))
         case .i64_rem_s:
-            return .value(.numeric(.intBinary(.remS(.i64))))
+            return .value(.numericIntBinary((.remS(.i64))))
         case .i64_rem_u:
-            return .value(.numeric(.intBinary(.remU(.i64))))
+            return .value(.numericIntBinary((.remU(.i64))))
         case .i64_and:
-            return .value(.numeric(.intBinary(.and(.i64))))
+            return .value(.numericIntBinary((.and(.i64))))
         case .i64_or:
-            return .value(.numeric(.intBinary(.or(.i64))))
+            return .value(.numericIntBinary((.or(.i64))))
         case .i64_xor:
-            return .value(.numeric(.intBinary(.xor(.i64))))
+            return .value(.numericIntBinary((.xor(.i64))))
         case .i64_shl:
-            return .value(.numeric(.intBinary(.shl(.i64))))
+            return .value(.numericIntBinary((.shl(.i64))))
         case .i64_shr_s:
-            return .value(.numeric(.intBinary(.shrS(.i64))))
+            return .value(.numericIntBinary((.shrS(.i64))))
         case .i64_shr_u:
-            return .value(.numeric(.intBinary(.shrU(.i64))))
+            return .value(.numericIntBinary((.shrU(.i64))))
         case .i64_rotl:
-            return .value(.numeric(.intBinary(.rotl(.i64))))
+            return .value(.numericIntBinary((.rotl(.i64))))
         case .i64_rotr:
-            return .value(.numeric(.intBinary(.rotr(.i64))))
+            return .value(.numericIntBinary((.rotr(.i64))))
 
         case .f32_abs:
-            return .value(.numeric(.floatUnary(.abs(.f32))))
+            return .value(.numericFloatUnary((.abs(.f32))))
         case .f32_neg:
-            return .value(.numeric(.floatUnary(.neg(.f32))))
+            return .value(.numericFloatUnary((.neg(.f32))))
         case .f32_ceil:
-            return .value(.numeric(.floatUnary(.ceil(.f32))))
+            return .value(.numericFloatUnary((.ceil(.f32))))
         case .f32_floor:
-            return .value(.numeric(.floatUnary(.floor(.f32))))
+            return .value(.numericFloatUnary((.floor(.f32))))
         case .f32_trunc:
-            return .value(.numeric(.floatUnary(.trunc(.f32))))
+            return .value(.numericFloatUnary((.trunc(.f32))))
         case .f32_nearest:
-            return .value(.numeric(.floatUnary(.nearest(.f32))))
+            return .value(.numericFloatUnary((.nearest(.f32))))
         case .f32_sqrt:
-            return .value(.numeric(.floatUnary(.sqrt(.f32))))
+            return .value(.numericFloatUnary((.sqrt(.f32))))
 
         case .f32_add:
-            return .value(.numeric(.binary(.add(.float(.f32)))))
+            return .value(.f32Add)
         case .f32_sub:
-            return .value(.numeric(.binary(.sub(.float(.f32)))))
+            return .value(.f32Sub)
         case .f32_mul:
-            return .value(.numeric(.binary(.mul(.float(.f32)))))
+            return .value(.f32Mul)
         case .f32_div:
-            return .value(.numeric(.floatBinary(.div(.f32))))
+            return .value(.numericFloatBinary((.div(.f32))))
         case .f32_min:
-            return .value(.numeric(.floatBinary(.min(.f32))))
+            return .value(.numericFloatBinary((.min(.f32))))
         case .f32_max:
-            return .value(.numeric(.floatBinary(.max(.f32))))
+            return .value(.numericFloatBinary((.max(.f32))))
         case .f32_copysign:
-            return .value(.numeric(.floatBinary(.copysign(.f32))))
+            return .value(.numericFloatBinary((.copysign(.f32))))
 
         case .f64_abs:
-            return .value(.numeric(.floatUnary(.abs(.f64))))
+            return .value(.numericFloatUnary((.abs(.f64))))
         case .f64_neg:
-            return .value(.numeric(.floatUnary(.neg(.f64))))
+            return .value(.numericFloatUnary((.neg(.f64))))
         case .f64_ceil:
-            return .value(.numeric(.floatUnary(.ceil(.f64))))
+            return .value(.numericFloatUnary((.ceil(.f64))))
         case .f64_floor:
-            return .value(.numeric(.floatUnary(.floor(.f64))))
+            return .value(.numericFloatUnary((.floor(.f64))))
         case .f64_trunc:
-            return .value(.numeric(.floatUnary(.trunc(.f64))))
+            return .value(.numericFloatUnary((.trunc(.f64))))
         case .f64_nearest:
-            return .value(.numeric(.floatUnary(.nearest(.f64))))
+            return .value(.numericFloatUnary((.nearest(.f64))))
         case .f64_sqrt:
-            return .value(.numeric(.floatUnary(.sqrt(.f64))))
+            return .value(.numericFloatUnary((.sqrt(.f64))))
 
         case .f64_add:
-            return .value(.numeric(.binary(.add(.float(.f64)))))
+            return .value(.f64Add)
         case .f64_sub:
-            return .value(.numeric(.binary(.sub(.float(.f64)))))
+            return .value(.f64Sub)
         case .f64_mul:
-            return .value(.numeric(.binary(.mul(.float(.f64)))))
+            return .value(.f64Mul)
         case .f64_div:
-            return .value(.numeric(.floatBinary(.div(.f64))))
+            return .value(.numericFloatBinary((.div(.f64))))
         case .f64_min:
-            return .value(.numeric(.floatBinary(.min(.f64))))
+            return .value(.numericFloatBinary((.min(.f64))))
         case .f64_max:
-            return .value(.numeric(.floatBinary(.max(.f64))))
+            return .value(.numericFloatBinary((.max(.f64))))
         case .f64_copysign:
-            return .value(.numeric(.floatBinary(.copysign(.f64))))
+            return .value(.numericFloatBinary((.copysign(.f64))))
 
         case .i32_wrap_i64:
-            return .value(.numeric(.conversion(.wrap)))
+            return .value(.numericConversion((.wrap)))
         case .i32_trunc_f32_s:
-            return .value(.numeric(.conversion(.truncSigned(.i32, .f32))))
+            return .value(.numericConversion((.truncSigned(.i32, .f32))))
         case .i32_trunc_f32_u:
-            return .value(.numeric(.conversion(.truncUnsigned(.i32, .f32))))
+            return .value(.numericConversion((.truncUnsigned(.i32, .f32))))
         case .i32_trunc_f64_s:
-            return .value(.numeric(.conversion(.truncSigned(.i32, .f64))))
+            return .value(.numericConversion((.truncSigned(.i32, .f64))))
         case .i32_trunc_f64_u:
-            return .value(.numeric(.conversion(.truncUnsigned(.i32, .f64))))
+            return .value(.numericConversion((.truncUnsigned(.i32, .f64))))
         case .i64_extend_i32_s:
-            return .value(.numeric(.conversion(.extendSigned)))
+            return .value(.numericConversion((.extendSigned)))
         case .i64_extend_i32_u:
-            return .value(.numeric(.conversion(.extendUnsigned)))
+            return .value(.numericConversion((.extendUnsigned)))
         case .i64_trunc_f32_s:
-            return .value(.numeric(.conversion(.truncSigned(.i64, .f32))))
+            return .value(.numericConversion((.truncSigned(.i64, .f32))))
         case .i64_trunc_f32_u:
-            return .value(.numeric(.conversion(.truncUnsigned(.i64, .f32))))
+            return .value(.numericConversion((.truncUnsigned(.i64, .f32))))
         case .i64_trunc_f64_s:
-            return .value(.numeric(.conversion(.truncSigned(.i64, .f64))))
+            return .value(.numericConversion((.truncSigned(.i64, .f64))))
         case .i64_trunc_f64_u:
-            return .value(.numeric(.conversion(.truncUnsigned(.i64, .f64))))
+            return .value(.numericConversion((.truncUnsigned(.i64, .f64))))
         case .f32_convert_i32_s:
-            return .value(.numeric(.conversion(.convertSigned(.f32, .i32))))
+            return .value(.numericConversion((.convertSigned(.f32, .i32))))
         case .f32_convert_i32_u:
-            return .value(.numeric(.conversion(.convertUnsigned(.f32, .i32))))
+            return .value(.numericConversion((.convertUnsigned(.f32, .i32))))
         case .f32_convert_i64_s:
-            return .value(.numeric(.conversion(.convertSigned(.f32, .i64))))
+            return .value(.numericConversion((.convertSigned(.f32, .i64))))
         case .f32_convert_i64_u:
-            return .value(.numeric(.conversion(.convertUnsigned(.f32, .i64))))
+            return .value(.numericConversion((.convertUnsigned(.f32, .i64))))
         case .f32_demote_f64:
-            return .value(.numeric(.conversion(.demote)))
+            return .value(.numericConversion((.demote)))
         case .f64_convert_i32_s:
-            return .value(.numeric(.conversion(.convertSigned(.f64, .i32))))
+            return .value(.numericConversion((.convertSigned(.f64, .i32))))
         case .f64_convert_i32_u:
-            return .value(.numeric(.conversion(.convertUnsigned(.f64, .i32))))
+            return .value(.numericConversion((.convertUnsigned(.f64, .i32))))
         case .f64_convert_i64_s:
-            return .value(.numeric(.conversion(.convertSigned(.f64, .i64))))
+            return .value(.numericConversion((.convertSigned(.f64, .i64))))
         case .f64_convert_i64_u:
-            return .value(.numeric(.conversion(.convertUnsigned(.f64, .i64))))
+            return .value(.numericConversion((.convertUnsigned(.f64, .i64))))
         case .f64_promote_f32:
-            return .value(.numeric(.conversion(.promote)))
+            return .value(.numericConversion((.promote)))
         case .i32_reinterpret_f32:
-            return .value(.numeric(.conversion(.reinterpret(.int(.i32), .float(.f32)))))
+            return .value(.numericConversion((.reinterpret(.int(.i32), .float(.f32)))))
         case .i64_reinterpret_f64:
-            return .value(.numeric(.conversion(.reinterpret(.int(.i64), .float(.f64)))))
+            return .value(.numericConversion((.reinterpret(.int(.i64), .float(.f64)))))
         case .f32_reinterpret_i32:
-            return .value(.numeric(.conversion(.reinterpret(.float(.f32), .int(.i32)))))
+            return .value(.numericConversion((.reinterpret(.float(.f32), .int(.i32)))))
         case .f64_reinterpret_i64:
-            return .value(.numeric(.conversion(.reinterpret(.float(.f64), .int(.i64)))))
+            return .value(.numericConversion((.reinterpret(.float(.f64), .int(.i64)))))
 
         case .i32_extend8_s:
-            return .value(.numeric(.conversion(.extend8Signed(.i32))))
+            return .value(.numericConversion((.extend8Signed(.i32))))
         case .i32_extend16_s:
-            return .value(.numeric(.conversion(.extend16Signed(.i32))))
+            return .value(.numericConversion((.extend16Signed(.i32))))
         case .i64_extend8_s:
-            return .value(.numeric(.conversion(.extend8Signed(.i64))))
+            return .value(.numericConversion((.extend8Signed(.i64))))
         case .i64_extend16_s:
-            return .value(.numeric(.conversion(.extend16Signed(.i64))))
+            return .value(.numericConversion((.extend16Signed(.i64))))
         case .i64_extend32_s:
-            return .value(.numeric(.conversion(.extend32Signed)))
+            return .value(.numericConversion((.extend32Signed)))
 
         case .ref_null:
             let type = try parseValueType()
@@ -763,32 +776,32 @@ extension WasmParser {
             return .value(try .reference(.refFunc(parseUnsigned())))
 
         case .table_get:
-            return .value(try .table(.get(parseUnsigned())))
+            return .value(try .tableGet(parseUnsigned()))
 
         case .table_set:
-            return .value(try .table(.set(parseUnsigned())))
+            return .value(try .tableSet(parseUnsigned()))
 
         case .wasm2InstructionPrefix:
             let codeSuffix: UInt32 = try parseUnsigned()
             switch codeSuffix {
             case 0:
-                return .value(.numeric(.conversion(.truncSaturatingSigned(.i32, .f32))))
+                return .value(.numericConversion((.truncSaturatingSigned(.i32, .f32))))
             case 1:
-                return .value(.numeric(.conversion(.truncSaturatingUnsigned(.i32, .f32))))
+                return .value(.numericConversion((.truncSaturatingUnsigned(.i32, .f32))))
             case 2:
-                return .value(.numeric(.conversion(.truncSaturatingSigned(.i32, .f64))))
+                return .value(.numericConversion((.truncSaturatingSigned(.i32, .f64))))
             case 3:
-                return .value(.numeric(.conversion(.truncSaturatingUnsigned(.i32, .f64))))
+                return .value(.numericConversion((.truncSaturatingUnsigned(.i32, .f64))))
             case 4:
-                return .value(.numeric(.conversion(.truncSaturatingSigned(.i64, .f32))))
+                return .value(.numericConversion((.truncSaturatingSigned(.i64, .f32))))
             case 5:
-                return .value(.numeric(.conversion(.truncSaturatingUnsigned(.i64, .f32))))
+                return .value(.numericConversion((.truncSaturatingUnsigned(.i64, .f32))))
             case 6:
-                return .value(.numeric(.conversion(.truncSaturatingSigned(.i64, .f64))))
+                return .value(.numericConversion((.truncSaturatingSigned(.i64, .f64))))
             case 7:
-                return .value(.numeric(.conversion(.truncSaturatingUnsigned(.i64, .f64))))
+                return .value(.numericConversion((.truncSaturatingUnsigned(.i64, .f64))))
             case 8:
-                let result = try Instruction.memory(.`init`(parseUnsigned()))
+                let result = try Instruction.memoryInit(parseUnsigned())
                 // memory.init requires data count section
                 // https://webassembly.github.io/spec/core/binary/modules.html#data-count-section
                 guard hasDataCount else {
@@ -808,14 +821,14 @@ extension WasmParser {
                 guard hasDataCount else {
                     throw WasmParserError.dataCountSectionRequired
                 }
-                return .value(try .memory(.dataDrop(parseUnsigned())))
+                return .value(try .memoryDataDrop(parseUnsigned()))
 
             case 10:
                 let (zero1, zero2) = try (stream.consumeAny(), stream.consumeAny())
                 guard zero1 == 0x00 && zero2 == 0x00 else {
                     throw WasmParserError.zeroExpected(actual: zero2, index: currentIndex)
                 }
-                return .value(.memory(.copy))
+                return .value(.memoryCopy)
 
             case 11:
                 let zero = try stream.consumeAny()
@@ -823,29 +836,29 @@ extension WasmParser {
                     throw WasmParserError.zeroExpected(actual: zero, index: currentIndex)
                 }
 
-                return .value(.memory(.fill))
+                return .value(.memoryFill)
 
             case 12:
                 let elementIndex: ElementIndex = try parseUnsigned()
                 let tableIndex: TableIndex = try parseUnsigned()
-                return .value(.table(.`init`(tableIndex, elementIndex)))
+                return .value(.tableInit(tableIndex, elementIndex))
 
             case 13:
-                return .value(try .table(.elementDrop(parseUnsigned())))
+                return .value(try .tableElementDrop(parseUnsigned()))
 
             case 14:
                 let sourceTableIndex: TableIndex = try parseUnsigned()
                 let destinationTableIndex: TableIndex = try parseUnsigned()
-                return .value(.table(.copy(sourceTableIndex, destinationTableIndex)))
+                return .value(.tableCopy(dest: sourceTableIndex, src: destinationTableIndex))
 
             case 15:
-                return .value(try .table(.grow(parseUnsigned())))
+                return .value(try .tableGrow(parseUnsigned()))
 
             case 16:
-                return .value(try .table(.size(parseUnsigned())))
+                return .value(try .tableSize(parseUnsigned()))
 
             case 17:
-                return .value(try .table(.fill(parseUnsigned())))
+                return .value(try .tableFill(parseUnsigned()))
 
             default:
                 throw WasmParserError.unimplementedInstruction(rawCode, suffix: codeSuffix)
@@ -853,40 +866,50 @@ extension WasmParser {
         }
     }
 
-    func parseExpression() throws -> (result: Expression, end: PseudoInstruction) {
+    func parseExpression(typeSection: [FunctionType]? = nil) throws -> (result: Expression, end: PseudoInstruction) {
         typealias PendingWork = (
             instructions: [Instruction],
-            resume: (Expression, PseudoInstruction) throws -> ParseInstructionResult
+            resume: ([Instruction], PseudoInstruction) throws -> ParseInstructionResult
         )
         var pendingWorks: [PendingWork] = []
         var instructions: [Instruction] = []
 
-        var nextResult = try parseInstruction()
+        func parseSingleInst() throws -> ParseInstructionResult {
+            return try parseInstruction(typeSection: typeSection)
+        }
+        var nextResult = try parseSingleInst()
 
         while true {
             switch nextResult {
-            case .value(.pseudo(let end)):
-                let expr = Expression(instructions: instructions)
+            case .value(let end) where end == .end || end == .else:
+                let end: PseudoInstruction = end == .end ? .end : .else
                 if let nextWork = pendingWorks.popLast() {
                     // If there is a pending parse, then restore the parsing
                     // state and resume the rest of the work
+                    nextResult = try nextWork.resume(instructions, end)
                     instructions = nextWork.instructions
-                    nextResult = try nextWork.resume(expr, end)
                 } else {
                     // If no more pending expression, the expression is top-level
-                    return (expr, end)
+                    return (instructions, end)
                 }
             case let .value(nextInstruction):
                 instructions.append(nextInstruction)
-                nextResult = try parseInstruction()
+                nextResult = try parseSingleInst()
+            case let .multiValue(nextInsts):
+                instructions.append(contentsOf: nextInsts)
+                nextResult = try parseSingleInst()
             case let .requestExpression(resume):
                 // If nested expression is requested, stop parsing the current expression
                 // and start parsing the nested one
                 pendingWorks.append((instructions, resume))
                 instructions = []
-                nextResult = try parseInstruction()
+                nextResult = try parseSingleInst()
             }
         }
+    }
+    func parseInstructionSequence(typeSection: [FunctionType]) throws -> (result: InstructionSequence, end: PseudoInstruction) {
+        let (instructions, end) = try parseExpression(typeSection: typeSection)
+        return (InstructionSequence(instructions: instructions), end)
     }
 }
 
@@ -1060,9 +1083,7 @@ extension WasmParser {
                 initializer = try parseVector { try parseExpression().result }
             } else {
                 initializer = try parseVector {
-                    try Expression(
-                        instructions: [.reference(.refFunc(parseUnsigned() as UInt32))]
-                    )
+                    try [.reference(.refFunc(parseUnsigned() as UInt32))]
                 }
             }
 
@@ -1267,10 +1288,10 @@ extension WasmParser {
         let functions = codes.enumerated().map { [hasDataCount, features] index, code in
             GuestFunction(
                 type: typeIndices[index], locals: code.locals,
-                body: {
+                body: { [types = module.types] in
                     let stream = StaticByteStream(bytes: Array(code.expression))
                     let parser = WasmParser<StaticByteStream>(stream: stream, features: features, hasDataCount: hasDataCount)
-                    let (result, end) = try parser.parseExpression()
+                    let (result, end) = try parser.parseInstructionSequence(typeSection: types)
                     guard end == .end else {
                         throw WasmParserError.endOpcodeExpected
                     }

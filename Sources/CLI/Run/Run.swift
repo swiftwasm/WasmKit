@@ -54,6 +54,11 @@ struct Run: ParsableCommand {
         }
 
         let interceptor = try deriveInterceptor()
+        #if !DEBUG
+        guard interceptor == nil else {
+            fatalError("Internal Error: Interceptor API is unavailable with Release build due to performance reasons")
+        }
+        #endif
         defer { interceptor?.finalize() }
 
         let invoke: () throws -> Void

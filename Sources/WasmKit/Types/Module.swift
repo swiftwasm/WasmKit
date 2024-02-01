@@ -68,17 +68,22 @@ public typealias LabelIndex = UInt32
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#functions>
 struct GuestFunction {
-    init(type: TypeIndex, locals: [ValueType], body: @escaping () throws -> Expression) {
+    init(type: TypeIndex, locals: [ValueType], body: @escaping () throws -> InstructionSequence) {
         self.type = type
-        self.locals = locals
+        // TODO: Deallocate const default locals after the module is deallocated
+        let defaultLocals = UnsafeMutableBufferPointer<Value>.allocate(capacity: locals.count)
+        for (index, localType) in locals.enumerated() {
+            defaultLocals[index] = localType.defaultValue
+        }
+        self.defaultLocals = UnsafeBufferPointer(defaultLocals)
         self.materializer = body
     }
 
     public let type: TypeIndex
-    public let locals: [ValueType]
-    private var _bodyStorage: Expression? = nil
-    private let materializer: () throws -> Expression
-    var body: Expression {
+    public let defaultLocals: UnsafeBufferPointer<Value>
+    private var _bodyStorage: InstructionSequence? = nil
+    private let materializer: () throws -> InstructionSequence
+    var body: InstructionSequence {
         mutating get throws {
             if let materialized = _bodyStorage {
                 return materialized

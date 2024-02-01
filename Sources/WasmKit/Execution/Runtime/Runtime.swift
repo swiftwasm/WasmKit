@@ -64,31 +64,27 @@ extension Runtime {
             initialGlobals: initialGlobals
         )
 
-        // Step 12.
-        let frame = Frame(arity: 0, module: instance, locals: [])
-
-        // Step 13.
-        var initExecution = ExecutionState()
-        try initExecution.stack.push(frame: frame)
+        // Step 12-13.
 
         // Steps 14-15.
         do {
             for (elementIndex, element) in module.elements.enumerated() {
                 let elementIndex = UInt32(elementIndex)
-
                 switch element.mode {
                 case let .active(tableIndex, offsetExpression):
-                    for i in offsetExpression.instructions + [
-                        .numeric(.const(.i32(0))),
-                        .numeric(.const(.i32(UInt32(element.initializer.count)))),
-                        .table(.`init`(tableIndex, elementIndex)),
-                        .table(.elementDrop(elementIndex)),
-                    ] {
-                        try initExecution.execute(i, runtime: self)
-                    }
+                    let initIseq = InstructionSequence(instructions: offsetExpression + [
+                        .numericConst(.i32(0)),
+                        .numericConst(.i32(UInt32(element.initializer.count))),
+                        .tableInit(tableIndex, elementIndex),
+                        .tableElementDrop(elementIndex),
+                    ])
+                    defer { initIseq.deallocate() }
+                    try evaluateConstExpr(initIseq, instance: instance)
 
                 case .declarative:
-                    try initExecution.execute(.table(.elementDrop(elementIndex)), runtime: self)
+                    let initIseq: InstructionSequence = [.tableElementDrop(elementIndex)]
+                    defer { initIseq.deallocate() }
+                    try evaluateConstExpr(initIseq, instance: instance)
 
                 case .passive:
                     continue
@@ -104,15 +100,14 @@ extension Runtime {
         do {
             for case let (dataIndex, .active(data)) in module.data.enumerated() {
                 assert(data.index == 0)
-
-                for i in data.offset.instructions + [
-                    .numeric(.const(.i32(0))),
-                    .numeric(.const(.i32(UInt32(data.initializer.count)))),
-                    .memory(.`init`(UInt32(dataIndex))),
-                    .memory(.dataDrop(UInt32(dataIndex))),
-                ] {
-                    try initExecution.execute(i, runtime: self)
-                }
+                let iseq = InstructionSequence(instructions: data.offset + [
+                    .numericConst(.i32(0)),
+                    .numericConst(.i32(UInt32(data.initializer.count))),
+                    .memoryInit(UInt32(dataIndex)),
+                    .memoryDataDrop(UInt32(dataIndex)),
+                ])
+                defer { iseq.deallocate() }
+                try evaluateConstExpr(iseq, instance: instance)
             }
         } catch Trap.outOfBoundsMemoryAccess {
             throw InstantiationError.outOfBoundsMemoryAccess
@@ -122,53 +117,70 @@ extension Runtime {
 
         // Step 17.
         if let startIndex = module.start {
-            try initExecution.invoke(functionAddress: instance.functionAddresses[Int(startIndex)], runtime: self)
-            while initExecution.stack.elements.count != 1 || initExecution.stack.currentFrame != frame {
-                try initExecution.step(runtime: self)
+            try withExecution { initExecution in
+                try initExecution.invoke(functionAddress: instance.functionAddresses[Int(startIndex)], runtime: self)
+                try initExecution.run(runtime: self)
             }
         }
-
-        // Steps 18-19.
-        try initExecution.stack.popFrame()
 
         return instance
     }
 
     private func evaluateGlobals(module: Module, externalValues: [ExternalValue]) throws -> [Value] {
-        let globalModuleInstance = ModuleInstance()
-
-        for externalValue in externalValues {
-            switch externalValue {
-            case let .global(address):
-                globalModuleInstance.globalAddresses.append(address)
-            case let .function(address):
-                globalModuleInstance.functionAddresses.append(address.address)
-            default:
-                continue
+        try store.withTemporaryModuleInstance { globalModuleInstance in
+            for externalValue in externalValues {
+                switch externalValue {
+                case let .global(address):
+                    globalModuleInstance.globalAddresses.append(address)
+                case let .function(address):
+                    globalModuleInstance.functionAddresses.append(address.address)
+                default:
+                    continue
+                }
             }
-        }
-
-        globalModuleInstance.types = module.types
-
-        for function in module.functions {
-            let address = store.allocate(function: function, module: globalModuleInstance)
-            globalModuleInstance.functionAddresses.append(address)
-        }
-
-        var initExecution = ExecutionState()
-        try initExecution.stack.push(frame: .init(arity: 0, module: globalModuleInstance, locals: []))
-
-        let globalInitializers = try module.globals.map { global in
-            for i in global.initializer.instructions {
-                try initExecution.execute(i, runtime: self)
+            
+            globalModuleInstance.types = module.types
+            
+            for function in module.functions {
+                let address = store.allocate(function: function, module: globalModuleInstance)
+                globalModuleInstance.functionAddresses.append(address)
             }
-
-            return try initExecution.stack.popValue()
+            
+            let globalInitializers = try module.globals.map { global in
+                let iseq = InstructionSequence(instructions: global.initializer)
+                defer { iseq.deallocate() }
+                return try evaluateConstExpr(iseq, instance: globalModuleInstance, arity: 1) { initExecution in
+                    return initExecution.stack.popValue()
+                }
+            }
+            
+            return globalInitializers
         }
+    }
 
-        try initExecution.stack.popFrame()
+    func evaluateConstExpr(_ iseq: InstructionSequence, instance: ModuleInstance, arity: Int = 0) throws {
+        try evaluateConstExpr(iseq, instance: instance, arity: arity, body: { _ in })
+    }
 
-        return globalInitializers
+    func evaluateConstExpr<T>(
+        _ iseq: InstructionSequence,
+        instance: ModuleInstance,
+        arity: Int = 0,
+        body: (inout ExecutionState) throws -> T
+    ) throws -> T {
+        try withExecution { initExecution in
+            try initExecution.stack.pushFrame(
+                iseq: iseq,
+                arity: arity,
+                module: instance.selfAddress,
+                argc: 0,
+                defaultLocals: nil,
+                returnPC: initExecution.programCounter + 1
+            )
+            initExecution.programCounter = iseq.baseAddress
+            try initExecution.run(runtime: self)
+            return try body(&initExecution)
+        }
     }
 }
 

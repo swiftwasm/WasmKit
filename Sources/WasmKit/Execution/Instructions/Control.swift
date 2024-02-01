@@ -1,163 +1,164 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#control-instructions>
-enum ControlInstruction: Equatable {
-    case unreachable
-    case nop
-    case block(expression: Expression, type: ResultType)
-    case loop(expression: Expression, type: ResultType)
-    case `if`(then: Expression, else: Expression, type: ResultType)
-    case br(_ labelIndex: LabelIndex)
-    case brIf(_ labelIndex: LabelIndex)
-    case brTable(_ labelIndices: [LabelIndex], default: LabelIndex)
-    case `return`
-    case call(functionIndex: UInt32)
-    case callIndirect(tableIndex: TableIndex, typeIndex: TypeIndex)
+extension ExecutionState {
+    func unreachable(runtime: Runtime) throws {
+        throw Trap.unreachable
+    }
+    mutating func nop(runtime: Runtime) throws {
+        programCounter += 1
+    }
+    private func getTypeSection(store: Store) -> [FunctionType] {
+        store.module(address: stack.currentFrame.module).types
+    }
 
-    func execute(runtime: Runtime, execution: inout ExecutionState) throws {
-        switch self {
-        case .unreachable:
-            throw Trap.unreachable
+    typealias BlockType = Instruction.BlockType
 
-        case .nop:
-            execution.programCounter += 1
+    mutating func block(runtime: Runtime, endRef: ExpressionRef, type: BlockType) {
+        enter(
+            jumpTo: programCounter + 1,
+            continuation: programCounter + endRef.relativeOffset,
+            arity: Int(type.results),
+            pushPopValues: Int(type.parameters)
+        )
+    }
+    mutating func loop(runtime: Runtime, type: BlockType) {
+        let paramSize = Int(type.parameters)
+        enter(jumpTo: programCounter + 1, continuation: programCounter, arity: paramSize, pushPopValues: paramSize)
+    }
 
-        case let .block(expression, type):
-            let (paramSize, resultSize) = type.arity(typeSection: { execution.stack.currentFrame.module.types })
-            let values = try execution.stack.popValues(count: paramSize)
-            execution.enter(expression, continuation: execution.programCounter + 1, arity: resultSize)
-            execution.stack.push(values: values)
-
-        case let .loop(expression, type):
-            let (paramSize, _) = type.arity(typeSection: { execution.stack.currentFrame.module.types })
-            let values = try execution.stack.popValues(count: paramSize)
-            execution.enter(expression, continuation: execution.programCounter, arity: paramSize)
-            execution.stack.push(values: values)
-
-        case let .if(then, `else`, type):
-            let isTrue = try execution.stack.popValue().i32 != 0
-
-            let expression: Expression
-            if isTrue {
-                expression = then
-            } else {
-                expression = `else`
-            }
-
-            if !expression.instructions.isEmpty {
-                let derived = ControlInstruction.block(expression: expression, type: type)
-                try derived.execute(runtime: runtime, execution: &execution)
-            } else {
-                execution.programCounter += 1
-            }
-
-        case let .brIf(labelIndex):
-            guard try execution.stack.popValue().i32 != 0 else {
-                execution.programCounter += 1
-                return
-            }
-
-            fallthrough
-
-        case let .br(labelIndex):
-            try execution.branch(labelIndex: Int(labelIndex))
-
-        case let .brTable(labelIndices, defaultLabelIndex):
-            let value = try execution.stack.popValue().i32
-            let labelIndex: LabelIndex
-            if labelIndices.indices.contains(Int(value)) {
-                labelIndex = labelIndices[Int(value)]
-            } else {
-                labelIndex = defaultLabelIndex
-            }
-
-            try execution.branch(labelIndex: Int(labelIndex))
-
-        case .return:
-            let values = try execution.stack.popValues(count: execution.stack.currentFrame.arity)
-
-            let currentFrame = Stack.Element.frame(execution.stack.currentFrame)
-            var lastLabel: Label?
-            while execution.stack.top != currentFrame {
-                execution.stack.discardTopValues()
-                lastLabel = try execution.stack.popLabel()
-            }
-            if let lastLabel {
-                execution.programCounter = lastLabel.continuation
-            }
-            execution.stack.push(values: values)
-
-        case let .call(functionIndex):
-            let functionAddresses = execution.stack.currentFrame.module.functionAddresses
-
-            guard functionAddresses.indices.contains(Int(functionIndex)) else {
-                throw Trap.invalidFunctionIndex(functionIndex)
-            }
-
-            try execution.invoke(functionAddress: functionAddresses[Int(functionIndex)], runtime: runtime)
-
-        case let .callIndirect(tableIndex, typeIndex):
-            let moduleInstance = execution.stack.currentFrame.module
-            let tableAddresses = moduleInstance.tableAddresses[Int(tableIndex)]
-            let tableInstance = runtime.store.tables[tableAddresses]
-            let expectedType = moduleInstance.types[Int(typeIndex)]
-            let value = try execution.stack.popValue().i32
-            let elementIndex = Int(value)
-            guard elementIndex < tableInstance.elements.count else {
-                throw Trap.undefinedElement
-            }
-            guard case let .function(functionAddress?) = tableInstance.elements[elementIndex]
-            else {
-                throw Trap.tableUninitialized(ElementIndex(elementIndex))
-            }
-            let function = runtime.store.functions[functionAddress]
-            guard function.type == expectedType else {
-                throw Trap.callIndirectFunctionTypeMismatch(actual: function.type, expected: expectedType)
-            }
-
-            try execution.invoke(functionAddress: functionAddress, runtime: runtime)
+    mutating func ifThen(runtime: Runtime, endRef: ExpressionRef, type: BlockType) {
+        let isTrue = stack.popValue().i32 != 0
+        if isTrue {
+            enter(
+                jumpTo: programCounter + 1,
+                continuation: programCounter.advanced(by: endRef.relativeOffset),
+                arity: Int(type.results),
+                pushPopValues: Int(type.parameters)
+            )
+        } else {
+            programCounter += endRef.relativeOffset
         }
     }
-}
 
-extension ControlInstruction: CustomStringConvertible {
-    public var description: String {
-        switch self {
-        case .loop:
-            return "loop"
-
-        case .block:
-            return "block"
-
-        case let .br(i):
-            return "br \(i)"
-
-        case let .brIf(i):
-            return "br_if \(i)"
-
-        case let .brTable(i, d):
-            return "br_if \(i.map(\.description).joined(separator: " ")) \(d)"
-
-        case let .call(functionIndex):
-            return "call \(functionIndex)"
-
-        case let .callIndirect(tableIndex, typeIndex):
-            return "call_indirect \(tableIndex) \(typeIndex)"
-
-        case let .if(type, then, `else`):
-            return """
-                if \(type)\n  \(then)
-                else\n  \(`else`)
-                end
-                """
-
-        case .unreachable:
-            return "unreachable"
-
-        case .nop:
-            return "nop"
-
-        case .return:
-            return "return"
+    mutating func ifThenElse(runtime: Runtime, elseRef: ExpressionRef, endRef: ExpressionRef, type: BlockType) {
+        let isTrue = stack.popValue().i32 != 0
+        let addendToPC: Int
+        if isTrue {
+            addendToPC = 1
+        } else {
+            addendToPC = elseRef.relativeOffset
         }
+        enter(
+            jumpTo: programCounter + addendToPC,
+            continuation: programCounter + endRef.relativeOffset,
+            arity: Int(type.results),
+            pushPopValues: Int(type.parameters)
+        )
+    }
+    mutating func end(runtime: Runtime) {
+        if let currentLabel = self.stack.currentLabel {
+            stack.exit(label: currentLabel)
+        }
+        programCounter += 1
+    }
+    mutating func `else`(runtime: Runtime) {
+        let label = self.stack.currentLabel!
+        stack.exit(label: label)
+        programCounter = label.continuation // if-then-else's continuation points the "end"
+    }
+
+    private mutating func branch(labelIndex: Int, runtime: Runtime) throws {
+        if stack.numberOfLabelsInCurrentFrame() == labelIndex {
+            try self.return(runtime: runtime)
+            return
+        }
+        let label = stack.getLabel(index: Int(labelIndex))
+        let values = stack.popValues(count: label.arity)
+
+        stack.unwindLabels(upto: labelIndex)
+
+        stack.push(values: values)
+        programCounter = label.continuation
+    }
+    mutating func br(runtime: Runtime, labelIndex: LabelIndex) throws {
+        try branch(labelIndex: Int(labelIndex), runtime: runtime)
+    }
+    mutating func brIf(runtime: Runtime, labelIndex: LabelIndex) throws {
+        guard stack.popValue().i32 != 0 else {
+            programCounter += 1
+            return
+        }
+        try br(runtime: runtime, labelIndex: labelIndex)
+    }
+    mutating func brTable(runtime: Runtime, brTable: Instruction.BrTable) throws {
+        let labelIndices = brTable.labelIndices
+        let defaultIndex = brTable.defaultIndex
+        let value = stack.popValue().i32
+        let labelIndex: LabelIndex
+        if labelIndices.indices.contains(Int(value)) {
+            labelIndex = labelIndices[Int(value)]
+        } else {
+            labelIndex = defaultIndex
+        }
+
+        try branch(labelIndex: Int(labelIndex), runtime: runtime)
+    }
+    mutating func `return`(runtime: Runtime) throws {
+        let currentFrame = stack.currentFrame!
+        _ = stack.exit(frame: currentFrame)
+        try endOfFunction(runtime: runtime, currentFrame: currentFrame)
+    }
+
+    mutating func endOfFunction(runtime: Runtime) throws {
+        try self.endOfFunction(runtime: runtime, currentFrame: stack.currentFrame)
+    }
+
+    mutating func endOfExecution(runtime: Runtime) throws {
+        reachedEndOfExecution = true
+    }
+
+    private mutating func endOfFunction(runtime: Runtime, currentFrame: Frame) throws {
+        // When reached at "end" of function
+        #if DEBUG
+        if let address = currentFrame.address {
+            runtime.interceptor?.onExitFunction(address, store: runtime.store)
+        }
+        #endif
+        let values = stack.popValues(count: currentFrame.arity)
+        stack.popFrame()
+        stack.push(values: values)
+        programCounter = currentFrame.returnPC
+    }
+
+    mutating func call(runtime: Runtime, functionIndex: UInt32) throws {
+        let functionAddresses = runtime.store.module(address: stack.currentFrame.module).functionAddresses
+
+        guard functionAddresses.indices.contains(Int(functionIndex)) else {
+            throw Trap.invalidFunctionIndex(functionIndex)
+        }
+
+        try invoke(functionAddress: functionAddresses[Int(functionIndex)], runtime: runtime)
+    }
+
+    mutating func callIndirect(runtime: Runtime, tableIndex: TableIndex, typeIndex: TypeIndex) throws {
+        let moduleInstance = runtime.store.module(address: stack.currentFrame.module)
+        let tableAddresses = moduleInstance.tableAddresses[Int(tableIndex)]
+        let tableInstance = runtime.store.tables[tableAddresses]
+        let expectedType = moduleInstance.types[Int(typeIndex)]
+        let value = stack.popValue().i32
+        let elementIndex = Int(value)
+        guard elementIndex < tableInstance.elements.count else {
+            throw Trap.undefinedElement
+        }
+        guard case let .function(functionAddress?) = tableInstance.elements[elementIndex]
+        else {
+            throw Trap.tableUninitialized(ElementIndex(elementIndex))
+        }
+        let function = runtime.store.functions[functionAddress]
+        guard function.type == expectedType else {
+            throw Trap.callIndirectFunctionTypeMismatch(actual: function.type, expected: expectedType)
+        }
+
+        try invoke(functionAddress: functionAddress, runtime: runtime)
     }
 }

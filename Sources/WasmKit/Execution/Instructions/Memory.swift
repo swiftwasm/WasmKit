@@ -1,85 +1,160 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#memory-instructions>
-enum MemoryInstruction: Equatable {
-    struct Memarg: Equatable {
-        let offset: UInt64
-        let align: UInt32
+extension ExecutionState {
+    typealias Memarg = Instruction.Memarg
+
+    mutating func i32Load(runtime: Runtime, memarg: Memarg) throws {
+        try memoryLoad(runtime: runtime, memarg: memarg, loadAs: UInt32.self, castToValue: { .i32($0) })
+    }
+    mutating func i64Load(runtime: Runtime, memarg: Memarg) throws {
+        try memoryLoad(runtime: runtime, memarg: memarg, loadAs: UInt64.self, castToValue: { .i64($0) })
+    }
+    mutating func f32Load(runtime: Runtime, memarg: Memarg) throws {
+        try memoryLoad(runtime: runtime, memarg: memarg, loadAs: UInt32.self, castToValue: { .f32($0) })
+    }
+    mutating func f64Load(runtime: Runtime, memarg: Memarg) throws {
+        try memoryLoad(runtime: runtime, memarg: memarg, loadAs: UInt64.self, castToValue: { .f64($0) })
+    }
+    mutating func i32Load8S(runtime: Runtime, memarg: Memarg) throws {
+        try memoryLoad(runtime: runtime, memarg: memarg, loadAs: Int8.self, castToValue: { .init(signed: Int32($0)) })
+    }
+    mutating func i32Load8U(runtime: Runtime, memarg: Memarg) throws {
+        try memoryLoad(runtime: runtime, memarg: memarg, loadAs: UInt8.self, castToValue: { .i32(UInt32($0)) })
+    }
+    mutating func i32Load16S(runtime: Runtime, memarg: Memarg) throws {
+        try memoryLoad(runtime: runtime, memarg: memarg, loadAs: Int16.self, castToValue: { .init(signed: Int32($0)) })
+    }
+    mutating func i32Load16U(runtime: Runtime, memarg: Memarg) throws {
+        try memoryLoad(runtime: runtime, memarg: memarg, loadAs: UInt16.self, castToValue: { .i32(UInt32($0)) })
+    }
+    mutating func i64Load8S(runtime: Runtime, memarg: Memarg) throws {
+        try memoryLoad(runtime: runtime, memarg: memarg, loadAs: Int8.self, castToValue: { .init(signed: Int64($0)) })
+    }
+    mutating func i64Load8U(runtime: Runtime, memarg: Memarg) throws {
+        try memoryLoad(runtime: runtime, memarg: memarg, loadAs: UInt8.self, castToValue: { .i64(UInt64($0)) })
+    }
+    mutating func i64Load16S(runtime: Runtime, memarg: Memarg) throws {
+        try memoryLoad(runtime: runtime, memarg: memarg, loadAs: Int16.self, castToValue: { .init(signed: Int64($0)) })
+    }
+    mutating func i64Load16U(runtime: Runtime, memarg: Memarg) throws {
+        try memoryLoad(runtime: runtime, memarg: memarg, loadAs: UInt16.self, castToValue: { .i64(UInt64($0)) })
+    }
+    mutating func i64Load32S(runtime: Runtime, memarg: Memarg) throws {
+        try memoryLoad(runtime: runtime, memarg: memarg, loadAs: Int32.self, castToValue: { .init(signed: Int64($0)) })
+    }
+    mutating func i64Load32U(runtime: Runtime, memarg: Memarg) throws {
+        try memoryLoad(runtime: runtime, memarg: memarg, loadAs: UInt32.self, castToValue: { .i64(UInt64($0)) })
     }
 
-    case load(
-        _ memarg: Memarg,
-        bitWidth: UInt8,
-        _ type: NumericType,
-        isSigned: Bool = true
-    )
-    case store(_ memarg: Memarg, bitWidth: UInt8, _ type: ValueType)
-    case size
-    case grow
-    case `init`(DataIndex)
-    case dataDrop(DataIndex)
-    case copy
-    case fill
+    @_transparent
+    private mutating func memoryLoad<T: FixedWidthInteger>(
+        runtime: Runtime, memarg: Instruction.Memarg, loadAs _: T.Type = T.self, castToValue: (T) -> Value
+    ) throws {
+        let moduleInstance = currentModule(store: runtime.store)
+        let store = runtime.store
 
-    func execute(_ stack: inout Stack, _ store: Store) throws {
-        let moduleInstance = stack.currentFrame.module
+        let memoryAddress = moduleInstance.memoryAddresses[0]
+        let memoryInstance = store.memories[memoryAddress]
+        let i = stack.popValue().asAddressOffset(memoryInstance.limit.isMemory64)
+        let (address, isOverflow) = memarg.offset.addingReportingOverflow(i)
+        guard !isOverflow else {
+            throw Trap.outOfBoundsMemoryAccess
+        }
+        let length = UInt64(T.bitWidth) / 8
+        let (endAddress, isEndOverflow) = address.addingReportingOverflow(length)
+        guard !isEndOverflow, endAddress <= memoryInstance.data.count else {
+            throw Trap.outOfBoundsMemoryAccess
+        }
 
-        switch self {
-        case let .load(memarg, bitWidth, type, isSigned):
-            let memoryAddress = moduleInstance.memoryAddresses[0]
+        let loaded = memoryInstance.data.withUnsafeBufferPointer { buffer in
+            let rawBuffer = UnsafeRawBufferPointer(buffer)
+            return rawBuffer.loadUnaligned(fromByteOffset: Int(address), as: T.self)
+        }
+        stack.push(value: castToValue(loaded))
+
+    }
+
+    mutating func i32Store(runtime: Runtime, memarg: Memarg) throws {
+        try memoryStore(runtime: runtime, memarg: memarg, castFromValue: { $0.i32 })
+    }
+    mutating func i64Store(runtime: Runtime, memarg: Memarg) throws {
+        try memoryStore(runtime: runtime, memarg: memarg, castFromValue: { $0.i64 })
+    }
+    mutating func f32Store(runtime: Runtime, memarg: Memarg) throws {
+        try memoryStore(runtime: runtime, memarg: memarg, castFromValue: { $0.f32 })
+    }
+    mutating func f64Store(runtime: Runtime, memarg: Memarg) throws {
+        try memoryStore(runtime: runtime, memarg: memarg, castFromValue: { $0.f64 })
+    }
+    mutating func i32Store8(runtime: Runtime, memarg: Memarg) throws {
+        try memoryStore(runtime: runtime, memarg: memarg, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) })
+    }
+    mutating func i32Store16(runtime: Runtime, memarg: Memarg) throws {
+        try memoryStore(runtime: runtime, memarg: memarg, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) })
+    }
+    mutating func i64Store8(runtime: Runtime, memarg: Memarg) throws {
+        try memoryStore(runtime: runtime, memarg: memarg, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) })
+    }
+    mutating func i64Store16(runtime: Runtime, memarg: Memarg) throws {
+        try memoryStore(runtime: runtime, memarg: memarg, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) })
+    }
+    mutating func i64Store32(runtime: Runtime, memarg: Memarg) throws {
+        try memoryStore(runtime: runtime, memarg: memarg, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) })
+    }
+
+    /// `[type].store[bitWidth]`
+    @_transparent
+    private mutating func memoryStore<T: FixedWidthInteger>(runtime: Runtime, memarg: Instruction.Memarg, castFromValue: (Value) -> T) throws {
+        let moduleInstance = currentModule(store: runtime.store)
+        let store = runtime.store
+
+        let value = stack.popValue()
+
+        let memoryAddress = moduleInstance.memoryAddresses[0]
+        let address: UInt64
+        let endAddress: UInt64
+        let length: UInt64
+        do {
             let memoryInstance = store.memories[memoryAddress]
-            let i = try stack.popValue().asAddressOffset(memoryInstance.limit.isMemory64)
-            let (address, isOverflow) = memarg.offset.addingReportingOverflow(i)
+            let i = stack.popValue().asAddressOffset(memoryInstance.limit.isMemory64)
+            var isOverflow: Bool
+            (address, isOverflow) = memarg.offset.addingReportingOverflow(i)
             guard !isOverflow else {
                 throw Trap.outOfBoundsMemoryAccess
             }
-            let length = UInt64(bitWidth) / 8
-            let (endAddress, isEndOverflow) = address.addingReportingOverflow(length)
-            guard !isEndOverflow, endAddress <= memoryInstance.data.count else {
+            length = UInt64(T.bitWidth) / 8
+            (endAddress, isOverflow) = address.addingReportingOverflow(length)
+            guard !isOverflow, endAddress <= memoryInstance.data.count else {
                 throw Trap.outOfBoundsMemoryAccess
             }
+        }
 
-            let bytes = memoryInstance.data[Int(address)..<Int(endAddress)]
+        let toStore = castFromValue(value)
+        store.memories[memoryAddress].data.withUnsafeMutableBufferPointer { buffer in
+            let rawBuffer = UnsafeMutableRawBufferPointer(buffer)
+            rawBuffer.baseAddress!.advanced(by: Int(address)).bindMemory(to: T.self, capacity: 1).pointee = toStore.littleEndian
+        }
+    }
 
-            stack.push(value: Value(bytes, .numeric(type), isSigned: isSigned)!)
+    mutating func memorySize(runtime: Runtime) {
+        let moduleInstance = currentModule(store: runtime.store)
+        let store = runtime.store
 
-        case let .store(memarg, bitWidth, _):
-            let value = try stack.popValue()
+        let memoryAddress = moduleInstance.memoryAddresses[0]
 
-            let memoryAddress = moduleInstance.memoryAddresses[0]
-            let address: UInt64
-            let endAddress: UInt64
-            let length: UInt64
-            do {
-                let memoryInstance = store.memories[memoryAddress]
-                let i = try stack.popValue().asAddressOffset(memoryInstance.limit.isMemory64)
-                var isOverflow: Bool
-                (address, isOverflow) = memarg.offset.addingReportingOverflow(i)
-                guard !isOverflow else {
-                    throw Trap.outOfBoundsMemoryAccess
-                }
-                length = UInt64(bitWidth) / 8
-                (endAddress, isOverflow) = address.addingReportingOverflow(length)
-                guard !isOverflow, endAddress <= memoryInstance.data.count else {
-                    throw Trap.outOfBoundsMemoryAccess
-                }
-            }
+        let memoryInstance = store.memories[memoryAddress]
+        let pageCount = memoryInstance.data.count / MemoryInstance.pageSize
+        stack.push(value: memoryInstance.limit.isMemory64 ? .i64(UInt64(pageCount)) : .i32(UInt32(pageCount)))
+    }
+    mutating func memoryGrow(runtime: Runtime) throws {
+        let moduleInstance = currentModule(store: runtime.store)
+        let store = runtime.store
 
-            // NOTE: Swift.Array can't allocate 2^64-1 bytes, so we actually support 2^63-1 bytes at most
-            store.memories[memoryAddress].data
-                .replaceSubrange(Int(address)..<Int(endAddress), with: value.bytes![0..<Int(length)])
-
-        case .size:
-            let memoryAddress = moduleInstance.memoryAddresses[0]
-
-            let memoryInstance = store.memories[memoryAddress]
-            let pageCount = memoryInstance.data.count / MemoryInstance.pageSize
-            stack.push(value: memoryInstance.limit.isMemory64 ? .i64(UInt64(pageCount)) : .i32(UInt32(pageCount)))
-
-        case .grow:
-            let memoryAddress = moduleInstance.memoryAddresses[0]
-            let isMemory64 = store.memories[memoryAddress].limit.isMemory64
-
-            let value = try stack.popValue()
+        let memoryAddress = moduleInstance.memoryAddresses[0]
+        try store.withMemory(at: memoryAddress) { memoryInstance in
+            let isMemory64 = memoryInstance.limit.isMemory64
+            
+            let value = stack.popValue()
             let pageCount: UInt64
             switch (isMemory64, value) {
             case let (true, .i64(value)):
@@ -91,21 +166,25 @@ enum MemoryInstruction: Equatable {
                     expected: isMemory64 ? .i64 : .i32, actual: value.type
                 )
             }
-            let oldPageCount = store.memories[memoryAddress].grow(by: Int(pageCount))
+            let oldPageCount = memoryInstance.grow(by: Int(pageCount))
             stack.push(value: oldPageCount)
+        }
+    }
+    mutating func memoryInit(runtime: Runtime, dataIndex: DataIndex) throws {
+        let moduleInstance = currentModule(store: runtime.store)
+        let store = runtime.store
 
-        case let .`init`(dataIndex):
-            let memoryAddress = moduleInstance.memoryAddresses[0]
+        let memoryAddress = moduleInstance.memoryAddresses[0]
+        try store.withMemory(at: memoryAddress) { memoryInstance in
             let dataAddress = moduleInstance.dataAddresses[Int(dataIndex)]
             let dataInstance = store.datas[dataAddress]
-            let memoryInstance = store.memories[memoryAddress]
-
-            let copyCounter = try stack.popValue().i32
-            let sourceIndex = try stack.popValue().i32
-            let destinationIndex = try stack.popValue().asAddressOffset(memoryInstance.limit.isMemory64)
-
+            
+            let copyCounter = stack.popValue().i32
+            let sourceIndex = stack.popValue().i32
+            let destinationIndex = stack.popValue().asAddressOffset(memoryInstance.limit.isMemory64)
+            
             guard copyCounter > 0 else { return }
-
+            
             guard
                 !sourceIndex.addingReportingOverflow(copyCounter).overflow
                     && !destinationIndex.addingReportingOverflow(UInt64(copyCounter)).overflow
@@ -114,65 +193,72 @@ enum MemoryInstruction: Equatable {
             else {
                 throw Trap.outOfBoundsMemoryAccess
             }
-
+            
             // FIXME: benchmark if using `replaceSubrange` is faster than this loop
             for i in 0..<copyCounter {
-                store.memories[memoryAddress].data[Int(destinationIndex + UInt64(i))] =
-                    dataInstance.data[Int(sourceIndex + i)]
+                memoryInstance.data[Int(destinationIndex + UInt64(i))] =
+                dataInstance.data[Int(sourceIndex + i)]
             }
+        }
+    }
+    mutating func memoryDataDrop(runtime: Runtime, dataIndex: DataIndex) {
+        let moduleInstance = currentModule(store: runtime.store)
+        let store = runtime.store
+        let dataAddress = moduleInstance.dataAddresses[Int(dataIndex)]
+        store.datas[dataAddress] = DataInstance(data: [])
+    }
+    mutating func memoryCopy(runtime: Runtime) throws {
+        let moduleInstance = currentModule(store: runtime.store)
+        let store = runtime.store
 
-        case let .dataDrop(dataIndex):
-            let dataAddress = moduleInstance.dataAddresses[Int(dataIndex)]
-            store.datas[dataAddress] = DataInstance(data: [])
-
-        case .fill:
-            let memoryAddress = moduleInstance.memoryAddresses[0]
-
-            let copyCounter = try Int(stack.popValue().i32)
-            let value = try stack.popValue()
-            let destinationIndex = try Int(stack.popValue().i32)
-
-            guard
-                !destinationIndex.addingReportingOverflow(copyCounter).overflow
-                    && store.memories[memoryAddress].data.count >= destinationIndex + copyCounter
-            else {
-                throw Trap.outOfBoundsMemoryAccess
-            }
-
-            store.memories[memoryAddress].data.replaceSubrange(
-                destinationIndex..<destinationIndex + copyCounter,
-                with: [UInt8](repeating: value.bytes![0], count: copyCounter)
-            )
-
-        case .copy:
-            let memoryAddress = moduleInstance.memoryAddresses[0]
-
-            let copyCounter = try stack.popValue().i32
-            let sourceIndex = try stack.popValue().i32
-            let destinationIndex = try stack.popValue().i32
+        let memoryAddress = moduleInstance.memoryAddresses[0]
+        try store.withMemory(at: memoryAddress) { memoryInstance in
+            let copyCounter = stack.popValue().i32
+            let sourceIndex = stack.popValue().i32
+            let destinationIndex = stack.popValue().i32
 
             guard copyCounter > 0 else { return }
 
             guard
                 !sourceIndex.addingReportingOverflow(copyCounter).overflow
                     && !destinationIndex.addingReportingOverflow(copyCounter).overflow
-                    && store.memories[memoryAddress].data.count >= destinationIndex + copyCounter
-                    && store.memories[memoryAddress].data.count >= sourceIndex + copyCounter
+                    && memoryInstance.data.count >= destinationIndex + copyCounter
+                    && memoryInstance.data.count >= sourceIndex + copyCounter
             else {
                 throw Trap.outOfBoundsMemoryAccess
             }
 
             if destinationIndex <= sourceIndex {
                 for i in 0..<copyCounter {
-                    store.memories[memoryAddress].data[Int(destinationIndex + i)] =
-                        store.memories[memoryAddress].data[Int(sourceIndex + i)]
+                    memoryInstance.data[Int(destinationIndex + i)] = memoryInstance.data[Int(sourceIndex + i)]
                 }
             } else {
                 for i in 1...copyCounter {
-                    store.memories[memoryAddress].data[Int(destinationIndex + copyCounter - i)] =
-                        store.memories[memoryAddress].data[Int(sourceIndex + copyCounter - i)]
+                    memoryInstance.data[Int(destinationIndex + copyCounter - i)] = memoryInstance.data[Int(sourceIndex + copyCounter - i)]
                 }
             }
+        }
+    }
+    mutating func memoryFill(runtime: Runtime) throws {
+        let moduleInstance = currentModule(store: runtime.store)
+        let store = runtime.store
+        let memoryAddress = moduleInstance.memoryAddresses[0]
+        try store.withMemory(at: memoryAddress) { memoryInstance in
+            let copyCounter = Int(stack.popValue().i32)
+            let value = stack.popValue()
+            let destinationIndex = Int(stack.popValue().i32)
+            
+            guard
+                !destinationIndex.addingReportingOverflow(copyCounter).overflow
+                    && memoryInstance.data.count >= destinationIndex + copyCounter
+            else {
+                throw Trap.outOfBoundsMemoryAccess
+            }
+            
+            memoryInstance.data.replaceSubrange(
+                destinationIndex..<destinationIndex + copyCounter,
+                with: [UInt8](repeating: value.bytes![0], count: copyCounter)
+            )
         }
     }
 }

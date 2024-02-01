@@ -1,54 +1,176 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#numeric-instructions>
-enum NumericInstruction: Equatable {
-    case const(Value)
-    case intUnary(IntUnary)
-    case floatUnary(FloatUnary)
-    case binary(Binary)
-    case intBinary(IntBinary)
-    case floatBinary(FloatBinary)
-    case conversion(Conversion)
+extension ExecutionState {
+    mutating func numericConst(runtime: Runtime, value: Value) {
+        stack.push(value: value)
+    }
+    mutating func numericIntUnary(runtime: Runtime, intUnary: NumericInstruction.IntUnary) {
+        let value = stack.popValue()
 
-    func execute(_ stack: inout Stack) throws {
-        switch self {
-        case let .const(value):
-            stack.push(value: value)
+        stack.push(value: intUnary(value))
+    }
+    mutating func numericFloatUnary(runtime: Runtime, floatUnary: NumericInstruction.FloatUnary) {
+        let value = stack.popValue()
 
-        case let .intUnary(instruction):
-            let value = try stack.popValue()
+        stack.push(value: floatUnary(value))
+    }
+    @inline(__always)
+    private mutating func numericBinary<T>(castTo: (Value) -> T, binary: (T, T) -> Value) {
+        let value2 = stack.popValue()
+        let value1 = stack.popValue()
 
-            stack.push(value: instruction(value))
+        stack.push(value: binary(castTo(value1), castTo(value2)))
+    }
 
-        case let .floatUnary(instruction):
-            let value = try stack.popValue()
+    mutating func i32Add(runtime: Runtime) {
+        numericBinary(castTo: \.i32, binary: { .i32($0 &+ $1) })
+    }
 
-            stack.push(value: instruction(value))
+    mutating func i64Add(runtime: Runtime) {
+        numericBinary(castTo: \.i64, binary: { .i64($0 &+ $1) })
+    }
 
-        case let .binary(instruction):
-            let value2 = try stack.popValue()
-            let value1 = try stack.popValue()
+    mutating func f32Add(runtime: Runtime) {
+        numericBinary(castTo: \.f32, binary: { .f32((Float32(bitPattern: $0) + Float32(bitPattern: $1)).bitPattern) })
+    }
 
-            stack.push(value: instruction(value1, value2))
+    mutating func f64Add(runtime: Runtime) {
+        numericBinary(castTo: \.f64, binary: { .f64((Float64(bitPattern: $0) + Float64(bitPattern: $1)).bitPattern) })
+    }
 
-        case let .intBinary(instruction):
-            let value2 = try stack.popValue()
-            let value1 = try stack.popValue()
+    mutating func i32Sub(runtime: Runtime) {
+        numericBinary(castTo: \.i32, binary: { .i32($0 &- $1) })
+    }
 
-            try stack.push(value: instruction(value1, value2))
+    mutating func i64Sub(runtime: Runtime) {
+        numericBinary(castTo: \.i64, binary: { .i64($0 &- $1) })
+    }
 
-        case let .floatBinary(instruction):
-            let value2 = try stack.popValue()
-            let value1 = try stack.popValue()
+    mutating func f32Sub(runtime: Runtime) {
+        numericBinary(castTo: \.f32, binary: { .f32((Float32(bitPattern: $0) - Float32(bitPattern: $1)).bitPattern) })
+    }
 
-            try stack.push(value: instruction(value1, value2))
+    mutating func f64Sub(runtime: Runtime) {
+        numericBinary(castTo: \.f64, binary: { .f64((Float64(bitPattern: $0) - Float64(bitPattern: $1)).bitPattern) })
+    }
 
-        case let .conversion(instruction):
-            let value = try stack.popValue()
+    mutating func i32Mul(runtime: Runtime) {
+        numericBinary(castTo: \.i32, binary: { .i32($0 &* $1) })
+    }
 
-            try stack.push(value: instruction(value))
-        }
+    mutating func i64Mul(runtime: Runtime) {
+        numericBinary(castTo: \.i64, binary: { .i64($0 &* $1) })
+    }
+
+    mutating func f32Mul(runtime: Runtime) {
+        numericBinary(castTo: \.f32, binary: { .f32((Float32(bitPattern: $0) * Float32(bitPattern: $1)).bitPattern) })
+    }
+
+    mutating func f64Mul(runtime: Runtime) {
+        numericBinary(castTo: \.f64, binary: { .f64((Float64(bitPattern: $0) * Float64(bitPattern: $1)).bitPattern) })
+    }
+
+    mutating func i32Eq(runtime: Runtime) {
+        numericBinary(castTo: \.i32, binary: { $0 == $1 ? true : false })
+    }
+
+    mutating func i64Eq(runtime: Runtime) {
+        numericBinary(castTo: \.i64, binary: { $0 == $1 ? true : false })
+    }
+
+    mutating func f32Eq(runtime: Runtime) {
+        numericBinary(castTo: \.f32, binary: { Float32(bitPattern: $0) == Float32(bitPattern: $1) ? true : false })
+    }
+
+    mutating func f64Eq(runtime: Runtime) {
+        numericBinary(castTo: \.f64, binary: { Float64(bitPattern: $0) == Float64(bitPattern: $1) ? true : false })
+    }
+
+    mutating func i32Ne(runtime: Runtime) {
+        numericBinary(castTo: \.i32, binary: { $0 == $1 ? false : true })
+    }
+
+    mutating func i64Ne(runtime: Runtime) {
+        numericBinary(castTo: \.i64, binary: { $0 == $1 ? false : true })
+    }
+
+    mutating func f32Ne(runtime: Runtime) {
+        numericBinary(castTo: \.f32, binary: { Float32(bitPattern: $0) == Float32(bitPattern: $1) ? false : true })
+    }
+
+    mutating func f64Ne(runtime: Runtime) {
+        numericBinary(castTo: \.f64, binary: { Float64(bitPattern: $0) == Float64(bitPattern: $1) ? false : true })
+    }
+
+    mutating func i32LtS(runtime: Runtime) {
+        numericBinary(castTo: \.i32, binary: { $0.signed < $1.signed ? true : false })
+    }
+    mutating func i64LtS(runtime: Runtime) {
+        numericBinary(castTo: \.i64, binary: { $0.signed < $1.signed ? true : false })
+    }
+    mutating func i32LtU(runtime: Runtime) {
+        numericBinary(castTo: \.i32, binary: { $0 < $1 ? true : false })
+    }
+    mutating func i64LtU(runtime: Runtime) {
+        numericBinary(castTo: \.i64, binary: { $0 < $1 ? true : false })
+    }
+    mutating func i32GtS(runtime: Runtime) {
+        numericBinary(castTo: \.i32, binary: { $0.signed > $1.signed ? true : false })
+    }
+    mutating func i64GtS(runtime: Runtime) {
+        numericBinary(castTo: \.i64, binary: { $0.signed > $1.signed ? true : false })
+    }
+    mutating func i32GtU(runtime: Runtime) {
+        numericBinary(castTo: \.i32, binary: { $0 > $1 ? true : false })
+    }
+    mutating func i64GtU(runtime: Runtime) {
+        numericBinary(castTo: \.i64, binary: { $0 > $1 ? true : false })
+    }
+    mutating func i32LeS(runtime: Runtime) {
+        numericBinary(castTo: \.i32, binary: { $0.signed <= $1.signed ? true : false })
+    }
+    mutating func i64LeS(runtime: Runtime) {
+        numericBinary(castTo: \.i64, binary: { $0.signed <= $1.signed ? true : false })
+    }
+    mutating func i32LeU(runtime: Runtime) {
+        numericBinary(castTo: \.i32, binary: { $0 <= $1 ? true : false })
+    }
+    mutating func i64LeU(runtime: Runtime) {
+        numericBinary(castTo: \.i64, binary: { $0 <= $1 ? true : false })
+    }
+    mutating func i32GeS(runtime: Runtime) {
+        numericBinary(castTo: \.i32, binary: { $0.signed >= $1.signed ? true : false })
+    }
+    mutating func i64GeS(runtime: Runtime) {
+        numericBinary(castTo: \.i64, binary: { $0.signed >= $1.signed ? true : false })
+    }
+    mutating func i32GeU(runtime: Runtime) {
+        numericBinary(castTo: \.i32, binary: { $0 >= $1 ? true : false })
+    }
+    mutating func i64GeU(runtime: Runtime) {
+        numericBinary(castTo: \.i64, binary: { $0 >= $1 ? true : false })
+    }
+
+    mutating func numericIntBinary(runtime: Runtime, intBinary: NumericInstruction.IntBinary) throws {
+        let value2 = stack.popValue()
+        let value1 = stack.popValue()
+
+        try stack.push(value: intBinary(value1, value2))
+    }
+    mutating func numericFloatBinary(runtime: Runtime, floatBinary: NumericInstruction.FloatBinary) {
+        let value2 = stack.popValue()
+        let value1 = stack.popValue()
+
+        stack.push(value: floatBinary(value1, value2))
+    }
+    mutating func numericConversion(runtime: Runtime, conversion: NumericInstruction.Conversion) throws {
+        let value = stack.popValue()
+
+        try stack.push(value: conversion(value))
     }
 }
+
+enum NumericInstruction {}
 
 /// Numeric Instructions
 extension NumericInstruction {
@@ -135,44 +257,6 @@ extension NumericInstruction {
         }
     }
 
-    public enum Binary: Equatable {
-        // binop
-        case add(NumericType)
-        case sub(NumericType)
-        case mul(NumericType)
-
-        // relop
-        case eq(NumericType)
-        case ne(NumericType)
-
-        var type: NumericType {
-            switch self {
-            case let .add(type),
-                let .sub(type),
-                let .mul(type),
-                let .eq(type),
-                let .ne(type):
-                return type
-            }
-        }
-
-        func callAsFunction(_ value1: Value, _ value2: Value) -> Value {
-            switch self {
-            case .add:
-                return value1 + value2
-            case .sub:
-                return value1 - value2
-            case .mul:
-                return value1 * value2
-
-            case .eq:
-                return value1 == value2 ? true : false
-            case .ne:
-                return value1 == value2 ? false : true
-            }
-        }
-    }
-
     public enum IntBinary: Equatable {
         // ibinop
         case divS(IntValueType)
@@ -188,16 +272,6 @@ extension NumericInstruction {
         case rotl(IntValueType)
         case rotr(IntValueType)
 
-        // irelop
-        case ltS(IntValueType)
-        case ltU(IntValueType)
-        case gtS(IntValueType)
-        case gtU(IntValueType)
-        case leS(IntValueType)
-        case leU(IntValueType)
-        case geS(IntValueType)
-        case geU(IntValueType)
-
         var type: NumericType {
             switch self {
             case let .divS(type),
@@ -211,15 +285,7 @@ extension NumericInstruction {
                 let .shrS(type),
                 let .shrU(type),
                 let .rotl(type),
-                let .rotr(type),
-                let .ltS(type),
-                let .ltU(type),
-                let .gtS(type),
-                let .gtU(type),
-                let .leS(type),
-                let .leU(type),
-                let .geS(type),
-                let .geU(type):
+                let .rotr(type):
                 return .int(type)
             }
         }
@@ -261,43 +327,6 @@ extension NumericInstruction {
                 return value1.rotl(value2)
             case (.rotr, _):
                 return value1.rotr(value2)
-
-            case (.ltS, .int(.i32)):
-                return value1.i32.signed < value2.i32.signed ? true : false
-            case (.ltU, .int(.i32)):
-                return value1.i32 < value2.i32 ? true : false
-            case (.gtS, .int(.i32)):
-                return value1.i32.signed > value2.i32.signed ? true : false
-            case (.gtU, .int(.i32)):
-                return value1.i32 > value2.i32 ? true : false
-            case (.leS, .int(.i32)):
-                return value1.i32.signed <= value2.i32.signed ? true : false
-            case (.leU, .int(.i32)):
-                return value1.i32 <= value2.i32 ? true : false
-            case (.geS, .int(.i32)):
-                return value1.i32.signed >= value2.i32.signed ? true : false
-            case (.geU, .int(.i32)):
-                return value1.i32 >= value2.i32 ? true : false
-
-            case (.ltS, .int(.i64)):
-                return value1.i64.signed < value2.i64.signed ? true : false
-            case (.ltU, .int(.i64)):
-                return value1.i64 < value2.i64 ? true : false
-            case (.gtS, .int(.i64)):
-                return value1.i64.signed > value2.i64.signed ? true : false
-            case (.gtU, .int(.i64)):
-                return value1.i64 > value2.i64 ? true : false
-            case (.leS, .int(.i64)):
-                return value1.i64.signed <= value2.i64.signed ? true : false
-            case (.leU, .int(.i64)):
-                return value1.i64 <= value2.i64 ? true : false
-            case (.geS, .int(.i64)):
-                return value1.i64.signed >= value2.i64.signed ? true : false
-            case (.geU, .int(.i64)):
-                return value1.i64 >= value2.i64 ? true : false
-
-            default:
-                fatalError("Invalid type \(type) for instruction \(self)")
             }
         }
     }
@@ -329,7 +358,7 @@ extension NumericInstruction {
             }
         }
 
-        func callAsFunction(_ value1: Value, _ value2: Value) throws -> Value {
+        func callAsFunction(_ value1: Value, _ value2: Value) -> Value {
             switch self {
             case .div:
                 guard !value1.isNan && !value2.isNan else {
@@ -813,75 +842,6 @@ extension NumericInstruction {
                     fatalError("unsupported operand types passed to instruction \(self)")
                 }
             }
-        }
-    }
-}
-
-extension NumericInstruction: CustomStringConvertible {
-    public var description: String {
-        switch self {
-        case let .const(v):
-            switch v {
-            case let .f32(f32): return "f32.const \(f32)"
-            case let .f64(f64): return "f64.const \(f64)"
-            case let .i32(i32): return "i32.const \(i32.signed)"
-            case let .i64(i64): return "i64.const \(i64.signed)"
-            case let .ref(.function(f?)): return "ref.func \(f)"
-            case .ref(.function(nil)): return "ref.null funcref"
-            case .ref(.extern(nil)): return "ref.null externref"
-            default: fatalError("unsuppported const instruction for value \(v)")
-            }
-
-        case let .binary(b):
-            switch b {
-            case let .add(t):
-                return "\(t).add"
-
-            case let .eq(t):
-                return "\(t).eq"
-
-            case let .mul(t):
-                return "\(t).mul"
-
-            case let .ne(t):
-                return "\(t).ne"
-
-            case let .sub(t):
-                return "\(t).sub"
-            }
-
-        case let .intBinary(ib):
-            switch ib {
-            case let .and(it): return "\(it).and"
-            case let .xor(it): return "\(it).xor"
-            case let .or(it): return "\(it).or"
-            case let .shl(it): return "\(it).shl"
-            case let .shrS(it): return "\(it).shr_s"
-            case let .shrU(it): return "\(it).shr_u"
-            case let .rotl(it): return "\(it).rotl"
-            case let .rotr(it): return "\(it).rotr"
-            case let .remS(it): return "\(it).rem_s"
-            case let .remU(it): return "\(it).rem_u"
-            case let .divS(it): return "\(it).div_s"
-            case let .divU(it): return "\(it).div_u"
-            case let .ltS(it): return "\(it).lt_s"
-            case let .ltU(it): return "\(it).lt_u"
-            case let .gtS(it): return "\(it).gt_s"
-            case let .gtU(it): return "\(it).gt_u"
-            case let .leS(it): return "\(it).le_s"
-            case let .leU(it): return "\(it).le_u"
-            case let .geS(it): return "\(it).ge_s"
-            case let .geU(it): return "\(it).ge_u"
-            }
-
-        case let .conversion(c):
-            return String(reflecting: c)
-        case let .intUnary(iu):
-            return String(reflecting: iu)
-        case let .floatUnary(fu):
-            return String(reflecting: fu)
-        case let .floatBinary(fb):
-            return String(reflecting: fb)
         }
     }
 }

@@ -7,6 +7,7 @@ public typealias GlobalAddress = Int
 public typealias ElementAddress = Int
 public typealias DataAddress = Int
 public typealias ExternAddress = Int
+internal typealias ModuleAddress = Int
 
 /// A collection of globals and functions that are exported from a host module.
 public struct HostModule {
@@ -38,6 +39,7 @@ public final class Store {
     private var hostGlobals: [GlobalInstance] = []
     var nameRegistry = NameRegistry()
 
+    private var modules: [ModuleInstance] = []
     public internal(set) var namedModuleInstances: [String: ModuleInstance] = [:]
 
     /// This property is separate from `registeredModuleInstances`, as host exports
@@ -55,6 +57,19 @@ public final class Store {
         for (moduleName, hostModule) in hostModules {
             registerUniqueHostModule(hostModule, as: moduleName)
         }
+    }
+
+    internal func module(address: ModuleAddress) -> ModuleInstance {
+        return self.modules[address]
+    }
+
+    internal func withTemporaryModuleInstance<T>(_ body: (ModuleInstance) throws -> T) rethrows -> T {
+        let tempAddress = self.modules.count
+        let module = ModuleInstance(selfAddress: tempAddress)
+        self.modules.append(module)
+        let result = try body(module)
+        self.modules.removeLast()
+        return result
     }
 }
 
@@ -107,7 +122,7 @@ public struct HostFunction {
 }
 
 enum StoreFunction {
-    case wasm(FunctionInstance, body: Expression)
+    case wasm(FunctionInstance, body: InstructionSequence)
     case host(HostFunction)
 }
 
@@ -162,6 +177,7 @@ extension Store {
         try body(&self.memories[address])
     }
 
+    @_transparent
     func function(at address: FunctionAddress) throws -> StoreFunction {
         if address < 0 {
             return .host(hostFunctions[-address - 1])
@@ -227,7 +243,7 @@ extension Store {
         initialGlobals: [Value]
     ) -> ModuleInstance {
         // Step 1 of module allocation algorithm, according to Wasm 2.0 spec.
-        let moduleInstance = ModuleInstance()
+        let moduleInstance = ModuleInstance(selfAddress: modules.count)
 
         moduleInstance.types = module.types
 
@@ -278,13 +294,13 @@ extension Store {
         // Step 6.
         for element in module.elements {
             let references = element.initializer.map { expression -> Reference in
-                switch expression.instructions[0] {
-                case let .reference(.refFunc(index)):
+                switch expression[0] {
+                case let .refFunc(index):
                     let addr = moduleInstance.functionAddresses[Int(index)]
                     return .function(addr)
-                case .reference(.refNull(.funcRef)):
+                case .refNull(.funcRef):
                     return .function(nil)
-                case .reference(.refNull(.externRef)):
+                case .refNull(.externRef):
                     return .extern(nil)
                 default:
                     fatalError("Unexpected element initializer expression: \(expression)")
@@ -318,6 +334,7 @@ extension Store {
             try? nameRegistry.register(instance: moduleInstance, nameSection: nameSection)
         }
 
+        self.modules.append(moduleInstance)
         // Steps 20-21.
         return moduleInstance
     }

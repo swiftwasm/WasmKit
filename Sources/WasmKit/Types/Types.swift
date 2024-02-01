@@ -9,15 +9,22 @@ public enum ResultType: Equatable {
     /// Empty result type
     case empty
 
-    func arity(typeSection: () -> [FunctionType]) -> (parameters: Int, results: Int) {
+    func arity(typeSection: [FunctionType]?) throws -> Instruction.BlockType {
         switch self {
         case .single:
-            return (0, 1)
+            return Instruction.BlockType(parameters: 0, results: 1)
         case .empty:
-            return (0, 0)
+            return Instruction.BlockType(parameters: 0, results: 0)
         case let .multi(typeIndex):
-            let funcType = typeSection()[Int(typeIndex)]
-            return (funcType.parameters.count, funcType.results.count)
+            let typeIndex = Int(typeIndex)
+            guard let typeSection, typeIndex < typeSection.count else {
+                throw WasmParserError.invalidTypeSectionReference
+            }
+            let funcType = typeSection[typeIndex]
+            return Instruction.BlockType(
+                parameters: UInt16(funcType.parameters.count),
+                results: UInt16(funcType.results.count)
+            )
         }
     }
 }

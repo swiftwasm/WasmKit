@@ -30,17 +30,21 @@ final class HostModuleTests: XCTestCase {
                 // [2] "foo"
                 GuestFunction(
                     type: 0, locals: [],
-                    body: [
-                        .control(.call(functionIndex: 0)),
-                        .control(.call(functionIndex: 0)),
-                        .control(.call(functionIndex: 0)),
-                    ]),
+                    body: {
+                        [
+                            .call(functionIndex: 0),
+                            .call(functionIndex: 0),
+                            .call(functionIndex: 0),
+                        ]
+                    }),
                 // [3] "bar"
                 GuestFunction(
                     type: 0, locals: [],
-                    body: [
-                        .control(.call(functionIndex: 1))
-                    ]),
+                    body: {
+                        [
+                            .control(.call(functionIndex: 1))
+                        ]
+                    }),
             ],
             imports: [
                 Import(module: "env", name: "bar", descriptor: .function(0)),

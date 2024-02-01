@@ -1,3 +1,5 @@
+typealias ProgramCounter = UnsafePointer<Instruction>
+
 /// An execution state of an invocation of exported function.
 ///
 /// Each new invocation through exported function has a separate ``ExecutionState``
@@ -5,126 +7,110 @@
 struct ExecutionState {
     var stack = Stack()
     /// Index of an instruction to be executed in the current function.
-    var programCounter = 0
+    var programCounter: ProgramCounter
+    var reachedEndOfExecution: Bool = false
 
     var isStackEmpty: Bool {
-        stack.top == nil
+        stack.isEmpty
+    }
+
+    fileprivate init(stack: Stack = Stack(), programCounter: ProgramCounter) {
+        self.stack = stack
+        self.programCounter = programCounter
+    }
+}
+
+@_transparent
+func withExecution<Return>(_ body: (inout ExecutionState) throws -> Return) rethrows -> Return {
+    try withUnsafeTemporaryAllocation(of: Instruction.self, capacity: 1) { rootISeq in
+        rootISeq.baseAddress?.pointee = .endOfExecution
+        // NOTE: unwinding a function jump into previous frame's PC + 1, so initial PC is -1ed
+        var execution = ExecutionState(programCounter: rootISeq.baseAddress! - 1)
+        return try body(&execution)
+    }
+}
+
+extension ExecutionState: CustomStringConvertible {
+    var description: String {
+        var result = "======== PC=\(programCounter) =========\n"
+        result += "\(stack.debugDescription)"
+
+        return result
     }
 }
 
 extension ExecutionState {
-    mutating func execute(_ instruction: Instruction, runtime: Runtime) throws {
-        switch instruction {
-        case let .control(instruction):
-            return try instruction.execute(runtime: runtime, execution: &self)
-
-        case let .memory(instruction):
-            try instruction.execute(&stack, runtime.store)
-
-        case let .numeric(instruction):
-            try instruction.execute(&stack)
-
-        case let .parametric(instruction):
-            try instruction.execute(&stack)
-
-        case let .reference(instruction):
-            try instruction.execute(&stack)
-
-        case let .table(instruction):
-            try instruction.execute(runtime: runtime, execution: &self)
-
-        case let .variable(instruction):
-            try instruction.execute(&stack, &runtime.store.globals)
-        case .pseudo:
-            // Structured pseudo instructions (end/else) should not appear at runtime
-            throw Trap.unreachable
-        }
-
-        programCounter += 1
-    }
-
-    mutating func branch(labelIndex: Int) throws {
-        let label = try stack.getLabel(index: Int(labelIndex))
-        let values = try stack.popValues(count: label.arity)
-
-        var lastLabel: Label?
-        for _ in 0...labelIndex {
-            stack.discardTopValues()
-            lastLabel = try stack.popLabel()
-        }
-
-        stack.push(values: values)
-        programCounter = lastLabel!.continuation
-    }
-
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/instructions.html#entering-xref-syntax-instructions-syntax-instr-mathit-instr-ast-with-label-l>
-    mutating func enter(_ expression: Expression, continuation: Int, arity: Int) {
-        let exit = programCounter + 1
-        let label = Label(arity: arity, expression: expression, continuation: continuation, exit: exit)
-        stack.push(label: label)
-        programCounter = label.expression.instructions.startIndex
+    @inline(__always)
+    mutating func enter(jumpTo targetPC: ProgramCounter, continuation: ProgramCounter, arity: Int, pushPopValues: Int = 0) {
+        stack.pushLabel(
+            arity: arity,
+            continuation: continuation,
+            popPushValues: pushPopValues
+        )
+        programCounter = targetPC
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/instructions.html#exiting-xref-syntax-instructions-syntax-instr-mathit-instr-ast-with-label-l>
     mutating func exit(label: Label) throws {
-        let values = try stack.popTopValues()
-        let lastLabel = try stack.popLabel()
-        assert(lastLabel == label)
-        stack.push(values: values)
-        programCounter = label.exit
+        stack.exit(label: label)
+        programCounter += 1
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/instructions.html#invocation-of-function-address>
     mutating func invoke(functionAddress address: FunctionAddress, runtime: Runtime) throws {
+        #if DEBUG
         runtime.interceptor?.onEnterFunction(address, store: runtime.store)
+        #endif
 
         switch try runtime.store.function(at: address) {
         case let .host(function):
-            let parameters = try stack.popValues(count: function.type.parameters.count)
-            let caller = Caller(runtime: runtime, instance: stack.currentFrame.module)
-            stack.push(values: try function.implementation(caller, parameters))
+            let parameters = stack.popValues(count: function.type.parameters.count)
+            let moduleInstance = runtime.store.module(address: stack.currentFrame.module)
+            let caller = Caller(runtime: runtime, instance: moduleInstance)
+            stack.push(values: try function.implementation(caller, Array(parameters)))
 
             programCounter += 1
 
         case let .wasm(function, body: body):
-            let locals = function.code.locals.map { $0.defaultValue }
             let expression = body
 
-            let arguments = try stack.popValues(count: function.type.parameters.count)
-
             let arity = function.type.results.count
-            try stack.push(frame: .init(arity: arity, module: function.module, locals: arguments + locals, address: address))
-
-            self.enter(
-                expression, continuation: programCounter + 1,
-                arity: arity
+            try stack.pushFrame(
+                iseq: expression,
+                arity: arity,
+                module: function.module,
+                argc: function.type.parameters.count,
+                defaultLocals: function.code.defaultLocals,
+                returnPC: programCounter.advanced(by: 1),
+                address: address
             )
+            programCounter = expression.baseAddress
         }
     }
 
-    public mutating func step(runtime: Runtime) throws {
-        if let label = stack.currentLabel {
-            if programCounter < label.expression.instructions.count {
-                try execute(stack.currentLabel.expression.instructions[programCounter], runtime: runtime)
-            } else {
-                try self.exit(label: label)
-            }
-        } else {
-            if let address = stack.currentFrame.address {
-                runtime.interceptor?.onExitFunction(address, store: runtime.store)
-            }
-            let values = try stack.popValues(count: stack.currentFrame.arity)
-            try stack.popFrame()
-            stack.push(values: values)
+    mutating func run(runtime: Runtime) throws {
+        while !reachedEndOfExecution {
+            let locals = self.stack.currentLocalsPointer
+            // Regular path
+            var inst: Instruction
+            // `doExecute` returns false when current frame *may* be updated
+            repeat {
+                inst = programCounter.pointee
+            } while try doExecute(inst, runtime: runtime, locals: locals)
         }
     }
 
-    public mutating func run(runtime: Runtime) throws {
-        while stack.currentFrame != nil {
-            try step(runtime: runtime)
-        }
+    func currentModule(store: Store) -> ModuleInstance {
+        store.module(address: stack.currentFrame.module)
+    }
+}
+
+extension ExecutionState {
+    mutating func pseudo(runtime: Runtime, pseudoInstruction: PseudoInstruction) throws {
+        fatalError("Unimplemented instruction: pseudo")
     }
 }
