@@ -13,3 +13,5 @@
 Tests/WITExtractorPluginTests/Fixtures/*/Package.resolved
 
 !**/.gitkeep
+
+Package.resolved
