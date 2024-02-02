@@ -1,6 +1,7 @@
 // swift-tools-version:5.8
 
 import PackageDescription
+import class Foundation.ProcessInfo
 
 let package = Package(
     name: "WasmKit",
@@ -24,12 +25,6 @@ let package = Package(
         .library(name: "_CabiShims", targets: ["_CabiShims"]),
         .plugin(name: "WITOverlayPlugin", targets: ["WITOverlayPlugin"]),
         .plugin(name: "WITExtractorPlugin", targets: ["WITExtractorPlugin"]),
-    ],
-    dependencies: [
-        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.2.2"),
-        .package(url: "https://github.com/apple/swift-system", .upToNextMinor(from: "1.1.1")),
-        .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.3.0"),
-        .package(url: "https://github.com/apple/swift-format.git", from: "508.0.1"),
     ],
     targets: [
         .executableTarget(
@@ -114,3 +109,17 @@ let package = Package(
     ],
     swiftLanguageVersions: [.v5]
 )
+
+if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
+    package.dependencies += [
+        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.2.2"),
+        .package(url: "https://github.com/apple/swift-system", .upToNextMinor(from: "1.1.1")),
+        .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.3.0"),
+        .package(url: "https://github.com/apple/swift-format.git", from: "508.0.1"),
+    ]
+} else {
+    package.dependencies += [
+        .package(path: "../swift-argument-parser"),
+        .package(path: "../swift-system"),
+    ]
+}
