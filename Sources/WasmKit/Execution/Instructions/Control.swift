@@ -56,14 +56,14 @@ extension ExecutionState {
         )
     }
     mutating func end(runtime: Runtime) {
-        if let currentLabel = self.stack.currentLabel {
-            stack.exit(label: currentLabel)
+        if self.stack.currentLabel != nil {
+            stack.exitLabel()
         }
         programCounter += 1
     }
     mutating func `else`(runtime: Runtime) {
         let label = self.stack.currentLabel!
-        stack.exit(label: label)
+        stack.exitLabel()
         programCounter = label.continuation // if-then-else's continuation points the "end"
     }
 

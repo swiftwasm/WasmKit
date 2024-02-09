@@ -76,8 +76,7 @@ struct Stack {
         self.numberOfValues - currentLabel.baseValueIndex
     }
 
-    mutating func exit(label: Label) {
-        // labelIndex = 0 means jumping to the current head label
+    mutating func exitLabel() {
         self.labels.pop()
     }
 

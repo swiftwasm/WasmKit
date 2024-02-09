@@ -54,8 +54,8 @@ extension ExecutionState {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/instructions.html#exiting-xref-syntax-instructions-syntax-instr-mathit-instr-ast-with-label-l>
-    mutating func exit(label: Label) throws {
-        stack.exit(label: label)
+    mutating func exitLabel() throws {
+        stack.exitLabel()
         programCounter += 1
     }
 
