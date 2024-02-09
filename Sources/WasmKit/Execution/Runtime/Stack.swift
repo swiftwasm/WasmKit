@@ -147,7 +147,6 @@ struct Stack {
 struct ValueStack {
     private let values: UnsafeMutableBufferPointer<Value>
     private var nextPointer: UnsafeMutablePointer<Value>
-    private let capacity: Int
     var baseAddress: UnsafeMutablePointer<Value> {
         values.baseAddress!
     }
@@ -155,7 +154,6 @@ struct ValueStack {
     init(capacity: Int) {
         self.values = .allocate(capacity: capacity)
         self.nextPointer = self.values.baseAddress!
-        self.capacity = capacity
     }
 
     func deallocate() {
