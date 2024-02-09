@@ -45,7 +45,6 @@ enum Instruction: Equatable {
     case memoryCopy
     case memoryFill
     case numericConst(Value)
-    case numericIntUnary(NumericInstruction.IntUnary)
     case numericFloatUnary(NumericInstruction.FloatUnary)
     case numericIntBinary(NumericInstruction.IntBinary)
     case numericFloatBinary(NumericInstruction.FloatBinary)
@@ -86,6 +85,14 @@ enum Instruction: Equatable {
     case i64GeS
     case i32GeU
     case i64GeU
+    case i32Clz
+    case i64Clz
+    case i32Ctz
+    case i64Ctz
+    case i32Popcnt
+    case i64Popcnt
+    case i32Eqz
+    case i64Eqz
     case drop
     case select
     case refNull(ReferenceType)

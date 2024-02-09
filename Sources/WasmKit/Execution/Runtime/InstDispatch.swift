@@ -111,8 +111,6 @@ extension ExecutionState {
             try self.memoryFill(runtime: runtime)
         case .numericConst(let value):
             self.numericConst(runtime: runtime, value: value)
-        case .numericIntUnary(let intUnary):
-            self.numericIntUnary(runtime: runtime, intUnary: intUnary)
         case .numericFloatUnary(let floatUnary):
             self.numericFloatUnary(runtime: runtime, floatUnary: floatUnary)
         case .numericIntBinary(let intBinary):
@@ -193,6 +191,22 @@ extension ExecutionState {
             self.i32GeU(runtime: runtime)
         case .i64GeU:
             self.i64GeU(runtime: runtime)
+        case .i32Clz:
+            self.i32Clz(runtime: runtime)
+        case .i64Clz:
+            self.i64Clz(runtime: runtime)
+        case .i32Ctz:
+            self.i32Ctz(runtime: runtime)
+        case .i64Ctz:
+            self.i64Ctz(runtime: runtime)
+        case .i32Popcnt:
+            self.i32Popcnt(runtime: runtime)
+        case .i64Popcnt:
+            self.i64Popcnt(runtime: runtime)
+        case .i32Eqz:
+            self.i32Eqz(runtime: runtime)
+        case .i64Eqz:
+            self.i64Eqz(runtime: runtime)
         case .drop:
             self.drop(runtime: runtime)
         case .select:
@@ -284,7 +298,6 @@ extension Instruction {
         case .memoryCopy: return "memoryCopy"
         case .memoryFill: return "memoryFill"
         case .numericConst: return "numericConst"
-        case .numericIntUnary: return "numericIntUnary"
         case .numericFloatUnary: return "numericFloatUnary"
         case .numericIntBinary: return "numericIntBinary"
         case .numericFloatBinary: return "numericFloatBinary"
@@ -325,6 +338,14 @@ extension Instruction {
         case .i64GeS: return "i64GeS"
         case .i32GeU: return "i32GeU"
         case .i64GeU: return "i64GeU"
+        case .i32Clz: return "i32Clz"
+        case .i64Clz: return "i64Clz"
+        case .i32Ctz: return "i32Ctz"
+        case .i64Ctz: return "i64Ctz"
+        case .i32Popcnt: return "i32Popcnt"
+        case .i64Popcnt: return "i64Popcnt"
+        case .i32Eqz: return "i32Eqz"
+        case .i64Eqz: return "i64Eqz"
         case .drop: return "drop"
         case .select: return "select"
         case .refNull: return "refNull"

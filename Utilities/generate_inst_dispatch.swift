@@ -35,6 +35,11 @@ let numericIntBinaryInsts: [Instruction] = ["LtS", "LtU", "GtS", "GtU", "LeS", "
         Instruction(name: "\(type)\(op)", immediates: [])
     }
 }
+let numericIntUnaryInsts: [Instruction] = ["Clz", "Ctz", "Popcnt", "Eqz"].flatMap { op -> [Instruction] in
+    intValueTypes.map { type in
+        Instruction(name: "\(type)\(op)", immediates: [])
+    }
+}
 
 let instructions = [
     // Controls
@@ -116,7 +121,6 @@ let instructions = [
     Instruction(name: "memoryFill", mayThrow: true, immediates: []),
     // Numeric
     Instruction(name: "numericConst", immediates: [Immediate(name: nil, type: "Value")]),
-    Instruction(name: "numericIntUnary", immediates: [Immediate(name: nil, type: "NumericInstruction.IntUnary")]),
     Instruction(name: "numericFloatUnary", immediates: [Immediate(name: nil, type: "NumericInstruction.FloatUnary")]),
     Instruction(name: "numericIntBinary", mayThrow: true, immediates: [Immediate(name: nil, type: "NumericInstruction.IntBinary")]),
     Instruction(name: "numericFloatBinary", immediates: [Immediate(name: nil, type: "NumericInstruction.FloatBinary")]),
@@ -124,6 +128,7 @@ let instructions = [
 ]
 + numericBinaryInsts
 + numericIntBinaryInsts
++ numericIntUnaryInsts
 + [
     // Parametric
     Instruction(name: "drop", immediates: []),

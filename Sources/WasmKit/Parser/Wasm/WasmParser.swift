@@ -523,7 +523,7 @@ extension WasmParser {
             return .value(.numericConst((.f64(n))))
 
         case .i32_eqz:
-            return .value(.numericIntUnary((.eqz(.i32))))
+            return .value(.i32Eqz)
         case .i32_eq:
             return .value(.i32Eq)
         case .i32_ne:
@@ -546,7 +546,7 @@ extension WasmParser {
             return .value(.i32GeU)
 
         case .i64_eqz:
-            return .value(.numericIntUnary((.eqz(.i64))))
+            return .value(.i64Eqz)
         case .i64_eq:
             return .value(.i64Eq)
         case .i64_ne:
@@ -595,11 +595,11 @@ extension WasmParser {
             return .value(.numericFloatBinary((.ge(.f64))))
 
         case .i32_clz:
-            return .value(.numericIntUnary((.clz(.i32))))
+            return .value(.i32Clz)
         case .i32_ctz:
-            return .value(.numericIntUnary((.ctz(.i32))))
+            return .value(.i32Ctz)
         case .i32_popcnt:
-            return .value(.numericIntUnary((.popcnt(.i32))))
+            return .value(.i32Popcnt)
         case .i32_add:
             return .value(.i32Add)
         case .i32_sub:
@@ -632,11 +632,11 @@ extension WasmParser {
             return .value(.numericIntBinary((.rotr(.i32))))
 
         case .i64_clz:
-            return .value(.numericIntUnary((.clz(.i64))))
+            return .value(.i64Clz)
         case .i64_ctz:
-            return .value(.numericIntUnary((.ctz(.i64))))
+            return .value(.i64Ctz)
         case .i64_popcnt:
-            return .value(.numericIntUnary((.popcnt(.i64))))
+            return .value(.i64Popcnt)
         case .i64_add:
             return .value(.i64Add)
         case .i64_sub:

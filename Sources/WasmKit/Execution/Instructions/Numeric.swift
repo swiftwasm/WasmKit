@@ -4,10 +4,11 @@ extension ExecutionState {
     mutating func numericConst(runtime: Runtime, value: Value) {
         stack.push(value: value)
     }
-    mutating func numericIntUnary(runtime: Runtime, intUnary: NumericInstruction.IntUnary) {
+    @inline(__always)
+    private mutating func numericUnary<T>(castTo: (Value) -> T, unary: (T) -> Value) {
         let value = stack.popValue()
 
-        stack.push(value: intUnary(value))
+        stack.push(value: unary(castTo(value)))
     }
     mutating func numericFloatUnary(runtime: Runtime, floatUnary: NumericInstruction.FloatUnary) {
         let value = stack.popValue()
@@ -150,7 +151,30 @@ extension ExecutionState {
     mutating func i64GeU(runtime: Runtime) {
         numericBinary(castTo: \.i64, binary: { $0 >= $1 ? true : false })
     }
-
+    mutating func i32Clz(runtime: Runtime) {
+        numericUnary(castTo: \.i32, unary: { .i32(UInt32($0.leadingZeroBitCount)) })
+    }
+    mutating func i64Clz(runtime: Runtime) {
+        numericUnary(castTo: \.i64, unary: { .i64(UInt64($0.leadingZeroBitCount)) })
+    }
+    mutating func i32Ctz(runtime: Runtime) {
+        numericUnary(castTo: \.i32, unary: { .i32(UInt32($0.trailingZeroBitCount)) })
+    }
+    mutating func i64Ctz(runtime: Runtime) {
+        numericUnary(castTo: \.i64, unary: { .i64(UInt64($0.trailingZeroBitCount)) })
+    }
+    mutating func i32Popcnt(runtime: Runtime) {
+        numericUnary(castTo: \.i32, unary: { .i32(UInt32($0.nonzeroBitCount)) })
+    }
+    mutating func i64Popcnt(runtime: Runtime) {
+        numericUnary(castTo: \.i64, unary: { .i64(UInt64($0.nonzeroBitCount)) })
+    }
+    mutating func i32Eqz(runtime: Runtime) {
+        numericUnary(castTo: \.i32, unary: { $0 == 0 ? true : false })
+    }
+    mutating func i64Eqz(runtime: Runtime) {
+        numericUnary(castTo: \.i64, unary: { $0 == 0 ? true : false })
+    }
     mutating func numericIntBinary(runtime: Runtime, intBinary: NumericInstruction.IntBinary) throws {
         let value2 = stack.popValue()
         let value1 = stack.popValue()
@@ -176,40 +200,6 @@ enum NumericInstruction {}
 extension NumericInstruction {
     internal enum Constant {
         case const(Value)
-    }
-
-    public enum IntUnary: Equatable {
-        // iunop
-        case clz(IntValueType)
-        case ctz(IntValueType)
-        case popcnt(IntValueType)
-
-        /// itestop
-        case eqz(IntValueType)
-
-        var type: NumericType {
-            switch self {
-            case let .clz(type),
-                let .ctz(type),
-                let .popcnt(type),
-                let .eqz(type):
-                return .int(type)
-            }
-        }
-
-        func callAsFunction(_ value: Value) -> Value {
-            switch self {
-            case .clz:
-                return value.leadingZeroBitCount
-            case .ctz:
-                return value.trailingZeroBitCount
-            case .popcnt:
-                return value.nonzeroBitCount
-
-            case .eqz:
-                return value.isZero ? true : false
-            }
-        }
     }
 
     public enum FloatUnary: Equatable {
