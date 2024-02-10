@@ -119,8 +119,9 @@ extension Runtime {
         // Step 17.
         if let startIndex = module.start {
             try withExecution { initExecution in
-                try initExecution.invoke(functionAddress: instance.functionAddresses[Int(startIndex)], runtime: self)
-                try initExecution.run(runtime: self)
+                var stack = Stack()
+                try initExecution.invoke(functionAddress: instance.functionAddresses[Int(startIndex)], runtime: self, stack: &stack)
+                try initExecution.run(runtime: self, stack: &stack)
             }
         }
 
@@ -150,8 +151,8 @@ extension Runtime {
             let globalInitializers = try module.globals.map { global in
                 let iseq = InstructionSequence(instructions: global.initializer)
                 defer { iseq.deallocate() }
-                return try evaluateConstExpr(iseq, instance: globalModuleInstance, arity: 1) { initExecution in
-                    return initExecution.stack.popValue()
+                return try evaluateConstExpr(iseq, instance: globalModuleInstance, arity: 1) { _, stack in
+                    return stack.popValue()
                 }
             }
             
@@ -160,17 +161,18 @@ extension Runtime {
     }
 
     func evaluateConstExpr(_ iseq: InstructionSequence, instance: ModuleInstance, arity: Int = 0) throws {
-        try evaluateConstExpr(iseq, instance: instance, arity: arity, body: { _ in })
+        try evaluateConstExpr(iseq, instance: instance, arity: arity, body: { _, _ in })
     }
 
     func evaluateConstExpr<T>(
         _ iseq: InstructionSequence,
         instance: ModuleInstance,
         arity: Int = 0,
-        body: (inout ExecutionState) throws -> T
+        body: (inout ExecutionState, inout Stack) throws -> T
     ) throws -> T {
         try withExecution { initExecution in
-            try initExecution.stack.pushFrame(
+            var stack = Stack()
+            try stack.pushFrame(
                 iseq: iseq,
                 arity: arity,
                 module: instance.selfAddress,
@@ -179,8 +181,8 @@ extension Runtime {
                 returnPC: initExecution.programCounter + 1
             )
             initExecution.programCounter = iseq.baseAddress
-            try initExecution.run(runtime: self)
-            return try body(&initExecution)
+            try initExecution.run(runtime: self, stack: &stack)
+            return try body(&initExecution, &stack)
         }
     }
 }

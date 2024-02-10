@@ -5,30 +5,31 @@ public struct Function: Equatable {
     /// Invokes a function of the given address with the given parameters.
     public func invoke(_ arguments: [Value] = [], runtime: Runtime) throws -> [Value] {
         try withExecution { execution in
-            try invoke(execution: &execution, with: arguments, runtime: runtime)
-            try execution.run(runtime: runtime)
-            return try Array(execution.stack.popTopValues())
+            var stack = Stack()
+            try invoke(execution: &execution, stack: &stack, with: arguments, runtime: runtime)
+            try execution.run(runtime: runtime, stack: &stack)
+            return try Array(stack.popTopValues())
         }
     }
 
-    private func invoke(execution: inout ExecutionState, with arguments: [Value], runtime: Runtime) throws {
+    private func invoke(execution: inout ExecutionState, stack: inout Stack, with arguments: [Value], runtime: Runtime) throws {
         switch try runtime.store.function(at: address) {
         case let .host(function):
             try check(functionType: function.type, parameters: arguments)
 
-            let parameters = execution.stack.popValues(count: function.type.parameters.count)
+            let parameters = stack.popValues(count: function.type.parameters.count)
 
-            let moduleInstance = runtime.store.module(address: execution.stack.currentFrame.module)
+            let moduleInstance = runtime.store.module(address: stack.currentFrame.module)
             let caller = Caller(runtime: runtime, instance: moduleInstance)
             let results = try function.implementation(caller, Array(parameters))
             try check(functionType: function.type, results: results)
-            execution.stack.push(values: results)
+            stack.push(values: results)
 
         case let .wasm(function, _):
             try check(functionType: function.type, parameters: arguments)
-            execution.stack.push(values: arguments)
+            stack.push(values: arguments)
 
-            try execution.invoke(functionAddress: address, runtime: runtime)
+            try execution.invoke(functionAddress: address, runtime: runtime, stack: &stack)
         }
     }
 
