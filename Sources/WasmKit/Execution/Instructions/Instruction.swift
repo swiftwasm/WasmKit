@@ -9,7 +9,7 @@ enum Instruction: Equatable {
     case `else`
     case br(labelIndex: LabelIndex)
     case brIf(labelIndex: LabelIndex)
-    case brTable(BrTable)
+    case brTable(Instruction.BrTable)
     case `return`
     case call(functionIndex: UInt32)
     case callIndirect(tableIndex: TableIndex, typeIndex: TypeIndex)

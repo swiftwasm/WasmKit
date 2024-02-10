@@ -61,7 +61,9 @@ extension ExecutionState {
             setTableElement(store: runtime.store, tableAddress: tableAddress, startIndex + i, fillValue)
         }
     }
-    mutating func tableCopy(runtime: Runtime, dest destinationTableIndex: TableIndex, src sourceTableIndex: TableIndex) throws {
+    mutating func tableCopy(runtime: Runtime, dest: TableIndex, src: TableIndex) throws {
+        let destinationTableIndex = dest
+        let sourceTableIndex = src
         let (_, sourceTable) = getTable(sourceTableIndex, store: runtime.store)
         let (destinationTableAddress, destinationTable) = getTable(destinationTableIndex, store: runtime.store)
 

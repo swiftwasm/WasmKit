@@ -21,6 +21,22 @@ struct Instruction {
         self.immediates = immediates
         assert(isControl || !mayUpdateFrame, "non-control instruction should not update frame")
     }
+
+    static var commonParameters: [(label: String, type: String)] {
+        [("runtime", "Runtime")]
+    }
+
+    var parameters: [(label: String, type: String)] {
+        let immediates = immediates.map {
+            let label = $0.name ?? camelCase(pascalCase: String($0.type.split(separator: ".").last!))
+            return (label, $0.type)
+        }
+        return (
+            Self.commonParameters
+            + (hasLocals ? [("locals", "UnsafeMutablePointer<Value>")] : [])
+            + immediates
+        )
+    }
 }
 
 let intValueTypes = ["i32", "i64"]
@@ -71,7 +87,7 @@ let instructions = [
         Immediate(name: "labelIndex", type: "LabelIndex")
     ]),
     Instruction(name: "brTable", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: [
-        Immediate(name: nil, type: "BrTable"),
+        Immediate(name: nil, type: "Instruction.BrTable"),
     ]),
     Instruction(name: "`return`", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: []),
     Instruction(name: "call", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: [
@@ -160,19 +176,19 @@ func camelCase(pascalCase: String) -> String {
 }
 
 func generateDispatcher(instructions: [Instruction]) -> String {
+    let doExecuteParams = [("instruction", "Instruction")]
+        + Instruction.commonParameters
+        + [("locals", "UnsafeMutablePointer<Value>")]
     var output = """
     extension ExecutionState {
         @inline(__always)
-        mutating func doExecute(_ instruction: Instruction, runtime: Runtime, locals: UnsafeMutablePointer<Value>) throws -> Bool {
+        mutating func doExecute(_ \(doExecuteParams.map { "\($0): \($1)" }.joined(separator: ", "))) throws -> Bool {
             switch instruction {
     """
 
     for inst in instructions {
         let tryPrefix = inst.mayThrow ? "try " : ""
-        let labels = inst.immediates.map {
-            $0.name ?? camelCase(pascalCase: String($0.type.split(separator: ".").last!))
-        }
-        let args = (["runtime"] + (inst.hasLocals ? ["locals"] : []) + labels).map { "\($0): \($0)" }
+        let args = inst.parameters.map { label, _ in "\(label): \(label)" }
         if inst.immediates.isEmpty {
             output += """
 
@@ -209,32 +225,24 @@ func generateDispatcher(instructions: [Instruction]) -> String {
     return output
 }
 
+func instMethodDecl(_ inst: Instruction) -> String {
+    let throwsKwd = inst.mayThrow ? " throws" : ""
+    let args = inst.parameters
+    return "mutating func \(inst.name)(\(args.map { "\($0): \($1)" }.joined(separator: ", ")))\(throwsKwd)"
+}
+
 func generatePrototype(instructions: [Instruction]) -> String {
     var output = """
 
     extension ExecutionState {
     """
     for inst in instructions {
-        let throwsKwd = inst.mayThrow ? " throws" : ""
-        if inst.immediates.isEmpty {
-            output += """
+        output += """
 
-            mutating func \(inst.name)(runtime: Runtime)\(throwsKwd) {
-                fatalError("Unimplemented instruction: \(inst.name)")
-            }
-        """
-        } else {
-            let labelTypes = inst.immediates.map {
-                let label = $0.name ?? camelCase(pascalCase: String($0.type.split(separator: ".").last!))
-                return (label, $0.type)
-            }
-            output += """
-
-            mutating func \(inst.name)(runtime: Runtime, \(labelTypes.map { "\($0): \($1)" }.joined(separator: ", ")))\(throwsKwd) {
-                fatalError("Unimplemented instruction: \(inst.name)")
-            }
-        """
+        \(instMethodDecl(inst)) {
+            fatalError("Unimplemented instruction: \(inst.name)")
         }
+    """
     }
     output += """
 
@@ -242,6 +250,39 @@ func generatePrototype(instructions: [Instruction]) -> String {
 
     """
     return output
+}
+
+func replaceInstMethodSignature(_ inst: Instruction) throws {
+    func tryReplace(file: URL) throws -> Bool {
+        var contents = try String(contentsOf: file)
+        guard contents.contains("mutating func \(inst.name)(") else {
+            return false
+        }
+        // Replace the found line with the new signature
+        var lines = contents.split(separator: "\n", omittingEmptySubsequences: false)
+        for (i, line) in lines.enumerated() {
+            if let range = line.range(of: "mutating func \(inst.name)(") {
+                lines[i] = lines[i][..<range.lowerBound] + instMethodDecl(inst) + " {"
+                break
+            }
+        }
+        contents = lines.joined(separator: "\n")
+        try contents.write(to: file, atomically: true, encoding: .utf8)
+        return true
+    }
+
+    let files = try FileManager.default.contentsOfDirectory(at: URL(fileURLWithPath: "Sources/WasmKit/Execution/Instructions"), includingPropertiesForKeys: nil)
+    for file in files {
+        if try tryReplace(file: file) {
+            print("Replaced \(inst.name) in \(file.lastPathComponent)")
+            return
+        }
+    }
+}
+func replaceMethodSignature(instructions: [Instruction]) throws {
+    for inst in instructions {
+        try replaceInstMethodSignature(inst)
+    }
 }
 
 func generateInstName(instructions: [Instruction]) -> String {
@@ -295,6 +336,8 @@ func main(arguments: [String]) throws {
         case "prototype":
             print(generatePrototype(instructions: instructions))
             return
+        case "replace":
+            try replaceMethodSignature(instructions: instructions)
         default: break
         }
     }
@@ -318,6 +361,7 @@ func main(arguments: [String]) throws {
         let output = generateEnumDefinition(instructions: instructions)
         try output.write(to: outputFile, atomically: true, encoding: .utf8)
     }
+    try replaceMethodSignature(instructions: instructions)
 }
 
 try main(arguments: CommandLine.arguments)
