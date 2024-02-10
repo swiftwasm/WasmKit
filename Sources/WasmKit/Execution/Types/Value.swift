@@ -1,3 +1,6 @@
+import enum WasmParser.ReferenceType
+import enum WasmParser.ValueType
+
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#value-types>
 
@@ -85,15 +88,24 @@ extension ValueType: CustomStringConvertible {
     }
 }
 
-/// Reference types
-public enum ReferenceType: Equatable {
-    /// A nullable reference type to a function.
-    case funcRef
-    /// A nullable external reference type.
-    case externRef
+extension ValueType {
+    init(_ valueType: WasmParser.ValueType) {
+        switch valueType {
+        case .i32: self = .i32
+        case .i64: self = .i64
+        case .f32: self = .f32
+        case .f64: self = .f64
+        case .ref(.externRef):
+            self = .reference(.externRef)
+        case .ref(.funcRef):
+            self = .reference(.funcRef)
+        }
+    }
 }
 
-/// Reference to a function.
+
+public typealias ReferenceType =  WasmParser.ReferenceType
+
 public enum Reference: Hashable {
     /// A reference to a function.
     case function(FunctionAddress?)
@@ -205,6 +217,25 @@ public enum Value: Hashable {
             return Float32(bitPattern: lhs) == Float32(bitPattern: rhs)
         case let (.f64(lhs), .f64(rhs)):
             return Float64(bitPattern: lhs) == Float64(bitPattern: rhs)
+        case let (.ref(.extern(lhs)), .ref(.extern(rhs))):
+            return lhs == rhs
+        case let (.ref(.function(lhs)), .ref(.function(rhs))):
+            return lhs == rhs
+        default:
+            return false
+        }
+    }
+
+    static func isBitwiseEqual(_ lhs: Self, _ rhs: Self) -> Bool {
+        switch (lhs, rhs) {
+        case let (.i32(lhs), .i32(rhs)):
+            return lhs == rhs
+        case let (.i64(lhs), .i64(rhs)):
+            return lhs == rhs
+        case let (.f32(lhs), .f32(rhs)):
+            return lhs == rhs
+        case let (.f64(lhs), .f64(rhs)):
+            return lhs == rhs
         case let (.ref(.extern(lhs)), .ref(.extern(rhs))):
             return lhs == rhs
         case let (.ref(.function(lhs)), .ref(.function(rhs))):

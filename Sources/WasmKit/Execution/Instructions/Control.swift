@@ -70,7 +70,7 @@ extension ExecutionState {
         programCounter = label.continuation // if-then-else's continuation points the "end"
     }
 
-    private mutating func branch(labelIndex: Int, stack: inout Stack, runtime: Runtime) throws {
+    private mutating func labelBranch(labelIndex: Int, stack: inout Stack, runtime: Runtime) throws {
         if stack.numberOfLabelsInCurrentFrame() == labelIndex {
             try self.return(runtime: runtime, stack: &stack)
             return
@@ -83,15 +83,33 @@ extension ExecutionState {
         stack.push(values: values)
         programCounter = label.continuation
     }
-    mutating func br(runtime: Runtime, stack: inout Stack, labelIndex: LabelIndex) throws {
-        try branch(labelIndex: Int(labelIndex), stack: &stack, runtime: runtime)
+    private mutating func branch(labelIndex: LabelIndex, stack: inout Stack, offset: Int32, copyCount: UInt32, popCount: UInt32) throws {
+        if popCount > 0 { // TODO: Maybe worth to have a special instruction for popCount=0?
+            stack.copyValues(copyCount: Int(copyCount), popCount: Int(popCount))
+        }
+        stack.popLabels(upto: Int(labelIndex))
+        programCounter += Int(offset)
     }
-    mutating func brIf(runtime: Runtime, stack: inout Stack, labelIndex: LabelIndex) throws {
+    mutating func br(runtime: Runtime, stack: inout Stack, labelIndex: LabelIndex, offset: Int32, copyCount: UInt32, popCount: UInt32) throws {
+        try branch(labelIndex: labelIndex, stack: &stack, offset: offset, copyCount: copyCount, popCount: popCount)
+    }
+    mutating func legacyBr(runtime: Runtime, stack: inout Stack, labelIndex: LabelIndex) throws {
+        try labelBranch(labelIndex: Int(labelIndex), stack: &stack, runtime: runtime)
+    }
+
+    mutating func brIf(runtime: Runtime, stack: inout Stack, labelIndex: LabelIndex, offset: Int32, copyCount: UInt32, popCount: UInt32) throws {
         guard stack.popValue().i32 != 0 else {
             programCounter += 1
             return
         }
-        try br(runtime: runtime, stack: &stack, labelIndex: labelIndex)
+        try branch(labelIndex: labelIndex, stack: &stack, offset: offset, copyCount: copyCount, popCount: popCount)
+    }
+    mutating func legacyBrIf(runtime: Runtime, stack: inout Stack, labelIndex: LabelIndex) throws {
+        guard stack.popValue().i32 != 0 else {
+            programCounter += 1
+            return
+        }
+        try labelBranch(labelIndex: Int(labelIndex), stack: &stack, runtime: runtime)
     }
     mutating func brTable(runtime: Runtime, stack: inout Stack, brTable: Instruction.BrTable) throws {
         let labelIndices = brTable.labelIndices
@@ -104,11 +122,11 @@ extension ExecutionState {
             labelIndex = defaultIndex
         }
 
-        try branch(labelIndex: Int(labelIndex), stack: &stack, runtime: runtime)
+        try labelBranch(labelIndex: Int(labelIndex), stack: &stack, runtime: runtime)
     }
     mutating func `return`(runtime: Runtime, stack: inout Stack) throws {
         let currentFrame = stack.currentFrame!
-        _ = stack.exit(frame: currentFrame)
+        stack.exit(frame: currentFrame)
         try endOfFunction(runtime: runtime, stack: &stack, currentFrame: currentFrame)
     }
 

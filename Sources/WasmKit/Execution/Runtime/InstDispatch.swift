@@ -27,11 +27,14 @@ extension ExecutionState {
         case .`else`:
             self.`else`(runtime: runtime, stack: &stack)
             return true
-        case .br(let labelIndex):
-            try self.br(runtime: runtime, stack: &stack, labelIndex: labelIndex)
+        case .br(let labelIndex, let offset, let copyCount, let popCount):
+            try self.br(runtime: runtime, stack: &stack, labelIndex: labelIndex, offset: offset, copyCount: copyCount, popCount: popCount)
             return false
-        case .brIf(let labelIndex):
-            try self.brIf(runtime: runtime, stack: &stack, labelIndex: labelIndex)
+        case .brIf(let labelIndex, let offset, let copyCount, let popCount):
+            try self.brIf(runtime: runtime, stack: &stack, labelIndex: labelIndex, offset: offset, copyCount: copyCount, popCount: popCount)
+            return false
+        case .legacyBrIf(let labelIndex):
+            try self.legacyBrIf(runtime: runtime, stack: &stack, labelIndex: labelIndex)
             return false
         case .brTable(let brTable):
             try self.brTable(runtime: runtime, stack: &stack, brTable: brTable)
@@ -262,6 +265,7 @@ extension Instruction {
         case .`else`: return "`else`"
         case .br: return "br"
         case .brIf: return "brIf"
+        case .legacyBrIf: return "legacyBrIf"
         case .brTable: return "brTable"
         case .`return`: return "`return`"
         case .call: return "call"

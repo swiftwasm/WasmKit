@@ -76,17 +76,23 @@ struct Stack {
         self.numberOfValues - currentLabel.baseValueIndex
     }
 
+    func _numberOfValuesInCurrentFrame() -> Int {
+        self.numberOfValues - currentFrame.baseStackAddress.valueIndex
+    }
+
     mutating func exitLabel() {
         self.labels.pop()
     }
 
-    mutating func exit(frame: Frame) -> Label? {
+    mutating func exit(frame: Frame) {
         let results = valueStack.popValues(count: frame.arity)
         self.valueStack.truncate(length: frame.baseStackAddress.valueFrameIndex)
         valueStack.push(values: results)
-        let labelToRemove = self.labels[frame.baseStackAddress.labelIndex]
         self.labels.pop(self.labels.count - frame.baseStackAddress.labelIndex)
-        return labelToRemove
+    }
+
+    mutating func popLabels(upto labelIndex: Int) {
+        self.labels.pop(labelIndex + 1)
     }
 
     @discardableResult
@@ -132,6 +138,9 @@ struct Stack {
     }
     mutating func push(value: Value) {
         self.valueStack.push(value: value)
+    }
+    mutating func copyValues(copyCount: Int, popCount: Int) {
+        self.valueStack.copyValues(copyCount: copyCount, popCount: popCount)
     }
 
     var topValue: Value {
@@ -211,6 +220,11 @@ struct ValueStack {
         }
         self.nextPointer = self.nextPointer.advanced(by: -count)
         return values
+    }
+    mutating func copyValues(copyCount: Int, popCount: Int) {
+        let newNextPointer = self.nextPointer - popCount
+        (newNextPointer - copyCount).moveUpdate(from: self.nextPointer - copyCount, count: copyCount)
+        self.nextPointer = newNextPointer
     }
 }
 

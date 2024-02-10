@@ -39,10 +39,12 @@ let package = Package(
         .target(
             name: "WasmKit",
             dependencies: [
+                "WasmParser",
                 "SystemExtras",
                 .product(name: "SystemPackage", package: "swift-system"),
             ]
         ),
+        .target(name: "WasmParser"),
         .target(
             name: "WASI",
             dependencies: ["WasmKit", "SystemExtras"]

@@ -79,11 +79,23 @@ let instructions = [
     ]),
     Instruction(name: "end", isControl: true, immediates: []),
     Instruction(name: "`else`", isControl: true, immediates: []),
-    // NOTE: A branch can unwind a frame by "br 0"
     Instruction(name: "br", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: [
-        Immediate(name: "labelIndex", type: "LabelIndex")
+        Immediate(name: "labelIndex", type: "LabelIndex"),
+        Immediate(name: "offset", type: "Int32"),
+        // Number of values that will be copied if the branch is taken
+        Immediate(name: "copyCount", type: "UInt32"),
+        // Number of values that will be popped if the branch is taken
+        Immediate(name: "popCount", type: "UInt32"),
     ]),
     Instruction(name: "brIf", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: [
+        Immediate(name: "labelIndex", type: "LabelIndex"),
+        Immediate(name: "offset", type: "Int32"),
+        // Number of values that will be copied if the branch is taken
+        Immediate(name: "copyCount", type: "UInt32"),
+        // Number of values that will be popped if the branch is taken
+        Immediate(name: "popCount", type: "UInt32"),
+    ]),
+    Instruction(name: "legacyBrIf", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: [
         Immediate(name: "labelIndex", type: "LabelIndex")
     ]),
     Instruction(name: "brTable", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: [

@@ -1,16 +1,16 @@
-protocol ByteStream: Stream where Element == UInt8 {}
+public protocol ByteStream: Stream where Element == UInt8 {}
 
-final class LegacyStaticByteStream: ByteStream {
-    let bytes: [UInt8]
-    var currentIndex: Int
+public final class StaticByteStream: ByteStream {
+    public let bytes: [UInt8]
+    public var currentIndex: Int
 
-    init(bytes: [UInt8]) {
+    public init(bytes: [UInt8]) {
         self.bytes = bytes
         currentIndex = bytes.startIndex
     }
 
     @discardableResult
-    func consumeAny() throws -> UInt8 {
+    public func consumeAny() throws -> UInt8 {
         guard bytes.indices.contains(currentIndex) else {
             throw StreamError<Element>.unexpectedEnd(expected: nil)
         }
@@ -21,7 +21,7 @@ final class LegacyStaticByteStream: ByteStream {
     }
 
     @discardableResult
-    func consume(_ expected: Set<UInt8>) throws -> UInt8 {
+    public func consume(_ expected: Set<UInt8>) throws -> UInt8 {
         guard bytes.indices.contains(currentIndex) else {
             throw StreamError<Element>.unexpectedEnd(expected: Set(expected))
         }
@@ -35,7 +35,7 @@ final class LegacyStaticByteStream: ByteStream {
         return consumed
     }
 
-    func consume(count: Int) throws -> ArraySlice<UInt8> {
+    public func consume(count: Int) throws -> ArraySlice<UInt8> {
         let updatedIndex = currentIndex + count
 
         guard bytes.indices.contains(updatedIndex - 1) else {
@@ -47,7 +47,7 @@ final class LegacyStaticByteStream: ByteStream {
         return bytes[currentIndex..<updatedIndex]
     }
 
-    func peek() -> UInt8? {
+    public func peek() -> UInt8? {
         guard bytes.indices.contains(currentIndex) else {
             return nil
         }
