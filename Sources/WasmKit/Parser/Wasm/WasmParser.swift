@@ -381,11 +381,7 @@ extension LegacyWasmParser {
             return .value(.else)
         case .end:
             return .value(.end)
-        case .br, .br_if: fatalError("no longer supported")
-        case .br_table:
-            let labelIndices: [UInt32] = try parseVector { try parseUnsigned() }
-            let labelIndex: UInt32 = try parseUnsigned()
-            return .value(.control(.brTable(.init(labelIndices: labelIndices, defaultIndex: labelIndex))))
+        case .br, .br_if, .br_table: fatalError("no longer supported")
         case .return:
             return .value(.control(.return))
         case .call:
@@ -1316,6 +1312,7 @@ extension LegacyWasmParser {
                     #endif
                     
                     var translator = InstructionTranslator(
+                        allocator: module.allocator,
                         module: InstructionTranslator.Module(
                             typeSection: types,
                             importSection: imports,

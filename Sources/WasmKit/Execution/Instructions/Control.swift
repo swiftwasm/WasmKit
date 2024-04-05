@@ -111,9 +111,9 @@ extension ExecutionState {
         }
         try labelBranch(labelIndex: Int(labelIndex), stack: &stack, runtime: runtime)
     }
-    mutating func brTable(runtime: Runtime, stack: inout Stack, brTable: Instruction.BrTable) throws {
-        let labelIndices = brTable.labelIndices
-        let defaultIndex = brTable.defaultIndex
+    mutating func legacyBrTable(runtime: Runtime, stack: inout Stack, legacyBrTable: Instruction.LegacyBrTable) throws {
+        let labelIndices = legacyBrTable.labelIndices
+        let defaultIndex = legacyBrTable.defaultIndex
         let value = stack.popValue().i32
         let labelIndex: LabelIndex
         if labelIndices.indices.contains(Int(value)) {
@@ -123,6 +123,17 @@ extension ExecutionState {
         }
 
         try labelBranch(labelIndex: Int(labelIndex), stack: &stack, runtime: runtime)
+    }
+    mutating func brTable(runtime: Runtime, stack: inout Stack, brTable: Instruction.BrTable) throws {
+        let index = stack.popValue().i32
+        let normalizedOffset = min(Int(index), brTable.buffer.count - 1)
+        let entry = brTable.buffer[normalizedOffset]
+
+        try branch(
+            labelIndex: entry.labelIndex, stack: &stack,
+            offset: entry.offset,
+            copyCount: UInt32(entry.copyCount), popCount: UInt32(entry.popCount)
+        )
     }
     mutating func `return`(runtime: Runtime, stack: inout Stack) throws {
         let currentFrame = stack.currentFrame!

@@ -6,6 +6,24 @@ import enum WasmParser.ReferenceType
 import struct WasmParser.BrTable
 import struct WasmParser.MemArg
 
+class ISeqAllocator {
+
+    private var buffers: [UnsafeMutableRawBufferPointer] = []
+
+    func allocateBrTable(capacity: Int) -> UnsafeMutableBufferPointer<Instruction.BrTable.Entry> {
+        assert(_isPOD(Instruction.BrTable.Entry.self), "Instruction.BrTable.Entry must be POD")
+        let buffer = UnsafeMutableBufferPointer<Instruction.BrTable.Entry>.allocate(capacity: capacity)
+        self.buffers.append(UnsafeMutableRawBufferPointer(buffer))
+        return buffer
+    }
+
+    deinit {
+        for buffer in buffers {
+            buffer.deallocate()
+        }
+    }
+}
+
 struct InstructionTranslator: InstructionVisitor {
     typealias Output = Void
 
@@ -145,13 +163,22 @@ struct InstructionTranslator: InstructionVisitor {
 
     struct ISeqBuilder {
         typealias InstructionFactoryWithLabel = (ISeqBuilder, MetaProgramCounter) -> (WasmKit.Instruction)
+        typealias BrTableEntryFactory = (ISeqBuilder, MetaProgramCounter) -> Instruction.BrTable.Entry
+        typealias BuildingBrTable = UnsafeMutableBufferPointer<Instruction.BrTable.Entry>
+
+        enum OnPinAction {
+            case emitInstruction(insertAt: MetaProgramCounter, InstructionFactoryWithLabel)
+            case fillBrTableEntry(
+                buildingTable: BuildingBrTable,
+                index: Int, make: BrTableEntryFactory
+            )
+        }
         struct LabelUser: CustomStringConvertible {
-            let insertAt: MetaProgramCounter
-            let make: InstructionFactoryWithLabel
+            let action: OnPinAction
             let sourceLine: UInt
 
             var description: String {
-                "LabelUser:\(sourceLine):PC=\(insertAt.offsetFromHead)"
+                "LabelUser:\(sourceLine)"
             }
         }
         enum LabelEntry {
@@ -172,6 +199,12 @@ struct InstructionTranslator: InstructionVisitor {
                     assert(users.isEmpty, "Label (#\(ref)) is used but not pinned at finalization-time: \(users)")
                 case .pinned: break
                 }
+            }
+        }
+
+        func dump() {
+            for instruction in instructions {
+                print(instruction)
             }
         }
 
@@ -210,7 +243,12 @@ struct InstructionTranslator: InstructionVisitor {
             case .unpinned(let users):
                 self.labels[ref] = .pinned(pc)
                 for user in users {
-                    instructions[user.insertAt.offsetFromHead] = user.make(self, pc)
+                    switch user.action {
+                    case let .emitInstruction(insertAt, make):
+                        instructions[insertAt.offsetFromHead] = make(self, pc)
+                    case let .fillBrTableEntry(brTable, index, make):
+                        brTable[index] = make(self, pc)
+                    }
                 }
             }
         }
@@ -218,14 +256,31 @@ struct InstructionTranslator: InstructionVisitor {
         mutating func pinLabelHere(_ ref: LabelRef) {
             pinLabel(ref, pc: insertingPC)
         }
-
+        
+        /// Emit an instruction at the current insertion point with resolved label position
+        /// - Parameters:
+        ///   - ref: Label reference to be resolved
+        ///   - make: Factory closure to make an inserting instruction
         mutating func emitWithLabel(_ ref: LabelRef, line: UInt = #line, make: @escaping InstructionFactoryWithLabel) {
+            let insertAt = insertingPC
+            emit(.nop) // Emit dummy instruction to be replaced later
+            emitWithLabel(ref, insertAt: insertAt, line: line, make: make)
+        }
+        
+        /// Emit an instruction at the specified position with resolved label position
+        /// - Parameters:
+        ///   - ref: Label reference to be resolved
+        ///   - insertAt: Instruction sequence offset to insert at
+        ///   - make: Factory closure to make an inserting instruction
+        mutating func emitWithLabel(
+            _ ref: LabelRef, insertAt: MetaProgramCounter,
+            line: UInt = #line, make: @escaping InstructionFactoryWithLabel
+        ) {
             switch self.labels[ref] {
             case .pinned(let pc):
-                self.emit(make(self, pc))
+                self.instructions[insertAt.offsetFromHead] = make(self, pc)
             case .unpinned(var users):
-                users.append(LabelUser(insertAt: insertingPC, make: make, sourceLine: line))
-                emit(.nop) // Emit dummy instruction to be replaced later
+                users.append(LabelUser(action: .emitInstruction(insertAt: insertAt, make), sourceLine: line))
                 self.labels[ref] = .unpinned(users: users)
             }
         }
@@ -239,6 +294,7 @@ struct InstructionTranslator: InstructionVisitor {
         }
     }
 
+    let allocator: ISeqAllocator
     let module: Module
     var iseqBuilder: ISeqBuilder
     var controlStack: ControlStack
@@ -246,7 +302,8 @@ struct InstructionTranslator: InstructionVisitor {
     let locals: Locals
     let endOfFunctionLabel: LabelRef
 
-    init(module: Module, type: FunctionType, locals: [ValueType]) {
+    init(allocator: ISeqAllocator, module: Module, type: FunctionType, locals: [ValueType]) {
+        self.allocator = allocator
         self.module = module
         self.iseqBuilder = ISeqBuilder()
         self.controlStack = ControlStack()
@@ -411,6 +468,22 @@ struct InstructionTranslator: InstructionVisitor {
         }
     }
 
+    private static func computePopCount(
+        destination: ControlStack.ControlFrame,
+        currentFrame: ControlStack.ControlFrame,
+        currentHeight: Int
+    ) -> UInt32 {
+        let popCount: UInt32
+        if _fastPath(currentFrame.reachable) {
+            popCount = UInt32(currentHeight - Int(destination.copyCount) - destination.stackHeight)
+        } else {
+            // Slow path: This path is taken when "br" is placed after "unreachable"
+            // It's ok to put the fake popCount because it will not be executed at runtime.
+            popCount = 0
+        }
+        return popCount
+    }
+
     private mutating func emitBranch(
         relativeDepth: UInt32,
         make: @escaping (_ offset: Int32, _ copyCount: UInt32, _ popCount: UInt32) -> Instruction
@@ -418,6 +491,7 @@ struct InstructionTranslator: InstructionVisitor {
         let frame: ControlStack.ControlFrame
         switch controlStack.branchTarget(relativeDepth: relativeDepth) {
         case .returnFunction:
+            // XX: unreachable?
             self.translateReturn()
             return
         case .localJump(let found):
@@ -426,14 +500,11 @@ struct InstructionTranslator: InstructionVisitor {
         let selfPC = iseqBuilder.insertingPC
         let copyCount = frame.copyCount
 
-        let popCount: UInt32
-        if _fastPath(controlStack.currentFrame().reachable) {
-            popCount = UInt32(valueStack.height - Int(copyCount) - frame.stackHeight)
-        } else {
-            // Slow path: This path is taken when "br" is placed after "unreachable"
-            // It's ok to put the fake popCount because it will not be executed at runtime.
-            popCount = 0
-        }
+        let popCount = Self.computePopCount(
+            destination: frame,
+            currentFrame: controlStack.currentFrame(),
+            currentHeight: valueStack.height
+        )
         iseqBuilder.emitWithLabel(frame.continuation) { _, continuation in
             let relativeOffset = continuation.offsetFromHead - selfPC.offsetFromHead
             return make(Int32(relativeOffset), UInt32(copyCount), popCount)
@@ -460,9 +531,38 @@ struct InstructionTranslator: InstructionVisitor {
     }
     
     mutating func visitBrTable(targets: WasmParser.BrTable) throws -> Output {
-        try popOperand(.i32)
-        let brTable = Instruction.BrTable(labelIndices: targets.labelIndices, defaultIndex: targets.defaultIndex)
-        emit(.brTable(brTable))
+        try popOperand(.i32) // Table index
+
+        let allLabelIndices = targets.labelIndices + [targets.defaultIndex]
+        let tableBuffer = allocator.allocateBrTable(capacity: allLabelIndices.count)
+        let brTable = Instruction.BrTable(buffer: UnsafeBufferPointer(tableBuffer))
+        let insertAt = iseqBuilder.insertingPC
+        iseqBuilder.emit(.brTable(brTable))
+
+        let currentFrame = controlStack.currentFrame()
+        let currentHeight = valueStack.height
+
+        for (entryIndex, labelIndex) in allLabelIndices.enumerated() {
+            let frame: ControlStack.ControlFrame
+            switch controlStack.branchTarget(relativeDepth: labelIndex) {
+            case .returnFunction: fatalError()
+            case .localJump(let found):
+                frame = found
+            }
+            let popCount = Self.computePopCount(
+                destination: frame, currentFrame: currentFrame, currentHeight: currentHeight
+            )
+
+            iseqBuilder.emitWithLabel(frame.continuation, insertAt: insertAt) { iseqBuilder, continuation in
+                let relativeOffset = continuation.offsetFromHead - insertAt.offsetFromHead
+                tableBuffer[entryIndex] = Instruction.BrTable.Entry(
+                    labelIndex: labelIndex, offset: Int32(relativeOffset),
+                    copyCount: frame.copyCount, popCount: UInt16(popCount)
+                )
+                assert(tableBuffer[entryIndex].labelIndex == labelIndex)
+                return .brTable(brTable)
+            }
+        }
         markUnreachable()
     }
     

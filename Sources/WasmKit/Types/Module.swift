@@ -15,6 +15,7 @@ public struct Module {
     public internal(set) var imports: [Import]
     public internal(set) var exports: [Export]
     public internal(set) var customSections = [CustomSection]()
+    let allocator: ISeqAllocator
 
     init(
         types: [FunctionType] = [],
@@ -38,6 +39,7 @@ public struct Module {
         self.start = start
         self.imports = imports
         self.exports = exports
+        self.allocator = ISeqAllocator()
     }
 
     /// Materialize lazily-computed elements in this module

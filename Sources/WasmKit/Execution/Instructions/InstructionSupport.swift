@@ -34,6 +34,20 @@ extension Instruction {
     }
 
     struct BrTable: Equatable {
+        struct Entry {
+            var labelIndex: LabelIndex
+            var offset: Int32
+            var copyCount: UInt16
+            var popCount: UInt16
+        }
+        let buffer: UnsafeBufferPointer<Entry>
+
+        static func == (lhs: Instruction.BrTable, rhs: Instruction.BrTable) -> Bool {
+            lhs.buffer.baseAddress == rhs.buffer.baseAddress
+        }
+    }
+
+    struct LegacyBrTable: Equatable {
         private let bufferBase: UnsafePointer<LabelIndex>
         private let bufferCount: UInt32
         var labelIndices: UnsafeBufferPointer<LabelIndex> {
@@ -53,7 +67,7 @@ extension Instruction {
             self.bufferCount = UInt32(buffer.count)
         }
 
-        static func == (lhs: Instruction.BrTable, rhs: Instruction.BrTable) -> Bool {
+        static func == (lhs: Instruction.LegacyBrTable, rhs: Instruction.LegacyBrTable) -> Bool {
             lhs.labelIndices.baseAddress == rhs.labelIndices.baseAddress
         }
     }

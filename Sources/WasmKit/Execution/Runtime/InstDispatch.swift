@@ -39,6 +39,9 @@ extension ExecutionState {
         case .brTable(let brTable):
             try self.brTable(runtime: runtime, stack: &stack, brTable: brTable)
             return false
+        case .legacyBrTable(let legacyBrTable):
+            try self.legacyBrTable(runtime: runtime, stack: &stack, legacyBrTable: legacyBrTable)
+            return false
         case .`return`:
             try self.`return`(runtime: runtime, stack: &stack)
             return false
@@ -267,6 +270,7 @@ extension Instruction {
         case .brIf: return "brIf"
         case .legacyBrIf: return "legacyBrIf"
         case .brTable: return "brTable"
+        case .legacyBrTable: return "legacyBrTable"
         case .`return`: return "`return`"
         case .call: return "call"
         case .callIndirect: return "callIndirect"

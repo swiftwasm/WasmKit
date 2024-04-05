@@ -101,6 +101,9 @@ let instructions = [
     Instruction(name: "brTable", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: [
         Immediate(name: nil, type: "Instruction.BrTable"),
     ]),
+    Instruction(name: "legacyBrTable", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: [
+        Immediate(name: nil, type: "Instruction.LegacyBrTable"),
+    ]),
     Instruction(name: "`return`", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: []),
     Instruction(name: "call", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: [
         Immediate(name: "functionIndex", type: "UInt32")
