@@ -113,8 +113,8 @@ struct Run: ParsableCommand {
     }
 
     func instantiateNonWASI(module: Module, interceptor: RuntimeInterceptor?) throws -> (() throws -> Void)? {
-        var arguments = arguments
-        let functionName = arguments.popLast()
+        let functionName = arguments.first
+        let arguments = arguments.dropFirst()
 
         var parameters: [Value] = []
         for argument in arguments {
