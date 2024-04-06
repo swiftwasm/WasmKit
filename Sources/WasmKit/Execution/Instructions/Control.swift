@@ -64,10 +64,9 @@ extension ExecutionState {
         }
         programCounter += 1
     }
-    mutating func `else`(runtime: Runtime, stack: inout Stack) {
-        let label = stack.currentLabel!
+    mutating func `else`(runtime: Runtime, stack: inout Stack, endRef: ExpressionRef) {
         stack.exitLabel()
-        programCounter = label.continuation // if-then-else's continuation points the "end"
+        programCounter += endRef.relativeOffset // if-then-else's continuation points the "end"
     }
     private mutating func branch(labelIndex: LabelIndex, stack: inout Stack, offset: Int32, copyCount: UInt32, popCount: UInt32) throws {
         if popCount > 0 { // TODO: Maybe worth to have a special instruction for popCount=0?

@@ -24,8 +24,8 @@ extension ExecutionState {
         case .end:
             self.end(runtime: runtime, stack: &stack)
             return true
-        case .`else`:
-            self.`else`(runtime: runtime, stack: &stack)
+        case .`else`(let endRef):
+            self.`else`(runtime: runtime, stack: &stack, endRef: endRef)
             return true
         case .br(let labelIndex, let offset, let copyCount, let popCount):
             try self.br(runtime: runtime, stack: &stack, labelIndex: labelIndex, offset: offset, copyCount: copyCount, popCount: popCount)

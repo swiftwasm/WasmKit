@@ -6,7 +6,7 @@ enum Instruction: Equatable {
     case ifThen(endRef: ExpressionRef, type: BlockType)
     case ifThenElse(elseRef: ExpressionRef, endRef: ExpressionRef, type: BlockType)
     case end
-    case `else`
+    case `else`(endRef: ExpressionRef)
     case br(labelIndex: LabelIndex, offset: Int32, copyCount: UInt32, popCount: UInt32)
     case brIf(labelIndex: LabelIndex, offset: Int32, copyCount: UInt32, popCount: UInt32)
     case brTable(Instruction.BrTable)

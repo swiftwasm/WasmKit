@@ -78,7 +78,9 @@ let instructions = [
         Immediate(name: "type", type: "BlockType")
     ]),
     Instruction(name: "end", isControl: true, immediates: []),
-    Instruction(name: "`else`", isControl: true, immediates: []),
+    Instruction(name: "`else`", isControl: true, immediates: [
+        Immediate(name: "endRef", type: "ExpressionRef")
+    ]),
     Instruction(name: "br", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: [
         Immediate(name: "labelIndex", type: "LabelIndex"),
         Immediate(name: "offset", type: "Int32"),

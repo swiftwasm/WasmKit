@@ -358,27 +358,9 @@ extension LegacyWasmParser {
                 return .multiValue([.loop(type: type)] + expr + [.end])
             }
         case .if:
-            let type = try parseResultType()
-            return ParseInstructionResult.requestExpression { (thenExpr: [Instruction], end: PseudoInstruction) -> ParseInstructionResult in
-                switch end {
-                case .else:
-                    return .requestExpression { (elseExpr: [Instruction], end2: PseudoInstruction) -> ParseInstructionResult in
-                        let type = try type.arity(typeSection: typeSection)
-                        let control = Instruction.ifThenElse(
-                            elseRef: ExpressionRef(thenExpr.count + 1 + 1),
-                            endRef: ExpressionRef(thenExpr.count + 1 + elseExpr.count + 1 + 1),
-                            type: type
-                        )
-                        return .multiValue([control] + thenExpr + [.else] + elseExpr + [.end])
-                    }
-                case .end:
-                    let type = try type.arity(typeSection: typeSection)
-                    let control = Instruction.ifThen(endRef: ExpressionRef(thenExpr.count + 2), type: type)
-                    return .multiValue([control] + thenExpr + [.end])
-                }
-            }
+            fatalError("no longer supported")
         case .else:
-            return .value(.else)
+            fatalError("no longer supported")
         case .end:
             return .value(.end)
         case .br, .br_if, .br_table: fatalError("no longer supported")
@@ -878,11 +860,19 @@ extension LegacyWasmParser {
         func parseSingleInst() throws -> ParseInstructionResult {
             return try parseInstruction(typeSection: typeSection)
         }
+        func isEndInstruction(_ instruction: Instruction) -> Bool {
+            if case .else = instruction {
+                return true
+            } else if instruction == .end {
+                return true
+            }
+            return false
+        }
         var nextResult = try parseSingleInst()
 
         while true {
             switch nextResult {
-            case .value(let end) where end == .end || end == .else:
+            case .value(let end) where isEndInstruction(end):
                 let end: PseudoInstruction = end == .end ? .end : .else
                 if let nextWork = pendingWorks.popLast() {
                     // If there is a pending parse, then restore the parsing

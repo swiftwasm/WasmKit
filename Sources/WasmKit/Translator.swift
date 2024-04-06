@@ -67,7 +67,7 @@ struct InstructionTranslator: InstructionVisitor {
             enum Kind {
                 case block(root: Bool)
                 case loop
-                case `if`(elseLabel: LabelRef)
+                case `if`(elseLabel: LabelRef, endLabel: LabelRef)
 
                 static var block: Kind { .block(root: false) }
             }
@@ -415,7 +415,10 @@ struct InstructionTranslator: InstructionVisitor {
         let elseLabel = iseqBuilder.allocLabel()
         let stackHeight = self.valueStack.height - Int(blockType.parameters.count)
         controlStack.pushFrame(
-            ControlStack.ControlFrame(blockType: blockType, stackHeight: stackHeight, continuation: endLabel, kind: .if(elseLabel: elseLabel))
+            ControlStack.ControlFrame(
+                blockType: blockType, stackHeight: stackHeight, continuation: endLabel,
+                kind: .if(elseLabel: elseLabel, endLabel: endLabel)
+            )
         )
         let selfPC = iseqBuilder.insertingPC
         iseqBuilder.emitWithLabel(endLabel) { iseqBuilder, endPC in
@@ -432,10 +435,14 @@ struct InstructionTranslator: InstructionVisitor {
     }
     
     mutating func visitElse() throws -> Output {
-        iseqBuilder.emit(.else)
         let frame = controlStack.currentFrame()
-        guard case let .if(elseLabel) = frame.kind else {
+        guard case let .if(elseLabel, endLabel) = frame.kind else {
             throw TranslationError("Expected `if` control frame on top of the stack for `else` but got \(frame)")
+        }
+        let selfPC = iseqBuilder.insertingPC
+        iseqBuilder.emitWithLabel(endLabel) { _, endPC in
+            let endRef = ExpressionRef(from: selfPC, to: endPC)
+            return .else(endRef: endRef)
         }
         valueStack.truncate(height: frame.stackHeight)
         // Re-push parameters
