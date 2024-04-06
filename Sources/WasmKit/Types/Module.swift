@@ -5,13 +5,13 @@
 public struct Module {
     public internal(set) var types: [FunctionType]
     var functions: [GuestFunction]
-    public internal(set) var tables: [Table]
-    public internal(set) var memories: [Memory]
-    public internal(set) var globals: [Global]
-    public internal(set) var elements: [ElementSegment]
-    public internal(set) var dataCount: UInt32?
-    public internal(set) var data: [DataSegment]
-    public internal(set) var start: FunctionIndex?
+    var tables: [Table]
+    var memories: [Memory]
+    var globals: [Global]
+    var elements: [ElementSegment]
+    var dataCount: UInt32?
+    var data: [DataSegment]
+    var start: FunctionIndex?
     public internal(set) var imports: [Import]
     public internal(set) var exports: [Export]
     public internal(set) var customSections = [CustomSection]()
@@ -48,23 +48,37 @@ public struct Module {
     }
 }
 
+/// A custom section in a module
 public struct CustomSection: Equatable {
     public let name: String
     public let bytes: ArraySlice<UInt8>
 }
 
-/// > Note:
-/// <https://webassembly.github.io/spec/core/syntax/modules.html#syntax-typeidx>
-public typealias TypeIndex = UInt32
-public typealias FunctionIndex = UInt32
-public typealias TableIndex = UInt32
-public typealias MemoryIndex = UInt32
-public typealias GlobalIndex = UInt32
-public typealias ElementIndex = UInt32
-public typealias DataIndex = UInt32
-public typealias LocalIndex = UInt32
-public typealias LabelIndex = UInt32
+// MARK: - Module Entity Indices
+// <https://webassembly.github.io/spec/core/syntax/modules.html#syntax-typeidx>
 
+/// Index type for function types within a module
+public typealias TypeIndex = UInt32
+/// Index type for tables within a module
+public typealias FunctionIndex = UInt32
+/// Index type for tables within a module
+public typealias TableIndex = UInt32
+/// Index type for memories within a module
+public typealias MemoryIndex = UInt32
+/// Index type for globals within a module
+public typealias GlobalIndex = UInt32
+/// Index type for elements within a module
+public typealias ElementIndex = UInt32
+/// Index type for data segments within a module
+public typealias DataIndex = UInt32
+/// Index type for labels within a function
+typealias LocalIndex = UInt32
+/// Index type for labels within a function
+typealias LabelIndex = UInt32
+
+// MARK: - Module Entities
+
+/// An executable function representation in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#functions>
 struct GuestFunction {
@@ -80,7 +94,7 @@ struct GuestFunction {
     }
 
     public let type: TypeIndex
-    public let defaultLocals: UnsafeBufferPointer<Value>
+    let defaultLocals: UnsafeBufferPointer<Value>
     private var _bodyStorage: InstructionSequence? = nil
     private let materializer: () throws -> InstructionSequence
     var body: InstructionSequence {
@@ -97,26 +111,28 @@ struct GuestFunction {
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#tables>
-public struct Table: Equatable {
+struct Table: Equatable {
     public let type: TableType
 }
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#memories>
-public struct Memory: Equatable {
+struct Memory: Equatable {
     public let type: MemoryType
 }
 
+/// Global entry in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#globals>
-public struct Global: Equatable {
+struct Global: Equatable {
     let type: GlobalType
     let initializer: Expression
 }
 
+/// Segment of elements that are initialized in a table
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#element-segments>
-public struct ElementSegment: Equatable {
+struct ElementSegment: Equatable {
     struct Flag: OptionSet {
         let rawValue: UInt32
 
@@ -144,14 +160,15 @@ public struct ElementSegment: Equatable {
         case passive
     }
 
-    public let type: ReferenceType
+    let type: ReferenceType
     let initializer: [Expression]
     let mode: Mode
 }
 
+/// Data segment in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#data-segments>
-public enum DataSegment: Equatable {
+enum DataSegment: Equatable {
     public struct Active: Equatable {
         let index: MemoryIndex
         let offset: Expression
@@ -162,31 +179,48 @@ public enum DataSegment: Equatable {
     case active(Active)
 }
 
+/// Exported entity in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#exports>
 public struct Export: Equatable {
+    /// Name of the export
     public let name: String
+    /// Descriptor of the export
     public let descriptor: ExportDescriptor
 }
 
+/// Export descriptor
 public enum ExportDescriptor: Equatable {
+    /// Function export
     case function(FunctionIndex)
+    /// Table export
     case table(TableIndex)
+    /// Memory export
     case memory(MemoryIndex)
+    /// Global export
     case global(GlobalIndex)
 }
 
+/// Import entity in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#imports>
 public struct Import: Equatable {
+    /// Module name imported from
     public let module: String
+    /// Name of the import
     public let name: String
+    /// Descriptor of the import
     public let descriptor: ImportDescriptor
 }
 
+/// Import descriptor
 public enum ImportDescriptor: Equatable {
+    /// Function import
     case function(TypeIndex)
+    /// Table import
     case table(TableType)
+    /// Memory import
     case memory(MemoryType)
+    /// Global import
     case global(GlobalType)
 }

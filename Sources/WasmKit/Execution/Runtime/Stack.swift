@@ -1,8 +1,7 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#stack>
-
-public struct Stack {
-    public enum Element: Equatable {
+struct Stack {
+    enum Element: Equatable {
         case value(Value)
         case label(Label)
         case frame(Frame)
@@ -296,7 +295,7 @@ struct BaseStackAddress {
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#frames>
-public struct Frame {
+struct Frame {
     let arity: Int
     let module: ModuleAddress
     let baseStackAddress: BaseStackAddress
@@ -323,7 +322,7 @@ public struct Frame {
 }
 
 extension Frame: Equatable {
-    public static func == (_ lhs: Frame, _ rhs: Frame) -> Bool {
+    static func == (_ lhs: Frame, _ rhs: Frame) -> Bool {
         lhs.module == rhs.module && lhs.arity == rhs.arity
     }
 }
@@ -341,7 +340,7 @@ extension Stack {
 }
 
 extension Frame: CustomDebugStringConvertible {
-    public var debugDescription: String {
+    var debugDescription: String {
         "[A=\(arity), BA=\(baseStackAddress), F=\(address?.description ?? "nil")]"
     }
 }

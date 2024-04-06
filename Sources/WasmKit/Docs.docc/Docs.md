@@ -93,8 +93,3 @@ _ = try runtime.invoke(instance, function: "_start")
 - ``CanonicalOptions``
 - ``CanonicalCallContext``
 - ``ComponentError``
-
-### Hook Runtime
-
-- ``RuntimeInterceptor``
-- ``GuestTimeProfiler``

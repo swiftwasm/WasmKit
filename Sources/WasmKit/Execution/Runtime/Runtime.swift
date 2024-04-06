@@ -11,6 +11,7 @@ public final class Runtime {
     }
 }
 
+@_documentation(visibility: internal)
 public protocol RuntimeInterceptor {
     func onEnterFunction(_ address: FunctionAddress, store: Store)
     func onExitFunction(_ address: FunctionAddress, store: Store)
