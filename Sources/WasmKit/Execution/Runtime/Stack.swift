@@ -95,17 +95,6 @@ struct Stack {
         self.labels.pop(labelIndex + 1)
     }
 
-    mutating func popTopValues() throws -> Array<Value> {
-        guard let currentLabel = self.currentLabel else {
-            return self.valueStack.popValues(count: self.valueStack.count)
-        }
-        guard currentLabel.baseValueIndex < self.numberOfValues else {
-            return []
-        }
-        let values = self.valueStack.popValues(count: self.numberOfValues - currentLabel.baseValueIndex)
-        return values
-    }
-
     mutating func popFrame() {
         let popped = self.frames.pop()
         self.currentFrame = self.frames.peek()

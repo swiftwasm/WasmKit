@@ -6,13 +6,14 @@ public struct Function: Equatable {
     public func invoke(_ arguments: [Value] = [], runtime: Runtime) throws -> [Value] {
         try withExecution { execution in
             var stack = Stack()
-            try invoke(execution: &execution, stack: &stack, with: arguments, runtime: runtime)
+            let numberOfResults = try invoke(execution: &execution, stack: &stack, with: arguments, runtime: runtime)
             try execution.run(runtime: runtime, stack: &stack)
-            return try Array(stack.popTopValues())
+            return Array(stack.popValues(count: numberOfResults))
         }
     }
 
-    private func invoke(execution: inout ExecutionState, stack: inout Stack, with arguments: [Value], runtime: Runtime) throws {
+    /// - Returns: Number of result values
+    private func invoke(execution: inout ExecutionState, stack: inout Stack, with arguments: [Value], runtime: Runtime) throws -> Int {
         switch try runtime.store.function(at: address) {
         case let .host(function):
             try check(functionType: function.type, parameters: arguments)
@@ -24,12 +25,14 @@ public struct Function: Equatable {
             let results = try function.implementation(caller, Array(parameters))
             try check(functionType: function.type, results: results)
             stack.push(values: results)
+            return function.type.results.count
 
         case let .wasm(function, _):
             try check(functionType: function.type, parameters: arguments)
             stack.push(values: arguments)
 
             try execution.invoke(functionAddress: address, runtime: runtime, stack: &stack)
+            return function.type.results.count
         }
     }
 
