@@ -1,8 +1,7 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#stack>
-
-public struct Stack {
-    public enum Element: Equatable {
+struct Stack {
+    enum Element: Equatable {
         case value(Value)
         case label(Label)
         case frame(Frame)

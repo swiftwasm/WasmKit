@@ -6,7 +6,6 @@ public enum Trap: Error {
 
     // Stack
     case stackOverflow
-    case stackTypeMismatch(expected: Any.Type, actual: Stack.Element?)
     case stackValueTypesMismatch(expected: ValueType, actual: ValueType)
     case stackElementNotFound(Any.Type, index: Int)
     case localIndexOutOfRange(index: UInt32)
