@@ -546,8 +546,6 @@ extension Swift.Error {
                 return "data count and data section have inconsistent lengths"
             case .expectedRefType:
                 return "malformed reference type"
-            case .unexpectedContent:
-                return "unexpected content after last section"
             case .sectionSizeMismatch:
                 return "section size mismatch"
             case .illegalOpcode:

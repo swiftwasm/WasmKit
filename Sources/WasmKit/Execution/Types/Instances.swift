@@ -146,6 +146,7 @@ public struct MemoryInstance {
     }
 }
 
+/// Instance of a global
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#global-instances>
 public struct GlobalInstance {
@@ -160,7 +161,7 @@ public struct GlobalInstance {
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#element-instances>
-public struct ElementInstance {
+struct ElementInstance {
     public let type: ReferenceType
     public var references: [Reference]
 
@@ -171,9 +172,9 @@ public struct ElementInstance {
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#syntax-datainst>
-public struct DataInstance {
+struct DataInstance {
     /// Bytes stored in this data instance.
-    public let data: [UInt8]
+    let data: [UInt8]
 }
 
 /// > Note:

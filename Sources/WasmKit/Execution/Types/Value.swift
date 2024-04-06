@@ -1,23 +1,37 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#value-types>
 
+/// Numeric types
 public enum NumericType: Equatable {
+    /// Integer value type.
     case int(IntValueType)
+    /// Floating-point value type.
     case float(FloatValueType)
 
+    /// 32-bit signed or unsigned integer.
     public static let i32: Self = .int(.i32)
+    /// 64-bit signed or unsigned integer.
     public static let i64: Self = .int(.i64)
+    /// 32-bit IEEE 754 floating-point number.
     public static let f32: Self = .float(.f32)
+    /// 64-bit IEEE 754 floating-point number.
     public static let f64: Self = .float(.f64)
 }
 
+/// Value types
 public enum ValueType: Equatable {
+    /// Numeric value type.
     case numeric(NumericType)
+    /// Reference value type.
     case reference(ReferenceType)
 
+    /// 32-bit signed or unsigned integer.
     public static let i32: Self = .numeric(.int(.i32))
+    /// 64-bit signed or unsigned integer.
     public static let i64: Self = .numeric(.int(.i64))
+    /// 32-bit IEEE 754 floating-point number.
     public static let f32: Self = .numeric(.float(.f32))
+    /// 64-bit IEEE 754 floating-point number.
     public static let f64: Self = .numeric(.float(.f64))
 
     var defaultValue: Value {
@@ -71,21 +85,33 @@ extension ValueType: CustomStringConvertible {
     }
 }
 
+/// Reference types
 public enum ReferenceType: Equatable {
+    /// A nullable reference type to a function.
     case funcRef
+    /// A nullable external reference type.
     case externRef
 }
 
+/// Reference to a function.
 public enum Reference: Hashable {
+    /// A reference to a function.
     case function(FunctionAddress?)
+    /// A reference to an external entity.
     case extern(ExternAddress?)
 }
 
+/// Runtime representation of a value.
 public enum Value: Hashable {
+    /// Value of a 32-bit signed or unsigned integer.
     case i32(UInt32)
+    /// Value of a 64-bit signed or unsigned integer.
     case i64(UInt64)
+    /// Value of a 32-bit IEEE 754 floating-point number.
     case f32(UInt32)
+    /// Value of a 64-bit IEEE 754 floating-point number.
     case f64(UInt64)
+    /// Reference value.
     case ref(Reference)
 
     var type: ValueType {
@@ -116,37 +142,49 @@ public enum Value: Hashable {
         }
     }
 
+    /// Create a new value from a signed 32-bit integer.
     public init(signed value: Int32) {
         self = .i32(UInt32(bitPattern: value))
     }
 
+    /// Create a new value from a signed 64-bit integer.
     public init(signed value: Int64) {
         self = .i64(UInt64(bitPattern: value))
     }
 
+    /// Create a new value from a 32-bit floating-point number.
     public static func fromFloat32(_ value: Float32) -> Value {
         return .f32(value.bitPattern)
     }
 
+    /// Create a new value from a 64-bit floating-point number.
     public static func fromFloat64(_ value: Float64) -> Value {
         return .f64(value.bitPattern)
     }
 
+    /// Returns the value as a 32-bit signed integer.
+    /// - Precondition: The value is of type `i32`.
     public var i32: UInt32 {
         guard case let .i32(result) = self else { fatalError() }
         return result
     }
 
+    /// Returns the value as a 64-bit signed integer.
+    /// - Precondition: The value is of type `i64`.
     public var i64: UInt64 {
         guard case let .i64(result) = self else { fatalError() }
         return result
     }
 
+    /// Returns the value as a 32-bit floating-point number.
+    /// - Precondition: The value is of type `f32`.
     public var f32: UInt32 {
         guard case let .f32(result) = self else { fatalError() }
         return result
     }
 
+    /// Returns the value as a 64-bit floating-point number.
+    /// - Precondition: The value is of type `f64`.
     public var f64: UInt64 {
         guard case let .f64(result) = self else { fatalError() }
         return result
@@ -156,6 +194,7 @@ public enum Value: Hashable {
         return isMemory64 ? i64 : UInt64(i32)
     }
 
+    /// Returns if the given values are equal.
     public static func == (lhs: Self, rhs: Self) -> Bool {
         switch (lhs, rhs) {
         case let (.i32(lhs), .i32(rhs)):
@@ -177,6 +216,8 @@ public enum Value: Hashable {
 }
 
 extension Value: Comparable {
+    /// Returns if the left value is less than the right value.
+    /// - Precondition: The values are of the same type.
     public static func < (lhs: Self, rhs: Self) -> Bool {
         switch (lhs, rhs) {
         case let (.i32(lhs), .i32(rhs)): return lhs < rhs
@@ -187,6 +228,8 @@ extension Value: Comparable {
         }
     }
 
+    /// Returns if the left value is greater than the right value.
+    /// - Precondition: The values are of the same type.
     public static func > (lhs: Self, rhs: Self) -> Bool {
         switch (lhs, rhs) {
         case let (.i32(lhs), .i32(rhs)): return lhs > rhs
@@ -197,6 +240,8 @@ extension Value: Comparable {
         }
     }
 
+    /// Returns if the left value is less than or equal to the right value.
+    /// - Precondition: The values are of the same type.
     public static func >= (lhs: Self, rhs: Self) -> Bool {
         switch (lhs, rhs) {
         case let (.i32(lhs), .i32(rhs)): return lhs >= rhs
@@ -207,6 +252,8 @@ extension Value: Comparable {
         }
     }
 
+    /// Returns if the left value is less than or equal to the right value.
+    /// - Precondition: The values are of the same type.
     public static func <= (lhs: Self, rhs: Self) -> Bool {
         switch (lhs, rhs) {
         case let (.i32(lhs), .i32(rhs)): return lhs <= rhs
@@ -219,6 +266,7 @@ extension Value: Comparable {
 }
 
 extension Value: ExpressibleByBooleanLiteral {
+    /// Create a new value from a boolean literal.
     public init(booleanLiteral value: BooleanLiteralType) {
         if value {
             self = .i32(1)
@@ -229,6 +277,7 @@ extension Value: ExpressibleByBooleanLiteral {
 }
 
 extension Value: CustomStringConvertible {
+    /// A textual representation of the value.
     public var description: String {
         switch self {
         case let .i32(rawValue): return "I32(\(rawValue.signed))"
@@ -245,8 +294,11 @@ extension Value: CustomStringConvertible {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/values.html#integers>
 
+/// Integer value types
 public enum IntValueType {
+    /// 32-bit signed or unsigned integer.
     case i32
+    /// 64-bit signed or unsigned integer.
     case i64
 }
 
@@ -297,8 +349,11 @@ extension RawSignedInteger {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/values.html#floating-point>
 
+/// Floating-point value types
 public enum FloatValueType {
+    /// 32-bit IEEE 754 floating-point number.
     case f32
+    /// 64-bit IEEE 754 floating-point number.
     case f64
 
     var nan: Value {

@@ -3,6 +3,7 @@ public struct GuestMemory {
     private let store: Store
     private let address: MemoryAddress
 
+    /// Creates a new memory instance from the given store and address
     public init(store: Store, address: MemoryAddress) {
         self.store = store
         self.address = address
@@ -47,17 +48,21 @@ extension GuestPrimitivePointee {
     }
 }
 
+/// Auto implementation of ``GuestPointee`` for ``RawRepresentable`` types
 extension GuestPrimitivePointee where Self: RawRepresentable, Self.RawValue: GuestPointee {
+    /// Reads a value of RawValue type and constructs a value of Self type
     public static func readFromGuest(_ pointer: UnsafeGuestRawPointer) -> Self {
         Self(rawValue: .readFromGuest(pointer))!
     }
 
+    /// Writes the raw value of the given value to the given pointer of guest memory
     public static func writeToGuest(at pointer: UnsafeGuestRawPointer, value: Self) {
         Self.RawValue.writeToGuest(at: pointer, value: value.rawValue)
     }
 }
 
 extension UInt8: GuestPrimitivePointee {
+    /// Reads a value of `UInt8` type from the given pointer of guest memory
     public static func readFromGuest(_ pointer: UnsafeGuestRawPointer) -> UInt8 {
         pointer.withHostPointer { hostPointer in
             let pointer = hostPointer.assumingMemoryBound(to: UInt8.self)
@@ -65,6 +70,7 @@ extension UInt8: GuestPrimitivePointee {
         }
     }
 
+    /// Writes the given value at the given pointer of guest memory
     public static func writeToGuest(at pointer: UnsafeGuestRawPointer, value: UInt8) {
         pointer.withHostPointer { hostPointer in
             let pointer = hostPointer.assumingMemoryBound(to: UInt8.self)
@@ -74,6 +80,7 @@ extension UInt8: GuestPrimitivePointee {
 }
 
 extension UInt16: GuestPrimitivePointee {
+    /// Reads a value of `UInt16` type from the given pointer of guest memory
     public static func readFromGuest(_ pointer: UnsafeGuestRawPointer) -> UInt16 {
         pointer.withHostPointer { hostPointer in
             let pointer = hostPointer.assumingMemoryBound(to: UInt16.self)
@@ -86,6 +93,7 @@ extension UInt16: GuestPrimitivePointee {
         }
     }
 
+    /// Writes the given value at the given pointer of guest memory
     public static func writeToGuest(at pointer: UnsafeGuestRawPointer, value: UInt16) {
         pointer.withHostPointer { hostPointer in
             let pointer = hostPointer.assumingMemoryBound(to: UInt16.self)
@@ -101,6 +109,7 @@ extension UInt16: GuestPrimitivePointee {
 }
 
 extension UInt32: GuestPrimitivePointee {
+    /// Reads a value of `UInt32` type from the given pointer of guest memory
     public static func readFromGuest(_ pointer: UnsafeGuestRawPointer) -> UInt32 {
         pointer.withHostPointer { hostPointer in
             let pointer = hostPointer.assumingMemoryBound(to: UInt32.self)
@@ -113,6 +122,7 @@ extension UInt32: GuestPrimitivePointee {
         }
     }
 
+    /// Writes the given value at the given pointer of guest memory
     public static func writeToGuest(at pointer: UnsafeGuestRawPointer, value: UInt32) {
         pointer.withHostPointer { hostPointer in
             let pointer = hostPointer.assumingMemoryBound(to: UInt32.self)
@@ -128,6 +138,7 @@ extension UInt32: GuestPrimitivePointee {
 }
 
 extension UInt64: GuestPrimitivePointee {
+    /// Reads a value of `UInt64` type from the given pointer of guest memory
     public static func readFromGuest(_ pointer: UnsafeGuestRawPointer) -> UInt64 {
         pointer.withHostPointer { hostPointer in
             let pointer = hostPointer.assumingMemoryBound(to: UInt64.self)
@@ -140,6 +151,7 @@ extension UInt64: GuestPrimitivePointee {
         }
     }
 
+    /// Writes the given value at the given pointer of guest memory
     public static func writeToGuest(at pointer: UnsafeGuestRawPointer, value: UInt64) {
         pointer.withHostPointer { hostPointer in
             let pointer = hostPointer.assumingMemoryBound(to: UInt64.self)
@@ -162,6 +174,7 @@ public struct UnsafeGuestRawPointer {
     /// An offset from the base address of the guest memory region
     public let offset: UInt32
 
+    /// Creates a new pointer from the given memory space and offset
     public init(memorySpace: GuestMemory, offset: UInt32) {
         self.memorySpace = memorySpace
         self.offset = offset
@@ -193,29 +206,39 @@ public struct UnsafeGuestRawPointer {
 }
 
 extension UnsafeGuestRawPointer: GuestPointee {
+    /// Returns the size of this type in bytes in guest memory
     public static var sizeInGuest: UInt32 {
         return UInt32(MemoryLayout<UInt32>.size)
     }
 
+    /// Returns the required alignment of this type, in bytes
     public static var alignInGuest: UInt32 {
         return UInt32(MemoryLayout<UInt32>.alignment)
     }
 
+    /// Reads a value of self type from the given pointer of guest memory
     public static func readFromGuest(_ pointer: UnsafeGuestRawPointer) -> UnsafeGuestRawPointer {
         UnsafeGuestRawPointer(memorySpace: pointer.memorySpace, offset: UInt32.readFromGuest(pointer))
     }
 
+    /// Writes the given value at the given pointer of guest memory
     public static func writeToGuest(at pointer: UnsafeGuestRawPointer, value: UnsafeGuestRawPointer) {
         UInt32.writeToGuest(at: pointer, value: value.offset)
     }
 }
 
 extension UnsafeGuestRawPointer {
+    /// Returns a boolean value indicating whether the first pointer references a guest
+    /// memory location earlier than the second pointer assuming they point the same guest
+    /// memory space.
     public static func < (lhs: UnsafeGuestRawPointer, rhs: UnsafeGuestRawPointer) -> Bool {
         // Assuming they point the same guest memory space
         lhs.offset < rhs.offset
     }
 
+    /// Returns a boolean value indicating whether the first pointer references a guest
+    /// memory location later than the second pointer assuming they point the same guest
+    /// memory space.
     public static func > (lhs: UnsafeGuestRawPointer, rhs: UnsafeGuestRawPointer) -> Bool {
         // Assuming they point the same guest memory space
         lhs.offset > rhs.offset
@@ -224,12 +247,15 @@ extension UnsafeGuestRawPointer {
 
 /// A pointee-bound pointer representation of guest memory space
 public struct UnsafeGuestPointer<Pointee: GuestPointee> {
+    /// A raw pointer representation of guest memory space
     public let raw: UnsafeGuestRawPointer
 
+    /// Creates a new pointer from the given raw pointer
     public init(_ raw: UnsafeGuestRawPointer) {
         self.raw = raw
     }
 
+    /// Creates a new pointer from the given memory space and offset
     public init(memorySpace: GuestMemory, offset: UInt32) {
         self.raw = UnsafeGuestRawPointer(memorySpace: memorySpace, offset: offset)
     }
@@ -249,37 +275,49 @@ public struct UnsafeGuestPointer<Pointee: GuestPointee> {
 }
 
 extension UnsafeGuestPointer: GuestPointee {
+    /// Returns the size of this type in bytes in guest memory
     public static var sizeInGuest: UInt32 {
         UnsafeGuestRawPointer.sizeInGuest
     }
 
+    /// Returns the required alignment of this type, in bytes
     public static var alignInGuest: UInt32 {
         UnsafeGuestRawPointer.alignInGuest
     }
 
+    /// Reads a value of self type from the given pointer of guest memory
     public static func readFromGuest(_ pointer: UnsafeGuestRawPointer) -> UnsafeGuestPointer<Pointee> {
         UnsafeGuestPointer(UnsafeGuestRawPointer.readFromGuest(pointer))
     }
 
+    /// Writes the given value at the given pointer of guest memory
     public static func writeToGuest(at pointer: UnsafeGuestRawPointer, value: UnsafeGuestPointer<Pointee>) {
         UnsafeGuestRawPointer.writeToGuest(at: pointer, value: value.raw)
     }
 }
 
 extension UnsafeGuestPointer {
+    /// Returns a new pointer offset from this pointer by the specified number of instances.
     public static func + (lhs: UnsafeGuestPointer, rhs: UInt32) -> UnsafeGuestPointer {
         let advanced = lhs.raw.advanced(by: Pointee.sizeInGuest * rhs)
         return UnsafeGuestPointer(advanced)
     }
 
+    /// Returns a new pointer offset from this pointer by the specified number of instances.
     public static func += (lhs: inout Self, rhs: UInt32) {
         lhs = lhs + rhs
     }
 
+    /// Returns a boolean value indicating whether the first pointer references a guest
+    /// memory location earlier than the second pointer assuming they point the same guest
+    /// memory space.
     public static func < (lhs: UnsafeGuestPointer, rhs: UnsafeGuestPointer) -> Bool {
         lhs.raw < rhs.raw
     }
 
+    /// Returns a boolean value indicating whether the first pointer references a guest
+    /// memory location later than the second pointer assuming they point the same guest
+    /// memory space.
     public static func > (lhs: UnsafeGuestPointer, rhs: UnsafeGuestPointer) -> Bool {
         lhs.raw > rhs.raw
     }
@@ -287,9 +325,12 @@ extension UnsafeGuestPointer {
 
 /// A pointee-bound interface to a buffer of elements stored contiguously in guest memory
 public struct UnsafeGuestBufferPointer<Pointee: GuestPointee> {
+    /// A pointer to the first element of the buffer
     public let baseAddress: UnsafeGuestPointer<Pointee>
+    /// The number of elements in the buffer
     public let count: UInt32
 
+    /// Creates a new buffer from the given base address and count
     public init(baseAddress: UnsafeGuestPointer<Pointee>, count: UInt32) {
         self.baseAddress = baseAddress
         self.count = count

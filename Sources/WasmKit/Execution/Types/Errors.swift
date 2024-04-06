@@ -5,32 +5,40 @@ public enum Trap: Error {
     case unreachable
 
     // Stack
+    /// Stack overflow
     case stackOverflow
+    /// The stack value type does not match the expected type
     case stackValueTypesMismatch(expected: ValueType, actual: ValueType)
-    case stackElementNotFound(Any.Type, index: Int)
-    case localIndexOutOfRange(index: UInt32)
+    /// Too deep call stack
     case callStackExhausted
 
     // Store
-    case globalAddressOutOfRange(index: GlobalAddress)
-    case globalImmutable(index: GlobalAddress)
+    /// Out of bounds table access
     case outOfBoundsTableAccess(index: ElementIndex)
+    /// Reading a dropped reference
     case readingDroppedReference(index: ElementIndex)
 
     // Invocation
+    /// Exported function not found
     case exportedFunctionNotFound(ModuleInstance, name: String)
+    /// The table element is not initialized
     case tableUninitialized(ElementIndex)
+    /// Undefined element in the table
     case undefinedElement
+    /// Table size overflow
     case tableSizeOverflow
+    /// Indirect call type mismatch
     case callIndirectFunctionTypeMismatch(actual: FunctionType, expected: FunctionType)
+    /// Out of bounds memory access
     case outOfBoundsMemoryAccess
+    /// Invalid function index
     case invalidFunctionIndex(FunctionIndex)
-    case poppedLabelMismatch
-    case labelMismatch
+    /// Integer divided by zero
     case integerDividedByZero
+    /// Integer overflowed during arithmetic operation
     case integerOverflowed
+    /// Invalid conversion to integer
     case invalidConversionToInteger
-    case tooManyBlockParameters([ValueType])
 
     /// Human-readable text representation of the trap that `.wast` text format expects in assertions
     public var assertionText: String {

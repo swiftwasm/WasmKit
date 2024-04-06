@@ -17,17 +17,24 @@ final class WasmParser<Stream: ByteStream> {
     }
 }
 
+/// Flags for enabling/disabling WebAssembly features
 public struct WasmFeatureSet: OptionSet {
+    /// The raw value of the feature set
     public let rawValue: Int
 
+    /// Initialize a new feature set with the given raw value
     public init(rawValue: Int) {
         self.rawValue = rawValue
     }
 
+    /// The WebAssembly memory64 proposal
     public static let memory64 = WasmFeatureSet(rawValue: 1 << 0)
+    /// The WebAssembly reference types proposal
     public static let referenceTypes = WasmFeatureSet(rawValue: 1 << 1)
 
+    /// The default feature set
     public static let `default`: WasmFeatureSet = [.referenceTypes]
+    /// The feature set with all features enabled
     public static let all: WasmFeatureSet = [.memory64, .referenceTypes]
 }
 
@@ -52,30 +59,53 @@ public func parseWasm(bytes: [UInt8], features: WasmFeatureSet = .default) throw
 }
 
 public enum WasmParserError: Swift.Error {
+    /// The magic number is not found or invalid
     case invalidMagicNumber([UInt8])
+    /// The version is not recognized
     case unknownVersion([UInt8])
+    /// The bytes are not valid UTF-8
     case invalidUTF8([UInt8])
+    /// The section has an invalid size
     case invalidSectionSize(UInt32)
+    /// The section ID is malformed
     case malformedSectionID(UInt8)
+    /// The byte is expected to be zero, but it's not
     case zeroExpected(actual: UInt8, index: Int)
+    /// The function and code length are inconsistent
     case inconsistentFunctionAndCodeLength(functionCount: Int, codeCount: Int)
+    /// The data count and data section length are inconsistent
     case inconsistentDataCountAndDataSectionLength(dataCount: UInt32, dataSection: Int)
+    /// The local count is too large
     case tooManyLocals
+    /// The type is expected to be a reference type, but it's not
     case expectedRefType(actual: ValueType)
+    /// The instruction is not implemented
     case unimplementedInstruction(UInt8, suffix: UInt32? = nil)
+    /// The element kind is unexpected
     case unexpectedElementKind(expected: UInt32, actual: UInt32)
+    /// The element kind is not recognized
     case integerRepresentationTooLong
+    /// `end` opcode is expected but not found
     case endOpcodeExpected
+    /// Unexpected end of the stream
     case unexpectedEnd
-    case unexpectedContent
+    /// The byte is not expected
     case sectionSizeMismatch(expected: Int, actual: Int)
+    /// Illegal opcode is found
     case illegalOpcode(UInt8)
+    /// Malformed mutability byte
     case malformedMutability(UInt8)
+    /// Malformed function type byte
     case malformedFunctionType(UInt8)
+    /// Sections in the module are out of order
     case sectionOutOfOrder
+    /// The data count section is required but not found
     case dataCountSectionRequired
+    /// Malformed limit byte
     case malformedLimit(UInt8)
+    /// Malformed indirect call
     case malformedIndirectCall
+    /// Invalid reference to a type section entry
     case invalidTypeSectionReference
 }
 
