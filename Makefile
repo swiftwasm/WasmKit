@@ -45,7 +45,9 @@ update:
 	@swift package update
 
 .PHONY: generate
-generate: $(GENERATED_DIRS)
+generate:
+	swift ./Utilities/generate_inst_visitor.swift
+	swift ./Utilities/generate_inst_dispatch.swift
 
 GIT_STATUS = $(shell git status --porcelain)
 ensure_clean:
