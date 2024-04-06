@@ -59,20 +59,15 @@ extension ExecutionState {
         )
     }
     mutating func end(runtime: Runtime, stack: inout Stack) {
-        if stack.currentLabel != nil {
-            stack.exitLabel()
-        }
         programCounter += 1
     }
     mutating func `else`(runtime: Runtime, stack: inout Stack, endRef: ExpressionRef) {
-        stack.exitLabel()
         programCounter += endRef.relativeOffset // if-then-else's continuation points the "end"
     }
     private mutating func branch(labelIndex: LabelIndex, stack: inout Stack, offset: Int32, copyCount: UInt32, popCount: UInt32) throws {
         if popCount > 0 { // TODO: Maybe worth to have a special instruction for popCount=0?
             stack.copyValues(copyCount: Int(copyCount), popCount: Int(popCount))
         }
-        stack.popLabels(upto: Int(labelIndex))
         programCounter += Int(offset)
     }
     mutating func br(runtime: Runtime, stack: inout Stack, labelIndex: LabelIndex, offset: Int32, copyCount: UInt32, popCount: UInt32) throws {

@@ -3,41 +3,23 @@
 struct Stack {
     enum Element: Equatable {
         case value(Value)
-        case label(Label)
         case frame(Frame)
     }
 
     private var limit: UInt16 { UInt16.max }
     private var valueStack: ValueStack
     private var numberOfValues: Int { valueStack.count }
-    private var labels: FixedSizeStack<Label> {
-        didSet {
-            self.currentLabel = self.labels.peek()
-        }
-    }
     private var frames: FixedSizeStack<Frame>
     var currentFrame: Frame!
-    var currentLabel: Label!
 
     var isEmpty: Bool {
-        self.frames.isEmpty && self.labels.isEmpty && self.numberOfValues == 0
+        self.frames.isEmpty && self.numberOfValues == 0
     }
 
     init() {
         let limit = UInt16.max
         self.valueStack = ValueStack(capacity: Int(limit))
         self.frames = FixedSizeStack(capacity: Int(limit))
-        self.labels = FixedSizeStack(capacity: Int(limit))
-    }
-
-    @inline(__always)
-    mutating func pushLabel(arity: Int, continuation: ProgramCounter, popPushValues: Int = 0) {
-        let label = Label(
-            arity: arity,
-            continuation: continuation,
-            baseValueIndex: self.numberOfValues - popPushValues
-        )
-        labels.push(label)
     }
 
     mutating func pushFrame(
@@ -50,7 +32,7 @@ struct Stack {
         address: FunctionAddress? = nil
     ) throws {
         // TODO: Stack overflow check can be done at the entry of expression
-        guard (frames.count + labels.count + numberOfValues) < limit else {
+        guard (frames.count + numberOfValues) < limit else {
             throw Trap.callStackExhausted
         }
         let valueFrameIndex = self.numberOfValues - argc
@@ -60,39 +42,21 @@ struct Stack {
         let baseStackAddress = BaseStackAddress(
             valueFrameIndex: valueFrameIndex,
             // Consume argment values from value stack
-            valueIndex: self.numberOfValues,
-            labelIndex: self.labels.count
+            valueIndex: self.numberOfValues
         )
         let frame = Frame(arity: arity, module: module, baseStackAddress: baseStackAddress, iseq: iseq, returnPC: returnPC, address: address)
         frames.push(frame)
         self.currentFrame = frame
     }
 
-    func numberOfLabelsInCurrentFrame() -> Int {
-        self.labels.count - currentFrame.baseStackAddress.labelIndex
-    }
-
-    func numberOfValuesInCurrentLabel() -> Int {
-        self.numberOfValues - currentLabel.baseValueIndex
-    }
-
     func _numberOfValuesInCurrentFrame() -> Int {
         self.numberOfValues - currentFrame.baseStackAddress.valueIndex
-    }
-
-    mutating func exitLabel() {
-        self.labels.pop()
     }
 
     mutating func exit(frame: Frame) {
         let results = valueStack.popValues(count: frame.arity)
         self.valueStack.truncate(length: frame.baseStackAddress.valueFrameIndex)
         valueStack.push(values: results)
-        self.labels.pop(self.labels.count - frame.baseStackAddress.labelIndex)
-    }
-
-    mutating func popLabels(upto labelIndex: Int) {
-        self.labels.pop(labelIndex + 1)
     }
 
     mutating func popFrame() {
@@ -258,24 +222,11 @@ extension FixedSizeStack: Sequence {
     }
 }
 
-/// > Note:
-/// <https://webassembly.github.io/spec/core/exec/runtime.html#labels>
-public struct Label: Equatable {
-    let arity: Int
-
-    /// Index of an instruction to jump to when this label is popped off the stack.
-    let continuation: ProgramCounter
-
-    let baseValueIndex: Int
-}
-
 struct BaseStackAddress {
     /// Locals are placed between `valueFrameIndex..<valueIndex`
     let valueFrameIndex: Int
     /// The base index of Wasm value stack
     let valueIndex: Int
-    /// The base index of Wasm label stack
-    let labelIndex: Int
 }
 
 /// > Note:
@@ -330,12 +281,6 @@ extension Frame: CustomDebugStringConvertible {
     }
 }
 
-extension Label: CustomDebugStringConvertible {
-    public var debugDescription: String {
-        "[A=\(arity), C=\(continuation), BVI=\(baseValueIndex)]"
-    }
-}
-
 extension Stack: CustomDebugStringConvertible {
     public var debugDescription: String {
         var result = ""
@@ -344,12 +289,6 @@ extension Stack: CustomDebugStringConvertible {
         for (index, frame) in frames.enumerated() {
             result += "FRAME[\(index)]: \(frame.debugDescription)\n"
         }
-        result += "==================================================\n"
-
-        for (index, label) in labels.enumerated() {
-            result += "LABEL[\(index)]: \(label.debugDescription)\n"
-        }
-
         result += "==================================================\n"
 
         for (index, value) in valueStack.enumerated() {

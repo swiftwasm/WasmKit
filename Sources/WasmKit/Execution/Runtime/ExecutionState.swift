@@ -37,18 +37,12 @@ extension ExecutionState {
     /// <https://webassembly.github.io/spec/core/exec/instructions.html#entering-xref-syntax-instructions-syntax-instr-mathit-instr-ast-with-label-l>
     @inline(__always)
     mutating func enter(jumpTo targetPC: ProgramCounter, continuation: ProgramCounter, stack: inout Stack, arity: Int, pushPopValues: Int = 0) {
-        stack.pushLabel(
-            arity: arity,
-            continuation: continuation,
-            popPushValues: pushPopValues
-        )
         programCounter = targetPC
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/instructions.html#exiting-xref-syntax-instructions-syntax-instr-mathit-instr-ast-with-label-l>
     mutating func exitLabel(stack: inout Stack) throws {
-        stack.exitLabel()
         programCounter += 1
     }
 
