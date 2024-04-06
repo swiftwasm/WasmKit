@@ -59,7 +59,7 @@ extension ExecutionState {
         )
     }
     mutating func end(runtime: Runtime, stack: inout Stack) {
-        programCounter += 1
+        fatalError()
     }
     mutating func `else`(runtime: Runtime, stack: inout Stack, endRef: ExpressionRef) {
         programCounter += endRef.relativeOffset // if-then-else's continuation points the "end"

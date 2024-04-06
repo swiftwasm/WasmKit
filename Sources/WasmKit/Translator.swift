@@ -460,7 +460,6 @@ struct InstructionTranslator: InstructionVisitor {
             // iseqBuilder.emit(.endOfFunction)
             return
         }
-        iseqBuilder.emit(.end)
 
         switch poppedFrame.kind {
         case .block:
