@@ -33,14 +33,8 @@ extension ExecutionState {
         case .brIf(let labelIndex, let offset, let copyCount, let popCount):
             try self.brIf(runtime: runtime, stack: &stack, labelIndex: labelIndex, offset: offset, copyCount: copyCount, popCount: popCount)
             return false
-        case .legacyBrIf(let labelIndex):
-            try self.legacyBrIf(runtime: runtime, stack: &stack, labelIndex: labelIndex)
-            return false
         case .brTable(let brTable):
             try self.brTable(runtime: runtime, stack: &stack, brTable: brTable)
-            return false
-        case .legacyBrTable(let legacyBrTable):
-            try self.legacyBrTable(runtime: runtime, stack: &stack, legacyBrTable: legacyBrTable)
             return false
         case .`return`:
             try self.`return`(runtime: runtime, stack: &stack)
@@ -268,9 +262,7 @@ extension Instruction {
         case .`else`: return "`else`"
         case .br: return "br"
         case .brIf: return "brIf"
-        case .legacyBrIf: return "legacyBrIf"
         case .brTable: return "brTable"
-        case .legacyBrTable: return "legacyBrTable"
         case .`return`: return "`return`"
         case .call: return "call"
         case .callIndirect: return "callIndirect"

@@ -9,9 +9,7 @@ enum Instruction: Equatable {
     case `else`
     case br(labelIndex: LabelIndex, offset: Int32, copyCount: UInt32, popCount: UInt32)
     case brIf(labelIndex: LabelIndex, offset: Int32, copyCount: UInt32, popCount: UInt32)
-    case legacyBrIf(labelIndex: LabelIndex)
     case brTable(Instruction.BrTable)
-    case legacyBrTable(Instruction.LegacyBrTable)
     case `return`
     case call(functionIndex: UInt32)
     case callIndirect(tableIndex: TableIndex, typeIndex: TypeIndex)

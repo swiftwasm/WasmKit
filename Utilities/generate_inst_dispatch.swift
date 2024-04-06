@@ -95,14 +95,8 @@ let instructions = [
         // Number of values that will be popped if the branch is taken
         Immediate(name: "popCount", type: "UInt32"),
     ]),
-    Instruction(name: "legacyBrIf", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: [
-        Immediate(name: "labelIndex", type: "LabelIndex")
-    ]),
     Instruction(name: "brTable", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: [
         Immediate(name: nil, type: "Instruction.BrTable"),
-    ]),
-    Instruction(name: "legacyBrTable", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: [
-        Immediate(name: nil, type: "Instruction.LegacyBrTable"),
     ]),
     Instruction(name: "`return`", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: []),
     Instruction(name: "call", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: [

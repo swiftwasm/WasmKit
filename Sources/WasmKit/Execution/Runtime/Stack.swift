@@ -95,17 +95,6 @@ struct Stack {
         self.labels.pop(labelIndex + 1)
     }
 
-    @discardableResult
-    mutating func unwindLabels(upto labelIndex: Int) -> Label? {
-        // labelIndex = 0 means jumping to the current head label
-        let labelToRemove = self.labels[self.labels.count - labelIndex - 1]
-        self.labels.pop(labelIndex + 1)
-        if self.numberOfValues > labelToRemove.baseValueIndex {
-            self.valueStack.truncate(length: labelToRemove.baseValueIndex)
-        }
-        return labelToRemove
-    }
-
     mutating func popTopValues() throws -> Array<Value> {
         guard let currentLabel = self.currentLabel else {
             return self.valueStack.popValues(count: self.valueStack.count)
@@ -121,10 +110,6 @@ struct Stack {
         let popped = self.frames.pop()
         self.currentFrame = self.frames.peek()
         self.valueStack.truncate(length: popped.baseStackAddress.valueFrameIndex)
-    }
-
-    func getLabel(index: Int) -> Label {
-        return self.labels[self.labels.count - index - 1]
     }
 
     mutating func popValues(count: Int) -> Array<Value> {
