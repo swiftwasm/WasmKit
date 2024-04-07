@@ -105,6 +105,10 @@ let package = Package(
             dependencies: ["WasmKit"]
         ),
         .testTarget(
+            name: "WasmParserTests",
+            dependencies: ["WasmParser"]
+        ),
+        .testTarget(
             name: "WASITests",
             dependencies: ["WASI"]
         ),

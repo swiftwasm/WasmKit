@@ -284,38 +284,34 @@ extension NumericInstruction {
             _ value1: Value,
             _ value2: Value
         ) throws -> Value {
-            guard case let .numeric(type) = value1.type else {
-                fatalError()
-            }
-
-            switch (self, type) {
-            case (.divS, _):
+            switch self {
+            case .divS:
                 guard !value2.isZero else { throw Trap.integerDividedByZero }
                 return try Value.divisionSigned(value1, value2)
-            case (.divU, _):
+            case .divU:
                 guard !value2.isZero else { throw Trap.integerDividedByZero }
                 return try Value.divisionUnsigned(value1, value2)
-            case (.remS, _):
+            case .remS:
                 guard !value2.isZero else { throw Trap.integerDividedByZero }
                 return try Value.remainderSigned(value1, value2)
-            case (.remU, _):
+            case .remU:
                 guard !value2.isZero else { throw Trap.integerDividedByZero }
                 return try Value.remainderUnsigned(value1, value2)
-            case (.and, _):
+            case .and:
                 return value1 & value2
-            case (.or, _):
+            case .or:
                 return value1 | value2
-            case (.xor, _):
+            case .xor:
                 return value1 ^ value2
-            case (.shl, _):
+            case .shl:
                 return value1 << value2
-            case (.shrS, _):
+            case .shrS:
                 return Value.rightShiftSigned(value1, value2)
-            case (.shrU, _):
+            case .shrU:
                 return Value.rightShiftUnsigned(value1, value2)
-            case (.rotl, _):
+            case .rotl:
                 return value1.rotl(value2)
-            case (.rotr, _):
+            case .rotr:
                 return value1.rotr(value2)
             }
         }

@@ -1,3 +1,5 @@
+import WasmParser
+
 public enum Trap: Error {
     // FIXME: for debugging purposes, to be eventually deleted
     case _raw(String)
@@ -8,7 +10,7 @@ public enum Trap: Error {
     /// Stack overflow
     case stackOverflow
     /// The stack value type does not match the expected type
-    case stackValueTypesMismatch(expected: ValueType, actual: ValueType)
+    case stackValueTypesMismatch(expected: WasmParser.ValueType, actual: WasmParser.ValueType)
     /// Too deep call stack
     case callStackExhausted
 
@@ -72,6 +74,7 @@ public enum InstantiationError: Error {
     case invalidTableExpression
     case outOfBoundsTableAccess
     case outOfBoundsMemoryAccess
+    case unsupported(String)
 
     /// Human-readable text representation of the trap that `.wast` text format expects in assertions
     public var assertionText: String {
@@ -80,6 +83,8 @@ public enum InstantiationError: Error {
             return "out of bounds table access"
         case .outOfBoundsMemoryAccess:
             return "out of bounds memory access"
+        case .unsupported(let message):
+            return "unsupported operation: \(message)"
         default:
             return String(describing: self)
         }

@@ -1,3 +1,5 @@
+import WasmParser
+
 /// A unit of stateless WebAssembly code, which is a direct representation of a module file. You can get one
 /// by calling either ``parseWasm(bytes:features:)`` or ``parseWasm(filePath:features:)``.
 /// > Note:
@@ -50,12 +52,6 @@ public struct Module {
     }
 }
 
-/// A custom section in a module
-public struct CustomSection: Equatable {
-    public let name: String
-    public let bytes: ArraySlice<UInt8>
-}
-
 // MARK: - Module Entity Indices
 // <https://webassembly.github.io/spec/core/syntax/modules.html#syntax-typeidx>
 
@@ -84,7 +80,7 @@ typealias LabelIndex = UInt32
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#functions>
 struct GuestFunction {
-    init(type: TypeIndex, locals: [ValueType], body: @escaping () throws -> InstructionSequence) {
+    init(type: TypeIndex, locals: [WasmParser.ValueType], body: @escaping () throws -> InstructionSequence) {
         self.type = type
         // TODO: Deallocate const default locals after the module is deallocated
         let defaultLocals = UnsafeMutableBufferPointer<Value>.allocate(capacity: locals.count)
@@ -109,120 +105,4 @@ struct GuestFunction {
             return result
         }
     }
-}
-
-/// > Note:
-/// <https://webassembly.github.io/spec/core/syntax/modules.html#tables>
-struct Table: Equatable {
-    public let type: TableType
-}
-
-/// > Note:
-/// <https://webassembly.github.io/spec/core/syntax/modules.html#memories>
-struct Memory: Equatable {
-    public let type: MemoryType
-}
-
-/// Global entry in a module
-/// > Note:
-/// <https://webassembly.github.io/spec/core/syntax/modules.html#globals>
-struct Global: Equatable {
-    let type: GlobalType
-    let initializer: Expression
-}
-
-/// Segment of elements that are initialized in a table
-/// > Note:
-/// <https://webassembly.github.io/spec/core/syntax/modules.html#element-segments>
-struct ElementSegment: Equatable {
-    struct Flag: OptionSet {
-        let rawValue: UInt32
-
-        init(rawValue: UInt32) {
-            self.rawValue = rawValue
-        }
-
-        var segmentHasElemKind: Bool {
-            !contains(.usesExpressions) && rawValue != 0
-        }
-
-        var segmentHasRefType: Bool {
-            contains(.usesExpressions) && rawValue != 4
-        }
-
-        static let isPassiveOrDeclarative = Flag(rawValue: 1 << 0)
-        static let isDeclarative = Flag(rawValue: 1 << 1)
-        static let hasTableIndex = Flag(rawValue: 1 << 1)
-        static let usesExpressions = Flag(rawValue: 1 << 2)
-    }
-
-    enum Mode: Equatable {
-        case active(table: TableIndex, offset: Expression)
-        case declarative
-        case passive
-    }
-
-    let type: ReferenceType
-    let initializer: [Expression]
-    let mode: Mode
-}
-
-/// Data segment in a module
-/// > Note:
-/// <https://webassembly.github.io/spec/core/syntax/modules.html#data-segments>
-enum DataSegment: Equatable {
-    public struct Active: Equatable {
-        let index: MemoryIndex
-        let offset: Expression
-        let initializer: ArraySlice<UInt8>
-    }
-
-    case passive([UInt8])
-    case active(Active)
-}
-
-/// Exported entity in a module
-/// > Note:
-/// <https://webassembly.github.io/spec/core/syntax/modules.html#exports>
-public struct Export: Equatable {
-    /// Name of the export
-    public let name: String
-    /// Descriptor of the export
-    public let descriptor: ExportDescriptor
-}
-
-/// Export descriptor
-public enum ExportDescriptor: Equatable {
-    /// Function export
-    case function(FunctionIndex)
-    /// Table export
-    case table(TableIndex)
-    /// Memory export
-    case memory(MemoryIndex)
-    /// Global export
-    case global(GlobalIndex)
-}
-
-/// Import entity in a module
-/// > Note:
-/// <https://webassembly.github.io/spec/core/syntax/modules.html#imports>
-public struct Import: Equatable {
-    /// Module name imported from
-    public let module: String
-    /// Name of the import
-    public let name: String
-    /// Descriptor of the import
-    public let descriptor: ImportDescriptor
-}
-
-/// Import descriptor
-public enum ImportDescriptor: Equatable {
-    /// Function import
-    case function(TypeIndex)
-    /// Table import
-    case table(TableType)
-    /// Memory import
-    case memory(MemoryType)
-    /// Global import
-    case global(GlobalType)
 }

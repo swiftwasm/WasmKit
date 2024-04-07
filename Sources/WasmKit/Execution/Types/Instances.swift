@@ -1,3 +1,5 @@
+import WasmParser
+
 /// A stateful runtime representation of a ``Module``.
 /// Usually instantiated by ``Runtime/instantiate(module:name:)``.
 /// > Note:

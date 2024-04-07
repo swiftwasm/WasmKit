@@ -1,4 +1,5 @@
 import XCTest
+@testable import WasmParser
 
 @testable import WasmKit
 
@@ -21,7 +22,7 @@ final class HostModuleTests: XCTestCase {
 
     func testReentrancy() throws {
         let runtime = Runtime()
-        let voidSignature = FunctionType(parameters: [], results: [])
+        let voidSignature = WasmParser.FunctionType(parameters: [], results: [])
         let module = Module(
             types: [voidSignature],
             functions: [

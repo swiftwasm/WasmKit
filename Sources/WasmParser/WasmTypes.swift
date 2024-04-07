@@ -1,8 +1,8 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-code>
 public struct Code {
-    let locals: [ValueType]
-    let expression: ArraySlice<UInt8>
+    public let locals: [ValueType]
+    public let expression: ArraySlice<UInt8>
 }
 
 extension Code: Equatable {
@@ -122,7 +122,7 @@ public struct BrTable: Equatable {
     public let defaultIndex: UInt32
 }
 
-
+/// A custom section in a module
 public struct CustomSection: Equatable {
     public let name: String
     public let bytes: ArraySlice<UInt8>
@@ -130,22 +130,23 @@ public struct CustomSection: Equatable {
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#syntax-typeidx>
-typealias TypeIndex = UInt32
-typealias FunctionIndex = UInt32
-typealias TableIndex = UInt32
-typealias DataIndex = UInt32
-typealias ElementIndex = UInt32
 
-struct ConstExpression: Equatable, ExpressibleByArrayLiteral {
-    let instructions: [Instruction]
+/// Index type for function types within a module
+public typealias TypeIndex = UInt32
+/// Index type for tables within a module
+public typealias FunctionIndex = UInt32
+/// Index type for tables within a module
+public typealias TableIndex = UInt32
+/// Index type for memories within a module
+public typealias MemoryIndex = UInt32
+/// Index type for globals within a module
+public typealias GlobalIndex = UInt32
+/// Index type for elements within a module
+public typealias ElementIndex = UInt32
+/// Index type for data segments within a module
+public typealias DataIndex = UInt32
 
-    init(instructions: [Instruction]) {
-        self.instructions = instructions
-    }
-    init(arrayLiteral elements: Instruction...) {
-        self.instructions = elements
-    }
-}
+public typealias ConstExpression = [Instruction]
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#tables>
@@ -159,13 +160,15 @@ public struct Memory: Equatable {
     public let type: MemoryType
 }
 
+/// Global entry in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#globals>
 public struct Global: Equatable {
-    let type: GlobalType
-    let initializer: ConstExpression
+    public let type: GlobalType
+    public let initializer: ConstExpression
 }
 
+/// Segment of elements that are initialized in a table
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#element-segments>
 public struct ElementSegment: Equatable {
@@ -190,59 +193,76 @@ public struct ElementSegment: Equatable {
         static let usesExpressions = Flag(rawValue: 1 << 2)
     }
 
-    enum Mode: Equatable {
+    public enum Mode: Equatable {
         case active(table: UInt32, offset: ConstExpression)
         case declarative
         case passive
     }
 
     public let type: ReferenceType
-    let initializer: [ConstExpression]
-    let mode: Mode
+    public let initializer: [ConstExpression]
+    public let mode: Mode
 }
 
+/// Data segment in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#data-segments>
 public enum DataSegment: Equatable {
     public struct Active: Equatable {
-        let index: UInt32
-        let offset: ConstExpression
-        let initializer: ArraySlice<UInt8>
+        public let index: UInt32
+        public let offset: ConstExpression
+        public let initializer: ArraySlice<UInt8>
     }
 
     case passive([UInt8])
     case active(Active)
 }
 
+/// Exported entity in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#exports>
 public struct Export: Equatable {
+    /// Name of the export
     public let name: String
+    /// Descriptor of the export
     public let descriptor: ExportDescriptor
 }
 
+/// Export descriptor
 public enum ExportDescriptor: Equatable {
-    case function(UInt32)
-    case table(UInt32)
-    case memory(UInt32)
-    case global(UInt32)
+    /// Function export
+    case function(FunctionIndex)
+    /// Table export
+    case table(TableIndex)
+    /// Memory export
+    case memory(MemoryIndex)
+    /// Global export
+    case global(GlobalIndex)
 }
 
+/// Import entity in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#imports>
 public struct Import: Equatable {
+    /// Module name imported from
     public let module: String
+    /// Name of the import
     public let name: String
+    /// Descriptor of the import
     public let descriptor: ImportDescriptor
 }
 
+/// Import descriptor
 public enum ImportDescriptor: Equatable {
-    case function(UInt32)
+    /// Function import
+    case function(TypeIndex)
+    /// Table import
     case table(TableType)
+    /// Memory import
     case memory(MemoryType)
+    /// Global import
     case global(GlobalType)
 }
-
 
 protocol RawUnsignedInteger: FixedWidthInteger & UnsignedInteger {
     associatedtype Signed: RawSignedInteger where Signed.Unsigned == Self

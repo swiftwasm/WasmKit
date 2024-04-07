@@ -1,9 +1,9 @@
 import Foundation
 
-struct WasmParser<Stream: ByteStream> {
+public struct Parser<Stream: ByteStream> {
     let stream: Stream
-    private var hasDataCount: Bool = false
-    private let features: WasmFeatureSet
+    public private(set) var hasDataCount: Bool = false
+    public let features: WasmFeatureSet
 
     enum NextParseTarget {
         case header
@@ -15,7 +15,7 @@ struct WasmParser<Stream: ByteStream> {
         return stream.currentIndex
     }
 
-    init(stream: Stream, features: WasmFeatureSet = .default, hasDataCount: Bool = false) {
+    public init(stream: Stream, features: WasmFeatureSet = .default, hasDataCount: Bool = false) {
         self.stream = stream
         self.features = features
         self.hasDataCount = hasDataCount
@@ -23,8 +23,13 @@ struct WasmParser<Stream: ByteStream> {
     }
 }
 
-public func parseExpression<V: InstructionVisitor>(bytes: [UInt8], features: WasmFeatureSet = .default, hasDataCount: Bool = false, visitor: inout V) throws {
-    let parser = WasmParser(stream: StaticByteStream(bytes: bytes), features: features, hasDataCount: hasDataCount)
+public func parseExpression<V: InstructionVisitor, Stream: ByteStream>(
+    stream: Stream,
+    features: WasmFeatureSet = .default,
+    hasDataCount: Bool = false,
+    visitor: inout V
+) throws {
+    let parser = Parser(stream: stream, features: features, hasDataCount: hasDataCount)
     var lastCode: InstructionCode?
     while try !parser.stream.hasReachedEnd() {
         (lastCode, _) = try parser.parseInstruction(visitor: &visitor)
@@ -32,6 +37,12 @@ public func parseExpression<V: InstructionVisitor>(bytes: [UInt8], features: Was
     guard lastCode == .end else {
         throw WasmParserError.endOpcodeExpected
     }
+}
+public func parseExpression<V: InstructionVisitor>(bytes: [UInt8], features: WasmFeatureSet = .default, hasDataCount: Bool = false, visitor: inout V) throws {
+    try parseExpression(
+        stream: StaticByteStream(bytes: bytes), features: features,
+        hasDataCount: hasDataCount, visitor: &visitor
+    )
 }
 
 /// Flags for enabling/disabling WebAssembly features
@@ -165,7 +176,7 @@ extension ByteStream {
     }
 }
 
-extension WasmParser {
+extension Parser {
     func parseVector<Content>(content parser: () throws -> Content) throws -> [Content] {
         try stream.parseVector(content: parser)
     }
@@ -189,7 +200,7 @@ extension WasmParser {
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/values.html#floating-point>
-extension WasmParser {
+extension Parser {
     func parseFloat() throws -> UInt32 {
         let consumedLittleEndian = try stream.consume(count: 4).reversed()
         let bitPattern = consumedLittleEndian.reduce(UInt32(0)) { acc, byte in
@@ -209,7 +220,7 @@ extension WasmParser {
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/types.html#types>
-extension WasmParser {
+extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/types.html#value-types>
     func parseValueType() throws -> ValueType {
@@ -341,7 +352,7 @@ extension WasmParser {
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/instructions.html>
-extension WasmParser {
+extension Parser {
     func parseInstruction<V: InstructionVisitor>(visitor v: inout V) throws -> (InstructionCode, V.Output) {
         let rawCode = try stream.consumeAny()
         guard let code = InstructionCode(rawValue: rawCode) else {
@@ -683,13 +694,13 @@ extension WasmParser {
             (_, inst) = try self.parseInstruction(visitor: &factory)
             insts.append(inst)
         } while inst != .end
-        return ConstExpression(instructions: insts)
+        return insts
     }
 }
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/modules.html#sections>
-extension WasmParser {
+extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#custom-section>
     func parseCustomSection(size: UInt32) throws -> CustomSection {
@@ -917,7 +928,7 @@ extension WasmParser {
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-module>
-extension WasmParser {
+extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-magic>
     func parseMagicNumber() throws {
@@ -964,7 +975,7 @@ extension WasmParser {
         }
     }
 
-    enum Payload {
+    public enum Payload {
         case header(version: [UInt8])
         case customSection(CustomSection)
         case typeSection([FunctionType])
@@ -979,12 +990,11 @@ extension WasmParser {
         case codeSection([Code])
         case dataSection([DataSegment])
         case dataCount(UInt32)
-        case endOfModule
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-module>
-    mutating func parseNext() throws -> Payload {
+    public mutating func parseNext() throws -> Payload? {
         switch nextParseTarget {
         case .header:
             try parseMagicNumber()
@@ -993,7 +1003,7 @@ extension WasmParser {
             return .header(version: version)
         case .section:
             guard try !stream.hasReachedEnd() else {
-                return .endOfModule
+                return nil
             }
             let sectionID = try stream.consumeAny()
             let sectionSize: UInt32 = try parseUnsigned()
@@ -1015,7 +1025,7 @@ extension WasmParser {
             case 11: payload = .dataSection(try parseDataSection())
             case 12:
                 hasDataCount = true
-                return .dataCount(try parseDataCountSection())
+                payload = .dataCount(try parseDataCountSection())
             default:
                 throw WasmParserError.malformedSectionID(sectionID)
             }
@@ -1031,15 +1041,19 @@ extension WasmParser {
 }
 
 /// > Note: <https://webassembly.github.io/spec/core/appendix/custom.html#name-section>
-struct NameSectionParser<Stream: ByteStream> {
+public struct NameSectionParser<Stream: ByteStream> {
     let stream: Stream
 
-    typealias NameMap = [UInt32: String]
-    enum ParsedNames {
+    public typealias NameMap = [UInt32: String]
+    public enum ParsedNames {
         case functions(NameMap)
     }
 
-    func parseAll() throws -> [ParsedNames] {
+    public init(stream: Stream) {
+        self.stream = stream
+    }
+
+    public func parseAll() throws -> [ParsedNames] {
         var results: [ParsedNames] = []
         while try !stream.hasReachedEnd() {
             let id = try stream.consumeAny()

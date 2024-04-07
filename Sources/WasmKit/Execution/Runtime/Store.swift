@@ -1,3 +1,5 @@
+import WasmParser
+
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#addresses>
 public typealias FunctionAddress = Int

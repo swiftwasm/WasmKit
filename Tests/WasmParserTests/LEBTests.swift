@@ -1,6 +1,6 @@
 import XCTest
 
-@testable import WasmKit
+@testable import WasmParser
 
 final class LEBTest: XCTestCase {
     func testUnsigned() {

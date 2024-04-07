@@ -1,5 +1,4 @@
-import struct WasmParser.MemArg
-import enum WasmParser.BlockType
+import WasmParser
 
 extension Instruction {
     typealias Memarg = MemArg
@@ -22,7 +21,7 @@ extension Instruction {
             case let .funcType(typeIndex):
                 let typeIndex = Int(typeIndex)
                 guard typeIndex < typeSection.count else {
-                    throw LegacyWasmParserError.invalidTypeSectionReference
+                    throw WasmParserError.invalidTypeSectionReference
                 }
                 let funcType = typeSection[typeIndex]
                 self = Instruction.BlockType(

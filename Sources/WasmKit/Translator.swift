@@ -1,10 +1,4 @@
-import protocol WasmParser.InstructionVisitor
-import enum WasmParser.BlockType
-import enum WasmParser.ValueType
-import enum WasmParser.IEEE754
-import enum WasmParser.ReferenceType
-import struct WasmParser.BrTable
-import struct WasmParser.MemArg
+import WasmParser
 
 class ISeqAllocator {
 
@@ -28,22 +22,49 @@ struct InstructionTranslator: InstructionVisitor {
     typealias Output = Void
 
     struct Module {
-        let typeSection: [FunctionType]
-        let importSection: [Import]
-        let functionTypeIndices: [TypeIndex]
-        let globalTypes: [GlobalType]
-        let memoryTypes: [MemoryType]
-        let tables: [Table]
+        private let typeSection: [FunctionType]
+        private let functionTypeIndices: [TypeIndex]
+        private let globalTypes: [GlobalType]
+        private let memoryTypes: [MemoryType]
+        private let tables: [Table]
 
+        init(
+            typeSection: [FunctionType],
+            importSection: [Import],
+            functionSection: [TypeIndex],
+            globalTypes: [GlobalType],
+            memoryTypes: [MemoryType],
+            tables: [Table]
+        ) {
+            self.typeSection = typeSection
+            self.functionTypeIndices = importSection.compactMap { (entry) -> TypeIndex? in
+                guard case let .function(typeIndex) = entry.descriptor else { return nil }
+                return typeIndex
+            } + functionSection
+            self.globalTypes = importSection.compactMap { (entry) -> GlobalType? in
+                guard case let .global(type) = entry.descriptor else { return nil }
+                return type
+            } + globalTypes
+            self.memoryTypes = importSection.compactMap { (entry) -> MemoryType? in
+                guard case let .memory(type) = entry.descriptor else { return nil }
+                return type
+            } + memoryTypes
+            self.tables = tables
+        }
+
+        func resolveType(_ index: TypeIndex) -> FunctionType {
+            typeSection[Int(index)]
+        }
+        func resolveBlockType(_ blockType: BlockType) throws -> FunctionType {
+            try FunctionType(blockType: blockType, typeSection: typeSection)
+        }
         func functionType(_ index: FunctionIndex) -> FunctionType {
             let typeIndex = functionTypeIndices[Int(index)]
             return typeSection[Int(typeIndex)]
         }
-
         func globalType(_ index: GlobalIndex) -> ValueType {
             self.globalTypes[Int(index)].valueType
         }
-
         func isMemory64(_ index: MemoryIndex) -> Bool {
             self.memoryTypes[Int(index)].isMemory64
         }
@@ -59,6 +80,7 @@ struct InstructionTranslator: InstructionVisitor {
         let offsetFromHead: Int
     }
     typealias LabelRef = Int
+    typealias ValueType = WasmParser.ValueType
 
     struct ControlStack {
         typealias BlockType = FunctionType
@@ -147,7 +169,7 @@ struct InstructionTranslator: InstructionVisitor {
         mutating func popRef() throws {
             switch pop() {
             case .some(let actual):
-                guard case .reference = actual else {
+                guard case .ref = actual else {
                     throw TranslationError("Expected reference value on the stack top but got \(actual)")
                 }
             case .unknown: break // OK
@@ -302,7 +324,7 @@ struct InstructionTranslator: InstructionVisitor {
     let locals: Locals
     let endOfFunctionLabel: LabelRef
 
-    init(allocator: ISeqAllocator, module: Module, type: FunctionType, locals: [ValueType]) {
+    init(allocator: ISeqAllocator, module: Module, type: FunctionType, locals: [WasmParser.ValueType]) {
         self.allocator = allocator
         self.module = module
         self.iseqBuilder = ISeqBuilder()
@@ -389,14 +411,14 @@ struct InstructionTranslator: InstructionVisitor {
     mutating func visitNop() -> Output { emit(.nop) }
     
     mutating func visitBlock(blockType: WasmParser.BlockType) throws -> Output {
-        let blockType = try FunctionType(blockType: blockType, typeSection: module.typeSection)
+        let blockType = try module.resolveBlockType(blockType)
         let endLabel = iseqBuilder.allocLabel()
         let stackHeight = self.valueStack.height - Int(blockType.parameters.count)
         controlStack.pushFrame(ControlStack.ControlFrame(blockType: blockType, stackHeight: stackHeight, continuation: endLabel, kind: .block))
     }
     
     mutating func visitLoop(blockType: WasmParser.BlockType) throws -> Output {
-        let blockType = try ControlStack.BlockType(blockType: blockType, typeSection: module.typeSection)
+        let blockType = try module.resolveBlockType(blockType)
         let headLabel = iseqBuilder.putLabel()
         let stackHeight = self.valueStack.height - Int(blockType.parameters.count)
         controlStack.pushFrame(ControlStack.ControlFrame(blockType: blockType, stackHeight: stackHeight, continuation: headLabel, kind: .loop))
@@ -405,7 +427,7 @@ struct InstructionTranslator: InstructionVisitor {
     mutating func visitIf(blockType: WasmParser.BlockType) throws -> Output {
         // Pop condition value
         try popOperand(.i32)
-        let blockType = try ControlStack.BlockType(blockType: blockType, typeSection: module.typeSection)
+        let blockType = try module.resolveBlockType(blockType)
         let endLabel = iseqBuilder.allocLabel()
         let elseLabel = iseqBuilder.allocLabel()
         let stackHeight = self.valueStack.height - Int(blockType.parameters.count)
@@ -586,7 +608,7 @@ struct InstructionTranslator: InstructionVisitor {
     
     mutating func visitCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws -> Output {
         try popOperand(.i32) // function address
-        let calleeType = self.module.typeSection[Int(typeIndex)]
+        let calleeType = self.module.resolveType(typeIndex)
         try visitCallLike(calleeType: calleeType)
         emit(.callIndirect(tableIndex: tableIndex, typeIndex: typeIndex))
     }
@@ -714,13 +736,13 @@ struct InstructionTranslator: InstructionVisitor {
     mutating func visitI64Const(value: Int64)-> Output { pushEmit(.i64, .numericConst(.i64(UInt64(bitPattern: value)))) }
     mutating func visitF32Const(value: IEEE754.Float32)-> Output { pushEmit(.f32, .numericConst(.f32(value.bitPattern))) }
     mutating func visitF64Const(value: IEEE754.Float64)-> Output { pushEmit(.f64, .numericConst(.f64(value.bitPattern))) }
-    mutating func visitRefNull(type: WasmParser.ReferenceType) -> Output { pushEmit(ValueType(.ref(type)), .refNull(type)) }
+    mutating func visitRefNull(type: WasmParser.ReferenceType) -> Output { pushEmit(.ref(type), .refNull(type)) }
     mutating func visitRefIsNull() throws -> Output {
         try valueStack.popRef()
         valueStack.push(.i32)
         emit(.refIsNull)
     }
-    mutating func visitRefFunc(functionIndex: UInt32)-> Output { pushEmit(.reference(.funcRef), .refFunc(functionIndex)) }
+    mutating func visitRefFunc(functionIndex: UInt32) -> Output { pushEmit(.ref(.funcRef), .refFunc(functionIndex)) }
 
     private mutating func visitUnary(_ operand: ValueType, _ instruction: Instruction) throws {
         try popPushEmit(operand, operand, instruction)
@@ -889,16 +911,16 @@ struct InstructionTranslator: InstructionVisitor {
         try popPushEmit([.i32, .i32, .i32], [], .tableCopy(dest: dstTable, src: srcTable))
     }
     mutating func visitTableFill(table: UInt32) throws -> Output {
-        try popPushEmit([.i32, .reference(module.elementType(table)), .i32], [], .tableFill(table))
+        try popPushEmit([.i32, .ref(module.elementType(table)), .i32], [], .tableFill(table))
     }
     mutating func visitTableGet(table: UInt32) throws -> Output {
-        try popPushEmit(.i32, .reference(module.elementType(table)), .tableGet(table))
+        try popPushEmit(.i32, .ref(module.elementType(table)), .tableGet(table))
     }
     mutating func visitTableSet(table: UInt32) throws -> Output {
-        try popPushEmit([.reference(module.elementType(table)), .i32], [], .tableSet(table))
+        try popPushEmit([.ref(module.elementType(table)), .i32], [], .tableSet(table))
     }
     mutating func visitTableGrow(table: UInt32) throws -> Output {
-        try popPushEmit([.i32, .reference(module.elementType(table))], [.i32], .tableGrow(table))
+        try popPushEmit([.i32, .ref(module.elementType(table))], [.i32], .tableGrow(table))
     }
     mutating func visitTableSize(table: UInt32) throws -> Output {
         pushEmit(.i32, .tableSize(table))
@@ -932,13 +954,13 @@ fileprivate extension FunctionType {
     init(blockType: WasmParser.BlockType, typeSection: [FunctionType]) throws {
         switch blockType {
         case .type(let valueType):
-            self.init(parameters: [], results: [ValueType(valueType)])
+            self.init(parameters: [], results: [valueType])
         case .empty:
             self.init(parameters: [], results: [])
         case let .funcType(typeIndex):
             let typeIndex = Int(typeIndex)
             guard typeIndex < typeSection.count else {
-                throw LegacyWasmParserError.invalidTypeSectionReference
+                throw WasmParserError.invalidTypeSectionReference
             }
             let funcType = typeSection[typeIndex]
             self.init(

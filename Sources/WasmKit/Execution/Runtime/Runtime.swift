@@ -73,12 +73,22 @@ extension Runtime {
                 let elementIndex = UInt32(elementIndex)
                 switch element.mode {
                 case let .active(tableIndex, offsetExpression):
-                    let initIseq = InstructionSequence(instructions: offsetExpression + [
+                    var instructions: [Instruction] = []
+                    switch offsetExpression.first {
+                    case .i32Const(let value):
+                        instructions.append(.numericConst(.i32(UInt32(bitPattern: value))))
+                    case .globalGet(let index):
+                        instructions.append(.globalGet(index: index))
+                    default:
+                        throw InstantiationError.unsupported("init expr in element section \(offsetExpression)")
+                    }
+                    instructions.append(contentsOf: [
                         .numericConst(.i32(0)),
                         .numericConst(.i32(UInt32(element.initializer.count))),
                         .tableInit(tableIndex, elementIndex),
                         .tableElementDrop(elementIndex),
                     ])
+                    let initIseq = InstructionSequence(instructions: instructions)
                     defer { initIseq.deallocate() }
                     try evaluateConstExpr(initIseq, instance: instance)
 
@@ -101,7 +111,18 @@ extension Runtime {
         do {
             for case let (dataIndex, .active(data)) in module.data.enumerated() {
                 assert(data.index == 0)
-                let iseq = InstructionSequence(instructions: data.offset + [
+                var instructions: [Instruction] = []
+                switch data.offset.first {
+                case .i32Const(let value):
+                    instructions.append(.numericConst(.i32(UInt32(bitPattern: value))))
+                case .i64Const(let value):
+                    instructions.append(.numericConst(.i64(UInt64(bitPattern: value))))
+                case .globalGet(let index):
+                    instructions.append(.globalGet(index: index))
+                default:
+                    throw InstantiationError.unsupported("init expr in data section \(data.offset)")
+                }
+                let iseq = InstructionSequence(instructions: instructions + [
                     .numericConst(.i32(0)),
                     .numericConst(.i32(UInt32(data.initializer.count))),
                     .memoryInit(UInt32(dataIndex)),
@@ -149,7 +170,26 @@ extension Runtime {
             }
             
             let globalInitializers = try module.globals.map { global in
-                let iseq = InstructionSequence(instructions: global.initializer)
+                var instructions: [Instruction] = []
+                switch global.initializer.first {
+                case .i32Const(let value):
+                    instructions.append(.numericConst(.i32(UInt32(bitPattern: value))))
+                case .i64Const(let value):
+                    instructions.append(.numericConst(.i64(UInt64(bitPattern: value))))
+                case .f32Const(let value):
+                    instructions.append(.numericConst(.f32(value.bitPattern)))
+                case .f64Const(let value):
+                    instructions.append(.numericConst(.f64(value.bitPattern)))
+                case .refNull(let type):
+                    instructions.append(.refNull(type))
+                case .refFunc(let functionIndex):
+                    instructions.append(.refFunc(functionIndex))
+                case .globalGet(let globalIndex):
+                    instructions.append(.globalGet(index: globalIndex))
+                default:
+                    throw InstantiationError.unsupported("init expr in global section \(global.initializer)")
+                }
+                let iseq = InstructionSequence(instructions: instructions)
                 defer { iseq.deallocate() }
                 return try evaluateConstExpr(iseq, instance: globalModuleInstance, arity: 1) { _, stack in
                     return stack.popValue()

@@ -21,88 +21,36 @@ public enum NumericType: Equatable {
     public static let f64: Self = .float(.f64)
 }
 
-/// Value types
-public enum ValueType: Equatable {
-    /// Numeric value type.
-    case numeric(NumericType)
-    /// Reference value type.
-    case reference(ReferenceType)
-
-    /// 32-bit signed or unsigned integer.
-    public static let i32: Self = .numeric(.int(.i32))
-    /// 64-bit signed or unsigned integer.
-    public static let i64: Self = .numeric(.int(.i64))
-    /// 32-bit IEEE 754 floating-point number.
-    public static let f32: Self = .numeric(.float(.f32))
-    /// 64-bit IEEE 754 floating-point number.
-    public static let f64: Self = .numeric(.float(.f64))
-
+extension WasmParser.ValueType {
     var defaultValue: Value {
         switch self {
-        case .numeric(.int(.i32)):
-            return .i32(0)
-        case .numeric(.int(.i64)):
-            return .i64(0)
-        case .numeric(.float(.f32)):
-            return .f32(0)
-        case .numeric(.float(.f64)):
-            return .f64(0)
-        case .reference(.externRef):
+        case .i32: return .i32(0)
+        case .i64: return .i64(0)
+        case .f32: return .f32(0)
+        case .f64: return .f64(0)
+        case .ref(.externRef):
             return .ref(.extern(nil))
-        case .reference(.funcRef):
+        case .ref(.funcRef):
             return .ref(.function(nil))
         }
     }
 
     var float: FloatValueType {
         switch self {
-        case let .numeric(.float(f)):
-            return f
+        case .f32: return .f32
+        case .f64: return .f64
         default:
             fatalError("unexpected value type \(self)")
         }
     }
-
     var bitWidth: Int? {
         switch self {
-        case .numeric(.int(.i32)), .numeric(.float(.f32)):
-            return 32
-        case .numeric(.int(.i64)), .numeric(.float(.f64)):
-            return 64
-        case .reference:
-            return nil
+        case .i32, .f32: return 32
+        case .i64, .f64: return 64
+        case .ref: return nil
         }
     }
 }
-
-extension ValueType: CustomStringConvertible {
-    public var description: String {
-        switch self {
-        case let .numeric(.int(type)):
-            return String(describing: type)
-        case let .numeric(.float(type)):
-            return String(describing: type)
-        case let .reference(type):
-            return String(describing: type)
-        }
-    }
-}
-
-extension ValueType {
-    init(_ valueType: WasmParser.ValueType) {
-        switch valueType {
-        case .i32: self = .i32
-        case .i64: self = .i64
-        case .f32: self = .f32
-        case .f64: self = .f64
-        case .ref(.externRef):
-            self = .reference(.externRef)
-        case .ref(.funcRef):
-            self = .reference(.funcRef)
-        }
-    }
-}
-
 
 public typealias ReferenceType =  WasmParser.ReferenceType
 
@@ -126,20 +74,20 @@ public enum Value: Hashable {
     /// Reference value.
     case ref(Reference)
 
-    var type: ValueType {
+    var type: WasmParser.ValueType {
         switch self {
         case .i32:
-            return .numeric(.int(.i32))
+            return .i32
         case .i64:
-            return .numeric(.int(.i64))
+            return .i64
         case .f32:
-            return .numeric(.float(.f32))
+            return .f32
         case .f64:
-            return .numeric(.float(.f64))
+            return .f64
         case .ref(.function):
-            return .reference(.funcRef)
+            return .ref(.funcRef)
         case .ref(.extern):
-            return .reference(.externRef)
+            return .ref(.externRef)
         }
     }
 
@@ -416,43 +364,6 @@ public enum FloatValueType {
 }
 
 extension Value {
-    init?<T: RandomAccessCollection>(_ bytes: T, _ type: ValueType, isSigned: Bool)
-    where T.Element == UInt8, T.Index == Int {
-        switch type {
-        case .numeric(.int(.i32)):
-            switch bytes.count {
-            case 1:
-                self = isSigned ? .i32(Int32(bytes[bytes.startIndex].signed).unsigned) : .i32(UInt32(bytes[bytes.startIndex]))
-            case 2:
-                self = isSigned ? .i32(Int32(UInt16(littleEndian: bytes).signed).unsigned) : .i32(UInt32(littleEndian: bytes))
-            case 4:
-                self = .i32(UInt32(littleEndian: bytes))
-            default:
-                fatalError()
-            }
-
-        case .numeric(.int(.i64)):
-            switch bytes.count {
-            case 1:
-                self = isSigned ? .i64(Int64(bytes[bytes.startIndex].signed).unsigned) : .i64(UInt64(bytes[bytes.startIndex]))
-            case 2:
-                self = isSigned ? .i64(Int64(UInt16(littleEndian: bytes).signed).unsigned) : .i64(UInt64(littleEndian: bytes))
-            case 4:
-                self = isSigned ? .i64(Int64(UInt32(littleEndian: bytes).signed).unsigned) : .i64(UInt64(littleEndian: bytes))
-            case 8:
-                self = .i64(UInt64(littleEndian: bytes))
-            default:
-                fatalError()
-            }
-
-        case .numeric(.float(.f32)):
-            self = .fromFloat32(Float32(bitPattern: UInt32(littleEndian: bytes)))
-        case .numeric(.float(.f64)):
-            self = .fromFloat64(Float64(bitPattern: UInt64(littleEndian: bytes)))
-        case .reference: return nil
-        }
-    }
-
     var bytes: [UInt8]? {
         switch self {
         case let .i32(rawValue): return rawValue.littleEndianBytes
