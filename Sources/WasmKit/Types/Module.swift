@@ -52,12 +52,6 @@ public struct Module {
     }
 }
 
-/// A custom section in a module
-public struct CustomSection: Equatable {
-    public let name: String
-    public let bytes: ArraySlice<UInt8>
-}
-
 // MARK: - Module Entity Indices
 // <https://webassembly.github.io/spec/core/syntax/modules.html#syntax-typeidx>
 
@@ -111,16 +105,4 @@ struct GuestFunction {
             return result
         }
     }
-}
-
-/// > Note:
-/// <https://webassembly.github.io/spec/core/syntax/modules.html#tables>
-struct Table: Equatable {
-    public let type: TableType
-}
-
-/// > Note:
-/// <https://webassembly.github.io/spec/core/syntax/modules.html#memories>
-struct Memory: Equatable {
-    public let type: MemoryType
 }

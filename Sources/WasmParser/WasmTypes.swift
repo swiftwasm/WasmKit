@@ -122,7 +122,7 @@ public struct BrTable: Equatable {
     public let defaultIndex: UInt32
 }
 
-
+/// A custom section in a module
 public struct CustomSection: Equatable {
     public let name: String
     public let bytes: ArraySlice<UInt8>

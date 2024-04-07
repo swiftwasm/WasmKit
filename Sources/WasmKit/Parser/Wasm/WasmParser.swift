@@ -90,217 +90,19 @@ public enum LegacyWasmParserError: Swift.Error {
 }
 
 /// > Note:
-/// <https://webassembly.github.io/spec/core/binary/conventions.html#vectors>
-extension ByteStream {
-    fileprivate func parseVector<Content>(content parser: () throws -> Content) throws -> [Content] {
-        var contents = [Content]()
-        let count: UInt32 = try parseUnsigned()
-        for _ in 0..<count {
-            try contents.append(parser())
-        }
-        return contents
-    }
-}
-
-/// > Note:
 /// <https://webassembly.github.io/spec/core/binary/values.html#integers>
 extension ByteStream {
     fileprivate func parseUnsigned<T: RawUnsignedInteger>(_: T.Type = T.self) throws -> T {
         return try T(LEB: { try? self.consumeAny() })
     }
-
-    fileprivate func parseSigned<T: FixedWidthInteger & SignedInteger>() throws -> T {
-        return try T(LEB: { try? self.consumeAny() })
-    }
-
-    fileprivate func parseInteger<T: RawUnsignedInteger>() throws -> T {
-        let signed: T.Signed = try parseSigned()
-        return signed.unsigned
-    }
-}
-
-/// > Note:
-/// <https://webassembly.github.io/spec/core/binary/values.html#names>
-extension ByteStream {
-    fileprivate func parseName() throws -> String {
-        let bytes = try parseVector { () -> UInt8 in
-            try consumeAny()
-        }
-
-        var name = ""
-
-        var iterator = bytes.makeIterator()
-        var decoder = UTF8()
-        Decode: while true {
-            switch decoder.decode(&iterator) {
-            case let .scalarValue(scalar): name.append(Character(scalar))
-            case .emptyInput: break Decode
-            case .error: throw LegacyWasmParserError.invalidUTF8(bytes)
-            }
-        }
-
-        return name
-    }
 }
 
 extension LegacyWasmParser {
-    func parseVector<Content>(content parser: () throws -> Content) throws -> [Content] {
-        try stream.parseVector(content: parser)
-    }
-
     func parseUnsigned<T: RawUnsignedInteger>(_: T.Type = T.self) throws -> T {
         try stream.parseUnsigned(T.self)
     }
-
-    func parseSigned<T: FixedWidthInteger & SignedInteger>() throws -> T {
-        try stream.parseSigned()
-    }
-
-    func parseInteger<T: RawUnsignedInteger>() throws -> T {
-        try stream.parseInteger()
-    }
-
-    func parseName() throws -> String {
-        try stream.parseName()
-    }
 }
 
-/// > Note:
-/// <https://webassembly.github.io/spec/core/binary/values.html#floating-point>
-extension LegacyWasmParser {
-    func parseFloat() throws -> UInt32 {
-        let consumedLittleEndian = try stream.consume(count: 4).reversed()
-        let bitPattern = consumedLittleEndian.reduce(UInt32(0)) { acc, byte in
-            acc << 8 + UInt32(byte)
-        }
-        return bitPattern
-    }
-
-    func parseDouble() throws -> UInt64 {
-        let consumedLittleEndian = try stream.consume(count: 8).reversed()
-        let bitPattern = consumedLittleEndian.reduce(UInt64(0)) { acc, byte in
-            acc << 8 + UInt64(byte)
-        }
-        return bitPattern
-    }
-}
-
-/// > Note:
-/// <https://webassembly.github.io/spec/core/binary/types.html#types>
-extension LegacyWasmParser {
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/binary/types.html#value-types>
-    func parseValueType() throws -> ValueType {
-        let b = try stream.consumeAny()
-
-        switch b {
-        case 0x7F:
-            return .i32
-        case 0x7E:
-            return .i64
-        case 0x7D:
-            return .f32
-        case 0x7C:
-            return .f64
-        case 0x70:
-            return .reference(.funcRef)
-        case 0x6F:
-            return .reference(.externRef)
-        default:
-            throw StreamError<Stream.Element>.unexpected(b, index: currentIndex, expected: Set(0x7C...0x7F))
-        }
-    }
-
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/binary/types.html#result-types>
-    func parseResultType() throws -> ResultType {
-        let nextByte = try stream.peek()!
-        switch nextByte {
-        case 0x40:
-            _ = try stream.consumeAny()
-            return .empty
-        case 0x7C...0x7F, 0x70, 0x6F:
-            return try .single(parseValueType())
-        default:
-            return try .multi(typeIndex: stream.consumeAny())
-        }
-    }
-
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/binary/types.html#function-types>
-    func parseFunctionType() throws -> FunctionType {
-        let opcode = try stream.consumeAny()
-
-        // XXX: spectest expects the first byte should be parsed as a LEB128 with 1 byte limit
-        // but the spec itself doesn't require it, so just check the continue bit of LEB128 here.
-        guard opcode & 0b10000000 == 0 else {
-            throw LegacyWasmParserError.integerRepresentationTooLong
-        }
-        guard opcode == 0x60 else {
-            throw LegacyWasmParserError.malformedFunctionType(opcode)
-        }
-
-        let parameters = try parseVector { try parseValueType() }
-        let results = try parseVector { try parseValueType() }
-        return FunctionType(parameters: parameters, results: results)
-    }
-
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/binary/types.html#limits>
-    func parseLimits() throws -> Limits {
-        let b = try stream.consumeAny()
-
-        switch b {
-        case 0x00:
-            return try Limits(min: UInt64(parseUnsigned(UInt32.self)), max: nil)
-        case 0x01:
-            return try Limits(min: UInt64(parseUnsigned(UInt32.self)), max: UInt64(parseUnsigned(UInt32.self)))
-        case 0x04 where features.contains(.memory64):
-            return try Limits(min: parseUnsigned(UInt64.self), max: nil, isMemory64: true)
-        case 0x05 where features.contains(.memory64):
-            return try Limits(min: parseUnsigned(UInt64.self), max: parseUnsigned(UInt64.self), isMemory64: true)
-        default:
-            throw LegacyWasmParserError.malformedLimit(b)
-        }
-    }
-
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/binary/types.html#memory-types>
-    func parseMemoryType() throws -> MemoryType {
-        return try parseLimits()
-    }
-
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/binary/types.html#table-types>
-    func parseTableType() throws -> TableType {
-        let elementType: ReferenceType
-        let b = try stream.consumeAny()
-
-        switch b {
-        case 0x70:
-            elementType = .funcRef
-        case 0x6F:
-            elementType = .externRef
-        default:
-            throw StreamError.unexpected(b, index: currentIndex, expected: [0x6F, 0x70])
-        }
-
-        let limits = try parseLimits()
-        return TableType(elementType: elementType, limits: limits)
-    }
-
-    func parseMutability() throws -> Mutability {
-        let b = try stream.consumeAny()
-        switch b {
-        case 0x00:
-            return .constant
-        case 0x01:
-            return .variable
-        default:
-            throw LegacyWasmParserError.malformedMutability(b)
-        }
-    }
-}
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/instructions.html>
@@ -320,24 +122,21 @@ extension LegacyWasmParser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#custom-section>
     func parseCustomSection(size: UInt32) throws -> CustomSection {
-        let preNameIndex = stream.currentIndex
-        let name = try parseName()
-        let nameSize = stream.currentIndex - preNameIndex
-        let contentSize = Int(size) - nameSize
-
-        guard contentSize >= 0 else {
-            throw LegacyWasmParserError.invalidSectionSize(size)
-        }
-
-        let bytes = try stream.consume(count: contentSize)
-
-        return CustomSection(name: name, bytes: bytes)
+        return try WasmParser.parseCustomSection(
+            stream: self.stream, size: size,
+            features: features,
+            hasDataCount: hasDataCount
+        )
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#type-section>
     func parseTypeSection() throws -> [FunctionType] {
-        return try parseVector { try parseFunctionType() }
+        return try WasmParser.parseTypeSection(
+            stream: self.stream,
+            features: features,
+            hasDataCount: hasDataCount
+        )
     }
 
     /// > Note:
@@ -353,19 +152,31 @@ extension LegacyWasmParser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#function-section>
     func parseFunctionSection() throws -> [TypeIndex] {
-        return try parseVector { try parseUnsigned() }
+        return try WasmParser.parseFunctionSection(
+            stream: self.stream,
+            features: features,
+            hasDataCount: hasDataCount
+        )
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#table-section>
     func parseTableSection() throws -> [Table] {
-        return try parseVector { try Table(type: parseTableType()) }
+        return try WasmParser.parseTableSection(
+            stream: self.stream,
+            features: features,
+            hasDataCount: hasDataCount
+        )
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#memory-section>
     func parseMemorySection() throws -> [Memory] {
-        return try parseVector { try Memory(type: parseLimits()) }
+        return try WasmParser.parseMemorySection(
+            stream: self.stream,
+            features: features,
+            hasDataCount: hasDataCount
+        )
     }
 
     /// > Note:
@@ -386,24 +197,6 @@ extension LegacyWasmParser {
             features: features,
             hasDataCount: hasDataCount
         )
-    }
-
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-exportdesc>
-    func parseExportDescriptor() throws -> ExportDescriptor {
-        let b = try stream.consume(Set(0x00...0x03))
-        switch b {
-        case 0x00:
-            return try .function(parseUnsigned())
-        case 0x01:
-            return try .table(parseUnsigned())
-        case 0x02:
-            return try .memory(parseUnsigned())
-        case 0x03:
-            return try .global(parseUnsigned())
-        default:
-            preconditionFailure("should never reach here")
-        }
     }
 
     /// > Note:

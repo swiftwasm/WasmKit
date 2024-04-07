@@ -1,4 +1,5 @@
 import struct WasmParser.NameSectionParser
+import struct WasmParser.CustomSection
 
 struct NameRegistry {
     private var functionNames: [FunctionAddress: String] = [:]

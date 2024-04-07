@@ -115,6 +115,57 @@ public func parseExportSection<Stream: ByteStream>(
     return try parser.parseExportSection()
 }
 
+@_spi(Migration)
+public func parseTableSection<Stream: ByteStream>(
+    stream: Stream,
+    features: WasmFeatureSet = .default,
+    hasDataCount: Bool = false
+) throws -> [Table] {
+    let parser = WasmParser(stream: stream, features: features, hasDataCount: hasDataCount)
+    return try parser.parseTableSection()
+}
+
+@_spi(Migration)
+public func parseMemorySection<Stream: ByteStream>(
+    stream: Stream,
+    features: WasmFeatureSet = .default,
+    hasDataCount: Bool = false
+) throws -> [Memory] {
+    let parser = WasmParser(stream: stream, features: features, hasDataCount: hasDataCount)
+    return try parser.parseMemorySection()
+}
+
+@_spi(Migration)
+public func parseTypeSection<Stream: ByteStream>(
+    stream: Stream,
+    features: WasmFeatureSet = .default,
+    hasDataCount: Bool = false
+) throws -> [FunctionType] {
+    let parser = WasmParser(stream: stream, features: features, hasDataCount: hasDataCount)
+    return try parser.parseTypeSection()
+}
+
+@_spi(Migration)
+public func parseCustomSection<Stream: ByteStream>(
+    stream: Stream,
+    size: UInt32,
+    features: WasmFeatureSet = .default,
+    hasDataCount: Bool = false
+) throws -> CustomSection {
+    let parser = WasmParser(stream: stream, features: features, hasDataCount: hasDataCount)
+    return try parser.parseCustomSection(size: size)
+}
+
+@_spi(Migration)
+public func parseFunctionSection<Stream: ByteStream>(
+    stream: Stream,
+    features: WasmFeatureSet = .default,
+    hasDataCount: Bool = false
+) throws -> [TypeIndex] {
+    let parser = WasmParser(stream: stream, features: features, hasDataCount: hasDataCount)
+    return try parser.parseFunctionSection()
+}
+
 /// Flags for enabling/disabling WebAssembly features
 public struct WasmFeatureSet: OptionSet {
     /// The raw value of the feature set

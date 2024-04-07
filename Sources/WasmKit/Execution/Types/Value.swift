@@ -75,6 +75,24 @@ public enum ValueType: Equatable {
     }
 }
 
+extension WasmParser.ValueType {
+    var float: FloatValueType {
+        switch self {
+        case .f32: return .f32
+        case .f64: return .f64
+        default:
+            fatalError("unexpected value type \(self)")
+        }
+    }
+    var bitWidth: Int? {
+        switch self {
+        case .i32, .f32: return 32
+        case .i64, .f64: return 64
+        case .ref: return nil
+        }
+    }
+}
+
 extension ValueType: CustomStringConvertible {
     public var description: String {
         switch self {
@@ -126,20 +144,20 @@ public enum Value: Hashable {
     /// Reference value.
     case ref(Reference)
 
-    var type: ValueType {
+    var type: WasmParser.ValueType {
         switch self {
         case .i32:
-            return .numeric(.int(.i32))
+            return .i32
         case .i64:
-            return .numeric(.int(.i64))
+            return .i64
         case .f32:
-            return .numeric(.float(.f32))
+            return .f32
         case .f64:
-            return .numeric(.float(.f64))
+            return .f64
         case .ref(.function):
-            return .reference(.funcRef)
+            return .ref(.funcRef)
         case .ref(.extern):
-            return .reference(.externRef)
+            return .ref(.externRef)
         }
     }
 
