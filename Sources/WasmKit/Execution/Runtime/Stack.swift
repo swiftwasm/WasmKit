@@ -253,18 +253,6 @@ extension Frame: Equatable {
     }
 }
 
-extension Stack {
-    func localGet(index: UInt32) -> Value {
-        let base = currentFrame.baseStackAddress.valueFrameIndex
-        return valueStack[base + Int(index)]
-    }
-
-    mutating func localSet(index: UInt32, value: Value) {
-        let base = currentFrame.baseStackAddress.valueFrameIndex
-        valueStack[base + Int(index)] = value
-    }
-}
-
 extension Frame: CustomDebugStringConvertible {
     var debugDescription: String {
         "[A=\(arity), BA=\(baseStackAddress), F=\(address?.description ?? "nil")]"

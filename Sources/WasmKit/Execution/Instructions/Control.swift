@@ -7,9 +7,6 @@ extension ExecutionState {
     mutating func nop(runtime: Runtime, stack: inout Stack) throws {
         programCounter += 1
     }
-    private func getTypeSection(store: Store, stack: inout Stack) -> [FunctionType] {
-        store.module(address: stack.currentFrame.module).types
-    }
 
     typealias BlockType = Instruction.BlockType
 
