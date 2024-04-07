@@ -85,7 +85,7 @@ struct GuestFunction {
         // TODO: Deallocate const default locals after the module is deallocated
         let defaultLocals = UnsafeMutableBufferPointer<Value>.allocate(capacity: locals.count)
         for (index, localType) in locals.enumerated() {
-            defaultLocals[index] = ValueType(localType).defaultValue
+            defaultLocals[index] = localType.defaultValue
         }
         self.defaultLocals = UnsafeBufferPointer(defaultLocals)
         self.materializer = body

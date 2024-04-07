@@ -3,6 +3,7 @@ import SwiftShims  // For swift_stdlib_random
 import SystemExtras
 import SystemPackage
 import WasmKit
+import WasmParser
 
 protocol WASI {
     /// Reads command-line argument data.

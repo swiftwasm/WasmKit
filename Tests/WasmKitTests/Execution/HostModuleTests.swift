@@ -22,7 +22,7 @@ final class HostModuleTests: XCTestCase {
 
     func testReentrancy() throws {
         let runtime = Runtime()
-        let voidSignature = WasmKit.FunctionType(parameters: [], results: [])
+        let voidSignature = WasmParser.FunctionType(parameters: [], results: [])
         let module = Module(
             types: [voidSignature],
             functions: [

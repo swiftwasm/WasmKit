@@ -10,7 +10,7 @@ public enum Trap: Error {
     /// Stack overflow
     case stackOverflow
     /// The stack value type does not match the expected type
-    case stackValueTypesMismatch(expected: ValueType, actual: WasmParser.ValueType)
+    case stackValueTypesMismatch(expected: WasmParser.ValueType, actual: WasmParser.ValueType)
     /// Too deep call stack
     case callStackExhausted
 

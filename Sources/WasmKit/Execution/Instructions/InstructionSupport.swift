@@ -1,6 +1,4 @@
-import struct WasmParser.MemArg
-import enum WasmParser.BlockType
-import enum WasmParser.WasmParserError
+import WasmParser
 
 extension Instruction {
     typealias Memarg = MemArg

@@ -1,14 +1,4 @@
-import protocol WasmParser.InstructionVisitor
-import enum WasmParser.BlockType
-import enum WasmParser.ValueType
-import enum WasmParser.IEEE754
-import enum WasmParser.ReferenceType
-import enum WasmParser.WasmParserError
-import struct WasmParser.BrTable
-import struct WasmParser.MemArg
-import struct WasmParser.GlobalType
-import struct WasmParser.Import
-import struct WasmParser.Table
+import WasmParser
 
 class ISeqAllocator {
 

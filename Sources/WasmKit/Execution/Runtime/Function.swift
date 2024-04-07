@@ -1,3 +1,5 @@
+import WasmParser
+
 /// A WebAssembly guest function or host function
 public struct Function: Equatable {
     internal let address: FunctionAddress
