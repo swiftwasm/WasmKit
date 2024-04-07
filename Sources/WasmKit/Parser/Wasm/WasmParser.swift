@@ -32,7 +32,7 @@ public func parseWasm(filePath: FilePath, features: WasmFeatureSet = .default) t
 /// Parse a given byte array as a WebAssembly binary format file
 /// > Note: <https://webassembly.github.io/spec/core/binary/index.html>
 public func parseWasm(bytes: [UInt8], features: WasmFeatureSet = .default) throws -> Module {
-    let stream = LegacyStaticByteStream(bytes: bytes)
+    let stream = StaticByteStream(bytes: bytes)
     let parser = LegacyWasmParser(stream: stream, features: features)
     let module = try parser.parseModule()
     return module
