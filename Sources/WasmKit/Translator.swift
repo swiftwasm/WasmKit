@@ -3,6 +3,7 @@ import enum WasmParser.BlockType
 import enum WasmParser.ValueType
 import enum WasmParser.IEEE754
 import enum WasmParser.ReferenceType
+import enum WasmParser.WasmParserError
 import struct WasmParser.BrTable
 import struct WasmParser.MemArg
 import struct WasmParser.GlobalType
@@ -969,7 +970,7 @@ fileprivate extension FunctionType {
         case let .funcType(typeIndex):
             let typeIndex = Int(typeIndex)
             guard typeIndex < typeSection.count else {
-                throw LegacyWasmParserError.invalidTypeSectionReference
+                throw WasmParserError.invalidTypeSectionReference
             }
             let funcType = typeSection[typeIndex]
             self.init(

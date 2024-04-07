@@ -515,7 +515,7 @@ extension Array where Element == Value {
 
 extension Swift.Error {
     var text: String {
-        if let error = self as? LegacyWasmParserError {
+        if let error = self as? WasmParserError {
             switch error {
             case .invalidMagicNumber:
                 return "magic header not detected"

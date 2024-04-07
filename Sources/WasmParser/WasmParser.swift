@@ -2,8 +2,8 @@ import Foundation
 
 public struct Parser<Stream: ByteStream> {
     let stream: Stream
-    private var hasDataCount: Bool = false
-    private let features: WasmFeatureSet
+    public private(set) var hasDataCount: Bool = false
+    public let features: WasmFeatureSet
 
     enum NextParseTarget {
         case header
