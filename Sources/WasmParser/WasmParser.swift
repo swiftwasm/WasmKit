@@ -1051,15 +1051,19 @@ extension WasmParser {
 }
 
 /// > Note: <https://webassembly.github.io/spec/core/appendix/custom.html#name-section>
-struct NameSectionParser<Stream: ByteStream> {
+public struct NameSectionParser<Stream: ByteStream> {
     let stream: Stream
 
-    typealias NameMap = [UInt32: String]
-    enum ParsedNames {
+    public typealias NameMap = [UInt32: String]
+    public enum ParsedNames {
         case functions(NameMap)
     }
 
-    func parseAll() throws -> [ParsedNames] {
+    public init(stream: Stream) {
+        self.stream = stream
+    }
+
+    public func parseAll() throws -> [ParsedNames] {
         var results: [ParsedNames] = []
         while try !stream.hasReachedEnd() {
             let id = try stream.consumeAny()

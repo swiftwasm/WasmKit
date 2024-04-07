@@ -1,3 +1,5 @@
+import struct WasmParser.NameSectionParser
+
 struct NameRegistry {
     private var functionNames: [FunctionAddress: String] = [:]
     private var materializers: [(inout NameRegistry) throws -> Void] = []
