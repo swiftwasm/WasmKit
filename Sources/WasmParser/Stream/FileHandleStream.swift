@@ -1,7 +1,7 @@
 import Foundation
 
-final class FileHandleStream: ByteStream {
-    private(set) var currentIndex: Int = 0
+public final class FileHandleStream: ByteStream {
+    private(set) public var currentIndex: Int = 0
 
     private let fileHandle: FileHandle
     private let bufferLength: Int
@@ -28,16 +28,16 @@ final class FileHandleStream: ByteStream {
     }
 
     @discardableResult
-    func consumeAny() throws -> UInt8 {
+    public func consumeAny() throws -> UInt8 {
         guard let consumed = try peek() else {
-            throw LegacyWasmParserError.unexpectedEnd
+            throw WasmParserError.unexpectedEnd
         }
         currentIndex = bytes.index(after: currentIndex)
         return consumed
     }
 
     @discardableResult
-    func consume(_ expected: Set<UInt8>) throws -> UInt8 {
+    public func consume(_ expected: Set<UInt8>) throws -> UInt8 {
         guard let consumed = try peek() else {
             throw StreamError<UInt8>.unexpectedEnd(expected: Set(expected))
         }
@@ -48,7 +48,7 @@ final class FileHandleStream: ByteStream {
         return consumed
     }
 
-    func consume(count: Int) throws -> ArraySlice<UInt8> {
+    public func consume(count: Int) throws -> ArraySlice<UInt8> {
         let bytesToRead = currentIndex + count - endOffset
 
         guard bytesToRead > 0 else {
@@ -73,7 +73,7 @@ final class FileHandleStream: ByteStream {
         return result
     }
 
-    func peek() throws -> UInt8? {
+    public func peek() throws -> UInt8? {
         try readMoreIfNeeded()
 
         let index = currentIndex - startOffset

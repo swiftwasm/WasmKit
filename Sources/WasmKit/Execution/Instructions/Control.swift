@@ -1,123 +1,70 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#control-instructions>
 extension ExecutionState {
-    func unreachable(runtime: Runtime) throws {
+    func unreachable(runtime: Runtime, stack: inout Stack) throws {
         throw Trap.unreachable
     }
-    mutating func nop(runtime: Runtime) throws {
+    mutating func nop(runtime: Runtime, stack: inout Stack) throws {
         programCounter += 1
-    }
-    private func getTypeSection(store: Store) -> [FunctionType] {
-        store.module(address: stack.currentFrame.module).types
     }
 
     typealias BlockType = Instruction.BlockType
 
-    mutating func block(runtime: Runtime, endRef: ExpressionRef, type: BlockType) {
-        enter(
-            jumpTo: programCounter + 1,
-            continuation: programCounter + endRef.relativeOffset,
-            arity: Int(type.results),
-            pushPopValues: Int(type.parameters)
-        )
-    }
-    mutating func loop(runtime: Runtime, type: BlockType) {
-        let paramSize = Int(type.parameters)
-        enter(jumpTo: programCounter + 1, continuation: programCounter, arity: paramSize, pushPopValues: paramSize)
-    }
-
-    mutating func ifThen(runtime: Runtime, endRef: ExpressionRef, type: BlockType) {
+    mutating func ifThen(runtime: Runtime, stack: inout Stack, elseOrEndRef: ExpressionRef) {
         let isTrue = stack.popValue().i32 != 0
         if isTrue {
-            enter(
-                jumpTo: programCounter + 1,
-                continuation: programCounter.advanced(by: endRef.relativeOffset),
-                arity: Int(type.results),
-                pushPopValues: Int(type.parameters)
-            )
+            programCounter += 1
         } else {
-            programCounter += endRef.relativeOffset
+            programCounter += elseOrEndRef.relativeOffset
         }
     }
 
-    mutating func ifThenElse(runtime: Runtime, elseRef: ExpressionRef, endRef: ExpressionRef, type: BlockType) {
-        let isTrue = stack.popValue().i32 != 0
-        let addendToPC: Int
-        if isTrue {
-            addendToPC = 1
-        } else {
-            addendToPC = elseRef.relativeOffset
+    mutating func end(runtime: Runtime, stack: inout Stack) {
+        fatalError()
+    }
+    mutating func `else`(runtime: Runtime, stack: inout Stack, endRef: ExpressionRef) {
+        programCounter += endRef.relativeOffset // if-then-else's continuation points the "end"
+    }
+    private mutating func branch(stack: inout Stack, offset: Int32, copyCount: UInt32, popCount: UInt32) throws {
+        if popCount > 0 { // TODO: Maybe worth to have a special instruction for popCount=0?
+            stack.copyValues(copyCount: Int(copyCount), popCount: Int(popCount))
         }
-        enter(
-            jumpTo: programCounter + addendToPC,
-            continuation: programCounter + endRef.relativeOffset,
-            arity: Int(type.results),
-            pushPopValues: Int(type.parameters)
-        )
+        programCounter += Int(offset)
     }
-    mutating func end(runtime: Runtime) {
-        if let currentLabel = self.stack.currentLabel {
-            stack.exit(label: currentLabel)
-        }
-        programCounter += 1
+    mutating func br(runtime: Runtime, stack: inout Stack, offset: Int32, copyCount: UInt32, popCount: UInt32) throws {
+        try branch(stack: &stack, offset: offset, copyCount: copyCount, popCount: popCount)
     }
-    mutating func `else`(runtime: Runtime) {
-        let label = self.stack.currentLabel!
-        stack.exit(label: label)
-        programCounter = label.continuation // if-then-else's continuation points the "end"
-    }
-
-    private mutating func branch(labelIndex: Int, runtime: Runtime) throws {
-        if stack.numberOfLabelsInCurrentFrame() == labelIndex {
-            try self.return(runtime: runtime)
-            return
-        }
-        let label = stack.getLabel(index: Int(labelIndex))
-        let values = stack.popValues(count: label.arity)
-
-        stack.unwindLabels(upto: labelIndex)
-
-        stack.push(values: values)
-        programCounter = label.continuation
-    }
-    mutating func br(runtime: Runtime, labelIndex: LabelIndex) throws {
-        try branch(labelIndex: Int(labelIndex), runtime: runtime)
-    }
-    mutating func brIf(runtime: Runtime, labelIndex: LabelIndex) throws {
+    mutating func brIf(runtime: Runtime, stack: inout Stack, offset: Int32, copyCount: UInt32, popCount: UInt32) throws {
         guard stack.popValue().i32 != 0 else {
             programCounter += 1
             return
         }
-        try br(runtime: runtime, labelIndex: labelIndex)
+        try branch(stack: &stack, offset: offset, copyCount: copyCount, popCount: popCount)
     }
-    mutating func brTable(runtime: Runtime, brTable: Instruction.BrTable) throws {
-        let labelIndices = brTable.labelIndices
-        let defaultIndex = brTable.defaultIndex
-        let value = stack.popValue().i32
-        let labelIndex: LabelIndex
-        if labelIndices.indices.contains(Int(value)) {
-            labelIndex = labelIndices[Int(value)]
-        } else {
-            labelIndex = defaultIndex
-        }
+    mutating func brTable(runtime: Runtime, stack: inout Stack, brTable: Instruction.BrTable) throws {
+        let index = stack.popValue().i32
+        let normalizedOffset = min(Int(index), brTable.buffer.count - 1)
+        let entry = brTable.buffer[normalizedOffset]
 
-        try branch(labelIndex: Int(labelIndex), runtime: runtime)
+        try branch(
+            stack: &stack,
+            offset: entry.offset,
+            copyCount: UInt32(entry.copyCount), popCount: UInt32(entry.popCount)
+        )
     }
-    mutating func `return`(runtime: Runtime) throws {
-        let currentFrame = stack.currentFrame!
-        _ = stack.exit(frame: currentFrame)
-        try endOfFunction(runtime: runtime, currentFrame: currentFrame)
+    mutating func `return`(runtime: Runtime, stack: inout Stack) throws {
+        try self.endOfFunction(runtime: runtime, stack: &stack)
     }
 
-    mutating func endOfFunction(runtime: Runtime) throws {
-        try self.endOfFunction(runtime: runtime, currentFrame: stack.currentFrame)
+    mutating func endOfFunction(runtime: Runtime, stack: inout Stack) throws {
+        try self.endOfFunction(runtime: runtime, stack: &stack, currentFrame: stack.currentFrame)
     }
 
-    mutating func endOfExecution(runtime: Runtime) throws {
+    mutating func endOfExecution(runtime: Runtime, stack: inout Stack) throws {
         reachedEndOfExecution = true
     }
 
-    private mutating func endOfFunction(runtime: Runtime, currentFrame: Frame) throws {
+    private mutating func endOfFunction(runtime: Runtime, stack: inout Stack, currentFrame: Frame) throws {
         // When reached at "end" of function
         #if DEBUG
         if let address = currentFrame.address {
@@ -130,17 +77,17 @@ extension ExecutionState {
         programCounter = currentFrame.returnPC
     }
 
-    mutating func call(runtime: Runtime, functionIndex: UInt32) throws {
+    mutating func call(runtime: Runtime, stack: inout Stack, functionIndex: UInt32) throws {
         let functionAddresses = runtime.store.module(address: stack.currentFrame.module).functionAddresses
 
         guard functionAddresses.indices.contains(Int(functionIndex)) else {
             throw Trap.invalidFunctionIndex(functionIndex)
         }
 
-        try invoke(functionAddress: functionAddresses[Int(functionIndex)], runtime: runtime)
+        try invoke(functionAddress: functionAddresses[Int(functionIndex)], runtime: runtime, stack: &stack)
     }
 
-    mutating func callIndirect(runtime: Runtime, tableIndex: TableIndex, typeIndex: TypeIndex) throws {
+    mutating func callIndirect(runtime: Runtime, stack: inout Stack, tableIndex: TableIndex, typeIndex: TypeIndex) throws {
         let moduleInstance = runtime.store.module(address: stack.currentFrame.module)
         let tableAddresses = moduleInstance.tableAddresses[Int(tableIndex)]
         let tableInstance = runtime.store.tables[tableAddresses]
@@ -159,6 +106,6 @@ extension ExecutionState {
             throw Trap.callIndirectFunctionTypeMismatch(actual: function.type, expected: expectedType)
         }
 
-        try invoke(functionAddress: functionAddress, runtime: runtime)
+        try invoke(functionAddress: functionAddress, runtime: runtime, stack: &stack)
     }
 }

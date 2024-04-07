@@ -1,10 +1,10 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#table-instructions>
 extension ExecutionState {
-    mutating func tableGet(runtime: Runtime, tableIndex: TableIndex) throws {
-        let (_, table) = getTable(tableIndex, store: runtime.store)
+    mutating func tableGet(runtime: Runtime, stack: inout Stack, tableIndex: TableIndex) throws {
+        let (_, table) = getTable(tableIndex, stack: &stack, store: runtime.store)
 
-        let elementIndex = try getElementIndex(table)
+        let elementIndex = try getElementIndex(stack: &stack, table)
 
         guard let reference = table.elements[Int(elementIndex)] else {
             throw Trap.readingDroppedReference(index: elementIndex)
@@ -12,20 +12,20 @@ extension ExecutionState {
 
         stack.push(value: .ref(reference))
     }
-    mutating func tableSet(runtime: Runtime, tableIndex: TableIndex) throws {
-        let (tableAddress, table) = getTable(tableIndex, store: runtime.store)
+    mutating func tableSet(runtime: Runtime, stack: inout Stack, tableIndex: TableIndex) throws {
+        let (tableAddress, table) = getTable(tableIndex, stack: &stack, store: runtime.store)
 
         let reference = stack.getReference()
-        let elementIndex = try getElementIndex(table)
+        let elementIndex = try getElementIndex(stack: &stack, table)
         setTableElement(store: runtime.store, tableAddress: tableAddress, elementIndex, reference)
 
     }
-    mutating func tableSize(runtime: Runtime, tableIndex: TableIndex) {
-        let (_, table) = getTable(tableIndex, store: runtime.store)
+    mutating func tableSize(runtime: Runtime, stack: inout Stack, tableIndex: TableIndex) {
+        let (_, table) = getTable(tableIndex, stack: &stack, store: runtime.store)
         stack.push(value: .i32(UInt32(table.elements.count)))
     }
-    mutating func tableGrow(runtime: Runtime, tableIndex: TableIndex) {
-        let (tableAddress, table) = getTable(tableIndex, store: runtime.store)
+    mutating func tableGrow(runtime: Runtime, stack: inout Stack, tableIndex: TableIndex) {
+        let (tableAddress, table) = getTable(tableIndex, stack: &stack, store: runtime.store)
 
         let growthSize = stack.popValue()
 
@@ -43,8 +43,8 @@ extension ExecutionState {
 
         stack.push(value: .i32(oldSize))
     }
-    mutating func tableFill(runtime: Runtime, tableIndex: TableIndex) throws {
-        let (tableAddress, table) = getTable(tableIndex, store: runtime.store)
+    mutating func tableFill(runtime: Runtime, stack: inout Stack, tableIndex: TableIndex) throws {
+        let (tableAddress, table) = getTable(tableIndex, stack: &stack, store: runtime.store)
         let fillCounter = stack.popValue().i32
         let fillValue = stack.getReference()
         let startIndex = stack.popValue().i32
@@ -61,9 +61,11 @@ extension ExecutionState {
             setTableElement(store: runtime.store, tableAddress: tableAddress, startIndex + i, fillValue)
         }
     }
-    mutating func tableCopy(runtime: Runtime, dest destinationTableIndex: TableIndex, src sourceTableIndex: TableIndex) throws {
-        let (_, sourceTable) = getTable(sourceTableIndex, store: runtime.store)
-        let (destinationTableAddress, destinationTable) = getTable(destinationTableIndex, store: runtime.store)
+    mutating func tableCopy(runtime: Runtime, stack: inout Stack, dest: TableIndex, src: TableIndex) throws {
+        let destinationTableIndex = dest
+        let sourceTableIndex = src
+        let (_, sourceTable) = getTable(sourceTableIndex, stack: &stack, store: runtime.store)
+        let (destinationTableAddress, destinationTable) = getTable(destinationTableIndex, stack: &stack, store: runtime.store)
 
         let copyCounter = stack.popValue().i32
         let sourceIndex = stack.popValue().i32
@@ -94,9 +96,9 @@ extension ExecutionState {
             )
         }
     }
-    mutating func tableInit(runtime: Runtime, tableIndex: TableIndex, elementIndex: ElementIndex) throws {
-        let (destinationTableAddress, destinationTable) = getTable(tableIndex, store: runtime.store)
-        let elementAddress = currentModule(store: runtime.store).elementAddresses[Int(elementIndex)]
+    mutating func tableInit(runtime: Runtime, stack: inout Stack, tableIndex: TableIndex, elementIndex: ElementIndex) throws {
+        let (destinationTableAddress, destinationTable) = getTable(tableIndex, stack: &stack, store: runtime.store)
+        let elementAddress = currentModule(store: runtime.store, stack: &stack).elementAddresses[Int(elementIndex)]
         let sourceElement = runtime.store.elements[elementAddress]
 
         let copyCounter = stack.popValue().i32
@@ -131,8 +133,8 @@ extension ExecutionState {
             )
         }
     }
-    mutating func tableElementDrop(runtime: Runtime, elementIndex: ElementIndex) {
-        let elementAddress = currentModule(store: runtime.store).elementAddresses[Int(elementIndex)]
+    mutating func tableElementDrop(runtime: Runtime, stack: inout Stack, elementIndex: ElementIndex) {
+        let elementAddress = currentModule(store: runtime.store, stack: &stack).elementAddresses[Int(elementIndex)]
         runtime.store.elements[elementAddress].drop()
     }
     
@@ -147,12 +149,12 @@ extension ExecutionState {
 }
 
 extension ExecutionState {
-    fileprivate func getTable(_ tableIndex: UInt32, store: Store) -> (TableAddress, TableInstance) {
-        let address = currentModule(store: store).tableAddresses[Int(tableIndex)]
+    fileprivate func getTable(_ tableIndex: UInt32, stack: inout Stack, store: Store) -> (TableAddress, TableInstance) {
+        let address = currentModule(store: store, stack: &stack).tableAddresses[Int(tableIndex)]
         return (address, store.tables[address])
     }
 
-    fileprivate mutating func getElementIndex(_ table: TableInstance) throws -> ElementIndex {
+    fileprivate mutating func getElementIndex(stack: inout Stack, _ table: TableInstance) throws -> ElementIndex {
         let elementIndex = stack.popValue().i32
 
         guard elementIndex < table.elements.count else {

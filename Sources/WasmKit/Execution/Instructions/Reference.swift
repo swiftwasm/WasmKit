@@ -1,7 +1,7 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#reference-instructions>
 extension ExecutionState {
-    mutating func refNull(runtime: Runtime, referenceType: ReferenceType) {
+    mutating func refNull(runtime: Runtime, stack: inout Stack, referenceType: ReferenceType) {
         switch referenceType {
         case .externRef:
             stack.push(value: .ref(.extern(nil)))
@@ -9,7 +9,7 @@ extension ExecutionState {
             stack.push(value: .ref(.function(nil)))
         }
     }
-    mutating func refIsNull(runtime: Runtime) {
+    mutating func refIsNull(runtime: Runtime, stack: inout Stack) {
         let value = stack.popValue()
 
         switch value {
@@ -21,7 +21,7 @@ extension ExecutionState {
             fatalError("Invalid type \(value.type) for `\(#function)` implementation")
         }
     }
-    mutating func refFunc(runtime: Runtime, functionIndex: FunctionIndex) {
+    mutating func refFunc(runtime: Runtime, stack: inout Stack, functionIndex: FunctionIndex) {
         let module = runtime.store.module(address: stack.currentFrame.module)
         let functionAddress = module.functionAddresses[Int(functionIndex)]
 

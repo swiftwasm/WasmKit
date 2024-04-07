@@ -6,7 +6,7 @@ struct NameRegistry {
 
     mutating func register(instance: ModuleInstance, nameSection: CustomSection) throws {
         materializers.append { registry in
-            let stream = StaticByteStream(bytes: Array(nameSection.bytes))
+            let stream = LegacyStaticByteStream(bytes: Array(nameSection.bytes))
             let parser = NameSectionParser(stream: stream)
             for result in try parser.parseAll() {
                 switch result {

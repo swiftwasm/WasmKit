@@ -1,6 +1,7 @@
 import Foundation
 import SystemPackage
 import WasmKit
+import WasmParser
 
 struct TestCase {
     enum Error: Swift.Error {
@@ -514,7 +515,7 @@ extension Array where Element == Value {
 
 extension Swift.Error {
     var text: String {
-        if let error = self as? WasmParserError {
+        if let error = self as? LegacyWasmParserError {
             switch error {
             case .invalidMagicNumber:
                 return "magic header not detected"

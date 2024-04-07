@@ -1,15 +1,17 @@
 enum Instruction: Equatable {
+    case localGet(index: LocalIndex)
+    case localSet(index: LocalIndex)
+    case localTee(index: LocalIndex)
+    case globalGet(index: GlobalIndex)
+    case globalSet(index: GlobalIndex)
     case unreachable
     case nop
-    case block(endRef: ExpressionRef, type: BlockType)
-    case loop(type: BlockType)
-    case ifThen(endRef: ExpressionRef, type: BlockType)
-    case ifThenElse(elseRef: ExpressionRef, endRef: ExpressionRef, type: BlockType)
+    case ifThen(elseOrEndRef: ExpressionRef)
     case end
-    case `else`
-    case br(labelIndex: LabelIndex)
-    case brIf(labelIndex: LabelIndex)
-    case brTable(BrTable)
+    case `else`(endRef: ExpressionRef)
+    case br(offset: Int32, copyCount: UInt32, popCount: UInt32)
+    case brIf(offset: Int32, copyCount: UInt32, popCount: UInt32)
+    case brTable(Instruction.BrTable)
     case `return`
     case call(functionIndex: UInt32)
     case callIndirect(tableIndex: TableIndex, typeIndex: TypeIndex)
@@ -45,7 +47,6 @@ enum Instruction: Equatable {
     case memoryCopy
     case memoryFill
     case numericConst(Value)
-    case numericIntUnary(NumericInstruction.IntUnary)
     case numericFloatUnary(NumericInstruction.FloatUnary)
     case numericIntBinary(NumericInstruction.IntBinary)
     case numericFloatBinary(NumericInstruction.FloatBinary)
@@ -86,6 +87,14 @@ enum Instruction: Equatable {
     case i64GeS
     case i32GeU
     case i64GeU
+    case i32Clz
+    case i64Clz
+    case i32Ctz
+    case i64Ctz
+    case i32Popcnt
+    case i64Popcnt
+    case i32Eqz
+    case i64Eqz
     case drop
     case select
     case refNull(ReferenceType)
@@ -99,9 +108,4 @@ enum Instruction: Equatable {
     case tableCopy(dest: TableIndex, src: TableIndex)
     case tableInit(TableIndex, ElementIndex)
     case tableElementDrop(ElementIndex)
-    case localGet(index: LocalIndex)
-    case localSet(index: LocalIndex)
-    case localTee(index: LocalIndex)
-    case globalGet(index: GlobalIndex)
-    case globalSet(index: GlobalIndex)
 }

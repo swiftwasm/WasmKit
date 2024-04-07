@@ -1,7 +1,8 @@
 import Foundation
 import SystemPackage
+import WasmParser
 
-final class WasmParser<Stream: ByteStream> {
+final class LegacyWasmParser<Stream: ByteStream> {
     let stream: Stream
     private var hasDataCount: Bool = false
     private let features: WasmFeatureSet
@@ -17,34 +18,13 @@ final class WasmParser<Stream: ByteStream> {
     }
 }
 
-/// Flags for enabling/disabling WebAssembly features
-public struct WasmFeatureSet: OptionSet {
-    /// The raw value of the feature set
-    public let rawValue: Int
-
-    /// Initialize a new feature set with the given raw value
-    public init(rawValue: Int) {
-        self.rawValue = rawValue
-    }
-
-    /// The WebAssembly memory64 proposal
-    public static let memory64 = WasmFeatureSet(rawValue: 1 << 0)
-    /// The WebAssembly reference types proposal
-    public static let referenceTypes = WasmFeatureSet(rawValue: 1 << 1)
-
-    /// The default feature set
-    public static let `default`: WasmFeatureSet = [.referenceTypes]
-    /// The feature set with all features enabled
-    public static let all: WasmFeatureSet = [.memory64, .referenceTypes]
-}
-
 /// Parse a given file as a WebAssembly binary format file
 /// > Note: <https://webassembly.github.io/spec/core/binary/index.html>
 public func parseWasm(filePath: FilePath, features: WasmFeatureSet = .default) throws -> Module {
     let fileHandle = try FileHandle(forReadingFrom: URL(fileURLWithPath: filePath.string))
     defer { try? fileHandle.close() }
     let stream = try FileHandleStream(fileHandle: fileHandle)
-    let parser = WasmParser(stream: stream, features: features)
+    let parser = LegacyWasmParser(stream: stream, features: features)
     let module = try parser.parseModule()
     return module
 }
@@ -52,13 +32,13 @@ public func parseWasm(filePath: FilePath, features: WasmFeatureSet = .default) t
 /// Parse a given byte array as a WebAssembly binary format file
 /// > Note: <https://webassembly.github.io/spec/core/binary/index.html>
 public func parseWasm(bytes: [UInt8], features: WasmFeatureSet = .default) throws -> Module {
-    let stream = StaticByteStream(bytes: bytes)
-    let parser = WasmParser(stream: stream, features: features)
+    let stream = LegacyStaticByteStream(bytes: bytes)
+    let parser = LegacyWasmParser(stream: stream, features: features)
     let module = try parser.parseModule()
     return module
 }
 
-public enum WasmParserError: Swift.Error {
+public enum LegacyWasmParserError: Swift.Error {
     /// The magic number is not found or invalid
     case invalidMagicNumber([UInt8])
     /// The version is not recognized
@@ -155,7 +135,7 @@ extension ByteStream {
             switch decoder.decode(&iterator) {
             case let .scalarValue(scalar): name.append(Character(scalar))
             case .emptyInput: break Decode
-            case .error: throw WasmParserError.invalidUTF8(bytes)
+            case .error: throw LegacyWasmParserError.invalidUTF8(bytes)
             }
         }
 
@@ -163,7 +143,7 @@ extension ByteStream {
     }
 }
 
-extension WasmParser {
+extension LegacyWasmParser {
     func parseVector<Content>(content parser: () throws -> Content) throws -> [Content] {
         try stream.parseVector(content: parser)
     }
@@ -187,7 +167,7 @@ extension WasmParser {
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/values.html#floating-point>
-extension WasmParser {
+extension LegacyWasmParser {
     func parseFloat() throws -> UInt32 {
         let consumedLittleEndian = try stream.consume(count: 4).reversed()
         let bitPattern = consumedLittleEndian.reduce(UInt32(0)) { acc, byte in
@@ -207,7 +187,7 @@ extension WasmParser {
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/types.html#types>
-extension WasmParser {
+extension LegacyWasmParser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/types.html#value-types>
     func parseValueType() throws -> ValueType {
@@ -254,10 +234,10 @@ extension WasmParser {
         // XXX: spectest expects the first byte should be parsed as a LEB128 with 1 byte limit
         // but the spec itself doesn't require it, so just check the continue bit of LEB128 here.
         guard opcode & 0b10000000 == 0 else {
-            throw WasmParserError.integerRepresentationTooLong
+            throw LegacyWasmParserError.integerRepresentationTooLong
         }
         guard opcode == 0x60 else {
-            throw WasmParserError.malformedFunctionType(opcode)
+            throw LegacyWasmParserError.malformedFunctionType(opcode)
         }
 
         let parameters = try parseVector { try parseValueType() }
@@ -280,7 +260,7 @@ extension WasmParser {
         case 0x05 where features.contains(.memory64):
             return try Limits(min: parseUnsigned(UInt64.self), max: parseUnsigned(UInt64.self), isMemory64: true)
         default:
-            throw WasmParserError.malformedLimit(b)
+            throw LegacyWasmParserError.malformedLimit(b)
         }
     }
 
@@ -325,7 +305,7 @@ extension WasmParser {
         case 0x01:
             return .variable
         default:
-            throw WasmParserError.malformedMutability(b)
+            throw LegacyWasmParserError.malformedMutability(b)
         }
     }
 
@@ -345,7 +325,7 @@ extension WasmParser {
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/instructions.html>
-extension WasmParser {
+extension LegacyWasmParser {
 
     enum ParseInstructionResult {
         /// The instruction is not fully parsed yet but need expression to continue
@@ -357,7 +337,7 @@ extension WasmParser {
     func parseInstruction(typeSection: [FunctionType]?) throws -> ParseInstructionResult {
         let rawCode = try stream.consumeAny()
         guard let code = InstructionCode(rawValue: rawCode) else {
-            throw WasmParserError.illegalOpcode(rawCode)
+            throw LegacyWasmParserError.illegalOpcode(rawCode)
         }
 
         switch code {
@@ -365,52 +345,15 @@ extension WasmParser {
             return .value(.control(.unreachable))
         case .nop:
             return .value(.control(.nop))
-        case .block:
-            let type = try parseResultType()
-            return .requestExpression { expr, _ in
-                let type = try type.arity(typeSection: typeSection)
-                return .multiValue([.block(endRef: ExpressionRef(expr.count + 1 + 1), type: type)] + expr + [.end])
-            }
-        case .loop:
-            let type = try parseResultType()
-            return .requestExpression { expr, _ in
-                let type = try type.arity(typeSection: typeSection)
-                return .multiValue([.loop(type: type)] + expr + [.end])
-            }
+        case .block, .loop:
+            fatalError("no longer supported")
         case .if:
-            let type = try parseResultType()
-            return ParseInstructionResult.requestExpression { (thenExpr: [Instruction], end: PseudoInstruction) -> ParseInstructionResult in
-                switch end {
-                case .else:
-                    return .requestExpression { (elseExpr: [Instruction], end2: PseudoInstruction) -> ParseInstructionResult in
-                        let type = try type.arity(typeSection: typeSection)
-                        let control = Instruction.ifThenElse(
-                            elseRef: ExpressionRef(thenExpr.count + 1 + 1),
-                            endRef: ExpressionRef(thenExpr.count + 1 + elseExpr.count + 1 + 1),
-                            type: type
-                        )
-                        return .multiValue([control] + thenExpr + [.else] + elseExpr + [.end])
-                    }
-                case .end:
-                    let type = try type.arity(typeSection: typeSection)
-                    let control = Instruction.ifThen(endRef: ExpressionRef(thenExpr.count + 2), type: type)
-                    return .multiValue([control] + thenExpr + [.end])
-                }
-            }
+            fatalError("no longer supported")
         case .else:
-            return .value(.else)
+            fatalError("no longer supported")
         case .end:
             return .value(.end)
-        case .br:
-            let label: UInt32 = try parseUnsigned()
-            return .value(.control(.br(labelIndex: label)))
-        case .br_if:
-            let label: UInt32 = try parseUnsigned()
-            return .value(.control(.brIf(labelIndex: label)))
-        case .br_table:
-            let labelIndices: [UInt32] = try parseVector { try parseUnsigned() }
-            let labelIndex: UInt32 = try parseUnsigned()
-            return .value(.control(.brTable(.init(labelIndices: labelIndices, defaultIndex: labelIndex))))
+        case .br, .br_if, .br_table: fatalError("no longer supported")
         case .return:
             return .value(.control(.return))
         case .call:
@@ -420,7 +363,7 @@ extension WasmParser {
             let typeIndex: TypeIndex = try parseUnsigned()
             if try !features.contains(.referenceTypes) && stream.peek() != 0 {
                 // Check that reserved byte is zero when reference-types is disabled
-                throw WasmParserError.malformedIndirectCall
+                throw LegacyWasmParserError.malformedIndirectCall
             }
             let tableIndex: TableIndex = try parseUnsigned()
             return .value(.control(.callIndirect(tableIndex: tableIndex, typeIndex: typeIndex)))
@@ -499,13 +442,13 @@ extension WasmParser {
         case .memory_size:
             let zero = try stream.consumeAny()
             guard zero == 0x00 else {
-                throw WasmParserError.zeroExpected(actual: zero, index: currentIndex)
+                throw LegacyWasmParserError.zeroExpected(actual: zero, index: currentIndex)
             }
             return .value(.memorySize)
         case .memory_grow:
             let zero = try stream.consumeAny()
             guard zero == 0x00 else {
-                throw WasmParserError.zeroExpected(actual: zero, index: currentIndex)
+                throw LegacyWasmParserError.zeroExpected(actual: zero, index: currentIndex)
             }
             return .value(.memoryGrow)
 
@@ -523,7 +466,7 @@ extension WasmParser {
             return .value(.numericConst((.f64(n))))
 
         case .i32_eqz:
-            return .value(.numericIntUnary((.eqz(.i32))))
+            return .value(.i32Eqz)
         case .i32_eq:
             return .value(.i32Eq)
         case .i32_ne:
@@ -546,7 +489,7 @@ extension WasmParser {
             return .value(.i32GeU)
 
         case .i64_eqz:
-            return .value(.numericIntUnary((.eqz(.i64))))
+            return .value(.i64Eqz)
         case .i64_eq:
             return .value(.i64Eq)
         case .i64_ne:
@@ -595,11 +538,11 @@ extension WasmParser {
             return .value(.numericFloatBinary((.ge(.f64))))
 
         case .i32_clz:
-            return .value(.numericIntUnary((.clz(.i32))))
+            return .value(.i32Clz)
         case .i32_ctz:
-            return .value(.numericIntUnary((.ctz(.i32))))
+            return .value(.i32Ctz)
         case .i32_popcnt:
-            return .value(.numericIntUnary((.popcnt(.i32))))
+            return .value(.i32Popcnt)
         case .i32_add:
             return .value(.i32Add)
         case .i32_sub:
@@ -632,11 +575,11 @@ extension WasmParser {
             return .value(.numericIntBinary((.rotr(.i32))))
 
         case .i64_clz:
-            return .value(.numericIntUnary((.clz(.i64))))
+            return .value(.i64Clz)
         case .i64_ctz:
-            return .value(.numericIntUnary((.ctz(.i64))))
+            return .value(.i64Ctz)
         case .i64_popcnt:
-            return .value(.numericIntUnary((.popcnt(.i64))))
+            return .value(.i64Popcnt)
         case .i64_add:
             return .value(.i64Add)
         case .i64_sub:
@@ -794,7 +737,7 @@ extension WasmParser {
             let type = try parseValueType()
 
             guard case let .reference(refType) = type else {
-                throw WasmParserError.expectedRefType(actual: type)
+                throw LegacyWasmParserError.expectedRefType(actual: type)
             }
 
             return .value(.reference(.refNull(refType)))
@@ -835,12 +778,12 @@ extension WasmParser {
                 // memory.init requires data count section
                 // https://webassembly.github.io/spec/core/binary/modules.html#data-count-section
                 guard hasDataCount else {
-                    throw WasmParserError.dataCountSectionRequired
+                    throw LegacyWasmParserError.dataCountSectionRequired
                 }
 
                 let zero = try stream.consumeAny()
                 guard zero == 0x00 else {
-                    throw WasmParserError.zeroExpected(actual: zero, index: currentIndex)
+                    throw LegacyWasmParserError.zeroExpected(actual: zero, index: currentIndex)
                 }
 
                 return .value(result)
@@ -849,21 +792,21 @@ extension WasmParser {
                 // memory.drop requires data count section
                 // https://webassembly.github.io/spec/core/binary/modules.html#data-count-section
                 guard hasDataCount else {
-                    throw WasmParserError.dataCountSectionRequired
+                    throw LegacyWasmParserError.dataCountSectionRequired
                 }
                 return .value(try .memoryDataDrop(parseUnsigned()))
 
             case 10:
                 let (zero1, zero2) = try (stream.consumeAny(), stream.consumeAny())
                 guard zero1 == 0x00 && zero2 == 0x00 else {
-                    throw WasmParserError.zeroExpected(actual: zero2, index: currentIndex)
+                    throw LegacyWasmParserError.zeroExpected(actual: zero2, index: currentIndex)
                 }
                 return .value(.memoryCopy)
 
             case 11:
                 let zero = try stream.consumeAny()
                 guard zero == 0x00 else {
-                    throw WasmParserError.zeroExpected(actual: zero, index: currentIndex)
+                    throw LegacyWasmParserError.zeroExpected(actual: zero, index: currentIndex)
                 }
 
                 return .value(.memoryFill)
@@ -891,7 +834,7 @@ extension WasmParser {
                 return .value(try .tableFill(parseUnsigned()))
 
             default:
-                throw WasmParserError.unimplementedInstruction(rawCode, suffix: codeSuffix)
+                throw LegacyWasmParserError.unimplementedInstruction(rawCode, suffix: codeSuffix)
             }
         }
     }
@@ -907,11 +850,19 @@ extension WasmParser {
         func parseSingleInst() throws -> ParseInstructionResult {
             return try parseInstruction(typeSection: typeSection)
         }
+        func isEndInstruction(_ instruction: Instruction) -> Bool {
+            if case .else = instruction {
+                return true
+            } else if instruction == .end {
+                return true
+            }
+            return false
+        }
         var nextResult = try parseSingleInst()
 
         while true {
             switch nextResult {
-            case .value(let end) where end == .end || end == .else:
+            case .value(let end) where isEndInstruction(end):
                 let end: PseudoInstruction = end == .end ? .end : .else
                 if let nextWork = pendingWorks.popLast() {
                     // If there is a pending parse, then restore the parsing
@@ -945,7 +896,7 @@ extension WasmParser {
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/modules.html#sections>
-extension WasmParser {
+extension LegacyWasmParser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#custom-section>
     func parseCustomSection(size: UInt32) throws -> CustomSection {
@@ -955,7 +906,7 @@ extension WasmParser {
         let contentSize = Int(size) - nameSize
 
         guard contentSize >= 0 else {
-            throw WasmParserError.invalidSectionSize(size)
+            throw LegacyWasmParserError.invalidSectionSize(size)
         }
 
         let bytes = try stream.consume(count: contentSize)
@@ -1093,7 +1044,7 @@ extension WasmParser {
                 let valueType = try parseValueType()
 
                 guard case let .reference(refType) = valueType else {
-                    throw WasmParserError.expectedRefType(actual: valueType)
+                    throw LegacyWasmParserError.expectedRefType(actual: valueType)
                 }
 
                 type = refType
@@ -1105,7 +1056,7 @@ extension WasmParser {
                 // `elemkind` parsing as defined in the spec
                 let elemKind = try parseUnsigned() as UInt32
                 guard elemKind == 0x00 else {
-                    throw WasmParserError.unexpectedElementKind(expected: 0x00, actual: elemKind)
+                    throw LegacyWasmParserError.unexpectedElementKind(expected: 0x00, actual: elemKind)
                 }
             }
 
@@ -1134,7 +1085,7 @@ extension WasmParser {
             }
             let totalLocals = localTypes.reduce(UInt64(0)) { $0 + UInt64($1.n) }
             guard totalLocals < UInt32.max else {
-                throw WasmParserError.tooManyLocals
+                throw LegacyWasmParserError.tooManyLocals
             }
 
             let locals = localTypes.map { (n: UInt32, type: ValueType) in
@@ -1181,13 +1132,13 @@ extension WasmParser {
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-module>
-extension WasmParser {
+extension LegacyWasmParser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-magic>
     func parseMagicNumber() throws {
         let magicNumber = try stream.consume(count: 4)
         guard magicNumber == [0x00, 0x61, 0x73, 0x6D] else {
-            throw WasmParserError.invalidMagicNumber(.init(magicNumber))
+            throw LegacyWasmParserError.invalidMagicNumber(.init(magicNumber))
         }
     }
 
@@ -1196,7 +1147,7 @@ extension WasmParser {
     func parseVersion() throws {
         let version = try stream.consume(count: 4)
         guard version == [0x01, 0x00, 0x00, 0x00] else {
-            throw WasmParserError.unknownVersion(.init(version))
+            throw LegacyWasmParserError.unknownVersion(.init(version))
         }
     }
 
@@ -1221,7 +1172,7 @@ extension WasmParser {
         private var last: Order = .initial
         mutating func track(order: Order) throws {
             guard last.rawValue < order.rawValue else {
-                throw WasmParserError.sectionOutOfOrder
+                throw LegacyWasmParserError.sectionOutOfOrder
             }
             last = order
         }
@@ -1244,7 +1195,7 @@ extension WasmParser {
             let sectionID = try stream.consumeAny()
 
             guard ids.contains(sectionID) else {
-                throw WasmParserError.malformedSectionID(sectionID)
+                throw LegacyWasmParserError.malformedSectionID(sectionID)
             }
 
             let sectionSize: UInt32 = try parseUnsigned()
@@ -1295,37 +1246,83 @@ extension WasmParser {
             }
             let expectedSectionEnd = sectionStart + Int(sectionSize)
             guard expectedSectionEnd == stream.currentIndex else {
-                throw WasmParserError.sectionSizeMismatch(
+                throw LegacyWasmParserError.sectionSizeMismatch(
                     expected: expectedSectionEnd, actual: stream.currentIndex
                 )
             }
         }
 
         guard typeIndices.count == codes.count else {
-            throw WasmParserError.inconsistentFunctionAndCodeLength(
+            throw LegacyWasmParserError.inconsistentFunctionAndCodeLength(
                 functionCount: typeIndices.count,
                 codeCount: codes.count
             )
         }
 
         if let dataCount = module.dataCount, dataCount != UInt32(module.data.count) {
-            throw WasmParserError.inconsistentDataCountAndDataSectionLength(
+            throw LegacyWasmParserError.inconsistentDataCountAndDataSectionLength(
                 dataCount: dataCount,
                 dataSection: module.data.count
             )
         }
 
+        let functionTypeIndices = module.imports.compactMap { (entry) -> TypeIndex? in
+            guard case let .function(typeIndex) = entry.descriptor else { return nil }
+            return typeIndex
+        } + typeIndices
+        let globalTypes = module.imports.compactMap { (entry) -> GlobalType? in
+            guard case let .global(type) = entry.descriptor else { return nil }
+            return type
+        } + module.globals.map { $0.type }
+        let memoryTypes = module.imports.compactMap { (entry) -> MemoryType? in
+            guard case let .memory(type) = entry.descriptor else { return nil }
+            return type
+        } + module.memories.map { $0.type }
+        let enableAssertDefault = _slowPath(getenv("WASMKIT_ENABLE_ASSERT") != nil)
         let functions = codes.enumerated().map { [hasDataCount, features] index, code in
-            GuestFunction(
+            let funcTypeIndex = typeIndices[index]
+            let funcType = module.types[Int(funcTypeIndex)]
+            return GuestFunction(
                 type: typeIndices[index], locals: code.locals,
-                body: { [types = module.types] in
-                    let stream = StaticByteStream(bytes: Array(code.expression))
-                    let parser = WasmParser<StaticByteStream>(stream: stream, features: features, hasDataCount: hasDataCount)
-                    let (result, end) = try parser.parseInstructionSequence(typeSection: types)
-                    guard end == .end else {
-                        throw WasmParserError.endOpcodeExpected
+                body: { [types = module.types, tables = module.tables, imports = module.imports] in
+                    let globalFuncIndex = module.imports.count + index
+                    var enableAssert = enableAssertDefault
+                    #if ASSERT
+                    enableAssert = true
+                    #endif
+                    
+                    var translator = InstructionTranslator(
+                        allocator: module.allocator,
+                        module: InstructionTranslator.Module(
+                            typeSection: types,
+                            importSection: imports,
+                            functionTypeIndices: functionTypeIndices,
+                            globalTypes: globalTypes,
+                            memoryTypes: memoryTypes,
+                            tables: tables
+                        ),
+                        type: funcType, locals: code.locals
+                    )
+
+                    if enableAssert && !_isFastAssertConfiguration() {
+                        print("🚀 Starting Translation for code[\(globalFuncIndex)] (\(funcType))")
+                        var tracing = InstructionTracingVisitor(trace: {
+                            print("🍵 code[\(globalFuncIndex)] Translating \($0)")
+                        }, visitor: translator)
+                        try WasmParser.parseExpression(
+                            bytes: Array(code.expression),
+                            features: features, hasDataCount: hasDataCount,
+                            visitor: &tracing
+                        )
+                        let newISeq = InstructionSequence(instructions: tracing.visitor.finalize())
+                        return newISeq
                     }
-                    return result
+                    try WasmParser.parseExpression(
+                        bytes: Array(code.expression),
+                        features: features, hasDataCount: hasDataCount,
+                        visitor: &translator
+                    )
+                    return InstructionSequence(instructions: translator.finalize())
                 })
         }
         module.functions = functions

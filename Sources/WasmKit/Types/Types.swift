@@ -18,7 +18,7 @@ public enum ResultType: Equatable {
         case let .multi(typeIndex):
             let typeIndex = Int(typeIndex)
             guard let typeSection, typeIndex < typeSection.count else {
-                throw WasmParserError.invalidTypeSectionReference
+                throw LegacyWasmParserError.invalidTypeSectionReference
             }
             let funcType = typeSection[typeIndex]
             return Instruction.BlockType(

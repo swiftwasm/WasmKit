@@ -3,41 +3,23 @@
 struct Stack {
     enum Element: Equatable {
         case value(Value)
-        case label(Label)
         case frame(Frame)
     }
 
     private var limit: UInt16 { UInt16.max }
     private var valueStack: ValueStack
     private var numberOfValues: Int { valueStack.count }
-    private var labels: FixedSizeStack<Label> {
-        didSet {
-            self.currentLabel = self.labels.peek()
-        }
-    }
     private var frames: FixedSizeStack<Frame>
     var currentFrame: Frame!
-    var currentLabel: Label!
 
     var isEmpty: Bool {
-        self.frames.isEmpty && self.labels.isEmpty && self.numberOfValues == 0
+        self.frames.isEmpty && self.numberOfValues == 0
     }
 
     init() {
         let limit = UInt16.max
         self.valueStack = ValueStack(capacity: Int(limit))
         self.frames = FixedSizeStack(capacity: Int(limit))
-        self.labels = FixedSizeStack(capacity: Int(limit))
-    }
-
-    @inline(__always)
-    mutating func pushLabel(arity: Int, continuation: ProgramCounter, popPushValues: Int = 0) {
-        let label = Label(
-            arity: arity,
-            continuation: continuation,
-            baseValueIndex: self.numberOfValues - popPushValues
-        )
-        labels.push(label)
     }
 
     mutating func pushFrame(
@@ -50,7 +32,7 @@ struct Stack {
         address: FunctionAddress? = nil
     ) throws {
         // TODO: Stack overflow check can be done at the entry of expression
-        guard (frames.count + labels.count + numberOfValues) < limit else {
+        guard (frames.count + numberOfValues) < limit else {
             throw Trap.callStackExhausted
         }
         let valueFrameIndex = self.numberOfValues - argc
@@ -60,66 +42,17 @@ struct Stack {
         let baseStackAddress = BaseStackAddress(
             valueFrameIndex: valueFrameIndex,
             // Consume argment values from value stack
-            valueIndex: self.numberOfValues,
-            labelIndex: self.labels.count
+            valueIndex: self.numberOfValues
         )
         let frame = Frame(arity: arity, module: module, baseStackAddress: baseStackAddress, iseq: iseq, returnPC: returnPC, address: address)
         frames.push(frame)
         self.currentFrame = frame
     }
 
-    func numberOfLabelsInCurrentFrame() -> Int {
-        self.labels.count - currentFrame.baseStackAddress.labelIndex
-    }
-
-    func numberOfValuesInCurrentLabel() -> Int {
-        self.numberOfValues - currentLabel.baseValueIndex
-    }
-
-    mutating func exit(label: Label) {
-        // labelIndex = 0 means jumping to the current head label
-        self.labels.pop()
-    }
-
-    mutating func exit(frame: Frame) -> Label? {
-        let results = valueStack.popValues(count: frame.arity)
-        self.valueStack.truncate(length: frame.baseStackAddress.valueFrameIndex)
-        valueStack.push(values: results)
-        let labelToRemove = self.labels[frame.baseStackAddress.labelIndex]
-        self.labels.pop(self.labels.count - frame.baseStackAddress.labelIndex)
-        return labelToRemove
-    }
-
-    @discardableResult
-    mutating func unwindLabels(upto labelIndex: Int) -> Label? {
-        // labelIndex = 0 means jumping to the current head label
-        let labelToRemove = self.labels[self.labels.count - labelIndex - 1]
-        self.labels.pop(labelIndex + 1)
-        if self.numberOfValues > labelToRemove.baseValueIndex {
-            self.valueStack.truncate(length: labelToRemove.baseValueIndex)
-        }
-        return labelToRemove
-    }
-
-    mutating func popTopValues() throws -> Array<Value> {
-        guard let currentLabel = self.currentLabel else {
-            return self.valueStack.popValues(count: self.valueStack.count)
-        }
-        guard currentLabel.baseValueIndex < self.numberOfValues else {
-            return []
-        }
-        let values = self.valueStack.popValues(count: self.numberOfValues - currentLabel.baseValueIndex)
-        return values
-    }
-
     mutating func popFrame() {
         let popped = self.frames.pop()
         self.currentFrame = self.frames.peek()
         self.valueStack.truncate(length: popped.baseStackAddress.valueFrameIndex)
-    }
-
-    func getLabel(index: Int) -> Label {
-        return self.labels[self.labels.count - index - 1]
     }
 
     mutating func popValues(count: Int) -> Array<Value> {
@@ -134,6 +67,9 @@ struct Stack {
     mutating func push(value: Value) {
         self.valueStack.push(value: value)
     }
+    mutating func copyValues(copyCount: Int, popCount: Int) {
+        self.valueStack.copyValues(copyCount: copyCount, popCount: popCount)
+    }
 
     var topValue: Value {
         self.valueStack.topValue
@@ -147,7 +83,6 @@ struct Stack {
 struct ValueStack {
     private let values: UnsafeMutableBufferPointer<Value>
     private var nextPointer: UnsafeMutablePointer<Value>
-    private let capacity: Int
     var baseAddress: UnsafeMutablePointer<Value> {
         values.baseAddress!
     }
@@ -155,7 +90,6 @@ struct ValueStack {
     init(capacity: Int) {
         self.values = .allocate(capacity: capacity)
         self.nextPointer = self.values.baseAddress!
-        self.capacity = capacity
     }
 
     func deallocate() {
@@ -215,6 +149,11 @@ struct ValueStack {
         self.nextPointer = self.nextPointer.advanced(by: -count)
         return values
     }
+    mutating func copyValues(copyCount: Int, popCount: Int) {
+        let newNextPointer = self.nextPointer - popCount
+        (newNextPointer - copyCount).moveUpdate(from: self.nextPointer - copyCount, count: copyCount)
+        self.nextPointer = newNextPointer
+    }
 }
 
 extension ValueStack: Sequence {
@@ -273,24 +212,11 @@ extension FixedSizeStack: Sequence {
     }
 }
 
-/// > Note:
-/// <https://webassembly.github.io/spec/core/exec/runtime.html#labels>
-public struct Label: Equatable {
-    let arity: Int
-
-    /// Index of an instruction to jump to when this label is popped off the stack.
-    let continuation: ProgramCounter
-
-    let baseValueIndex: Int
-}
-
 struct BaseStackAddress {
     /// Locals are placed between `valueFrameIndex..<valueIndex`
     let valueFrameIndex: Int
     /// The base index of Wasm value stack
     let valueIndex: Int
-    /// The base index of Wasm label stack
-    let labelIndex: Int
 }
 
 /// > Note:
@@ -327,27 +253,9 @@ extension Frame: Equatable {
     }
 }
 
-extension Stack {
-    func localGet(index: UInt32) -> Value {
-        let base = currentFrame.baseStackAddress.valueFrameIndex
-        return valueStack[base + Int(index)]
-    }
-
-    mutating func localSet(index: UInt32, value: Value) {
-        let base = currentFrame.baseStackAddress.valueFrameIndex
-        valueStack[base + Int(index)] = value
-    }
-}
-
 extension Frame: CustomDebugStringConvertible {
     var debugDescription: String {
         "[A=\(arity), BA=\(baseStackAddress), F=\(address?.description ?? "nil")]"
-    }
-}
-
-extension Label: CustomDebugStringConvertible {
-    public var debugDescription: String {
-        "[A=\(arity), C=\(continuation), BVI=\(baseValueIndex)]"
     }
 }
 
@@ -359,12 +267,6 @@ extension Stack: CustomDebugStringConvertible {
         for (index, frame) in frames.enumerated() {
             result += "FRAME[\(index)]: \(frame.debugDescription)\n"
         }
-        result += "==================================================\n"
-
-        for (index, label) in labels.enumerated() {
-            result += "LABEL[\(index)]: \(label.debugDescription)\n"
-        }
-
         result += "==================================================\n"
 
         for (index, value) in valueStack.enumerated() {

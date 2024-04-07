@@ -1,14 +1,14 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#parametric-instructions>
 extension ExecutionState {
-    mutating func drop(runtime: Runtime) {
+    mutating func drop(runtime: Runtime, stack: inout Stack) {
         _ = stack.popValue()
     }
-    mutating func select(runtime: Runtime) throws {
-        try doSelect()
+    mutating func select(runtime: Runtime, stack: inout Stack) throws {
+        try doSelect(stack: &stack)
     }
 
-    private mutating func doSelect() throws {
+    private mutating func doSelect(stack: inout Stack) throws {
         let flagValue = stack.popValue()
         guard case let .i32(flag) = flagValue else {
             throw Trap.stackValueTypesMismatch(expected: .i32, actual: flagValue.type)

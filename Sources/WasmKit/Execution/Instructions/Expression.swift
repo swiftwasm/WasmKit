@@ -1,8 +1,3 @@
-struct BranchLabel: Equatable {
-    let label: Label
-    var index: LabelIndex
-}
-
 /// See spec's
 /// [definition](https://webassembly.github.io/spec/core/text/instructions.html?highlight=pseudo#control-instructions).
 /// > The `block`, `loop` and `if` instructions are structured instructions. They bracket nested sequences of

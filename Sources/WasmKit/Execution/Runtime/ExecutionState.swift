@@ -5,17 +5,11 @@ typealias ProgramCounter = UnsafePointer<Instruction>
 /// Each new invocation through exported function has a separate ``ExecutionState``
 /// even though the invocation happens during another invocation.
 struct ExecutionState {
-    var stack = Stack()
     /// Index of an instruction to be executed in the current function.
     var programCounter: ProgramCounter
     var reachedEndOfExecution: Bool = false
 
-    var isStackEmpty: Bool {
-        stack.isEmpty
-    }
-
-    fileprivate init(stack: Stack = Stack(), programCounter: ProgramCounter) {
-        self.stack = stack
+    fileprivate init(programCounter: ProgramCounter) {
         self.programCounter = programCounter
     }
 }
@@ -32,8 +26,7 @@ func withExecution<Return>(_ body: (inout ExecutionState) throws -> Return) reth
 
 extension ExecutionState: CustomStringConvertible {
     var description: String {
-        var result = "======== PC=\(programCounter) =========\n"
-        result += "\(stack.debugDescription)"
+        let result = "======== PC=\(programCounter) =========\n"
 
         return result
     }
@@ -41,27 +34,8 @@ extension ExecutionState: CustomStringConvertible {
 
 extension ExecutionState {
     /// > Note:
-    /// <https://webassembly.github.io/spec/core/exec/instructions.html#entering-xref-syntax-instructions-syntax-instr-mathit-instr-ast-with-label-l>
-    @inline(__always)
-    mutating func enter(jumpTo targetPC: ProgramCounter, continuation: ProgramCounter, arity: Int, pushPopValues: Int = 0) {
-        stack.pushLabel(
-            arity: arity,
-            continuation: continuation,
-            popPushValues: pushPopValues
-        )
-        programCounter = targetPC
-    }
-
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/exec/instructions.html#exiting-xref-syntax-instructions-syntax-instr-mathit-instr-ast-with-label-l>
-    mutating func exit(label: Label) throws {
-        stack.exit(label: label)
-        programCounter += 1
-    }
-
-    /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/instructions.html#invocation-of-function-address>
-    mutating func invoke(functionAddress address: FunctionAddress, runtime: Runtime) throws {
+    mutating func invoke(functionAddress address: FunctionAddress, runtime: Runtime, stack: inout Stack) throws {
         #if DEBUG
         runtime.interceptor?.onEnterFunction(address, store: runtime.store)
         #endif
@@ -92,19 +66,19 @@ extension ExecutionState {
         }
     }
 
-    mutating func run(runtime: Runtime) throws {
+    mutating func run(runtime: Runtime, stack: inout Stack) throws {
         while !reachedEndOfExecution {
-            let locals = self.stack.currentLocalsPointer
+            let locals = stack.currentLocalsPointer
             // Regular path
             var inst: Instruction
             // `doExecute` returns false when current frame *may* be updated
             repeat {
                 inst = programCounter.pointee
-            } while try doExecute(inst, runtime: runtime, locals: locals)
+            } while try doExecute(inst, runtime: runtime, stack: &stack, locals: locals)
         }
     }
 
-    func currentModule(store: Store) -> ModuleInstance {
+    func currentModule(store: Store, stack: inout Stack) -> ModuleInstance {
         store.module(address: stack.currentFrame.module)
     }
 }
