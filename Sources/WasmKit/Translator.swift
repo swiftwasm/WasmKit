@@ -519,7 +519,7 @@ struct InstructionTranslator: InstructionVisitor {
     mutating func visitBr(relativeDepth: UInt32) -> Output {
         emitBranch(relativeDepth: relativeDepth) { offset, copyCount, popCount in
             return .br(
-                labelIndex: relativeDepth, offset: offset,
+                offset: offset,
                 copyCount: copyCount, popCount: popCount
             )
         }
@@ -530,7 +530,7 @@ struct InstructionTranslator: InstructionVisitor {
         try popOperand(.i32)
         emitBranch(relativeDepth: relativeDepth) { offset, copyCount, popCount in
             return .brIf(
-                labelIndex: relativeDepth, offset: offset,
+                offset: offset,
                 copyCount: copyCount, popCount: popCount
             )
         }

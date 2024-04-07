@@ -82,7 +82,6 @@ let instructions = [
         Immediate(name: "endRef", type: "ExpressionRef")
     ]),
     Instruction(name: "br", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: [
-        Immediate(name: "labelIndex", type: "LabelIndex"),
         Immediate(name: "offset", type: "Int32"),
         // Number of values that will be copied if the branch is taken
         Immediate(name: "copyCount", type: "UInt32"),
@@ -90,7 +89,6 @@ let instructions = [
         Immediate(name: "popCount", type: "UInt32"),
     ]),
     Instruction(name: "brIf", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: [
-        Immediate(name: "labelIndex", type: "LabelIndex"),
         Immediate(name: "offset", type: "Int32"),
         // Number of values that will be copied if the branch is taken
         Immediate(name: "copyCount", type: "UInt32"),
