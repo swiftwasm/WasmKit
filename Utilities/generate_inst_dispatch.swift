@@ -56,8 +56,71 @@ let numericIntUnaryInsts: [Instruction] = ["Clz", "Ctz", "Popcnt", "Eqz"].flatMa
         Instruction(name: "\(type)\(op)", immediates: [])
     }
 }
+let numericOtherInsts: [Instruction] = [
+    // Numeric
+    Instruction(name: "numericConst", immediates: [Immediate(name: nil, type: "Value")]),
+    Instruction(name: "numericFloatUnary", immediates: [Immediate(name: nil, type: "NumericInstruction.FloatUnary")]),
+    Instruction(name: "numericIntBinary", mayThrow: true, immediates: [Immediate(name: nil, type: "NumericInstruction.IntBinary")]),
+    Instruction(name: "numericFloatBinary", immediates: [Immediate(name: nil, type: "NumericInstruction.FloatBinary")]),
+    Instruction(name: "numericConversion", mayThrow: true, immediates: [Immediate(name: nil, type: "NumericInstruction.Conversion")]),
+]
 
-let instructions = [
+let memoryLoadStoreInsts: [Instruction] = [
+        "i32Load",
+        "i64Load",
+        "f32Load",
+        "f64Load",
+        "i32Load8S",
+        "i32Load8U",
+        "i32Load16S",
+        "i32Load16U",
+        "i64Load8S",
+        "i64Load8U",
+        "i64Load16S",
+        "i64Load16U",
+        "i64Load32S",
+        "i64Load32U",
+        "i32Store",
+        "i64Store",
+        "f32Store",
+        "f64Store",
+        "i32Store8",
+        "i32Store16",
+        "i64Store8",
+        "i64Store16",
+        "i64Store32",
+    ].map {
+        Instruction(name: $0, mayThrow: true, immediates: [Immediate(name: "memarg", type: "Memarg")])
+    }
+let memoryOpInsts: [Instruction] = [
+    Instruction(name: "memorySize", immediates: []),
+    Instruction(name: "memoryGrow", mayThrow: true, immediates: []),
+    Instruction(name: "memoryInit", mayThrow: true, immediates: [Immediate(name: nil, type: "DataIndex")]),
+    Instruction(name: "memoryDataDrop", immediates: [Immediate(name: nil, type: "DataIndex")]),
+    Instruction(name: "memoryCopy", mayThrow: true, immediates: []),
+    Instruction(name: "memoryFill", mayThrow: true, immediates: []),
+]
+
+let miscInsts: [Instruction] = [
+    // Parametric
+    Instruction(name: "drop", immediates: []),
+    Instruction(name: "select", mayThrow: true, immediates: []),
+    // Reference
+    Instruction(name: "refNull", immediates: [Immediate(name: nil, type: "ReferenceType")]),
+    Instruction(name: "refIsNull", immediates: []),
+    Instruction(name: "refFunc", immediates: [Immediate(name: nil, type: "FunctionIndex")]),
+    // Table
+    Instruction(name: "tableGet", mayThrow: true, immediates: [Immediate(name: nil, type: "TableIndex")]),
+    Instruction(name: "tableSet", mayThrow: true, immediates: [Immediate(name: nil, type: "TableIndex")]),
+    Instruction(name: "tableSize", immediates: [Immediate(name: nil, type: "TableIndex")]),
+    Instruction(name: "tableGrow", immediates: [Immediate(name: nil, type: "TableIndex")]),
+    Instruction(name: "tableFill", mayThrow: true, immediates: [Immediate(name: nil, type: "TableIndex")]),
+    Instruction(name: "tableCopy", mayThrow: true, immediates: [Immediate(name: "dest", type: "TableIndex"), Immediate(name: "src", type: "TableIndex")]),
+    Instruction(name: "tableInit", mayThrow: true, immediates: [Immediate(name: nil, type: "TableIndex"), Immediate(name: nil, type: "ElementIndex")]),
+    Instruction(name: "tableElementDrop", immediates: [Immediate(name: nil, type: "ElementIndex")]),
+]
+
+let instructions: [Instruction] = [
     // Variable
     Instruction(name: "localGet", hasLocals: true, immediates: [Immediate(name: "index", type: "LocalIndex")]),
     Instruction(name: "localSet", hasLocals: true, immediates: [Immediate(name: "index", type: "LocalIndex")]),
@@ -115,69 +178,13 @@ let instructions = [
     Instruction(name: "endOfFunction", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: []),
     Instruction(name: "endOfExecution", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: []),
 ]
-// Memory
-+ [
-        "i32Load",
-        "i64Load",
-        "f32Load",
-        "f64Load",
-        "i32Load8S",
-        "i32Load8U",
-        "i32Load16S",
-        "i32Load16U",
-        "i64Load8S",
-        "i64Load8U",
-        "i64Load16S",
-        "i64Load16U",
-        "i64Load32S",
-        "i64Load32U",
-        "i32Store",
-        "i64Store",
-        "f32Store",
-        "f64Store",
-        "i32Store8",
-        "i32Store16",
-        "i64Store8",
-        "i64Store16",
-        "i64Store32",
-    ].map {
-        Instruction(name: $0, mayThrow: true, immediates: [Immediate(name: "memarg", type: "Memarg")])
-    }
-+ [
-    Instruction(name: "memorySize", immediates: []),
-    Instruction(name: "memoryGrow", mayThrow: true, immediates: []),
-    Instruction(name: "memoryInit", mayThrow: true, immediates: [Immediate(name: nil, type: "DataIndex")]),
-    Instruction(name: "memoryDataDrop", immediates: [Immediate(name: nil, type: "DataIndex")]),
-    Instruction(name: "memoryCopy", mayThrow: true, immediates: []),
-    Instruction(name: "memoryFill", mayThrow: true, immediates: []),
-    // Numeric
-    Instruction(name: "numericConst", immediates: [Immediate(name: nil, type: "Value")]),
-    Instruction(name: "numericFloatUnary", immediates: [Immediate(name: nil, type: "NumericInstruction.FloatUnary")]),
-    Instruction(name: "numericIntBinary", mayThrow: true, immediates: [Immediate(name: nil, type: "NumericInstruction.IntBinary")]),
-    Instruction(name: "numericFloatBinary", immediates: [Immediate(name: nil, type: "NumericInstruction.FloatBinary")]),
-    Instruction(name: "numericConversion", mayThrow: true, immediates: [Immediate(name: nil, type: "NumericInstruction.Conversion")]),
-]
++ memoryLoadStoreInsts
++ memoryOpInsts
++ numericOtherInsts
 + numericBinaryInsts
 + numericIntBinaryInsts
 + numericIntUnaryInsts
-+ [
-    // Parametric
-    Instruction(name: "drop", immediates: []),
-    Instruction(name: "select", mayThrow: true, immediates: []),
-    // Reference
-    Instruction(name: "refNull", immediates: [Immediate(name: nil, type: "ReferenceType")]),
-    Instruction(name: "refIsNull", immediates: []),
-    Instruction(name: "refFunc", immediates: [Immediate(name: nil, type: "FunctionIndex")]),
-    // Table
-    Instruction(name: "tableGet", mayThrow: true, immediates: [Immediate(name: nil, type: "TableIndex")]),
-    Instruction(name: "tableSet", mayThrow: true, immediates: [Immediate(name: nil, type: "TableIndex")]),
-    Instruction(name: "tableSize", immediates: [Immediate(name: nil, type: "TableIndex")]),
-    Instruction(name: "tableGrow", immediates: [Immediate(name: nil, type: "TableIndex")]),
-    Instruction(name: "tableFill", mayThrow: true, immediates: [Immediate(name: nil, type: "TableIndex")]),
-    Instruction(name: "tableCopy", mayThrow: true, immediates: [Immediate(name: "dest", type: "TableIndex"), Immediate(name: "src", type: "TableIndex")]),
-    Instruction(name: "tableInit", mayThrow: true, immediates: [Immediate(name: nil, type: "TableIndex"), Immediate(name: nil, type: "ElementIndex")]),
-    Instruction(name: "tableElementDrop", immediates: [Immediate(name: nil, type: "ElementIndex")]),
-]
++ miscInsts
 
 func camelCase(pascalCase: String) -> String {
     let first = pascalCase.first!.lowercased()
