@@ -49,10 +49,6 @@ struct Stack {
         self.currentFrame = frame
     }
 
-    func _numberOfValuesInCurrentFrame() -> Int {
-        self.numberOfValues - currentFrame.baseStackAddress.valueIndex
-    }
-
     mutating func exit(frame: Frame) {
         let results = valueStack.popValues(count: frame.arity)
         self.valueStack.truncate(length: frame.baseStackAddress.valueFrameIndex)
