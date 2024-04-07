@@ -10,25 +10,15 @@ extension ExecutionState {
 
     typealias BlockType = Instruction.BlockType
 
-    mutating func ifThen(runtime: Runtime, stack: inout Stack, endRef: ExpressionRef, type: BlockType) {
+    mutating func ifThen(runtime: Runtime, stack: inout Stack, elseOrEndRef: ExpressionRef, type: BlockType) {
         let isTrue = stack.popValue().i32 != 0
         if isTrue {
             programCounter += 1
         } else {
-            programCounter += endRef.relativeOffset
+            programCounter += elseOrEndRef.relativeOffset
         }
     }
 
-    mutating func ifThenElse(runtime: Runtime, stack: inout Stack, elseRef: ExpressionRef, type: BlockType) {
-        let isTrue = stack.popValue().i32 != 0
-        let addendToPC: Int
-        if isTrue {
-            addendToPC = 1
-        } else {
-            addendToPC = elseRef.relativeOffset
-        }
-        programCounter += addendToPC
-    }
     mutating func end(runtime: Runtime, stack: inout Stack) {
         fatalError()
     }

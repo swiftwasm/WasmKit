@@ -6,8 +6,7 @@ enum Instruction: Equatable {
     case globalSet(index: GlobalIndex)
     case unreachable
     case nop
-    case ifThen(endRef: ExpressionRef, type: BlockType)
-    case ifThenElse(elseRef: ExpressionRef, type: BlockType)
+    case ifThen(elseOrEndRef: ExpressionRef, type: BlockType)
     case end
     case `else`(endRef: ExpressionRef)
     case br(offset: Int32, copyCount: UInt32, popCount: UInt32)

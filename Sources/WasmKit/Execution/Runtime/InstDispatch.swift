@@ -19,11 +19,8 @@ extension ExecutionState {
         case .nop:
             try self.nop(runtime: runtime, stack: &stack)
             return true
-        case .ifThen(let endRef, let type):
-            self.ifThen(runtime: runtime, stack: &stack, endRef: endRef, type: type)
-            return true
-        case .ifThenElse(let elseRef, let type):
-            self.ifThenElse(runtime: runtime, stack: &stack, elseRef: elseRef, type: type)
+        case .ifThen(let elseOrEndRef, let type):
+            self.ifThen(runtime: runtime, stack: &stack, elseOrEndRef: elseOrEndRef, type: type)
             return true
         case .end:
             self.end(runtime: runtime, stack: &stack)
@@ -254,7 +251,6 @@ extension Instruction {
         case .unreachable: return "unreachable"
         case .nop: return "nop"
         case .ifThen: return "ifThen"
-        case .ifThenElse: return "ifThenElse"
         case .end: return "end"
         case .`else`: return "`else`"
         case .br: return "br"

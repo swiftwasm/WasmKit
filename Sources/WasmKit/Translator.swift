@@ -417,15 +417,13 @@ struct InstructionTranslator: InstructionVisitor {
         )
         let selfPC = iseqBuilder.insertingPC
         iseqBuilder.emitWithLabel(endLabel) { iseqBuilder, endPC in
-            let endRef = ExpressionRef(from: selfPC, to: endPC)
+            let elseOrEndRef: ExpressionRef
             if let elsePC = iseqBuilder.resolveLabel(elseLabel) {
-                return .ifThenElse(
-                    elseRef: ExpressionRef(from: selfPC, to: elsePC),
-                    type: Instruction.BlockType(blockType)
-                )
+                elseOrEndRef = ExpressionRef(from: selfPC, to: elsePC)
             } else {
-                return .ifThen(endRef: endRef, type: Instruction.BlockType(blockType))
+                elseOrEndRef = ExpressionRef(from: selfPC, to: endPC)
             }
+            return .ifThen(elseOrEndRef: elseOrEndRef, type: Instruction.BlockType(blockType))
         }
     }
     
