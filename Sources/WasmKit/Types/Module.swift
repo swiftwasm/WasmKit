@@ -124,37 +124,3 @@ struct Table: Equatable {
 struct Memory: Equatable {
     public let type: MemoryType
 }
-
-/// Exported entity in a module
-/// > Note:
-/// <https://webassembly.github.io/spec/core/syntax/modules.html#exports>
-public struct Export: Equatable {
-    /// Name of the export
-    public let name: String
-    /// Descriptor of the export
-    public let descriptor: ExportDescriptor
-}
-
-/// Export descriptor
-public enum ExportDescriptor: Equatable {
-    /// Function export
-    case function(FunctionIndex)
-    /// Table export
-    case table(TableIndex)
-    /// Memory export
-    case memory(MemoryIndex)
-    /// Global export
-    case global(GlobalIndex)
-}
-
-/// Import descriptor
-public enum ImportDescriptor: Equatable {
-    /// Function import
-    case function(TypeIndex)
-    /// Table import
-    case table(TableType)
-    /// Memory import
-    case memory(MemoryType)
-    /// Global import
-    case global(GlobalType)
-}

@@ -1,5 +1,5 @@
 import XCTest
-import WasmParser
+@testable import WasmParser
 
 @testable import WasmKit
 

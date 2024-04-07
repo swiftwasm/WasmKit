@@ -105,6 +105,16 @@ public func parseImportSection<Stream: ByteStream>(
     return try parser.parseImportSection()
 }
 
+@_spi(Migration)
+public func parseExportSection<Stream: ByteStream>(
+    stream: Stream,
+    features: WasmFeatureSet = .default,
+    hasDataCount: Bool = false
+) throws -> [Export] {
+    let parser = WasmParser(stream: stream, features: features, hasDataCount: hasDataCount)
+    return try parser.parseExportSection()
+}
+
 /// Flags for enabling/disabling WebAssembly features
 public struct WasmFeatureSet: OptionSet {
     /// The raw value of the feature set

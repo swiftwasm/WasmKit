@@ -381,11 +381,11 @@ extension LegacyWasmParser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#export-section>
     func parseExportSection() throws -> [Export] {
-        return try parseVector {
-            let name = try parseName()
-            let descriptor = try parseExportDescriptor()
-            return Export(name: name, descriptor: descriptor)
-        }
+        return try WasmParser.parseExportSection(
+            stream: self.stream,
+            features: features,
+            hasDataCount: hasDataCount
+        )
     }
 
     /// > Note:

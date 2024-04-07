@@ -218,18 +218,26 @@ public enum DataSegment: Equatable {
     case active(Active)
 }
 
+/// Exported entity in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#exports>
 public struct Export: Equatable {
+    /// Name of the export
     public let name: String
+    /// Descriptor of the export
     public let descriptor: ExportDescriptor
 }
 
+/// Export descriptor
 public enum ExportDescriptor: Equatable {
-    case function(UInt32)
-    case table(UInt32)
-    case memory(UInt32)
-    case global(UInt32)
+    /// Function export
+    case function(FunctionIndex)
+    /// Table export
+    case table(TableIndex)
+    /// Memory export
+    case memory(MemoryIndex)
+    /// Global export
+    case global(GlobalIndex)
 }
 
 /// Import entity in a module
@@ -242,12 +250,6 @@ public struct Import: Equatable {
     public let name: String
     /// Descriptor of the import
     public let descriptor: ImportDescriptor
-
-    public init(module: String, name: String, descriptor: ImportDescriptor) {
-        self.module = module
-        self.name = name
-        self.descriptor = descriptor
-    }
 }
 
 /// Import descriptor
