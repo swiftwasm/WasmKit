@@ -1,6 +1,6 @@
 import Foundation
 
-struct WasmParser<Stream: ByteStream> {
+public struct Parser<Stream: ByteStream> {
     let stream: Stream
     private var hasDataCount: Bool = false
     private let features: WasmFeatureSet
@@ -15,7 +15,7 @@ struct WasmParser<Stream: ByteStream> {
         return stream.currentIndex
     }
 
-    init(stream: Stream, features: WasmFeatureSet = .default, hasDataCount: Bool = false) {
+    public init(stream: Stream, features: WasmFeatureSet = .default, hasDataCount: Bool = false) {
         self.stream = stream
         self.features = features
         self.hasDataCount = hasDataCount
@@ -29,7 +29,7 @@ public func parseExpression<V: InstructionVisitor, Stream: ByteStream>(
     hasDataCount: Bool = false,
     visitor: inout V
 ) throws {
-    let parser = WasmParser(stream: stream, features: features, hasDataCount: hasDataCount)
+    let parser = Parser(stream: stream, features: features, hasDataCount: hasDataCount)
     var lastCode: InstructionCode?
     while try !parser.stream.hasReachedEnd() {
         (lastCode, _) = try parser.parseInstruction(visitor: &visitor)
@@ -43,127 +43,6 @@ public func parseExpression<V: InstructionVisitor>(bytes: [UInt8], features: Was
         stream: StaticByteStream(bytes: bytes), features: features,
         hasDataCount: hasDataCount, visitor: &visitor
     )
-}
-
-@_spi(Migration)
-public func parseConstExpression<Stream: ByteStream>(
-    stream: Stream,
-    features: WasmFeatureSet = .default,
-    hasDataCount: Bool = false
-) throws -> ConstExpression {
-    let parser = WasmParser(stream: stream, features: features, hasDataCount: hasDataCount)
-    return try parser.parseConstExpression()
-}
-
-@_spi(Migration)
-public func parseDataSection<Stream: ByteStream>(
-    stream: Stream,
-    features: WasmFeatureSet = .default,
-    hasDataCount: Bool = false
-) throws -> [DataSegment] {
-    let parser = WasmParser(stream: stream, features: features, hasDataCount: hasDataCount)
-    return try parser.parseDataSection()
-}
-
-@_spi(Migration)
-public func parseElementSection<Stream: ByteStream>(
-    stream: Stream,
-    features: WasmFeatureSet = .default,
-    hasDataCount: Bool = false
-) throws -> [ElementSegment] {
-    let parser = WasmParser(stream: stream, features: features, hasDataCount: hasDataCount)
-    return try parser.parseElementSection()
-}
-
-@_spi(Migration)
-public func parseCodeSection<Stream: ByteStream>(
-    stream: Stream,
-    features: WasmFeatureSet = .default,
-    hasDataCount: Bool = false
-) throws -> [Code] {
-    let parser = WasmParser(stream: stream, features: features, hasDataCount: hasDataCount)
-    return try parser.parseCodeSection()
-}
-
-@_spi(Migration)
-public func parseGlobalSection<Stream: ByteStream>(
-    stream: Stream,
-    features: WasmFeatureSet = .default,
-    hasDataCount: Bool = false
-) throws -> [Global] {
-    let parser = WasmParser(stream: stream, features: features, hasDataCount: hasDataCount)
-    return try parser.parseGlobalSection()
-}
-
-@_spi(Migration)
-public func parseImportSection<Stream: ByteStream>(
-    stream: Stream,
-    features: WasmFeatureSet = .default,
-    hasDataCount: Bool = false
-) throws -> [Import] {
-    let parser = WasmParser(stream: stream, features: features, hasDataCount: hasDataCount)
-    return try parser.parseImportSection()
-}
-
-@_spi(Migration)
-public func parseExportSection<Stream: ByteStream>(
-    stream: Stream,
-    features: WasmFeatureSet = .default,
-    hasDataCount: Bool = false
-) throws -> [Export] {
-    let parser = WasmParser(stream: stream, features: features, hasDataCount: hasDataCount)
-    return try parser.parseExportSection()
-}
-
-@_spi(Migration)
-public func parseTableSection<Stream: ByteStream>(
-    stream: Stream,
-    features: WasmFeatureSet = .default,
-    hasDataCount: Bool = false
-) throws -> [Table] {
-    let parser = WasmParser(stream: stream, features: features, hasDataCount: hasDataCount)
-    return try parser.parseTableSection()
-}
-
-@_spi(Migration)
-public func parseMemorySection<Stream: ByteStream>(
-    stream: Stream,
-    features: WasmFeatureSet = .default,
-    hasDataCount: Bool = false
-) throws -> [Memory] {
-    let parser = WasmParser(stream: stream, features: features, hasDataCount: hasDataCount)
-    return try parser.parseMemorySection()
-}
-
-@_spi(Migration)
-public func parseTypeSection<Stream: ByteStream>(
-    stream: Stream,
-    features: WasmFeatureSet = .default,
-    hasDataCount: Bool = false
-) throws -> [FunctionType] {
-    let parser = WasmParser(stream: stream, features: features, hasDataCount: hasDataCount)
-    return try parser.parseTypeSection()
-}
-
-@_spi(Migration)
-public func parseCustomSection<Stream: ByteStream>(
-    stream: Stream,
-    size: UInt32,
-    features: WasmFeatureSet = .default,
-    hasDataCount: Bool = false
-) throws -> CustomSection {
-    let parser = WasmParser(stream: stream, features: features, hasDataCount: hasDataCount)
-    return try parser.parseCustomSection(size: size)
-}
-
-@_spi(Migration)
-public func parseFunctionSection<Stream: ByteStream>(
-    stream: Stream,
-    features: WasmFeatureSet = .default,
-    hasDataCount: Bool = false
-) throws -> [TypeIndex] {
-    let parser = WasmParser(stream: stream, features: features, hasDataCount: hasDataCount)
-    return try parser.parseFunctionSection()
 }
 
 /// Flags for enabling/disabling WebAssembly features
@@ -297,7 +176,7 @@ extension ByteStream {
     }
 }
 
-extension WasmParser {
+extension Parser {
     func parseVector<Content>(content parser: () throws -> Content) throws -> [Content] {
         try stream.parseVector(content: parser)
     }
@@ -321,7 +200,7 @@ extension WasmParser {
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/values.html#floating-point>
-extension WasmParser {
+extension Parser {
     func parseFloat() throws -> UInt32 {
         let consumedLittleEndian = try stream.consume(count: 4).reversed()
         let bitPattern = consumedLittleEndian.reduce(UInt32(0)) { acc, byte in
@@ -341,7 +220,7 @@ extension WasmParser {
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/types.html#types>
-extension WasmParser {
+extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/types.html#value-types>
     func parseValueType() throws -> ValueType {
@@ -473,7 +352,7 @@ extension WasmParser {
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/instructions.html>
-extension WasmParser {
+extension Parser {
     func parseInstruction<V: InstructionVisitor>(visitor v: inout V) throws -> (InstructionCode, V.Output) {
         let rawCode = try stream.consumeAny()
         guard let code = InstructionCode(rawValue: rawCode) else {
@@ -821,7 +700,7 @@ extension WasmParser {
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/modules.html#sections>
-extension WasmParser {
+extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#custom-section>
     func parseCustomSection(size: UInt32) throws -> CustomSection {
@@ -1049,7 +928,7 @@ extension WasmParser {
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-module>
-extension WasmParser {
+extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-magic>
     func parseMagicNumber() throws {
@@ -1096,7 +975,7 @@ extension WasmParser {
         }
     }
 
-    enum Payload {
+    public enum Payload {
         case header(version: [UInt8])
         case customSection(CustomSection)
         case typeSection([FunctionType])
@@ -1111,12 +990,11 @@ extension WasmParser {
         case codeSection([Code])
         case dataSection([DataSegment])
         case dataCount(UInt32)
-        case endOfModule
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-module>
-    mutating func parseNext() throws -> Payload {
+    public mutating func parseNext() throws -> Payload? {
         switch nextParseTarget {
         case .header:
             try parseMagicNumber()
@@ -1125,7 +1003,7 @@ extension WasmParser {
             return .header(version: version)
         case .section:
             guard try !stream.hasReachedEnd() else {
-                return .endOfModule
+                return nil
             }
             let sectionID = try stream.consumeAny()
             let sectionSize: UInt32 = try parseUnsigned()
@@ -1147,7 +1025,7 @@ extension WasmParser {
             case 11: payload = .dataSection(try parseDataSection())
             case 12:
                 hasDataCount = true
-                return .dataCount(try parseDataCountSection())
+                payload = .dataCount(try parseDataCountSection())
             default:
                 throw WasmParserError.malformedSectionID(sectionID)
             }

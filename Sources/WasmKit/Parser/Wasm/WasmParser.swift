@@ -1,6 +1,6 @@
 import Foundation
 import SystemPackage
-@_spi(Migration) import WasmParser
+import WasmParser
 
 final class LegacyWasmParser<Stream: ByteStream> {
     let stream: Stream
@@ -90,179 +90,8 @@ public enum LegacyWasmParserError: Swift.Error {
 }
 
 /// > Note:
-/// <https://webassembly.github.io/spec/core/binary/values.html#integers>
-extension ByteStream {
-    fileprivate func parseUnsigned<T: RawUnsignedInteger>(_: T.Type = T.self) throws -> T {
-        return try T(LEB: { try? self.consumeAny() })
-    }
-}
-
-extension LegacyWasmParser {
-    func parseUnsigned<T: RawUnsignedInteger>(_: T.Type = T.self) throws -> T {
-        try stream.parseUnsigned(T.self)
-    }
-}
-
-
-/// > Note:
-/// <https://webassembly.github.io/spec/core/binary/instructions.html>
-extension LegacyWasmParser {
-    func parseExpression(typeSection: [FunctionType]? = nil) throws -> Expression {
-        return try WasmParser.parseConstExpression(
-            stream: self.stream,
-            features: features,
-            hasDataCount: hasDataCount
-        )
-    }
-}
-
-/// > Note:
-/// <https://webassembly.github.io/spec/core/binary/modules.html#sections>
-extension LegacyWasmParser {
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/binary/modules.html#custom-section>
-    func parseCustomSection(size: UInt32) throws -> CustomSection {
-        return try WasmParser.parseCustomSection(
-            stream: self.stream, size: size,
-            features: features,
-            hasDataCount: hasDataCount
-        )
-    }
-
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/binary/modules.html#type-section>
-    func parseTypeSection() throws -> [FunctionType] {
-        return try WasmParser.parseTypeSection(
-            stream: self.stream,
-            features: features,
-            hasDataCount: hasDataCount
-        )
-    }
-
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/binary/modules.html#import-section>
-    func parseImportSection() throws -> [Import] {
-        return try WasmParser.parseImportSection(
-            stream: self.stream,
-            features: features,
-            hasDataCount: hasDataCount
-        )
-    }
-
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/binary/modules.html#function-section>
-    func parseFunctionSection() throws -> [TypeIndex] {
-        return try WasmParser.parseFunctionSection(
-            stream: self.stream,
-            features: features,
-            hasDataCount: hasDataCount
-        )
-    }
-
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/binary/modules.html#table-section>
-    func parseTableSection() throws -> [Table] {
-        return try WasmParser.parseTableSection(
-            stream: self.stream,
-            features: features,
-            hasDataCount: hasDataCount
-        )
-    }
-
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/binary/modules.html#memory-section>
-    func parseMemorySection() throws -> [Memory] {
-        return try WasmParser.parseMemorySection(
-            stream: self.stream,
-            features: features,
-            hasDataCount: hasDataCount
-        )
-    }
-
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/binary/modules.html#global-section>
-    func parseGlobalSection() throws -> [Global] {
-        return try WasmParser.parseGlobalSection(
-            stream: self.stream,
-            features: features,
-            hasDataCount: hasDataCount
-        )
-    }
-
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/binary/modules.html#export-section>
-    func parseExportSection() throws -> [Export] {
-        return try WasmParser.parseExportSection(
-            stream: self.stream,
-            features: features,
-            hasDataCount: hasDataCount
-        )
-    }
-
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/binary/modules.html#start-section>
-    func parseStartSection() throws -> FunctionIndex {
-        return try parseUnsigned()
-    }
-
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/binary/modules.html#element-section>
-    func parseElementSection() throws -> [ElementSegment] {
-        return try WasmParser.parseElementSection(
-            stream: self.stream,
-            features: features,
-            hasDataCount: hasDataCount
-        )
-    }
-
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/binary/modules.html#code-section>
-    func parseCodeSection() throws -> [Code] {
-        return try WasmParser.parseCodeSection(
-            stream: self.stream,
-            features: features,
-            hasDataCount: hasDataCount
-        )
-    }
-
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/binary/modules.html#data-section>
-    func parseDataSection() throws -> [DataSegment] {
-        return try WasmParser.parseDataSection(
-            stream: self.stream,
-            features: features,
-            hasDataCount: hasDataCount
-        )
-    }
-
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/binary/modules.html#data-count-section>
-    func parseDataCountSection() throws -> UInt32 {
-        return try parseUnsigned()
-    }
-}
-
-/// > Note:
 /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-module>
 extension LegacyWasmParser {
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-magic>
-    func parseMagicNumber() throws {
-        let magicNumber = try stream.consume(count: 4)
-        guard magicNumber == [0x00, 0x61, 0x73, 0x6D] else {
-            throw LegacyWasmParserError.invalidMagicNumber(.init(magicNumber))
-        }
-    }
-
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-version>
-    func parseVersion() throws {
-        let version = try stream.consume(count: 4)
-        guard version == [0x01, 0x00, 0x00, 0x00] else {
-            throw LegacyWasmParserError.unknownVersion(.init(version))
-        }
-    }
-
     private struct OrderTracking {
         enum Order: UInt8 {
             case initial = 0
@@ -293,74 +122,57 @@ extension LegacyWasmParser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-module>
     func parseModule() throws -> Module {
-        try parseMagicNumber()
-        try parseVersion()
-
         var module = Module()
 
+        var orderTracking = OrderTracking()
         var typeIndices = [TypeIndex]()
         var codes = [Code]()
-        var orderTracking = OrderTracking()
+        var parser = WasmParser.Parser<Stream>(
+            stream: self.stream, features: features, hasDataCount: hasDataCount
+        )
 
-        let ids: ClosedRange<UInt8> = 0...12
-        while try !stream.hasReachedEnd() {
-            let sectionID = try stream.consumeAny()
-
-            guard ids.contains(sectionID) else {
-                throw LegacyWasmParserError.malformedSectionID(sectionID)
-            }
-
-            let sectionSize: UInt32 = try parseUnsigned()
-            let sectionStart = stream.currentIndex
-
-            switch sectionID {
-            case 0:
-                try module.customSections.append(parseCustomSection(size: sectionSize))
-            case 1:
+        while let payload = try parser.parseNext() {
+            switch payload {
+            case .header: break
+            case .customSection(let customSection):
+                module.customSections.append(customSection)
+            case .typeSection(let types):
                 try orderTracking.track(order: .type)
-                module.types = try parseTypeSection()
-            case 2:
+                module.types = types
+            case .importSection(let importSection):
                 try orderTracking.track(order: ._import)
-                module.imports = try parseImportSection()
-            case 3:
+                module.imports = importSection
+            case .functionSection(let types):
                 try orderTracking.track(order: .function)
-                typeIndices = try parseFunctionSection()
-            case 4:
+                typeIndices = types
+            case .tableSection(let tableSection):
                 try orderTracking.track(order: .table)
-                module.tables = try parseTableSection()
-            case 5:
+                module.tables = tableSection
+            case .memorySection(let memorySection):
                 try orderTracking.track(order: .memory)
-                module.memories = try parseMemorySection()
-            case 6:
+                module.memories = memorySection
+            case .globalSection(let globalSection):
                 try orderTracking.track(order: .global)
-                module.globals = try parseGlobalSection()
-            case 7:
+                module.globals = globalSection
+            case .exportSection(let exportSection):
                 try orderTracking.track(order: .export)
-                module.exports = try parseExportSection()
-            case 8:
+                module.exports = exportSection
+            case .startSection(let functionIndex):
                 try orderTracking.track(order: .start)
-                module.start = try parseStartSection()
-            case 9:
+                module.start = functionIndex
+            case .elementSection(let elementSection):
                 try orderTracking.track(order: .element)
-                module.elements = try parseElementSection()
-            case 10:
+                module.elements = elementSection
+            case .codeSection(let codeSection):
                 try orderTracking.track(order: .code)
-                codes = try parseCodeSection()
-            case 11:
+                codes = codeSection
+            case .dataSection(let dataSection):
                 try orderTracking.track(order: .data)
-                module.data = try parseDataSection()
-            case 12:
+                module.data = dataSection
+            case .dataCount(let dataCount):
                 try orderTracking.track(order: .dataCount)
-                module.dataCount = try parseDataCountSection()
+                module.dataCount = dataCount
                 hasDataCount = true
-            default:
-                break
-            }
-            let expectedSectionEnd = sectionStart + Int(sectionSize)
-            guard expectedSectionEnd == stream.currentIndex else {
-                throw LegacyWasmParserError.sectionSizeMismatch(
-                    expected: expectedSectionEnd, actual: stream.currentIndex
-                )
             }
         }
 
