@@ -19,7 +19,7 @@ extension ExecutionState {
         }
     }
 
-    mutating func ifThenElse(runtime: Runtime, stack: inout Stack, elseRef: ExpressionRef, endRef: ExpressionRef, type: BlockType) {
+    mutating func ifThenElse(runtime: Runtime, stack: inout Stack, elseRef: ExpressionRef, type: BlockType) {
         let isTrue = stack.popValue().i32 != 0
         let addendToPC: Int
         if isTrue {

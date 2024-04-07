@@ -136,7 +136,6 @@ let instructions: [Instruction] = [
     ]),
     Instruction(name: "ifThenElse", isControl: true, immediates: [
         Immediate(name: "elseRef", type: "ExpressionRef"),
-        Immediate(name: "endRef", type: "ExpressionRef"),
         Immediate(name: "type", type: "BlockType")
     ]),
     Instruction(name: "end", isControl: true, immediates: []),

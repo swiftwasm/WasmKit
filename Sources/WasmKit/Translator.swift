@@ -421,7 +421,7 @@ struct InstructionTranslator: InstructionVisitor {
             if let elsePC = iseqBuilder.resolveLabel(elseLabel) {
                 return .ifThenElse(
                     elseRef: ExpressionRef(from: selfPC, to: elsePC),
-                    endRef: endRef, type: Instruction.BlockType(blockType)
+                    type: Instruction.BlockType(blockType)
                 )
             } else {
                 return .ifThen(endRef: endRef, type: Instruction.BlockType(blockType))

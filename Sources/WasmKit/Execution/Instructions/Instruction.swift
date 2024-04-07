@@ -7,7 +7,7 @@ enum Instruction: Equatable {
     case unreachable
     case nop
     case ifThen(endRef: ExpressionRef, type: BlockType)
-    case ifThenElse(elseRef: ExpressionRef, endRef: ExpressionRef, type: BlockType)
+    case ifThenElse(elseRef: ExpressionRef, type: BlockType)
     case end
     case `else`(endRef: ExpressionRef)
     case br(offset: Int32, copyCount: UInt32, popCount: UInt32)

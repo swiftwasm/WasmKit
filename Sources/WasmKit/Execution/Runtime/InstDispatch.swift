@@ -22,8 +22,8 @@ extension ExecutionState {
         case .ifThen(let endRef, let type):
             self.ifThen(runtime: runtime, stack: &stack, endRef: endRef, type: type)
             return true
-        case .ifThenElse(let elseRef, let endRef, let type):
-            self.ifThenElse(runtime: runtime, stack: &stack, elseRef: elseRef, endRef: endRef, type: type)
+        case .ifThenElse(let elseRef, let type):
+            self.ifThenElse(runtime: runtime, stack: &stack, elseRef: elseRef, type: type)
             return true
         case .end:
             self.end(runtime: runtime, stack: &stack)
