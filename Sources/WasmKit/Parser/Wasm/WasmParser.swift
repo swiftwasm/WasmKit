@@ -289,14 +289,6 @@ extension LegacyWasmParser {
         return TableType(elementType: elementType, limits: limits)
     }
 
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/binary/types.html#global-types>
-    func parseGlobalType() throws -> GlobalType {
-        let valueType = try parseValueType()
-        let mutability = try parseMutability()
-        return GlobalType(mutability: mutability, valueType: valueType)
-    }
-
     func parseMutability() throws -> Mutability {
         let b = try stream.consumeAny()
         switch b {
@@ -351,30 +343,11 @@ extension LegacyWasmParser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#import-section>
     func parseImportSection() throws -> [Import] {
-        return try parseVector {
-            let module = try parseName()
-            let name = try parseName()
-            let descriptor = try parseImportDescriptor()
-            return Import(module: module, name: name, descriptor: descriptor)
-        }
-    }
-
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-importdesc>
-    func parseImportDescriptor() throws -> ImportDescriptor {
-        let b = try stream.consume(Set(0x00...0x03))
-        switch b {
-        case 0x00:
-            return try .function(parseUnsigned())
-        case 0x01:
-            return try .table(parseTableType())
-        case 0x02:
-            return try .memory(parseMemoryType())
-        case 0x03:
-            return try .global(parseGlobalType())
-        default:
-            preconditionFailure("should never reach here")
-        }
+        return try WasmParser.parseImportSection(
+            stream: self.stream,
+            features: features,
+            hasDataCount: hasDataCount
+        )
     }
 
     /// > Note:
@@ -398,11 +371,11 @@ extension LegacyWasmParser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#global-section>
     func parseGlobalSection() throws -> [Global] {
-        return try parseVector {
-            let type = try parseGlobalType()
-            let expression = try parseExpression()
-            return Global(type: type, initializer: expression)
-        }
+        return try WasmParser.parseGlobalSection(
+            stream: self.stream,
+            features: features,
+            hasDataCount: hasDataCount
+        )
     }
 
     /// > Note:

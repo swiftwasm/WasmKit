@@ -125,14 +125,6 @@ struct Memory: Equatable {
     public let type: MemoryType
 }
 
-/// Global entry in a module
-/// > Note:
-/// <https://webassembly.github.io/spec/core/syntax/modules.html#globals>
-struct Global: Equatable {
-    let type: GlobalType
-    let initializer: Expression
-}
-
 /// Exported entity in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#exports>
@@ -153,18 +145,6 @@ public enum ExportDescriptor: Equatable {
     case memory(MemoryIndex)
     /// Global export
     case global(GlobalIndex)
-}
-
-/// Import entity in a module
-/// > Note:
-/// <https://webassembly.github.io/spec/core/syntax/modules.html#imports>
-public struct Import: Equatable {
-    /// Module name imported from
-    public let module: String
-    /// Name of the import
-    public let name: String
-    /// Descriptor of the import
-    public let descriptor: ImportDescriptor
 }
 
 /// Import descriptor

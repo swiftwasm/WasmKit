@@ -130,11 +130,21 @@ public struct CustomSection: Equatable {
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#syntax-typeidx>
-typealias TypeIndex = UInt32
-typealias FunctionIndex = UInt32
-typealias TableIndex = UInt32
-typealias DataIndex = UInt32
-typealias ElementIndex = UInt32
+
+/// Index type for function types within a module
+public typealias TypeIndex = UInt32
+/// Index type for tables within a module
+public typealias FunctionIndex = UInt32
+/// Index type for tables within a module
+public typealias TableIndex = UInt32
+/// Index type for memories within a module
+public typealias MemoryIndex = UInt32
+/// Index type for globals within a module
+public typealias GlobalIndex = UInt32
+/// Index type for elements within a module
+public typealias ElementIndex = UInt32
+/// Index type for data segments within a module
+public typealias DataIndex = UInt32
 
 public typealias ConstExpression = [Instruction]
 
@@ -150,11 +160,12 @@ public struct Memory: Equatable {
     public let type: MemoryType
 }
 
+/// Global entry in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#globals>
 public struct Global: Equatable {
-    let type: GlobalType
-    let initializer: ConstExpression
+    public let type: GlobalType
+    public let initializer: ConstExpression
 }
 
 /// Segment of elements that are initialized in a table
@@ -221,21 +232,35 @@ public enum ExportDescriptor: Equatable {
     case global(UInt32)
 }
 
+/// Import entity in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#imports>
 public struct Import: Equatable {
+    /// Module name imported from
     public let module: String
+    /// Name of the import
     public let name: String
+    /// Descriptor of the import
     public let descriptor: ImportDescriptor
+
+    public init(module: String, name: String, descriptor: ImportDescriptor) {
+        self.module = module
+        self.name = name
+        self.descriptor = descriptor
+    }
 }
 
+/// Import descriptor
 public enum ImportDescriptor: Equatable {
-    case function(UInt32)
+    /// Function import
+    case function(TypeIndex)
+    /// Table import
     case table(TableType)
+    /// Memory import
     case memory(MemoryType)
+    /// Global import
     case global(GlobalType)
 }
-
 
 protocol RawUnsignedInteger: FixedWidthInteger & UnsignedInteger {
     associatedtype Signed: RawSignedInteger where Signed.Unsigned == Self

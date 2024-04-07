@@ -41,19 +41,7 @@ public struct FunctionType: Equatable {
     public let results: [ValueType]
 }
 
-/// > Note:
-/// <https://webassembly.github.io/spec/core/syntax/types.html#limits>
-public struct Limits: Equatable {
-    public let min: UInt64
-    public let max: UInt64?
-    public let isMemory64: Bool
-
-    public init(min: UInt64, max: UInt64?, isMemory64: Bool = false) {
-        self.min = min
-        self.max = max
-        self.isMemory64 = isMemory64
-    }
-}
+public typealias Limits = WasmParser.Limits
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#memory-types>
@@ -73,12 +61,7 @@ public enum Mutability: Equatable {
     case variable
 }
 
-/// > Note:
-/// <https://webassembly.github.io/spec/core/syntax/types.html#global-types>
-public struct GlobalType: Equatable {
-    public let mutability: Mutability
-    public let valueType: ValueType
-}
+import WasmParser
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#external-types>

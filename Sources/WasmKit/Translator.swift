@@ -5,6 +5,8 @@ import enum WasmParser.IEEE754
 import enum WasmParser.ReferenceType
 import struct WasmParser.BrTable
 import struct WasmParser.MemArg
+import struct WasmParser.GlobalType
+import struct WasmParser.Import
 
 class ISeqAllocator {
 
@@ -69,7 +71,7 @@ struct InstructionTranslator: InstructionVisitor {
             return typeSection[Int(typeIndex)]
         }
         func globalType(_ index: GlobalIndex) -> ValueType {
-            self.globalTypes[Int(index)].valueType
+            ValueType(self.globalTypes[Int(index)].valueType)
         }
         func isMemory64(_ index: MemoryIndex) -> Bool {
             self.memoryTypes[Int(index)].isMemory64
