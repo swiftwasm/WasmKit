@@ -34,19 +34,6 @@ extension ExecutionState: CustomStringConvertible {
 
 extension ExecutionState {
     /// > Note:
-    /// <https://webassembly.github.io/spec/core/exec/instructions.html#entering-xref-syntax-instructions-syntax-instr-mathit-instr-ast-with-label-l>
-    @inline(__always)
-    mutating func enter(jumpTo targetPC: ProgramCounter, continuation: ProgramCounter, stack: inout Stack, arity: Int, pushPopValues: Int = 0) {
-        programCounter = targetPC
-    }
-
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/exec/instructions.html#exiting-xref-syntax-instructions-syntax-instr-mathit-instr-ast-with-label-l>
-    mutating func exitLabel(stack: inout Stack) throws {
-        programCounter += 1
-    }
-
-    /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/instructions.html#invocation-of-function-address>
     mutating func invoke(functionAddress address: FunctionAddress, runtime: Runtime, stack: inout Stack) throws {
         #if DEBUG

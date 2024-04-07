@@ -11,29 +11,16 @@ extension ExecutionState {
     typealias BlockType = Instruction.BlockType
 
     mutating func block(runtime: Runtime, stack: inout Stack, endRef: ExpressionRef, type: BlockType) {
-        enter(
-            jumpTo: programCounter + 1,
-            continuation: programCounter + endRef.relativeOffset,
-            stack: &stack,
-            arity: Int(type.results),
-            pushPopValues: Int(type.parameters)
-        )
+        programCounter += 1
     }
     mutating func loop(runtime: Runtime, stack: inout Stack, type: BlockType) {
-        let paramSize = Int(type.parameters)
-        enter(jumpTo: programCounter + 1, continuation: programCounter, stack: &stack, arity: paramSize, pushPopValues: paramSize)
+        programCounter += 1
     }
 
     mutating func ifThen(runtime: Runtime, stack: inout Stack, endRef: ExpressionRef, type: BlockType) {
         let isTrue = stack.popValue().i32 != 0
         if isTrue {
-            enter(
-                jumpTo: programCounter + 1,
-                continuation: programCounter.advanced(by: endRef.relativeOffset),
-                stack: &stack,
-                arity: Int(type.results),
-                pushPopValues: Int(type.parameters)
-            )
+            programCounter += 1
         } else {
             programCounter += endRef.relativeOffset
         }
@@ -47,13 +34,7 @@ extension ExecutionState {
         } else {
             addendToPC = elseRef.relativeOffset
         }
-        enter(
-            jumpTo: programCounter + addendToPC,
-            continuation: programCounter + endRef.relativeOffset,
-            stack: &stack,
-            arity: Int(type.results),
-            pushPopValues: Int(type.parameters)
-        )
+        programCounter += addendToPC
     }
     mutating func end(runtime: Runtime, stack: inout Stack) {
         fatalError()
