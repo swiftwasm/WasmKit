@@ -1,3 +1,5 @@
+import WasmParser
+
 /// See spec's
 /// [definition](https://webassembly.github.io/spec/core/text/instructions.html?highlight=pseudo#control-instructions).
 /// > The `block`, `loop` and `if` instructions are structured instructions. They bracket nested sequences of
@@ -54,4 +56,4 @@ struct ExpressionRef: Equatable {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/instructions.html#expressions>
 
-typealias Expression = [Instruction]
+typealias Expression = [WasmParser.Instruction]

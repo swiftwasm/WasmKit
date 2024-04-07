@@ -23,8 +23,13 @@ struct WasmParser<Stream: ByteStream> {
     }
 }
 
-public func parseExpression<V: InstructionVisitor>(bytes: [UInt8], features: WasmFeatureSet = .default, hasDataCount: Bool = false, visitor: inout V) throws {
-    let parser = WasmParser(stream: StaticByteStream(bytes: bytes), features: features, hasDataCount: hasDataCount)
+public func parseExpression<V: InstructionVisitor, Stream: ByteStream>(
+    stream: Stream,
+    features: WasmFeatureSet = .default,
+    hasDataCount: Bool = false,
+    visitor: inout V
+) throws {
+    let parser = WasmParser(stream: stream, features: features, hasDataCount: hasDataCount)
     var lastCode: InstructionCode?
     while try !parser.stream.hasReachedEnd() {
         (lastCode, _) = try parser.parseInstruction(visitor: &visitor)
@@ -32,6 +37,21 @@ public func parseExpression<V: InstructionVisitor>(bytes: [UInt8], features: Was
     guard lastCode == .end else {
         throw WasmParserError.endOpcodeExpected
     }
+}
+public func parseExpression<V: InstructionVisitor>(bytes: [UInt8], features: WasmFeatureSet = .default, hasDataCount: Bool = false, visitor: inout V) throws {
+    try parseExpression(
+        stream: StaticByteStream(bytes: bytes), features: features,
+        hasDataCount: hasDataCount, visitor: &visitor
+    )
+}
+
+public func parseConstExpression<Stream: ByteStream>(
+    stream: Stream,
+    features: WasmFeatureSet = .default,
+    hasDataCount: Bool = false
+) throws -> ConstExpression {
+    let parser = WasmParser(stream: stream, features: features, hasDataCount: hasDataCount)
+    return try parser.parseConstExpression()
 }
 
 /// Flags for enabling/disabling WebAssembly features

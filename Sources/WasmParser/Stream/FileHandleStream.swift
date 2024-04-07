@@ -10,7 +10,7 @@ public final class FileHandleStream: ByteStream {
     private var startOffset: Int = 0
     private var bytes: [UInt8] = []
 
-    init(fileHandle: FileHandle, bufferLength: Int = 1024 * 8) throws {
+    public init(fileHandle: FileHandle, bufferLength: Int = 1024 * 8) throws {
         self.fileHandle = fileHandle
         self.bufferLength = bufferLength
 

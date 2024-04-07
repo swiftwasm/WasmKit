@@ -136,13 +136,13 @@ typealias TableIndex = UInt32
 typealias DataIndex = UInt32
 typealias ElementIndex = UInt32
 
-struct ConstExpression: Equatable, ExpressibleByArrayLiteral {
-    let instructions: [Instruction]
+public struct ConstExpression: Equatable, ExpressibleByArrayLiteral {
+    public let instructions: [Instruction]
 
-    init(instructions: [Instruction]) {
+    public init(instructions: [Instruction]) {
         self.instructions = instructions
     }
-    init(arrayLiteral elements: Instruction...) {
+    public init(arrayLiteral elements: Instruction...) {
         self.instructions = elements
     }
 }

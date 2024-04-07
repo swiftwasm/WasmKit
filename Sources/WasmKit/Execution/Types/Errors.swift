@@ -72,6 +72,7 @@ public enum InstantiationError: Error {
     case invalidTableExpression
     case outOfBoundsTableAccess
     case outOfBoundsMemoryAccess
+    case unsupported(String)
 
     /// Human-readable text representation of the trap that `.wast` text format expects in assertions
     public var assertionText: String {
@@ -80,6 +81,8 @@ public enum InstantiationError: Error {
             return "out of bounds table access"
         case .outOfBoundsMemoryAccess:
             return "out of bounds memory access"
+        case .unsupported(let message):
+            return "unsupported operation: \(message)"
         default:
             return String(describing: self)
         }

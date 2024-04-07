@@ -839,58 +839,13 @@ extension LegacyWasmParser {
         }
     }
 
-    func parseExpression(typeSection: [FunctionType]? = nil) throws -> (result: Expression, end: PseudoInstruction) {
-        typealias PendingWork = (
-            instructions: [Instruction],
-            resume: ([Instruction], PseudoInstruction) throws -> ParseInstructionResult
+    func parseExpression(typeSection: [FunctionType]? = nil) throws -> Expression {
+        let constExpr = try WasmParser.parseConstExpression(
+            stream: self.stream,
+            features: features,
+            hasDataCount: hasDataCount
         )
-        var pendingWorks: [PendingWork] = []
-        var instructions: [Instruction] = []
-
-        func parseSingleInst() throws -> ParseInstructionResult {
-            return try parseInstruction(typeSection: typeSection)
-        }
-        func isEndInstruction(_ instruction: Instruction) -> Bool {
-            if case .else = instruction {
-                return true
-            } else if instruction == .end {
-                return true
-            }
-            return false
-        }
-        var nextResult = try parseSingleInst()
-
-        while true {
-            switch nextResult {
-            case .value(let end) where isEndInstruction(end):
-                let end: PseudoInstruction = end == .end ? .end : .else
-                if let nextWork = pendingWorks.popLast() {
-                    // If there is a pending parse, then restore the parsing
-                    // state and resume the rest of the work
-                    nextResult = try nextWork.resume(instructions, end)
-                    instructions = nextWork.instructions
-                } else {
-                    // If no more pending expression, the expression is top-level
-                    return (instructions, end)
-                }
-            case let .value(nextInstruction):
-                instructions.append(nextInstruction)
-                nextResult = try parseSingleInst()
-            case let .multiValue(nextInsts):
-                instructions.append(contentsOf: nextInsts)
-                nextResult = try parseSingleInst()
-            case let .requestExpression(resume):
-                // If nested expression is requested, stop parsing the current expression
-                // and start parsing the nested one
-                pendingWorks.append((instructions, resume))
-                instructions = []
-                nextResult = try parseSingleInst()
-            }
-        }
-    }
-    func parseInstructionSequence(typeSection: [FunctionType]) throws -> (result: InstructionSequence, end: PseudoInstruction) {
-        let (instructions, end) = try parseExpression(typeSection: typeSection)
-        return (InstructionSequence(instructions: instructions), end)
+        return constExpr.instructions
     }
 }
 
@@ -972,7 +927,7 @@ extension LegacyWasmParser {
     func parseGlobalSection() throws -> [Global] {
         return try parseVector {
             let type = try parseGlobalType()
-            let (expression, _) = try parseExpression()
+            let expression = try parseExpression()
             return Global(type: type, initializer: expression)
         }
     }
@@ -1036,7 +991,7 @@ extension LegacyWasmParser {
                     table = 0
                 }
 
-                let (offset, _) = try parseExpression()
+                let offset = try parseExpression()
                 mode = .active(table: table, offset: offset)
             }
 
@@ -1061,10 +1016,10 @@ extension LegacyWasmParser {
             }
 
             if flag.contains(.usesExpressions) {
-                initializer = try parseVector { try parseExpression().result }
+                initializer = try parseVector { try parseExpression() }
             } else {
                 initializer = try parseVector {
-                    try [.reference(.refFunc(parseUnsigned() as UInt32))]
+                    try [.refFunc(functionIndex: parseUnsigned() as UInt32)]
                 }
             }
 
@@ -1105,7 +1060,7 @@ extension LegacyWasmParser {
             let kind: UInt32 = try parseUnsigned()
             switch kind {
             case 0:
-                let (offset, _) = try parseExpression()
+                let offset = try parseExpression()
                 let initializer = try parseVectorBytes()
                 return .active(.init(index: 0, offset: offset, initializer: initializer))
 
@@ -1114,7 +1069,7 @@ extension LegacyWasmParser {
 
             case 2:
                 let index: UInt32 = try parseUnsigned()
-                let (offset, _) = try parseExpression()
+                let offset = try parseExpression()
                 let initializer = try parseVectorBytes()
                 return .active(.init(index: index, offset: offset, initializer: initializer))
             default:
@@ -1266,26 +1221,21 @@ extension LegacyWasmParser {
             )
         }
 
-        let functionTypeIndices = module.imports.compactMap { (entry) -> TypeIndex? in
-            guard case let .function(typeIndex) = entry.descriptor else { return nil }
-            return typeIndex
-        } + typeIndices
-        let globalTypes = module.imports.compactMap { (entry) -> GlobalType? in
-            guard case let .global(type) = entry.descriptor else { return nil }
-            return type
-        } + module.globals.map { $0.type }
-        let memoryTypes = module.imports.compactMap { (entry) -> MemoryType? in
-            guard case let .memory(type) = entry.descriptor else { return nil }
-            return type
-        } + module.memories.map { $0.type }
+        let translatorContext = InstructionTranslator.Module(
+            typeSection: module.types,
+            importSection: module.imports,
+            functionSection: typeIndices,
+            globalTypes: module.globals.map { $0.type },
+            memoryTypes: module.memories.map { $0.type },
+            tables: module.tables
+        )
         let enableAssertDefault = _slowPath(getenv("WASMKIT_ENABLE_ASSERT") != nil)
         let functions = codes.enumerated().map { [hasDataCount, features] index, code in
             let funcTypeIndex = typeIndices[index]
             let funcType = module.types[Int(funcTypeIndex)]
             return GuestFunction(
                 type: typeIndices[index], locals: code.locals,
-                body: { [types = module.types, tables = module.tables, imports = module.imports] in
-                    let globalFuncIndex = module.imports.count + index
+                body: {
                     var enableAssert = enableAssertDefault
                     #if ASSERT
                     enableAssert = true
@@ -1293,18 +1243,12 @@ extension LegacyWasmParser {
                     
                     var translator = InstructionTranslator(
                         allocator: module.allocator,
-                        module: InstructionTranslator.Module(
-                            typeSection: types,
-                            importSection: imports,
-                            functionTypeIndices: functionTypeIndices,
-                            globalTypes: globalTypes,
-                            memoryTypes: memoryTypes,
-                            tables: tables
-                        ),
+                        module: translatorContext,
                         type: funcType, locals: code.locals
                     )
 
                     if enableAssert && !_isFastAssertConfiguration() {
+                        let globalFuncIndex = module.imports.count + index
                         print("🚀 Starting Translation for code[\(globalFuncIndex)] (\(funcType))")
                         var tracing = InstructionTracingVisitor(trace: {
                             print("🍵 code[\(globalFuncIndex)] Translating \($0)")

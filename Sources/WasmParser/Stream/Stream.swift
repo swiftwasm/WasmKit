@@ -20,7 +20,8 @@ extension Stream {
         try consume(Set([expected]))
     }
 
-    func hasReachedEnd() throws -> Bool {
+    // TODO: Internalize
+    public func hasReachedEnd() throws -> Bool {
         try peek() == nil
     }
 }
