@@ -1,8 +1,8 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-code>
 public struct Code {
-    let locals: [ValueType]
-    let expression: ArraySlice<UInt8>
+    public let locals: [ValueType]
+    public let expression: ArraySlice<UInt8>
 }
 
 extension Code: Equatable {
@@ -136,16 +136,7 @@ typealias TableIndex = UInt32
 typealias DataIndex = UInt32
 typealias ElementIndex = UInt32
 
-public struct ConstExpression: Equatable, ExpressibleByArrayLiteral {
-    public let instructions: [Instruction]
-
-    public init(instructions: [Instruction]) {
-        self.instructions = instructions
-    }
-    public init(arrayLiteral elements: Instruction...) {
-        self.instructions = elements
-    }
-}
+public typealias ConstExpression = [Instruction]
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#tables>
@@ -166,6 +157,7 @@ public struct Global: Equatable {
     let initializer: ConstExpression
 }
 
+/// Segment of elements that are initialized in a table
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#element-segments>
 public struct ElementSegment: Equatable {
@@ -190,24 +182,25 @@ public struct ElementSegment: Equatable {
         static let usesExpressions = Flag(rawValue: 1 << 2)
     }
 
-    enum Mode: Equatable {
+    public enum Mode: Equatable {
         case active(table: UInt32, offset: ConstExpression)
         case declarative
         case passive
     }
 
     public let type: ReferenceType
-    let initializer: [ConstExpression]
-    let mode: Mode
+    public let initializer: [ConstExpression]
+    public let mode: Mode
 }
 
+/// Data segment in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#data-segments>
 public enum DataSegment: Equatable {
     public struct Active: Equatable {
-        let index: UInt32
-        let offset: ConstExpression
-        let initializer: ArraySlice<UInt8>
+        public let index: UInt32
+        public let offset: ConstExpression
+        public let initializer: ArraySlice<UInt8>
     }
 
     case passive([UInt8])

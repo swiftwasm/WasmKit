@@ -1,3 +1,5 @@
+import WasmParser
+
 /// A unit of stateless WebAssembly code, which is a direct representation of a module file. You can get one
 /// by calling either ``parseWasm(bytes:features:)`` or ``parseWasm(filePath:features:)``.
 /// > Note:
@@ -84,12 +86,12 @@ typealias LabelIndex = UInt32
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#functions>
 struct GuestFunction {
-    init(type: TypeIndex, locals: [ValueType], body: @escaping () throws -> InstructionSequence) {
+    init(type: TypeIndex, locals: [WasmParser.ValueType], body: @escaping () throws -> InstructionSequence) {
         self.type = type
         // TODO: Deallocate const default locals after the module is deallocated
         let defaultLocals = UnsafeMutableBufferPointer<Value>.allocate(capacity: locals.count)
         for (index, localType) in locals.enumerated() {
-            defaultLocals[index] = localType.defaultValue
+            defaultLocals[index] = ValueType(localType).defaultValue
         }
         self.defaultLocals = UnsafeBufferPointer(defaultLocals)
         self.materializer = body
@@ -129,56 +131,6 @@ struct Memory: Equatable {
 struct Global: Equatable {
     let type: GlobalType
     let initializer: Expression
-}
-
-/// Segment of elements that are initialized in a table
-/// > Note:
-/// <https://webassembly.github.io/spec/core/syntax/modules.html#element-segments>
-struct ElementSegment: Equatable {
-    struct Flag: OptionSet {
-        let rawValue: UInt32
-
-        init(rawValue: UInt32) {
-            self.rawValue = rawValue
-        }
-
-        var segmentHasElemKind: Bool {
-            !contains(.usesExpressions) && rawValue != 0
-        }
-
-        var segmentHasRefType: Bool {
-            contains(.usesExpressions) && rawValue != 4
-        }
-
-        static let isPassiveOrDeclarative = Flag(rawValue: 1 << 0)
-        static let isDeclarative = Flag(rawValue: 1 << 1)
-        static let hasTableIndex = Flag(rawValue: 1 << 1)
-        static let usesExpressions = Flag(rawValue: 1 << 2)
-    }
-
-    enum Mode: Equatable {
-        case active(table: TableIndex, offset: Expression)
-        case declarative
-        case passive
-    }
-
-    let type: ReferenceType
-    let initializer: [Expression]
-    let mode: Mode
-}
-
-/// Data segment in a module
-/// > Note:
-/// <https://webassembly.github.io/spec/core/syntax/modules.html#data-segments>
-enum DataSegment: Equatable {
-    public struct Active: Equatable {
-        let index: MemoryIndex
-        let offset: Expression
-        let initializer: ArraySlice<UInt8>
-    }
-
-    case passive([UInt8])
-    case active(Active)
 }
 
 /// Exported entity in a module

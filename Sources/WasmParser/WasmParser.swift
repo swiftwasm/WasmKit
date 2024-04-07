@@ -45,6 +45,7 @@ public func parseExpression<V: InstructionVisitor>(bytes: [UInt8], features: Was
     )
 }
 
+@_spi(Migration)
 public func parseConstExpression<Stream: ByteStream>(
     stream: Stream,
     features: WasmFeatureSet = .default,
@@ -52,6 +53,36 @@ public func parseConstExpression<Stream: ByteStream>(
 ) throws -> ConstExpression {
     let parser = WasmParser(stream: stream, features: features, hasDataCount: hasDataCount)
     return try parser.parseConstExpression()
+}
+
+@_spi(Migration)
+public func parseDataSection<Stream: ByteStream>(
+    stream: Stream,
+    features: WasmFeatureSet = .default,
+    hasDataCount: Bool = false
+) throws -> [DataSegment] {
+    let parser = WasmParser(stream: stream, features: features, hasDataCount: hasDataCount)
+    return try parser.parseDataSection()
+}
+
+@_spi(Migration)
+public func parseElementSection<Stream: ByteStream>(
+    stream: Stream,
+    features: WasmFeatureSet = .default,
+    hasDataCount: Bool = false
+) throws -> [ElementSegment] {
+    let parser = WasmParser(stream: stream, features: features, hasDataCount: hasDataCount)
+    return try parser.parseElementSection()
+}
+
+@_spi(Migration)
+public func parseCodeSection<Stream: ByteStream>(
+    stream: Stream,
+    features: WasmFeatureSet = .default,
+    hasDataCount: Bool = false
+) throws -> [Code] {
+    let parser = WasmParser(stream: stream, features: features, hasDataCount: hasDataCount)
+    return try parser.parseCodeSection()
 }
 
 /// Flags for enabling/disabling WebAssembly features
@@ -703,7 +734,7 @@ extension WasmParser {
             (_, inst) = try self.parseInstruction(visitor: &factory)
             insts.append(inst)
         } while inst != .end
-        return ConstExpression(instructions: insts)
+        return insts
     }
 }
 

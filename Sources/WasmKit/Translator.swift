@@ -329,13 +329,13 @@ struct InstructionTranslator: InstructionVisitor {
     let locals: Locals
     let endOfFunctionLabel: LabelRef
 
-    init(allocator: ISeqAllocator, module: Module, type: FunctionType, locals: [ValueType]) {
+    init(allocator: ISeqAllocator, module: Module, type: FunctionType, locals: [WasmParser.ValueType]) {
         self.allocator = allocator
         self.module = module
         self.iseqBuilder = ISeqBuilder()
         self.controlStack = ControlStack()
         self.valueStack = ValueStack()
-        self.locals = Locals(types: type.parameters + locals)
+        self.locals = Locals(types: type.parameters + locals.map(ValueType.init))
 
         do {
             let endLabel = self.iseqBuilder.allocLabel()
