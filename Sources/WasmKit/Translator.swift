@@ -393,10 +393,6 @@ struct InstructionTranslator: InstructionVisitor {
         let endLabel = iseqBuilder.allocLabel()
         let stackHeight = self.valueStack.height - Int(blockType.parameters.count)
         controlStack.pushFrame(ControlStack.ControlFrame(blockType: blockType, stackHeight: stackHeight, continuation: endLabel, kind: .block))
-        let selfPC = iseqBuilder.insertingPC
-        iseqBuilder.emitWithLabel(endLabel) { _, endPC in
-            return .block(endRef: ExpressionRef(from: selfPC, to: endPC), type: Instruction.BlockType(blockType))
-        }
     }
     
     mutating func visitLoop(blockType: WasmParser.BlockType) throws -> Output {
@@ -404,7 +400,6 @@ struct InstructionTranslator: InstructionVisitor {
         let headLabel = iseqBuilder.putLabel()
         let stackHeight = self.valueStack.height - Int(blockType.parameters.count)
         controlStack.pushFrame(ControlStack.ControlFrame(blockType: blockType, stackHeight: stackHeight, continuation: headLabel, kind: .loop))
-        iseqBuilder.emit(.loop(type: Instruction.BlockType(blockType)))
     }
     
     mutating func visitIf(blockType: WasmParser.BlockType) throws -> Output {

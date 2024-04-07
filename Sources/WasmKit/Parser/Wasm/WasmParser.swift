@@ -345,18 +345,8 @@ extension LegacyWasmParser {
             return .value(.control(.unreachable))
         case .nop:
             return .value(.control(.nop))
-        case .block:
-            let type = try parseResultType()
-            return .requestExpression { expr, _ in
-                let type = try type.arity(typeSection: typeSection)
-                return .multiValue([.block(endRef: ExpressionRef(expr.count + 1 + 1), type: type)] + expr + [.end])
-            }
-        case .loop:
-            let type = try parseResultType()
-            return .requestExpression { expr, _ in
-                let type = try type.arity(typeSection: typeSection)
-                return .multiValue([.loop(type: type)] + expr + [.end])
-            }
+        case .block, .loop:
+            fatalError("no longer supported")
         case .if:
             fatalError("no longer supported")
         case .else:

@@ -19,12 +19,6 @@ extension ExecutionState {
         case .nop:
             try self.nop(runtime: runtime, stack: &stack)
             return true
-        case .block(let endRef, let type):
-            self.block(runtime: runtime, stack: &stack, endRef: endRef, type: type)
-            return true
-        case .loop(let type):
-            self.loop(runtime: runtime, stack: &stack, type: type)
-            return true
         case .ifThen(let endRef, let type):
             self.ifThen(runtime: runtime, stack: &stack, endRef: endRef, type: type)
             return true
@@ -259,8 +253,6 @@ extension Instruction {
         case .globalSet: return "globalSet"
         case .unreachable: return "unreachable"
         case .nop: return "nop"
-        case .block: return "block"
-        case .loop: return "loop"
         case .ifThen: return "ifThen"
         case .ifThenElse: return "ifThenElse"
         case .end: return "end"

@@ -130,13 +130,6 @@ let instructions: [Instruction] = [
     // Controls
     Instruction(name: "unreachable", isControl: true, mayThrow: true, immediates: []),
     Instruction(name: "nop", isControl: true, mayThrow: true, immediates: []),
-    Instruction(name: "block", isControl: true, immediates: [
-        Immediate(name: "endRef", type: "ExpressionRef"),
-        Immediate(name: "type", type: "BlockType")
-    ]),
-    Instruction(name: "loop", isControl: true, immediates: [
-        Immediate(name: "type", type: "BlockType")
-    ]),
     Instruction(name: "ifThen", isControl: true, immediates: [
         Immediate(name: "endRef", type: "ExpressionRef"),
         Immediate(name: "type", type: "BlockType")
