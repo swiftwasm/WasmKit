@@ -19,8 +19,8 @@ extension ExecutionState {
         case .nop:
             try self.nop(runtime: runtime, stack: &stack)
             return true
-        case .ifThen(let elseOrEndRef, let type):
-            self.ifThen(runtime: runtime, stack: &stack, elseOrEndRef: elseOrEndRef, type: type)
+        case .ifThen(let elseOrEndRef):
+            self.ifThen(runtime: runtime, stack: &stack, elseOrEndRef: elseOrEndRef)
             return true
         case .end:
             self.end(runtime: runtime, stack: &stack)

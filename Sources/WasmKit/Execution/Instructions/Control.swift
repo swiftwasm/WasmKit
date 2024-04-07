@@ -10,7 +10,7 @@ extension ExecutionState {
 
     typealias BlockType = Instruction.BlockType
 
-    mutating func ifThen(runtime: Runtime, stack: inout Stack, elseOrEndRef: ExpressionRef, type: BlockType) {
+    mutating func ifThen(runtime: Runtime, stack: inout Stack, elseOrEndRef: ExpressionRef) {
         let isTrue = stack.popValue().i32 != 0
         if isTrue {
             programCounter += 1

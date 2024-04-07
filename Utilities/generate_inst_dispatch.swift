@@ -133,7 +133,6 @@ let instructions: [Instruction] = [
     Instruction(name: "ifThen", isControl: true, immediates: [
         // elseRef for if-then-else-end sequence, endRef for if-then-end sequence
         Immediate(name: "elseOrEndRef", type: "ExpressionRef"),
-        Immediate(name: "type", type: "BlockType")
     ]),
     Instruction(name: "end", isControl: true, immediates: []),
     Instruction(name: "`else`", isControl: true, immediates: [

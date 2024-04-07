@@ -423,7 +423,7 @@ struct InstructionTranslator: InstructionVisitor {
             } else {
                 elseOrEndRef = ExpressionRef(from: selfPC, to: endPC)
             }
-            return .ifThen(elseOrEndRef: elseOrEndRef, type: Instruction.BlockType(blockType))
+            return .ifThen(elseOrEndRef: elseOrEndRef)
         }
     }
     
