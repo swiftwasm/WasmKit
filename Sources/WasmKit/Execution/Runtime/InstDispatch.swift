@@ -3,6 +3,16 @@ extension ExecutionState {
     @inline(__always)
     mutating func doExecute(_ instruction: Instruction, runtime: Runtime, stack: inout Stack, locals: UnsafeMutablePointer<Value>) throws -> Bool {
         switch instruction {
+        case .localGet(let index):
+            self.localGet(runtime: runtime, stack: &stack, locals: locals, index: index)
+        case .localSet(let index):
+            self.localSet(runtime: runtime, stack: &stack, locals: locals, index: index)
+        case .localTee(let index):
+            self.localTee(runtime: runtime, stack: &stack, locals: locals, index: index)
+        case .globalGet(let index):
+            try self.globalGet(runtime: runtime, stack: &stack, index: index)
+        case .globalSet(let index):
+            try self.globalSet(runtime: runtime, stack: &stack, index: index)
         case .unreachable:
             try self.unreachable(runtime: runtime, stack: &stack)
             return true
@@ -233,16 +243,6 @@ extension ExecutionState {
             try self.tableInit(runtime: runtime, stack: &stack, tableIndex: tableIndex, elementIndex: elementIndex)
         case .tableElementDrop(let elementIndex):
             self.tableElementDrop(runtime: runtime, stack: &stack, elementIndex: elementIndex)
-        case .localGet(let index):
-            self.localGet(runtime: runtime, stack: &stack, locals: locals, index: index)
-        case .localSet(let index):
-            self.localSet(runtime: runtime, stack: &stack, locals: locals, index: index)
-        case .localTee(let index):
-            self.localTee(runtime: runtime, stack: &stack, locals: locals, index: index)
-        case .globalGet(let index):
-            try self.globalGet(runtime: runtime, stack: &stack, index: index)
-        case .globalSet(let index):
-            try self.globalSet(runtime: runtime, stack: &stack, index: index)
         }
         programCounter += 1
         return true
@@ -252,6 +252,11 @@ extension ExecutionState {
 extension Instruction {
     var name: String {
         switch self {
+        case .localGet: return "localGet"
+        case .localSet: return "localSet"
+        case .localTee: return "localTee"
+        case .globalGet: return "globalGet"
+        case .globalSet: return "globalSet"
         case .unreachable: return "unreachable"
         case .nop: return "nop"
         case .block: return "block"
@@ -359,11 +364,6 @@ extension Instruction {
         case .tableCopy: return "tableCopy"
         case .tableInit: return "tableInit"
         case .tableElementDrop: return "tableElementDrop"
-        case .localGet: return "localGet"
-        case .localSet: return "localSet"
-        case .localTee: return "localTee"
-        case .globalGet: return "globalGet"
-        case .globalSet: return "globalSet"
         }
     }
 }

@@ -1,4 +1,9 @@
 enum Instruction: Equatable {
+    case localGet(index: LocalIndex)
+    case localSet(index: LocalIndex)
+    case localTee(index: LocalIndex)
+    case globalGet(index: GlobalIndex)
+    case globalSet(index: GlobalIndex)
     case unreachable
     case nop
     case block(endRef: ExpressionRef, type: BlockType)
@@ -106,9 +111,4 @@ enum Instruction: Equatable {
     case tableCopy(dest: TableIndex, src: TableIndex)
     case tableInit(TableIndex, ElementIndex)
     case tableElementDrop(ElementIndex)
-    case localGet(index: LocalIndex)
-    case localSet(index: LocalIndex)
-    case localTee(index: LocalIndex)
-    case globalGet(index: GlobalIndex)
-    case globalSet(index: GlobalIndex)
 }
