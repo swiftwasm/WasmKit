@@ -92,9 +92,7 @@ extension ExecutionState {
         )
     }
     mutating func `return`(runtime: Runtime, stack: inout Stack) throws {
-        let currentFrame = stack.currentFrame!
-        stack.exit(frame: currentFrame)
-        try endOfFunction(runtime: runtime, stack: &stack, currentFrame: currentFrame)
+        try self.endOfFunction(runtime: runtime, stack: &stack)
     }
 
     mutating func endOfFunction(runtime: Runtime, stack: inout Stack) throws {

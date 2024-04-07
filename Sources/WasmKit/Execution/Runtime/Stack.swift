@@ -49,12 +49,6 @@ struct Stack {
         self.currentFrame = frame
     }
 
-    mutating func exit(frame: Frame) {
-        let results = valueStack.popValues(count: frame.arity)
-        self.valueStack.truncate(length: frame.baseStackAddress.valueFrameIndex)
-        valueStack.push(values: results)
-    }
-
     mutating func popFrame() {
         let popped = self.frames.pop()
         self.currentFrame = self.frames.peek()
