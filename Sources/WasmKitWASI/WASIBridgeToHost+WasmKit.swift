@@ -1,7 +1,7 @@
-import WASIBase
+import WASI
 import WasmKit
 
-public typealias WASIBridgeToHost = WASIBase.WASIBridgeToHost
+public typealias WASIBridgeToHost = WASI.WASIBridgeToHost
 
 extension WASIBridgeToHost {
     public var hostModules: [String: HostModule] {

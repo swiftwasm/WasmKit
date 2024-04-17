@@ -12,12 +12,12 @@ let package = Package(
             targets: ["WasmKit"]
         ),
         .library(
-            name: "WASI",
-            targets: ["WASI"]
+            name: "WasmKitWASI",
+            targets: ["WasmKitWASI"]
         ),
         .library(
-            name: "WASIBase",
-            targets: ["WASIBase"]
+            name: "WASI",
+            targets: ["WASI"]
         ),
         .library(
             name: "WIT", targets: ["WIT"]
@@ -35,7 +35,7 @@ let package = Package(
             name: "CLI",
             dependencies: [
                 "WasmKit",
-                "WASI",
+                "WasmKitWASI",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "SystemPackage", package: "swift-system"),
             ]
@@ -44,7 +44,7 @@ let package = Package(
             name: "WasmTypes"
         ),
         .target(
-            name: "WASIBase",
+            name: "WASI",
             dependencies: ["WasmTypes", "SystemExtras"]
         ),
         .target(
@@ -61,8 +61,8 @@ let package = Package(
             dependencies: ["WasmTypes"]
         ),
         .target(
-            name: "WASI",
-            dependencies: ["WasmKit", "WASIBase"]
+            name: "WasmKitWASI",
+            dependencies: ["WasmKit", "WASI"]
         ),
         .target(
             name: "SystemExtras",
@@ -85,7 +85,7 @@ let package = Package(
         .plugin(name: "GenerateOverlayForTesting", capability: .buildTool(), dependencies: ["WITTool"]),
         .testTarget(
             name: "WITOverlayGeneratorTests",
-            dependencies: ["WITOverlayGenerator", "WasmKit", "WASI"],
+            dependencies: ["WITOverlayGenerator", "WasmKit", "WasmKitWASI"],
             exclude: ["Fixtures", "Compiled", "Generated"],
             plugins: [.plugin(name: "GenerateOverlayForTesting")]
         ),

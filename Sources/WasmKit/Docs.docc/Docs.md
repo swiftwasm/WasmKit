@@ -46,7 +46,7 @@ This example shows how to run WASI application on WasmKit.
 
 ```swift
 import WasmKit
-import WASI
+import WasmKitWASI
 import Foundation
 
 let bytes = try Data(contentsOf: URL(filePath: "./main.wasm"))

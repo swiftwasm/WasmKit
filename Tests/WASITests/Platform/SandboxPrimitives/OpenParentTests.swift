@@ -1,7 +1,7 @@
 import SystemPackage
 import XCTest
 
-@testable import WASIBase
+@testable import WASI
 
 final class OpenParentTests: XCTestCase {
     func testSplitParent() {
