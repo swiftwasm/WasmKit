@@ -1,7 +1,9 @@
 import WASIBase
 import WasmKit
 
-public class WASIBridgeToHost: BaseWASIBridgeToHost<GuestMemory> {
+public typealias WASIBridgeToHost = WASIBase.WASIBridgeToHost
+
+extension WASIBridgeToHost {
     public var hostModules: [String: HostModule] {
         baseHostModules.mapValues {
             HostModule(functions: $0.functions.mapValues { function in
@@ -9,7 +11,7 @@ public class WASIBridgeToHost: BaseWASIBridgeToHost<GuestMemory> {
                     guard case let .memory(memoryAddr) = caller.instance.exports["memory"] else {
                         throw WASIError(description: "Missing required \"memory\" export")
                     }
-                    let memory = GuestMemory(store: caller.store, address: memoryAddr)
+                    let memory = WasmKitGuestMemory(store: caller.store, address: memoryAddr)
                     return try function.implementation(memory, values)
                 }
             })

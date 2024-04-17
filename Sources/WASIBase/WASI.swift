@@ -793,17 +793,17 @@ public struct WASIExitCode: Error {
     public let code: UInt32
 }
 
-public struct BaseHostFunction<GuestMemory> {
+public struct WASIHostFunction {
     public let type: FunctionType
     public let implementation: (GuestMemory, [Value]) throws -> [Value]
 }
 
-public struct BaseHostModule<GuestMemory> {
-    public let functions: [String: BaseHostFunction<GuestMemory>]
+public struct WASIHostModule {
+    public let functions: [String: WASIHostFunction]
 }
 
 extension WASI {
-    func _hostModules<GuestMemory: BaseGuestMemory>(_ memory: GuestMemory.Type) -> [String: BaseHostModule<GuestMemory>] {
+    var _hostModules: [String: WASIHostModule] {
         let unimplementedFunctionTypes: [String: FunctionType] = [
             "poll_oneoff": .init(parameters: [.i32, .i32, .i32, .i32], results: [.i32]),
             "proc_raise": .init(parameters: [.i32], results: [.i32]),
@@ -815,9 +815,9 @@ extension WASI {
 
         ]
 
-        var preview1: [String: BaseHostFunction<GuestMemory>] = unimplementedFunctionTypes.reduce(into: [:]) { functions, entry in
+        var preview1: [String: WASIHostFunction] = unimplementedFunctionTypes.reduce(into: [:]) { functions, entry in
             let (name, type) = entry
-            functions[name] = BaseHostFunction(type: type) { _, _ in
+            functions[name] = WASIHostFunction(type: type) { _, _ in
                 print("\"\(name)\" not implemented yet")
                 return [.i32(WASIAbi.Errno.ENOSYS.rawValue)]
             }
@@ -847,8 +847,8 @@ extension WASI {
             }
         }
 
-        func wasiFunction(type: FunctionType, implementation: @escaping (GuestMemory, [Value]) throws -> [Value]) -> BaseHostFunction<GuestMemory> {
-            return BaseHostFunction(type: type) { caller, arguments in
+        func wasiFunction(type: FunctionType, implementation: @escaping (GuestMemory, [Value]) throws -> [Value]) -> WASIHostFunction {
+            return WASIHostFunction(type: type) { caller, arguments in
                 do {
                     return try implementation(caller, arguments)
                 } catch let errno as WASIAbi.Errno {
@@ -1347,12 +1347,12 @@ extension WASI {
         }
 
         return [
-            "wasi_snapshot_preview1": BaseHostModule(functions: preview1)
+            "wasi_snapshot_preview1": WASIHostModule(functions: preview1)
         ]
     }
 }
 
-open class BaseWASIBridgeToHost<GuestMemory: BaseGuestMemory>: WASI {
+public class WASIBridgeToHost: WASI {
     private let args: [String]
     private let environment: [String: String]
     private var fdTable: FdTable
@@ -1388,9 +1388,7 @@ open class BaseWASIBridgeToHost<GuestMemory: BaseGuestMemory>: WASI {
         self.fdTable = fdTable
     }
 
-    public var baseHostModules: [String: BaseHostModule<GuestMemory>] {
-        _hostModules(GuestMemory.self)
-    }
+    public var baseHostModules: [String: WASIHostModule] { _hostModules }
 
     func args_get(
         argv: UnsafeGuestPointer<UnsafeGuestPointer<UInt8>>,

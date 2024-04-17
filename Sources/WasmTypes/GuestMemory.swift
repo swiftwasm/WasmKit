@@ -1,5 +1,5 @@
 /// A write/read-able view representation of WebAssembly Memory instance
-public protocol BaseGuestMemory {
+public protocol GuestMemory {
     /// Executes the given closure with a mutable buffer pointer to the host memory region mapped as guest memory.
     func withUnsafeMutableBufferPointer<T>(
         offset: UInt,
@@ -159,12 +159,12 @@ extension UInt64: GuestPrimitivePointee {
 /// > Note: This type assumes pointer-size is 32-bit because WASI preview1 assumes the address space is 32-bit
 public struct UnsafeGuestRawPointer {
     /// A guest memory space that this pointer points
-    public let memorySpace: BaseGuestMemory
+    public let memorySpace: GuestMemory
     /// An offset from the base address of the guest memory region
     public let offset: UInt32
 
     /// Creates a new pointer from the given memory space and offset
-    public init(memorySpace: BaseGuestMemory, offset: UInt32) {
+    public init(memorySpace: GuestMemory, offset: UInt32) {
         self.memorySpace = memorySpace
         self.offset = offset
     }
@@ -245,7 +245,7 @@ public struct UnsafeGuestPointer<Pointee: GuestPointee> {
     }
 
     /// Creates a new pointer from the given memory space and offset
-    public init(memorySpace: BaseGuestMemory, offset: UInt32) {
+    public init(memorySpace: GuestMemory, offset: UInt32) {
         self.raw = UnsafeGuestRawPointer(memorySpace: memorySpace, offset: offset)
     }
 

@@ -17,8 +17,8 @@ public struct CanonicalCallContext {
     /// The executing `Runtime` instance
     public let runtime: Runtime
     /// A reference to the guest memory.
-    public var guestMemory: GuestMemory {
-        GuestMemory(store: runtime.store, address: options.memory)
+    public var guestMemory: WasmKitGuestMemory {
+        WasmKitGuestMemory(store: runtime.store, address: options.memory)
     }
 
     public init(options: CanonicalOptions, moduleInstance: ModuleInstance, runtime: Runtime) {
@@ -50,7 +50,7 @@ public struct CanonicalCallContext {
     }
 }
 
-public struct GuestMemory: BaseGuestMemory {
+public struct WasmKitGuestMemory: GuestMemory {
     private let store: Store
     private let address: MemoryAddress
 
