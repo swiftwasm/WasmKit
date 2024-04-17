@@ -1403,7 +1403,7 @@ open class BaseWASIBridgeToHost<GuestMemory: BaseGuestMemory>: WASI {
             offsets += 1
             let count = arg.utf8CString.withUnsafeBytes { bytes in
                 let count = UInt32(bytes.count)
-                buffer.raw.withHostPointer(count: bytes.count) { hostDestBuffer in
+                _ = buffer.raw.withHostPointer(count: bytes.count) { hostDestBuffer in
                     bytes.copyBytes(to: hostDestBuffer)
                 }
                 return count
@@ -1428,7 +1428,7 @@ open class BaseWASIBridgeToHost<GuestMemory: BaseGuestMemory>: WASI {
             offsets += 1
             let count = "\(key)=\(value)".utf8CString.withUnsafeBytes { bytes in
                 let count = UInt32(bytes.count)
-                buffer.raw.withHostPointer(count: bytes.count) { hostDestBuffer in
+                _ = buffer.raw.withHostPointer(count: bytes.count) { hostDestBuffer in
                     bytes.copyBytes(to: hostDestBuffer)
                 }
                 return count
@@ -1629,7 +1629,7 @@ open class BaseWASIBridgeToHost<GuestMemory: BaseGuestMemory>: WASI {
             guard bytes.count <= maxPathLength else {
                 throw WASIAbi.Errno.ENAMETOOLONG
             }
-            path.withHostPointer(count: Int(maxPathLength)) { buffer in
+            _ = path.withHostPointer(count: Int(maxPathLength)) { buffer in
                 bytes.copyBytes(to: buffer)
             }
         }
@@ -1690,7 +1690,7 @@ open class BaseWASIBridgeToHost<GuestMemory: BaseGuestMemory>: WASI {
                 let copyingBytes = min(entry.dirNameLen, totalBufferSize - bufferUsed)
                 let rangeStart = buffer.baseAddress.raw.advanced(by: bufferUsed)
                 name.withUTF8 { bytes in
-                    rangeStart.withHostPointer(count: Int(copyingBytes)) { hostBuffer in
+                    _ = rangeStart.withHostPointer(count: Int(copyingBytes)) { hostBuffer in
                         bytes.copyBytes(to: hostBuffer, count: Int(copyingBytes))
                     }
                 }
