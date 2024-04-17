@@ -59,8 +59,8 @@ extension FdWASIFile {
         let handle = FileHandle(fileDescriptor: fd.rawValue)
         var nread: UInt32 = 0
         for iovec in buffer {
-            try iovec.buffer.withHostPointer { rawBufferStart in
-                var bufferStart = rawBufferStart.bindMemory(
+            try iovec.buffer.withHostPointer(count: Int(iovec.length)) { rawBufferStart in
+                var bufferStart = rawBufferStart.baseAddress!.bindMemory(
                     to: UInt8.self, capacity: Int(iovec.length)
                 )
                 let bufferEnd = bufferStart + Int(iovec.length)

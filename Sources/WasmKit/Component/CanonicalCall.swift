@@ -1,3 +1,5 @@
+@_exported import WasmTypes
+
 struct CanonicalABIError: Error, CustomStringConvertible {
     let description: String
 }
@@ -15,8 +17,8 @@ public struct CanonicalCallContext {
     /// The executing `Runtime` instance
     public let runtime: Runtime
     /// A reference to the guest memory.
-    public var guestMemory: GuestMemory {
-        GuestMemory(store: runtime.store, address: options.memory)
+    public var guestMemory: WasmKitGuestMemory {
+        WasmKitGuestMemory(store: runtime.store, address: options.memory)
     }
 
     public init(options: CanonicalOptions, moduleInstance: ModuleInstance, runtime: Runtime) {
@@ -45,5 +47,25 @@ public struct CanonicalCallContext {
             throw CanonicalABIError(description: "\"cabi_realloc\" export should return an i32 value")
         }
         return UnsafeGuestRawPointer(memorySpace: guestMemory, offset: new)
+    }
+}
+
+public struct WasmKitGuestMemory: GuestMemory {
+    private let store: Store
+    private let address: MemoryAddress
+
+    /// Creates a new memory instance from the given store and address
+    public init(store: Store, address: MemoryAddress) {
+        self.store = store
+        self.address = address
+    }
+
+    /// Executes the given closure with a mutable buffer pointer to the host memory region mapped as guest memory.
+    public func withUnsafeMutableBufferPointer<T>(offset: UInt, count: Int, _ body: (UnsafeMutableRawBufferPointer) throws -> T) rethrows -> T {
+        try store.withMemory(at: address) { memory in
+            try memory.data.withUnsafeMutableBufferPointer { buffer in
+                try body(UnsafeMutableRawBufferPointer(start: buffer.baseAddress! + Int(offset), count: count))
+            }
+        }
     }
 }

@@ -1,6 +1,6 @@
 import Foundation
 import WasmKit
-import WASI
+import WasmKitWASI
 import WIT
 import XCTest
 @testable import WITOverlayGenerator

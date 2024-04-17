@@ -1,7 +1,7 @@
 import ArgumentParser
 import Foundation
 import SystemPackage
-import WASI
+import WasmKitWASI
 import WasmKit
 
 struct Run: ParsableCommand {

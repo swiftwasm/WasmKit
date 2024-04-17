@@ -12,8 +12,8 @@ public enum CanonicalLowering {
         let newBuffer = try context.realloc(
             old: 0, oldSize: 0, oldAlign: 1, newSize: UInt32(bytes.count)
         )
-        newBuffer.withHostPointer { newBuffer in
-            UnsafeMutableRawBufferPointer(start: newBuffer, count: bytes.count).copyBytes(from: bytes)
+        newBuffer.withHostPointer(count: bytes.count) { newBuffer in
+            newBuffer.copyBytes(from: bytes)
         }
         return (newBuffer.offset, UInt32(bytes.count))
     }

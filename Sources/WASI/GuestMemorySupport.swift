@@ -1,4 +1,4 @@
-import WasmKit
+import WasmTypes
 
 extension GuestPointee {
     static func readFromGuest(_ pointer: inout UnsafeGuestRawPointer) -> Self {

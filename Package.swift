@@ -5,11 +5,15 @@ import class Foundation.ProcessInfo
 
 let package = Package(
     name: "WasmKit",
-    platforms: [.macOS(.v12)],
+    platforms: [.macOS(.v12), .iOS(.v14)],
     products: [
         .library(
             name: "WasmKit",
             targets: ["WasmKit"]
+        ),
+        .library(
+            name: "WasmKitWASI",
+            targets: ["WasmKitWASI"]
         ),
         .library(
             name: "WASI",
@@ -31,23 +35,34 @@ let package = Package(
             name: "CLI",
             dependencies: [
                 "WasmKit",
-                "WASI",
+                "WasmKitWASI",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "SystemPackage", package: "swift-system"),
             ]
+        ),
+        .target(
+            name: "WasmTypes"
+        ),
+        .target(
+            name: "WASI",
+            dependencies: ["WasmTypes", "SystemExtras"]
         ),
         .target(
             name: "WasmKit",
             dependencies: [
                 "WasmParser",
                 "SystemExtras",
+                "WasmTypes",
                 .product(name: "SystemPackage", package: "swift-system"),
             ]
         ),
-        .target(name: "WasmParser"),
         .target(
-            name: "WASI",
-            dependencies: ["WasmKit", "SystemExtras"]
+            name: "WasmParser",
+            dependencies: ["WasmTypes"]
+        ),
+        .target(
+            name: "WasmKitWASI",
+            dependencies: ["WasmKit", "WASI"]
         ),
         .target(
             name: "SystemExtras",
@@ -70,7 +85,7 @@ let package = Package(
         .plugin(name: "GenerateOverlayForTesting", capability: .buildTool(), dependencies: ["WITTool"]),
         .testTarget(
             name: "WITOverlayGeneratorTests",
-            dependencies: ["WITOverlayGenerator", "WasmKit", "WASI"],
+            dependencies: ["WITOverlayGenerator", "WasmKit", "WasmKitWASI"],
             exclude: ["Fixtures", "Compiled", "Generated"],
             plugins: [.plugin(name: "GenerateOverlayForTesting")]
         ),

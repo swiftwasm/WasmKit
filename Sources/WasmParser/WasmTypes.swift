@@ -1,3 +1,5 @@
+@_exported import WasmTypes
+
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-code>
 public struct Code {
@@ -25,18 +27,6 @@ public enum BlockType: Equatable {
     case empty
     case type(ValueType)
     case funcType(UInt32)
-}
-
-/// > Note:
-/// <https://webassembly.github.io/spec/core/syntax/types.html#function-types>
-public struct FunctionType: Equatable {
-    public init(parameters: [ValueType], results: [ValueType] = []) {
-        self.parameters = parameters
-        self.results = results
-    }
-
-    public let parameters: [ValueType]
-    public let results: [ValueType]
 }
 
 /// > Note:
@@ -85,27 +75,6 @@ public enum ExternalType {
     case table(TableType)
     case memory(MemoryType)
     case global(GlobalType)
-}
-
-/// Reference types
-public enum ReferenceType: Equatable {
-    /// A nullable reference type to a function.
-    case funcRef
-    /// A nullable external reference type.
-    case externRef
-}
-
-public enum ValueType: Equatable {
-    /// 32-bit signed or unsigned integer.
-    case i32
-    /// 64-bit signed or unsigned integer.
-    case i64
-    /// 32-bit IEEE 754 floating-point number.
-    case f32
-    /// 64-bit IEEE 754 floating-point number.
-    case f64
-    /// Reference value type.
-    case ref(ReferenceType)
 }
 
 public enum IEEE754 {

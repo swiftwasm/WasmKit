@@ -2,8 +2,7 @@ import Foundation
 import SwiftShims  // For swift_stdlib_random
 import SystemExtras
 import SystemPackage
-import WasmKit
-import WasmParser
+import WasmTypes
 
 protocol WASI {
     /// Reads command-line argument data.
@@ -379,8 +378,8 @@ enum WASIAbi {
         let length: WASIAbi.Size
 
         func withHostBufferPointer<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
-            try buffer.withHostPointer { hostPointer in
-                try body(UnsafeRawBufferPointer(start: hostPointer, count: Int(length)))
+            try buffer.withHostPointer(count: Int(length)) { hostPointer in
+                try body(UnsafeRawBufferPointer(hostPointer))
             }
         }
 
@@ -782,16 +781,29 @@ enum WASIAbi {
     }
 }
 
-struct WASIError: Error, CustomStringConvertible {
-    let description: String
+public struct WASIError: Error, CustomStringConvertible {
+    public let description: String
+
+    public init(description: String) {
+        self.description = description
+    }
 }
 
-struct WASIExitCode: Error {
-    let code: UInt32
+public struct WASIExitCode: Error {
+    public let code: UInt32
+}
+
+public struct WASIHostFunction {
+    public let type: FunctionType
+    public let implementation: (GuestMemory, [Value]) throws -> [Value]
+}
+
+public struct WASIHostModule {
+    public let functions: [String: WASIHostFunction]
 }
 
 extension WASI {
-    var _hostModules: [String: HostModule] {
+    var _hostModules: [String: WASIHostModule] {
         let unimplementedFunctionTypes: [String: FunctionType] = [
             "poll_oneoff": .init(parameters: [.i32, .i32, .i32, .i32], results: [.i32]),
             "proc_raise": .init(parameters: [.i32], results: [.i32]),
@@ -803,23 +815,19 @@ extension WASI {
 
         ]
 
-        var preview1: [String: HostFunction] = unimplementedFunctionTypes.reduce(into: [:]) { functions, entry in
+        var preview1: [String: WASIHostFunction] = unimplementedFunctionTypes.reduce(into: [:]) { functions, entry in
             let (name, type) = entry
-            functions[name] = HostFunction(type: type) { _, _ in
+            functions[name] = WASIHostFunction(type: type) { _, _ in
                 print("\"\(name)\" not implemented yet")
                 return [.i32(WASIAbi.Errno.ENOSYS.rawValue)]
             }
         }
 
         func withMemoryBuffer<T>(
-            caller: Caller,
+            caller: GuestMemory,
             body: (GuestMemory) throws -> T
         ) throws -> T {
-            guard case let .memory(memoryAddr) = caller.instance.exports["memory"] else {
-                throw WASIError(description: "Missing required \"memory\" export")
-            }
-            let memory = GuestMemory(store: caller.store, address: memoryAddr)
-            return try body(memory)
+            return try body(caller)
         }
 
         func readString(pointer: UInt32, length: UInt32, buffer: GuestMemory) throws -> String {
@@ -839,8 +847,8 @@ extension WASI {
             }
         }
 
-        func wasiFunction(type: FunctionType, implementation: @escaping (Caller, [Value]) throws -> [Value]) -> HostFunction {
-            return HostFunction(type: type) { caller, arguments in
+        func wasiFunction(type: FunctionType, implementation: @escaping (GuestMemory, [Value]) throws -> [Value]) -> WASIHostFunction {
+            return WASIHostFunction(type: type) { caller, arguments in
                 do {
                     return try implementation(caller, arguments)
                 } catch let errno as WASIAbi.Errno {
@@ -1339,7 +1347,7 @@ extension WASI {
         }
 
         return [
-            "wasi_snapshot_preview1": HostModule(globals: [:], functions: preview1)
+            "wasi_snapshot_preview1": WASIHostModule(functions: preview1)
         ]
     }
 }
@@ -1380,16 +1388,7 @@ public class WASIBridgeToHost: WASI {
         self.fdTable = fdTable
     }
 
-    public var hostModules: [String: HostModule] { _hostModules }
-
-    public func start(_ instance: ModuleInstance, runtime: Runtime) throws -> UInt32 {
-        do {
-            _ = try runtime.invoke(instance, function: "_start")
-        } catch let code as WASIExitCode {
-            return code.code
-        }
-        return 0
-    }
+    public var wasiHostModules: [String: WASIHostModule] { _hostModules }
 
     func args_get(
         argv: UnsafeGuestPointer<UnsafeGuestPointer<UInt8>>,
@@ -1402,8 +1401,7 @@ public class WASIBridgeToHost: WASI {
             offsets += 1
             let count = arg.utf8CString.withUnsafeBytes { bytes in
                 let count = UInt32(bytes.count)
-                buffer.raw.withHostPointer { hostRawPointer in
-                    let hostDestBuffer = UnsafeMutableRawBufferPointer(start: hostRawPointer, count: bytes.count)
+                _ = buffer.raw.withHostPointer(count: bytes.count) { hostDestBuffer in
                     bytes.copyBytes(to: hostDestBuffer)
                 }
                 return count
@@ -1428,8 +1426,7 @@ public class WASIBridgeToHost: WASI {
             offsets += 1
             let count = "\(key)=\(value)".utf8CString.withUnsafeBytes { bytes in
                 let count = UInt32(bytes.count)
-                buffer.raw.withHostPointer { hostRawPointer in
-                    let hostDestBuffer = UnsafeMutableRawBufferPointer(start: hostRawPointer, count: bytes.count)
+                _ = buffer.raw.withHostPointer(count: bytes.count) { hostDestBuffer in
                     bytes.copyBytes(to: hostDestBuffer)
                 }
                 return count
@@ -1630,8 +1627,7 @@ public class WASIBridgeToHost: WASI {
             guard bytes.count <= maxPathLength else {
                 throw WASIAbi.Errno.ENAMETOOLONG
             }
-            path.withHostPointer {
-                let buffer = UnsafeMutableRawBufferPointer(start: $0, count: Int(maxPathLength))
+            _ = path.withHostPointer(count: Int(maxPathLength)) { buffer in
                 bytes.copyBytes(to: buffer)
             }
         }
@@ -1692,10 +1688,7 @@ public class WASIBridgeToHost: WASI {
                 let copyingBytes = min(entry.dirNameLen, totalBufferSize - bufferUsed)
                 let rangeStart = buffer.baseAddress.raw.advanced(by: bufferUsed)
                 name.withUTF8 { bytes in
-                    rangeStart.withHostPointer { rangeStart in
-                        let hostBuffer = UnsafeMutableRawBufferPointer(
-                            start: rangeStart, count: Int(copyingBytes)
-                        )
+                    _ = rangeStart.withHostPointer(count: Int(copyingBytes)) { hostBuffer in
                         bytes.copyBytes(to: hostBuffer, count: Int(copyingBytes))
                     }
                 }
@@ -1865,8 +1858,9 @@ public class WASIBridgeToHost: WASI {
     }
 
     func random_get(buffer: UnsafeGuestPointer<UInt8>, length: WASIAbi.Size) {
-        buffer.withHostPointer {
-            swift_stdlib_random(UnsafeMutableRawPointer($0), Int(length))
+        guard length > 0 else { return }
+        buffer.withHostPointer(count: Int(length)) {
+            swift_stdlib_random($0.baseAddress!, Int(length))
         }
     }
 }
