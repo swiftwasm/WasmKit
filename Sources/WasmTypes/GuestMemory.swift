@@ -3,7 +3,7 @@ public protocol BaseGuestMemory {
     /// Executes the given closure with a mutable buffer pointer to the host memory region mapped as guest memory.
     func withUnsafeMutableBufferPointer<T>(
         offset: UInt,
-        size: Int,
+        count: Int,
         _ body: (UnsafeMutableRawBufferPointer) throws -> T
     ) rethrows -> T
 }
@@ -171,7 +171,7 @@ public struct UnsafeGuestRawPointer {
 
     /// Executes the given closure with a mutable raw pointer to the host memory region mapped as guest memory.
     public func withHostPointer<R>(count: Int, _ body: (UnsafeMutableRawBufferPointer) throws -> R) rethrows -> R {
-        try memorySpace.withUnsafeMutableBufferPointer(offset: UInt(offset), size: count) { buffer in
+        try memorySpace.withUnsafeMutableBufferPointer(offset: UInt(offset), count: count) { buffer in
             try body(UnsafeMutableRawBufferPointer(start: buffer.baseAddress!, count: count))
         }
     }
