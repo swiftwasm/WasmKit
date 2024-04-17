@@ -1388,7 +1388,7 @@ public class WASIBridgeToHost: WASI {
         self.fdTable = fdTable
     }
 
-    public var baseHostModules: [String: WASIHostModule] { _hostModules }
+    public var wasiHostModules: [String: WASIHostModule] { _hostModules }
 
     func args_get(
         argv: UnsafeGuestPointer<UnsafeGuestPointer<UInt8>>,
