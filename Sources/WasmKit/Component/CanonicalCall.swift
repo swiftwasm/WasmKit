@@ -61,7 +61,7 @@ public struct GuestMemory: BaseGuestMemory {
     }
 
     /// Executes the given closure with a mutable buffer pointer to the host memory region mapped as guest memory.
-    public func withUnsafeMutableBufferPointer<T>(_ body: (UnsafeMutableRawBufferPointer) throws -> T) rethrows -> T {
+    public func withUnsafeMutableBufferPointer<T>(offset: UInt, size: Int, _ body: (UnsafeMutableRawBufferPointer) throws -> T) rethrows -> T {
         try store.withMemory(at: address) { memory in
             try memory.data.withUnsafeMutableBufferPointer { buffer in
                 try body(UnsafeMutableRawBufferPointer(buffer))
