@@ -1,14 +1,5 @@
 import WasmParser
 
-/// > Note:
-/// <https://webassembly.github.io/spec/core/exec/runtime.html#addresses>
-public typealias FunctionAddress = Int
-public typealias TableAddress = Int
-public typealias MemoryAddress = Int
-public typealias GlobalAddress = Int
-public typealias ElementAddress = Int
-public typealias DataAddress = Int
-public typealias ExternAddress = Int
 internal typealias ModuleAddress = Int
 
 /// A collection of globals and functions that are exported from a host module.

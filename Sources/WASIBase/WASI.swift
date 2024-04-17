@@ -2,8 +2,7 @@ import Foundation
 import SwiftShims  // For swift_stdlib_random
 import SystemExtras
 import SystemPackage
-import WasmKit
-import WasmParser
+import WasmTypes
 
 protocol WASI {
     /// Reads command-line argument data.
@@ -782,16 +781,34 @@ enum WASIAbi {
     }
 }
 
-struct WASIError: Error, CustomStringConvertible {
-    let description: String
+public struct WASIError: Error, CustomStringConvertible {
+    public let description: String
+
+    public init(description: String) {
+        self.description = description
+    }
 }
 
-struct WASIExitCode: Error {
-    let code: UInt32
+public struct WASIExitCode: Error {
+    public let code: UInt32
+}
+
+public struct BaseHostFunction<GuestMemory> {
+    public init(type: FunctionType, implementation: @escaping (GuestMemory, [Value]) throws -> [Value]) {
+        self.type = type
+        self.implementation = implementation
+    }
+
+    public let type: FunctionType
+    public let implementation: (GuestMemory, [Value]) throws -> [Value]
+}
+
+public struct BaseHostModule<GuestMemory> {
+    public let functions: [String: BaseHostFunction<GuestMemory>]
 }
 
 extension WASI {
-    var _hostModules: [String: HostModule] {
+    func _hostModules<GuestMemory: BaseGuestMemory>(_ memory: GuestMemory.Type) -> [String: BaseHostModule<GuestMemory>] {
         let unimplementedFunctionTypes: [String: FunctionType] = [
             "poll_oneoff": .init(parameters: [.i32, .i32, .i32, .i32], results: [.i32]),
             "proc_raise": .init(parameters: [.i32], results: [.i32]),
@@ -803,23 +820,19 @@ extension WASI {
 
         ]
 
-        var preview1: [String: HostFunction] = unimplementedFunctionTypes.reduce(into: [:]) { functions, entry in
+        var preview1: [String: BaseHostFunction<GuestMemory>] = unimplementedFunctionTypes.reduce(into: [:]) { functions, entry in
             let (name, type) = entry
-            functions[name] = HostFunction(type: type) { _, _ in
+            functions[name] = BaseHostFunction(type: type) { _, _ in
                 print("\"\(name)\" not implemented yet")
                 return [.i32(WASIAbi.Errno.ENOSYS.rawValue)]
             }
         }
 
         func withMemoryBuffer<T>(
-            caller: Caller,
+            caller: GuestMemory,
             body: (GuestMemory) throws -> T
         ) throws -> T {
-            guard case let .memory(memoryAddr) = caller.instance.exports["memory"] else {
-                throw WASIError(description: "Missing required \"memory\" export")
-            }
-            let memory = GuestMemory(store: caller.store, address: memoryAddr)
-            return try body(memory)
+            return try body(caller)
         }
 
         func readString(pointer: UInt32, length: UInt32, buffer: GuestMemory) throws -> String {
@@ -839,8 +852,8 @@ extension WASI {
             }
         }
 
-        func wasiFunction(type: FunctionType, implementation: @escaping (Caller, [Value]) throws -> [Value]) -> HostFunction {
-            return HostFunction(type: type) { caller, arguments in
+        func wasiFunction(type: FunctionType, implementation: @escaping (GuestMemory, [Value]) throws -> [Value]) -> BaseHostFunction<GuestMemory> {
+            return BaseHostFunction(type: type) { caller, arguments in
                 do {
                     return try implementation(caller, arguments)
                 } catch let errno as WASIAbi.Errno {
@@ -1339,12 +1352,12 @@ extension WASI {
         }
 
         return [
-            "wasi_snapshot_preview1": HostModule(globals: [:], functions: preview1)
+            "wasi_snapshot_preview1": BaseHostModule(functions: preview1)
         ]
     }
 }
 
-public class WASIBridgeToHost: WASI {
+open class BaseWASIBridgeToHost<GuestMemory: BaseGuestMemory>: WASI {
     private let args: [String]
     private let environment: [String: String]
     private var fdTable: FdTable
@@ -1380,15 +1393,8 @@ public class WASIBridgeToHost: WASI {
         self.fdTable = fdTable
     }
 
-    public var hostModules: [String: HostModule] { _hostModules }
-
-    public func start(_ instance: ModuleInstance, runtime: Runtime) throws -> UInt32 {
-        do {
-            _ = try runtime.invoke(instance, function: "_start")
-        } catch let code as WASIExitCode {
-            return code.code
-        }
-        return 0
+    public var baseHostModules: [String: BaseHostModule<GuestMemory>] {
+        _hostModules(GuestMemory.self)
     }
 
     func args_get(

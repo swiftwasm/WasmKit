@@ -1,22 +1,7 @@
 /// A write/read-able view representation of WebAssembly Memory instance
-public struct GuestMemory {
-    private let store: Store
-    private let address: MemoryAddress
-
-    /// Creates a new memory instance from the given store and address
-    public init(store: Store, address: MemoryAddress) {
-        self.store = store
-        self.address = address
-    }
-
+public protocol BaseGuestMemory {
     /// Executes the given closure with a mutable buffer pointer to the host memory region mapped as guest memory.
-    func withUnsafeMutableBufferPointer<T>(_ body: (UnsafeMutableRawBufferPointer) throws -> T) rethrows -> T {
-        try store.withMemory(at: address) { memory in
-            try memory.data.withUnsafeMutableBufferPointer { buffer in
-                try body(UnsafeMutableRawBufferPointer(buffer))
-            }
-        }
-    }
+    func withUnsafeMutableBufferPointer<T>(_ body: (UnsafeMutableRawBufferPointer) throws -> T) rethrows -> T
 }
 
 /// A pointer-referenceable type that is intended to be pointee of ``UnsafeGuestPointer``
@@ -170,12 +155,12 @@ extension UInt64: GuestPrimitivePointee {
 /// > Note: This type assumes pointer-size is 32-bit because WASI preview1 assumes the address space is 32-bit
 public struct UnsafeGuestRawPointer {
     /// A guest memory space that this pointer points
-    public let memorySpace: GuestMemory
+    public let memorySpace: BaseGuestMemory
     /// An offset from the base address of the guest memory region
     public let offset: UInt32
 
     /// Creates a new pointer from the given memory space and offset
-    public init(memorySpace: GuestMemory, offset: UInt32) {
+    public init(memorySpace: BaseGuestMemory, offset: UInt32) {
         self.memorySpace = memorySpace
         self.offset = offset
     }
@@ -256,7 +241,7 @@ public struct UnsafeGuestPointer<Pointee: GuestPointee> {
     }
 
     /// Creates a new pointer from the given memory space and offset
-    public init(memorySpace: GuestMemory, offset: UInt32) {
+    public init(memorySpace: BaseGuestMemory, offset: UInt32) {
         self.raw = UnsafeGuestRawPointer(memorySpace: memorySpace, offset: offset)
     }
 

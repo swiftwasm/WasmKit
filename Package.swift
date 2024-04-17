@@ -5,7 +5,7 @@ import class Foundation.ProcessInfo
 
 let package = Package(
     name: "WasmKit",
-    platforms: [.macOS(.v12)],
+    platforms: [.macOS(.v12), .iOS(.v14)],
     products: [
         .library(
             name: "WasmKit",
@@ -14,6 +14,10 @@ let package = Package(
         .library(
             name: "WASI",
             targets: ["WASI"]
+        ),
+        .library(
+            name: "WASIBase",
+            targets: ["WASIBase"]
         ),
         .library(
             name: "WIT", targets: ["WIT"]
@@ -37,17 +41,28 @@ let package = Package(
             ]
         ),
         .target(
+            name: "WasmTypes"
+        ),
+        .target(
+            name: "WASIBase",
+            dependencies: ["WasmTypes", "SystemExtras"]
+        ),
+        .target(
             name: "WasmKit",
             dependencies: [
                 "WasmParser",
                 "SystemExtras",
+                "WasmTypes",
                 .product(name: "SystemPackage", package: "swift-system"),
             ]
         ),
-        .target(name: "WasmParser"),
+        .target(
+            name: "WasmParser",
+            dependencies: ["WasmTypes"]
+        ),
         .target(
             name: "WASI",
-            dependencies: ["WasmKit", "SystemExtras"]
+            dependencies: ["WasmKit", "WASIBase"]
         ),
         .target(
             name: "SystemExtras",
