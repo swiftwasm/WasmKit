@@ -794,11 +794,6 @@ public struct WASIExitCode: Error {
 }
 
 public struct BaseHostFunction<GuestMemory> {
-    public init(type: FunctionType, implementation: @escaping (GuestMemory, [Value]) throws -> [Value]) {
-        self.type = type
-        self.implementation = implementation
-    }
-
     public let type: FunctionType
     public let implementation: (GuestMemory, [Value]) throws -> [Value]
 }
