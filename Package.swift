@@ -5,7 +5,7 @@ import class Foundation.ProcessInfo
 
 let package = Package(
     name: "WasmKit",
-    platforms: [.macOS(.v12), .iOS(.v14)],
+    platforms: [.macOS(.v11), .iOS(.v14)],
     products: [
         .library(
             name: "WasmKit",
