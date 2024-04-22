@@ -1,0 +1,6 @@
+add_subdirectory(WasmKit)
+add_subdirectory(WasmKitWASI)
+add_subdirectory(SystemExtras)
+add_subdirectory(WASI)
+add_subdirectory(WasmTypes)
+add_subdirectory(WasmParser)
