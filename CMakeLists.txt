@@ -17,11 +17,13 @@ endif()
 # The subdirectory into which host libraries will be installed.
 set(SWIFT_HOST_LIBRARIES_SUBDIRECTORY "swift/host")
 
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/${SWIFT_HOST_LIBRARIES_SUBDIRECTORY}")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib/${SWIFT_HOST_LIBRARIES_SUBDIRECTORY}")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 
 set(CMAKE_MACOSX_RPATH YES)
+
+set(BUILD_SHARED_LIBS OFF)
 
 include(AddSwiftHostLibrary)
 
@@ -51,6 +53,21 @@ if(NOT SwiftSystem_FOUND)
     GIT_TAG 1.1.1
   )
   FetchContent_MakeAvailable(SwiftSystem)
+endif()
+
+option(WASMKIT_BUILD_CLI "Build wasmkit-cli" ON)
+
+if(WASMKIT_BUILD_CLI)
+  set(BUILD_TESTING OFF) # disable ArgumentParser tests
+  find_package(ArgumentParser CONFIG)
+  if(NOT ArgumentParser_FOUND)
+    message("-- Vending ArgumentParser")
+    FetchContent_Declare(ArgumentParser
+            GIT_REPOSITORY https://github.com/apple/swift-argument-parser
+            GIT_TAG 1.2.2
+    )
+    FetchContent_MakeAvailable(ArgumentParser)
+  endif()
 endif()
 
 add_subdirectory(Sources)

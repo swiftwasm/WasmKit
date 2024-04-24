@@ -139,7 +139,7 @@ function(add_wasmkit_library name)
     install(
       DIRECTORY ${module_base}
       DESTINATION lib/${SWIFT_HOST_LIBRARIES_SUBDIRECTORY}
-      FILES_MATCHING PATTERN "*.swiftinterface"
+      FILES_MATCHING PATTERN "*.swiftmodule"
     )
   else()
     set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${name})
