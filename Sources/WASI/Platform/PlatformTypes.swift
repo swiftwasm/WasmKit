@@ -115,12 +115,17 @@ extension WASIAbi.Filestat {
 
 extension WASIAbi.Timestamp {
 
-    fileprivate init(seconds: Int, nanoseconds: Int) {
-        self = UInt64(nanoseconds + seconds * 1_000_000_000)
+    fileprivate init(seconds: UInt64, nanoseconds: UInt64) {
+        self = nanoseconds + seconds * 1_000_000_000
     }
 
     init(platformTimeSpec timespec: Clock.TimeSpec) {
-        self.init(seconds: timespec.rawValue.tv_sec, nanoseconds: timespec.rawValue.tv_nsec)
+        self.init(seconds: UInt64(timespec.rawValue.tv_sec),
+                  nanoseconds: UInt64(timespec.rawValue.tv_nsec))
+    }
+
+    init(wallClockDuration duration: WallClock.Duration) {
+        self.init(seconds: duration.seconds, nanoseconds: UInt64(duration.nanoseconds))
     }
 }
 

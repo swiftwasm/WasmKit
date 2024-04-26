@@ -1355,6 +1355,8 @@ public class WASIBridgeToHost: WASI {
     private let args: [String]
     private let environment: [String: String]
     private var fdTable: FdTable
+    private let wallClock: WallClock
+    private let monotonicClock: MonotonicClock
     private var randomGenerator: RandomBufferGenerator
 
     public init(
@@ -1364,6 +1366,8 @@ public class WASIBridgeToHost: WASI {
         stdin: FileDescriptor = .standardInput,
         stdout: FileDescriptor = .standardOutput,
         stderr: FileDescriptor = .standardError,
+        wallClock: WallClock = SystemWallClock(),
+        monotonicClock: MonotonicClock = SystemMonotonicClock(),
         randomGenerator: RandomBufferGenerator = SystemRandomNumberGenerator()
     ) throws {
         self.args = args
@@ -1387,6 +1391,8 @@ public class WASIBridgeToHost: WASI {
             }
         }
         self.fdTable = fdTable
+        self.wallClock = wallClock
+        self.monotonicClock = monotonicClock
         self.randomGenerator = randomGenerator
     }
 
@@ -1446,73 +1452,27 @@ public class WASIBridgeToHost: WASI {
     }
 
     func clock_res_get(id: WASIAbi.ClockId) throws -> WASIAbi.Timestamp {
-        let clock: SystemExtras.Clock
         switch id {
         case .REALTIME:
-            #if os(Linux)
-                clock = .boottime
-            #elseif os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-                clock = .rawMonotonic
-            #elseif os(OpenBSD) || os(FreeBSD) || os(WASI)
-                clock = .monotonic
-            #else
-                #error("Unsupported platform")
-            #endif
+            return WASIAbi.Timestamp(wallClockDuration: try wallClock.resolution())
         case .MONOTONIC:
-            #if os(Linux)
-                clock = .monotonic
-            #elseif os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-                clock = .rawUptime
-            #elseif os(WASI)
-                clock = .monotonic
-            #elseif os(OpenBSD) || os(FreeBSD)
-                clock = .uptime
-            #else
-                #error("Unsupported platform")
-            #endif
+            return try monotonicClock.resolution()
         case .PROCESS_CPUTIME_ID, .THREAD_CPUTIME_ID:
             throw WASIAbi.Errno.EBADF
         }
-        let timeSpec = try WASIAbi.Errno.translatingPlatformErrno {
-            try clock.resolution()
-        }
-        return WASIAbi.Timestamp(platformTimeSpec: timeSpec)
     }
 
     func clock_time_get(
         id: WASIAbi.ClockId, precision: WASIAbi.Timestamp
     ) throws -> WASIAbi.Timestamp {
-        let clock: SystemExtras.Clock
         switch id {
         case .REALTIME:
-            #if os(Linux)
-                clock = .boottime
-            #elseif os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-                clock = .rawMonotonic
-            #elseif os(OpenBSD) || os(FreeBSD) || os(WASI)
-                clock = .monotonic
-            #else
-                #error("Unsupported platform")
-            #endif
+            return WASIAbi.Timestamp(wallClockDuration: try wallClock.now())
         case .MONOTONIC:
-            #if os(Linux)
-                clock = .monotonic
-            #elseif os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-                clock = .rawUptime
-            #elseif os(WASI)
-                clock = .monotonic
-            #elseif os(OpenBSD) || os(FreeBSD)
-                clock = .uptime
-            #else
-                #error("Unsupported platform")
-            #endif
+            return try monotonicClock.now()
         case .PROCESS_CPUTIME_ID, .THREAD_CPUTIME_ID:
             throw WASIAbi.Errno.EBADF
         }
-        let timeSpec = try WASIAbi.Errno.translatingPlatformErrno {
-            try clock.currentTime()
-        }
-        return WASIAbi.Timestamp(platformTimeSpec: timeSpec)
     }
 
     func fd_advise(fd: WASIAbi.Fd, offset: WASIAbi.FileSize, length: WASIAbi.FileSize, advice: WASIAbi.Advice) throws {
