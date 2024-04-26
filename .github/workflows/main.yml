@@ -74,3 +74,17 @@ jobs:
       - run: swift test
       - run: ./CI/check-spectest.sh
       - run: ./CI/check-wasi-testsuite.sh
+
+  build-cmake:
+    runs-on: ubuntu-20.04
+    container:
+      image: swift:5.8-focal
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install CMake
+        run: sudo apt-get install cmake ninja
+      - run: cmake -G Ninja -B ./build
+      - run: cmake --build ./build
+      - run: ./build/bin/wasmkit-cli --version
