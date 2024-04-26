@@ -1,5 +1,4 @@
 import Foundation
-import SwiftShims  // For swift_stdlib_random
 import SystemExtras
 import SystemPackage
 import WasmTypes
@@ -1356,6 +1355,7 @@ public class WASIBridgeToHost: WASI {
     private let args: [String]
     private let environment: [String: String]
     private var fdTable: FdTable
+    private var randomGenerator: RandomBufferGenerator
 
     public init(
         args: [String] = [],
@@ -1363,7 +1363,8 @@ public class WASIBridgeToHost: WASI {
         preopens: [String: String] = [:],
         stdin: FileDescriptor = .standardInput,
         stdout: FileDescriptor = .standardOutput,
-        stderr: FileDescriptor = .standardError
+        stderr: FileDescriptor = .standardError,
+        randomGenerator: RandomBufferGenerator = SystemRandomNumberGenerator()
     ) throws {
         self.args = args
         self.environment = environment
@@ -1386,6 +1387,7 @@ public class WASIBridgeToHost: WASI {
             }
         }
         self.fdTable = fdTable
+        self.randomGenerator = randomGenerator
     }
 
     public var wasiHostModules: [String: WASIHostModule] { _hostModules }
@@ -1860,7 +1862,7 @@ public class WASIBridgeToHost: WASI {
     func random_get(buffer: UnsafeGuestPointer<UInt8>, length: WASIAbi.Size) {
         guard length > 0 else { return }
         buffer.withHostPointer(count: Int(length)) {
-            swift_stdlib_random($0.baseAddress!, Int(length))
+            self.randomGenerator.fill(buffer: $0)
         }
     }
 }
