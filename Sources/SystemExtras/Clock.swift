@@ -64,7 +64,7 @@ extension Clock {
 
   @_alwaysEmitIntoClient
   public func resolution() throws -> Clock.TimeSpec {
-    try _currentTime().get()
+    try _resolution().get()
   }
 
   @usableFromInline
