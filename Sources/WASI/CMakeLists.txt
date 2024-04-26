@@ -8,6 +8,8 @@ add_wasmkit_library(WASI
   Platform/SandboxPrimitives.swift
   FileSystem.swift
   GuestMemorySupport.swift
+  Clock.swift
+  RandomBufferGenerator.swift
   WASI.swift
 )
 
