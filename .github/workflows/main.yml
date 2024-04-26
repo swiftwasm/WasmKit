@@ -26,6 +26,7 @@ jobs:
         uses: swiftwasm/setup-swiftwasm@v1
         with:
           swift-version: "wasm-5.8.0-RELEASE"
+          add-to-path: false
       - name: Select Xcode version
         run: sudo xcode-select -switch /Applications/${{ matrix.xcode }}.app
       - name: Configure Tests/default.json
@@ -37,7 +38,7 @@ jobs:
             "hostSdkRootPath": "$(xcrun --show-sdk-path --sdk macosx)"
           }
           EOS
-      - run: env PATH=/usr/bin:$PATH swift test
+      - run: swift test
       # TODO: Enable spectest and wasi-testsuite checks
 
   build-linux:
@@ -61,6 +62,7 @@ jobs:
         uses: swiftwasm/setup-swiftwasm@v1
         with:
           swift-version: "wasm-5.8.0-RELEASE"
+          add-to-path: false
       - name: Configure Tests/default.json
         run: |
           cat <<EOS > Tests/default.json
@@ -69,6 +71,24 @@ jobs:
             "hostSwiftExecutablePath": "/usr/bin/swift"
           }
           EOS
-      - run: env PATH=/usr/bin:$PATH swift test
+      - run: swift test
       - run: ./CI/check-spectest.sh
       - run: ./CI/check-wasi-testsuite.sh
+
+  build-cmake:
+    runs-on: ubuntu-20.04
+    container:
+      image: swift:5.8-focal
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install Ninja
+        run: apt-get update && apt-get install -y ninja-build
+      - name: Install CMake
+        run: |
+          apt-get install -y curl
+          curl -L https://github.com/Kitware/CMake/releases/download/v3.29.2/cmake-3.29.2-linux-x86_64.tar.gz | tar xz --strip-component 1 -C /usr/local/
+      - run: cmake -G Ninja -B ./build
+      - run: cmake --build ./build
+      - run: ./build/bin/wasmkit-cli --version
