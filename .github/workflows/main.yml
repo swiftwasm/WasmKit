@@ -84,7 +84,7 @@ jobs:
         with:
           submodules: recursive
       - name: Install CMake
-        run: apt-get update && apt-get install cmake ninja-build
+        run: apt-get update && apt-get install -y cmake ninja-build
       - run: cmake -G Ninja -B ./build
       - run: cmake --build ./build
       - run: ./build/bin/wasmkit-cli --version
