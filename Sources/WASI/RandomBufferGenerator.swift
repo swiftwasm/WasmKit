@@ -33,7 +33,9 @@ extension RandomBufferGenerator where Self: RandomNumberGenerator {
             withUnsafeBytes(of: random) { randomBytes in
                 let startOffset = count * 8
                 let destination = UnsafeMutableBufferPointer(rebasing: buffer[startOffset..<(startOffset + remaining)])
-                UnsafeMutableRawBufferPointer(destination).copyMemory(from: randomBytes)
+                UnsafeMutableRawBufferPointer(destination).copyMemory(
+                    from: UnsafeRawBufferPointer(start: randomBytes.baseAddress, count: remaining)
+                )
             }
         }
     }
