@@ -21,6 +21,9 @@ struct Spectest: AsyncParsableCommand {
     var parallel: Bool = true
 
     func run() async throws {
+        guard #available(macOS 11, *) else {
+            fatalError("Spectest requires macOS 11+")
+        }
         let printVerbose = self.verbose
         @Sendable func log(_ message: String, verbose: Bool = false) {
             if !verbose || printVerbose {

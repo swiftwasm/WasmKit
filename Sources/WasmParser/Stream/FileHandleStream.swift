@@ -1,16 +1,16 @@
-import Foundation
+import SystemPackage
 
 public final class FileHandleStream: ByteStream {
     private(set) public var currentIndex: Int = 0
 
-    private let fileHandle: FileHandle
+    private let fileHandle: FileDescriptor
     private let bufferLength: Int
 
     private var endOffset: Int = 0
     private var startOffset: Int = 0
     private var bytes: [UInt8] = []
 
-    public init(fileHandle: FileHandle, bufferLength: Int = 1024 * 8) throws {
+    public init(fileHandle: FileDescriptor, bufferLength: Int = 1024 * 8) throws {
         self.fileHandle = fileHandle
         self.bufferLength = bufferLength
 
@@ -21,7 +21,7 @@ public final class FileHandleStream: ByteStream {
         guard Int(endOffset) == currentIndex else { return }
         startOffset = currentIndex
 
-        let data = try fileHandle.read(upToCount: bufferLength) ?? Foundation.Data()
+        let data = try fileHandle.read(upToCount: bufferLength)
 
         bytes = [UInt8](data)
         endOffset = startOffset + bytes.count
@@ -58,11 +58,12 @@ public final class FileHandleStream: ByteStream {
             return result
         }
 
-        guard let data = try fileHandle.read(upToCount: bytesToRead), data.count == bytesToRead else {
+        let data = try fileHandle.read(upToCount: bytesToRead)
+        guard data.count == bytesToRead else {
             throw StreamError<UInt8>.unexpectedEnd(expected: nil)
         }
 
-        bytes.append(contentsOf: [UInt8](data))
+        bytes.append(contentsOf: data)
         endOffset = endOffset + data.count
 
         let bytesIndex = currentIndex - startOffset
@@ -82,5 +83,13 @@ public final class FileHandleStream: ByteStream {
         }
 
         return bytes[index]
+    }
+}
+
+extension FileDescriptor {
+    func read(upToCount maxLength: Int) throws -> [UInt8] {
+        try [UInt8](unsafeUninitializedCapacity: maxLength) { buffer, outCount in
+            outCount = try read(into: UnsafeMutableRawBufferPointer(buffer))
+        }
     }
 }

@@ -1,4 +1,3 @@
-import Foundation
 import SystemExtras
 import SystemPackage
 import WasmTypes
@@ -835,8 +834,7 @@ extension WASI {
                 count: length
             )
             return try pointer.withHostPointer { hostBuffer in
-                guard let baseAddress = hostBuffer.baseAddress,
-                    memchr(baseAddress, 0x00, Int(pointer.count)) == nil
+                guard hostBuffer.firstIndex(of: 0x00) == nil
                 else {
                     // If byte sequence contains null byte in the middle, it's illegal string
                     // TODO: This restriction should be only applied to strings that can be interpreted as platform-string, which is expected to be null-terminated
@@ -1379,12 +1377,7 @@ public class WASIBridgeToHost: WASI {
 
         for (guestPath, hostPath) in preopens {
             let fd = try hostPath.withCString { cHostPath in
-                let fd = open(cHostPath, O_DIRECTORY)
-                if fd < 0 {
-                    let errno = errno
-                    throw POSIXError(POSIXErrorCode(rawValue: errno)!)
-                }
-                return FileDescriptor(rawValue: fd)
+                try FileDescriptor.open(cHostPath, .readOnly, options: .directory)
             }
             if try fd.attributes().fileType.isDirectory {
                 _ = try fdTable.push(.directory(DirEntry(preopenPath: guestPath, fd: fd)))
@@ -1409,8 +1402,8 @@ public class WASIBridgeToHost: WASI {
             offsets += 1
             let count = arg.utf8CString.withUnsafeBytes { bytes in
                 let count = UInt32(bytes.count)
-                _ = buffer.raw.withHostPointer(count: bytes.count) { hostDestBuffer in
-                    bytes.copyBytes(to: hostDestBuffer)
+                buffer.raw.withHostPointer(count: bytes.count) { hostDestBuffer in
+                    hostDestBuffer.copyMemory(from: bytes)
                 }
                 return count
             }
@@ -1434,8 +1427,8 @@ public class WASIBridgeToHost: WASI {
             offsets += 1
             let count = "\(key)=\(value)".utf8CString.withUnsafeBytes { bytes in
                 let count = UInt32(bytes.count)
-                _ = buffer.raw.withHostPointer(count: bytes.count) { hostDestBuffer in
-                    bytes.copyBytes(to: hostDestBuffer)
+                buffer.raw.withHostPointer(count: bytes.count) { hostDestBuffer in
+                    hostDestBuffer.copyMemory(from: bytes)
                 }
                 return count
             }
@@ -1589,8 +1582,8 @@ public class WASIBridgeToHost: WASI {
             guard bytes.count <= maxPathLength else {
                 throw WASIAbi.Errno.ENAMETOOLONG
             }
-            _ = path.withHostPointer(count: Int(maxPathLength)) { buffer in
-                bytes.copyBytes(to: buffer)
+            path.withHostPointer(count: Int(maxPathLength)) { buffer in
+                UnsafeMutableRawBufferPointer(buffer).copyMemory(from: UnsafeRawBufferPointer(bytes))
             }
         }
     }
@@ -1650,8 +1643,11 @@ public class WASIBridgeToHost: WASI {
                 let copyingBytes = min(entry.dirNameLen, totalBufferSize - bufferUsed)
                 let rangeStart = buffer.baseAddress.raw.advanced(by: bufferUsed)
                 name.withUTF8 { bytes in
-                    _ = rangeStart.withHostPointer(count: Int(copyingBytes)) { hostBuffer in
-                        bytes.copyBytes(to: hostBuffer, count: Int(copyingBytes))
+                    rangeStart.withHostPointer(count: Int(copyingBytes)) { hostBuffer in
+                        hostBuffer.copyMemory(from: UnsafeRawBufferPointer(
+                            start: UnsafeRawPointer(bytes.baseAddress),
+                            count: Int(copyingBytes)
+                        ))
                     }
                 }
                 bufferUsed += copyingBytes

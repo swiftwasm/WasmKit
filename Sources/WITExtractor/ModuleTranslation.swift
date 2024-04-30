@@ -1,3 +1,4 @@
+@available(macOS 11, *)
 struct ModuleTranslation {
     let diagnostics: DiagnosticCollection
     let typeMapping: TypeMapping

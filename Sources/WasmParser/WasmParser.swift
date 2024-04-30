@@ -1,5 +1,3 @@
-import Foundation
-
 public struct Parser<Stream: ByteStream> {
     let stream: Stream
     public private(set) var hasDataCount: Bool = false

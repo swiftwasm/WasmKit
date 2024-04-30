@@ -76,8 +76,11 @@ struct Run: ParsableCommand {
         log("Finished invoking function \"\(path)\": \(invokeTime)", verbose: true)
     }
 
-    func deriveInterceptor() throws -> (interceptor: GuestTimeProfiler, finalize: () -> Void)? {
+    func deriveInterceptor() throws -> (interceptor: RuntimeInterceptor, finalize: () -> Void)? {
         guard let outputPath = self.profileOutput else { return nil }
+        guard #available(macOS 11, *) else {
+            fatalError("Interceptor requires macOS 11+")
+        }
         FileManager.default.createFile(atPath: outputPath, contents: nil)
         let fileHandle = try FileHandle(forWritingTo: URL(fileURLWithPath: outputPath))
         let profiler = GuestTimeProfiler { data in

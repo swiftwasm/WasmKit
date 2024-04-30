@@ -1,3 +1,5 @@
+#if DEBUG
+
 import Foundation
 import SystemExtras
 import SystemPackage
@@ -85,3 +87,5 @@ public class GuestTimeProfiler: RuntimeInterceptor {
         output("\n]".data(using: .utf8)!)
     }
 }
+
+#endif
