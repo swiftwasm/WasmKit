@@ -1,6 +1,3 @@
-#if DEBUG
-
-import Foundation
 import SystemExtras
 import SystemPackage
 
@@ -19,28 +16,32 @@ public class GuestTimeProfiler: RuntimeInterceptor {
         let ts: Int
     }
 
-    private var output: (Data) -> Void
+    private let encode: (any Encodable) throws -> [UInt8]
+    private let output: ([UInt8]) -> Void
     private var hasFirstEvent: Bool = false
-    private let encoder = JSONEncoder()
     private let startTime: UInt64
 
-    public init(output: @escaping (Data) -> Void) {
+    public init(
+        encoder: some GuestTimeProfilerJSONEncoder,
+        output: @escaping ([UInt8]) -> Void
+    ) {
+        self.encode = { try [UInt8](encoder.encode($0)) }
         self.output = output
         self.startTime = Self.getTimestamp()
     }
 
-    private func eventLine(_ event: Event) -> Data? {
-        return try? encoder.encode(event)
+    private func eventLine(_ event: Event) -> [UInt8]? {
+        return try? encode(event)
     }
 
     private func addEventLine(_ event: Event) {
         guard let line = eventLine(event) else { return }
         if !hasFirstEvent {
-            self.output("[\n".data(using: .utf8)!)
+            self.output(Array("[\n".utf8))
             self.output(line)
             hasFirstEvent = true
         } else {
-            self.output(",\n".data(using: .utf8)!)
+            self.output(Array(",\n".utf8))
             self.output(line)
         }
     }
@@ -67,7 +68,7 @@ public class GuestTimeProfiler: RuntimeInterceptor {
         let functionName = try? store.nameRegistry.lookup(address)
         let event = Event(
             ph: .begin, pid: 1,
-            name: functionName ?? "unknown function(\(String(format: "0x%x", address)))",
+            name: functionName ?? "unknown function(0x\(String(address, radix: 16)))",
             ts: getDurationSinceStart()
         )
         addEventLine(event)
@@ -77,15 +78,25 @@ public class GuestTimeProfiler: RuntimeInterceptor {
         let functionName = try? store.nameRegistry.lookup(address)
         let event = Event(
             ph: .end, pid: 1,
-            name: functionName ?? "unknown function(\(String(format: "0x%x", address)))",
+            name: functionName ?? "unknown function(0x\(String(address, radix: 16)))",
             ts: getDurationSinceStart()
         )
         addEventLine(event)
     }
 
     public func finalize() {
-        output("\n]".data(using: .utf8)!)
+        output(Array("\n]".utf8))
     }
 }
 
-#endif
+/// A top-level JSON encoder.
+///
+/// If you depend on `Foundation`, you can add a trivial conformance to this with
+/// ```swift
+/// extension JSONEncoder: GuestTimeProfilerJSONEncoder {}
+/// ```
+@_documentation(visibility: internal)
+public protocol GuestTimeProfilerJSONEncoder {
+    associatedtype Bytes: Collection<UInt8>
+    func encode(_ output: some Encodable) throws -> Bytes
+}
