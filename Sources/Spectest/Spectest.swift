@@ -4,6 +4,7 @@ import SystemPackage
 import WasmKit
 
 @main
+@available(macOS 11, *)
 struct Spectest: AsyncParsableCommand {
     @Argument
     var path: String
@@ -20,7 +21,6 @@ struct Spectest: AsyncParsableCommand {
     @Flag(inversion: .prefixedNo)
     var parallel: Bool = true
 
-    @available(macOS 11, *)
     func run() async throws {
         let printVerbose = self.verbose
         @Sendable func log(_ message: String, verbose: Bool = false) {
