@@ -116,15 +116,3 @@ private enum JSON {
         return output
     }
 }
-
-/// A top-level JSON encoder.
-///
-/// If you depend on `Foundation`, you can add a trivial conformance to this with
-/// ```swift
-/// extension JSONEncoder: GuestTimeProfilerJSONEncoder {}
-/// ```
-@_documentation(visibility: internal)
-public protocol GuestTimeProfilerJSONEncoder {
-    associatedtype Bytes: Collection<UInt8>
-    func encode(_ output: some Encodable) throws -> Bytes
-}
