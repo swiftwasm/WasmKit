@@ -12,6 +12,10 @@ let package = Package(
             targets: ["WasmKit"]
         ),
         .library(
+            name: "WasmParser",
+            targets: ["WasmParser"]
+        ),
+        .library(
             name: "WasmKitWASI",
             targets: ["WasmKitWASI"]
         ),
