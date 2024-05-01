@@ -157,8 +157,16 @@ struct ValueStack {
 }
 
 extension ValueStack: Sequence {
-    func makeIterator() -> some IteratorProtocol {
-        self.values[..<count].makeIterator()
+    struct Iterator: IteratorProtocol {
+        fileprivate var base: UnsafeMutableBufferPointer<Value>.SubSequence.Iterator
+
+        mutating func next() -> Value? {
+            base.next()
+        }
+    }
+
+    func makeIterator() -> Iterator {
+        Iterator(base: self.values[..<count].makeIterator())
     }
 }
 
@@ -207,8 +215,16 @@ struct FixedSizeStack<Element> {
 }
 
 extension FixedSizeStack: Sequence {
-    func makeIterator() -> some IteratorProtocol<Element> {
-        self.buffer[..<numberOfElements].makeIterator()
+    struct Iterator: IteratorProtocol {
+        fileprivate var base: UnsafeMutableBufferPointer<Element>.SubSequence.Iterator
+
+        mutating func next() -> Element? {
+            base.next()
+        }
+    }
+
+    func makeIterator() -> Iterator {
+        Iterator(base: self.buffer[..<numberOfElements].makeIterator())
     }
 }
 

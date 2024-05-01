@@ -31,6 +31,9 @@ public struct WITExtractor {
     }
 
     public func run(moduleName: String) throws -> Output {
+        guard #available(macOS 11, *) else {
+            fatalError("WITExtractor requires macOS 11+")
+        }
         let header = """
             // DO NOT EDIT.
             //
@@ -42,6 +45,7 @@ public struct WITExtractor {
         return output
     }
 
+    @available(macOS 11, *)
     func runWithoutHeader(moduleName: String) throws -> Output {
         let output = try digester.dumpSDK(moduleName: moduleName, arguments: extraDigesterArguments)
         var typeMapping = TypeMapping()

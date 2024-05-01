@@ -4,6 +4,7 @@ import SystemPackage
 import WasmKit
 
 @main
+@available(macOS 11, *)
 struct Spectest: AsyncParsableCommand {
     @Argument
     var path: String

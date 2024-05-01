@@ -1,3 +1,4 @@
+@available(macOS 11, *)
 struct TypeMapping {
     typealias DeclScope = [SwiftAPIDigester.SDKNodeDecl]
     struct DeclSource {

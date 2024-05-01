@@ -123,6 +123,10 @@ struct ExtractWIT: ParsableCommand {
     var digesterArgs: [String] = []
 
     func run() throws {
+        guard #available(macOS 11, *) else {
+            fatalError("ExtractWIT requires macOS 11+")
+        }
+
         let extractor = WITExtractor(
             namespace: namespace,
             packageName: packageName,

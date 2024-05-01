@@ -116,6 +116,7 @@ struct SwiftAPIDigester {
     typealias SDKNodeType = SDKNodeInherit<SDKNodeBody, SDKNodeTypeBody>
     typealias SDKNodeTypeNominal = SDKNodeInherit<SDKNodeType, SDKNodeTypeNominalBody>
 
+    @available(macOS 11, *)
     func dumpSDK(moduleName: String, arguments: [String]) throws -> Output {
         var args = [
             "-dump-sdk",
