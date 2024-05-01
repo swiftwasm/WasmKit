@@ -1,4 +1,3 @@
-import Foundation
 import SystemExtras
 import SystemPackage
 
@@ -15,30 +14,29 @@ public class GuestTimeProfiler: RuntimeInterceptor {
         let pid: Int
         let name: String
         let ts: Int
+
+        var jsonLine: String {
+            #"{"ph":"\#(ph.rawValue)","pid":\#(pid),"name":"\#(JSON.serialize(name))","ts":\#(ts)}"#
+        }
     }
 
-    private var output: (Data) -> Void
+    private var output: (_ line: String) -> Void
     private var hasFirstEvent: Bool = false
-    private let encoder = JSONEncoder()
     private let startTime: UInt64
 
-    public init(output: @escaping (Data) -> Void) {
+    public init(output: @escaping (_ line: String) -> Void) {
         self.output = output
         self.startTime = Self.getTimestamp()
     }
 
-    private func eventLine(_ event: Event) -> Data? {
-        return try? encoder.encode(event)
-    }
-
     private func addEventLine(_ event: Event) {
-        guard let line = eventLine(event) else { return }
+        let line = event.jsonLine
         if !hasFirstEvent {
-            self.output("[\n".data(using: .utf8)!)
+            self.output("[\n")
             self.output(line)
             hasFirstEvent = true
         } else {
-            self.output(",\n".data(using: .utf8)!)
+            self.output(",\n")
             self.output(line)
         }
     }
@@ -65,7 +63,7 @@ public class GuestTimeProfiler: RuntimeInterceptor {
         let functionName = try? store.nameRegistry.lookup(address)
         let event = Event(
             ph: .begin, pid: 1,
-            name: functionName ?? "unknown function(\(String(format: "0x%x", address)))",
+            name: functionName ?? "unknown function(0x\(String(address, radix: 16)))",
             ts: getDurationSinceStart()
         )
         addEventLine(event)
@@ -75,13 +73,46 @@ public class GuestTimeProfiler: RuntimeInterceptor {
         let functionName = try? store.nameRegistry.lookup(address)
         let event = Event(
             ph: .end, pid: 1,
-            name: functionName ?? "unknown function(\(String(format: "0x%x", address)))",
+            name: functionName ?? "unknown function(0x\(String(address, radix: 16)))",
             ts: getDurationSinceStart()
         )
         addEventLine(event)
     }
 
     public func finalize() {
-        output("\n]".data(using: .utf8)!)
+        output("\n]")
+    }
+}
+
+/// Foundation-less JSON serialization
+private enum JSON {
+    static func serialize(_ value: String) -> String {
+        // https://www.ietf.org/rfc/rfc4627.txt
+        var output = "\""
+        for scalar in value.unicodeScalars {
+            switch scalar {
+            case "\"":
+                output += "\\\""
+            case "\\":
+                output += "\\\\"
+            case "\u{08}":
+                output += "\\b"
+            case "\u{0C}":
+                output += "\\f"
+            case "\n":
+                output += "\\n"
+            case "\r":
+                output += "\\r"
+            case "\t":
+                output += "\\t"
+            case "\u{20}"..."\u{21}", "\u{23}"..."\u{5B}", "\u{5D}"..."\u{10FFFF}":
+                output.unicodeScalars.append(scalar)
+            default:
+                var hex = String(scalar.value, radix: 16, uppercase: true)
+                hex = String(repeating: "0", count: 4 - hex.count) + hex
+                output += "\\u" + hex
+            }
+        }
+        return output
     }
 }

@@ -58,7 +58,10 @@ let package = Package(
         ),
         .target(
             name: "WasmParser",
-            dependencies: ["WasmTypes"]
+            dependencies: [
+                "WasmTypes",
+                .product(name: "SystemPackage", package: "swift-system"),
+            ]
         ),
         .target(
             name: "WasmKitWASI",

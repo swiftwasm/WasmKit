@@ -1,4 +1,3 @@
-import Foundation
 import SystemPackage
 
 protocol FdWASIEntry: WASIEntry {
@@ -31,13 +30,11 @@ extension FdWASIFile {
             throw WASIAbi.Errno.EBADF
         }
         // TODO: Use `writev`
-        let handle = FileHandle(fileDescriptor: fd.rawValue)
         var bytesWritten: UInt32 = 0
         for iovec in buffer {
-            try iovec.withHostBufferPointer {
-                try handle.write(contentsOf: $0)
+            bytesWritten += try iovec.withHostBufferPointer {
+                UInt32(try fd.write(UnsafeRawBufferPointer($0)))
             }
-            bytesWritten += iovec.length
         }
         return bytesWritten
     }
@@ -45,34 +42,22 @@ extension FdWASIFile {
     @inlinable
     func pwrite<Buffer: Sequence>(vectored buffer: Buffer, offset: WASIAbi.FileSize) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
         // TODO: Use `pwritev`
-        let handle = FileHandle(fileDescriptor: fd.rawValue)
-        let savedOffset = try handle.offset()
-        try handle.seek(toOffset: offset)
-        let nwritten = try write(vectored: buffer)
-        try handle.seek(toOffset: savedOffset)
-        return nwritten
+        var currentOffset: Int64 = Int64(offset)
+        for iovec in buffer {
+            currentOffset += try iovec.withHostBufferPointer {
+                Int64(try fd.writeAll(toAbsoluteOffset: currentOffset, $0))
+            }
+        }
+        let nwritten = WASIAbi.FileSize(currentOffset) - offset
+        return WASIAbi.Size(nwritten)
     }
 
     @inlinable
     func read<Buffer: Sequence>(into buffer: Buffer) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
-        // TODO: Use `readv`
-        let handle = FileHandle(fileDescriptor: fd.rawValue)
         var nread: UInt32 = 0
         for iovec in buffer {
-            try iovec.buffer.withHostPointer(count: Int(iovec.length)) { rawBufferStart in
-                var bufferStart = rawBufferStart.baseAddress!.bindMemory(
-                    to: UInt8.self, capacity: Int(iovec.length)
-                )
-                let bufferEnd = bufferStart + Int(iovec.length)
-                while bufferStart < bufferEnd {
-                    let remaining = bufferEnd - bufferStart
-                    guard let bytes = try handle.read(upToCount: remaining) else {
-                        break
-                    }
-                    bytes.copyBytes(to: bufferStart, count: bytes.count)
-                    bufferStart += bytes.count
-                }
-                nread += iovec.length - UInt32(bufferEnd - bufferStart)
+            nread += try iovec.withHostBufferPointer {
+                try UInt32(fd.read(into: $0))
             }
         }
         return nread
@@ -81,11 +66,12 @@ extension FdWASIFile {
     @inlinable
     func pread<Buffer: Sequence>(into buffer: Buffer, offset: WASIAbi.FileSize) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
         // TODO: Use `preadv`
-        let handle = FileHandle(fileDescriptor: fd.rawValue)
-        let savedOffset = try handle.offset()
-        try handle.seek(toOffset: offset)
-        let nread = try read(into: buffer)
-        try handle.seek(toOffset: savedOffset)
+        var nread: UInt32 = 0
+        for iovec in buffer {
+            nread += try iovec.withHostBufferPointer {
+                try UInt32(fd.read(fromAbsoluteOffset: Int64(offset + UInt64(nread)), into: $0))
+            }
+        }
         return nread
     }
 }

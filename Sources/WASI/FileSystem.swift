@@ -1,4 +1,3 @@
-import Foundation
 import SystemPackage
 
 struct FileAccessMode: OptionSet {

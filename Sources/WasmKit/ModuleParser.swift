@@ -1,11 +1,10 @@
-import Foundation
 import SystemPackage
 import WasmParser
 
 /// Parse a given file as a WebAssembly binary format file
 /// > Note: <https://webassembly.github.io/spec/core/binary/index.html>
 public func parseWasm(filePath: FilePath, features: WasmFeatureSet = .default) throws -> Module {
-    let fileHandle = try FileHandle(forReadingFrom: URL(fileURLWithPath: filePath.string))
+    let fileHandle = try FileDescriptor.open(filePath, .readOnly)
     defer { try? fileHandle.close() }
     let stream = try FileHandleStream(fileHandle: fileHandle)
     let module = try parseModule(stream: stream, features: features)
@@ -126,16 +125,17 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
         memoryTypes: module.memories.map { $0.type },
         tables: module.tables
     )
-    let enableAssertDefault = _slowPath(getenv("WASMKIT_ENABLE_ASSERT") != nil)
     let functions = codes.enumerated().map { [hasDataCount = parser.hasDataCount, features] index, code in
         let funcTypeIndex = typeIndices[index]
         let funcType = module.types[Int(funcTypeIndex)]
         return GuestFunction(
             type: typeIndices[index], locals: code.locals,
             body: {
-                var enableAssert = enableAssertDefault
+                let enableAssert: Bool
                 #if ASSERT
                 enableAssert = true
+                #else
+                enableAssert = false
                 #endif
                 
                 var translator = InstructionTranslator(
