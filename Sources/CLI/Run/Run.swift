@@ -1,5 +1,4 @@
 import ArgumentParser
-import Foundation
 import SystemPackage
 import WasmKitWASI
 import WasmKit
@@ -43,7 +42,7 @@ struct Run: ParsableCommand {
         log("Started parsing module", verbose: true)
 
         let module: Module
-        if verbose {
+        if verbose, #available(macOS 13.0, *) {
             let (parsedModule, parseTime) = try measure {
                 try parseWasm(filePath: FilePath(path))
             }
@@ -71,26 +70,27 @@ struct Run: ParsableCommand {
             invoke = entry
         }
 
-        let (_, invokeTime) = try measure(execution: invoke)
-
-        log("Finished invoking function \"\(path)\": \(invokeTime)", verbose: true)
+        if #available(macOS 13.0, *) {
+            let (_, invokeTime) = try measure(execution: invoke)
+            log("Finished invoking function \"\(path)\": \(invokeTime)", verbose: true)
+        } else {
+            try invoke()
+        }
     }
 
     func deriveInterceptor() throws -> (interceptor: GuestTimeProfiler, finalize: () -> Void)? {
         guard let outputPath = self.profileOutput else { return nil }
-        guard #available(macOS 11, *) else {
-            fatalError("Interceptor requires macOS 11+")
-        }
-        FileManager.default.createFile(atPath: outputPath, contents: nil)
-        let fileHandle = try FileHandle(forWritingTo: URL(fileURLWithPath: outputPath))
-        let profiler = GuestTimeProfiler(encoder: JSONEncoder()) { data in
-            try? fileHandle.write(contentsOf: data)
+        let fileHandle = try FileDescriptor.open(
+            FilePath(outputPath), .writeOnly, options: .create
+        )
+        let profiler = GuestTimeProfiler { data in
+            var data = data
+            _ = data.withUTF8 { try! fileHandle.writeAll($0) }
         }
         return (
             profiler,
             {
                 profiler.finalize()
-                try! fileHandle.synchronize()
                 try! fileHandle.close()
 
                 print("\nProfile Completed: \(outputPath) can be viewed using https://ui.perfetto.dev/")
@@ -147,25 +147,21 @@ struct Run: ParsableCommand {
         }
     }
 
+    @available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *)
     func measure<Result>(
         execution: () throws -> Result
     ) rethrows -> (Result, String) {
-        let start = DispatchTime.now()
-        let result = try execution()
-        let end = DispatchTime.now()
+        var result: Result!
+        let formattedTime = try ContinuousClock().measure {
+            result = try execution()
+        }
 
-        let numberFormatter = NumberFormatter()
-        numberFormatter.numberStyle = .decimal
-        let nanoseconds = NSNumber(value: end.uptimeNanoseconds - start.uptimeNanoseconds)
-        let formattedTime = numberFormatter.string(from: nanoseconds)! + " ns"
-        return (result, formattedTime)
+        return (result, formattedTime.description)
     }
 
     @Sendable func log(_ message: String, verbose: Bool = false) {
         if !verbose || self.verbose {
-            fputs(message + "\n", stderr)
+            try! FileDescriptor.standardError.writeAll((message + "\n").utf8)
         }
     }
 }
-
-extension JSONEncoder: GuestTimeProfilerJSONEncoder {}

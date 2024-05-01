@@ -86,7 +86,7 @@ public final class FileHandleStream: ByteStream {
     }
 }
 
-extension FileDescriptor {
+private extension FileDescriptor {
     func read(upToCount maxLength: Int) throws -> [UInt8] {
         try [UInt8](unsafeUninitializedCapacity: maxLength) { buffer, outCount in
             outCount = try read(into: UnsafeMutableRawBufferPointer(buffer))

@@ -14,34 +14,29 @@ public class GuestTimeProfiler: RuntimeInterceptor {
         let pid: Int
         let name: String
         let ts: Int
+
+        var jsonLine: String {
+            #"{"ph":"\#(ph.rawValue)","pid":\#(pid),"name":"\#(JSON.serialize(name))","ts":\#(ts)}"#
+        }
     }
 
-    private let encode: (any Encodable) throws -> [UInt8]
-    private let output: ([UInt8]) -> Void
+    private var output: (_ line: String) -> Void
     private var hasFirstEvent: Bool = false
     private let startTime: UInt64
 
-    public init(
-        encoder: some GuestTimeProfilerJSONEncoder,
-        output: @escaping ([UInt8]) -> Void
-    ) {
-        self.encode = { try [UInt8](encoder.encode($0)) }
+    public init(output: @escaping (_ line: String) -> Void) {
         self.output = output
         self.startTime = Self.getTimestamp()
     }
 
-    private func eventLine(_ event: Event) -> [UInt8]? {
-        return try? encode(event)
-    }
-
     private func addEventLine(_ event: Event) {
-        guard let line = eventLine(event) else { return }
+        let line = event.jsonLine
         if !hasFirstEvent {
-            self.output(Array("[\n".utf8))
+            self.output("[\n")
             self.output(line)
             hasFirstEvent = true
         } else {
-            self.output(Array(",\n".utf8))
+            self.output(",\n")
             self.output(line)
         }
     }
@@ -85,7 +80,40 @@ public class GuestTimeProfiler: RuntimeInterceptor {
     }
 
     public func finalize() {
-        output(Array("\n]".utf8))
+        output("\n]")
+    }
+}
+
+/// Foundation-less JSON serialization
+private enum JSON {
+    static func serialize(_ value: String) -> String {
+        // https://www.ietf.org/rfc/rfc4627.txt
+        var output = "\""
+        for scalar in value.unicodeScalars {
+            switch scalar {
+            case "\"":
+                output += "\\\""
+            case "\\":
+                output += "\\\\"
+            case "\u{08}":
+                output += "\\b"
+            case "\u{0C}":
+                output += "\\f"
+            case "\n":
+                output += "\\n"
+            case "\r":
+                output += "\\r"
+            case "\t":
+                output += "\\t"
+            case "\u{20}"..."\u{21}", "\u{23}"..."\u{5B}", "\u{5D}"..."\u{10FFFF}":
+                output.unicodeScalars.append(scalar)
+            default:
+                var hex = String(scalar.value, radix: 16, uppercase: true)
+                hex = String(repeating: "0", count: 4 - hex.count) + hex
+                output += "\\u" + hex
+            }
+        }
+        return output
     }
 }
 

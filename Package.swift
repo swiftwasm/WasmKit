@@ -38,14 +38,17 @@ let package = Package(
                 "WasmKitWASI",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "SystemPackage", package: "swift-system"),
-            ]
+            ],
+            exclude: ["CMakeLists.txt"]
         ),
         .target(
-            name: "WasmTypes"
+            name: "WasmTypes",
+            exclude: ["CMakeLists.txt"]
         ),
         .target(
             name: "WASI",
-            dependencies: ["WasmTypes", "SystemExtras"]
+            dependencies: ["WasmTypes", "SystemExtras"],
+            exclude: ["CMakeLists.txt"]
         ),
         .target(
             name: "WasmKit",
@@ -54,24 +57,29 @@ let package = Package(
                 "SystemExtras",
                 "WasmTypes",
                 .product(name: "SystemPackage", package: "swift-system"),
-            ]
+            ],
+            exclude: ["CMakeLists.txt"]
         ),
         .target(
             name: "WasmParser",
             dependencies: [
                 "WasmTypes",
                 .product(name: "SystemPackage", package: "swift-system"),
-            ]
+            ],
+            exclude: ["CMakeLists.txt"]
         ),
         .target(
             name: "WasmKitWASI",
-            dependencies: ["WasmKit", "WASI"]
+            dependencies: ["WasmKit", "WASI"],
+            exclude: ["CMakeLists.txt"]
         ),
         .target(
             name: "SystemExtras",
             dependencies: [
                 .product(name: "SystemPackage", package: "swift-system")
-            ]),
+            ],
+            exclude: ["CMakeLists.txt"]
+        ),
         .executableTarget(
             name: "Spectest",
             dependencies: [

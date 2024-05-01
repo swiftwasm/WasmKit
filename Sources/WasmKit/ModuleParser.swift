@@ -125,17 +125,17 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
         memoryTypes: module.memories.map { $0.type },
         tables: module.tables
     )
-    #warning("Get env without foundation")
-    let enableAssertDefault = false // _slowPath(getenv("WASMKIT_ENABLE_ASSERT") != nil)
     let functions = codes.enumerated().map { [hasDataCount = parser.hasDataCount, features] index, code in
         let funcTypeIndex = typeIndices[index]
         let funcType = module.types[Int(funcTypeIndex)]
         return GuestFunction(
             type: typeIndices[index], locals: code.locals,
             body: {
-                var enableAssert = enableAssertDefault
+                let enableAssert: Bool
                 #if ASSERT
                 enableAssert = true
+                #else
+                enableAssert = false
                 #endif
                 
                 var translator = InstructionTranslator(

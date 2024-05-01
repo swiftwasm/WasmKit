@@ -1,3 +1,12 @@
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+import Darwin
+#elseif os(Linux) || os(FreeBSD) || os(Android)
+import Glibc
+#elseif os(Windows)
+import ucrt
+#else
+#error("Unsupported Platform")
+#endif
 import SystemExtras
 import SystemPackage
 import WasmTypes
@@ -375,9 +384,9 @@ enum WASIAbi {
         let buffer: UnsafeGuestRawPointer
         let length: WASIAbi.Size
 
-        func withHostBufferPointer<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+        func withHostBufferPointer<R>(_ body: (UnsafeMutableRawBufferPointer) throws -> R) rethrows -> R {
             try buffer.withHostPointer(count: Int(length)) { hostPointer in
-                try body(UnsafeRawBufferPointer(hostPointer))
+                try body(hostPointer)
             }
         }
 
@@ -1377,7 +1386,12 @@ public class WASIBridgeToHost: WASI {
 
         for (guestPath, hostPath) in preopens {
             let fd = try hostPath.withCString { cHostPath in
-                try FileDescriptor.open(cHostPath, .readOnly, options: .directory)
+                let fd = open(cHostPath, O_DIRECTORY)
+                if fd < 0 {
+                    let errno = errno
+                    throw WASIError(description: "Failed to open preopen path '\(hostPath)': \(String(cString: strerror(errno)))")
+                }
+                return FileDescriptor(rawValue: fd)
             }
             if try fd.attributes().fileType.isDirectory {
                 _ = try fdTable.push(.directory(DirEntry(preopenPath: guestPath, fd: fd)))
@@ -1583,7 +1597,7 @@ public class WASIBridgeToHost: WASI {
                 throw WASIAbi.Errno.ENAMETOOLONG
             }
             path.withHostPointer(count: Int(maxPathLength)) { buffer in
-                UnsafeMutableRawBufferPointer(buffer).copyMemory(from: UnsafeRawBufferPointer(bytes))
+                UnsafeMutableRawBufferPointer(buffer).copyBytes(from: bytes)
             }
         }
     }
@@ -1644,10 +1658,9 @@ public class WASIBridgeToHost: WASI {
                 let rangeStart = buffer.baseAddress.raw.advanced(by: bufferUsed)
                 name.withUTF8 { bytes in
                     rangeStart.withHostPointer(count: Int(copyingBytes)) { hostBuffer in
-                        hostBuffer.copyMemory(from: UnsafeRawBufferPointer(
-                            start: UnsafeRawPointer(bytes.baseAddress),
-                            count: Int(copyingBytes)
-                        ))
+                        hostBuffer.copyMemory(
+                            from: UnsafeRawBufferPointer(start: bytes.baseAddress, count: Int(copyingBytes))
+                        )
                     }
                 }
                 bufferUsed += copyingBytes
