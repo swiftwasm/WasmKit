@@ -63,7 +63,7 @@ public final class FileHandleStream: ByteStream {
             throw StreamError<UInt8>.unexpectedEnd(expected: nil)
         }
 
-        bytes.append(contentsOf: data)
+        bytes.append(contentsOf: [UInt8](data))
         endOffset = endOffset + data.count
 
         let bytesIndex = currentIndex - startOffset
