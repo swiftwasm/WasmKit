@@ -1,4 +1,12 @@
-import Foundation
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+import Darwin
+#elseif os(Linux) || os(FreeBSD) || os(Android)
+import Glibc
+#elseif os(Windows)
+import ucrt
+#else
+#error("Unsupported Platform")
+#endif
 import SystemExtras
 import SystemPackage
 import WasmTypes
@@ -376,9 +384,9 @@ enum WASIAbi {
         let buffer: UnsafeGuestRawPointer
         let length: WASIAbi.Size
 
-        func withHostBufferPointer<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+        func withHostBufferPointer<R>(_ body: (UnsafeMutableRawBufferPointer) throws -> R) rethrows -> R {
             try buffer.withHostPointer(count: Int(length)) { hostPointer in
-                try body(UnsafeRawBufferPointer(hostPointer))
+                try body(hostPointer)
             }
         }
 
@@ -1382,7 +1390,7 @@ public class WASIBridgeToHost: WASI {
                 let fd = open(cHostPath, O_DIRECTORY)
                 if fd < 0 {
                     let errno = errno
-                    throw POSIXError(POSIXErrorCode(rawValue: errno)!)
+                    throw WASIError(description: "Failed to open preopen path '\(hostPath)': \(String(cString: strerror(errno)))")
                 }
                 return FileDescriptor(rawValue: fd)
             }
@@ -1409,8 +1417,8 @@ public class WASIBridgeToHost: WASI {
             offsets += 1
             let count = arg.utf8CString.withUnsafeBytes { bytes in
                 let count = UInt32(bytes.count)
-                _ = buffer.raw.withHostPointer(count: bytes.count) { hostDestBuffer in
-                    bytes.copyBytes(to: hostDestBuffer)
+                buffer.raw.withHostPointer(count: bytes.count) { hostDestBuffer in
+                    hostDestBuffer.copyMemory(from: bytes)
                 }
                 return count
             }
@@ -1434,8 +1442,8 @@ public class WASIBridgeToHost: WASI {
             offsets += 1
             let count = "\(key)=\(value)".utf8CString.withUnsafeBytes { bytes in
                 let count = UInt32(bytes.count)
-                _ = buffer.raw.withHostPointer(count: bytes.count) { hostDestBuffer in
-                    bytes.copyBytes(to: hostDestBuffer)
+                buffer.raw.withHostPointer(count: bytes.count) { hostDestBuffer in
+                    hostDestBuffer.copyMemory(from: bytes)
                 }
                 return count
             }
@@ -1589,8 +1597,8 @@ public class WASIBridgeToHost: WASI {
             guard bytes.count <= maxPathLength else {
                 throw WASIAbi.Errno.ENAMETOOLONG
             }
-            _ = path.withHostPointer(count: Int(maxPathLength)) { buffer in
-                bytes.copyBytes(to: buffer)
+            path.withHostPointer(count: Int(maxPathLength)) { buffer in
+                UnsafeMutableRawBufferPointer(buffer).copyBytes(from: bytes)
             }
         }
     }
@@ -1650,8 +1658,10 @@ public class WASIBridgeToHost: WASI {
                 let copyingBytes = min(entry.dirNameLen, totalBufferSize - bufferUsed)
                 let rangeStart = buffer.baseAddress.raw.advanced(by: bufferUsed)
                 name.withUTF8 { bytes in
-                    _ = rangeStart.withHostPointer(count: Int(copyingBytes)) { hostBuffer in
-                        bytes.copyBytes(to: hostBuffer, count: Int(copyingBytes))
+                    rangeStart.withHostPointer(count: Int(copyingBytes)) { hostBuffer in
+                        hostBuffer.copyMemory(
+                            from: UnsafeRawBufferPointer(start: bytes.baseAddress, count: Int(copyingBytes))
+                        )
                     }
                 }
                 bufferUsed += copyingBytes
