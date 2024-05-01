@@ -843,7 +843,8 @@ extension WASI {
                 count: length
             )
             return try pointer.withHostPointer { hostBuffer in
-                guard hostBuffer.firstIndex(of: 0x00) == nil
+                guard let baseAddress = hostBuffer.baseAddress,
+                    memchr(baseAddress, 0x00, Int(pointer.count)) == nil
                 else {
                     // If byte sequence contains null byte in the middle, it's illegal string
                     // TODO: This restriction should be only applied to strings that can be interpreted as platform-string, which is expected to be null-terminated
