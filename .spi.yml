@@ -1,8 +1,10 @@
 version: 1
 builder:
   configs:
-    - documentation_targets: 
+    - documentation_targets:
         - WasmKit
+        - WasmKitWASI
+        - WasmParser
         - WASI
         - WIT
         - WITExtractor
