@@ -57,11 +57,13 @@ public struct WasmFeatureSet: OptionSet {
     public static let memory64 = WasmFeatureSet(rawValue: 1 << 0)
     /// The WebAssembly reference types proposal
     public static let referenceTypes = WasmFeatureSet(rawValue: 1 << 1)
+    /// The WebAssembly threads proposal
+    public static let threads = WasmFeatureSet(rawValue: 1 << 2)
 
     /// The default feature set
     public static let `default`: WasmFeatureSet = [.referenceTypes]
     /// The feature set with all features enabled
-    public static let all: WasmFeatureSet = [.memory64, .referenceTypes]
+    public static let all: WasmFeatureSet = [.memory64, .referenceTypes, .threads]
 }
 
 public enum WasmParserError: Swift.Error {
@@ -274,19 +276,39 @@ extension Parser {
     /// <https://webassembly.github.io/spec/core/binary/types.html#limits>
     func parseLimits() throws -> Limits {
         let b = try stream.consumeAny()
+        let sharedMask    : UInt8 = 0b0010
+        let isMemory64Mask: UInt8 = 0b0100
 
-        switch b {
-        case 0x00:
-            return try Limits(min: UInt64(parseUnsigned(UInt32.self)), max: nil)
-        case 0x01:
-            return try Limits(min: UInt64(parseUnsigned(UInt32.self)), max: UInt64(parseUnsigned(UInt32.self)))
-        case 0x04 where features.contains(.memory64):
-            return try Limits(min: parseUnsigned(UInt64.self), max: nil, isMemory64: true)
-        case 0x05 where features.contains(.memory64):
-            return try Limits(min: parseUnsigned(UInt64.self), max: parseUnsigned(UInt64.self), isMemory64: true)
-        default:
+        let hasMax = b & 0b0001 != 0
+        let shared = b & sharedMask != 0
+        let isMemory64 = b & isMemory64Mask != 0
+
+        var flagMask: UInt8 = 0b0001
+        if features.contains(.threads) {
+            flagMask |= sharedMask
+        }
+        if features.contains(.memory64) {
+            flagMask |= isMemory64Mask
+        }
+        guard (b & ~flagMask) == 0 else {
             throw WasmParserError.malformedLimit(b)
         }
+
+        let min: UInt64
+        if isMemory64 {
+            min = try parseUnsigned(UInt64.self)
+        } else {
+            min = try UInt64(parseUnsigned(UInt32.self))
+        }
+        var max: UInt64?
+        if hasMax {
+            if isMemory64 {
+                max = try parseUnsigned(UInt64.self)
+            } else {
+                max = try UInt64(parseUnsigned(UInt32.self))
+            }
+        }
+        return Limits(min: min, max: max, isMemory64: isMemory64, shared: shared)
     }
 
     /// > Note:
