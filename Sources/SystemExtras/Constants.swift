@@ -12,12 +12,14 @@ import ucrt
 
 import SystemPackage
 
+#if !os(Windows)
 @_alwaysEmitIntoClient
 internal var _AT_EACCESS: CInt { AT_EACCESS }
 @_alwaysEmitIntoClient
 internal var _AT_SYMLINK_NOFOLLOW: CInt { AT_SYMLINK_NOFOLLOW }
 @_alwaysEmitIntoClient
 internal var _AT_SYMLINK_FOLLOW: CInt { AT_SYMLINK_FOLLOW }
+#endif
 @_alwaysEmitIntoClient
 internal var _AT_REMOVEDIR: CInt { AT_REMOVEDIR }
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)

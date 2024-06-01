@@ -71,11 +71,6 @@ internal func system_unlinkat(
   return unlinkat(fd, path, flags)
 }
 
-// futimens
-internal func system_futimens(_ fd: Int32, _ times: UnsafePointer<CInterop.TimeSpec>) -> CInt {
-  return futimens(fd, times)
-}
-
 // ftruncate
 internal func system_ftruncate(_ fd: Int32, _ size: off_t) -> CInt {
   return ftruncate(fd, size)
@@ -115,9 +110,16 @@ internal func system_readdir(_ dirp: CInterop.DirP) -> UnsafeMutablePointer<dire
   return readdir(dirp)
 }
 
+#if !os(Windows)
+
 extension CInterop {
   public typealias ClockId = clockid_t
   public typealias TimeSpec = timespec
+}
+
+// futimens
+internal func system_futimens(_ fd: Int32, _ times: UnsafePointer<CInterop.TimeSpec>) -> CInt {
+  return futimens(fd, times)
 }
 
 // clock_gettime
@@ -129,3 +131,4 @@ internal func system_clock_gettime(_ id: CInterop.ClockId, _ tp: UnsafeMutablePo
 internal func system_clock_getres(_ id: CInterop.ClockId, _ tp: UnsafeMutablePointer<CInterop.TimeSpec>) -> CInt {
     return clock_getres(id, tp)
 }
+#endif

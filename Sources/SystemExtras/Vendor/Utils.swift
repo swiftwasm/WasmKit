@@ -1,7 +1,7 @@
 /*
  This source file is part of the Swift System open source project
 
- Copyright (c) 2020 Apple Inc. and the Swift System project authors
+ Copyright (c) 2020 - 2021 Apple Inc. and the Swift System project authors
  Licensed under Apache License v2.0 with Runtime Library Exception
 
  See https://swift.org/LICENSE.txt for license information
@@ -12,38 +12,22 @@
 
 import SystemPackage
 
-#if canImport(Darwin)
-import Darwin
-#endif
-
-#if canImport(Glibc)
-import Glibc
-#endif
-
-#if canImport(ucrt)
-import ucrt
-#endif
-
-#if canImport(WASILibc)
-import WASILibc
-#endif
-
 // Results in errno if i == -1
-// @available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+@available(/*System 0.0.1: macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0*/iOS 8, *)
 private func valueOrErrno<I: FixedWidthInteger>(
   _ i: I
 ) -> Result<I, Errno> {
-    i == -1 ? .failure(Errno(rawValue: errno)) : .success(i)
+  i == -1 ? .failure(Errno(rawValue: system_errno)) : .success(i)
 }
 
-// @available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+@available(/*System 0.0.1: macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0*/iOS 8, *)
 private func nothingOrErrno<I: FixedWidthInteger>(
   _ i: I
 ) -> Result<(), Errno> {
   valueOrErrno(i).map { _ in () }
 }
 
-// @available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+@available(/*System 0.0.1: macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0*/iOS 8, *)
 internal func valueOrErrno<I: FixedWidthInteger>(
   retryOnInterrupt: Bool, _ f: () -> I
 ) -> Result<I, Errno> {
@@ -57,7 +41,7 @@ internal func valueOrErrno<I: FixedWidthInteger>(
   } while true
 }
 
-// @available(macOS 10.16, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
+@available(/*System 0.0.1: macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0*/iOS 8, *)
 internal func nothingOrErrno<I: FixedWidthInteger>(
   retryOnInterrupt: Bool, _ f: () -> I
 ) -> Result<(), Errno> {
@@ -147,4 +131,14 @@ extension MutableCollection where Element: Equatable {
       if self[idx] == e { self[idx] = new }
     }
   }
+}
+
+internal func _withOptionalUnsafePointerOrNull<T, R>(
+  to value: T?,
+  _ body: (UnsafePointer<T>?) throws -> R
+) rethrows -> R {
+  guard let value = value else {
+    return try body(nil)
+  }
+  return try withUnsafePointer(to: value, body)
 }

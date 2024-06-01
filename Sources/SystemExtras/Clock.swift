@@ -12,6 +12,8 @@ import ucrt
 
 import SystemPackage
 
+#if !os(Windows)
+
 @frozen
 public struct Clock: RawRepresentable {
 
@@ -110,3 +112,4 @@ extension Clock {
     }
   }
 }
+#endif
