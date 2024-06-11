@@ -1,6 +1,0 @@
-[submodule "Vendor/testsuite"]
-	path = Vendor/testsuite
-	url = https://github.com/WebAssembly/testsuite.git
-[submodule "Vendor/wasi-testsuite"]
-	path = Vendor/wasi-testsuite
-	url = https://github.com/WebAssembly/wasi-testsuite.git

@@ -17,10 +17,12 @@ test:
 docs:
 	swift package generate-documentation --target WasmKit
 
-WAST_ROOT = Vendor/testsuite
+### Spectest (Core WebAssembly Specification Test Suite)
+
+TESTSUITE_DIR = Vendor/testsuite
 SPECTEST_ROOT = ./spectest
-WAST_FILES = $(wildcard $(WAST_ROOT)/*.wast) $(wildcard $(WAST_ROOT)/proposals/memory64/*.wast)
-JSON_FILES = $(WAST_FILES:$(WAST_ROOT)/%.wast=$(SPECTEST_ROOT)/%.json)
+WAST_FILES = $(wildcard $(TESTSUITE_DIR)/*.wast) $(wildcard $(TESTSUITE_DIR)/proposals/memory64/*.wast)
+JSON_FILES = $(WAST_FILES:$(TESTSUITE_DIR)/%.wast=$(SPECTEST_ROOT)/%.json)
 
 .PHONY: spec
 spec: $(JSON_FILES) $(SPECTEST_ROOT)/host.wasm
@@ -28,7 +30,8 @@ spec: $(JSON_FILES) $(SPECTEST_ROOT)/host.wasm
 $(SPECTEST_ROOT)/host.wasm: ./Examples/wasm/host.wat
 	wat2wasm ./Examples/wasm/host.wat -o $(SPECTEST_ROOT)/host.wasm
 
-$(SPECTEST_ROOT)/%.json: $(WAST_ROOT)/%.wast
+$(TESTSUITE_DIR)/%.wast: $(TESTSUITE_DIR)
+$(SPECTEST_ROOT)/%.json: $(TESTSUITE_DIR)/%.wast
 	@mkdir -p $(@D)
 	wast2json $^ -o $@
 
@@ -36,13 +39,14 @@ $(SPECTEST_ROOT)/%.json: $(WAST_ROOT)/%.wast
 spectest: spec
 	swift run Spectest $(SPECTEST_ROOT)
 
-.PHONY: clean
-clean:
-	@swift package clean
 
-.PHONY: update
-update:
-	@swift package update
+### WASI Test Suite
+
+.PHONY: wasitest
+wasitest:
+	./IntegrationTests/WASI/run-tests.sh
+
+### Utilities
 
 .PHONY: generate
 generate:
