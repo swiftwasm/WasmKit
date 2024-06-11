@@ -34,4 +34,5 @@ set -e
 install_tools
 
 SOURCE_DIR="$(cd $(dirname $0)/.. && pwd)"
+./Vendor/checkout-dependency testsuite
 exec make -C $SOURCE_DIR spectest

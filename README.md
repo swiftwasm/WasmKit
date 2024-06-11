@@ -29,5 +29,15 @@ Add the URL of this repository to your `Package.swift` manifest. Then add the `W
 To run the core spec test suite run this:
 
 ```sh
-$ make spectest   # Prepare core spec tests and check their assertions with WasmKit
+# Checkout the core spec test suite
+$ ./Vendor/checkout-dependency spectest
+# Prepare core spec tests and check their assertions with WasmKit
+$ make spectest
+
+# Checkout WASI spec test suite
+$ ./Vendor/checkout-dependency wasi-testsuite
+# Install Python dependencies for running WASI spec tests
+$ python3 -m pip install -r ./Vendor/wasi-testsuite/test-runner/requirements.txt
+# Run WASI spec tests
+$ make wasitest
 ```
