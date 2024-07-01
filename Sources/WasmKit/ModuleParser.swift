@@ -129,7 +129,7 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
         let funcTypeIndex = typeIndices[index]
         let funcType = module.types[Int(funcTypeIndex)]
         return GuestFunction(
-            type: typeIndices[index], locals: code.locals,
+            type: typeIndices[index], locals: code.locals, allocator: module.allocator,
             body: {
                 let enableAssert: Bool
                 #if ASSERT

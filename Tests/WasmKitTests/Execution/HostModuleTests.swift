@@ -23,6 +23,17 @@ final class HostModuleTests: XCTestCase {
     func testReentrancy() throws {
         let runtime = Runtime()
         let voidSignature = WasmParser.FunctionType(parameters: [], results: [])
+        let allocator = ISeqAllocator()
+        func compile(_ instructions: [WasmKit.Instruction], maxStackHeight: Int) -> InstructionSequence {
+            let buffer = allocator.allocateInstructions(capacity: instructions.count + 1)
+            for (i, instruction) in instructions.enumerated() {
+                buffer[i] = instruction
+            }
+            buffer[instructions.count] = .endOfFunction
+            return InstructionSequence(
+                instructions: UnsafeBufferPointer(buffer), maxStackHeight: maxStackHeight
+            )
+        }
         let module = Module(
             types: [voidSignature],
             functions: [
@@ -30,21 +41,31 @@ final class HostModuleTests: XCTestCase {
                 // [1] (import "env" "qux" func)
                 // [2] "foo"
                 GuestFunction(
-                    type: 0, locals: [],
+                    type: 0,
+                    locals: [],
+                    allocator: allocator,
                     body: {
-                        [
-                            .call(functionIndex: 0),
-                            .call(functionIndex: 0),
-                            .call(functionIndex: 0),
-                        ]
+                        compile(
+                            [
+                                .call(functionIndex: 0),
+                                .call(functionIndex: 0),
+                                .call(functionIndex: 0),
+                            ],
+                            maxStackHeight: 0
+                        )
                     }),
                 // [3] "bar"
                 GuestFunction(
-                    type: 0, locals: [],
+                    type: 0,
+                    locals: [],
+                    allocator: allocator,
                     body: {
-                        [
-                            .call(functionIndex: 1)
-                        ]
+                        compile(
+                            [
+                                .call(functionIndex: 1)
+                            ],
+                            maxStackHeight: 0
+                        )
                     }),
             ],
             imports: [

@@ -80,14 +80,14 @@ typealias LabelIndex = UInt32
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#functions>
 struct GuestFunction {
-    init(type: TypeIndex, locals: [WasmParser.ValueType], body: @escaping () throws -> InstructionSequence) {
+    init(
+        type: TypeIndex,
+        locals: [WasmParser.ValueType],
+        allocator: ISeqAllocator,
+        body: @escaping () throws -> InstructionSequence
+    ) {
         self.type = type
-        // TODO: Deallocate const default locals after the module is deallocated
-        let defaultLocals = UnsafeMutableBufferPointer<Value>.allocate(capacity: locals.count)
-        for (index, localType) in locals.enumerated() {
-            defaultLocals[index] = localType.defaultValue
-        }
-        self.defaultLocals = UnsafeBufferPointer(defaultLocals)
+        self.defaultLocals = allocator.allocateDefaultLocals(locals)
         self.materializer = body
     }
 

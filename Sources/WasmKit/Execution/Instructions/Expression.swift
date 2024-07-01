@@ -6,19 +6,10 @@ struct InstructionSequence: Equatable {
     /// This height does not count the locals.
     let maxStackHeight: Int
 
-    init(instructions: [Instruction], maxStackHeight: Int) {
-        assert(_isPOD(Instruction.self))
-        let buffer = UnsafeMutableBufferPointer<Instruction>.allocate(capacity: instructions.count + 1)
-        for (idx, instruction) in instructions.enumerated() {
-            buffer[idx] = instruction
-        }
-        buffer[instructions.count] = .endOfFunction
-        self.instructions = UnsafeBufferPointer(buffer)
+    init(instructions: UnsafeBufferPointer<Instruction>, maxStackHeight: Int) {
+        self.instructions = instructions
+        assert(self.instructions.last == .endOfFunction)
         self.maxStackHeight = maxStackHeight
-    }
-
-    func deallocate() {
-        instructions.deallocate()
     }
 
     var baseAddress: UnsafePointer<Instruction> {

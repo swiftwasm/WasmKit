@@ -11,6 +11,22 @@ class ISeqAllocator {
         return buffer
     }
 
+    func allocateDefaultLocals(_ locals: [ValueType]) -> UnsafeBufferPointer<Value> {
+        let buffer = UnsafeMutableBufferPointer<Value>.allocate(capacity: locals.count)
+        for (index, localType) in locals.enumerated() {
+            buffer[index] = localType.defaultValue
+        }
+        self.buffers.append(UnsafeMutableRawBufferPointer(buffer))
+        return UnsafeBufferPointer(buffer)
+    }
+
+    func allocateInstructions(capacity: Int) -> UnsafeMutableBufferPointer<Instruction> {
+        assert(_isPOD(Instruction.self), "Instruction must be POD")
+        let buffer = UnsafeMutableBufferPointer<Instruction>.allocate(capacity: capacity)
+        self.buffers.append(UnsafeMutableRawBufferPointer(buffer))
+        return buffer
+    }
+
     deinit {
         for buffer in buffers {
             buffer.deallocate()
@@ -404,7 +420,13 @@ struct InstructionTranslator: InstructionVisitor {
         iseqBuilder.assertDanglingLabels()
         #endif
         let instructions = iseqBuilder.finalize()
-        return InstructionSequence(instructions: instructions, maxStackHeight: valueStack.maxHeight)
+        // TODO: Figure out a way to avoid the copy here while keeping the execution performance.
+        let buffer = allocator.allocateInstructions(capacity: instructions.count + 1)
+        for (idx, instruction) in instructions.enumerated() {
+            buffer[idx] = instruction
+        }
+        buffer[instructions.count] = .endOfFunction
+        return InstructionSequence(instructions: UnsafeBufferPointer(buffer), maxStackHeight: valueStack.maxHeight)
     }
 
     // MARK: - Visitor

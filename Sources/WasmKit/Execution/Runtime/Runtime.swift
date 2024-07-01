@@ -87,18 +87,21 @@ extension Runtime {
                         .numericConst(.i32(UInt32(element.initializer.count))),
                         .tableInit(tableIndex, elementIndex),
                         .tableElementDrop(elementIndex),
+                        .endOfFunction,
                     ])
-                    let initIseq = InstructionSequence(instructions: instructions, maxStackHeight: 2)
-                    defer { initIseq.deallocate() }
-                    try evaluateConstExpr(initIseq, instance: instance)
+                    try instructions.withUnsafeBufferPointer {
+                        let initIseq = InstructionSequence(instructions: $0, maxStackHeight: 2)
+                        try evaluateConstExpr(initIseq, instance: instance)
+                    }
 
                 case .declarative:
-                    let initIseq = InstructionSequence(
-                        instructions: [.tableElementDrop(elementIndex)],
-                        maxStackHeight: 0
-                    )
-                    defer { initIseq.deallocate() }
-                    try evaluateConstExpr(initIseq, instance: instance)
+                    let instructions: [Instruction] = [.tableElementDrop(elementIndex), .endOfFunction]
+                    try instructions.withUnsafeBufferPointer {
+                        let initIseq = InstructionSequence(
+                            instructions: $0, maxStackHeight: 0
+                        )
+                        try evaluateConstExpr(initIseq, instance: instance)
+                    }
 
                 case .passive:
                     continue
@@ -125,14 +128,17 @@ extension Runtime {
                 default:
                     throw InstantiationError.unsupported("init expr in data section \(data.offset)")
                 }
-                let iseq = InstructionSequence(instructions: instructions + [
+                instructions.append(contentsOf: [
                     .numericConst(.i32(0)),
                     .numericConst(.i32(UInt32(data.initializer.count))),
                     .memoryInit(UInt32(dataIndex)),
                     .memoryDataDrop(UInt32(dataIndex)),
-                ], maxStackHeight: 2)
-                defer { iseq.deallocate() }
-                try evaluateConstExpr(iseq, instance: instance)
+                    .endOfFunction,
+                ])
+                try instructions.withUnsafeBufferPointer {
+                    let iseq = InstructionSequence(instructions: $0, maxStackHeight: 2)
+                    try evaluateConstExpr(iseq, instance: instance)
+                }
             }
         } catch Trap.outOfBoundsMemoryAccess {
             throw InstantiationError.outOfBoundsMemoryAccess
@@ -193,10 +199,12 @@ extension Runtime {
                 default:
                     throw InstantiationError.unsupported("init expr in global section \(global.initializer)")
                 }
-                let iseq = InstructionSequence(instructions: instructions, maxStackHeight: 1)
-                defer { iseq.deallocate() }
-                return try evaluateConstExpr(iseq, instance: globalModuleInstance, arity: 1) { _, stack in
-                    return stack.popValue()
+                instructions.append(.endOfFunction)
+                return try instructions.withUnsafeBufferPointer {
+                    let iseq = InstructionSequence(instructions: $0, maxStackHeight: 1)
+                    return try evaluateConstExpr(iseq, instance: globalModuleInstance, arity: 1) { _, stack in
+                        return stack.popValue()
+                    }
                 }
             }
             
