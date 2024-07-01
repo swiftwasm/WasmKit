@@ -23,16 +23,10 @@ let package = Package(
             name: "WASI",
             targets: ["WASI"]
         ),
-        .library(
-            name: "WIT", targets: ["WIT"]
-        ),
         .executable(
             name: "wasmkit-cli",
             targets: ["CLI"]
         ),
-        .library(name: "_CabiShims", targets: ["_CabiShims"]),
-        .plugin(name: "WITOverlayPlugin", targets: ["WITOverlayPlugin"]),
-        .plugin(name: "WITExtractorPlugin", targets: ["WITExtractorPlugin"]),
     ],
     targets: [
         .executableTarget(
@@ -92,6 +86,45 @@ let package = Package(
                 .product(name: "SystemPackage", package: "swift-system"),
             ]
         ),
+        .testTarget(
+            name: "WasmKitTests",
+            dependencies: ["WasmKit"]
+        ),
+        .testTarget(
+            name: "WasmParserTests",
+            dependencies: ["WasmParser"]
+        ),
+        .testTarget(
+            name: "WASITests",
+            dependencies: ["WASI"]
+        ),
+    ],
+    swiftLanguageVersions: [.v5]
+)
+
+if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
+    package.dependencies += [
+        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.2.2"),
+        .package(url: "https://github.com/apple/swift-system", .upToNextMinor(from: "1.2.1")),
+        .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.3.0"),
+        .package(url: "https://github.com/apple/swift-format.git", from: "510.1.0"),
+    ]
+} else {
+    package.dependencies += [
+        .package(path: "../swift-argument-parser"),
+        .package(path: "../swift-system"),
+    ]
+}
+
+#if !os(Windows)
+    package.products.append(contentsOf: [
+        .library(name: "WIT", targets: ["WIT"]),
+        .library(name: "_CabiShims", targets: ["_CabiShims"]),
+        .plugin(name: "WITOverlayPlugin", targets: ["WITOverlayPlugin"]),
+        .plugin(name: "WITExtractorPlugin", targets: ["WITExtractorPlugin"]),
+    ])
+
+    package.targets.append(contentsOf: [
         .target(name: "WIT"),
         .testTarget(name: "WITTests", dependencies: ["WIT"]),
         .target(name: "WITOverlayGenerator", dependencies: ["WIT"]),
@@ -130,32 +163,5 @@ let package = Package(
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ]
         ),
-        .testTarget(
-            name: "WasmKitTests",
-            dependencies: ["WasmKit"]
-        ),
-        .testTarget(
-            name: "WasmParserTests",
-            dependencies: ["WasmParser"]
-        ),
-        .testTarget(
-            name: "WASITests",
-            dependencies: ["WASI"]
-        ),
-    ],
-    swiftLanguageVersions: [.v5]
-)
-
-if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
-    package.dependencies += [
-        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.2.2"),
-        .package(url: "https://github.com/apple/swift-system", .upToNextMinor(from: "1.2.1")),
-        .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.3.0"),
-        .package(url: "https://github.com/apple/swift-format.git", from: "510.1.0"),
-    ]
-} else {
-    package.dependencies += [
-        .package(path: "../swift-argument-parser"),
-        .package(path: "../swift-system"),
-    ]
-}
+    ])
+#endif
