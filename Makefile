@@ -1,18 +1,5 @@
 NAME := WasmKit
 
-MODULES = $(notdir $(wildcard Sources/*))
-
-.PHONY: all
-all: build
-
-.PHONY: build
-build:
-	@swift build
-
-.PHONY: test
-test:
-	@swift test
-
 .PHONY: docs
 docs:
 	swift package generate-documentation --target WasmKit
@@ -52,11 +39,3 @@ wasitest:
 generate:
 	swift ./Utilities/generate_inst_visitor.swift
 	swift ./Utilities/generate_inst_dispatch.swift
-
-GIT_STATUS = $(shell git status --porcelain)
-ensure_clean:
-	@[ -z "$(GIT_STATUS)" ] \
-    && echo Working directory is clean \
-	|| (printf "Uncommitted changes: \n $(GIT_STATUS)\n" && exit 1)
-
-FORCE:
