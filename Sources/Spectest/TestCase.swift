@@ -79,13 +79,6 @@ struct TestCase {
     let content: Content
     let path: String
 
-    private static func isDirectory(_ path: FilePath) -> Bool {
-        let fd = try? FileDescriptor.open(path, FileDescriptor.AccessMode.readOnly, options: .directory)
-        let isDirectory = fd != nil
-        try? fd?.close()
-        return isDirectory
-    }
-
     static func load(include: [String], exclude: [String], in path: String, log: ((String) -> Void)? = nil) throws -> [TestCase] {
         let fileManager = FileManager.default
         let filePath = FilePath(path)
@@ -562,4 +555,21 @@ extension Swift.Error {
 
         return "unknown error: \(self)"
     }
+}
+
+#if os(Windows)
+import WinSDK
+#endif
+internal func isDirectory(_ path: FilePath) -> Bool {
+    #if os(Windows)
+    return path.withPlatformString {
+        let result = GetFileAttributesW($0)
+        return result != INVALID_FILE_ATTRIBUTES && result & DWORD(FILE_ATTRIBUTE_DIRECTORY) != 0
+    }
+    #else
+    let fd = try? FileDescriptor.open(path, FileDescriptor.AccessMode.readOnly, options: .directory)
+    let isDirectory = fd != nil
+    try? fd?.close()
+    return isDirectory
+    #endif
 }

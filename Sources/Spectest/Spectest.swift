@@ -41,7 +41,7 @@ struct Spectest: AsyncParsableCommand {
 
         let rootPath: String
         let filePath = FilePath(path)
-        if (try? FileDescriptor.open(filePath, FileDescriptor.AccessMode.readOnly, options: .directory)) != nil {
+        if isDirectory(filePath) {
             rootPath = path
         } else {
             rootPath = URL(fileURLWithPath: path).deletingLastPathComponent().path
