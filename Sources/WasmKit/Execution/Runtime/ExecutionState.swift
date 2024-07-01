@@ -82,9 +82,3 @@ extension ExecutionState {
         store.module(address: stack.currentFrame.module)
     }
 }
-
-extension ExecutionState {
-    mutating func pseudo(runtime: Runtime, pseudoInstruction: PseudoInstruction) throws {
-        fatalError("Unimplemented instruction: pseudo")
-    }
-}

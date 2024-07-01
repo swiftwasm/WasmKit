@@ -1,20 +1,12 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#stack>
 struct Stack {
-    enum Element: Equatable {
-        case value(Value)
-        case frame(Frame)
-    }
 
     private var limit: UInt16 { UInt16.max }
     private var valueStack: ValueStack
     private var numberOfValues: Int { valueStack.count }
     private var frames: FixedSizeStack<Frame>
     var currentFrame: Frame!
-
-    var isEmpty: Bool {
-        self.frames.isEmpty && self.numberOfValues == 0
-    }
 
     init() {
         let limit = UInt16.max

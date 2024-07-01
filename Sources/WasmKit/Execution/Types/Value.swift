@@ -445,30 +445,6 @@ extension Value {
         }
     }
 
-    var leadingZeroBitCount: Value {
-        switch self {
-        case let .i32(rawValue): return .i32(UInt32(rawValue.leadingZeroBitCount))
-        case let .i64(rawValue): return .i64(UInt64(rawValue.leadingZeroBitCount))
-        default: fatalError("Invalid type \(type) for `Value.\(#function)` implementation")
-        }
-    }
-
-    var trailingZeroBitCount: Value {
-        switch self {
-        case let .i32(rawValue): return .i32(UInt32(rawValue.trailingZeroBitCount))
-        case let .i64(rawValue): return .i64(UInt64(rawValue.trailingZeroBitCount))
-        default: fatalError("Invalid type \(type) for `Value.\(#function)` implementation")
-        }
-    }
-
-    var nonzeroBitCount: Value {
-        switch self {
-        case let .i32(rawValue): return .i32(UInt32(rawValue.nonzeroBitCount))
-        case let .i64(rawValue): return .i64(UInt64(rawValue.nonzeroBitCount))
-        default: fatalError("Invalid type \(type) for `Value.\(#function)` implementation")
-        }
-    }
-
     func rotl(_ l: Self) -> Self {
         switch (self, l) {
         case let (.i32(rawValue), .i32(l)):
@@ -523,36 +499,6 @@ extension Value {
             let lhs = Float64(bitPattern: lhs)
             let rhs = Float64(bitPattern: rhs)
             return .f64(lhs.sign == rhs.sign ? lhs.bitPattern : (-lhs).bitPattern)
-        default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value.\(#function)` implementation")
-        }
-    }
-
-    static func + (lhs: Self, rhs: Self) -> Self {
-        switch (lhs, rhs) {
-        case let (.i32(lhs), .i32(rhs)): return .i32(lhs &+ rhs)
-        case let (.i64(lhs), .i64(rhs)): return .i64(lhs &+ rhs)
-        case let (.f32(lhs), .f32(rhs)): return .f32((Float32(bitPattern: lhs) + Float32(bitPattern: rhs)).bitPattern)
-        case let (.f64(lhs), .f64(rhs)): return .f64((Float64(bitPattern: lhs) + Float64(bitPattern: rhs)).bitPattern)
-        default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value.\(#function)` implementation")
-        }
-    }
-
-    static func - (lhs: Self, rhs: Self) -> Self {
-        switch (lhs, rhs) {
-        case let (.i32(lhs), .i32(rhs)): return .i32(lhs &- rhs)
-        case let (.i64(lhs), .i64(rhs)): return .i64(lhs &- rhs)
-        case let (.f32(lhs), .f32(rhs)): return .f32((Float32(bitPattern: lhs) - Float32(bitPattern: rhs)).bitPattern)
-        case let (.f64(lhs), .f64(rhs)): return .f64((Float64(bitPattern: lhs) - Float64(bitPattern: rhs)).bitPattern)
-        default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value.\(#function)` implementation")
-        }
-    }
-
-    static func * (lhs: Self, rhs: Self) -> Self {
-        switch (lhs, rhs) {
-        case let (.i32(lhs), .i32(rhs)): return .i32(lhs &* rhs)
-        case let (.i64(lhs), .i64(rhs)): return .i64(lhs &* rhs)
-        case let (.f32(lhs), .f32(rhs)): return .f32((Float32(bitPattern: lhs) * Float32(bitPattern: rhs)).bitPattern)
-        case let (.f64(lhs), .f64(rhs)): return .f64((Float64(bitPattern: lhs) * Float64(bitPattern: rhs)).bitPattern)
         default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value.\(#function)` implementation")
         }
     }
