@@ -90,6 +90,9 @@ internal func system_symlinkat(
   return symlinkat(oldPath, newDirFd, newPath)
 }
 
+// ucrt does not provide `opendir` API
+#if !os(Windows)
+
 extension CInterop {
   #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
   public typealias DirP = UnsafeMutablePointer<DIR>
@@ -109,6 +112,7 @@ internal func system_fdopendir(_ fd: Int32) -> CInterop.DirP? {
 internal func system_readdir(_ dirp: CInterop.DirP) -> UnsafeMutablePointer<dirent>? {
   return readdir(dirp)
 }
+#endif
 
 #if !os(Windows)
 

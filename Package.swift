@@ -15,14 +15,6 @@ let package = Package(
             name: "WasmParser",
             targets: ["WasmParser"]
         ),
-        .library(
-            name: "WasmKitWASI",
-            targets: ["WasmKitWASI"]
-        ),
-        .library(
-            name: "WASI",
-            targets: ["WASI"]
-        ),
         .executable(
             name: "wasmkit-cli",
             targets: ["CLI"]
@@ -33,7 +25,6 @@ let package = Package(
             name: "CLI",
             dependencies: [
                 "WasmKit",
-                "WasmKitWASI",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "SystemPackage", package: "swift-system"),
             ],
@@ -44,15 +35,9 @@ let package = Package(
             exclude: ["CMakeLists.txt"]
         ),
         .target(
-            name: "WASI",
-            dependencies: ["WasmTypes", "SystemExtras"],
-            exclude: ["CMakeLists.txt"]
-        ),
-        .target(
             name: "WasmKit",
             dependencies: [
                 "WasmParser",
-                "SystemExtras",
                 "WasmTypes",
                 .product(name: "SystemPackage", package: "swift-system"),
             ],
@@ -63,18 +48,6 @@ let package = Package(
             dependencies: [
                 "WasmTypes",
                 .product(name: "SystemPackage", package: "swift-system"),
-            ],
-            exclude: ["CMakeLists.txt"]
-        ),
-        .target(
-            name: "WasmKitWASI",
-            dependencies: ["WasmKit", "WASI"],
-            exclude: ["CMakeLists.txt"]
-        ),
-        .target(
-            name: "SystemExtras",
-            dependencies: [
-                .product(name: "SystemPackage", package: "swift-system")
             ],
             exclude: ["CMakeLists.txt"]
         ),
@@ -93,10 +66,6 @@ let package = Package(
         .testTarget(
             name: "WasmParserTests",
             dependencies: ["WasmParser"]
-        ),
-        .testTarget(
-            name: "WASITests",
-            dependencies: ["WASI"]
         ),
     ],
     swiftLanguageVersions: [.v5]
@@ -117,6 +86,57 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
 }
 
 #if !os(Windows)
+    // Add WASI-related products and targets
+    package.products.append(contentsOf: [
+        .library(
+            name: "WasmKitWASI",
+            targets: ["WasmKitWASI"]
+        ),
+        .library(
+            name: "WASI",
+            targets: ["WASI"]
+        ),
+    ])
+    package.targets.append(contentsOf: [
+        .target(
+            name: "WASI",
+            dependencies: ["WasmTypes", "SystemExtras"],
+            exclude: ["CMakeLists.txt"]
+        ),
+        .target(
+            name: "WasmKitWASI",
+            dependencies: ["WasmKit", "WASI"],
+            exclude: ["CMakeLists.txt"]
+        ),
+        .target(
+            name: "SystemExtras",
+            dependencies: [
+                .product(name: "SystemPackage", package: "swift-system")
+            ],
+            exclude: ["CMakeLists.txt"]
+        ),
+        .testTarget(
+            name: "WASITests",
+            dependencies: ["WASI"]
+        ),
+        .testTarget(
+            name: "WASITests",
+            dependencies: ["WASI"]
+        ),
+    ])
+    let targetDependenciesToAdd = [
+        "CLI": ["WasmKitWASI"],
+        "WasmKit": ["SystemExtras"],
+    ]
+    for (targetName, dependencies) in targetDependenciesToAdd {
+        if let target = package.targets.first(where: { $0.name == targetName }) {
+            target.dependencies += dependencies.map { .target(name: $0) }
+        } else {
+            fatalError("Target \(targetName) not found!?")
+        }
+    }
+
+    // Add WIT-related products and targets
     package.products.append(contentsOf: [
         .library(name: "WIT", targets: ["WIT"]),
         .library(name: "_CabiShims", targets: ["_CabiShims"]),
