@@ -15,10 +15,14 @@ let package = Package(
             name: "WasmParser",
             targets: ["WasmParser"]
         ),
+        .library(
+            name: "WIT", targets: ["WIT"]
+        ),
         .executable(
             name: "wasmkit-cli",
             targets: ["CLI"]
         ),
+        .library(name: "_CabiShims", targets: ["_CabiShims"]),
     ],
     targets: [
         .executableTarget(
@@ -57,6 +61,24 @@ let package = Package(
                 "WasmKit",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "SystemPackage", package: "swift-system"),
+            ]
+        ),
+        .target(name: "WIT"),
+        .testTarget(name: "WITTests", dependencies: ["WIT"]),
+        .target(name: "WITOverlayGenerator", dependencies: ["WIT"]),
+        .target(name: "_CabiShims"),
+        .target(name: "WITExtractor"),
+        .testTarget(
+            name: "WITExtractorTests",
+            dependencies: ["WITExtractor", "WIT"]
+        ),
+        .executableTarget(
+            name: "WITTool",
+            dependencies: [
+                "WIT",
+                "WITOverlayGenerator",
+                "WITExtractor",
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ]
         ),
         .testTarget(
@@ -119,10 +141,6 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
             name: "WASITests",
             dependencies: ["WASI"]
         ),
-        .testTarget(
-            name: "WASITests",
-            dependencies: ["WASI"]
-        ),
     ])
     let targetDependenciesToAdd = [
         "CLI": ["WasmKitWASI"],
@@ -136,19 +154,13 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
         }
     }
 
-    // Add WIT-related products and targets
+    // Add build tool plugins only for non-Windows platforms
     package.products.append(contentsOf: [
-        .library(name: "WIT", targets: ["WIT"]),
-        .library(name: "_CabiShims", targets: ["_CabiShims"]),
         .plugin(name: "WITOverlayPlugin", targets: ["WITOverlayPlugin"]),
         .plugin(name: "WITExtractorPlugin", targets: ["WITExtractorPlugin"]),
     ])
 
     package.targets.append(contentsOf: [
-        .target(name: "WIT"),
-        .testTarget(name: "WITTests", dependencies: ["WIT"]),
-        .target(name: "WITOverlayGenerator", dependencies: ["WIT"]),
-        .target(name: "_CabiShims"),
         .plugin(name: "WITOverlayPlugin", capability: .buildTool(), dependencies: ["WITTool"]),
         .plugin(name: "GenerateOverlayForTesting", capability: .buildTool(), dependencies: ["WITTool"]),
         .testTarget(
@@ -156,11 +168,6 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
             dependencies: ["WITOverlayGenerator", "WasmKit", "WasmKitWASI"],
             exclude: ["Fixtures", "Compiled", "Generated"],
             plugins: [.plugin(name: "GenerateOverlayForTesting")]
-        ),
-        .target(name: "WITExtractor"),
-        .testTarget(
-            name: "WITExtractorTests",
-            dependencies: ["WITExtractor", "WIT"]
         ),
         .plugin(
             name: "WITExtractorPlugin",
@@ -173,15 +180,6 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
         .testTarget(
             name: "WITExtractorPluginTests",
             exclude: ["Fixtures"]
-        ),
-        .executableTarget(
-            name: "WITTool",
-            dependencies: [
-                "WIT",
-                "WITOverlayGenerator",
-                "WITExtractor",
-                .product(name: "ArgumentParser", package: "swift-argument-parser"),
-            ]
         ),
     ])
 #endif

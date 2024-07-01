@@ -1,5 +1,8 @@
 import SystemPackage
 import WasmParser
+#if os(Windows)
+import ucrt
+#endif
 
 /// Parse a given file as a WebAssembly binary format file
 /// > Note: <https://webassembly.github.io/spec/core/binary/index.html>
