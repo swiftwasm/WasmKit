@@ -24,7 +24,7 @@ $(SPECTEST_ROOT)/%.json: $(TESTSUITE_DIR)/%.wast
 
 .PHONY: spectest
 spectest: spec
-	swift run Spectest $(SPECTEST_ROOT)
+	swift run --sanitize address Spectest $(SPECTEST_ROOT)
 
 
 ### WASI Test Suite
