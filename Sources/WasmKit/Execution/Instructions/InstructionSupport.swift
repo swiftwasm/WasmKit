@@ -3,35 +3,6 @@ import WasmParser
 extension Instruction {
     typealias Memarg = MemArg
 
-    struct BlockType: Equatable {
-        let parameters: UInt16
-        let results: UInt16
-
-        init(parameters: UInt16, results: UInt16) {
-            self.parameters = parameters
-            self.results = results
-        }
-
-        init(blockType: WasmParser.BlockType, typeSection: [FunctionType]) throws {
-            switch blockType {
-            case .type:
-                self = Instruction.BlockType(parameters: 0, results: 1)
-            case .empty:
-                self = Instruction.BlockType(parameters: 0, results: 0)
-            case let .funcType(typeIndex):
-                let typeIndex = Int(typeIndex)
-                guard typeIndex < typeSection.count else {
-                    throw WasmParserError.invalidTypeSectionReference
-                }
-                let funcType = typeSection[typeIndex]
-                self = Instruction.BlockType(
-                    parameters: UInt16(funcType.parameters.count),
-                    results: UInt16(funcType.results.count)
-                )
-            }
-        }
-    }
-
     struct BrTable: Equatable {
         struct Entry {
             var labelIndex: LabelIndex
@@ -45,38 +16,6 @@ extension Instruction {
             lhs.buffer.baseAddress == rhs.buffer.baseAddress
         }
     }
-
-    struct LegacyBrTable: Equatable {
-        private let bufferBase: UnsafePointer<LabelIndex>
-        private let bufferCount: UInt32
-        var labelIndices: UnsafeBufferPointer<LabelIndex> {
-            UnsafeBufferPointer(start: bufferBase, count: Int(bufferCount - 1))
-        }
-        var defaultIndex: LabelIndex {
-            bufferBase[Int(bufferCount - 1)]
-        }
-
-        init(labelIndices: [LabelIndex], defaultIndex: LabelIndex) {
-            let buffer = UnsafeMutableBufferPointer<LabelIndex>.allocate(capacity: labelIndices.count + 1)
-            for (index, labelindex) in labelIndices.enumerated() {
-                buffer[index] = labelindex
-            }
-            buffer[labelIndices.count] = defaultIndex
-            self.bufferBase = UnsafePointer(buffer.baseAddress!)
-            self.bufferCount = UInt32(buffer.count)
-        }
-
-        static func == (lhs: Instruction.LegacyBrTable, rhs: Instruction.LegacyBrTable) -> Bool {
-            lhs.labelIndices.baseAddress == rhs.labelIndices.baseAddress
-        }
-    }
-
-    // Just for migration purpose
-    static func control(_ x: Instruction) -> Instruction { x }
-    static func numeric(_ x: Instruction) -> Instruction { x }
-    static func parametric(_ x: Instruction) -> Instruction { x }
-    static func variable(_ x: Instruction) -> Instruction { x }
-    static func reference(_ x: Instruction) -> Instruction { x }
 
     static let f32Lt: Instruction = .numericFloatBinary(.lt(.f32))
     static let f32Gt: Instruction = .numericFloatBinary(.gt(.f32))

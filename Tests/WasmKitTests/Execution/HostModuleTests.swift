@@ -43,7 +43,7 @@ final class HostModuleTests: XCTestCase {
                     type: 0, locals: [],
                     body: {
                         [
-                            .control(.call(functionIndex: 1))
+                            .call(functionIndex: 1)
                         ]
                     }),
             ],

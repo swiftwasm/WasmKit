@@ -1,15 +1,5 @@
 import WasmParser
 
-/// See spec's
-/// [definition](https://webassembly.github.io/spec/core/text/instructions.html?highlight=pseudo#control-instructions).
-/// > The `block`, `loop` and `if` instructions are structured instructions. They bracket nested sequences of
-/// > instructions, called blocks, terminated with, or separated by, end or else pseudo-instructions. As the
-/// > grammar prescribes, they must be well-nested.
-enum PseudoInstruction {
-    case `else`
-    case end
-}
-
 struct InstructionSequence: Equatable {
     let instructions: UnsafeBufferPointer<Instruction>
 
@@ -52,8 +42,3 @@ struct ExpressionRef: Equatable {
         self._relativeOffset = UInt32(relativeOffset)
     }
 }
-
-/// > Note:
-/// <https://webassembly.github.io/spec/core/syntax/instructions.html#expressions>
-
-typealias Expression = [WasmParser.Instruction]
