@@ -79,13 +79,6 @@ struct TestCase {
     let content: Content
     let path: String
 
-    private static func isDirectory(_ path: FilePath) -> Bool {
-        let fd = try? FileDescriptor.open(path, FileDescriptor.AccessMode.readOnly, options: .directory)
-        let isDirectory = fd != nil
-        try? fd?.close()
-        return isDirectory
-    }
-
     static func load(include: [String], exclude: [String], in path: String, log: ((String) -> Void)? = nil) throws -> [TestCase] {
         let fileManager = FileManager.default
         let filePath = FilePath(path)
@@ -419,9 +412,9 @@ extension TestCase.Command {
         }
     }
 
-    private func deriveFeatureSet(rootPath: String) -> WasmFeatureSet {
+    private func deriveFeatureSet(rootPath: FilePath) -> WasmFeatureSet {
         var features = WasmFeatureSet.default
-        if rootPath.hasSuffix("/proposals/memory64") {
+        if rootPath.ends(with: "proposals/memory64") {
             features.insert(.memory64)
             // memory64 doesn't expect reference-types proposal
             // and it depends on the fact reference-types is disabled
@@ -431,9 +424,10 @@ extension TestCase.Command {
     }
 
     private func parseModule(rootPath: String, filename: String) throws -> Module {
-        let url = URL(fileURLWithPath: rootPath).appendingPathComponent(filename)
+        let rootPath = FilePath(rootPath)
+        let path = rootPath.appending(filename)
 
-        let module = try parseWasm(filePath: FilePath(url.path), features: deriveFeatureSet(rootPath: rootPath))
+        let module = try parseWasm(filePath: path, features: deriveFeatureSet(rootPath: rootPath))
         return module
     }
 
@@ -562,4 +556,21 @@ extension Swift.Error {
 
         return "unknown error: \(self)"
     }
+}
+
+#if os(Windows)
+import WinSDK
+#endif
+internal func isDirectory(_ path: FilePath) -> Bool {
+    #if os(Windows)
+    return path.withPlatformString {
+        let result = GetFileAttributesW($0)
+        return result != INVALID_FILE_ATTRIBUTES && result & DWORD(FILE_ATTRIBUTE_DIRECTORY) != 0
+    }
+    #else
+    let fd = try? FileDescriptor.open(path, FileDescriptor.AccessMode.readOnly, options: .directory)
+    let isDirectory = fd != nil
+    try? fd?.close()
+    return isDirectory
+    #endif
 }

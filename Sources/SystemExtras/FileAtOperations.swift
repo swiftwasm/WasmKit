@@ -26,6 +26,7 @@ extension FileDescriptor {
       self.rawValue = rawValue
     }
 
+    #if !os(Windows)
     /// Indicates the operation does't follow symlinks
     ///
     /// If you specify this option and the file you pass to
@@ -35,6 +36,7 @@ extension FileDescriptor {
     /// The corresponding C constant is `AT_SYMLINK_NOFOLLOW`.
     @_alwaysEmitIntoClient
     public static var noFollow: AtOptions { AtOptions(rawValue: _AT_SYMLINK_NOFOLLOW) }
+    #endif
 
     /* FIXME: Disabled until CSystem will include "linux/fcntl.h"
     #if os(Linux)

@@ -12,6 +12,7 @@ import ucrt
 
 import SystemPackage
 
+#if !os(Windows)
 @_alwaysEmitIntoClient
 internal var _AT_EACCESS: CInt { AT_EACCESS }
 @_alwaysEmitIntoClient
@@ -20,6 +21,7 @@ internal var _AT_SYMLINK_NOFOLLOW: CInt { AT_SYMLINK_NOFOLLOW }
 internal var _AT_SYMLINK_FOLLOW: CInt { AT_SYMLINK_FOLLOW }
 @_alwaysEmitIntoClient
 internal var _AT_REMOVEDIR: CInt { AT_REMOVEDIR }
+#endif
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 @_alwaysEmitIntoClient
 internal var _AT_REALDEV: CInt { AT_REALDEV }
@@ -35,17 +37,20 @@ internal var _AT_NO_AUTOMOUNT: CInt { AT_NO_AUTOMOUNT }
 #endif
 */
 
+#if !os(Windows)
 @_alwaysEmitIntoClient
 internal var _F_GETFL: CInt { F_GETFL }
 @_alwaysEmitIntoClient
 internal var _O_DSYNC: CInt { O_DSYNC }
 @_alwaysEmitIntoClient
 internal var _O_SYNC: CInt { O_SYNC }
+#endif
 #if os(Linux)
 @_alwaysEmitIntoClient
 internal var _O_RSYNC: CInt { O_RSYNC }
 #endif
 
+#if !os(Windows)
 @_alwaysEmitIntoClient
 internal var _UTIME_NOW: CInt {
     #if os(Linux)
@@ -87,23 +92,26 @@ internal var _DT_LNK: CInt { CInt(DT_LNK) }
 internal var _DT_SOCK: CInt { CInt(DT_SOCK) }
 @_alwaysEmitIntoClient
 internal var _DT_WHT: CInt { CInt(DT_WHT) }
+#endif
 
 @_alwaysEmitIntoClient
 internal var _S_IFMT: CInterop.Mode { S_IFMT }
-@_alwaysEmitIntoClient
-internal var _S_IFIFO: CInterop.Mode { S_IFIFO }
 @_alwaysEmitIntoClient
 internal var _S_IFCHR: CInterop.Mode { S_IFCHR }
 @_alwaysEmitIntoClient
 internal var _S_IFDIR: CInterop.Mode { S_IFDIR }
 @_alwaysEmitIntoClient
-internal var _S_IFBLK: CInterop.Mode { S_IFBLK }
-@_alwaysEmitIntoClient
 internal var _S_IFREG: CInterop.Mode { S_IFREG }
+#if !os(Windows)
+@_alwaysEmitIntoClient
+internal var _S_IFIFO: CInterop.Mode { S_IFIFO }
+@_alwaysEmitIntoClient
+internal var _S_IFBLK: CInterop.Mode { S_IFBLK }
 @_alwaysEmitIntoClient
 internal var _S_IFLNK: CInterop.Mode { S_IFLNK }
 @_alwaysEmitIntoClient
 internal var _S_IFSOCK: CInterop.Mode { S_IFSOCK }
+#endif
 
 #if os(Linux)
 @_alwaysEmitIntoClient

@@ -1,6 +1,8 @@
 import ArgumentParser
 import SystemPackage
+#if canImport(WasmKitWASI)
 import WasmKitWASI
+#endif
 import WasmKit
 
 struct Run: ParsableCommand {
@@ -78,6 +80,7 @@ struct Run: ParsableCommand {
         }
     }
 
+    #if canImport(SystemExtras)
     func deriveInterceptor() throws -> (interceptor: GuestTimeProfiler, finalize: () -> Void)? {
         guard let outputPath = self.profileOutput else { return nil }
         let fileHandle = try FileDescriptor.open(
@@ -97,8 +100,15 @@ struct Run: ParsableCommand {
             }
         )
     }
+    #else
+    // GuestTimeProfiler is not available without SystemExtras
+    func deriveInterceptor() throws -> (interceptor: RuntimeInterceptor, finalize: () -> Void)? {
+        nil
+    }
+    #endif
 
     func instantiateWASI(module: Module, interceptor: RuntimeInterceptor?) throws -> () throws -> Void {
+        #if canImport(WasmKitWASI)
         // Flatten environment variables into a dictionary (Respect the last value if a key is duplicated)
         let environment = environment.reduce(into: [String: String]()) {
             $0[$1.key] = $1.value
@@ -113,6 +123,9 @@ struct Run: ParsableCommand {
             let exitCode = try wasi.start(moduleInstance, runtime: runtime)
             throw ExitCode(Int32(exitCode))
         }
+        #else
+        fatalError("WASI is not supported on this platform")
+        #endif
     }
 
     func instantiateNonWASI(module: Module, interceptor: RuntimeInterceptor?) throws -> (() throws -> Void)? {

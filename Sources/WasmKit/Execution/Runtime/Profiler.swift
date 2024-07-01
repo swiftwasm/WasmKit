@@ -1,3 +1,4 @@
+#if canImport(SystemExtras)
 import SystemExtras
 import SystemPackage
 
@@ -116,3 +117,5 @@ private enum JSON {
         return output
     }
 }
+
+#endif

@@ -1,10 +1,21 @@
 import SystemPackage
 import WasmParser
+#if os(Windows)
+import ucrt
+#endif
 
 /// Parse a given file as a WebAssembly binary format file
 /// > Note: <https://webassembly.github.io/spec/core/binary/index.html>
 public func parseWasm(filePath: FilePath, features: WasmFeatureSet = .default) throws -> Module {
-    let fileHandle = try FileDescriptor.open(filePath, .readOnly)
+    #if os(Windows)
+    // TODO: Upstream `O_BINARY` to `SystemPackage
+    let accessMode = FileDescriptor.AccessMode(
+        rawValue: FileDescriptor.AccessMode.readOnly.rawValue | O_BINARY
+    )
+    #else
+    let accessMode: FileDescriptor.AccessMode = .readOnly
+    #endif
+    let fileHandle = try FileDescriptor.open(filePath, accessMode)
     defer { try? fileHandle.close() }
     let stream = try FileHandleStream(fileHandle: fileHandle)
     let module = try parseModule(stream: stream, features: features)
