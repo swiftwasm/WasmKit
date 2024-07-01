@@ -155,7 +155,7 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
                         features: features, hasDataCount: hasDataCount,
                         visitor: &tracing
                     )
-                    let newISeq = InstructionSequence(instructions: tracing.visitor.finalize())
+                    let newISeq = tracing.visitor.finalize()
                     return newISeq
                 }
                 try WasmParser.parseExpression(
@@ -163,7 +163,7 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
                     features: features, hasDataCount: hasDataCount,
                     visitor: &translator
                 )
-                return InstructionSequence(instructions: translator.finalize())
+                return translator.finalize()
             })
     }
     module.functions = functions

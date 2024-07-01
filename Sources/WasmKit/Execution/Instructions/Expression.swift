@@ -2,8 +2,11 @@ import WasmParser
 
 struct InstructionSequence: Equatable {
     let instructions: UnsafeBufferPointer<Instruction>
+    /// The maximum height of the value stack during execution of this function.
+    /// This height does not count the locals.
+    let maxStackHeight: Int
 
-    init(instructions: [Instruction]) {
+    init(instructions: [Instruction], maxStackHeight: Int) {
         assert(_isPOD(Instruction.self))
         let buffer = UnsafeMutableBufferPointer<Instruction>.allocate(capacity: instructions.count + 1)
         for (idx, instruction) in instructions.enumerated() {
@@ -11,6 +14,7 @@ struct InstructionSequence: Equatable {
         }
         buffer[instructions.count] = .endOfFunction
         self.instructions = UnsafeBufferPointer(buffer)
+        self.maxStackHeight = maxStackHeight
     }
 
     func deallocate() {
@@ -23,12 +27,6 @@ struct InstructionSequence: Equatable {
 
     static func == (lhs: InstructionSequence, rhs: InstructionSequence) -> Bool {
         lhs.instructions.baseAddress == rhs.instructions.baseAddress
-    }
-}
-
-extension InstructionSequence: ExpressibleByArrayLiteral {
-    init(arrayLiteral elements: Instruction...) {
-        self.init(instructions: elements)
     }
 }
 

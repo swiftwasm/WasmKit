@@ -145,12 +145,16 @@ struct InstructionTranslator: InstructionVisitor {
     }
     struct ValueStack {
         private var values: [MetaValue] = []
+        /// The maximum height of the stack within the function
+        private(set) var maxHeight: Int = 0
         var height: Int { values.count }
 
         mutating func push(_ value: ValueType) {
-            self.values.append(.some(value))
+            push(.some(value))
         }
         mutating func push(_ value: MetaValue) {
+            // Record the maximum height of the stack we have seen
+            maxHeight = max(maxHeight, height)
             self.values.append(value)
         }
 
@@ -393,13 +397,14 @@ struct InstructionTranslator: InstructionVisitor {
         valueStack.truncate(height: currentFrame.stackHeight)
     }
 
-    public mutating func finalize() -> [Instruction] {
+    public mutating func finalize() -> InstructionSequence {
         iseqBuilder.pinLabelHere(self.endOfFunctionLabel)
         #if DEBUG
         // Check dangling labels
         iseqBuilder.assertDanglingLabels()
         #endif
-        return iseqBuilder.finalize()
+        let instructions = iseqBuilder.finalize()
+        return InstructionSequence(instructions: instructions, maxStackHeight: valueStack.maxHeight)
     }
 
     // MARK: - Visitor

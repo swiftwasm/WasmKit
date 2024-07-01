@@ -88,12 +88,15 @@ extension Runtime {
                         .tableInit(tableIndex, elementIndex),
                         .tableElementDrop(elementIndex),
                     ])
-                    let initIseq = InstructionSequence(instructions: instructions)
+                    let initIseq = InstructionSequence(instructions: instructions, maxStackHeight: 2)
                     defer { initIseq.deallocate() }
                     try evaluateConstExpr(initIseq, instance: instance)
 
                 case .declarative:
-                    let initIseq: InstructionSequence = [.tableElementDrop(elementIndex)]
+                    let initIseq = InstructionSequence(
+                        instructions: [.tableElementDrop(elementIndex)],
+                        maxStackHeight: 0
+                    )
                     defer { initIseq.deallocate() }
                     try evaluateConstExpr(initIseq, instance: instance)
 
@@ -127,7 +130,7 @@ extension Runtime {
                     .numericConst(.i32(UInt32(data.initializer.count))),
                     .memoryInit(UInt32(dataIndex)),
                     .memoryDataDrop(UInt32(dataIndex)),
-                ])
+                ], maxStackHeight: 2)
                 defer { iseq.deallocate() }
                 try evaluateConstExpr(iseq, instance: instance)
             }
@@ -141,6 +144,7 @@ extension Runtime {
         if let startIndex = module.start {
             try withExecution { initExecution in
                 var stack = Stack()
+                defer { stack.deallocate() }
                 try initExecution.invoke(functionAddress: instance.functionAddresses[Int(startIndex)], runtime: self, stack: &stack)
                 try initExecution.run(runtime: self, stack: &stack)
             }
@@ -189,7 +193,7 @@ extension Runtime {
                 default:
                     throw InstantiationError.unsupported("init expr in global section \(global.initializer)")
                 }
-                let iseq = InstructionSequence(instructions: instructions)
+                let iseq = InstructionSequence(instructions: instructions, maxStackHeight: 1)
                 defer { iseq.deallocate() }
                 return try evaluateConstExpr(iseq, instance: globalModuleInstance, arity: 1) { _, stack in
                     return stack.popValue()
@@ -212,6 +216,7 @@ extension Runtime {
     ) throws -> T {
         try withExecution { initExecution in
             var stack = Stack()
+            defer { stack.deallocate() }
             try stack.pushFrame(
                 iseq: iseq,
                 arity: arity,

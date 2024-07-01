@@ -23,8 +23,7 @@ struct Stack {
         returnPC: ProgramCounter,
         address: FunctionAddress? = nil
     ) throws {
-        // TODO: Stack overflow check can be done at the entry of expression
-        guard (frames.count + numberOfValues) < limit else {
+        guard frames.count < limit, (numberOfValues + iseq.maxStackHeight + (defaultLocals?.count ?? 0)) < limit else {
             throw Trap.callStackExhausted
         }
         let valueFrameIndex = self.numberOfValues - argc
@@ -61,6 +60,11 @@ struct Stack {
     }
     mutating func copyValues(copyCount: Int, popCount: Int) {
         self.valueStack.copyValues(copyCount: copyCount, popCount: popCount)
+    }
+
+    func deallocate() {
+        self.valueStack.deallocate()
+        self.frames.deallocate()
     }
 
     var topValue: Value {
@@ -203,6 +207,10 @@ struct FixedSizeStack<Element> {
 
     subscript(_ index: Int) -> Element {
         self.buffer[index]
+    }
+
+    func deallocate() {
+        self.buffer.deallocate()
     }
 }
 
