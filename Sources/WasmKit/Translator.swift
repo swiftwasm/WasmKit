@@ -970,9 +970,3 @@ fileprivate extension FunctionType {
         }
     }
 }
-
-fileprivate extension Instruction.BlockType {
-    init(_ functionType: FunctionType) {
-        self.init(parameters: UInt16(functionType.parameters.count), results: UInt16(functionType.results.count))
-    }
-}
