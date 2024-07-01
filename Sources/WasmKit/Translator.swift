@@ -11,6 +11,22 @@ class ISeqAllocator {
         return buffer
     }
 
+    func allocateDefaultLocals(_ locals: [ValueType]) -> UnsafeBufferPointer<Value> {
+        let buffer = UnsafeMutableBufferPointer<Value>.allocate(capacity: locals.count)
+        for (index, localType) in locals.enumerated() {
+            buffer[index] = localType.defaultValue
+        }
+        self.buffers.append(UnsafeMutableRawBufferPointer(buffer))
+        return UnsafeBufferPointer(buffer)
+    }
+
+    func allocateInstructions(capacity: Int) -> UnsafeMutableBufferPointer<Instruction> {
+        assert(_isPOD(Instruction.self), "Instruction must be POD")
+        let buffer = UnsafeMutableBufferPointer<Instruction>.allocate(capacity: capacity)
+        self.buffers.append(UnsafeMutableRawBufferPointer(buffer))
+        return buffer
+    }
+
     deinit {
         for buffer in buffers {
             buffer.deallocate()
@@ -145,12 +161,16 @@ struct InstructionTranslator: InstructionVisitor {
     }
     struct ValueStack {
         private var values: [MetaValue] = []
+        /// The maximum height of the stack within the function
+        private(set) var maxHeight: Int = 0
         var height: Int { values.count }
 
         mutating func push(_ value: ValueType) {
-            self.values.append(.some(value))
+            push(.some(value))
         }
         mutating func push(_ value: MetaValue) {
+            // Record the maximum height of the stack we have seen
+            maxHeight = max(maxHeight, height)
             self.values.append(value)
         }
 
@@ -393,13 +413,20 @@ struct InstructionTranslator: InstructionVisitor {
         valueStack.truncate(height: currentFrame.stackHeight)
     }
 
-    public mutating func finalize() -> [Instruction] {
+    public mutating func finalize() -> InstructionSequence {
         iseqBuilder.pinLabelHere(self.endOfFunctionLabel)
         #if DEBUG
         // Check dangling labels
         iseqBuilder.assertDanglingLabels()
         #endif
-        return iseqBuilder.finalize()
+        let instructions = iseqBuilder.finalize()
+        // TODO: Figure out a way to avoid the copy here while keeping the execution performance.
+        let buffer = allocator.allocateInstructions(capacity: instructions.count + 1)
+        for (idx, instruction) in instructions.enumerated() {
+            buffer[idx] = instruction
+        }
+        buffer[instructions.count] = .endOfFunction
+        return InstructionSequence(instructions: UnsafeBufferPointer(buffer), maxStackHeight: valueStack.maxHeight)
     }
 
     // MARK: - Visitor

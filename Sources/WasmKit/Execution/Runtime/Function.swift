@@ -8,6 +8,7 @@ public struct Function: Equatable {
     public func invoke(_ arguments: [Value] = [], runtime: Runtime) throws -> [Value] {
         try withExecution { execution in
             var stack = Stack()
+            defer { stack.deallocate() }
             let numberOfResults = try invoke(execution: &execution, stack: &stack, with: arguments, runtime: runtime)
             try execution.run(runtime: runtime, stack: &stack)
             return Array(stack.popValues(count: numberOfResults))

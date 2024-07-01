@@ -125,45 +125,25 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
         memoryTypes: module.memories.map { $0.type },
         tables: module.tables
     )
+    let allocator = module.allocator
     let functions = codes.enumerated().map { [hasDataCount = parser.hasDataCount, features] index, code in
         let funcTypeIndex = typeIndices[index]
         let funcType = module.types[Int(funcTypeIndex)]
         return GuestFunction(
-            type: typeIndices[index], locals: code.locals,
+            type: typeIndices[index], locals: code.locals, allocator: allocator,
             body: {
-                let enableAssert: Bool
-                #if ASSERT
-                enableAssert = true
-                #else
-                enableAssert = false
-                #endif
-                
                 var translator = InstructionTranslator(
-                    allocator: module.allocator,
+                    allocator: allocator,
                     module: translatorContext,
                     type: funcType, locals: code.locals
                 )
 
-                if enableAssert && !_isFastAssertConfiguration() {
-                    let globalFuncIndex = module.imports.count + index
-                    print("🚀 Starting Translation for code[\(globalFuncIndex)] (\(funcType))")
-                    var tracing = InstructionTracingVisitor(trace: {
-                        print("🍵 code[\(globalFuncIndex)] Translating \($0)")
-                    }, visitor: translator)
-                    try WasmParser.parseExpression(
-                        bytes: Array(code.expression),
-                        features: features, hasDataCount: hasDataCount,
-                        visitor: &tracing
-                    )
-                    let newISeq = InstructionSequence(instructions: tracing.visitor.finalize())
-                    return newISeq
-                }
                 try WasmParser.parseExpression(
                     bytes: Array(code.expression),
                     features: features, hasDataCount: hasDataCount,
                     visitor: &translator
                 )
-                return InstructionSequence(instructions: translator.finalize())
+                return translator.finalize()
             })
     }
     module.functions = functions

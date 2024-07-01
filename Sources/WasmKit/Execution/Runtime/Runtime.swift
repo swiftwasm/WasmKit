@@ -87,15 +87,21 @@ extension Runtime {
                         .numericConst(.i32(UInt32(element.initializer.count))),
                         .tableInit(tableIndex, elementIndex),
                         .tableElementDrop(elementIndex),
+                        .endOfFunction,
                     ])
-                    let initIseq = InstructionSequence(instructions: instructions)
-                    defer { initIseq.deallocate() }
-                    try evaluateConstExpr(initIseq, instance: instance)
+                    try instructions.withUnsafeBufferPointer {
+                        let initIseq = InstructionSequence(instructions: $0, maxStackHeight: 2)
+                        try evaluateConstExpr(initIseq, instance: instance)
+                    }
 
                 case .declarative:
-                    let initIseq: InstructionSequence = [.tableElementDrop(elementIndex)]
-                    defer { initIseq.deallocate() }
-                    try evaluateConstExpr(initIseq, instance: instance)
+                    let instructions: [Instruction] = [.tableElementDrop(elementIndex), .endOfFunction]
+                    try instructions.withUnsafeBufferPointer {
+                        let initIseq = InstructionSequence(
+                            instructions: $0, maxStackHeight: 0
+                        )
+                        try evaluateConstExpr(initIseq, instance: instance)
+                    }
 
                 case .passive:
                     continue
@@ -122,14 +128,17 @@ extension Runtime {
                 default:
                     throw InstantiationError.unsupported("init expr in data section \(data.offset)")
                 }
-                let iseq = InstructionSequence(instructions: instructions + [
+                instructions.append(contentsOf: [
                     .numericConst(.i32(0)),
                     .numericConst(.i32(UInt32(data.initializer.count))),
                     .memoryInit(UInt32(dataIndex)),
                     .memoryDataDrop(UInt32(dataIndex)),
+                    .endOfFunction,
                 ])
-                defer { iseq.deallocate() }
-                try evaluateConstExpr(iseq, instance: instance)
+                try instructions.withUnsafeBufferPointer {
+                    let iseq = InstructionSequence(instructions: $0, maxStackHeight: 2)
+                    try evaluateConstExpr(iseq, instance: instance)
+                }
             }
         } catch Trap.outOfBoundsMemoryAccess {
             throw InstantiationError.outOfBoundsMemoryAccess
@@ -141,6 +150,7 @@ extension Runtime {
         if let startIndex = module.start {
             try withExecution { initExecution in
                 var stack = Stack()
+                defer { stack.deallocate() }
                 try initExecution.invoke(functionAddress: instance.functionAddresses[Int(startIndex)], runtime: self, stack: &stack)
                 try initExecution.run(runtime: self, stack: &stack)
             }
@@ -189,10 +199,12 @@ extension Runtime {
                 default:
                     throw InstantiationError.unsupported("init expr in global section \(global.initializer)")
                 }
-                let iseq = InstructionSequence(instructions: instructions)
-                defer { iseq.deallocate() }
-                return try evaluateConstExpr(iseq, instance: globalModuleInstance, arity: 1) { _, stack in
-                    return stack.popValue()
+                instructions.append(.endOfFunction)
+                return try instructions.withUnsafeBufferPointer {
+                    let iseq = InstructionSequence(instructions: $0, maxStackHeight: 1)
+                    return try evaluateConstExpr(iseq, instance: globalModuleInstance, arity: 1) { _, stack in
+                        return stack.popValue()
+                    }
                 }
             }
             
@@ -212,6 +224,7 @@ extension Runtime {
     ) throws -> T {
         try withExecution { initExecution in
             var stack = Stack()
+            defer { stack.deallocate() }
             try stack.pushFrame(
                 iseq: iseq,
                 arity: arity,
