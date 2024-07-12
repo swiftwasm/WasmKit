@@ -946,6 +946,23 @@ extension Parser {
     }
 }
 
+public enum ParsingPayload {
+    case header(version: [UInt8])
+    case customSection(CustomSection)
+    case typeSection([FunctionType])
+    case importSection([Import])
+    case functionSection([TypeIndex])
+    case tableSection([Table])
+    case memorySection([Memory])
+    case globalSection([Global])
+    case exportSection([Export])
+    case startSection(FunctionIndex)
+    case elementSection([ElementSegment])
+    case codeSection([Code])
+    case dataSection([DataSegment])
+    case dataCount(UInt32)
+}
+
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-module>
 extension Parser {
@@ -995,26 +1012,9 @@ extension Parser {
         }
     }
 
-    public enum Payload {
-        case header(version: [UInt8])
-        case customSection(CustomSection)
-        case typeSection([FunctionType])
-        case importSection([Import])
-        case functionSection([TypeIndex])
-        case tableSection([Table])
-        case memorySection([Memory])
-        case globalSection([Global])
-        case exportSection([Export])
-        case startSection(FunctionIndex)
-        case elementSection([ElementSegment])
-        case codeSection([Code])
-        case dataSection([DataSegment])
-        case dataCount(UInt32)
-    }
-
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-module>
-    public mutating func parseNext() throws -> Payload? {
+    public mutating func parseNext() throws -> ParsingPayload? {
         switch nextParseTarget {
         case .header:
             try parseMagicNumber()
@@ -1029,7 +1029,7 @@ extension Parser {
             let sectionSize: UInt32 = try parseUnsigned()
             let sectionStart = stream.currentIndex
 
-            let payload: Payload
+            let payload: ParsingPayload
             switch sectionID {
             case 0:  payload = .customSection(try parseCustomSection(size: sectionSize))
             case 1:  payload = .typeSection(try parseTypeSection())

@@ -1,6 +1,6 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#function-types>
-public struct FunctionType: Equatable {
+public struct FunctionType: Equatable, Hashable {
     public init(parameters: [ValueType], results: [ValueType] = []) {
         self.parameters = parameters
         self.results = results
@@ -11,14 +11,14 @@ public struct FunctionType: Equatable {
 }
 
 /// Reference types
-public enum ReferenceType: Equatable {
+public enum ReferenceType: Equatable, Hashable {
     /// A nullable reference type to a function.
     case funcRef
     /// A nullable external reference type.
     case externRef
 }
 
-public enum ValueType: Equatable {
+public enum ValueType: Equatable, Hashable {
     /// 32-bit signed or unsigned integer.
     case i32
     /// 64-bit signed or unsigned integer.

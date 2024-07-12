@@ -2,10 +2,19 @@ import ArgumentParser
 import Foundation
 import SystemPackage
 import WasmKit
+import WAT
 
 @main
 @available(macOS 11, *)
 struct Spectest: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        subcommands: [Run.self, ParseWat.self],
+        defaultSubcommand: Run.self
+    )
+}
+
+@available(macOS 11, *)
+struct Run: AsyncParsableCommand {
     @Argument
     var path: String
 
@@ -115,5 +124,64 @@ struct Spectest: AsyncParsableCommand {
 
     private func percentage(_ numerator: Int, _ denominator: Int) -> String {
         "\(Int(Double(numerator) / Double(denominator) * 100))%"
+    }
+}
+
+struct ParseWat: ParsableCommand {
+    @Argument
+    var path: String
+
+    @Option
+    var output: String?
+
+    func run() throws {
+        let allFiles: [URL]
+        if isDirectory(FilePath(path)) {
+            allFiles = try FileManager.default.contentsOfDirectory(at: URL(fileURLWithPath: path), includingPropertiesForKeys: nil)
+        } else {
+            allFiles = [URL(fileURLWithPath: path)]
+        }
+        let exclude = [
+            "annotations.wast"
+        ]
+
+        var failureCount = 0
+        var allParseCount = 0
+        for filePath in allFiles {
+            guard filePath.pathExtension == "wast" else {
+                continue
+            }
+            guard !exclude.contains(filePath.lastPathComponent) else { continue }
+            guard !filePath.lastPathComponent.starts(with: "simd_") else { continue }
+            print("Parsing \(filePath.path)...")
+            let source = try String(contentsOf: filePath)
+            do {
+                allParseCount += 1
+                var wast = try parseWAST(source)
+                var moduleIndex = 0
+                while let directive = try wast.nextDirective() {
+                    guard case let .module(moduleDirective) = directive,
+                       case var .text(wat) = moduleDirective.source else {
+                        continue
+                    }
+                    if let output {
+                        let bytes = try wat.encode()
+                        let outputFileName = filePath.deletingPathExtension().lastPathComponent + ".\(moduleIndex).wasm"
+                        let outputPath = URL(fileURLWithPath: output).appendingPathComponent(outputFileName)
+                        try Data(bytes).write(to: outputPath)
+                    }
+                    moduleIndex += 1
+                }
+            } catch {
+                failureCount += 1
+                print("Failed to parse \(filePath.path):\(error)")
+            }
+        }
+
+        if failureCount > 0 {
+            print("Failed to parse \(failureCount) / \(allParseCount) files")
+        } else {
+            print("Passed")
+        }
     }
 }

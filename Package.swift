@@ -16,6 +16,10 @@ let package = Package(
             targets: ["WasmParser"]
         ),
         .library(
+            name: "WAT",
+            targets: ["WAT"]
+        ),
+        .library(
             name: "WIT", targets: ["WIT"]
         ),
         .executable(
@@ -47,6 +51,7 @@ let package = Package(
             ],
             exclude: ["CMakeLists.txt"]
         ),
+        .target(name: "WAT", dependencies: ["WasmParser"]),
         .target(
             name: "WasmParser",
             dependencies: [
@@ -59,10 +64,12 @@ let package = Package(
             name: "Spectest",
             dependencies: [
                 "WasmKit",
+                "WAT",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "SystemPackage", package: "swift-system"),
             ]
         ),
+        .testTarget(name: "WATTests", dependencies: ["WAT"]),
         .target(name: "WIT"),
         .testTarget(name: "WITTests", dependencies: ["WIT"]),
         .target(name: "WITOverlayGenerator", dependencies: ["WIT"]),
