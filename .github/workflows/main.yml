@@ -44,23 +44,35 @@ jobs:
   build-linux:
     strategy:
       matrix:
-        swift:
-          - "5.8-focal"
-          - "5.8-amazonlinux2"
-          - "5.9-focal"
-          - "5.9-amazonlinux2"
+        include:
+          - swift: "5.8-focal"
+            swiftwasm-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-5.8.0-RELEASE/swift-wasm-5.8.0-RELEASE-ubuntu20.04_x86_64.tar.gz"
+          - swift: "5.8-amazonlinux2"
+            swiftwasm-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-5.8.0-RELEASE/swift-wasm-5.8.0-RELEASE-amazonlinux2_x86_64.tar.gz"
+          - swift: "5.9-focal"
+            swiftwasm-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-5.9.2-RELEASE/swift-wasm-5.9.2-RELEASE-ubuntu20.04_x86_64.tar.gz"
+          - swift: "5.9-amazonlinux2"
+            swiftwasm-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-5.9.2-RELEASE/swift-wasm-5.9.2-RELEASE-amazonlinux2_x86_64.tar.gz"
 
-    container:
-      image: swift:${{ matrix.swift }}
     runs-on: ubuntu-20.04
+    name: "build-linux (${{ matrix.swift }})"
 
     steps:
       - uses: actions/checkout@v3
-      - id: setup-swiftwasm
-        uses: swiftwasm/setup-swiftwasm@v1
-        with:
-          swift-version: "wasm-5.8.0-RELEASE"
-          add-to-path: false
+      - name: Configure container
+        run: |
+          docker run -dit --name build-container -v $PWD:/workspace -w /workspace swift:${{ matrix.swift }}
+          echo 'docker exec -i build-container "$@"' > ./build-exec
+          chmod +x ./build-exec
+
+      - name: Install WebAssembly toolchain
+        id: setup-swiftwasm
+        run: |
+          toolchain_path="/opt/swiftwasm"
+          ./build-exec mkdir -p "$toolchain_path"
+          curl -L ${{ matrix.swiftwasm-download }} | ./build-exec tar xz --strip-component 1 -C "$toolchain_path"
+          echo "toolchain-path=$toolchain_path" >> $GITHUB_OUTPUT
+
       - name: Configure Tests/default.json
         run: |
           cat <<EOS > Tests/default.json
@@ -69,9 +81,9 @@ jobs:
             "hostSwiftExecutablePath": "/usr/bin/swift"
           }
           EOS
-      - run: swift test
-      - run: ./CI/check-spectest.sh
-      - run: ./CI/check-wasi-testsuite.sh
+      - run: ./build-exec swift test
+      - run: ./build-exec ./CI/check-spectest.sh
+      - run: ./build-exec ./CI/check-wasi-testsuite.sh
 
   build-windows:
     runs-on: windows-latest
