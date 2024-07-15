@@ -142,6 +142,6 @@ function(add_wasmkit_library name)
       FILES_MATCHING PATTERN "*.swiftmodule"
     )
   else()
-    set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${name})
+    set_property(GLOBAL APPEND PROPERTY WASMKIT_EXPORTS ${name})
   endif()
 endfunction()
