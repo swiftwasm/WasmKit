@@ -166,7 +166,7 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
         .testTarget(
             name: "WITOverlayGeneratorTests",
             dependencies: ["WITOverlayGenerator", "WasmKit", "WasmKitWASI"],
-            exclude: ["Fixtures", "Compiled", "Generated"],
+            exclude: ["Fixtures", "Compiled", "Generated", "EmbeddedSupport"],
             plugins: [.plugin(name: "GenerateOverlayForTesting")]
         ),
         .plugin(
