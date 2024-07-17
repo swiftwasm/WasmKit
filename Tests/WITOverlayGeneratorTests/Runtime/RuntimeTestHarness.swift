@@ -17,7 +17,7 @@ import XCTest
 struct RuntimeTestHarness {
     struct Configuration: Codable {
         let swiftExecutablePath: URL
-        let wasiSwiftSDK: URL
+        let wasiSwiftSDKPath: URL
 
         var swiftCompilerExecutablePath: URL {
             swiftExecutablePath.deletingLastPathComponent().appendingPathComponent("swiftc")
@@ -166,10 +166,10 @@ struct RuntimeTestHarness {
             "-target", "wasm32-unknown-wasi",
             "-static-stdlib",
             "-Xclang-linker", "-mexec-model=reactor",
-            "-resource-dir", configuration.wasiSwiftSDK.appendingPathComponent( "/swift.xctoolchain/usr/lib/swift_static").path,
-            "-sdk", configuration.wasiSwiftSDK.appendingPathComponent("WASI.sdk").path,
+            "-resource-dir", configuration.wasiSwiftSDKPath.appendingPathComponent( "/swift.xctoolchain/usr/lib/swift_static").path,
+            "-sdk", configuration.wasiSwiftSDKPath.appendingPathComponent("WASI.sdk").path,
             "-Xclang-linker", "-resource-dir",
-            "-Xclang-linker", configuration.wasiSwiftSDK.appendingPathComponent("swift.xctoolchain/usr/lib/swift_static/clang").path
+            "-Xclang-linker", configuration.wasiSwiftSDKPath.appendingPathComponent("swift.xctoolchain/usr/lib/swift_static/clang").path
         ])
     }
 
