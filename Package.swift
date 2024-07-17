@@ -12,6 +12,14 @@ let package = Package(
             targets: ["WasmKit"]
         ),
         .library(
+            name: "WasmKitWASI",
+            targets: ["WasmKitWASI"]
+        ),
+        .library(
+            name: "WASI",
+            targets: ["WASI"]
+        ),
+        .library(
             name: "WasmParser",
             targets: ["WasmParser"]
         ),
@@ -33,6 +41,7 @@ let package = Package(
             name: "CLI",
             dependencies: [
                 "WasmKit",
+                "WasmKitWASI",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "SystemPackage", package: "swift-system"),
             ],
@@ -47,6 +56,7 @@ let package = Package(
             dependencies: [
                 "WasmParser",
                 "WasmTypes",
+                "SystemExtras",
                 .product(name: "SystemPackage", package: "swift-system"),
             ],
             exclude: ["CMakeLists.txt"]
@@ -57,6 +67,27 @@ let package = Package(
             dependencies: [
                 "WasmTypes",
                 .product(name: "SystemPackage", package: "swift-system"),
+            ],
+            exclude: ["CMakeLists.txt"]
+        ),
+        .target(
+            name: "WASI",
+            dependencies: ["WasmTypes", "SystemExtras"],
+            exclude: ["CMakeLists.txt"]
+        ),
+        .target(
+            name: "WasmKitWASI",
+            dependencies: ["WasmKit", "WASI"],
+            exclude: ["CMakeLists.txt"]
+        ),
+        .testTarget(
+            name: "WASITests",
+            dependencies: ["WASI"]
+        ),
+        .target(
+            name: "SystemExtras",
+            dependencies: [
+                .product(name: "SystemPackage", package: "swift-system")
             ],
             exclude: ["CMakeLists.txt"]
         ),
@@ -115,52 +146,6 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
 }
 
 #if !os(Windows)
-    // Add WASI-related products and targets
-    package.products.append(contentsOf: [
-        .library(
-            name: "WasmKitWASI",
-            targets: ["WasmKitWASI"]
-        ),
-        .library(
-            name: "WASI",
-            targets: ["WASI"]
-        ),
-    ])
-    package.targets.append(contentsOf: [
-        .target(
-            name: "WASI",
-            dependencies: ["WasmTypes", "SystemExtras"],
-            exclude: ["CMakeLists.txt"]
-        ),
-        .target(
-            name: "WasmKitWASI",
-            dependencies: ["WasmKit", "WASI"],
-            exclude: ["CMakeLists.txt"]
-        ),
-        .target(
-            name: "SystemExtras",
-            dependencies: [
-                .product(name: "SystemPackage", package: "swift-system")
-            ],
-            exclude: ["CMakeLists.txt"]
-        ),
-        .testTarget(
-            name: "WASITests",
-            dependencies: ["WASI"]
-        ),
-    ])
-    let targetDependenciesToAdd = [
-        "CLI": ["WasmKitWASI"],
-        "WasmKit": ["SystemExtras"],
-    ]
-    for (targetName, dependencies) in targetDependenciesToAdd {
-        if let target = package.targets.first(where: { $0.name == targetName }) {
-            target.dependencies += dependencies.map { .target(name: $0) }
-        } else {
-            fatalError("Target \(targetName) not found!?")
-        }
-    }
-
     // Add build tool plugins only for non-Windows platforms
     package.products.append(contentsOf: [
         .plugin(name: "WITOverlayPlugin", targets: ["WITOverlayPlugin"]),

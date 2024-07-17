@@ -1386,14 +1386,14 @@ public class WASIBridgeToHost: WASI {
         fdTable[2] = .file(StdioFileEntry(fd: stderr, accessMode: .write))
 
         for (guestPath, hostPath) in preopens {
-            let fd = try hostPath.withCString { cHostPath in
-                let fd = open(cHostPath, O_DIRECTORY)
-                if fd < 0 {
-                    let errno = errno
-                    throw WASIError(description: "Failed to open preopen path '\(hostPath)': \(String(cString: strerror(errno)))")
-                }
-                return FileDescriptor(rawValue: fd)
-            }
+            let options: FileDescriptor.OpenOptions
+            #if os(Windows)
+            options = []
+            #else
+            options = .directory
+            #endif
+
+            let fd = try FileDescriptor.open(FilePath(hostPath), .readWrite, options: options)
             if try fd.attributes().fileType.isDirectory {
                 _ = try fdTable.push(.directory(DirEntry(preopenPath: guestPath, fd: fd)))
             }
@@ -1756,6 +1756,9 @@ public class WASIBridgeToHost: WASI {
         fsRightsInheriting: WASIAbi.Rights,
         fdflags: WASIAbi.Fdflags
     ) throws -> WASIAbi.Fd {
+        #if os(Windows)
+        throw WASIAbi.Errno.ENOTSUP
+        #else
         guard case let .directory(dirEntry) = fdTable[dirFd] else {
             throw WASIAbi.Errno.ENOTDIR
         }
@@ -1787,6 +1790,7 @@ public class WASIBridgeToHost: WASI {
         }
         let guestFd = try fdTable.push(newEntry)
         return guestFd
+        #endif
     }
 
     func path_readlink(fd: WASIAbi.Fd, path: String, buffer: UnsafeGuestBufferPointer<UInt8>) throws -> WASIAbi.Size {

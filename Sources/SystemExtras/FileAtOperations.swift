@@ -4,6 +4,7 @@ import Darwin
 import Glibc
 #elseif os(Windows)
 import ucrt
+import WinSDK
 #else
 #error("Unsupported Platform")
 #endif
@@ -52,6 +53,7 @@ extension FileDescriptor {
     #endif
     */
 
+    #if !os(Windows)
     /// Indicates the operation removes directory
     ///
     /// If you specify this option and the file path you pass to
@@ -61,6 +63,7 @@ extension FileDescriptor {
     /// The corresponding C constant is `AT_REMOVEDIR`.
     @_alwaysEmitIntoClient
     public static var removeDirectory: AtOptions { AtOptions(rawValue: _AT_REMOVEDIR) }
+    #endif
   }
 
   /// Opens or creates a file relative to a directory file descriptor
@@ -126,6 +129,9 @@ extension FileDescriptor {
     permissions: FilePermissions?,
     retryOnInterrupt: Bool
   ) -> Result<FileDescriptor, Errno> {
+    #if os(Windows)
+    return .failure(Errno(rawValue: ERROR_NOT_SUPPORTED))
+    #else
     let oFlag = mode.rawValue | options.rawValue
     let descOrError: Result<CInt, Errno> = valueOrErrno(retryOnInterrupt: retryOnInterrupt) {
       if let permissions = permissions {
@@ -136,6 +142,7 @@ extension FileDescriptor {
       return system_openat(self.rawValue, path, oFlag)
     }
     return descOrError.map { FileDescriptor(rawValue: $0) }
+    #endif
   }
 
   /// Returns attributes information about a file relative to a directory file descriptor
@@ -168,11 +175,15 @@ extension FileDescriptor {
 
   @usableFromInline
   internal func _attributes(at path: UnsafePointer<CInterop.PlatformChar>, options: AtOptions) -> Result<Attributes, Errno> {
+    #if os(Windows)
+    return .failure(Errno(rawValue: ERROR_NOT_SUPPORTED))
+    #else
     var stat: stat = stat()
     return nothingOrErrno(retryOnInterrupt: false) {
       system_fstatat(self.rawValue, path, &stat, options.rawValue)
     }
     .map { Attributes(rawValue: stat) }
+    #endif
   }
 
   /// Remove a file entry relative to a directory file descriptor
@@ -205,9 +216,13 @@ extension FileDescriptor {
   internal func _remove(
     at path: UnsafePointer<CInterop.PlatformChar>, options: AtOptions
   ) -> Result<(), Errno> {
+    #if os(Windows)
+    return .failure(Errno(rawValue: ERROR_NOT_SUPPORTED))
+    #else
     return nothingOrErrno(retryOnInterrupt: false) {
       system_unlinkat(self.rawValue, path, options.rawValue)
     }
+    #endif
   }
 
   /// Create a directory relative to a directory file descriptor
@@ -244,9 +259,13 @@ extension FileDescriptor {
   internal func _createDirectory(
     at path: UnsafePointer<CInterop.PlatformChar>, permissions: FilePermissions
   ) -> Result<(), Errno> {
+    #if os(Windows)
+    return .failure(Errno(rawValue: ERROR_NOT_SUPPORTED))
+    #else
     return nothingOrErrno(retryOnInterrupt: false) {
       system_mkdirat(self.rawValue, path, permissions.rawValue)
     }
+    #endif
   }
 
   /// Create a symbolic link relative to a directory file descriptor
@@ -285,8 +304,12 @@ extension FileDescriptor {
     original: UnsafePointer<CInterop.PlatformChar>,
     link: UnsafePointer<CInterop.PlatformChar>
   ) -> Result<(), Errno> {
+    #if os(Windows)
+    return .failure(Errno(rawValue: ERROR_NOT_SUPPORTED))
+    #else
     return nothingOrErrno(retryOnInterrupt: false) {
       system_symlinkat(original, self.rawValue, link)
     }
+    #endif
   }
 }

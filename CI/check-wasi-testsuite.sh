@@ -26,5 +26,5 @@ SOURCE_DIR="$(cd $(dirname $0)/.. && pwd)"
   cd $SOURCE_DIR && \
   ./Vendor/checkout-dependency wasi-testsuite && \
   python3 -m pip install -r ./Vendor/wasi-testsuite/test-runner/requirements.txt && \
-  exec ./IntegrationTests/WASI/run-tests.sh
+  exec ./IntegrationTests/WASI/run-tests.py
 )

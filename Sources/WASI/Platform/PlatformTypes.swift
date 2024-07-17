@@ -5,41 +5,55 @@ extension WASIAbi.FileType {
     init(platformFileType: FileDescriptor.FileType) {
         if platformFileType.isDirectory {
             self = .DIRECTORY
-        } else if platformFileType.isSymlink {
-            self = .SYMBOLIC_LINK
-        } else if platformFileType.isFile {
-            self = .REGULAR_FILE
-        } else if platformFileType.isCharacterDevice {
-            self = .CHARACTER_DEVICE
-        } else if platformFileType.isBlockDevice {
-            self = .BLOCK_DEVICE
-        } else if platformFileType.isSocket {
-            self = .SOCKET_STREAM
-        } else {
-            self = .UNKNOWN
+            return
         }
+        #if !os(Windows)
+        if platformFileType.isSymlink {
+            self = .SYMBOLIC_LINK
+            return
+        }
+        if platformFileType.isFile {
+            self = .REGULAR_FILE
+            return
+        }
+        if platformFileType.isCharacterDevice {
+            self = .CHARACTER_DEVICE
+            return
+        }
+        if platformFileType.isBlockDevice {
+            self = .BLOCK_DEVICE
+            return
+        }
+        if platformFileType.isSocket {
+            self = .SOCKET_STREAM
+            return
+        }
+        #endif
+        self = .UNKNOWN
     }
 }
 
 extension WASIAbi.Fdflags {
     init(platformOpenOptions: FileDescriptor.OpenOptions) {
         var fdFlags: WASIAbi.Fdflags = []
-        if platformOpenOptions.contains(.append) {
-            fdFlags.insert(.APPEND)
-        }
-        if platformOpenOptions.contains(.dataSync) {
-            fdFlags.insert(.DSYNC)
-        }
-        if platformOpenOptions.contains(.nonBlocking) {
-            fdFlags.insert(.NONBLOCK)
-        }
-        if platformOpenOptions.contains(.fileSync) {
-            fdFlags.insert(.SYNC)
-        }
-        #if os(Linux)
-            if platformOpenOptions.contains(.readSync) {
-                fdFlags.insert(.RSYNC)
+        #if !os(Windows)
+            if platformOpenOptions.contains(.append) {
+                fdFlags.insert(.APPEND)
             }
+            if platformOpenOptions.contains(.dataSync) {
+                fdFlags.insert(.DSYNC)
+            }
+            if platformOpenOptions.contains(.nonBlocking) {
+                fdFlags.insert(.NONBLOCK)
+            }
+            if platformOpenOptions.contains(.fileSync) {
+                fdFlags.insert(.SYNC)
+            }
+            #if os(Linux)
+                if platformOpenOptions.contains(.readSync) {
+                    fdFlags.insert(.RSYNC)
+                }
+            #endif
         #endif
         self = fdFlags
     }
@@ -49,19 +63,21 @@ extension WASIAbi.Fdflags {
         if self.contains(.APPEND) {
             flags.insert(.append)
         }
-        if self.contains(.DSYNC) {
-            flags.insert(.dataSync)
-        }
-        if self.contains(.NONBLOCK) {
-            flags.insert(.nonBlocking)
-        }
-        if self.contains(.SYNC) {
-            flags.insert(.fileSync)
-        }
-        #if os(Linux)
-            if self.contains(.RSYNC) {
-                flags.insert(.readSync)
+        #if !os(Windows)
+            if self.contains(.DSYNC) {
+                flags.insert(.dataSync)
             }
+            if self.contains(.NONBLOCK) {
+                flags.insert(.nonBlocking)
+            }
+            if self.contains(.SYNC) {
+                flags.insert(.fileSync)
+            }
+            #if os(Linux)
+                if self.contains(.RSYNC) {
+                    flags.insert(.readSync)
+                }
+            #endif
         #endif
         return flags
     }
@@ -72,7 +88,7 @@ extension WASIAbi.Timestamp {
         atim: WASIAbi.Timestamp,
         mtim: WASIAbi.Timestamp,
         fstFlags: WASIAbi.FstFlags
-    ) throws -> (access: Clock.TimeSpec, modification: Clock.TimeSpec) {
+    ) throws -> (access: FileTime, modification: FileTime) {
         return try (
             atim.platformTimeSpec(
                 set: fstFlags.contains(.ATIM), now: fstFlags.contains(.ATIM_NOW)
@@ -83,12 +99,12 @@ extension WASIAbi.Timestamp {
         )
     }
 
-    func platformTimeSpec(set: Bool, now: Bool) throws -> Clock.TimeSpec {
+    func platformTimeSpec(set: Bool, now: Bool) throws -> FileTime {
         switch (set, now) {
         case (true, true):
             throw WASIAbi.Errno.EINVAL
         case (true, false):
-            return Clock.TimeSpec(
+            return FileTime(
                 seconds: Int(self / 1_000_000_000),
                 nanoseconds: Int(self % 1_000_000_000)
             )
@@ -119,9 +135,13 @@ extension WASIAbi.Timestamp {
         self = nanoseconds + seconds * 1_000_000_000
     }
 
-    init(platformTimeSpec timespec: Clock.TimeSpec) {
+    init(platformTimeSpec timespec: FileTime) {
+        #if os(Windows)
+        self = UInt64(timespec.unixNanoseconds)
+        #else
         self.init(seconds: UInt64(timespec.rawValue.tv_sec),
                   nanoseconds: UInt64(timespec.rawValue.tv_nsec))
+        #endif
     }
 
     init(wallClockDuration duration: WallClock.Duration) {
@@ -168,8 +188,10 @@ extension WASIAbi.Errno {
         case .invalidArgument: self = .EINVAL
         case .tooManyOpenFilesInSystem: self = .ENFILE
         case .tooManyOpenFiles: self = .EMFILE
+        #if !os(Windows)
         case .inappropriateIOCTLForDevice: self = .ENOTTY
         case .textFileBusy: self = .ETXTBSY
+        #endif
         case .fileTooLarge: self = .EFBIG
         case .noSpace: self = .ENOSPC
         case .illegalSeek: self = .ESPIPE
@@ -209,17 +231,23 @@ extension WASIAbi.Errno {
         case .staleNFSFileHandle: self = .ESTALE
         case .noLocks: self = .ENOLCK
         case .noFunction: self = .ENOSYS
+        #if !os(Windows)
         case .overflow: self = .EOVERFLOW
+        #endif
         case .canceled: self = .ECANCELED
+        #if !os(Windows)
         case .identifierRemoved: self = .EIDRM
         case .noMessage: self = .ENOMSG
+        #endif
         case .illegalByteSequence: self = .EILSEQ
+        #if !os(Windows)
         case .badMessage: self = .EBADMSG
         case .multiHop: self = .EMULTIHOP
         case .noLink: self = .ENOLINK
         case .protocolError: self = .EPROTO
         case .notRecoverable: self = .ENOTRECOVERABLE
         case .previousOwnerDied: self = .EOWNERDEAD
+        #endif
         default: return nil
         }
     }

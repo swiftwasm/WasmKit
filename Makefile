@@ -17,7 +17,7 @@ spectest:
 
 .PHONY: wasitest
 wasitest:
-	./IntegrationTests/WASI/run-tests.sh
+	./IntegrationTests/WASI/run-tests.py
 
 ### Utilities
 

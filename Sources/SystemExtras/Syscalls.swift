@@ -4,11 +4,14 @@ import Darwin
 import Glibc
 #elseif os(Windows)
 import ucrt
+import WinSDK
 #else
 #error("Unsupported Platform")
 #endif
 
 import SystemPackage
+
+#if !os(Windows)
 
 // openat
 internal func system_openat(
@@ -40,6 +43,8 @@ internal func system_fcntl(_ fd: Int32, _ cmd: Int32) -> CInt {
   return fcntl(fd, cmd)
 }
 
+#endif
+
 #if os(Linux)
 // posix_fadvise
 internal func system_posix_fadvise(
@@ -53,6 +58,8 @@ internal func system_posix_fadvise(
 internal func system_fstat(_ fd: Int32, _ stat: UnsafeMutablePointer<stat>) -> CInt {
   return fstat(fd, stat)
 }
+
+#if !os(Windows)
 
 // fstatat
 internal func system_fstatat(
@@ -90,9 +97,6 @@ internal func system_symlinkat(
   return symlinkat(oldPath, newDirFd, newPath)
 }
 
-// ucrt does not provide `opendir` API
-#if !os(Windows)
-
 extension CInterop {
   #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
   public typealias DirP = UnsafeMutablePointer<DIR>
@@ -114,7 +118,13 @@ internal func system_readdir(_ dirp: CInterop.DirP) -> UnsafeMutablePointer<dire
 }
 #endif
 
-#if !os(Windows)
+#if os(Windows)
+
+extension CInterop {
+  public typealias TimeSpec = FILETIME
+}
+
+#else
 
 extension CInterop {
   public typealias ClockId = clockid_t
