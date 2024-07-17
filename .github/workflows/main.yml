@@ -13,20 +13,34 @@ jobs:
           # Swift 5.8.1
           - os: macos-13
             xcode: Xcode_14.3.1
+            development-toolchain-download: "https://download.swift.org/development/xcode/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a-osx.pkg"
+            development-toolchain-tag: DEVELOPMENT-SNAPSHOT-2024-07-08-a
+            wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi.artifactbundle.zip"
+            wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi
           # Swift 5.9.0
           - os: macos-13
             xcode: Xcode_15.0.1
+            development-toolchain-download: "https://download.swift.org/development/xcode/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a-osx.pkg"
+            development-toolchain-tag: DEVELOPMENT-SNAPSHOT-2024-07-08-a
+            wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi.artifactbundle.zip"
+            wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi
 
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
         with:
           submodules: recursive
-      - id: setup-swiftwasm
-        uses: swiftwasm/setup-swiftwasm@v1
-        with:
-          swift-version: "wasm-5.8.0-RELEASE"
-          add-to-path: false
+      - id: setup-development
+        run: |
+          toolchain_path="/Library/Developer/Toolchains/${{ matrix.development-toolchain-tag }}.xctoolchain"
+          pkg="$(mktemp -d)/InstallMe.pkg"
+          curl -L ${{ matrix.development-toolchain-download }} -o $pkg
+          sudo installer -pkg $pkg -target /
+          echo "toolchain-path=$toolchain_path" >> $GITHUB_OUTPUT
+          "$toolchain_path/usr/bin/swift" sdk install "${{ matrix.wasi-swift-sdk-download }}"
+          wasi_sdk_path=$("$toolchain_path/usr/bin/swift" sdk configure --show-configuration "${{ matrix.wasi-swift-sdk-id }}" wasm32-unknown-wasi | grep sdkRootPath: | cut -d: -f2)
+          echo "wasi-swift-sdk-path=$(dirname $wasi_sdk_path)" >> $GITHUB_OUTPUT
+
       - name: Select Xcode version
         run: sudo xcode-select -switch /Applications/${{ matrix.xcode }}.app
       - name: Configure Tests/default.json
@@ -46,13 +60,21 @@ jobs:
       matrix:
         include:
           - swift: "5.8-focal"
-            swiftwasm-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-5.8.0-RELEASE/swift-wasm-5.8.0-RELEASE-ubuntu20.04_x86_64.tar.gz"
+            development-toolchain-download: "https://download.swift.org/development/ubuntu2004/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a-ubuntu20.04.tar.gz"
+            wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi.artifactbundle.zip"
+            wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi
           - swift: "5.8-amazonlinux2"
-            swiftwasm-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-5.8.0-RELEASE/swift-wasm-5.8.0-RELEASE-amazonlinux2_x86_64.tar.gz"
+            development-toolchain-download: "https://download.swift.org/development/amazonlinux2/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a-amazonlinux2.tar.gz"
+            wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi.artifactbundle.zip"
+            wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi
           - swift: "5.9-focal"
-            swiftwasm-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-5.9.2-RELEASE/swift-wasm-5.9.2-RELEASE-ubuntu20.04_x86_64.tar.gz"
+            development-toolchain-download: "https://download.swift.org/development/ubuntu2004/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a-ubuntu20.04.tar.gz"
+            wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi.artifactbundle.zip"
+            wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi
           - swift: "5.9-amazonlinux2"
-            swiftwasm-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-5.9.2-RELEASE/swift-wasm-5.9.2-RELEASE-amazonlinux2_x86_64.tar.gz"
+            development-toolchain-download: "https://download.swift.org/development/amazonlinux2/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a-amazonlinux2.tar.gz"
+            wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi.artifactbundle.zip"
+            wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi
 
     runs-on: ubuntu-20.04
     name: "build-linux (${{ matrix.swift }})"
@@ -65,19 +87,23 @@ jobs:
           echo 'docker exec -i build-container "$@"' > ./build-exec
           chmod +x ./build-exec
 
-      - name: Install WebAssembly toolchain
-        id: setup-swiftwasm
+      - name: Install Development toolchain
+        id: setup-development
         run: |
           toolchain_path="/opt/swiftwasm"
           ./build-exec mkdir -p "$toolchain_path"
-          curl -L ${{ matrix.swiftwasm-download }} | ./build-exec tar xz --strip-component 1 -C "$toolchain_path"
+          curl -L ${{ matrix.development-toolchain-download }} | ./build-exec tar xz --strip-component 1 -C "$toolchain_path"
           echo "toolchain-path=$toolchain_path" >> $GITHUB_OUTPUT
+          ./build-exec "$toolchain_path/usr/bin/swift" sdk install "${{ matrix.wasi-swift-sdk-download }}"
+          wasi_sdk_path=$(./build-exec "$toolchain_path/usr/bin/swift" sdk configure --show-configuration "${{ matrix.wasi-swift-sdk-id }}" wasm32-unknown-wasi | grep sdkRootPath: | cut -d: -f2)
+          echo "wasi-swift-sdk-path=$(dirname $wasi_sdk_path)" >> $GITHUB_OUTPUT
 
       - name: Configure Tests/default.json
         run: |
           cat <<EOS > Tests/default.json
           {
-            "swiftExecutablePath": "${{ steps.setup-swiftwasm.outputs.toolchain-path }}/usr/bin/swift",
+            "swiftExecutablePath": "${{ steps.setup-development.outputs.toolchain-path }}/usr/bin/swift",
+            "wasiSwiftSDKPath": "${{ steps.setup-development.outputs.wasi-swift-sdk-path }}",
             "hostSwiftExecutablePath": "/usr/bin/swift"
           }
           EOS
