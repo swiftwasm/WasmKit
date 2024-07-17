@@ -55,7 +55,7 @@ struct RuntimeTestHarness {
             Please create 'Tests/default.json' with this or similar contents:
             {
                 "swiftExecutablePath": "$HOME/Library/Developer/Toolchains/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a.xctoolchain/usr/bin/swift",
-                "wasiSwiftSDK": "$HOME/Library/org.swift.swiftpm/swift-sdks/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi.artifactbundle/DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi/wasm32-unknown-wasi"
+                "wasiSwiftSDKPath": "$HOME/Library/org.swift.swiftpm/swift-sdks/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi.artifactbundle/DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi/wasm32-unknown-wasi"
             }
 
 
