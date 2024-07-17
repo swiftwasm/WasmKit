@@ -17,6 +17,7 @@ import XCTest
 struct RuntimeTestHarness {
     struct Configuration: Codable {
         let swiftExecutablePath: URL
+        let wasiSwiftSDK: URL
 
         var swiftCompilerExecutablePath: URL {
             swiftExecutablePath.deletingLastPathComponent().appendingPathComponent("swiftc")
@@ -53,8 +54,10 @@ struct RuntimeTestHarness {
             throw XCTSkip("""
             Please create 'Tests/default.json' with this or similar contents:
             {
-                "swiftExecutablePath": "/Library/Developer/Toolchains/swift-wasm-5.8.0-RELEASE.xctoolchain/usr/bin/swift"
+                "swiftExecutablePath": "$HOME/Library/Developer/Toolchains/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a.xctoolchain/usr/bin/swift",
+                "wasiSwiftSDK": "$HOME/Library/org.swift.swiftpm/swift-sdks/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi.artifactbundle/DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi/wasm32-unknown-wasi"
             }
+
 
             or specify `configuration` parameter in your test code.
             """)
@@ -116,32 +119,70 @@ struct RuntimeTestHarness {
     }
 
     /// Build up WebAssembly module from the fixture and instantiate WasmKit runtime with the module.
-    mutating func build(link: (inout [String: HostModule]) -> Void) throws -> (Runtime, ModuleInstance) {
-        defer { cleanupTemporaryFiles() }
-        let compiled = try compile(inputFiles: collectGuestInputFiles())
+    mutating func build(
+        link: (inout [String: HostModule]) -> Void,
+        run: (Runtime, ModuleInstance) throws -> Void
+    ) throws {
+        for compile in [compileForEmbedded, compileForWASI] {
+            defer { cleanupTemporaryFiles() }
+            let compiled = try compile(collectGuestInputFiles())
+            
+            let wasi = try WASIBridgeToHost(args: [compiled.path])
+            var hostModules: [String: HostModule] = wasi.hostModules
+            link(&hostModules)
+            
+            let module = try parseWasm(filePath: .init(compiled.path))
+            let runtime = Runtime(hostModules: hostModules)
+            let instance = try runtime.instantiate(module: module)
+            try run(runtime, instance)
+        }
+    }
 
-        let wasi = try WASIBridgeToHost(args: [compiled.path])
-        var hostModules: [String: HostModule] = wasi.hostModules
-        link(&hostModules)
+    func compileForEmbedded(inputFiles: [String]) throws -> URL {
+        let embeddedSupport = Self.testsDirectory.appendingPathComponent("EmbeddedSupport")
 
-        let module = try parseWasm(filePath: .init(compiled.path))
-        let runtime = Runtime(hostModules: hostModules)
-        let instance = try runtime.instantiate(module: module)
-        return (runtime, instance)
+        let libc = embeddedSupport.appendingPathComponent("MinLibc.c")
+        let libcObjFile = Self.testsDirectory
+            .appendingPathComponent("Compiled")
+            .appendingPathComponent("MinLibc.o")
+        FileManager.default.createFile(atPath: libcObjFile.deletingLastPathComponent().path, contents: nil, attributes: nil)
+        try compileToObj(cInputFiles: [libc.path], arguments: [
+            "-target", "wasm32-unknown-none-wasm",
+            // Enable bulk memory operations for `realloc`
+            "-mbulk-memory",
+        ], outputPath: libcObjFile)
+
+        return try compile(inputFiles: inputFiles + [libcObjFile.path], arguments: [
+            "-target", "wasm32-unknown-none-wasm",
+            "-enable-experimental-feature", "Embedded",
+            "-wmo", "-Xcc", "-fdeclspec",
+            "-Xfrontend", "-disable-stack-protector",
+            "-Xlinker", "--no-entry", "-Xclang-linker", "-nostdlib",
+        ])
+    }
+
+    func compileForWASI(inputFiles: [String]) throws -> URL {
+        return try compile(inputFiles: inputFiles, arguments: [
+            "-target", "wasm32-unknown-wasi",
+            "-static-stdlib",
+            "-Xclang-linker", "-mexec-model=reactor",
+            "-resource-dir", configuration.wasiSwiftSDK.appendingPathComponent( "/swift.xctoolchain/usr/lib/swift_static").path,
+            "-sdk", configuration.wasiSwiftSDK.appendingPathComponent("WASI.sdk").path,
+            "-Xclang-linker", "-resource-dir",
+            "-Xclang-linker", configuration.wasiSwiftSDK.appendingPathComponent("swift.xctoolchain/usr/lib/swift_static/clang").path
+        ])
     }
 
     /// Compile the given input Swift source files into core Wasm module
-    func compile(inputFiles: [String]) throws -> URL {
+    func compile(inputFiles: [String], arguments: [String]) throws -> URL {
         let outputPath = Self.testsDirectory
             .appendingPathComponent("Compiled")
             .appendingPathComponent("\(fixtureName).core.wasm")
         try fileManager.createDirectory(at: outputPath.deletingLastPathComponent(), withIntermediateDirectories: true)
         let process = Process()
         process.launchPath = configuration.swiftCompilerExecutablePath.path
-        process.arguments = inputFiles + [
-            "-target", "wasm32-unknown-wasi",
+        process.arguments = inputFiles + arguments + [
             "-I\(Self.sourcesDirectory.appendingPathComponent("_CabiShims").appendingPathComponent("include").path)",
-            "-Xclang-linker", "-mexec-model=reactor",
             // TODO: Remove `--export-all` linker option by replacing `@_cdecl` with `@_expose(wasm)`
             "-Xlinker", "--export-all",
             "-o", outputPath.path
@@ -161,7 +202,9 @@ struct RuntimeTestHarness {
                 """
             }.joined(separator: "\n====================\n")      
             let message = """
-            Failed to execute \(process.arguments?.joined(separator: " ") ?? " ")
+            Failed to execute \(
+                ([configuration.swiftCompilerExecutablePath.path] + (process.arguments ?? [])).joined(separator: " ")
+            )
             Exit status: \(process.terminationStatus)
             Input files:
             \(fileContents)
@@ -169,5 +212,29 @@ struct RuntimeTestHarness {
             throw Error(description: message)
         }
         return outputPath
+    }
+
+    /// Compile the given input Swift source files into an object file
+    func compileToObj(cInputFiles: [String], arguments: [String], outputPath: URL) throws {
+        let process = Process()
+        // Assume that clang is placed alongside swiftc
+        process.launchPath = configuration.swiftCompilerExecutablePath
+            .deletingLastPathComponent().appendingPathComponent("clang").path
+        process.arguments = cInputFiles + arguments + [
+            "-c",
+            "-o", outputPath.path
+        ]
+        process.environment = [:]
+        process.launch()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else {
+            let message = """
+            Failed to execute \(
+                ([configuration.swiftCompilerExecutablePath.path] + (process.arguments ?? [])).joined(separator: " ")
+            )
+            Exit status: \(process.terminationStatus)
+            """
+            throw Error(description: message)
+        }
     }
 }
