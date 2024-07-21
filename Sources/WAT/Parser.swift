@@ -925,9 +925,9 @@ struct WatParserError: Error, CustomStringConvertible {
 
     var description: String {
         if let location {
-            "\(location.line):\(location.column): \(message)"
+            return "\(location.line):\(location.column): \(message)"
         } else {
-            message
+            return message
         }
     }
 

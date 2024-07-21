@@ -13,7 +13,7 @@ public struct Location: Equatable, CustomDebugStringConvertible {
     }
 
     public var debugDescription: String {
-        "Location\(sourceLocation(at: index, in: source))"
+        return "Location\(sourceLocation(at: index, in: source))"
     }
 }
 
