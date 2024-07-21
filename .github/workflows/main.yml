@@ -123,6 +123,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: python3 ./Vendor/checkout-dependency testsuite
       # Check Windows build with CMake
+      - uses: Cyberboss/install-winget@v1
       - run: winget install Ninja-build.Ninja Kitware.CMake
       - run: cmake -G Ninja -B .build/cmake
       - run: cmake --build .build/cmake
