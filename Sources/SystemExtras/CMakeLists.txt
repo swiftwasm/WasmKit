@@ -1,6 +1,7 @@
 add_wasmkit_library(SystemExtras
   Vendor/Exports.swift
   Vendor/Utils.swift
+  Vendor/WindowsSyscallAdapter.swift
   Clock.swift
   Constants.swift
   FileAtOperations.swift
