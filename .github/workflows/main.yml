@@ -52,8 +52,9 @@ jobs:
             "hostSdkRootPath": "$(xcrun --show-sdk-path --sdk macosx)"
           }
           EOS
+      - run: ./Vendor/checkout-dependency testsuite
       - run: swift test
-      # TODO: Enable spectest and wasi-testsuite checks
+      # TODO: Enable wasi-testsuite checks
 
   build-linux:
     strategy:
@@ -107,6 +108,7 @@ jobs:
             "hostSwiftExecutablePath": "/usr/bin/swift"
           }
           EOS
+      - run: ./Vendor/checkout-dependency testsuite
       - run: ./build-exec swift test
       - run: ./build-exec ./CI/check-spectest.sh
       - run: ./build-exec ./CI/check-wasi-testsuite.sh
@@ -119,6 +121,7 @@ jobs:
           branch: swift-5.10.1-release
           tag: 5.10.1-RELEASE
       - uses: actions/checkout@v4
+      - run: ./Vendor/checkout-dependency testsuite
       - run: swift test
 
   build-cmake:
