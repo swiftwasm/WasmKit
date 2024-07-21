@@ -1386,14 +1386,19 @@ public class WASIBridgeToHost: WASI {
         fdTable[2] = .file(StdioFileEntry(fd: stderr, accessMode: .write))
 
         for (guestPath, hostPath) in preopens {
-            let options: FileDescriptor.OpenOptions
             #if os(Windows)
-            options = []
+            let fd = try FileDescriptor.open(FilePath(hostPath), .readWrite)
             #else
-            options = .directory
+            let fd = try hostPath.withCString { cHostPath in
+                let fd = open(cHostPath, O_DIRECTORY)
+                if fd < 0 {
+                    let errno = errno
+                    throw WASIError(description: "Failed to open preopen path '\(hostPath)': \(String(cString: strerror(errno)))")
+                }
+                return FileDescriptor(rawValue: fd)
+            }
             #endif
 
-            let fd = try FileDescriptor.open(FilePath(hostPath), .readWrite, options: options)
             if try fd.attributes().fileType.isDirectory {
                 _ = try fdTable.push(.directory(DirEntry(preopenPath: guestPath, fd: fd)))
             }
