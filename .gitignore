@@ -4,7 +4,6 @@
 *.xcodeproj
 .swiftpm
 
-/spectest
 .vscode
 
 /Tests/default.json

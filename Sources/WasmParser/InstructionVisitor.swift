@@ -1425,3 +1425,210 @@ public protocol InstructionVisitor {
     mutating func visitI64TruncSatF64S() throws -> Output
     mutating func visitI64TruncSatF64U() throws -> Output
 }
+
+public protocol VoidInstructionVisitor: InstructionVisitor where Output == Void {}
+
+extension VoidInstructionVisitor {
+    public mutating func visitUnreachable() throws -> Void {}
+    public mutating func visitNop() throws -> Void {}
+    public mutating func visitBlock(blockType: BlockType) throws -> Void {}
+    public mutating func visitLoop(blockType: BlockType) throws -> Void {}
+    public mutating func visitIf(blockType: BlockType) throws -> Void {}
+    public mutating func visitElse() throws -> Void {}
+    public mutating func visitEnd() throws -> Void {}
+    public mutating func visitBr(relativeDepth: UInt32) throws -> Void {}
+    public mutating func visitBrIf(relativeDepth: UInt32) throws -> Void {}
+    public mutating func visitBrTable(targets: BrTable) throws -> Void {}
+    public mutating func visitReturn() throws -> Void {}
+    public mutating func visitCall(functionIndex: UInt32) throws -> Void {}
+    public mutating func visitCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws -> Void {}
+    public mutating func visitDrop() throws -> Void {}
+    public mutating func visitSelect() throws -> Void {}
+    public mutating func visitTypedSelect(type: ValueType) throws -> Void {}
+    public mutating func visitLocalGet(localIndex: UInt32) throws -> Void {}
+    public mutating func visitLocalSet(localIndex: UInt32) throws -> Void {}
+    public mutating func visitLocalTee(localIndex: UInt32) throws -> Void {}
+    public mutating func visitGlobalGet(globalIndex: UInt32) throws -> Void {}
+    public mutating func visitGlobalSet(globalIndex: UInt32) throws -> Void {}
+    public mutating func visitI32Load(memarg: MemArg) throws -> Void {}
+    public mutating func visitI64Load(memarg: MemArg) throws -> Void {}
+    public mutating func visitF32Load(memarg: MemArg) throws -> Void {}
+    public mutating func visitF64Load(memarg: MemArg) throws -> Void {}
+    public mutating func visitI32Load8S(memarg: MemArg) throws -> Void {}
+    public mutating func visitI32Load8U(memarg: MemArg) throws -> Void {}
+    public mutating func visitI32Load16S(memarg: MemArg) throws -> Void {}
+    public mutating func visitI32Load16U(memarg: MemArg) throws -> Void {}
+    public mutating func visitI64Load8S(memarg: MemArg) throws -> Void {}
+    public mutating func visitI64Load8U(memarg: MemArg) throws -> Void {}
+    public mutating func visitI64Load16S(memarg: MemArg) throws -> Void {}
+    public mutating func visitI64Load16U(memarg: MemArg) throws -> Void {}
+    public mutating func visitI64Load32S(memarg: MemArg) throws -> Void {}
+    public mutating func visitI64Load32U(memarg: MemArg) throws -> Void {}
+    public mutating func visitI32Store(memarg: MemArg) throws -> Void {}
+    public mutating func visitI64Store(memarg: MemArg) throws -> Void {}
+    public mutating func visitF32Store(memarg: MemArg) throws -> Void {}
+    public mutating func visitF64Store(memarg: MemArg) throws -> Void {}
+    public mutating func visitI32Store8(memarg: MemArg) throws -> Void {}
+    public mutating func visitI32Store16(memarg: MemArg) throws -> Void {}
+    public mutating func visitI64Store8(memarg: MemArg) throws -> Void {}
+    public mutating func visitI64Store16(memarg: MemArg) throws -> Void {}
+    public mutating func visitI64Store32(memarg: MemArg) throws -> Void {}
+    public mutating func visitMemorySize(memory: UInt32) throws -> Void {}
+    public mutating func visitMemoryGrow(memory: UInt32) throws -> Void {}
+    public mutating func visitI32Const(value: Int32) throws -> Void {}
+    public mutating func visitI64Const(value: Int64) throws -> Void {}
+    public mutating func visitF32Const(value: IEEE754.Float32) throws -> Void {}
+    public mutating func visitF64Const(value: IEEE754.Float64) throws -> Void {}
+    public mutating func visitRefNull(type: ReferenceType) throws -> Void {}
+    public mutating func visitRefIsNull() throws -> Void {}
+    public mutating func visitRefFunc(functionIndex: UInt32) throws -> Void {}
+    public mutating func visitI32Eqz() throws -> Void {}
+    public mutating func visitI32Eq() throws -> Void {}
+    public mutating func visitI32Ne() throws -> Void {}
+    public mutating func visitI32LtS() throws -> Void {}
+    public mutating func visitI32LtU() throws -> Void {}
+    public mutating func visitI32GtS() throws -> Void {}
+    public mutating func visitI32GtU() throws -> Void {}
+    public mutating func visitI32LeS() throws -> Void {}
+    public mutating func visitI32LeU() throws -> Void {}
+    public mutating func visitI32GeS() throws -> Void {}
+    public mutating func visitI32GeU() throws -> Void {}
+    public mutating func visitI64Eqz() throws -> Void {}
+    public mutating func visitI64Eq() throws -> Void {}
+    public mutating func visitI64Ne() throws -> Void {}
+    public mutating func visitI64LtS() throws -> Void {}
+    public mutating func visitI64LtU() throws -> Void {}
+    public mutating func visitI64GtS() throws -> Void {}
+    public mutating func visitI64GtU() throws -> Void {}
+    public mutating func visitI64LeS() throws -> Void {}
+    public mutating func visitI64LeU() throws -> Void {}
+    public mutating func visitI64GeS() throws -> Void {}
+    public mutating func visitI64GeU() throws -> Void {}
+    public mutating func visitF32Eq() throws -> Void {}
+    public mutating func visitF32Ne() throws -> Void {}
+    public mutating func visitF32Lt() throws -> Void {}
+    public mutating func visitF32Gt() throws -> Void {}
+    public mutating func visitF32Le() throws -> Void {}
+    public mutating func visitF32Ge() throws -> Void {}
+    public mutating func visitF64Eq() throws -> Void {}
+    public mutating func visitF64Ne() throws -> Void {}
+    public mutating func visitF64Lt() throws -> Void {}
+    public mutating func visitF64Gt() throws -> Void {}
+    public mutating func visitF64Le() throws -> Void {}
+    public mutating func visitF64Ge() throws -> Void {}
+    public mutating func visitI32Clz() throws -> Void {}
+    public mutating func visitI32Ctz() throws -> Void {}
+    public mutating func visitI32Popcnt() throws -> Void {}
+    public mutating func visitI32Add() throws -> Void {}
+    public mutating func visitI32Sub() throws -> Void {}
+    public mutating func visitI32Mul() throws -> Void {}
+    public mutating func visitI32DivS() throws -> Void {}
+    public mutating func visitI32DivU() throws -> Void {}
+    public mutating func visitI32RemS() throws -> Void {}
+    public mutating func visitI32RemU() throws -> Void {}
+    public mutating func visitI32And() throws -> Void {}
+    public mutating func visitI32Or() throws -> Void {}
+    public mutating func visitI32Xor() throws -> Void {}
+    public mutating func visitI32Shl() throws -> Void {}
+    public mutating func visitI32ShrS() throws -> Void {}
+    public mutating func visitI32ShrU() throws -> Void {}
+    public mutating func visitI32Rotl() throws -> Void {}
+    public mutating func visitI32Rotr() throws -> Void {}
+    public mutating func visitI64Clz() throws -> Void {}
+    public mutating func visitI64Ctz() throws -> Void {}
+    public mutating func visitI64Popcnt() throws -> Void {}
+    public mutating func visitI64Add() throws -> Void {}
+    public mutating func visitI64Sub() throws -> Void {}
+    public mutating func visitI64Mul() throws -> Void {}
+    public mutating func visitI64DivS() throws -> Void {}
+    public mutating func visitI64DivU() throws -> Void {}
+    public mutating func visitI64RemS() throws -> Void {}
+    public mutating func visitI64RemU() throws -> Void {}
+    public mutating func visitI64And() throws -> Void {}
+    public mutating func visitI64Or() throws -> Void {}
+    public mutating func visitI64Xor() throws -> Void {}
+    public mutating func visitI64Shl() throws -> Void {}
+    public mutating func visitI64ShrS() throws -> Void {}
+    public mutating func visitI64ShrU() throws -> Void {}
+    public mutating func visitI64Rotl() throws -> Void {}
+    public mutating func visitI64Rotr() throws -> Void {}
+    public mutating func visitF32Abs() throws -> Void {}
+    public mutating func visitF32Neg() throws -> Void {}
+    public mutating func visitF32Ceil() throws -> Void {}
+    public mutating func visitF32Floor() throws -> Void {}
+    public mutating func visitF32Trunc() throws -> Void {}
+    public mutating func visitF32Nearest() throws -> Void {}
+    public mutating func visitF32Sqrt() throws -> Void {}
+    public mutating func visitF32Add() throws -> Void {}
+    public mutating func visitF32Sub() throws -> Void {}
+    public mutating func visitF32Mul() throws -> Void {}
+    public mutating func visitF32Div() throws -> Void {}
+    public mutating func visitF32Min() throws -> Void {}
+    public mutating func visitF32Max() throws -> Void {}
+    public mutating func visitF32Copysign() throws -> Void {}
+    public mutating func visitF64Abs() throws -> Void {}
+    public mutating func visitF64Neg() throws -> Void {}
+    public mutating func visitF64Ceil() throws -> Void {}
+    public mutating func visitF64Floor() throws -> Void {}
+    public mutating func visitF64Trunc() throws -> Void {}
+    public mutating func visitF64Nearest() throws -> Void {}
+    public mutating func visitF64Sqrt() throws -> Void {}
+    public mutating func visitF64Add() throws -> Void {}
+    public mutating func visitF64Sub() throws -> Void {}
+    public mutating func visitF64Mul() throws -> Void {}
+    public mutating func visitF64Div() throws -> Void {}
+    public mutating func visitF64Min() throws -> Void {}
+    public mutating func visitF64Max() throws -> Void {}
+    public mutating func visitF64Copysign() throws -> Void {}
+    public mutating func visitI32WrapI64() throws -> Void {}
+    public mutating func visitI32TruncF32S() throws -> Void {}
+    public mutating func visitI32TruncF32U() throws -> Void {}
+    public mutating func visitI32TruncF64S() throws -> Void {}
+    public mutating func visitI32TruncF64U() throws -> Void {}
+    public mutating func visitI64ExtendI32S() throws -> Void {}
+    public mutating func visitI64ExtendI32U() throws -> Void {}
+    public mutating func visitI64TruncF32S() throws -> Void {}
+    public mutating func visitI64TruncF32U() throws -> Void {}
+    public mutating func visitI64TruncF64S() throws -> Void {}
+    public mutating func visitI64TruncF64U() throws -> Void {}
+    public mutating func visitF32ConvertI32S() throws -> Void {}
+    public mutating func visitF32ConvertI32U() throws -> Void {}
+    public mutating func visitF32ConvertI64S() throws -> Void {}
+    public mutating func visitF32ConvertI64U() throws -> Void {}
+    public mutating func visitF32DemoteF64() throws -> Void {}
+    public mutating func visitF64ConvertI32S() throws -> Void {}
+    public mutating func visitF64ConvertI32U() throws -> Void {}
+    public mutating func visitF64ConvertI64S() throws -> Void {}
+    public mutating func visitF64ConvertI64U() throws -> Void {}
+    public mutating func visitF64PromoteF32() throws -> Void {}
+    public mutating func visitI32ReinterpretF32() throws -> Void {}
+    public mutating func visitI64ReinterpretF64() throws -> Void {}
+    public mutating func visitF32ReinterpretI32() throws -> Void {}
+    public mutating func visitF64ReinterpretI64() throws -> Void {}
+    public mutating func visitI32Extend8S() throws -> Void {}
+    public mutating func visitI32Extend16S() throws -> Void {}
+    public mutating func visitI64Extend8S() throws -> Void {}
+    public mutating func visitI64Extend16S() throws -> Void {}
+    public mutating func visitI64Extend32S() throws -> Void {}
+    public mutating func visitMemoryInit(dataIndex: UInt32) throws -> Void {}
+    public mutating func visitDataDrop(dataIndex: UInt32) throws -> Void {}
+    public mutating func visitMemoryCopy(dstMem: UInt32, srcMem: UInt32) throws -> Void {}
+    public mutating func visitMemoryFill(memory: UInt32) throws -> Void {}
+    public mutating func visitTableInit(elemIndex: UInt32, table: UInt32) throws -> Void {}
+    public mutating func visitElemDrop(elemIndex: UInt32) throws -> Void {}
+    public mutating func visitTableCopy(dstTable: UInt32, srcTable: UInt32) throws -> Void {}
+    public mutating func visitTableFill(table: UInt32) throws -> Void {}
+    public mutating func visitTableGet(table: UInt32) throws -> Void {}
+    public mutating func visitTableSet(table: UInt32) throws -> Void {}
+    public mutating func visitTableGrow(table: UInt32) throws -> Void {}
+    public mutating func visitTableSize(table: UInt32) throws -> Void {}
+    public mutating func visitI32TruncSatF32S() throws -> Void {}
+    public mutating func visitI32TruncSatF32U() throws -> Void {}
+    public mutating func visitI32TruncSatF64S() throws -> Void {}
+    public mutating func visitI32TruncSatF64U() throws -> Void {}
+    public mutating func visitI64TruncSatF32S() throws -> Void {}
+    public mutating func visitI64TruncSatF32U() throws -> Void {}
+    public mutating func visitI64TruncSatF64S() throws -> Void {}
+    public mutating func visitI64TruncSatF64U() throws -> Void {}
+}
+

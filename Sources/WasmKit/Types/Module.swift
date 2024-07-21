@@ -11,7 +11,6 @@ public struct Module {
     var memories: [Memory]
     var globals: [Global]
     var elements: [ElementSegment]
-    var dataCount: UInt32?
     var data: [DataSegment]
     var start: FunctionIndex?
     public internal(set) var imports: [Import]

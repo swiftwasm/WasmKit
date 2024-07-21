@@ -69,6 +69,7 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
     var parser = WasmParser.Parser<Stream>(
         stream: stream, features: features
     )
+    var dataCount: UInt32?
 
     while let payload = try parser.parseNext() {
         switch payload {
@@ -108,9 +109,9 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
         case .dataSection(let dataSection):
             try orderTracking.track(order: .data)
             module.data = dataSection
-        case .dataCount(let dataCount):
+        case .dataCount(let count):
             try orderTracking.track(order: .dataCount)
-            module.dataCount = dataCount
+            dataCount = count
         }
     }
 
@@ -121,7 +122,7 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
         )
     }
 
-    if let dataCount = module.dataCount, dataCount != UInt32(module.data.count) {
+    if let dataCount = dataCount, dataCount != UInt32(module.data.count) {
         throw WasmParserError.inconsistentDataCountAndDataSectionLength(
             dataCount: dataCount,
             dataSection: module.data.count

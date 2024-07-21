@@ -54,6 +54,11 @@ public typealias MemoryType = Limits
 public struct TableType: Equatable {
     public let elementType: ReferenceType
     public let limits: Limits
+
+    public init(elementType: ReferenceType, limits: Limits) {
+        self.elementType = elementType
+        self.limits = limits
+    }
 }
 
 /// > Note:
@@ -68,6 +73,11 @@ public enum Mutability: Equatable {
 public struct GlobalType: Equatable {
     public let mutability: Mutability
     public let valueType: ValueType
+
+    public init(mutability: Mutability, valueType: ValueType) {
+        self.mutability = mutability
+        self.valueType = valueType
+    }
 }
 
 /// > Note:
@@ -82,15 +92,28 @@ public enum ExternalType {
 public enum IEEE754 {
     public struct Float32: Equatable {
         public let bitPattern: UInt32
+
+        public init(bitPattern: UInt32) {
+            self.bitPattern = bitPattern
+        }
     }
     public struct Float64: Equatable {
         public let bitPattern: UInt64
+
+        public init(bitPattern: UInt64) {
+            self.bitPattern = bitPattern
+        }
     }
 }
 
 public struct BrTable: Equatable {
     public let labelIndices: [UInt32]
     public let defaultIndex: UInt32
+
+    public init(labelIndices: [UInt32], defaultIndex: UInt32) {
+        self.labelIndices = labelIndices
+        self.defaultIndex = defaultIndex
+    }
 }
 
 /// A custom section in a module
@@ -123,6 +146,10 @@ public typealias ConstExpression = [Instruction]
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#tables>
 public struct Table: Equatable {
     public let type: TableType
+
+    public init(type: TableType) {
+        self.type = type
+    }
 }
 
 /// > Note:
@@ -197,6 +224,11 @@ public struct Export: Equatable {
     public let name: String
     /// Descriptor of the export
     public let descriptor: ExportDescriptor
+
+    public init(name: String, descriptor: ExportDescriptor) {
+        self.name = name
+        self.descriptor = descriptor
+    }
 }
 
 /// Export descriptor
@@ -221,6 +253,12 @@ public struct Import: Equatable {
     public let name: String
     /// Descriptor of the import
     public let descriptor: ImportDescriptor
+
+    public init(module: String, name: String, descriptor: ImportDescriptor) {
+        self.module = module
+        self.name = name
+        self.descriptor = descriptor
+    }
 }
 
 /// Import descriptor
