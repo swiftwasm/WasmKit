@@ -25,7 +25,6 @@ class EncoderTests: XCTestCase {
         }
 
         print("Checking\n  wast: \(wast.path)\n  json: \(json.path)")
-        let moduleBinaryFiles = try Spectest.moduleFiles(json: json)
         var parser = WastParser(try String(contentsOf: wast))
         var watModules: [ModuleDirective] = []
         while let directive = try parser.nextDirective() {
@@ -33,6 +32,11 @@ class EncoderTests: XCTestCase {
                 watModules.append(moduleDirective)
             }
         }
+        guard FileManager.default.fileExists(atPath: json.path) else {
+            print("Skipping binary comparison because the oracle file (\(json.path)) does not exist.")
+            return
+        }
+        let moduleBinaryFiles = try Spectest.moduleFiles(json: json)
         assertEqual(watModules.count, moduleBinaryFiles.count)
         if watModules.count != moduleBinaryFiles.count {
             recordFail()

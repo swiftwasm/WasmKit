@@ -176,7 +176,7 @@ class ParserTests: XCTestCase {
         var failureCount = 0
         var totalCount = 0
         for filePath in Spectest.wastFiles(include: []) {
-            print("Parsing \(filePath.path())...")
+            print("Parsing \(filePath.path)...")
             totalCount += 1
             let source = try String(contentsOf: filePath)
             do {

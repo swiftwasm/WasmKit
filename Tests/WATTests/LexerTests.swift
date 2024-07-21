@@ -77,7 +77,7 @@ class LexerTests: XCTestCase {
     func testLexSpectest() throws {
         var failureCount = 0
         for filePath in Spectest.wastFiles() {
-            print("Lexing \(filePath.path())...")
+            print("Lexing \(filePath.path)...")
             let source = try String(contentsOf: filePath)
             do {
                 _ = try collectToken(source)
