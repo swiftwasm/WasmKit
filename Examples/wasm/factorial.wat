@@ -1,3 +1,4 @@
+(module
   (func $fac (export "fac") (param i64) (result i64)
     (if (result i64) (i64.eqz (local.get 0))
       (then (i64.const 1))
@@ -9,3 +10,4 @@
       )
     )
   )
+)
