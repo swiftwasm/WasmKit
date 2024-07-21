@@ -5,7 +5,10 @@ import os
 import shlex
 
 # shlex.split() splits according to shell quoting rules
-WASMKIT_CLI = shlex.split(os.getenv("TEST_RUNTIME_EXE", "wasmkit-cli"))
+if sys.platform == "win32":
+    WASMKIT_CLI = [os.getenv("TEST_RUNTIME_EXE", "wasmkit-cli.exe")]
+else:
+    WASMKIT_CLI = shlex.split(os.getenv("TEST_RUNTIME_EXE", "wasmkit-cli"))
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--version", action="store_true")

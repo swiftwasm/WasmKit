@@ -1,4 +1,3 @@
-#if canImport(SystemExtras)
 import SystemExtras
 import SystemPackage
 
@@ -23,24 +22,27 @@ public class GuestTimeProfiler: RuntimeInterceptor {
 
     private var output: (_ line: String) -> Void
     private var hasFirstEvent: Bool = false
-    private let startTime: UInt64
 
-    public init(output: @escaping (_ line: String) -> Void) {
-        self.output = output
-        self.startTime = Self.getTimestamp()
+    #if swift(>=5.7) && os(Windows)
+    // We can use ContinuousClock on platforms that doesn't ship stdlib as stable ABI
+    // Once we drop macOS 12.3, iOS 15.4, watchOS 8.5, and tvOS 15.4 support, we can remove
+    // this conditional compilation
+    private typealias Instant = ContinuousClock.Instant
+
+    private static func getTimestamp() -> Instant {
+        ContinuousClock.now
     }
 
-    private func addEventLine(_ event: Event) {
-        let line = event.jsonLine
-        if !hasFirstEvent {
-            self.output("[\n")
-            self.output(line)
-            hasFirstEvent = true
-        } else {
-            self.output(",\n")
-            self.output(line)
-        }
+    private func getDurationSinceStart() -> Int {
+        let duration = self.startTime.duration(to: .now)
+        let (seconds, attoseconds) = duration.components
+        // Convert to microseconds
+        return Int(seconds * 1_000_000 + attoseconds / 1_000_000_000_000)
     }
+
+    #else
+
+    private typealias Instant = UInt64
 
     private static func getTimestamp() -> UInt64 {
         let clock: SystemExtras.Clock
@@ -58,6 +60,27 @@ public class GuestTimeProfiler: RuntimeInterceptor {
     }
     private func getDurationSinceStart() -> Int {
         Int(Self.getTimestamp() - startTime)
+    }
+    #endif
+
+
+    private let startTime: Instant
+
+    public init(output: @escaping (_ line: String) -> Void) {
+        self.output = output
+        self.startTime = Self.getTimestamp()
+    }
+
+    private func addEventLine(_ event: Event) {
+        let line = event.jsonLine
+        if !hasFirstEvent {
+            self.output("[\n")
+            self.output(line)
+            hasFirstEvent = true
+        } else {
+            self.output(",\n")
+            self.output(line)
+        }
     }
 
     public func onEnterFunction(_ address: FunctionAddress, store: Store) {
@@ -117,5 +140,3 @@ private enum JSON {
         return output
     }
 }
-
-#endif

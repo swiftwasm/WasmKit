@@ -38,9 +38,15 @@ extension SandboxPrimitives {
 
         let dirFd: FileDescriptor
         if !dirName.isEmpty {
+            let options: FileDescriptor.OpenOptions
+            #if os(Windows)
+            options = []
+            #else
+            options = .directory
+            #endif
             dirFd = try openAt(
                 start: start, path: dirName,
-                mode: .readOnly, options: .directory,
+                mode: .readOnly, options: options,
                 permissions: []
             )
         } else {

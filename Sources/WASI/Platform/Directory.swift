@@ -13,6 +13,9 @@ extension DirEntry: WASIDir, FdWASIEntry {
         accessMode: FileAccessMode,
         fdflags: WASIAbi.Fdflags
     ) throws -> FileDescriptor {
+        #if os(Windows)
+        throw WASIAbi.Errno.ENOSYS
+        #else
         var options: FileDescriptor.OpenOptions = []
         if !symlinkFollow {
             options.insert(.noFollow)
@@ -67,6 +70,7 @@ extension DirEntry: WASIDir, FdWASIEntry {
             permissions: .ownerReadWrite
         )
         return newFd
+        #endif
     }
 
     func setFilestatTimes(
@@ -94,10 +98,14 @@ extension DirEntry: WASIDir, FdWASIEntry {
     }
 
     func removeDirectory(atPath path: String) throws {
+        #if os(Windows)
+        throw WASIAbi.Errno.ENOSYS
+        #else
         let (dir, basename) = try SandboxPrimitives.openParent(start: fd, path: path)
         try WASIAbi.Errno.translatingPlatformErrno {
             try dir.remove(at: FilePath(basename), options: .removeDirectory)
         }
+        #endif
     }
 
     func symlink(from sourcePath: String, to destPath: String) throws {
@@ -112,6 +120,9 @@ extension DirEntry: WASIDir, FdWASIEntry {
     func readEntries(
         cookie: WASIAbi.DirCookie
     ) throws -> AnyIterator<Result<ReaddirElement, any Error>> {
+        #if os(Windows)
+        throw WASIAbi.Errno.ENOSYS
+        #else
         // Duplicate fd because readdir takes the ownership of
         // the given fd and closedir also close the underlying fd
         let newFd = try WASIAbi.Errno.translatingPlatformErrno {
@@ -143,6 +154,7 @@ extension DirEntry: WASIDir, FdWASIEntry {
         .dropFirst(Int(cookie))
         .makeIterator()
         return AnyIterator(iterator)
+        #endif
     }
 
     func createDirectory(atPath path: String) throws {
@@ -153,6 +165,9 @@ extension DirEntry: WASIDir, FdWASIEntry {
     }
 
     func attributes(path: String, symlinkFollow: Bool) throws -> WASIAbi.Filestat {
+        #if os(Windows)
+        throw WASIAbi.Errno.ENOSYS
+        #else
         var options: FileDescriptor.AtOptions = []
         if !symlinkFollow {
             options.insert(.noFollow)
@@ -165,5 +180,6 @@ extension DirEntry: WASIDir, FdWASIEntry {
         }
 
         return WASIAbi.Filestat(stat: attributes)
+        #endif
     }
 }

@@ -4,6 +4,7 @@ import Darwin
 import Glibc
 #elseif os(Windows)
 import ucrt
+import WinSDK
 #else
 #error("Unsupported Platform")
 #endif
@@ -81,6 +82,24 @@ extension FileDescriptor {
   /// Typically created from `st_mode & S_IFMT`.
   @frozen
   public struct FileType: RawRepresentable {
+    #if os(Windows)
+    /// The raw Windows file type derived from `dwFileAttributes`.
+    @_alwaysEmitIntoClient
+    public var rawValue: DWORD
+
+    /// Creates a strongly-typed file type from a raw Windows file type.
+    @_alwaysEmitIntoClient
+    public init(rawValue: DWORD) {
+      self.rawValue = rawValue
+    }
+
+    /// A Boolean value indicating whether this file type represents a directory file.
+    @_alwaysEmitIntoClient
+    public var isDirectory: Bool {
+      rawValue == DWORD(FILE_ATTRIBUTE_DIRECTORY)
+    }
+
+    #else
     /// The raw C file type.
     @_alwaysEmitIntoClient
     public var rawValue: CInterop.Mode
@@ -93,15 +112,17 @@ extension FileDescriptor {
 
     public static var directory: FileType { FileType(rawValue: _S_IFDIR) }
 
+    #if !os(Windows)
     public static var symlink: FileType { FileType(rawValue: _S_IFLNK) }
-
-    public static var file: FileType { FileType(rawValue: _S_IFREG) }
-
-    public static var characterDevice: FileType { FileType(rawValue: _S_IFCHR) }
 
     public static var blockDevice: FileType { FileType(rawValue: _S_IFBLK) }
 
     public static var socket: FileType { FileType(rawValue: _S_IFSOCK) }
+    #endif
+
+    public static var file: FileType { FileType(rawValue: _S_IFREG) }
+
+    public static var characterDevice: FileType { FileType(rawValue: _S_IFCHR) }
 
     public static var unknown: FileType { FileType(rawValue: _S_IFMT) }
 
@@ -109,12 +130,6 @@ extension FileDescriptor {
     @_alwaysEmitIntoClient
     public var isDirectory: Bool {
       _is(_S_IFDIR)
-    }
-
-    /// A Boolean value indicating whether this file type represents a symbolic link.
-    @_alwaysEmitIntoClient
-    public var isSymlink: Bool {
-      _is(_S_IFLNK)
     }
 
     /// A Boolean value indicating whether this file type represents a regular file.
@@ -129,6 +144,13 @@ extension FileDescriptor {
       _is(_S_IFCHR)
     }
 
+    #if !os(Windows)
+    /// A Boolean value indicating whether this file type represents a symbolic link.
+    @_alwaysEmitIntoClient
+    public var isSymlink: Bool {
+      _is(_S_IFLNK)
+    }
+
     /// A Boolean value indicating whether this file type represents a block-oriented device file.
     @_alwaysEmitIntoClient
     public var isBlockDevice: Bool {
@@ -140,11 +162,13 @@ extension FileDescriptor {
     public var isSocket: Bool {
       _is(_S_IFSOCK)
     }
+    #endif
 
     @_alwaysEmitIntoClient
     internal func _is(_ mode: CInterop.Mode) -> Bool {
       rawValue == mode
     }
+    #endif
   }
 
   /// A metadata information about a file.
@@ -152,6 +176,58 @@ extension FileDescriptor {
   /// The corresponding C struct is `stat`.
   @frozen
   public struct Attributes: RawRepresentable {
+    #if os(Windows)
+    /// The raw Windows file metadata structure.
+    @_alwaysEmitIntoClient
+    public var rawValue: BY_HANDLE_FILE_INFORMATION
+
+    /// Creates a strongly-typed file type from a raw Windows file metadata structure.
+    @_alwaysEmitIntoClient
+    public init(rawValue: BY_HANDLE_FILE_INFORMATION) {
+      self.rawValue = rawValue
+    }
+
+    @_alwaysEmitIntoClient
+    public var device: UInt64 {
+      UInt64(rawValue.dwVolumeSerialNumber)
+    }
+
+    @_alwaysEmitIntoClient
+    public var inode: UInt64 {
+      UInt64(rawValue.nFileIndexHigh) << 32 | UInt64(rawValue.nFileIndexLow)
+    }
+
+    @_alwaysEmitIntoClient
+    public var fileType: FileType {
+      return FileType(rawValue: rawValue.dwFileAttributes)
+    }
+
+    @_alwaysEmitIntoClient
+    public var linkCount: UInt32 {
+      rawValue.nNumberOfLinks
+    }
+
+    @_alwaysEmitIntoClient
+    public var size: Int64 {
+      Int64(rawValue.nFileSizeHigh) << 32 | Int64(rawValue.nFileSizeLow)
+    }
+
+    @_alwaysEmitIntoClient
+    public var accessTime: FileTime {
+      FileTime(rawValue: rawValue.ftLastAccessTime)
+    }
+
+    @_alwaysEmitIntoClient
+    public var modificationTime: FileTime {
+      FileTime(rawValue: rawValue.ftLastWriteTime)
+    }
+
+    @_alwaysEmitIntoClient
+    public var creationTime: FileTime {
+      FileTime(rawValue: rawValue.ftCreationTime)
+    }
+
+    #else
     /// The raw C file metadata structure.
     @_alwaysEmitIntoClient
     public let rawValue: stat
@@ -214,6 +290,7 @@ extension FileDescriptor {
       Clock.TimeSpec(rawValue: self.rawValue.st_ctim)
       #endif
     }
+    #endif
   }
 
   /// Queries the metadata about the file
@@ -228,11 +305,21 @@ extension FileDescriptor {
 
   @usableFromInline
   internal func _attributes() -> Result<Attributes, Errno> {
+    #if os(Windows)
+    var info = BY_HANDLE_FILE_INFORMATION()
+    let handle = HANDLE(bitPattern: _get_osfhandle(self.rawValue))
+    return nothingOrErrno(retryOnInterrupt: false) {
+      let ok = GetFileInformationByHandle(handle, &info)
+      return ok ? 0 : -1
+    }
+    .map { Attributes(rawValue: info) }
+    #else
     var stat: stat = stat()
     return nothingOrErrno(retryOnInterrupt: false) {
       system_fstat(self.rawValue, &stat)
     }
     .map { Attributes(rawValue: stat) }
+    #endif
   }
 
   /// Queries the current status of the file descriptor.
@@ -247,10 +334,15 @@ extension FileDescriptor {
 
   @usableFromInline
   internal func _status() -> Result<OpenOptions, Errno> {
+    #if os(Windows)
+    // FIXME: Need to query by `NtQueryInformationFile`?
+    return .success(OpenOptions(rawValue: 0))
+    #else
     valueOrErrno(retryOnInterrupt: false) {
       system_fcntl(self.rawValue, _F_GETFL)
     }
     .map { OpenOptions(rawValue: $0) }
+    #endif
   }
 
   @_alwaysEmitIntoClient
@@ -260,26 +352,87 @@ extension FileDescriptor {
 
   @usableFromInline
   internal func _setStatus(_ options: OpenOptions) -> Result<(), Errno> {
+    #if os(Windows)
+    // FIXME: Re-open the file with new options?
+    return .success(())
+    #else
     nothingOrErrno(retryOnInterrupt: false) {
       system_fcntl(self.rawValue, F_SETFL, options.rawValue)
     }
+    #endif
   }
 
   @_alwaysEmitIntoClient
   public func setTimes(
-    access: Clock.TimeSpec = .omit, modification: Clock.TimeSpec = .omit
+    access: FileTime = .omit, modification: FileTime = .omit
   ) throws {
     try _setTime(access: access, modification: modification).get()
   }
 
   @usableFromInline
-  internal func _setTime(access: Clock.TimeSpec, modification: Clock.TimeSpec) -> Result<(), Errno> {
+  internal func _setTime(access: FileTime, modification: FileTime) -> Result<(), Errno> {
+    #if os(Windows)
+    let handle = HANDLE(bitPattern: _get_osfhandle(self.rawValue))
+    return nothingOrErrno(retryOnInterrupt: false) {
+      let ok: Bool
+      var nowCache: FILETIME?
+      let atime: FILETIME?
+      switch access {
+      case .now:
+        var now = FILETIME()
+        GetSystemTimeAsFileTime(&now)
+        nowCache = now
+        atime = now
+      case .absolute(let time):
+        atime = time
+      case .omit:
+        atime = nil
+      }
+
+      let mtime: FILETIME?
+      switch modification {
+      case .now:
+        if let now = nowCache {
+          mtime = now
+        } else {
+          var now = FILETIME()
+          GetSystemTimeAsFileTime(&now)
+          mtime = now
+        }
+      case .absolute(let time):
+        mtime = time
+      case .omit:
+        mtime = nil
+      }
+
+      switch (atime, mtime) {
+      case (nil, nil):
+        ok = true
+      case (.some(let atime), nil):
+        ok = withUnsafePointer(to: atime) { atimePtr in
+          SetFileTime(handle, nil, atimePtr, nil)
+        }
+      case (nil, .some(let mtime)):
+        ok = withUnsafePointer(to: mtime) { mtimePtr in
+          SetFileTime(handle, nil, nil, mtimePtr)
+        }
+      case (.some(let atime), .some(let mtime)):
+        ok = withUnsafePointer(to: atime) { atimePtr in
+          withUnsafePointer(to: mtime) { mtimePtr in
+            SetFileTime(handle, nil, atimePtr, mtimePtr)
+          }
+        }
+      }
+      return ok ? 0 : -1
+    }
+    #else
     let times = ContiguousArray([access.rawValue, modification.rawValue])
     return times.withUnsafeBufferPointer { timesPtr in
       nothingOrErrno(retryOnInterrupt: false) {
         system_futimens(self.rawValue, timesPtr.baseAddress!)
       }
     }
+    #endif
   }
 
   @_alwaysEmitIntoClient
@@ -287,14 +440,60 @@ extension FileDescriptor {
     try _truncate(size: size).get()
   }
 
+  #if os(Windows)
+  @usableFromInline
+  internal func _truncate(size: Int64) -> Result<(), Errno> {
+    return nothingOrErrno(retryOnInterrupt: false) {
+      var info = FILE_END_OF_FILE_INFO()
+      info.EndOfFile.QuadPart = size
+      let handle = HANDLE(bitPattern: _get_osfhandle(self.rawValue))
+      let ok = SetFileInformationByHandle(handle, FileEndOfFileInfo, &info, DWORD(MemoryLayout.size(ofValue: info)))
+      return ok ? 0 : -1
+    }
+  }
+  #else
   @usableFromInline
   internal func _truncate(size: Int64) -> Result<(), Errno> {
     return nothingOrErrno(retryOnInterrupt: false) {
       system_ftruncate(self.rawValue, off_t(size))
     }
   }
+  #endif
 
-  public struct DirectoryEntry: RawRepresentable {
+  #if os(Windows)
+  public struct DirectoryEntry {
+    public var data: WIN32_FIND_DATAW
+
+    public var name: String {
+      withUnsafePointer(to: data.cFileName) { cFileName in
+        cFileName.withMemoryRebound(to: UInt16.self, capacity: Int(MAX_PATH) * MemoryLayout<WCHAR>.size) {
+          // String initializer copies the given buffer contents, so it's safe.
+          return String(decodingCString: $0, as: UTF16.self)
+        }
+      }
+    }
+
+    public var fileType: FileType {
+      return FileType(rawValue: data.dwFileAttributes)
+    }
+  }
+
+  public struct DirectoryStream: RawRepresentable, IteratorProtocol, Sequence {
+    public var rawValue: HANDLE
+
+    public init(rawValue: HANDLE) {
+      self.rawValue = rawValue
+    }
+
+    public func next() -> Result<DirectoryEntry, Errno>? {
+      // TODO: Implement by `FindNextFileW`?
+      return .failure(Errno(rawValue: ERROR_NOT_SUPPORTED))
+    }
+  }
+
+  #else
+
+  public struct DirectoryEntry {
     @_alwaysEmitIntoClient
     public var rawValue: UnsafeMutablePointer<dirent>
 
@@ -356,18 +555,60 @@ extension FileDescriptor {
       }
     }
   }
+  #endif
 
   public func contentsOfDirectory() throws -> DirectoryStream {
     return try _contentsOfDirectory().get()
   }
 
   internal func _contentsOfDirectory() -> Result<DirectoryStream, Errno> {
+    #if os(Windows)
+    // TODO: Implement by `FindFirstFileW`?
+    return .failure(Errno(rawValue: ERROR_NOT_SUPPORTED))
+    #else
     guard let dirp = system_fdopendir(self.rawValue) else {
       return .failure(Errno(rawValue: system_errno))
     }
     return .success(DirectoryStream(rawValue: dirp))
+    #endif
   }
 }
+
+#if os(Windows)
+public enum FileTime {
+  case omit
+  case now
+  case absolute(FILETIME)
+
+  @_alwaysEmitIntoClient
+  public var unixNanoseconds: Int64 {
+    guard case let .absolute(rawValue) = self else { return 0 }
+    let ntNanoseconds = (Int64(rawValue.dwHighDateTime) << 32) | Int64(rawValue.dwLowDateTime)
+    return ntNanoseconds - Self.unixEpochNanoseconds
+  }
+
+  @_alwaysEmitIntoClient
+  public static var unixEpochNanoseconds: Int64 {
+    return 11644473600 * 1_000_000
+  }
+
+  public init(rawValue: FILETIME) {
+    self = .absolute(rawValue)
+  }
+
+  public init(seconds: Int, nanoseconds: Int) {
+    let fileTime: Int64 = Int64(seconds) * 1_000_000_000 + Int64(nanoseconds) + Self.unixEpochNanoseconds
+    self = .absolute(FILETIME(
+      dwLowDateTime: DWORD(fileTime & 0xFFFF_FFFF),
+      dwHighDateTime: DWORD(fileTime >> 32)
+    ))
+  }
+}
+#else
+public typealias FileTime = Clock.TimeSpec
+#endif
+
+#if !os(Windows)
 
 // MARK: - Synchronized Input and Output
 
@@ -389,3 +630,5 @@ extension FileDescriptor.OpenOptions {
   }
   #endif
 }
+
+#endif
