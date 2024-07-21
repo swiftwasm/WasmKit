@@ -123,6 +123,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: python3 ./Vendor/checkout-dependency testsuite
       - run: swift test
+      - run: ./CI/check-wasi-testsuite.ps1
 
   build-cmake:
     runs-on: ubuntu-20.04
