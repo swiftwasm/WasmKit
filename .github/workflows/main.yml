@@ -122,14 +122,15 @@ jobs:
           tag: 5.10.1-RELEASE
       - uses: actions/checkout@v4
       - run: python3 ./Vendor/checkout-dependency testsuite
-      # Check Windows build with CMake
-      - uses: Cyberboss/install-winget@v1
-      - run: winget install Ninja-build.Ninja Kitware.CMake --disable-interactivity --accept-source-agreements
-      - run: |
-          echo "$env:LOCALAPPDATA\Microsoft\WinGet\Links" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          echo "$env:ProgramFiles\CMake\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-      - run: cmake -G Ninja -B .build/cmake
-      - run: cmake --build .build/cmake
+      # FIXME: CMake build is failing on CI due to "link: extra operand '/OUT:lib\\libXXXX.a'" error
+      # # Check Windows build with CMake
+      # - uses: Cyberboss/install-winget@v1
+      # - run: winget install Ninja-build.Ninja Kitware.CMake --disable-interactivity --accept-source-agreements
+      # - run: |
+      #     echo "$env:LOCALAPPDATA\Microsoft\WinGet\Links" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      #     echo "$env:ProgramFiles\CMake\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      # - run: cmake -G Ninja -B .build/cmake
+      # - run: cmake --build .build/cmake
       # Run tests with SwiftPM
       - run: swift test
       - run: ./CI/check-wasi-testsuite.ps1
