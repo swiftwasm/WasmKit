@@ -121,7 +121,7 @@ jobs:
           branch: swift-5.10.1-release
           tag: 5.10.1-RELEASE
       - uses: actions/checkout@v4
-      - run: ./Vendor/checkout-dependency testsuite
+      - run: python3 ./Vendor/checkout-dependency testsuite
       - run: swift test
 
   build-cmake:
