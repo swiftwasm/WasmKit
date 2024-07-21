@@ -124,7 +124,7 @@ jobs:
       - run: python3 ./Vendor/checkout-dependency testsuite
       # Check Windows build with CMake
       - uses: Cyberboss/install-winget@v1
-      - run: winget install Ninja-build.Ninja Kitware.CMake
+      - run: winget install Ninja-build.Ninja Kitware.CMake --disable-interactivity --accept-source-agreements
       - run: cmake -G Ninja -B .build/cmake
       - run: cmake --build .build/cmake
       # Run tests with SwiftPM
