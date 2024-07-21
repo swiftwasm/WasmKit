@@ -37,7 +37,7 @@ You can find API documentation on the [Swift Package Index](https://swiftpackage
 | Category | Feature | Status |
 |----------|---------|--------|
 | WebAssembly MVP | Parsing binary format | ✅ Implemented |
-|                 | Parsing text format (WAT) | ❌ Not implemented |
+|                 | Parsing text format (WAT) | ✅ Implemented |
 |                 | Execution | ✅ Implemented |
 |                 | Validation | 🚧 Partially implemented |
 | WebAssembly Proposal | [Reference types](https://github.com/WebAssembly/reference-types/blob/master/proposals/reference-types/Overview.md) | ✅ Implemented |

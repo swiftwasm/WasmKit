@@ -6,6 +6,7 @@ builder:
         - WasmKitWASI
         - WasmParser
         - WASI
+        - WAT
         - WIT
         - WITExtractor
         - WITOverlayGenerator
