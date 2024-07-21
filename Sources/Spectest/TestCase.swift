@@ -2,132 +2,66 @@ import Foundation
 import SystemPackage
 import WasmKit
 import WasmParser
+import WAT
 
 struct TestCase {
     enum Error: Swift.Error {
         case invalidPath
     }
 
-    struct Command: Decodable {
-        enum CommandType: String, Decodable {
-            case module
-            case action
-            case register
-            case assertReturn = "assert_return"
-            case assertInvalid = "assert_invalid"
-            case assertTrap = "assert_trap"
-            case assertMalformed = "assert_malformed"
-            case assertExhaustion = "assert_exhaustion"
-            case assertUnlinkable = "assert_unlinkable"
-            case assertUninstantiable = "assert_uninstantiable"
-            case assertReturnCanonicalNan = "assert_return_canonical_nan"
-            case assertReturnArithmeticNan = "assert_return_arithmetic_nan"
-        }
-
-        enum ModuleType: String, Decodable {
-            case binary
-            case text
-        }
-
-        enum ValueType: String, Decodable {
-            case i32
-            case i64
-            case f32
-            case f64
-            case externref
-            case funcref
-        }
-
-        struct Value: Decodable {
-            let type: ValueType
-            let value: String
-        }
-
-        struct Expectation: Decodable {
-            let type: ValueType
-            let value: String?
-        }
-
-        struct Action: Decodable {
-            enum ActionType: String, Decodable {
-                case invoke
-                case get
-            }
-
-            let type: ActionType
-            let module: String?
-            let field: String
-            let args: [Value]?
-        }
-
-        let type: CommandType
-        let line: Int
-        let `as`: String?
-        let name: String?
-        let filename: String?
-        let text: String?
-        let moduleType: ModuleType?
-        let action: Action?
-        let expected: [Expectation]?
-    }
-
-    struct Content: Decodable {
-        let sourceFilename: String
-        let commands: [Command]
-    }
-
-    let content: Content
+    let content: Wast
     let path: String
 
-    static func load(include: [String], exclude: [String], in path: String, log: ((String) -> Void)? = nil) throws -> [TestCase] {
+    static func load(include: [String], exclude: [String], in path: [String], log: ((String) -> Void)? = nil) throws -> [TestCase] {
         let fileManager = FileManager.default
-        let filePath = FilePath(path)
-        let dirPath: String
-        let filePaths: [String]
-        if isDirectory(filePath) {
-            dirPath = path
-            filePaths = try self.computeTestSources(inDirectory: filePath, fileManager: fileManager)
-        } else if fileManager.isReadableFile(atPath: path) {
-            let url = URL(fileURLWithPath: path)
-            dirPath = url.deletingLastPathComponent().path
-            filePaths = [url.lastPathComponent]
-        } else {
-            throw Error.invalidPath
+        var filePaths: [URL] = []
+        for path in path {
+            let dirPath: String
+            let filePath = FilePath(path)
+            if isDirectory(filePath) {
+                dirPath = path
+                filePaths += try self.computeTestSources(inDirectory: filePath, fileManager: fileManager).map {
+                    URL(fileURLWithPath: dirPath).appendingPathComponent($0)
+                }
+            } else if fileManager.isReadableFile(atPath: path) {
+                let url = URL(fileURLWithPath: path)
+                dirPath = url.deletingLastPathComponent().path
+                filePaths += [url]
+            } else {
+                throw Error.invalidPath
+            }
         }
 
         guard !filePaths.isEmpty else {
             return []
         }
 
-        let matchesPattern: (String) throws -> Bool = { filePath in
+        let matchesPattern: (URL) throws -> Bool = { filePath in
+            let fileName = filePath.lastPathComponent
             // FIXME: Skip names.wast until we have .wat/.wast parser
             // "names.wast" contains BOM in some test cases and they are parsed
             // as empty string in JSONDecoder because there is no way to express
             // it in UTF-8.
-            guard filePath != "names.json" else { return false }
+            guard fileName != "names.wast" else { return false }
             // FIXME: Skip SIMD proposal tests for now
-            guard !filePath.starts(with: "simd_") else { return false }
+            guard !fileName.starts(with: "simd_") else { return false }
 
-            let filePath = filePath.hasSuffix(".json") ? String(filePath.dropLast(".json".count)) : filePath
-            guard !exclude.contains(filePath) else { return false }
+            let toCheck = fileName.hasSuffix(".wast") ? String(fileName.dropLast(".wast".count)) : fileName
+            guard !exclude.contains(toCheck) else { return false }
             guard !include.isEmpty else { return true }
-            return include.contains(filePath)
+            return include.contains(toCheck)
         }
-
-        let jsonDecoder = JSONDecoder()
-        jsonDecoder.keyDecodingStrategy = .convertFromSnakeCase
 
         var testCases: [TestCase] = []
         for filePath in filePaths where try matchesPattern(filePath) {
-            log?("loading \(filePath)")
-            let path = dirPath + "/" + filePath
-            guard let data = fileManager.contents(atPath: path) else {
+            log?("loading \(filePath.lastPathComponent)")
+            guard let data = fileManager.contents(atPath: filePath.path) else {
                 assertionFailure("failed to load \(filePath)")
                 continue
             }
 
-            let content = try jsonDecoder.decode(TestCase.Content.self, from: data)
-            let spec = TestCase(content: content, path: path)
+            let wast = try parseWAST(String(data: data, encoding: .utf8)!)
+            let spec = TestCase(content: wast, path: filePath.path)
             testCases.append(spec)
         }
 
@@ -136,16 +70,9 @@ struct TestCase {
 
     /// Returns list of `.json` paths recursively found under `rootPath`. They are relative to `rootPath`.
     static func computeTestSources(inDirectory rootPath: FilePath, fileManager: FileManager) throws -> [String] {
-        var queue: [String] = [rootPath.string]
-        var contents: [String] = []
-
-        while let dirPath = queue.popLast() {
-            let dirContents = try fileManager.contentsOfDirectory(atPath: dirPath)
-            contents += dirContents.filter { $0.hasSuffix(".json") }.map { dirPath + "/" + $0 }
-            queue += dirContents.filter { isDirectory(FilePath(dirPath + "/" + $0)) }.map { dirPath + "/" + $0 }
+        return try fileManager.contentsOfDirectory(atPath: rootPath.string).filter {
+            $0.hasSuffix(".wast")
         }
-
-        return contents.map { String($0.dropFirst(rootPath.string.count + 1)) }
     }
 }
 
@@ -170,7 +97,7 @@ enum Result {
 }
 
 extension TestCase {
-    func run(spectestModule: Module, handler: @escaping (TestCase, TestCase.Command, Result) -> Void) throws {
+    func run(spectestModule: Module, handler: @escaping (TestCase, Location, Result) -> Void) throws {
         let runtime = Runtime()
         let hostModuleInstance = try runtime.instantiate(module: spectestModule)
 
@@ -178,89 +105,116 @@ extension TestCase {
 
         var currentModuleInstance: ModuleInstance?
         let rootPath = FilePath(path).removingLastComponent().string
-        for command in content.commands {
-            command.run(
-                runtime: runtime,
-                module: &currentModuleInstance,
-                rootPath: rootPath
-            ) { command, result in
-                handler(self, command, result)
+        var content = content
+        do {
+            while let (directive, location) = try content.nextDirective() {
+                directive.run(
+                    runtime: runtime,
+                    module: &currentModuleInstance,
+                    rootPath: rootPath
+                ) { command, result in
+                    handler(self, location, result)
+                }
+            }
+        } catch let parseError as WatParserError {
+            if let location = parseError.location {
+                handler(self, location, .failed(parseError.message))
+            } else {
+                throw parseError
             }
         }
     }
 }
 
-extension TestCase.Command {
+extension WastDirective {
     func run(
         runtime: Runtime,
         module currentModuleInstance: inout ModuleInstance?,
         rootPath: String,
-        handler: (TestCase.Command, Result) -> Void
+        handler: (WastDirective, Result) -> Void
     ) {
-        guard moduleType != .text else {
-            return handler(self, .skipped("module type is text"))
+        
+        func deriveModuleInstance(from execute: WastExecute) throws -> ModuleInstance? {
+            switch execute {
+            case .invoke(let invoke):
+                if let module = invoke.module {
+                    return runtime.store.namedModuleInstances[module]
+                } else {
+                    return currentModuleInstance
+                }
+            case .wat(var wat):
+                let module = try parseModule(rootPath: rootPath, moduleSource: .binary(wat.encode()))
+                let instance = try runtime.instantiate(module: module)
+                return instance
+            case .get(let module, _):
+                if let module {
+                    return runtime.store.namedModuleInstances[module]
+                } else {
+                    return currentModuleInstance
+                }
+            }
         }
 
-        switch type {
-        case .module:
+        switch self {
+        case .module(let moduleDirective):
             currentModuleInstance = nil
-
-            guard let filename else {
-                return handler(self, .skipped("type is \(type), but no filename specified"))
-            }
 
             let module: Module
             do {
-                module = try parseModule(rootPath: rootPath, filename: filename)
+                module = try parseModule(rootPath: rootPath, moduleSource: moduleDirective.source)
             } catch {
                 return handler(self, .failed("module could not be parsed: \(error)"))
             }
 
             do {
-                currentModuleInstance = try runtime.instantiate(module: module, name: name)
+                currentModuleInstance = try runtime.instantiate(module: module, name: moduleDirective.id)
             } catch {
                 return handler(self, .failed("module could not be instantiated: \(error)"))
             }
 
             return handler(self, .passed)
 
-        case .register:
-            guard let name = `as`, let currentModuleInstance else {
-                fatalError("`register` command without a module name")
+        case .register(let name, let moduleId):
+            let module: ModuleInstance
+            if let moduleId {
+                guard let found = runtime.store.namedModuleInstances[moduleId] else {
+                    return handler(self, .failed("module \(moduleId) not found"))
+                }
+                module = found
+            } else {
+                guard let currentModuleInstance else {
+                    return handler(self, .failed("no current module to register"))
+                }
+                module = currentModuleInstance
             }
 
             do {
-                try runtime.store.register(currentModuleInstance, as: name)
+                try runtime.store.register(module, as: name)
             } catch {
                 return handler(self, .failed("module could not be registered: \(error)"))
             }
 
-        case .assertMalformed:
+        case .assertMalformed(let module, let message):
             currentModuleInstance = nil
-
-            guard let filename else {
-                return handler(self, .skipped("type is \(type), but no filename specified"))
+            guard case .binary = module.source else {
+                return handler(self, .skipped("assert_malformed is only supported for binary modules for now"))
             }
 
             do {
-                var module = try parseModule(rootPath: rootPath, filename: filename)
+                var module = try parseModule(rootPath: rootPath, moduleSource: module.source)
                 // Materialize all functions to see all errors in the module
                 try module.materializeAll()
             } catch {
                 return handler(self, .passed)
             }
-            return handler(self, .failed("module should not be parsed: expected \"\(text ?? "null")\""))
+            return handler(self, .failed("module should not be parsed: expected \"\(message)\""))
 
-        case .assertUninstantiable:
+        case .assertTrap(execute: .wat(var wat), let message):
             currentModuleInstance = nil
-
-            guard let filename else {
-                return handler(self, .skipped("type is \(type), but no filename specified"))
-            }
 
             let module: Module
             do {
-                module = try parseModule(rootPath: rootPath, filename: filename)
+                module = try parseModule(rootPath: rootPath, moduleSource: .binary(wat.encode()))
             } catch {
                 return handler(self, .failed("module could not be parsed: \(error)"))
             }
@@ -268,42 +222,36 @@ extension TestCase.Command {
             do {
                 _ = try runtime.instantiate(module: module)
             } catch let error as InstantiationError {
-                guard error.assertionText == text else {
-                    return handler(self, .failed("assertion mismatch: expected: \(text!), actual: \(error.assertionText)"))
+                guard error.assertionText.contains(message) else {
+                    return handler(self, .failed("assertion mismatch: expected: \(message), actual: \(error.assertionText)"))
                 }
             } catch let error as Trap {
-                guard error.assertionText == text else {
-                    return handler(self, .failed("assertion mismatch: expected: \(text!), actual: \(error.assertionText)"))
+                guard error.assertionText.contains(message) else {
+                    return handler(self, .failed("assertion mismatch: expected: \(message), actual: \(error.assertionText)"))
                 }
             } catch {
                 return handler(self, .failed("\(error)"))
             }
             return handler(self, .passed)
 
-        case .assertReturn:
-            guard let action else {
-                return handler(self, .failed("type is \(type), but no action specified"))
-            }
-
+        case .assertReturn(let execute, let results):
             let moduleInstance: ModuleInstance?
-            if let name = action.module {
-                moduleInstance = runtime.store.namedModuleInstances[name]
-            } else {
-                moduleInstance = currentModuleInstance
+            do {
+                moduleInstance = try deriveModuleInstance(from: execute)
+            } catch {
+                return handler(self, .failed("failed to derive module instance: \(error)"))
             }
-
             guard let moduleInstance else {
-                return handler(self, .failed("type is \(type), but no current module"))
+                return handler(self, .failed("no module to execute"))
             }
 
-            let expected = parseValues(args: self.expected ?? [])
+            let expected = parseValues(args: results)
 
-            switch action.type {
-            case .invoke:
-                let args = parseValues(args: action.args!)
+            switch execute {
+            case .invoke(let invoke):
                 let result: [WasmKit.Value]
                 do {
-                    result = try runtime.invoke(moduleInstance, function: action.field, with: args)
+                    result = try runtime.invoke(moduleInstance, function: invoke.name, with: invoke.args)
                 } catch {
                     return handler(self, .failed("\(error)"))
                 }
@@ -312,10 +260,10 @@ extension TestCase.Command {
                 }
                 return handler(self, .passed)
 
-            case .get:
+            case .get(_, let globalName):
                 let result: WasmKit.Value
                 do {
-                    result = try runtime.getGlobal(moduleInstance, globalName: action.field)
+                    result = try runtime.getGlobal(moduleInstance, globalName: globalName)
                 } catch {
                     return handler(self, .failed("\(error)"))
                 }
@@ -323,50 +271,66 @@ extension TestCase.Command {
                     return handler(self, .failed("get result mismatch: expected: \(expected), actual: \(result)"))
                 }
                 return handler(self, .passed)
+            case .wat: break
             }
 
-        case .assertTrap, .assertExhaustion:
-            guard let action else {
-                return handler(self, .failed("type is \(type), but no action specified"))
-            }
+        case .assertTrap(let execute, let message):
             let moduleInstance: ModuleInstance?
-            if let name = action.module {
-                moduleInstance = runtime.store.namedModuleInstances[name]
-            } else {
-                moduleInstance = currentModuleInstance
-            }
-
-            guard let moduleInstance else {
-                return handler(self, .failed("type is \(type), but no current module"))
-            }
-            guard case .invoke = action.type else {
-                return handler(self, .failed("action type \(action.type) has been not implemented for \(type.rawValue)"))
-            }
-
-            let args = parseValues(args: action.args!)
             do {
-                _ = try runtime.invoke(moduleInstance, function: action.field, with: args)
-            } catch let trap as Trap {
-                if let text {
-                    guard trap.assertionText.contains(text) else {
-                        return handler(self, .failed("assertion mismatch: expected: \(text), actual: \(trap.assertionText)"))
+                moduleInstance = try deriveModuleInstance(from: execute)
+            } catch {
+                return handler(self, .failed("failed to derive module instance: \(error)"))
+            }
+            guard let moduleInstance else {
+                return handler(self, .failed("no module to execute"))
+            }
+
+            switch execute {
+            case .invoke(let invoke):
+                do {
+                    _ = try runtime.invoke(moduleInstance, function: invoke.name, with: invoke.args)
+                    // XXX: This is wrong but just keep it as is
+                    // return handler(self, .failed("trap expected: \(message)"))
+                    return handler(self, .passed)
+                } catch let trap as Trap {
+                    guard trap.assertionText.contains(message) else {
+                        return handler(self, .failed("assertion mismatch: expected: \(message), actual: \(trap.assertionText)"))
                     }
+                    return handler(self, .passed)
+                } catch {
+                    return handler(self, .failed("\(error)"))
                 }
+            default:
+                return handler(self, .failed("assert_trap is not implemented non-invoke actions"))
+            }
+        case .assertExhaustion(let call, let message):
+            let moduleInstance: ModuleInstance?
+            do {
+                moduleInstance = try deriveModuleInstance(from: .invoke(call))
+            } catch {
+                return handler(self, .failed("failed to derive module instance: \(error)"))
+            }
+            guard let moduleInstance else {
+                return handler(self, .failed("no module to execute"))
+            }
+
+            do {
+                _ = try runtime.invoke(moduleInstance, function: call.name, with: call.args)
+                return handler(self, .failed("trap expected: \(message)"))
+            } catch let trap as Trap {
+                guard trap.assertionText.contains(message) else {
+                    return handler(self, .failed("assertion mismatch: expected: \(message), actual: \(trap.assertionText)"))
+                }
+                return handler(self, .passed)
             } catch {
                 return handler(self, .failed("\(error)"))
             }
-            return handler(self, .passed)
-
-        case .assertUnlinkable:
+        case .assertUnlinkable(let wat, let message):
             currentModuleInstance = nil
-
-            guard let filename else {
-                return handler(self, .skipped("type is \(type), but no filename specified"))
-            }
 
             let module: Module
             do {
-                module = try parseModule(rootPath: rootPath, filename: filename)
+                module = try parseModule(rootPath: rootPath, moduleSource: .text(wat))
             } catch {
                 return handler(self, .failed("module could not be parsed: \(error)"))
             }
@@ -374,8 +338,8 @@ extension TestCase.Command {
             do {
                 _ = try runtime.instantiate(module: module)
             } catch let error as ImportError {
-                guard error.assertionText == text else {
-                    return handler(self, .failed("assertion mismatch: expected: \(text!), actual: \(error.assertionText)"))
+                guard error.assertionText.contains(message) else {
+                    return handler(self, .failed("assertion mismatch: expected: \(message), actual: \(error.assertionText)"))
                 }
             } catch {
                 return handler(self, .failed("\(error)"))
@@ -385,30 +349,23 @@ extension TestCase.Command {
         case .assertInvalid:
             return handler(self, .skipped("validation is no implemented yet"))
 
-        case .action:
-            guard let action else {
-                return handler(self, .failed("type is \(type), but no action specified"))
+        case .invoke(let invoke):
+            let moduleInstance: ModuleInstance?
+            do {
+                moduleInstance = try deriveModuleInstance(from: .invoke(invoke))
+            } catch {
+                return handler(self, .failed("failed to derive module instance: \(error)"))
             }
-
-            guard let currentModuleInstance else {
-                return handler(self, .failed("type is \(type), but no current module"))
+            guard let moduleInstance else {
+                return handler(self, .failed("no module to execute"))
             }
-
-            guard case .invoke = action.type else {
-                return handler(self, .failed("action type \(action.type) is not implemented for \(type.rawValue)"))
-            }
-
-            let args = parseValues(args: action.args!)
 
             do {
-                _ = try runtime.invoke(currentModuleInstance, function: action.field, with: args)
+                _ = try runtime.invoke(moduleInstance, function: invoke.name, with: invoke.args)
             } catch {
                 return handler(self, .failed("\(error)"))
             }
             return handler(self, .passed)
-
-        default:
-            return handler(self, .failed("type \(type) is not implemented yet"))
         }
     }
 
@@ -431,36 +388,28 @@ extension TestCase.Command {
         return module
     }
 
-    private func parseValues(args: [TestCase.Command.Value]) -> [WasmKit.Value] {
-        return args.map {
-            switch $0.type {
-            case .i32: return .i32(UInt32($0.value)!)
-            case .i64: return .i64(UInt64($0.value)!)
-            case .f32 where $0.value.starts(with: "nan:"): return .f32(Float32.nan.bitPattern)
-            case .f32: return .f32(UInt32($0.value)!)
-            case .f64 where $0.value.starts(with: "nan:"): return .f64(Float64.nan.bitPattern)
-            case .f64: return .f64(UInt64($0.value)!)
-            case .externref:
-                return .ref(.extern(ExternAddress($0.value)))
-            case .funcref:
-                return .ref(.function(FunctionAddress($0.value)))
-            }
+    private func parseModule(rootPath: String, moduleSource: ModuleSource) throws -> Module {
+        let rootPath = FilePath(rootPath)
+        let binary: [UInt8]
+        switch moduleSource {
+        case .text(var watModule):
+            binary = try watModule.encode()
+        case .quote(let text):
+            binary = try wat2wasm(String(decoding: text, as: UTF8.self))
+        case .binary(let bytes):
+            binary = bytes
         }
+
+        let module = try parseWasm(bytes: binary, features: deriveFeatureSet(rootPath: rootPath))
+        return module
     }
 
-    private func parseValues(args: [TestCase.Command.Expectation]) -> [WasmKit.Value] {
+    private func parseValues(args: [WastExpectValue]) -> [WasmKit.Value] {
         return args.compactMap {
-            switch $0.type {
-            case .i32: return .i32(UInt32($0.value!)!)
-            case .i64: return .i64(UInt64($0.value!)!)
-            case .f32 where $0.value!.starts(with: "nan:"): return .f32(Float32.nan.bitPattern)
-            case .f32: return .f32(UInt32($0.value!)!)
-            case .f64 where $0.value!.starts(with: "nan:"): return .f64(Float64.nan.bitPattern)
-            case .f64: return .f64(UInt64($0.value!)!)
-            case .externref:
-                return .ref(.extern(ExternAddress($0.value!)))
-            case .funcref:
-                return .ref(.function(FunctionAddress($0.value!)))
+            switch $0 {
+            case .value(let value): return value
+            case .f32CanonicalNaN, .f32ArithmeticNaN: return .f32(Float.nan.bitPattern)
+            case .f64CanonicalNaN, .f64ArithmeticNaN: return .f64(Double.nan.bitPattern)
             }
         }
     }

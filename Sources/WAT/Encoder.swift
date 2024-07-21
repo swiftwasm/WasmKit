@@ -360,13 +360,17 @@ extension Import: WasmEncodable {
 }
 
 extension WatParser.DataSegmentDecl.Offset {
-    func encode(to encoder: inout Encoder, watModule: inout WatModule) throws {
+    func encode(to encoder: inout Encoder, watModule: inout WatModule, isMemory64: Bool) throws {
         switch self {
         case .source(var offset):
             try encoder.writeExpression(lexer: &offset, watModule: &watModule)
         case .synthesized(let index):
             var exprEncoder = ExpressionEncoder()
-            try exprEncoder.visitI32Const(value: Int32(index))
+            if isMemory64 {
+                try exprEncoder.visitI64Const(value: Int64(index))
+            } else {
+                try exprEncoder.visitI32Const(value: Int32(index))
+            }
             try exprEncoder.visitEnd()
             encoder.output.append(contentsOf: exprEncoder.encoder.output)
         }
@@ -375,11 +379,15 @@ extension WatParser.DataSegmentDecl.Offset {
 
 extension WatParser.DataSegmentDecl {
     func encode(to encoder: inout Encoder, watModule: inout WatModule) throws {
+        func isMemory64(memoryIndex: Int) -> Bool {
+            guard memoryIndex < watModule.memories.count else { return false }
+            return watModule.memories[memoryIndex].type.isMemory64
+        }
         switch (self.memory, self.offset) {
         case (nil, let offset?):
             // active with default memory
             encoder.output.append(0x00)
-            try offset.encode(to: &encoder, watModule: &watModule)
+            try offset.encode(to: &encoder, watModule: &watModule, isMemory64: isMemory64(memoryIndex: 0))
         case (nil, nil):
             // passive
             encoder.output.append(0x01)
@@ -393,7 +401,7 @@ extension WatParser.DataSegmentDecl {
                 encoder.output.append(0x02)
                 encoder.writeUnsignedLEB128(UInt32(memoryIndex))
             }
-            try offset.encode(to: &encoder, watModule: &watModule)
+            try offset.encode(to: &encoder, watModule: &watModule, isMemory64: isMemory64(memoryIndex: memoryIndex))
         case (_?, nil):
             fatalError("memory with memory index but no offset")
         }

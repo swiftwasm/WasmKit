@@ -106,8 +106,13 @@ public struct Wast {
     }
 
     /// Parses the next directive in the WAST script.
-    public mutating func nextDirective() throws -> WastDirective? {
-        return try parser.nextDirective()
+    public mutating func nextDirective() throws -> (directive: WastDirective, location: Location)? {
+        let location = try parser.parser.peek()?.location(in: parser.parser.lexer) ?? parser.parser.lexer.location()
+        if let directive = try parser.nextDirective() {
+            return (directive, location)
+        } else {
+            return nil
+        }
     }
 }
 

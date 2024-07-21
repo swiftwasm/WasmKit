@@ -456,15 +456,24 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
 
     mutating func parseWastExpectValue() throws -> WastExpectValue? {
         let initialParser = parser
-        if try parser.takeParenBlockStart("f64.const") || parser.takeParenBlockStart("f32.const") {
+        func takeNaNPattern(canonical: WastExpectValue, arithmetic: WastExpectValue) throws -> WastExpectValue? {
             if try parser.takeKeyword("nan:canonical") {
                 try parser.expect(.rightParen)
-                return .canonicalNaN
+                return canonical
             }
             if try parser.takeKeyword("nan:arithmetic") {
                 try parser.expect(.rightParen)
-                return .arithmeticNaN
+                return arithmetic
             }
+            return nil
+        }
+        if try parser.takeParenBlockStart("f64.const"),
+           let value = try takeNaNPattern(canonical: .f64CanonicalNaN, arithmetic: .f64ArithmeticNaN) {
+            return value
+        }
+        if try parser.takeParenBlockStart("f32.const"),
+           let value = try takeNaNPattern(canonical: .f32CanonicalNaN, arithmetic: .f32ArithmeticNaN) {
+            return value
         }
         parser = initialParser
         return nil
@@ -919,13 +928,14 @@ extension ExpressionParser {
     }
 }
 
-struct WatParserError: Error, CustomStringConvertible {
-    let message: String
-    let location: (line: Int, column: Int)?
+public struct WatParserError: Error, CustomStringConvertible {
+    public let message: String
+    public let location: Location?
 
-    var description: String {
+    public var description: String {
         if let location {
-            return "\(location.line):\(location.column): \(message)"
+            let (line, column) = location.computeLineAndColumn()
+            return "\(line):\(column): \(message)"
         } else {
             return message
         }
@@ -933,10 +943,6 @@ struct WatParserError: Error, CustomStringConvertible {
 
     init(_ message: String, location: Location?) {
         self.message = message
-        if let location {
-            self.location = sourceLocation(at: location.index, in: location.source)
-        } else {
-            self.location = nil
-        }
+        self.location = location
     }
 }

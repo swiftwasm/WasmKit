@@ -279,6 +279,14 @@ struct WatParser {
             let id = try parser.takeId()
             let exports = try inlineExports()
             let importNames = try inlineImport()
+
+            let isMemory64: Bool
+            if try parser.takeKeyword("i64") {
+                isMemory64 = true
+            } else {
+                _ = try parser.takeKeyword("i32")
+                isMemory64 = false
+            }
             let type: MemoryType
             var data: DataSegmentDecl?
             if try parser.takeParenBlockStart("data") {
@@ -287,10 +295,10 @@ struct WatParser {
                 // Align up to page size
                 let byteSize = alignUp(dataBytes.count, to: WASM_PAGE_SIZE)
                 let numberOfPages = byteSize / WASM_PAGE_SIZE
-                type = MemoryType(min: UInt64(numberOfPages), max: UInt64(numberOfPages), shared: false)
+                type = MemoryType(min: UInt64(numberOfPages), max: UInt64(numberOfPages), isMemory64: isMemory64, shared: false)
                 try parser.expect(.rightParen)
             } else {
-                type = try memoryType()
+                type = try memoryType(isMemory64: isMemory64)
             }
             kind = .memory(MemoryDecl(id: id, exports: exports, type: type, importNames: importNames, inlineData: data))
             try parser.expect(.rightParen)
@@ -486,11 +494,21 @@ struct WatParser {
     }
 
     mutating func memoryType() throws -> MemoryType {
-        let limits: Limits
+        let isMemory64: Bool
         if try parser.takeKeyword("i64") {
-            limits = try limit64()
+            isMemory64 = true
         } else {
             _ = try parser.takeKeyword("i32")
+            isMemory64 = false
+        }
+        return try memoryType(isMemory64: isMemory64)
+    }
+
+    mutating func memoryType(isMemory64: Bool) throws -> MemoryType {
+        let limits: Limits
+        if isMemory64 {
+            limits = try limit64()
+        } else {
             limits = try limit32()
         }
         let shared = try parser.takeKeyword("shared")

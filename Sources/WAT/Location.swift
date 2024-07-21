@@ -15,6 +15,10 @@ public struct Location: Equatable, CustomDebugStringConvertible {
     public var debugDescription: String {
         return "Location\(sourceLocation(at: index, in: source))"
     }
+
+    public func computeLineAndColumn() -> (line: Int, column: Int) {
+        return sourceLocation(at: index, in: source)
+    }
 }
 
 

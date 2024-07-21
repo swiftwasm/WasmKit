@@ -155,11 +155,17 @@ public enum WastExpectValue {
     /// A concrete value that is expected to be returned.
     case value(Value)
     /// A value that is expected to be a canonical NaN.
-    /// Corresponds to `nan:canonical` in WAST.
-    case canonicalNaN
+    /// Corresponds to `f32.const nan:canonical` in WAST.
+    case f32CanonicalNaN
     /// A value that is expected to be an arithmetic NaN.
-    /// Corresponds to `nan:arithmetic` in WAST.
-    case arithmeticNaN
+    /// Corresponds to `f32.const nan:arithmetic` in WAST.
+    case f32ArithmeticNaN
+    /// A value that is expected to be a canonical NaN.
+    /// Corresponds to `f64.const nan:canonical` in WAST.
+    case f64CanonicalNaN
+    /// A value that is expected to be an arithmetic NaN.
+    /// Corresponds to `f64.const nan:arithmetic` in WAST.
+    case f64ArithmeticNaN
 }
 
 /// A directive in a WAST script.
