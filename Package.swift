@@ -82,7 +82,7 @@ let package = Package(
         ),
         .testTarget(
             name: "WASITests",
-            dependencies: ["WASI"]
+            dependencies: ["WASI", "WasmKitWASI"]
         ),
         .target(
             name: "SystemExtras",

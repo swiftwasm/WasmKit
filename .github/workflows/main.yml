@@ -52,9 +52,8 @@ jobs:
             "hostSdkRootPath": "$(xcrun --show-sdk-path --sdk macosx)"
           }
           EOS
-      - run: ./Vendor/checkout-dependency testsuite
+      - run: ./Vendor/checkout-dependency
       - run: swift test
-      # TODO: Enable wasi-testsuite checks
 
   build-linux:
     strategy:
@@ -109,9 +108,8 @@ jobs:
           }
           EOS
       - run: ./build-exec ./CI/install-wabt.sh
-      - run: ./Vendor/checkout-dependency testsuite
+      - run: ./Vendor/checkout-dependency
       - run: ./build-exec swift test
-      - run: ./build-exec ./CI/check-wasi-testsuite.sh
 
   build-windows:
     runs-on: windows-latest
@@ -121,7 +119,7 @@ jobs:
           branch: swift-5.10.1-release
           tag: 5.10.1-RELEASE
       - uses: actions/checkout@v4
-      - run: python3 ./Vendor/checkout-dependency testsuite
+      - run: python3 ./Vendor/checkout-dependency
       # FIXME: CMake build is failing on CI due to "link: extra operand '/OUT:lib\\libXXXX.a'" error
       # # Check Windows build with CMake
       # - uses: Cyberboss/install-winget@v1
@@ -133,7 +131,6 @@ jobs:
       # - run: cmake --build .build/cmake
       # Run tests with SwiftPM
       - run: swift test
-      - run: ./CI/check-wasi-testsuite.ps1
 
   build-cmake:
     runs-on: ubuntu-20.04

@@ -4,12 +4,6 @@ NAME := WasmKit
 docs:
 	swift package generate-documentation --target WasmKit
 
-### WASI Test Suite
-
-.PHONY: wasitest
-wasitest:
-	./IntegrationTests/WASI/run-tests.py
-
 ### Utilities
 
 .PHONY: generate
