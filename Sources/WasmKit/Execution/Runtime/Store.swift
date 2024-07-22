@@ -234,7 +234,7 @@ extension Store {
         module: Module,
         externalValues: [ExternalValue],
         initialGlobals: [Value]
-    ) -> ModuleInstance {
+    ) throws -> ModuleInstance {
         // Step 1 of module allocation algorithm, according to Wasm 2.0 spec.
         let moduleInstance = ModuleInstance(selfAddress: modules.count)
 
@@ -286,7 +286,7 @@ extension Store {
 
         // Step 6.
         for element in module.elements {
-            let references = element.initializer.map { expression -> Reference in
+            let references = try element.initializer.map { expression -> Reference in
                 switch expression[0] {
                 case let .refFunc(index):
                     let addr = moduleInstance.functionAddresses[Int(index)]
@@ -295,8 +295,16 @@ extension Store {
                     return .function(nil)
                 case .refNull(.externRef):
                     return .extern(nil)
+                case .globalGet(let index):
+                    let globalAddr = moduleInstance.globalAddresses[Int(index)]
+                    switch globals[globalAddr].value {
+                    case .ref(.function(let addr)):
+                        return .function(addr)
+                    default:
+                        throw Trap._raw("Unexpected global value type for element initializer expression")
+                    }
                 default:
-                    fatalError("Unexpected element initializer expression: \(expression)")
+                    throw Trap._raw("Unexpected element initializer expression: \(expression)")
                 }
             }
             let address = allocate(elementType: element.type, references: references)

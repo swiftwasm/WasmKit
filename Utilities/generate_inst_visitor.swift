@@ -136,19 +136,25 @@ func buildInstructionInstanceFromContext(_ instruction: Instruction) -> String {
     return code
 }
 
-func generateInstructionFactory(_ instructions: InstructionSet) -> String {
+func generateAnyInstructionVisitor(_ instructions: InstructionSet) -> String {
     var code = """
-    struct InstructionFactory: InstructionVisitor {
+    /// A visitor that visits all instructions by a single visit method.
+    public protocol AnyInstructionVisitor: InstructionVisitor {
+        /// Visiting any instruction.
+        mutating func visit(_ instruction: Instruction) throws -> Output
+    }
+
+    extension AnyInstructionVisitor {
 
     """
 
     for instruction in instructions {
-        code += "    func \(instruction.visitMethodName)("
+        code += "    public mutating func \(instruction.visitMethodName)("
         code += instruction.immediates.map { i in
             "\(i.label): \(i.type)"
         }.joined(separator: ", ")
-        code += ") -> Instruction { "
-        code += "return " + buildInstructionInstanceFromContext(instruction)
+        code += ") throws -> Output { "
+        code += "return try self.visit(" + buildInstructionInstanceFromContext(instruction) + ")"
         code += " }\n"
     }
 
@@ -423,7 +429,7 @@ func main(args: [String] = CommandLine.arguments) throws {
         """
         output += generateInstructionEnum(instructions)
         output += "\n\n"
-        output += generateInstructionFactory(instructions)
+        output += generateAnyInstructionVisitor(instructions)
         output += "\n\n"
         output += generateTracingVisitor(instructions)
         output += "\n\n"

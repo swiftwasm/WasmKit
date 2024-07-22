@@ -453,6 +453,14 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
         return false
     }
 
+    mutating func parseConstInstruction(visitor: inout Visitor) throws -> Bool {
+        var wat = Wat.empty()
+        if try foldedInstruction(visitor: &visitor, wat: &wat) {
+            return true
+        }
+        return false
+    }
+
     mutating func parseWastExpectValue() throws -> WastExpectValue? {
         let initialParser = parser
         func takeNaNPattern(canonical: WastExpectValue, arithmetic: WastExpectValue) throws -> WastExpectValue? {
