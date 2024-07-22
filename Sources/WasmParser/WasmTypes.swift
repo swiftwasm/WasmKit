@@ -1,5 +1,6 @@
 @_exported import WasmTypes
 
+/// Function code in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-code>
 public struct Code {
@@ -142,6 +143,7 @@ public typealias DataIndex = UInt32
 
 public typealias ConstExpression = [Instruction]
 
+/// Table entry in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#tables>
 public struct Table: Equatable {

@@ -1,3 +1,5 @@
+/// Type of a WebAssembly function.
+///
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#function-types>
 public struct FunctionType: Equatable, Hashable {
@@ -6,7 +8,9 @@ public struct FunctionType: Equatable, Hashable {
         self.results = results
     }
 
+    /// The types of the function parameters.
     public let parameters: [ValueType]
+    /// The types of the function results.
     public let results: [ValueType]
 }
 

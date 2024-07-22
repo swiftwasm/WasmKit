@@ -1,3 +1,12 @@
+import SystemPackage
+
+#if os(Windows)
+    import ucrt
+#endif
+
+/// A streaming parser for WebAssembly binary format.
+///
+/// The parser is designed to be used to incrementally parse a WebAssembly binary bytestream.
 public struct Parser<Stream: ByteStream> {
     let stream: Stream
     public private(set) var hasDataCount: Bool = false
@@ -21,6 +30,56 @@ public struct Parser<Stream: ByteStream> {
     }
 }
 
+extension Parser where Stream == StaticByteStream {
+
+    /// Initialize a new parser with the given bytes
+    ///
+    /// - Parameters:
+    ///   - bytes: The bytes of the WebAssembly binary file to parse
+    ///   - features: Enabled WebAssembly features for parsing
+    public init(bytes: [UInt8], features: WasmFeatureSet = .default) {
+        self.init(stream: StaticByteStream(bytes: bytes), features: features)
+    }
+}
+
+extension Parser where Stream == FileHandleStream {
+
+    /// Initialize a new parser with the given file handle
+    ///
+    /// - Parameters:
+    ///   - fileHandle: The file handle to the WebAssembly binary file to parse
+    ///   - features: Enabled WebAssembly features for parsing
+    public init(fileHandle: FileDescriptor, features: WasmFeatureSet = .default) throws {
+        self.init(stream: try FileHandleStream(fileHandle: fileHandle), features: features)
+    }
+
+    /// Initialize a new parser with the given file path
+    ///
+    /// - Parameters:
+    ///   - filePath: The file path to the WebAssembly binary file to parse
+    ///   - features: Enabled WebAssembly features for parsing
+    public init(filePath: FilePath, features: WasmFeatureSet = .default) throws {
+        #if os(Windows)
+            // TODO: Upstream `O_BINARY` to `SystemPackage
+            let accessMode = FileDescriptor.AccessMode(
+                rawValue: FileDescriptor.AccessMode.readOnly.rawValue | O_BINARY
+            )
+        #else
+            let accessMode: FileDescriptor.AccessMode = .readOnly
+        #endif
+        let fileHandle = try FileDescriptor.open(filePath, accessMode)
+        self.init(stream: try FileHandleStream(fileHandle: fileHandle), features: features)
+    }
+}
+
+/// Parse a WebAssembly expression from the given byte stream
+///
+/// - Parameters:
+///   - stream: The byte stream to parse
+///   - features: The enabled WebAssembly features
+///   - hasDataCount: Whether the module has a data count section
+///   - visitor: The instruction visitor to visit the parsed instructions
+/// - Throws: `WasmParserError` if the parsing fails
 public func parseExpression<V: InstructionVisitor, Stream: ByteStream>(
     stream: Stream,
     features: WasmFeatureSet = .default,
@@ -36,6 +95,49 @@ public func parseExpression<V: InstructionVisitor, Stream: ByteStream>(
         throw WasmParserError.endOpcodeExpected
     }
 }
+
+/// Parse a WebAssembly expression from the given byte stream
+///
+/// - Parameters:
+///   - bytes: The bytes to parse
+///   - features: The enabled WebAssembly features
+///   - hasDataCount: Whether the module has a data count section
+///   - visitor: The instruction visitor to visit the parsed instructions
+/// - Throws: `WasmParserError` if the parsing fails
+///
+/// See ``parseExpression(stream:features:hasDataCount:visitor:)`` for stream version.
+///
+/// The input bytes sequence is usually extracted from a WebAssembly module's code section.
+///
+/// ```swift
+/// import WasmParser
+///
+/// let bytes = try wat2wasm(String(contentsOfFile: "wasm/factorial.wat"))
+///
+/// struct MyVisitor: VoidInstructionVisitor {
+///     func visitLocalGet(localIndex: UInt32) {
+///         print("local.get \(localIndex)")
+///     }
+/// }
+///
+/// var parser = WasmParser.Parser(bytes: [
+///     0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x01, 0x06, 0x01, 0x60,
+///     0x01, 0x7e, 0x01, 0x7e, 0x03, 0x02, 0x01, 0x00, 0x07, 0x07, 0x01, 0x03,
+///     0x66, 0x61, 0x63, 0x00, 0x00, 0x0a, 0x17, 0x01, 0x15, 0x00, 0x20, 0x00,
+///     0x50, 0x04, 0x7e, 0x42, 0x01, 0x05, 0x20, 0x00, 0x20, 0x00, 0x42, 0x01,
+///     0x7d, 0x10, 0x00, 0x7e, 0x0b, 0x0b
+/// ])
+/// while let payload = try parser.parseNext() {
+///     switch payload {
+///     case .codeSection(let section):
+///         for code in section {
+///             var visitor = MyVisitor()
+///             try parseExpression(bytes: Array(code.expression), visitor: &visitor)
+///         }
+///     default: break
+///     }
+/// }
+/// ````
 public func parseExpression<V: InstructionVisitor>(bytes: [UInt8], features: WasmFeatureSet = .default, hasDataCount: Bool = false, visitor: inout V) throws {
     try parseExpression(
         stream: StaticByteStream(bytes: bytes), features: features,
@@ -1012,8 +1114,34 @@ extension Parser {
         }
     }
 
+    /// Attempts to parse a chunk of the Wasm binary stream.
+    ///
+    /// - Returns: A `ParsingPayload` if the parsing was successful, otherwise `nil`.
+    ///
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-module>
+    ///
+    /// The following example demonstrates how to use the `Parser` to parse a Wasm binary stream:
+    ///
+    /// ```swift
+    /// import WasmParser
+    ///
+    /// var parser = Parser(bytes: [
+    ///     0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x01, 0x06, 0x01, 0x60,
+    ///     0x01, 0x7e, 0x01, 0x7e, 0x03, 0x02, 0x01, 0x00, 0x07, 0x07, 0x01, 0x03,
+    ///     0x66, 0x61, 0x63, 0x00, 0x00, 0x0a, 0x17, 0x01, 0x15, 0x00, 0x20, 0x00,
+    ///     0x50, 0x04, 0x7e, 0x42, 0x01, 0x05, 0x20, 0x00, 0x20, 0x00, 0x42, 0x01,
+    ///     0x7d, 0x10, 0x00, 0x7e, 0x0b, 0x0b
+    /// ])
+    ///
+    /// while let payload = try parser.parseNext() {
+    ///     switch payload {
+    ///     case .header(let version):
+    ///         print("Wasm version: \(version)")
+    ///     default: break
+    ///     }
+    /// }
+    /// ```
     public mutating func parseNext() throws -> ParsingPayload? {
         switch nextParseTarget {
         case .header:
@@ -1060,12 +1188,18 @@ extension Parser {
     }
 }
 
+/// A parser for the name custom section.
+///
 /// > Note: <https://webassembly.github.io/spec/core/appendix/custom.html#name-section>
 public struct NameSectionParser<Stream: ByteStream> {
     let stream: Stream
 
+    /// A map of names by its index.
     public typealias NameMap = [UInt32: String]
+
+    /// Parsed names.
     public enum ParsedNames {
+        /// Function names.
         case functions(NameMap)
     }
 
@@ -1073,6 +1207,10 @@ public struct NameSectionParser<Stream: ByteStream> {
         self.stream = stream
     }
 
+    /// Parses the entire name section.
+    ///
+    /// - Throws: If the stream is malformed or the section is invalid.
+    /// - Returns: A list of parsed names.
     public func parseAll() throws -> [ParsedNames] {
         var results: [ParsedNames] = []
         while try !stream.hasReachedEnd() {

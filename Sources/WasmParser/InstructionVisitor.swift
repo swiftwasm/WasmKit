@@ -408,10 +408,18 @@ struct InstructionFactory: InstructionVisitor {
     func visitI64TruncSatF64U() -> Instruction { return .i64TruncSatF64U }
 }
 
+/// A visitor that traces the instructions visited.
 public struct InstructionTracingVisitor<V: InstructionVisitor>: InstructionVisitor {
+    /// A closure that is invoked with the visited instruction.
     public let trace: (Instruction) -> Void
+    /// The visitor to forward the instructions to.
     public var visitor: V
 
+    /// Creates a new tracing visitor.
+    ///
+    /// - Parameters:
+    ///   - trace: A closure that is invoked with the visited instruction.
+    ///   - visitor: The visitor to forward the instructions to.
     public init(trace: @escaping (Instruction) -> Void, visitor: V) {
         self.trace = trace
         self.visitor = visitor
@@ -1222,211 +1230,421 @@ public struct InstructionTracingVisitor<V: InstructionVisitor>: InstructionVisit
     }
 }
 
+/// A visitor for WebAssembly instructions.
+///
+/// The visitor pattern is used while parsing WebAssembly expressions to allow for easy extensibility.
+/// See the following parsing functions:
+/// - ``parseExpression(bytes:features:hasDataCount:visitor:)``
+/// - ``parseExpression(stream:features:hasDataCount:visitor:)``
 public protocol InstructionVisitor {
+
+    /// The return type of visitor methods.
     associatedtype Output
+    /// Visiting `unreachable` instruction.
     mutating func visitUnreachable() throws -> Output
+    /// Visiting `nop` instruction.
     mutating func visitNop() throws -> Output
+    /// Visiting `block` instruction.
     mutating func visitBlock(blockType: BlockType) throws -> Output
+    /// Visiting `loop` instruction.
     mutating func visitLoop(blockType: BlockType) throws -> Output
+    /// Visiting `if` instruction.
     mutating func visitIf(blockType: BlockType) throws -> Output
+    /// Visiting `else` instruction.
     mutating func visitElse() throws -> Output
+    /// Visiting `end` instruction.
     mutating func visitEnd() throws -> Output
+    /// Visiting `br` instruction.
     mutating func visitBr(relativeDepth: UInt32) throws -> Output
+    /// Visiting `br_if` instruction.
     mutating func visitBrIf(relativeDepth: UInt32) throws -> Output
+    /// Visiting `br_table` instruction.
     mutating func visitBrTable(targets: BrTable) throws -> Output
+    /// Visiting `return` instruction.
     mutating func visitReturn() throws -> Output
+    /// Visiting `call` instruction.
     mutating func visitCall(functionIndex: UInt32) throws -> Output
+    /// Visiting `call_indirect` instruction.
     mutating func visitCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws -> Output
+    /// Visiting `drop` instruction.
     mutating func visitDrop() throws -> Output
+    /// Visiting `select` instruction.
     mutating func visitSelect() throws -> Output
+    /// Visiting `typedSelect` instruction.
     mutating func visitTypedSelect(type: ValueType) throws -> Output
+    /// Visiting `local.get` instruction.
     mutating func visitLocalGet(localIndex: UInt32) throws -> Output
+    /// Visiting `local.set` instruction.
     mutating func visitLocalSet(localIndex: UInt32) throws -> Output
+    /// Visiting `local.tee` instruction.
     mutating func visitLocalTee(localIndex: UInt32) throws -> Output
+    /// Visiting `global.get` instruction.
     mutating func visitGlobalGet(globalIndex: UInt32) throws -> Output
+    /// Visiting `global.set` instruction.
     mutating func visitGlobalSet(globalIndex: UInt32) throws -> Output
+    /// Visiting `i32.load` instruction.
     mutating func visitI32Load(memarg: MemArg) throws -> Output
+    /// Visiting `i64.load` instruction.
     mutating func visitI64Load(memarg: MemArg) throws -> Output
+    /// Visiting `f32.load` instruction.
     mutating func visitF32Load(memarg: MemArg) throws -> Output
+    /// Visiting `f64.load` instruction.
     mutating func visitF64Load(memarg: MemArg) throws -> Output
+    /// Visiting `i32.load8_s` instruction.
     mutating func visitI32Load8S(memarg: MemArg) throws -> Output
+    /// Visiting `i32.load8_u` instruction.
     mutating func visitI32Load8U(memarg: MemArg) throws -> Output
+    /// Visiting `i32.load16_s` instruction.
     mutating func visitI32Load16S(memarg: MemArg) throws -> Output
+    /// Visiting `i32.load16_u` instruction.
     mutating func visitI32Load16U(memarg: MemArg) throws -> Output
+    /// Visiting `i64.load8_s` instruction.
     mutating func visitI64Load8S(memarg: MemArg) throws -> Output
+    /// Visiting `i64.load8_u` instruction.
     mutating func visitI64Load8U(memarg: MemArg) throws -> Output
+    /// Visiting `i64.load16_s` instruction.
     mutating func visitI64Load16S(memarg: MemArg) throws -> Output
+    /// Visiting `i64.load16_u` instruction.
     mutating func visitI64Load16U(memarg: MemArg) throws -> Output
+    /// Visiting `i64.load32_s` instruction.
     mutating func visitI64Load32S(memarg: MemArg) throws -> Output
+    /// Visiting `i64.load32_u` instruction.
     mutating func visitI64Load32U(memarg: MemArg) throws -> Output
+    /// Visiting `i32.store` instruction.
     mutating func visitI32Store(memarg: MemArg) throws -> Output
+    /// Visiting `i64.store` instruction.
     mutating func visitI64Store(memarg: MemArg) throws -> Output
+    /// Visiting `f32.store` instruction.
     mutating func visitF32Store(memarg: MemArg) throws -> Output
+    /// Visiting `f64.store` instruction.
     mutating func visitF64Store(memarg: MemArg) throws -> Output
+    /// Visiting `i32.store8` instruction.
     mutating func visitI32Store8(memarg: MemArg) throws -> Output
+    /// Visiting `i32.store16` instruction.
     mutating func visitI32Store16(memarg: MemArg) throws -> Output
+    /// Visiting `i64.store8` instruction.
     mutating func visitI64Store8(memarg: MemArg) throws -> Output
+    /// Visiting `i64.store16` instruction.
     mutating func visitI64Store16(memarg: MemArg) throws -> Output
+    /// Visiting `i64.store32` instruction.
     mutating func visitI64Store32(memarg: MemArg) throws -> Output
+    /// Visiting `memory.size` instruction.
     mutating func visitMemorySize(memory: UInt32) throws -> Output
+    /// Visiting `memory.grow` instruction.
     mutating func visitMemoryGrow(memory: UInt32) throws -> Output
+    /// Visiting `i32.const` instruction.
     mutating func visitI32Const(value: Int32) throws -> Output
+    /// Visiting `i64.const` instruction.
     mutating func visitI64Const(value: Int64) throws -> Output
+    /// Visiting `f32.const` instruction.
     mutating func visitF32Const(value: IEEE754.Float32) throws -> Output
+    /// Visiting `f64.const` instruction.
     mutating func visitF64Const(value: IEEE754.Float64) throws -> Output
+    /// Visiting `ref.null` instruction.
     mutating func visitRefNull(type: ReferenceType) throws -> Output
+    /// Visiting `ref.is_null` instruction.
     mutating func visitRefIsNull() throws -> Output
+    /// Visiting `ref.func` instruction.
     mutating func visitRefFunc(functionIndex: UInt32) throws -> Output
+    /// Visiting `i32.eqz` instruction.
     mutating func visitI32Eqz() throws -> Output
+    /// Visiting `i32.eq` instruction.
     mutating func visitI32Eq() throws -> Output
+    /// Visiting `i32.ne` instruction.
     mutating func visitI32Ne() throws -> Output
+    /// Visiting `i32.lt_s` instruction.
     mutating func visitI32LtS() throws -> Output
+    /// Visiting `i32.lt_u` instruction.
     mutating func visitI32LtU() throws -> Output
+    /// Visiting `i32.gt_s` instruction.
     mutating func visitI32GtS() throws -> Output
+    /// Visiting `i32.gt_u` instruction.
     mutating func visitI32GtU() throws -> Output
+    /// Visiting `i32.le_s` instruction.
     mutating func visitI32LeS() throws -> Output
+    /// Visiting `i32.le_u` instruction.
     mutating func visitI32LeU() throws -> Output
+    /// Visiting `i32.ge_s` instruction.
     mutating func visitI32GeS() throws -> Output
+    /// Visiting `i32.ge_u` instruction.
     mutating func visitI32GeU() throws -> Output
+    /// Visiting `i64.eqz` instruction.
     mutating func visitI64Eqz() throws -> Output
+    /// Visiting `i64.eq` instruction.
     mutating func visitI64Eq() throws -> Output
+    /// Visiting `i64.ne` instruction.
     mutating func visitI64Ne() throws -> Output
+    /// Visiting `i64.lt_s` instruction.
     mutating func visitI64LtS() throws -> Output
+    /// Visiting `i64.lt_u` instruction.
     mutating func visitI64LtU() throws -> Output
+    /// Visiting `i64.gt_s` instruction.
     mutating func visitI64GtS() throws -> Output
+    /// Visiting `i64.gt_u` instruction.
     mutating func visitI64GtU() throws -> Output
+    /// Visiting `i64.le_s` instruction.
     mutating func visitI64LeS() throws -> Output
+    /// Visiting `i64.le_u` instruction.
     mutating func visitI64LeU() throws -> Output
+    /// Visiting `i64.ge_s` instruction.
     mutating func visitI64GeS() throws -> Output
+    /// Visiting `i64.ge_u` instruction.
     mutating func visitI64GeU() throws -> Output
+    /// Visiting `f32.eq` instruction.
     mutating func visitF32Eq() throws -> Output
+    /// Visiting `f32.ne` instruction.
     mutating func visitF32Ne() throws -> Output
+    /// Visiting `f32.lt` instruction.
     mutating func visitF32Lt() throws -> Output
+    /// Visiting `f32.gt` instruction.
     mutating func visitF32Gt() throws -> Output
+    /// Visiting `f32.le` instruction.
     mutating func visitF32Le() throws -> Output
+    /// Visiting `f32.ge` instruction.
     mutating func visitF32Ge() throws -> Output
+    /// Visiting `f64.eq` instruction.
     mutating func visitF64Eq() throws -> Output
+    /// Visiting `f64.ne` instruction.
     mutating func visitF64Ne() throws -> Output
+    /// Visiting `f64.lt` instruction.
     mutating func visitF64Lt() throws -> Output
+    /// Visiting `f64.gt` instruction.
     mutating func visitF64Gt() throws -> Output
+    /// Visiting `f64.le` instruction.
     mutating func visitF64Le() throws -> Output
+    /// Visiting `f64.ge` instruction.
     mutating func visitF64Ge() throws -> Output
+    /// Visiting `i32.clz` instruction.
     mutating func visitI32Clz() throws -> Output
+    /// Visiting `i32.ctz` instruction.
     mutating func visitI32Ctz() throws -> Output
+    /// Visiting `i32.popcnt` instruction.
     mutating func visitI32Popcnt() throws -> Output
+    /// Visiting `i32.add` instruction.
     mutating func visitI32Add() throws -> Output
+    /// Visiting `i32.sub` instruction.
     mutating func visitI32Sub() throws -> Output
+    /// Visiting `i32.mul` instruction.
     mutating func visitI32Mul() throws -> Output
+    /// Visiting `i32.div_s` instruction.
     mutating func visitI32DivS() throws -> Output
+    /// Visiting `i32.div_u` instruction.
     mutating func visitI32DivU() throws -> Output
+    /// Visiting `i32.rem_s` instruction.
     mutating func visitI32RemS() throws -> Output
+    /// Visiting `i32.rem_u` instruction.
     mutating func visitI32RemU() throws -> Output
+    /// Visiting `i32.and` instruction.
     mutating func visitI32And() throws -> Output
+    /// Visiting `i32.or` instruction.
     mutating func visitI32Or() throws -> Output
+    /// Visiting `i32.xor` instruction.
     mutating func visitI32Xor() throws -> Output
+    /// Visiting `i32.shl` instruction.
     mutating func visitI32Shl() throws -> Output
+    /// Visiting `i32.shr_s` instruction.
     mutating func visitI32ShrS() throws -> Output
+    /// Visiting `i32.shr_u` instruction.
     mutating func visitI32ShrU() throws -> Output
+    /// Visiting `i32.rotl` instruction.
     mutating func visitI32Rotl() throws -> Output
+    /// Visiting `i32.rotr` instruction.
     mutating func visitI32Rotr() throws -> Output
+    /// Visiting `i64.clz` instruction.
     mutating func visitI64Clz() throws -> Output
+    /// Visiting `i64.ctz` instruction.
     mutating func visitI64Ctz() throws -> Output
+    /// Visiting `i64.popcnt` instruction.
     mutating func visitI64Popcnt() throws -> Output
+    /// Visiting `i64.add` instruction.
     mutating func visitI64Add() throws -> Output
+    /// Visiting `i64.sub` instruction.
     mutating func visitI64Sub() throws -> Output
+    /// Visiting `i64.mul` instruction.
     mutating func visitI64Mul() throws -> Output
+    /// Visiting `i64.div_s` instruction.
     mutating func visitI64DivS() throws -> Output
+    /// Visiting `i64.div_u` instruction.
     mutating func visitI64DivU() throws -> Output
+    /// Visiting `i64.rem_s` instruction.
     mutating func visitI64RemS() throws -> Output
+    /// Visiting `i64.rem_u` instruction.
     mutating func visitI64RemU() throws -> Output
+    /// Visiting `i64.and` instruction.
     mutating func visitI64And() throws -> Output
+    /// Visiting `i64.or` instruction.
     mutating func visitI64Or() throws -> Output
+    /// Visiting `i64.xor` instruction.
     mutating func visitI64Xor() throws -> Output
+    /// Visiting `i64.shl` instruction.
     mutating func visitI64Shl() throws -> Output
+    /// Visiting `i64.shr_s` instruction.
     mutating func visitI64ShrS() throws -> Output
+    /// Visiting `i64.shr_u` instruction.
     mutating func visitI64ShrU() throws -> Output
+    /// Visiting `i64.rotl` instruction.
     mutating func visitI64Rotl() throws -> Output
+    /// Visiting `i64.rotr` instruction.
     mutating func visitI64Rotr() throws -> Output
+    /// Visiting `f32.abs` instruction.
     mutating func visitF32Abs() throws -> Output
+    /// Visiting `f32.neg` instruction.
     mutating func visitF32Neg() throws -> Output
+    /// Visiting `f32.ceil` instruction.
     mutating func visitF32Ceil() throws -> Output
+    /// Visiting `f32.floor` instruction.
     mutating func visitF32Floor() throws -> Output
+    /// Visiting `f32.trunc` instruction.
     mutating func visitF32Trunc() throws -> Output
+    /// Visiting `f32.nearest` instruction.
     mutating func visitF32Nearest() throws -> Output
+    /// Visiting `f32.sqrt` instruction.
     mutating func visitF32Sqrt() throws -> Output
+    /// Visiting `f32.add` instruction.
     mutating func visitF32Add() throws -> Output
+    /// Visiting `f32.sub` instruction.
     mutating func visitF32Sub() throws -> Output
+    /// Visiting `f32.mul` instruction.
     mutating func visitF32Mul() throws -> Output
+    /// Visiting `f32.div` instruction.
     mutating func visitF32Div() throws -> Output
+    /// Visiting `f32.min` instruction.
     mutating func visitF32Min() throws -> Output
+    /// Visiting `f32.max` instruction.
     mutating func visitF32Max() throws -> Output
+    /// Visiting `f32.copysign` instruction.
     mutating func visitF32Copysign() throws -> Output
+    /// Visiting `f64.abs` instruction.
     mutating func visitF64Abs() throws -> Output
+    /// Visiting `f64.neg` instruction.
     mutating func visitF64Neg() throws -> Output
+    /// Visiting `f64.ceil` instruction.
     mutating func visitF64Ceil() throws -> Output
+    /// Visiting `f64.floor` instruction.
     mutating func visitF64Floor() throws -> Output
+    /// Visiting `f64.trunc` instruction.
     mutating func visitF64Trunc() throws -> Output
+    /// Visiting `f64.nearest` instruction.
     mutating func visitF64Nearest() throws -> Output
+    /// Visiting `f64.sqrt` instruction.
     mutating func visitF64Sqrt() throws -> Output
+    /// Visiting `f64.add` instruction.
     mutating func visitF64Add() throws -> Output
+    /// Visiting `f64.sub` instruction.
     mutating func visitF64Sub() throws -> Output
+    /// Visiting `f64.mul` instruction.
     mutating func visitF64Mul() throws -> Output
+    /// Visiting `f64.div` instruction.
     mutating func visitF64Div() throws -> Output
+    /// Visiting `f64.min` instruction.
     mutating func visitF64Min() throws -> Output
+    /// Visiting `f64.max` instruction.
     mutating func visitF64Max() throws -> Output
+    /// Visiting `f64.copysign` instruction.
     mutating func visitF64Copysign() throws -> Output
+    /// Visiting `i32.wrap_i64` instruction.
     mutating func visitI32WrapI64() throws -> Output
+    /// Visiting `i32.trunc_f32_s` instruction.
     mutating func visitI32TruncF32S() throws -> Output
+    /// Visiting `i32.trunc_f32_u` instruction.
     mutating func visitI32TruncF32U() throws -> Output
+    /// Visiting `i32.trunc_f64_s` instruction.
     mutating func visitI32TruncF64S() throws -> Output
+    /// Visiting `i32.trunc_f64_u` instruction.
     mutating func visitI32TruncF64U() throws -> Output
+    /// Visiting `i64.extend_i32_s` instruction.
     mutating func visitI64ExtendI32S() throws -> Output
+    /// Visiting `i64.extend_i32_u` instruction.
     mutating func visitI64ExtendI32U() throws -> Output
+    /// Visiting `i64.trunc_f32_s` instruction.
     mutating func visitI64TruncF32S() throws -> Output
+    /// Visiting `i64.trunc_f32_u` instruction.
     mutating func visitI64TruncF32U() throws -> Output
+    /// Visiting `i64.trunc_f64_s` instruction.
     mutating func visitI64TruncF64S() throws -> Output
+    /// Visiting `i64.trunc_f64_u` instruction.
     mutating func visitI64TruncF64U() throws -> Output
+    /// Visiting `f32.convert_i32_s` instruction.
     mutating func visitF32ConvertI32S() throws -> Output
+    /// Visiting `f32.convert_i32_u` instruction.
     mutating func visitF32ConvertI32U() throws -> Output
+    /// Visiting `f32.convert_i64_s` instruction.
     mutating func visitF32ConvertI64S() throws -> Output
+    /// Visiting `f32.convert_i64_u` instruction.
     mutating func visitF32ConvertI64U() throws -> Output
+    /// Visiting `f32.demote_f64` instruction.
     mutating func visitF32DemoteF64() throws -> Output
+    /// Visiting `f64.convert_i32_s` instruction.
     mutating func visitF64ConvertI32S() throws -> Output
+    /// Visiting `f64.convert_i32_u` instruction.
     mutating func visitF64ConvertI32U() throws -> Output
+    /// Visiting `f64.convert_i64_s` instruction.
     mutating func visitF64ConvertI64S() throws -> Output
+    /// Visiting `f64.convert_i64_u` instruction.
     mutating func visitF64ConvertI64U() throws -> Output
+    /// Visiting `f64.promote_f32` instruction.
     mutating func visitF64PromoteF32() throws -> Output
+    /// Visiting `i32.reinterpret_f32` instruction.
     mutating func visitI32ReinterpretF32() throws -> Output
+    /// Visiting `i64.reinterpret_f64` instruction.
     mutating func visitI64ReinterpretF64() throws -> Output
+    /// Visiting `f32.reinterpret_i32` instruction.
     mutating func visitF32ReinterpretI32() throws -> Output
+    /// Visiting `f64.reinterpret_i64` instruction.
     mutating func visitF64ReinterpretI64() throws -> Output
+    /// Visiting `i32.extend8_s` instruction.
     mutating func visitI32Extend8S() throws -> Output
+    /// Visiting `i32.extend16_s` instruction.
     mutating func visitI32Extend16S() throws -> Output
+    /// Visiting `i64.extend8_s` instruction.
     mutating func visitI64Extend8S() throws -> Output
+    /// Visiting `i64.extend16_s` instruction.
     mutating func visitI64Extend16S() throws -> Output
+    /// Visiting `i64.extend32_s` instruction.
     mutating func visitI64Extend32S() throws -> Output
+    /// Visiting `memory.init` instruction.
     mutating func visitMemoryInit(dataIndex: UInt32) throws -> Output
+    /// Visiting `data.drop` instruction.
     mutating func visitDataDrop(dataIndex: UInt32) throws -> Output
+    /// Visiting `memory.copy` instruction.
     mutating func visitMemoryCopy(dstMem: UInt32, srcMem: UInt32) throws -> Output
+    /// Visiting `memory.fill` instruction.
     mutating func visitMemoryFill(memory: UInt32) throws -> Output
+    /// Visiting `table.init` instruction.
     mutating func visitTableInit(elemIndex: UInt32, table: UInt32) throws -> Output
+    /// Visiting `elem.drop` instruction.
     mutating func visitElemDrop(elemIndex: UInt32) throws -> Output
+    /// Visiting `table.copy` instruction.
     mutating func visitTableCopy(dstTable: UInt32, srcTable: UInt32) throws -> Output
+    /// Visiting `table.fill` instruction.
     mutating func visitTableFill(table: UInt32) throws -> Output
+    /// Visiting `table.get` instruction.
     mutating func visitTableGet(table: UInt32) throws -> Output
+    /// Visiting `table.set` instruction.
     mutating func visitTableSet(table: UInt32) throws -> Output
+    /// Visiting `table.grow` instruction.
     mutating func visitTableGrow(table: UInt32) throws -> Output
+    /// Visiting `table.size` instruction.
     mutating func visitTableSize(table: UInt32) throws -> Output
+    /// Visiting `i32.trunc_sat_f32_s` instruction.
     mutating func visitI32TruncSatF32S() throws -> Output
+    /// Visiting `i32.trunc_sat_f32_u` instruction.
     mutating func visitI32TruncSatF32U() throws -> Output
+    /// Visiting `i32.trunc_sat_f64_s` instruction.
     mutating func visitI32TruncSatF64S() throws -> Output
+    /// Visiting `i32.trunc_sat_f64_u` instruction.
     mutating func visitI32TruncSatF64U() throws -> Output
+    /// Visiting `i64.trunc_sat_f32_s` instruction.
     mutating func visitI64TruncSatF32S() throws -> Output
+    /// Visiting `i64.trunc_sat_f32_u` instruction.
     mutating func visitI64TruncSatF32U() throws -> Output
+    /// Visiting `i64.trunc_sat_f64_s` instruction.
     mutating func visitI64TruncSatF64S() throws -> Output
+    /// Visiting `i64.trunc_sat_f64_u` instruction.
     mutating func visitI64TruncSatF64U() throws -> Output
 }
 
+/// A visitor for WebAssembly instructions that returns `Void` with default implementations.
 public protocol VoidInstructionVisitor: InstructionVisitor where Output == Void {}
 
 extension VoidInstructionVisitor {

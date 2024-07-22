@@ -53,13 +53,22 @@ typealias InstructionSet = [Instruction]
 
 func generateVisitorProtocol(_ instructions: InstructionSet) -> String {
     var code = """
+    /// A visitor for WebAssembly instructions.
+    ///
+    /// The visitor pattern is used while parsing WebAssembly expressions to allow for easy extensibility.
+    /// See the following parsing functions:
+    /// - ``parseExpression(bytes:features:hasDataCount:visitor:)``
+    /// - ``parseExpression(stream:features:hasDataCount:visitor:)``
     public protocol InstructionVisitor {
+
+        /// The return type of visitor methods.
         associatedtype Output
     """
 
     for instruction in instructions {
-        code += "\n    "
-        code += "mutating func \(instruction.visitMethodName)("
+        code += "\n"
+        code += "    /// Visiting `\(instruction.name ?? instruction.enumCaseName)` instruction.\n"
+        code += "    mutating func \(instruction.visitMethodName)("
         code += instruction.immediates.map { i in
             "\(i.label): \(i.type)"
         }.joined(separator: ", ")
@@ -74,6 +83,7 @@ func generateVisitorProtocol(_ instructions: InstructionSet) -> String {
     code += """
 
 
+    /// A visitor for WebAssembly instructions that returns `Void` with default implementations.
     public protocol VoidInstructionVisitor: InstructionVisitor where Output == Void {}
 
     extension VoidInstructionVisitor {
@@ -149,10 +159,18 @@ func generateInstructionFactory(_ instructions: InstructionSet) -> String {
 
 func generateTracingVisitor(_ instructions: InstructionSet) -> String {
     var code = """
+    /// A visitor that traces the instructions visited.
     public struct InstructionTracingVisitor<V: InstructionVisitor>: InstructionVisitor {
+        /// A closure that is invoked with the visited instruction.
         public let trace: (Instruction) -> Void
+        /// The visitor to forward the instructions to.
         public var visitor: V
 
+        /// Creates a new tracing visitor.
+        ///
+        /// - Parameters:
+        ///   - trace: A closure that is invoked with the visited instruction.
+        ///   - visitor: The visitor to forward the instructions to.
         public init(trace: @escaping (Instruction) -> Void, visitor: V) {
             self.trace = trace
             self.visitor = visitor
