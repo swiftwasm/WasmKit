@@ -8,33 +8,13 @@ let package = Package(
     name: "WasmKit",
     platforms: [.macOS(.v10_13), .iOS(.v12)],
     products: [
-        .library(
-            name: "WasmKit",
-            targets: ["WasmKit"]
-        ),
-        .library(
-            name: "WasmKitWASI",
-            targets: ["WasmKitWASI"]
-        ),
-        .library(
-            name: "WASI",
-            targets: ["WASI"]
-        ),
-        .library(
-            name: "WasmParser",
-            targets: ["WasmParser"]
-        ),
-        .library(
-            name: "WAT",
-            targets: ["WAT"]
-        ),
-        .library(
-            name: "WIT", targets: ["WIT"]
-        ),
-        .executable(
-            name: "wasmkit-cli",
-            targets: ["CLI"]
-        ),
+        .executable(name: "wasmkit-cli", targets: ["CLI"]),
+        .library(name: "WasmKit", targets: ["WasmKit"]),
+        .library(name: "WasmKitWASI", targets: ["WasmKitWASI"]),
+        .library(name: "WASI", targets: ["WASI"]),
+        .library(name: "WasmParser", targets: ["WasmParser"]),
+        .library(name: "WAT", targets: ["WAT"]),
+        .library(name: "WIT", targets: ["WIT"]),
         .library(name: "_CabiShims", targets: ["_CabiShims"]),
     ],
     targets: [
@@ -48,10 +28,7 @@ let package = Package(
             ],
             exclude: ["CMakeLists.txt"]
         ),
-        .target(
-            name: "WasmTypes",
-            exclude: ["CMakeLists.txt"]
-        ),
+
         .target(
             name: "WasmKit",
             dependencies: [
@@ -62,7 +39,11 @@ let package = Package(
             ],
             exclude: ["CMakeLists.txt"]
         ),
+        .testTarget(name: "WasmKitTests", dependencies: ["WasmKit", "WAT"]),
+
         .target(name: "WAT", dependencies: ["WasmParser"]),
+        .testTarget(name: "WATTests", dependencies: ["WAT"]),
+
         .target(
             name: "WasmParser",
             dependencies: [
@@ -71,20 +52,22 @@ let package = Package(
             ],
             exclude: ["CMakeLists.txt"]
         ),
-        .target(
-            name: "WASI",
-            dependencies: ["WasmTypes", "SystemExtras"],
-            exclude: ["CMakeLists.txt"]
-        ),
+        .testTarget(name: "WasmParserTests", dependencies: ["WasmParser"]),
+
+        .target(name: "WasmTypes", exclude: ["CMakeLists.txt"]),
+
         .target(
             name: "WasmKitWASI",
             dependencies: ["WasmKit", "WASI"],
             exclude: ["CMakeLists.txt"]
         ),
-        .testTarget(
-            name: "WASITests",
-            dependencies: ["WASI", "WasmKitWASI"]
+        .target(
+            name: "WASI",
+            dependencies: ["WasmTypes", "SystemExtras"],
+            exclude: ["CMakeLists.txt"]
         ),
+        .testTarget(name: "WASITests", dependencies: ["WASI", "WasmKitWASI"]),
+
         .target(
             name: "SystemExtras",
             dependencies: [
@@ -92,16 +75,7 @@ let package = Package(
             ],
             exclude: ["CMakeLists.txt"]
         ),
-        .testTarget(name: "WATTests", dependencies: ["WAT"]),
-        .target(name: "WIT"),
-        .testTarget(name: "WITTests", dependencies: ["WIT"]),
-        .target(name: "WITOverlayGenerator", dependencies: ["WIT"]),
-        .target(name: "_CabiShims"),
-        .target(name: "WITExtractor"),
-        .testTarget(
-            name: "WITExtractorTests",
-            dependencies: ["WITExtractor", "WIT"]
-        ),
+
         .executableTarget(
             name: "WITTool",
             dependencies: [
@@ -111,14 +85,15 @@ let package = Package(
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ]
         ),
-        .testTarget(
-            name: "WasmKitTests",
-            dependencies: ["WasmKit", "WAT"]
-        ),
-        .testTarget(
-            name: "WasmParserTests",
-            dependencies: ["WasmParser"]
-        ),
+
+        .target(name: "WIT"),
+        .testTarget(name: "WITTests", dependencies: ["WIT"]),
+
+        .target(name: "WITOverlayGenerator", dependencies: ["WIT"]),
+        .target(name: "_CabiShims"),
+
+        .target(name: "WITExtractor"),
+        .testTarget(name: "WITExtractorTests", dependencies: ["WITExtractor", "WIT"]),
     ],
     swiftLanguageVersions: [.v5]
 )
