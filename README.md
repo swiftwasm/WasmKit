@@ -13,7 +13,7 @@ WasmKit provides a command line tool to run WebAssembly binaries compliant with 
 ```sh
 $ git clone https://github.com/swiftwasm/WasmKit.git
 $ cd WasmKit
-$ swift run wasmkit-cli run ./Examples/hello.wasm
+$ swift run wasmkit-cli run ./Examples/wasm/hello.wasm
 Hello, World!
 ```
 
