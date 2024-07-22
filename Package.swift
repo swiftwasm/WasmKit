@@ -82,7 +82,7 @@ let package = Package(
         ),
         .testTarget(
             name: "WASITests",
-            dependencies: ["WASI"]
+            dependencies: ["WASI", "WasmKitWASI"]
         ),
         .target(
             name: "SystemExtras",
@@ -90,15 +90,6 @@ let package = Package(
                 .product(name: "SystemPackage", package: "swift-system")
             ],
             exclude: ["CMakeLists.txt"]
-        ),
-        .executableTarget(
-            name: "Spectest",
-            dependencies: [
-                "WasmKit",
-                "WAT",
-                .product(name: "ArgumentParser", package: "swift-argument-parser"),
-                .product(name: "SystemPackage", package: "swift-system"),
-            ]
         ),
         .testTarget(name: "WATTests", dependencies: ["WAT"]),
         .target(name: "WIT"),
@@ -121,7 +112,7 @@ let package = Package(
         ),
         .testTarget(
             name: "WasmKitTests",
-            dependencies: ["WasmKit"]
+            dependencies: ["WasmKit", "WAT"]
         ),
         .testTarget(
             name: "WasmParserTests",

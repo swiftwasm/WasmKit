@@ -16,6 +16,7 @@ import WasmParser
 ///   (export "add" (func $add))
 /// )
 /// """)
+/// ```
 public func wat2wasm(_ input: String) throws -> [UInt8] {
     var wat = try parseWAT(input)
     return try encode(module: &wat)
@@ -75,8 +76,8 @@ public struct WatModule {
 ///
 /// ```swift
 /// import WAT
-/// 
-/// let wat = try parseWAT("""
+///
+/// var wat = try parseWAT("""
 /// (module
 ///   (func $add (param i32 i32) (result i32)
 ///     local.get 0
@@ -86,7 +87,7 @@ public struct WatModule {
 /// )
 /// """)
 ///
-/// let wasm = wat.encode()
+/// let wasm = try wat.encode()
 /// ```
 public func parseWAT(_ input: String) throws -> WatModule {
     var parser = Parser(input)
@@ -106,6 +107,9 @@ public struct Wast {
     }
 
     /// Parses the next directive in the WAST script.
+    ///
+    /// - Returns: A tuple containing the parsed directive and its location in the WAST script
+    ///   or `nil` if there are no more directives to parse.
     public mutating func nextDirective() throws -> (directive: WastDirective, location: Location)? {
         let location = try parser.parser.peek()?.location(in: parser.parser.lexer) ?? parser.parser.lexer.location()
         if let directive = try parser.nextDirective() {
@@ -120,6 +124,25 @@ public struct Wast {
 ///
 /// - Parameter input: The WAST string to parse
 /// - Returns: The parsed `Wast` instance
+///
+/// The returned `Wast` instance can be used to iterate over the directives in the WAST script.
+///
+/// ```swift
+/// var wast = try parseWAST("""
+/// (module
+///   (func $add (param i32 i32) (result i32)
+///     local.get 0
+///     local.get 1
+///     i32.add)
+///   (export "add" (func $add))
+/// )
+/// (assert_return (invoke "add" (i32.const 1) (i32.const 2)) (i32.const 3))
+/// """)
+///
+/// while let (directive, location) = try wast.nextDirective() {
+///     print("\(location): \(directive)")
+/// }
+/// ```
 public func parseWAST(_ input: String) throws -> Wast {
     return Wast(input)
 }

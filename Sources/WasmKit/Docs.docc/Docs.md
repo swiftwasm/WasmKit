@@ -87,8 +87,6 @@ See [examples](https://github.com/swiftwasm/WasmKit/tree/main/Examples) for exec
 
 - ``parseWasm(bytes:features:)``
 - ``parseWasm(filePath:features:)``
-- ``WasmFeatureSet``
-- ``WasmParserError``
 
 ### Extending Runtime
 

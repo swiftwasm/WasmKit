@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# This script checks out a dependency from a git repository.
+# This script checks out dependency repositories from dependencies.json
 #
 # Usage:
 #   checkout-dependency <dependency-name>
@@ -10,31 +10,48 @@ import sys
 import json
 import subprocess
 
+class CheckoutDependency:
+
+    def __init__(self, dependencies_file):
+        self.dependencies_file = dependencies_file
+        self.dependencies = json.load(open(dependencies_file))
+
+    def checkout(self, dependency_name):
+        dependency = self.dependencies.get(dependency_name)
+
+        if dependency is None:
+            print(f"Dependency '{dependency_name}' not found in {self.dependencies_file}")
+            print(f"Available dependencies: {', '.join(self.dependencies.keys())}")
+            sys.exit(1)
+
+        dependency_path = os.path.join(os.path.dirname(__file__), dependency_name)
+        if os.path.exists(dependency_path):
+            print(f"Dependency '{dependency_name}' already exists at {dependency_path}")
+            return
+
+        print(f"Checking out '{dependency_name}' to {dependency_path}")
+        subprocess.run(["git", "clone", dependency["repository"], dependency_path], check=True)
+        subprocess.run(["git", "-C", dependency_path, "checkout", dependency["revision"]], check=True)
+
+    def checkout_all(self):
+        for dependency_name in self.dependencies.keys():
+            self.checkout(dependency_name)
 
 def main():
-    if len(sys.argv) != 2:
-        print("Usage: checkout-dependency <dependency-name>")
-        sys.exit(1)
-
-    dependency_name = sys.argv[1]
+    import argparse
     dependencies_file = os.path.join(os.path.dirname(__file__), "dependencies.json")
-    dependencies = json.load(open(dependencies_file))
-    dependency = dependencies.get(dependency_name)
+    checkout_dependency = CheckoutDependency(dependencies_file)
 
-    if dependency is None:
-        print(f"Dependency '{dependency_name}' not found in {dependencies_file}")
-        print(f"Available dependencies: {', '.join(dependencies.keys())}")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description="Checkout dependency repositories")
+    available_dependencies = ", ".join(checkout_dependency.dependencies.keys())
+    parser.add_argument("names", nargs="*", help=f"Available dependencies: {available_dependencies}")
+    args = parser.parse_args()
 
-    dependency_path = os.path.join(os.path.dirname(__file__), dependency_name)
-    if os.path.exists(dependency_path):
-        print(f"Dependency '{dependency_name}' already exists at {dependency_path}")
-        sys.exit(0)
-
-    print(f"Checking out '{dependency_name}' to {dependency_path}")
-    subprocess.run(["git", "clone", dependency["repository"], dependency_path], check=True)
-    subprocess.run(["git", "-C", dependency_path, "checkout", dependency["revision"]], check=True)
-
+    if args.names:
+        for dependency_name in args.names:
+            checkout_dependency.checkout(dependency_name)
+    else:
+        checkout_dependency.checkout_all()
 
 if __name__ == "__main__":
     main()
