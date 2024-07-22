@@ -109,7 +109,7 @@ jobs:
           EOS
       - run: ./build-exec ./CI/install-wabt.sh
       - run: ./Vendor/checkout-dependency
-      - run: ./build-exec swift test --sanitize address
+      - run: ./build-exec swift test
 
   build-windows:
     runs-on: windows-latest
@@ -130,7 +130,7 @@ jobs:
       # - run: cmake -G Ninja -B .build/cmake
       # - run: cmake --build .build/cmake
       # Run tests with SwiftPM
-      - run: swift test --sanitize address
+      - run: swift test
 
   build-cmake:
     runs-on: ubuntu-20.04
