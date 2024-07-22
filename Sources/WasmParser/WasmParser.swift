@@ -808,6 +808,14 @@ extension Parser {
         }
     }
 
+    struct InstructionFactory: AnyInstructionVisitor {
+        typealias Output = Instruction
+
+        func visit(_ instruction: Instruction) throws -> Instruction {
+            return instruction
+        }
+    }
+
     func parseConstExpression() throws -> ConstExpression {
         var factory = InstructionFactory()
         var insts: [Instruction] = []

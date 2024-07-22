@@ -204,208 +204,214 @@ public enum Instruction: Equatable {
     case `i64TruncSatF64U`
 }
 
-struct InstructionFactory: InstructionVisitor {
-    func visitUnreachable() -> Instruction { return .unreachable }
-    func visitNop() -> Instruction { return .nop }
-    func visitBlock(blockType: BlockType) -> Instruction { return .block(blockType: blockType) }
-    func visitLoop(blockType: BlockType) -> Instruction { return .loop(blockType: blockType) }
-    func visitIf(blockType: BlockType) -> Instruction { return .if(blockType: blockType) }
-    func visitElse() -> Instruction { return .else }
-    func visitEnd() -> Instruction { return .end }
-    func visitBr(relativeDepth: UInt32) -> Instruction { return .br(relativeDepth: relativeDepth) }
-    func visitBrIf(relativeDepth: UInt32) -> Instruction { return .brIf(relativeDepth: relativeDepth) }
-    func visitBrTable(targets: BrTable) -> Instruction { return .brTable(targets: targets) }
-    func visitReturn() -> Instruction { return .return }
-    func visitCall(functionIndex: UInt32) -> Instruction { return .call(functionIndex: functionIndex) }
-    func visitCallIndirect(typeIndex: UInt32, tableIndex: UInt32) -> Instruction { return .callIndirect(typeIndex: typeIndex, tableIndex: tableIndex) }
-    func visitDrop() -> Instruction { return .drop }
-    func visitSelect() -> Instruction { return .select }
-    func visitTypedSelect(type: ValueType) -> Instruction { return .typedSelect(type: type) }
-    func visitLocalGet(localIndex: UInt32) -> Instruction { return .localGet(localIndex: localIndex) }
-    func visitLocalSet(localIndex: UInt32) -> Instruction { return .localSet(localIndex: localIndex) }
-    func visitLocalTee(localIndex: UInt32) -> Instruction { return .localTee(localIndex: localIndex) }
-    func visitGlobalGet(globalIndex: UInt32) -> Instruction { return .globalGet(globalIndex: globalIndex) }
-    func visitGlobalSet(globalIndex: UInt32) -> Instruction { return .globalSet(globalIndex: globalIndex) }
-    func visitI32Load(memarg: MemArg) -> Instruction { return .i32Load(memarg: memarg) }
-    func visitI64Load(memarg: MemArg) -> Instruction { return .i64Load(memarg: memarg) }
-    func visitF32Load(memarg: MemArg) -> Instruction { return .f32Load(memarg: memarg) }
-    func visitF64Load(memarg: MemArg) -> Instruction { return .f64Load(memarg: memarg) }
-    func visitI32Load8S(memarg: MemArg) -> Instruction { return .i32Load8S(memarg: memarg) }
-    func visitI32Load8U(memarg: MemArg) -> Instruction { return .i32Load8U(memarg: memarg) }
-    func visitI32Load16S(memarg: MemArg) -> Instruction { return .i32Load16S(memarg: memarg) }
-    func visitI32Load16U(memarg: MemArg) -> Instruction { return .i32Load16U(memarg: memarg) }
-    func visitI64Load8S(memarg: MemArg) -> Instruction { return .i64Load8S(memarg: memarg) }
-    func visitI64Load8U(memarg: MemArg) -> Instruction { return .i64Load8U(memarg: memarg) }
-    func visitI64Load16S(memarg: MemArg) -> Instruction { return .i64Load16S(memarg: memarg) }
-    func visitI64Load16U(memarg: MemArg) -> Instruction { return .i64Load16U(memarg: memarg) }
-    func visitI64Load32S(memarg: MemArg) -> Instruction { return .i64Load32S(memarg: memarg) }
-    func visitI64Load32U(memarg: MemArg) -> Instruction { return .i64Load32U(memarg: memarg) }
-    func visitI32Store(memarg: MemArg) -> Instruction { return .i32Store(memarg: memarg) }
-    func visitI64Store(memarg: MemArg) -> Instruction { return .i64Store(memarg: memarg) }
-    func visitF32Store(memarg: MemArg) -> Instruction { return .f32Store(memarg: memarg) }
-    func visitF64Store(memarg: MemArg) -> Instruction { return .f64Store(memarg: memarg) }
-    func visitI32Store8(memarg: MemArg) -> Instruction { return .i32Store8(memarg: memarg) }
-    func visitI32Store16(memarg: MemArg) -> Instruction { return .i32Store16(memarg: memarg) }
-    func visitI64Store8(memarg: MemArg) -> Instruction { return .i64Store8(memarg: memarg) }
-    func visitI64Store16(memarg: MemArg) -> Instruction { return .i64Store16(memarg: memarg) }
-    func visitI64Store32(memarg: MemArg) -> Instruction { return .i64Store32(memarg: memarg) }
-    func visitMemorySize(memory: UInt32) -> Instruction { return .memorySize(memory: memory) }
-    func visitMemoryGrow(memory: UInt32) -> Instruction { return .memoryGrow(memory: memory) }
-    func visitI32Const(value: Int32) -> Instruction { return .i32Const(value: value) }
-    func visitI64Const(value: Int64) -> Instruction { return .i64Const(value: value) }
-    func visitF32Const(value: IEEE754.Float32) -> Instruction { return .f32Const(value: value) }
-    func visitF64Const(value: IEEE754.Float64) -> Instruction { return .f64Const(value: value) }
-    func visitRefNull(type: ReferenceType) -> Instruction { return .refNull(type: type) }
-    func visitRefIsNull() -> Instruction { return .refIsNull }
-    func visitRefFunc(functionIndex: UInt32) -> Instruction { return .refFunc(functionIndex: functionIndex) }
-    func visitI32Eqz() -> Instruction { return .i32Eqz }
-    func visitI32Eq() -> Instruction { return .i32Eq }
-    func visitI32Ne() -> Instruction { return .i32Ne }
-    func visitI32LtS() -> Instruction { return .i32LtS }
-    func visitI32LtU() -> Instruction { return .i32LtU }
-    func visitI32GtS() -> Instruction { return .i32GtS }
-    func visitI32GtU() -> Instruction { return .i32GtU }
-    func visitI32LeS() -> Instruction { return .i32LeS }
-    func visitI32LeU() -> Instruction { return .i32LeU }
-    func visitI32GeS() -> Instruction { return .i32GeS }
-    func visitI32GeU() -> Instruction { return .i32GeU }
-    func visitI64Eqz() -> Instruction { return .i64Eqz }
-    func visitI64Eq() -> Instruction { return .i64Eq }
-    func visitI64Ne() -> Instruction { return .i64Ne }
-    func visitI64LtS() -> Instruction { return .i64LtS }
-    func visitI64LtU() -> Instruction { return .i64LtU }
-    func visitI64GtS() -> Instruction { return .i64GtS }
-    func visitI64GtU() -> Instruction { return .i64GtU }
-    func visitI64LeS() -> Instruction { return .i64LeS }
-    func visitI64LeU() -> Instruction { return .i64LeU }
-    func visitI64GeS() -> Instruction { return .i64GeS }
-    func visitI64GeU() -> Instruction { return .i64GeU }
-    func visitF32Eq() -> Instruction { return .f32Eq }
-    func visitF32Ne() -> Instruction { return .f32Ne }
-    func visitF32Lt() -> Instruction { return .f32Lt }
-    func visitF32Gt() -> Instruction { return .f32Gt }
-    func visitF32Le() -> Instruction { return .f32Le }
-    func visitF32Ge() -> Instruction { return .f32Ge }
-    func visitF64Eq() -> Instruction { return .f64Eq }
-    func visitF64Ne() -> Instruction { return .f64Ne }
-    func visitF64Lt() -> Instruction { return .f64Lt }
-    func visitF64Gt() -> Instruction { return .f64Gt }
-    func visitF64Le() -> Instruction { return .f64Le }
-    func visitF64Ge() -> Instruction { return .f64Ge }
-    func visitI32Clz() -> Instruction { return .i32Clz }
-    func visitI32Ctz() -> Instruction { return .i32Ctz }
-    func visitI32Popcnt() -> Instruction { return .i32Popcnt }
-    func visitI32Add() -> Instruction { return .i32Add }
-    func visitI32Sub() -> Instruction { return .i32Sub }
-    func visitI32Mul() -> Instruction { return .i32Mul }
-    func visitI32DivS() -> Instruction { return .i32DivS }
-    func visitI32DivU() -> Instruction { return .i32DivU }
-    func visitI32RemS() -> Instruction { return .i32RemS }
-    func visitI32RemU() -> Instruction { return .i32RemU }
-    func visitI32And() -> Instruction { return .i32And }
-    func visitI32Or() -> Instruction { return .i32Or }
-    func visitI32Xor() -> Instruction { return .i32Xor }
-    func visitI32Shl() -> Instruction { return .i32Shl }
-    func visitI32ShrS() -> Instruction { return .i32ShrS }
-    func visitI32ShrU() -> Instruction { return .i32ShrU }
-    func visitI32Rotl() -> Instruction { return .i32Rotl }
-    func visitI32Rotr() -> Instruction { return .i32Rotr }
-    func visitI64Clz() -> Instruction { return .i64Clz }
-    func visitI64Ctz() -> Instruction { return .i64Ctz }
-    func visitI64Popcnt() -> Instruction { return .i64Popcnt }
-    func visitI64Add() -> Instruction { return .i64Add }
-    func visitI64Sub() -> Instruction { return .i64Sub }
-    func visitI64Mul() -> Instruction { return .i64Mul }
-    func visitI64DivS() -> Instruction { return .i64DivS }
-    func visitI64DivU() -> Instruction { return .i64DivU }
-    func visitI64RemS() -> Instruction { return .i64RemS }
-    func visitI64RemU() -> Instruction { return .i64RemU }
-    func visitI64And() -> Instruction { return .i64And }
-    func visitI64Or() -> Instruction { return .i64Or }
-    func visitI64Xor() -> Instruction { return .i64Xor }
-    func visitI64Shl() -> Instruction { return .i64Shl }
-    func visitI64ShrS() -> Instruction { return .i64ShrS }
-    func visitI64ShrU() -> Instruction { return .i64ShrU }
-    func visitI64Rotl() -> Instruction { return .i64Rotl }
-    func visitI64Rotr() -> Instruction { return .i64Rotr }
-    func visitF32Abs() -> Instruction { return .f32Abs }
-    func visitF32Neg() -> Instruction { return .f32Neg }
-    func visitF32Ceil() -> Instruction { return .f32Ceil }
-    func visitF32Floor() -> Instruction { return .f32Floor }
-    func visitF32Trunc() -> Instruction { return .f32Trunc }
-    func visitF32Nearest() -> Instruction { return .f32Nearest }
-    func visitF32Sqrt() -> Instruction { return .f32Sqrt }
-    func visitF32Add() -> Instruction { return .f32Add }
-    func visitF32Sub() -> Instruction { return .f32Sub }
-    func visitF32Mul() -> Instruction { return .f32Mul }
-    func visitF32Div() -> Instruction { return .f32Div }
-    func visitF32Min() -> Instruction { return .f32Min }
-    func visitF32Max() -> Instruction { return .f32Max }
-    func visitF32Copysign() -> Instruction { return .f32Copysign }
-    func visitF64Abs() -> Instruction { return .f64Abs }
-    func visitF64Neg() -> Instruction { return .f64Neg }
-    func visitF64Ceil() -> Instruction { return .f64Ceil }
-    func visitF64Floor() -> Instruction { return .f64Floor }
-    func visitF64Trunc() -> Instruction { return .f64Trunc }
-    func visitF64Nearest() -> Instruction { return .f64Nearest }
-    func visitF64Sqrt() -> Instruction { return .f64Sqrt }
-    func visitF64Add() -> Instruction { return .f64Add }
-    func visitF64Sub() -> Instruction { return .f64Sub }
-    func visitF64Mul() -> Instruction { return .f64Mul }
-    func visitF64Div() -> Instruction { return .f64Div }
-    func visitF64Min() -> Instruction { return .f64Min }
-    func visitF64Max() -> Instruction { return .f64Max }
-    func visitF64Copysign() -> Instruction { return .f64Copysign }
-    func visitI32WrapI64() -> Instruction { return .i32WrapI64 }
-    func visitI32TruncF32S() -> Instruction { return .i32TruncF32S }
-    func visitI32TruncF32U() -> Instruction { return .i32TruncF32U }
-    func visitI32TruncF64S() -> Instruction { return .i32TruncF64S }
-    func visitI32TruncF64U() -> Instruction { return .i32TruncF64U }
-    func visitI64ExtendI32S() -> Instruction { return .i64ExtendI32S }
-    func visitI64ExtendI32U() -> Instruction { return .i64ExtendI32U }
-    func visitI64TruncF32S() -> Instruction { return .i64TruncF32S }
-    func visitI64TruncF32U() -> Instruction { return .i64TruncF32U }
-    func visitI64TruncF64S() -> Instruction { return .i64TruncF64S }
-    func visitI64TruncF64U() -> Instruction { return .i64TruncF64U }
-    func visitF32ConvertI32S() -> Instruction { return .f32ConvertI32S }
-    func visitF32ConvertI32U() -> Instruction { return .f32ConvertI32U }
-    func visitF32ConvertI64S() -> Instruction { return .f32ConvertI64S }
-    func visitF32ConvertI64U() -> Instruction { return .f32ConvertI64U }
-    func visitF32DemoteF64() -> Instruction { return .f32DemoteF64 }
-    func visitF64ConvertI32S() -> Instruction { return .f64ConvertI32S }
-    func visitF64ConvertI32U() -> Instruction { return .f64ConvertI32U }
-    func visitF64ConvertI64S() -> Instruction { return .f64ConvertI64S }
-    func visitF64ConvertI64U() -> Instruction { return .f64ConvertI64U }
-    func visitF64PromoteF32() -> Instruction { return .f64PromoteF32 }
-    func visitI32ReinterpretF32() -> Instruction { return .i32ReinterpretF32 }
-    func visitI64ReinterpretF64() -> Instruction { return .i64ReinterpretF64 }
-    func visitF32ReinterpretI32() -> Instruction { return .f32ReinterpretI32 }
-    func visitF64ReinterpretI64() -> Instruction { return .f64ReinterpretI64 }
-    func visitI32Extend8S() -> Instruction { return .i32Extend8S }
-    func visitI32Extend16S() -> Instruction { return .i32Extend16S }
-    func visitI64Extend8S() -> Instruction { return .i64Extend8S }
-    func visitI64Extend16S() -> Instruction { return .i64Extend16S }
-    func visitI64Extend32S() -> Instruction { return .i64Extend32S }
-    func visitMemoryInit(dataIndex: UInt32) -> Instruction { return .memoryInit(dataIndex: dataIndex) }
-    func visitDataDrop(dataIndex: UInt32) -> Instruction { return .dataDrop(dataIndex: dataIndex) }
-    func visitMemoryCopy(dstMem: UInt32, srcMem: UInt32) -> Instruction { return .memoryCopy(dstMem: dstMem, srcMem: srcMem) }
-    func visitMemoryFill(memory: UInt32) -> Instruction { return .memoryFill(memory: memory) }
-    func visitTableInit(elemIndex: UInt32, table: UInt32) -> Instruction { return .tableInit(elemIndex: elemIndex, table: table) }
-    func visitElemDrop(elemIndex: UInt32) -> Instruction { return .elemDrop(elemIndex: elemIndex) }
-    func visitTableCopy(dstTable: UInt32, srcTable: UInt32) -> Instruction { return .tableCopy(dstTable: dstTable, srcTable: srcTable) }
-    func visitTableFill(table: UInt32) -> Instruction { return .tableFill(table: table) }
-    func visitTableGet(table: UInt32) -> Instruction { return .tableGet(table: table) }
-    func visitTableSet(table: UInt32) -> Instruction { return .tableSet(table: table) }
-    func visitTableGrow(table: UInt32) -> Instruction { return .tableGrow(table: table) }
-    func visitTableSize(table: UInt32) -> Instruction { return .tableSize(table: table) }
-    func visitI32TruncSatF32S() -> Instruction { return .i32TruncSatF32S }
-    func visitI32TruncSatF32U() -> Instruction { return .i32TruncSatF32U }
-    func visitI32TruncSatF64S() -> Instruction { return .i32TruncSatF64S }
-    func visitI32TruncSatF64U() -> Instruction { return .i32TruncSatF64U }
-    func visitI64TruncSatF32S() -> Instruction { return .i64TruncSatF32S }
-    func visitI64TruncSatF32U() -> Instruction { return .i64TruncSatF32U }
-    func visitI64TruncSatF64S() -> Instruction { return .i64TruncSatF64S }
-    func visitI64TruncSatF64U() -> Instruction { return .i64TruncSatF64U }
+/// A visitor that visits all instructions by a single visit method.
+public protocol AnyInstructionVisitor: InstructionVisitor {
+    /// Visiting any instruction.
+    mutating func visit(_ instruction: Instruction) throws -> Output
+}
+
+extension AnyInstructionVisitor {
+    public mutating func visitUnreachable() throws -> Output { return try self.visit(.unreachable) }
+    public mutating func visitNop() throws -> Output { return try self.visit(.nop) }
+    public mutating func visitBlock(blockType: BlockType) throws -> Output { return try self.visit(.block(blockType: blockType)) }
+    public mutating func visitLoop(blockType: BlockType) throws -> Output { return try self.visit(.loop(blockType: blockType)) }
+    public mutating func visitIf(blockType: BlockType) throws -> Output { return try self.visit(.if(blockType: blockType)) }
+    public mutating func visitElse() throws -> Output { return try self.visit(.else) }
+    public mutating func visitEnd() throws -> Output { return try self.visit(.end) }
+    public mutating func visitBr(relativeDepth: UInt32) throws -> Output { return try self.visit(.br(relativeDepth: relativeDepth)) }
+    public mutating func visitBrIf(relativeDepth: UInt32) throws -> Output { return try self.visit(.brIf(relativeDepth: relativeDepth)) }
+    public mutating func visitBrTable(targets: BrTable) throws -> Output { return try self.visit(.brTable(targets: targets)) }
+    public mutating func visitReturn() throws -> Output { return try self.visit(.return) }
+    public mutating func visitCall(functionIndex: UInt32) throws -> Output { return try self.visit(.call(functionIndex: functionIndex)) }
+    public mutating func visitCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws -> Output { return try self.visit(.callIndirect(typeIndex: typeIndex, tableIndex: tableIndex)) }
+    public mutating func visitDrop() throws -> Output { return try self.visit(.drop) }
+    public mutating func visitSelect() throws -> Output { return try self.visit(.select) }
+    public mutating func visitTypedSelect(type: ValueType) throws -> Output { return try self.visit(.typedSelect(type: type)) }
+    public mutating func visitLocalGet(localIndex: UInt32) throws -> Output { return try self.visit(.localGet(localIndex: localIndex)) }
+    public mutating func visitLocalSet(localIndex: UInt32) throws -> Output { return try self.visit(.localSet(localIndex: localIndex)) }
+    public mutating func visitLocalTee(localIndex: UInt32) throws -> Output { return try self.visit(.localTee(localIndex: localIndex)) }
+    public mutating func visitGlobalGet(globalIndex: UInt32) throws -> Output { return try self.visit(.globalGet(globalIndex: globalIndex)) }
+    public mutating func visitGlobalSet(globalIndex: UInt32) throws -> Output { return try self.visit(.globalSet(globalIndex: globalIndex)) }
+    public mutating func visitI32Load(memarg: MemArg) throws -> Output { return try self.visit(.i32Load(memarg: memarg)) }
+    public mutating func visitI64Load(memarg: MemArg) throws -> Output { return try self.visit(.i64Load(memarg: memarg)) }
+    public mutating func visitF32Load(memarg: MemArg) throws -> Output { return try self.visit(.f32Load(memarg: memarg)) }
+    public mutating func visitF64Load(memarg: MemArg) throws -> Output { return try self.visit(.f64Load(memarg: memarg)) }
+    public mutating func visitI32Load8S(memarg: MemArg) throws -> Output { return try self.visit(.i32Load8S(memarg: memarg)) }
+    public mutating func visitI32Load8U(memarg: MemArg) throws -> Output { return try self.visit(.i32Load8U(memarg: memarg)) }
+    public mutating func visitI32Load16S(memarg: MemArg) throws -> Output { return try self.visit(.i32Load16S(memarg: memarg)) }
+    public mutating func visitI32Load16U(memarg: MemArg) throws -> Output { return try self.visit(.i32Load16U(memarg: memarg)) }
+    public mutating func visitI64Load8S(memarg: MemArg) throws -> Output { return try self.visit(.i64Load8S(memarg: memarg)) }
+    public mutating func visitI64Load8U(memarg: MemArg) throws -> Output { return try self.visit(.i64Load8U(memarg: memarg)) }
+    public mutating func visitI64Load16S(memarg: MemArg) throws -> Output { return try self.visit(.i64Load16S(memarg: memarg)) }
+    public mutating func visitI64Load16U(memarg: MemArg) throws -> Output { return try self.visit(.i64Load16U(memarg: memarg)) }
+    public mutating func visitI64Load32S(memarg: MemArg) throws -> Output { return try self.visit(.i64Load32S(memarg: memarg)) }
+    public mutating func visitI64Load32U(memarg: MemArg) throws -> Output { return try self.visit(.i64Load32U(memarg: memarg)) }
+    public mutating func visitI32Store(memarg: MemArg) throws -> Output { return try self.visit(.i32Store(memarg: memarg)) }
+    public mutating func visitI64Store(memarg: MemArg) throws -> Output { return try self.visit(.i64Store(memarg: memarg)) }
+    public mutating func visitF32Store(memarg: MemArg) throws -> Output { return try self.visit(.f32Store(memarg: memarg)) }
+    public mutating func visitF64Store(memarg: MemArg) throws -> Output { return try self.visit(.f64Store(memarg: memarg)) }
+    public mutating func visitI32Store8(memarg: MemArg) throws -> Output { return try self.visit(.i32Store8(memarg: memarg)) }
+    public mutating func visitI32Store16(memarg: MemArg) throws -> Output { return try self.visit(.i32Store16(memarg: memarg)) }
+    public mutating func visitI64Store8(memarg: MemArg) throws -> Output { return try self.visit(.i64Store8(memarg: memarg)) }
+    public mutating func visitI64Store16(memarg: MemArg) throws -> Output { return try self.visit(.i64Store16(memarg: memarg)) }
+    public mutating func visitI64Store32(memarg: MemArg) throws -> Output { return try self.visit(.i64Store32(memarg: memarg)) }
+    public mutating func visitMemorySize(memory: UInt32) throws -> Output { return try self.visit(.memorySize(memory: memory)) }
+    public mutating func visitMemoryGrow(memory: UInt32) throws -> Output { return try self.visit(.memoryGrow(memory: memory)) }
+    public mutating func visitI32Const(value: Int32) throws -> Output { return try self.visit(.i32Const(value: value)) }
+    public mutating func visitI64Const(value: Int64) throws -> Output { return try self.visit(.i64Const(value: value)) }
+    public mutating func visitF32Const(value: IEEE754.Float32) throws -> Output { return try self.visit(.f32Const(value: value)) }
+    public mutating func visitF64Const(value: IEEE754.Float64) throws -> Output { return try self.visit(.f64Const(value: value)) }
+    public mutating func visitRefNull(type: ReferenceType) throws -> Output { return try self.visit(.refNull(type: type)) }
+    public mutating func visitRefIsNull() throws -> Output { return try self.visit(.refIsNull) }
+    public mutating func visitRefFunc(functionIndex: UInt32) throws -> Output { return try self.visit(.refFunc(functionIndex: functionIndex)) }
+    public mutating func visitI32Eqz() throws -> Output { return try self.visit(.i32Eqz) }
+    public mutating func visitI32Eq() throws -> Output { return try self.visit(.i32Eq) }
+    public mutating func visitI32Ne() throws -> Output { return try self.visit(.i32Ne) }
+    public mutating func visitI32LtS() throws -> Output { return try self.visit(.i32LtS) }
+    public mutating func visitI32LtU() throws -> Output { return try self.visit(.i32LtU) }
+    public mutating func visitI32GtS() throws -> Output { return try self.visit(.i32GtS) }
+    public mutating func visitI32GtU() throws -> Output { return try self.visit(.i32GtU) }
+    public mutating func visitI32LeS() throws -> Output { return try self.visit(.i32LeS) }
+    public mutating func visitI32LeU() throws -> Output { return try self.visit(.i32LeU) }
+    public mutating func visitI32GeS() throws -> Output { return try self.visit(.i32GeS) }
+    public mutating func visitI32GeU() throws -> Output { return try self.visit(.i32GeU) }
+    public mutating func visitI64Eqz() throws -> Output { return try self.visit(.i64Eqz) }
+    public mutating func visitI64Eq() throws -> Output { return try self.visit(.i64Eq) }
+    public mutating func visitI64Ne() throws -> Output { return try self.visit(.i64Ne) }
+    public mutating func visitI64LtS() throws -> Output { return try self.visit(.i64LtS) }
+    public mutating func visitI64LtU() throws -> Output { return try self.visit(.i64LtU) }
+    public mutating func visitI64GtS() throws -> Output { return try self.visit(.i64GtS) }
+    public mutating func visitI64GtU() throws -> Output { return try self.visit(.i64GtU) }
+    public mutating func visitI64LeS() throws -> Output { return try self.visit(.i64LeS) }
+    public mutating func visitI64LeU() throws -> Output { return try self.visit(.i64LeU) }
+    public mutating func visitI64GeS() throws -> Output { return try self.visit(.i64GeS) }
+    public mutating func visitI64GeU() throws -> Output { return try self.visit(.i64GeU) }
+    public mutating func visitF32Eq() throws -> Output { return try self.visit(.f32Eq) }
+    public mutating func visitF32Ne() throws -> Output { return try self.visit(.f32Ne) }
+    public mutating func visitF32Lt() throws -> Output { return try self.visit(.f32Lt) }
+    public mutating func visitF32Gt() throws -> Output { return try self.visit(.f32Gt) }
+    public mutating func visitF32Le() throws -> Output { return try self.visit(.f32Le) }
+    public mutating func visitF32Ge() throws -> Output { return try self.visit(.f32Ge) }
+    public mutating func visitF64Eq() throws -> Output { return try self.visit(.f64Eq) }
+    public mutating func visitF64Ne() throws -> Output { return try self.visit(.f64Ne) }
+    public mutating func visitF64Lt() throws -> Output { return try self.visit(.f64Lt) }
+    public mutating func visitF64Gt() throws -> Output { return try self.visit(.f64Gt) }
+    public mutating func visitF64Le() throws -> Output { return try self.visit(.f64Le) }
+    public mutating func visitF64Ge() throws -> Output { return try self.visit(.f64Ge) }
+    public mutating func visitI32Clz() throws -> Output { return try self.visit(.i32Clz) }
+    public mutating func visitI32Ctz() throws -> Output { return try self.visit(.i32Ctz) }
+    public mutating func visitI32Popcnt() throws -> Output { return try self.visit(.i32Popcnt) }
+    public mutating func visitI32Add() throws -> Output { return try self.visit(.i32Add) }
+    public mutating func visitI32Sub() throws -> Output { return try self.visit(.i32Sub) }
+    public mutating func visitI32Mul() throws -> Output { return try self.visit(.i32Mul) }
+    public mutating func visitI32DivS() throws -> Output { return try self.visit(.i32DivS) }
+    public mutating func visitI32DivU() throws -> Output { return try self.visit(.i32DivU) }
+    public mutating func visitI32RemS() throws -> Output { return try self.visit(.i32RemS) }
+    public mutating func visitI32RemU() throws -> Output { return try self.visit(.i32RemU) }
+    public mutating func visitI32And() throws -> Output { return try self.visit(.i32And) }
+    public mutating func visitI32Or() throws -> Output { return try self.visit(.i32Or) }
+    public mutating func visitI32Xor() throws -> Output { return try self.visit(.i32Xor) }
+    public mutating func visitI32Shl() throws -> Output { return try self.visit(.i32Shl) }
+    public mutating func visitI32ShrS() throws -> Output { return try self.visit(.i32ShrS) }
+    public mutating func visitI32ShrU() throws -> Output { return try self.visit(.i32ShrU) }
+    public mutating func visitI32Rotl() throws -> Output { return try self.visit(.i32Rotl) }
+    public mutating func visitI32Rotr() throws -> Output { return try self.visit(.i32Rotr) }
+    public mutating func visitI64Clz() throws -> Output { return try self.visit(.i64Clz) }
+    public mutating func visitI64Ctz() throws -> Output { return try self.visit(.i64Ctz) }
+    public mutating func visitI64Popcnt() throws -> Output { return try self.visit(.i64Popcnt) }
+    public mutating func visitI64Add() throws -> Output { return try self.visit(.i64Add) }
+    public mutating func visitI64Sub() throws -> Output { return try self.visit(.i64Sub) }
+    public mutating func visitI64Mul() throws -> Output { return try self.visit(.i64Mul) }
+    public mutating func visitI64DivS() throws -> Output { return try self.visit(.i64DivS) }
+    public mutating func visitI64DivU() throws -> Output { return try self.visit(.i64DivU) }
+    public mutating func visitI64RemS() throws -> Output { return try self.visit(.i64RemS) }
+    public mutating func visitI64RemU() throws -> Output { return try self.visit(.i64RemU) }
+    public mutating func visitI64And() throws -> Output { return try self.visit(.i64And) }
+    public mutating func visitI64Or() throws -> Output { return try self.visit(.i64Or) }
+    public mutating func visitI64Xor() throws -> Output { return try self.visit(.i64Xor) }
+    public mutating func visitI64Shl() throws -> Output { return try self.visit(.i64Shl) }
+    public mutating func visitI64ShrS() throws -> Output { return try self.visit(.i64ShrS) }
+    public mutating func visitI64ShrU() throws -> Output { return try self.visit(.i64ShrU) }
+    public mutating func visitI64Rotl() throws -> Output { return try self.visit(.i64Rotl) }
+    public mutating func visitI64Rotr() throws -> Output { return try self.visit(.i64Rotr) }
+    public mutating func visitF32Abs() throws -> Output { return try self.visit(.f32Abs) }
+    public mutating func visitF32Neg() throws -> Output { return try self.visit(.f32Neg) }
+    public mutating func visitF32Ceil() throws -> Output { return try self.visit(.f32Ceil) }
+    public mutating func visitF32Floor() throws -> Output { return try self.visit(.f32Floor) }
+    public mutating func visitF32Trunc() throws -> Output { return try self.visit(.f32Trunc) }
+    public mutating func visitF32Nearest() throws -> Output { return try self.visit(.f32Nearest) }
+    public mutating func visitF32Sqrt() throws -> Output { return try self.visit(.f32Sqrt) }
+    public mutating func visitF32Add() throws -> Output { return try self.visit(.f32Add) }
+    public mutating func visitF32Sub() throws -> Output { return try self.visit(.f32Sub) }
+    public mutating func visitF32Mul() throws -> Output { return try self.visit(.f32Mul) }
+    public mutating func visitF32Div() throws -> Output { return try self.visit(.f32Div) }
+    public mutating func visitF32Min() throws -> Output { return try self.visit(.f32Min) }
+    public mutating func visitF32Max() throws -> Output { return try self.visit(.f32Max) }
+    public mutating func visitF32Copysign() throws -> Output { return try self.visit(.f32Copysign) }
+    public mutating func visitF64Abs() throws -> Output { return try self.visit(.f64Abs) }
+    public mutating func visitF64Neg() throws -> Output { return try self.visit(.f64Neg) }
+    public mutating func visitF64Ceil() throws -> Output { return try self.visit(.f64Ceil) }
+    public mutating func visitF64Floor() throws -> Output { return try self.visit(.f64Floor) }
+    public mutating func visitF64Trunc() throws -> Output { return try self.visit(.f64Trunc) }
+    public mutating func visitF64Nearest() throws -> Output { return try self.visit(.f64Nearest) }
+    public mutating func visitF64Sqrt() throws -> Output { return try self.visit(.f64Sqrt) }
+    public mutating func visitF64Add() throws -> Output { return try self.visit(.f64Add) }
+    public mutating func visitF64Sub() throws -> Output { return try self.visit(.f64Sub) }
+    public mutating func visitF64Mul() throws -> Output { return try self.visit(.f64Mul) }
+    public mutating func visitF64Div() throws -> Output { return try self.visit(.f64Div) }
+    public mutating func visitF64Min() throws -> Output { return try self.visit(.f64Min) }
+    public mutating func visitF64Max() throws -> Output { return try self.visit(.f64Max) }
+    public mutating func visitF64Copysign() throws -> Output { return try self.visit(.f64Copysign) }
+    public mutating func visitI32WrapI64() throws -> Output { return try self.visit(.i32WrapI64) }
+    public mutating func visitI32TruncF32S() throws -> Output { return try self.visit(.i32TruncF32S) }
+    public mutating func visitI32TruncF32U() throws -> Output { return try self.visit(.i32TruncF32U) }
+    public mutating func visitI32TruncF64S() throws -> Output { return try self.visit(.i32TruncF64S) }
+    public mutating func visitI32TruncF64U() throws -> Output { return try self.visit(.i32TruncF64U) }
+    public mutating func visitI64ExtendI32S() throws -> Output { return try self.visit(.i64ExtendI32S) }
+    public mutating func visitI64ExtendI32U() throws -> Output { return try self.visit(.i64ExtendI32U) }
+    public mutating func visitI64TruncF32S() throws -> Output { return try self.visit(.i64TruncF32S) }
+    public mutating func visitI64TruncF32U() throws -> Output { return try self.visit(.i64TruncF32U) }
+    public mutating func visitI64TruncF64S() throws -> Output { return try self.visit(.i64TruncF64S) }
+    public mutating func visitI64TruncF64U() throws -> Output { return try self.visit(.i64TruncF64U) }
+    public mutating func visitF32ConvertI32S() throws -> Output { return try self.visit(.f32ConvertI32S) }
+    public mutating func visitF32ConvertI32U() throws -> Output { return try self.visit(.f32ConvertI32U) }
+    public mutating func visitF32ConvertI64S() throws -> Output { return try self.visit(.f32ConvertI64S) }
+    public mutating func visitF32ConvertI64U() throws -> Output { return try self.visit(.f32ConvertI64U) }
+    public mutating func visitF32DemoteF64() throws -> Output { return try self.visit(.f32DemoteF64) }
+    public mutating func visitF64ConvertI32S() throws -> Output { return try self.visit(.f64ConvertI32S) }
+    public mutating func visitF64ConvertI32U() throws -> Output { return try self.visit(.f64ConvertI32U) }
+    public mutating func visitF64ConvertI64S() throws -> Output { return try self.visit(.f64ConvertI64S) }
+    public mutating func visitF64ConvertI64U() throws -> Output { return try self.visit(.f64ConvertI64U) }
+    public mutating func visitF64PromoteF32() throws -> Output { return try self.visit(.f64PromoteF32) }
+    public mutating func visitI32ReinterpretF32() throws -> Output { return try self.visit(.i32ReinterpretF32) }
+    public mutating func visitI64ReinterpretF64() throws -> Output { return try self.visit(.i64ReinterpretF64) }
+    public mutating func visitF32ReinterpretI32() throws -> Output { return try self.visit(.f32ReinterpretI32) }
+    public mutating func visitF64ReinterpretI64() throws -> Output { return try self.visit(.f64ReinterpretI64) }
+    public mutating func visitI32Extend8S() throws -> Output { return try self.visit(.i32Extend8S) }
+    public mutating func visitI32Extend16S() throws -> Output { return try self.visit(.i32Extend16S) }
+    public mutating func visitI64Extend8S() throws -> Output { return try self.visit(.i64Extend8S) }
+    public mutating func visitI64Extend16S() throws -> Output { return try self.visit(.i64Extend16S) }
+    public mutating func visitI64Extend32S() throws -> Output { return try self.visit(.i64Extend32S) }
+    public mutating func visitMemoryInit(dataIndex: UInt32) throws -> Output { return try self.visit(.memoryInit(dataIndex: dataIndex)) }
+    public mutating func visitDataDrop(dataIndex: UInt32) throws -> Output { return try self.visit(.dataDrop(dataIndex: dataIndex)) }
+    public mutating func visitMemoryCopy(dstMem: UInt32, srcMem: UInt32) throws -> Output { return try self.visit(.memoryCopy(dstMem: dstMem, srcMem: srcMem)) }
+    public mutating func visitMemoryFill(memory: UInt32) throws -> Output { return try self.visit(.memoryFill(memory: memory)) }
+    public mutating func visitTableInit(elemIndex: UInt32, table: UInt32) throws -> Output { return try self.visit(.tableInit(elemIndex: elemIndex, table: table)) }
+    public mutating func visitElemDrop(elemIndex: UInt32) throws -> Output { return try self.visit(.elemDrop(elemIndex: elemIndex)) }
+    public mutating func visitTableCopy(dstTable: UInt32, srcTable: UInt32) throws -> Output { return try self.visit(.tableCopy(dstTable: dstTable, srcTable: srcTable)) }
+    public mutating func visitTableFill(table: UInt32) throws -> Output { return try self.visit(.tableFill(table: table)) }
+    public mutating func visitTableGet(table: UInt32) throws -> Output { return try self.visit(.tableGet(table: table)) }
+    public mutating func visitTableSet(table: UInt32) throws -> Output { return try self.visit(.tableSet(table: table)) }
+    public mutating func visitTableGrow(table: UInt32) throws -> Output { return try self.visit(.tableGrow(table: table)) }
+    public mutating func visitTableSize(table: UInt32) throws -> Output { return try self.visit(.tableSize(table: table)) }
+    public mutating func visitI32TruncSatF32S() throws -> Output { return try self.visit(.i32TruncSatF32S) }
+    public mutating func visitI32TruncSatF32U() throws -> Output { return try self.visit(.i32TruncSatF32U) }
+    public mutating func visitI32TruncSatF64S() throws -> Output { return try self.visit(.i32TruncSatF64S) }
+    public mutating func visitI32TruncSatF64U() throws -> Output { return try self.visit(.i32TruncSatF64U) }
+    public mutating func visitI64TruncSatF32S() throws -> Output { return try self.visit(.i64TruncSatF32S) }
+    public mutating func visitI64TruncSatF32U() throws -> Output { return try self.visit(.i64TruncSatF32U) }
+    public mutating func visitI64TruncSatF64S() throws -> Output { return try self.visit(.i64TruncSatF64S) }
+    public mutating func visitI64TruncSatF64U() throws -> Output { return try self.visit(.i64TruncSatF64U) }
 }
 
 /// A visitor that traces the instructions visited.

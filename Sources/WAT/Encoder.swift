@@ -142,13 +142,15 @@ extension TableType: WasmEncodable {
     }
 }
 
-struct ElementExprCollector: VoidInstructionVisitor {
+struct ElementExprCollector: AnyInstructionVisitor {
+    typealias Output = Void
+
     var isAllRefFunc: Bool = true
     var useExpression: Bool {
         // if all instructions are ref.func, use function indices representation
         return !isAllRefFunc
     }
-    let addFunctionIndex: (UInt32?) -> Void
+    var instructions: [Instruction] = []
 
     mutating func parse(indices: WatParser.ElementDecl.Indices, wat: inout Wat) throws {
         switch indices {
@@ -160,6 +162,10 @@ struct ElementExprCollector: VoidInstructionVisitor {
         }
     }
 
+    private mutating func addFunctionIndex(_ index: UInt32) {
+        instructions.append(.refFunc(functionIndex: index))
+    }
+
     private mutating func parseFunctionList(lexer: Lexer, wat: Wat) throws {
         var parser = Parser(lexer)
         while let funcUse = try parser.takeIndexOrId() {
@@ -168,12 +174,12 @@ struct ElementExprCollector: VoidInstructionVisitor {
         }
     }
 
-    mutating func visitRefFunc(functionIndex: UInt32) throws {
-        addFunctionIndex(functionIndex)
-    }
-    mutating func visitRefNull(type: ReferenceType) throws {
-        isAllRefFunc = false
-        addFunctionIndex(nil)
+    mutating func visit(_ instruction: Instruction) throws {
+        if case .refFunc = instruction {
+        } else {
+            isAllRefFunc = false
+        }
+        instructions.append(instruction)
     }
 }
 
@@ -209,8 +215,7 @@ extension WAT.WatParser.ElementDecl {
             fatalError("Inline element segment should be replaced with active mode")
         }
 
-        var functionIndices: [UInt32?] = []
-        var collector = ElementExprCollector(addFunctionIndex: { functionIndices.append($0) })
+        var collector = ElementExprCollector()
         try collector.parse(indices: indices, wat: &wat)
 
         if collector.useExpression {
@@ -243,19 +248,24 @@ extension WAT.WatParser.ElementDecl {
         }
 
         if collector.useExpression {
-            try encoder.encodeVector(functionIndices) { funcIndex, encoder in
+            try encoder.encodeVector(collector.instructions) { instruction, encoder in
                 var exprEncoder = ExpressionEncoder()
-                if let funcIndex {
-                    try exprEncoder.visitRefFunc(functionIndex: funcIndex)
-                } else {
+                switch instruction {
+                case .globalGet(let globalIndex):
+                    try exprEncoder.visitGlobalGet(globalIndex: globalIndex)
+                case .refFunc(let functionIndex):
+                    try exprEncoder.visitRefFunc(functionIndex: functionIndex)
+                case .refNull(let type):
                     try exprEncoder.visitRefNull(type: type)
+                default:
+                    throw WatParserError("unexpected instruction in element expression (\(instruction)", location: nil)
                 }
                 try exprEncoder.visitEnd()
                 encoder.output.append(contentsOf: exprEncoder.encoder.output)
             }
         } else {
-            encoder.encodeVector(functionIndices) { funcIndex, encoder in
-                guard let funcIndex else { fatalError("null function reference in non-expression mode") }
+            encoder.encodeVector(collector.instructions) { instruction, encoder in
+                guard case let .refFunc(funcIndex) = instruction else { fatalError("non-ref.func instruction in non-expression mode") }
                 encoder.writeUnsignedLEB128(funcIndex)
             }
         }

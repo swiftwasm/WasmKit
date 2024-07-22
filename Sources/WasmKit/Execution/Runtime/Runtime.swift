@@ -59,7 +59,7 @@ extension Runtime {
         // Process `elem.init` evaluation during allocation
 
         // Step 11.
-        let instance = store.allocate(
+        let instance = try store.allocate(
             module: module,
             externalValues: externalValues,
             initialGlobals: initialGlobals
