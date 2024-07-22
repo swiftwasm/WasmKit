@@ -412,10 +412,10 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
     }
 
     @discardableResult
-    mutating func parse(visitor: inout Visitor, watModule: inout WatModule) throws -> Int {
+    mutating func parse(visitor: inout Visitor, wat: inout Wat) throws -> Int {
         var numberOfInstructions = 0
         while true {
-            guard try instruction(visitor: &visitor, watModule: &watModule) else {
+            guard try instruction(visitor: &visitor, wat: &wat) else {
                 numberOfInstructions += 1
                 break
             }
@@ -424,10 +424,10 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
         return numberOfInstructions
     }
 
-    mutating func parseElemExprList(visitor: inout Visitor, watModule: inout WatModule) throws {
+    mutating func parseElemExprList(visitor: inout Visitor, wat: inout Wat) throws {
         while true {
             let needRightParen = try parser.takeParenBlockStart("item")
-            guard try instruction(visitor: &visitor, watModule: &watModule) else {
+            guard try instruction(visitor: &visitor, wat: &wat) else {
                 break
             }
             if needRightParen {
@@ -439,7 +439,7 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
     mutating func parseWastConstInstruction(
         visitor: inout Visitor
     ) throws -> Bool where Visitor: WastConstInstructionVisitor {
-        var watModule = WatModule.empty()
+        var wat = Wat.empty()
         // WAST allows extra const value instruction
         if try parser.takeParenBlockStart("ref.extern") {
             _ = try visitor.visitRefExtern(value: parser.expectUnsignedInt())
@@ -447,7 +447,7 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
             return true
         }
         // WAST const expr only accepts folded instructions
-        if try foldedInstruction(visitor: &visitor, watModule: &watModule) {
+        if try foldedInstruction(visitor: &visitor, wat: &wat) {
             return true
         }
         return false
@@ -482,19 +482,19 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
 
     /// Parse "(instr)" or "instr" and visit the instruction.
     /// - Returns: `true` if an instruction was parsed. Otherwise, `false`.
-    private mutating func instruction(visitor: inout Visitor, watModule: inout WatModule) throws -> Bool {
-        if try nonFoldedInstruction(visitor: &visitor, watModule: &watModule) {
+    private mutating func instruction(visitor: inout Visitor, wat: inout Wat) throws -> Bool {
+        if try nonFoldedInstruction(visitor: &visitor, wat: &wat) {
             return true
         }
-        if try foldedInstruction(visitor: &visitor, watModule: &watModule) {
+        if try foldedInstruction(visitor: &visitor, wat: &wat) {
             return true
         }
         return false
     }
 
     /// Parse an instruction without surrounding parentheses.
-    private mutating func nonFoldedInstruction(visitor: inout Visitor, watModule: inout WatModule) throws -> Bool {
-        if try plainInstruction(visitor: &visitor, watModule: &watModule) {
+    private mutating func nonFoldedInstruction(visitor: inout Visitor, wat: inout Wat) throws -> Bool {
+        if try plainInstruction(visitor: &visitor, wat: &wat) {
             return true
         }
         return false
@@ -504,7 +504,7 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
         let visit: ((inout Visitor, inout ExpressionParser) throws -> Visitor.Output)?
     }
 
-    private mutating func foldedInstruction(visitor: inout Visitor, watModule: inout WatModule) throws -> Bool {
+    private mutating func foldedInstruction(visitor: inout Visitor, wat: inout Wat) throws -> Bool {
         guard try parser.peek(.leftParen) != nil else {
             return false
         }
@@ -518,7 +518,7 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
             }
             try parser.expect(.leftParen)
             let keyword = try parser.expectKeyword()
-            guard let visit = try parseTextInstruction(keyword: keyword, watModule: &watModule) else {
+            guard let visit = try parseTextInstruction(keyword: keyword, wat: &wat) else {
                 return false
             }
             let suspense: Suspense
@@ -531,20 +531,20 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
                 // Condition may be absent
                 if try !parser.takeParenBlockStart("then") {
                     // Visit condition expr
-                    _ = try foldedInstruction(visitor: &visitor, watModule: &watModule)
+                    _ = try foldedInstruction(visitor: &visitor, wat: &wat)
                     try parser.expectParenBlockStart("then")
                 }
                 // Visit "if"
                 _ = try visit(&visitor)
                 // Visit "then" block
-                try parse(visitor: &visitor, watModule: &watModule)
+                try parse(visitor: &visitor, wat: &wat)
                 try parser.expect(.rightParen)
                 // Visit "else" block if present
                 if try parser.takeParenBlockStart("else") {
                     // Visit only when "else" block has child expr
                     if try parser.peek(.rightParen) == nil {
                         _ = try visitor.visitElse()
-                        try parse(visitor: &visitor, watModule: &watModule)
+                        try parse(visitor: &visitor, wat: &wat)
                     }
                     try parser.expect(.rightParen)
                 }
@@ -557,7 +557,7 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
                 _ = try visit(&visitor)
                 // Visit child expr here because folded "block" and "loop"
                 // allows unfolded child instructions unlike others.
-                try parse(visitor: &visitor, watModule: &watModule)
+                try parse(visitor: &visitor, wat: &wat)
                 suspense = Suspense(visit: { visitor, this in
                     this.labelStack.pop()
                     return try visitor.visitEnd()
@@ -571,7 +571,7 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
     }
 
     /// Parse a single instruction without consuming the surrounding parentheses and instruction keyword.
-    private mutating func parseTextInstruction(keyword: String, watModule: inout WatModule) throws -> ((inout Visitor) throws -> Visitor.Output)? {
+    private mutating func parseTextInstruction(keyword: String, wat: inout Wat) throws -> ((inout Visitor) throws -> Visitor.Output)? {
         switch keyword {
         case "select":
             // Special handling for "select", which have two variants 1. with type, 2. without type
@@ -599,18 +599,18 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
             }
         default:
             // Other instructions are parsed by auto-generated code.
-            return try WAT.parseTextInstruction(keyword: keyword, expressionParser: &self, watModule: &watModule)
+            return try WAT.parseTextInstruction(keyword: keyword, expressionParser: &self, wat: &wat)
         }
     }
 
     /// - Returns: `true` if a plain instruction was parsed.
-    private mutating func plainInstruction(visitor: inout Visitor, watModule: inout WatModule) throws -> Bool {
+    private mutating func plainInstruction(visitor: inout Visitor, wat: inout Wat) throws -> Bool {
         guard let keyword = try parser.peekKeyword() else {
             return false
         }
         let originalParser = parser
         try parser.consume()
-        guard let visit = try parseTextInstruction(keyword: keyword, watModule: &watModule) else {
+        guard let visit = try parseTextInstruction(keyword: keyword, wat: &wat) else {
             parser = originalParser
             return false
         }
@@ -623,43 +623,43 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
         return UInt32(try locals.resolve(use: index).index)
     }
 
-    private mutating func functionIndex(watModule: inout WatModule) throws -> UInt32 {
+    private mutating func functionIndex(wat: inout Wat) throws -> UInt32 {
         let funcUse = try parser.expectIndexOrId()
-        return UInt32(try watModule.functionsMap.resolve(use: funcUse).index)
+        return UInt32(try wat.functionsMap.resolve(use: funcUse).index)
     }
 
-    private mutating func memoryIndex(watModule: inout WatModule) throws -> UInt32 {
+    private mutating func memoryIndex(wat: inout Wat) throws -> UInt32 {
         guard let use = try parser.takeIndexOrId() else { return 0 }
-        return UInt32(try watModule.memories.resolve(use: use).index)
+        return UInt32(try wat.memories.resolve(use: use).index)
     }
 
-    private mutating func globalIndex(watModule: inout WatModule) throws -> UInt32 {
+    private mutating func globalIndex(wat: inout Wat) throws -> UInt32 {
         guard let use = try parser.takeIndexOrId() else { return 0 }
-        return UInt32(try watModule.globals.resolve(use: use).index)
+        return UInt32(try wat.globals.resolve(use: use).index)
     }
 
-    private mutating func dataIndex(watModule: inout WatModule) throws -> UInt32 {
+    private mutating func dataIndex(wat: inout Wat) throws -> UInt32 {
         guard let use = try parser.takeIndexOrId() else { return 0 }
-        return UInt32(try watModule.data.resolve(use: use).index)
+        return UInt32(try wat.data.resolve(use: use).index)
     }
 
-    private mutating func tableIndex(watModule: inout WatModule) throws -> UInt32 {
+    private mutating func tableIndex(wat: inout Wat) throws -> UInt32 {
         guard let use = try parser.takeIndexOrId() else { return 0 }
-        return UInt32(try watModule.tablesMap.resolve(use: use).index)
+        return UInt32(try wat.tablesMap.resolve(use: use).index)
     }
 
-    private mutating func elementIndex(watModule: inout WatModule) throws -> UInt32 {
+    private mutating func elementIndex(wat: inout Wat) throws -> UInt32 {
         guard let use = try parser.takeIndexOrId() else { return 0 }
-        return UInt32(try watModule.elementsMap.resolve(use: use).index)
+        return UInt32(try wat.elementsMap.resolve(use: use).index)
     }
 
-    private mutating func blockType(watModule: inout WatModule) throws -> BlockType {
+    private mutating func blockType(wat: inout Wat) throws -> BlockType {
         let results = try withWatParser({ try $0.results() })
         if !results.isEmpty {
-            return try watModule.types.resolveBlockType(results: results)
+            return try wat.types.resolveBlockType(results: results)
         }
         let typeUse = try withWatParser { try $0.typeUse() }
-        return try watModule.types.resolveBlockType(use: typeUse)
+        return try wat.types.resolveBlockType(use: typeUse)
     }
 
     private mutating func labelIndex() throws -> UInt32 {
@@ -714,25 +714,25 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
 }
 
 extension ExpressionParser {
-    mutating func visitBlock(watModule: inout WatModule) throws -> BlockType {
+    mutating func visitBlock(wat: inout Wat) throws -> BlockType {
         self.labelStack.push(try parser.takeId())
-        return try blockType(watModule: &watModule)
+        return try blockType(wat: &wat)
     }
-    mutating func visitLoop(watModule: inout WatModule) throws -> BlockType {
+    mutating func visitLoop(wat: inout Wat) throws -> BlockType {
         self.labelStack.push(try parser.takeId())
-        return try blockType(watModule: &watModule)
+        return try blockType(wat: &wat)
     }
-    mutating func visitIf(watModule: inout WatModule) throws -> BlockType {
+    mutating func visitIf(wat: inout Wat) throws -> BlockType {
         self.labelStack.push(try parser.takeId())
-        return try blockType(watModule: &watModule)
+        return try blockType(wat: &wat)
     }
-    mutating func visitBr(watModule: inout WatModule) throws -> UInt32 {
+    mutating func visitBr(wat: inout Wat) throws -> UInt32 {
         return try labelIndex()
     }
-    mutating func visitBrIf(watModule: inout WatModule) throws -> UInt32 {
+    mutating func visitBrIf(wat: inout Wat) throws -> UInt32 {
         return try labelIndex()
     }
-    mutating func visitBrTable(watModule: inout WatModule) throws -> BrTable {
+    mutating func visitBrTable(wat: inout Wat) throws -> BrTable {
         var labelIndices: [UInt32] = []
         while let labelUse = try takeLabelIndex() {
             labelIndices.append(labelUse)
@@ -742,147 +742,147 @@ extension ExpressionParser {
         }
         return BrTable(labelIndices: labelIndices, defaultIndex: defaultIndex)
     }
-    mutating func visitCall(watModule: inout WatModule) throws -> UInt32 {
+    mutating func visitCall(wat: inout Wat) throws -> UInt32 {
         let use = try parser.expectIndexOrId()
-        return UInt32(try watModule.functionsMap.resolve(use: use).index)
+        return UInt32(try wat.functionsMap.resolve(use: use).index)
     }
-    mutating func visitCallIndirect(watModule: inout WatModule) throws -> (typeIndex: UInt32, tableIndex: UInt32) {
+    mutating func visitCallIndirect(wat: inout Wat) throws -> (typeIndex: UInt32, tableIndex: UInt32) {
         let tableIndex: UInt32
         if let tableId = try parser.takeIndexOrId() {
-            tableIndex = UInt32(try watModule.tablesMap.resolve(use: tableId).index)
+            tableIndex = UInt32(try wat.tablesMap.resolve(use: tableId).index)
         } else {
             tableIndex = 0
         }
         let typeUse = try withWatParser { try $0.typeUse() }
-        let (_, typeIndex) = try watModule.types.resolve(use: typeUse)
+        let (_, typeIndex) = try wat.types.resolve(use: typeUse)
         return (UInt32(typeIndex), tableIndex)
     }
-    mutating func visitTypedSelect(watModule: inout WatModule) throws -> ValueType {
+    mutating func visitTypedSelect(wat: inout Wat) throws -> ValueType {
         fatalError("unreachable because Instruction.json does not define the name of typed select and it is handled in parseTextInstruction() manually")
     }
-    mutating func visitLocalGet(watModule: inout WatModule) throws -> UInt32 {
+    mutating func visitLocalGet(wat: inout Wat) throws -> UInt32 {
         return try localIndex()
     }
-    mutating func visitLocalSet(watModule: inout WatModule) throws -> UInt32 {
+    mutating func visitLocalSet(wat: inout Wat) throws -> UInt32 {
         return try localIndex()
     }
-    mutating func visitLocalTee(watModule: inout WatModule) throws -> UInt32 {
+    mutating func visitLocalTee(wat: inout Wat) throws -> UInt32 {
         return try localIndex()
     }
-    mutating func visitGlobalGet(watModule: inout WatModule) throws -> UInt32 {
-        return try globalIndex(watModule: &watModule)
+    mutating func visitGlobalGet(wat: inout Wat) throws -> UInt32 {
+        return try globalIndex(wat: &wat)
     }
-    mutating func visitGlobalSet(watModule: inout WatModule) throws -> UInt32 {
-        return try globalIndex(watModule: &watModule)
+    mutating func visitGlobalSet(wat: inout Wat) throws -> UInt32 {
+        return try globalIndex(wat: &wat)
     }
-    mutating func visitI32Load(watModule: inout WatModule) throws -> MemArg {
+    mutating func visitI32Load(wat: inout Wat) throws -> MemArg {
         return try visitLoad(defaultAlign: 4)
     }
-    mutating func visitI64Load(watModule: inout WatModule) throws -> MemArg {
+    mutating func visitI64Load(wat: inout Wat) throws -> MemArg {
         return try visitLoad(defaultAlign: 8)
     }
-    mutating func visitF32Load(watModule: inout WatModule) throws -> MemArg {
+    mutating func visitF32Load(wat: inout Wat) throws -> MemArg {
         return try visitLoad(defaultAlign: 4)
     }
-    mutating func visitF64Load(watModule: inout WatModule) throws -> MemArg {
+    mutating func visitF64Load(wat: inout Wat) throws -> MemArg {
         return try visitLoad(defaultAlign: 8)
     }
-    mutating func visitI32Load8S(watModule: inout WatModule) throws -> MemArg {
+    mutating func visitI32Load8S(wat: inout Wat) throws -> MemArg {
         return try visitLoad(defaultAlign: 1)
     }
-    mutating func visitI32Load8U(watModule: inout WatModule) throws -> MemArg {
+    mutating func visitI32Load8U(wat: inout Wat) throws -> MemArg {
         return try visitLoad(defaultAlign: 1)
     }
-    mutating func visitI32Load16S(watModule: inout WatModule) throws -> MemArg {
+    mutating func visitI32Load16S(wat: inout Wat) throws -> MemArg {
         return try visitLoad(defaultAlign: 2)
     }
-    mutating func visitI32Load16U(watModule: inout WatModule) throws -> MemArg {
+    mutating func visitI32Load16U(wat: inout Wat) throws -> MemArg {
         return try visitLoad(defaultAlign: 2)
     }
-    mutating func visitI64Load8S(watModule: inout WatModule) throws -> MemArg {
+    mutating func visitI64Load8S(wat: inout Wat) throws -> MemArg {
         return try visitLoad(defaultAlign: 1)
     }
-    mutating func visitI64Load8U(watModule: inout WatModule) throws -> MemArg {
+    mutating func visitI64Load8U(wat: inout Wat) throws -> MemArg {
         return try visitLoad(defaultAlign: 1)
     }
-    mutating func visitI64Load16S(watModule: inout WatModule) throws -> MemArg {
+    mutating func visitI64Load16S(wat: inout Wat) throws -> MemArg {
         return try visitLoad(defaultAlign: 2)
     }
-    mutating func visitI64Load16U(watModule: inout WatModule) throws -> MemArg {
+    mutating func visitI64Load16U(wat: inout Wat) throws -> MemArg {
         return try visitLoad(defaultAlign: 2)
     }
-    mutating func visitI64Load32S(watModule: inout WatModule) throws -> MemArg {
+    mutating func visitI64Load32S(wat: inout Wat) throws -> MemArg {
         return try visitLoad(defaultAlign: 4)
     }
-    mutating func visitI64Load32U(watModule: inout WatModule) throws -> MemArg {
+    mutating func visitI64Load32U(wat: inout Wat) throws -> MemArg {
         return try visitLoad(defaultAlign: 4)
     }
-    mutating func visitI32Store(watModule: inout WatModule) throws -> MemArg {
+    mutating func visitI32Store(wat: inout Wat) throws -> MemArg {
         return try visitStore(defaultAlign: 4)
     }
-    mutating func visitI64Store(watModule: inout WatModule) throws -> MemArg {
+    mutating func visitI64Store(wat: inout Wat) throws -> MemArg {
         return try visitStore(defaultAlign: 8)
     }
-    mutating func visitF32Store(watModule: inout WatModule) throws -> MemArg {
+    mutating func visitF32Store(wat: inout Wat) throws -> MemArg {
         return try visitStore(defaultAlign: 4)
     }
-    mutating func visitF64Store(watModule: inout WatModule) throws -> MemArg {
+    mutating func visitF64Store(wat: inout Wat) throws -> MemArg {
         return try visitStore(defaultAlign: 8)
     }
-    mutating func visitI32Store8(watModule: inout WatModule) throws -> MemArg {
+    mutating func visitI32Store8(wat: inout Wat) throws -> MemArg {
         return try visitStore(defaultAlign: 1)
     }
-    mutating func visitI32Store16(watModule: inout WatModule) throws -> MemArg {
+    mutating func visitI32Store16(wat: inout Wat) throws -> MemArg {
         return try visitStore(defaultAlign: 2)
     }
-    mutating func visitI64Store8(watModule: inout WatModule) throws -> MemArg {
+    mutating func visitI64Store8(wat: inout Wat) throws -> MemArg {
         return try visitStore(defaultAlign: 1)
     }
-    mutating func visitI64Store16(watModule: inout WatModule) throws -> MemArg {
+    mutating func visitI64Store16(wat: inout Wat) throws -> MemArg {
         return try visitStore(defaultAlign: 2)
     }
-    mutating func visitI64Store32(watModule: inout WatModule) throws -> MemArg {
+    mutating func visitI64Store32(wat: inout Wat) throws -> MemArg {
         return try visitStore(defaultAlign: 4)
     }
-    mutating func visitMemorySize(watModule: inout WatModule) throws -> UInt32 {
-        return try memoryIndex(watModule: &watModule)
+    mutating func visitMemorySize(wat: inout Wat) throws -> UInt32 {
+        return try memoryIndex(wat: &wat)
     }
-    mutating func visitMemoryGrow(watModule: inout WatModule) throws -> UInt32 {
-        return try memoryIndex(watModule: &watModule)
+    mutating func visitMemoryGrow(wat: inout Wat) throws -> UInt32 {
+        return try memoryIndex(wat: &wat)
     }
-    mutating func visitI32Const(watModule: inout WatModule) throws -> Int32 {
+    mutating func visitI32Const(wat: inout Wat) throws -> Int32 {
         return try parser.expectSignedInt(fromBitPattern: Int32.init(bitPattern:))
     }
-    mutating func visitI64Const(watModule: inout WatModule) throws -> Int64 {
+    mutating func visitI64Const(wat: inout Wat) throws -> Int64 {
         return try parser.expectSignedInt(fromBitPattern: Int64.init(bitPattern:))
     }
-    mutating func visitF32Const(watModule: inout WatModule) throws -> IEEE754.Float32 {
+    mutating func visitF32Const(wat: inout Wat) throws -> IEEE754.Float32 {
         return try parser.expectFloat32()
     }
-    mutating func visitF64Const(watModule: inout WatModule) throws -> IEEE754.Float64 {
+    mutating func visitF64Const(wat: inout Wat) throws -> IEEE754.Float64 {
         return try parser.expectFloat64()
     }
-    mutating func visitRefNull(watModule: inout WatModule) throws -> ReferenceType {
+    mutating func visitRefNull(wat: inout Wat) throws -> ReferenceType {
         return try refKind()
     }
-    mutating func visitRefFunc(watModule: inout WatModule) throws -> UInt32 {
-        return try functionIndex(watModule: &watModule)
+    mutating func visitRefFunc(wat: inout Wat) throws -> UInt32 {
+        return try functionIndex(wat: &wat)
     }
-    mutating func visitMemoryInit(watModule: inout WatModule) throws -> UInt32 {
-        return try dataIndex(watModule: &watModule)
+    mutating func visitMemoryInit(wat: inout Wat) throws -> UInt32 {
+        return try dataIndex(wat: &wat)
     }
-    mutating func visitDataDrop(watModule: inout WatModule) throws -> UInt32 {
-        return try dataIndex(watModule: &watModule)
+    mutating func visitDataDrop(wat: inout Wat) throws -> UInt32 {
+        return try dataIndex(wat: &wat)
     }
-    mutating func visitMemoryCopy(watModule: inout WatModule) throws -> (dstMem: UInt32, srcMem: UInt32) {
-        let dest = try memoryIndex(watModule: &watModule)
-        let source = try memoryIndex(watModule: &watModule)
+    mutating func visitMemoryCopy(wat: inout Wat) throws -> (dstMem: UInt32, srcMem: UInt32) {
+        let dest = try memoryIndex(wat: &wat)
+        let source = try memoryIndex(wat: &wat)
         return (dest, source)
     }
-    mutating func visitMemoryFill(watModule: inout WatModule) throws -> UInt32 {
-        return try memoryIndex(watModule: &watModule)
+    mutating func visitMemoryFill(wat: inout Wat) throws -> UInt32 {
+        return try memoryIndex(wat: &wat)
     }
-    mutating func visitTableInit(watModule: inout WatModule) throws -> (elemIndex: UInt32, table: UInt32) {
+    mutating func visitTableInit(wat: inout Wat) throws -> (elemIndex: UInt32, table: UInt32) {
         // Accept two-styles (the first one is informal, but used in testsuite...)
         //   table.init $elemidx
         //   table.init $tableidx $elemidx
@@ -896,36 +896,36 @@ extension ExpressionParser {
             elementUse = use1
             tableUse = nil
         }
-        let table = try tableUse.map { UInt32(try watModule.tablesMap.resolve(use: $0).index) } ?? 0
-        let elemIndex = UInt32(try watModule.elementsMap.resolve(use: elementUse).index)
+        let table = try tableUse.map { UInt32(try wat.tablesMap.resolve(use: $0).index) } ?? 0
+        let elemIndex = UInt32(try wat.elementsMap.resolve(use: elementUse).index)
         return (elemIndex, table)
     }
-    mutating func visitElemDrop(watModule: inout WatModule) throws -> UInt32 {
-        return try elementIndex(watModule: &watModule)
+    mutating func visitElemDrop(wat: inout Wat) throws -> UInt32 {
+        return try elementIndex(wat: &wat)
     }
-    mutating func visitTableCopy(watModule: inout WatModule) throws -> (dstTable: UInt32, srcTable: UInt32) {
+    mutating func visitTableCopy(wat: inout Wat) throws -> (dstTable: UInt32, srcTable: UInt32) {
         if let destUse = try parser.takeIndexOrId() {
-            let (_, destIndex) = try watModule.tablesMap.resolve(use: destUse)
+            let (_, destIndex) = try wat.tablesMap.resolve(use: destUse)
             let sourceUse = try parser.expectIndexOrId()
-            let (_, sourceIndex) = try watModule.tablesMap.resolve(use: sourceUse)
+            let (_, sourceIndex) = try wat.tablesMap.resolve(use: sourceUse)
             return (UInt32(destIndex), UInt32(sourceIndex))
         }
         return (0, 0)
     }
-    mutating func visitTableFill(watModule: inout WatModule) throws -> UInt32 {
-        return try tableIndex(watModule: &watModule)
+    mutating func visitTableFill(wat: inout Wat) throws -> UInt32 {
+        return try tableIndex(wat: &wat)
     }
-    mutating func visitTableGet(watModule: inout WatModule) throws -> UInt32 {
-        return try tableIndex(watModule: &watModule)
+    mutating func visitTableGet(wat: inout Wat) throws -> UInt32 {
+        return try tableIndex(wat: &wat)
     }
-    mutating func visitTableSet(watModule: inout WatModule) throws -> UInt32 {
-        return try tableIndex(watModule: &watModule)
+    mutating func visitTableSet(wat: inout Wat) throws -> UInt32 {
+        return try tableIndex(wat: &wat)
     }
-    mutating func visitTableGrow(watModule: inout WatModule) throws -> UInt32 {
-        return try tableIndex(watModule: &watModule)
+    mutating func visitTableGrow(wat: inout Wat) throws -> UInt32 {
+        return try tableIndex(wat: &wat)
     }
-    mutating func visitTableSize(watModule: inout WatModule) throws -> UInt32 {
-        return try tableIndex(watModule: &watModule)
+    mutating func visitTableSize(wat: inout Wat) throws -> UInt32 {
+        return try tableIndex(wat: &wat)
     }
 }
 

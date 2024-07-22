@@ -9,147 +9,147 @@ import WasmParser
 /// - Returns: A closure that invokes the corresponding visitor method. Nil if the keyword is not recognized.
 ///
 /// Note: The returned closure does not consume any tokens.
-func parseTextInstruction<V: InstructionVisitor>(keyword: String, expressionParser: inout ExpressionParser<V>, watModule: inout WatModule) throws -> ((inout V) throws -> V.Output)? {
+func parseTextInstruction<V: InstructionVisitor>(keyword: String, expressionParser: inout ExpressionParser<V>, wat: inout Wat) throws -> ((inout V) throws -> V.Output)? {
     switch keyword {
     case "unreachable": return { return try $0.visitUnreachable() }
     case "nop": return { return try $0.visitNop() }
     case "block":
-        let (blockType) = try expressionParser.visitBlock(watModule: &watModule)
+        let (blockType) = try expressionParser.visitBlock(wat: &wat)
         return { return try $0.visitBlock(blockType: blockType) }
     case "loop":
-        let (blockType) = try expressionParser.visitLoop(watModule: &watModule)
+        let (blockType) = try expressionParser.visitLoop(wat: &wat)
         return { return try $0.visitLoop(blockType: blockType) }
     case "if":
-        let (blockType) = try expressionParser.visitIf(watModule: &watModule)
+        let (blockType) = try expressionParser.visitIf(wat: &wat)
         return { return try $0.visitIf(blockType: blockType) }
     case "else": return { return try $0.visitElse() }
     case "end": return { return try $0.visitEnd() }
     case "br":
-        let (relativeDepth) = try expressionParser.visitBr(watModule: &watModule)
+        let (relativeDepth) = try expressionParser.visitBr(wat: &wat)
         return { return try $0.visitBr(relativeDepth: relativeDepth) }
     case "br_if":
-        let (relativeDepth) = try expressionParser.visitBrIf(watModule: &watModule)
+        let (relativeDepth) = try expressionParser.visitBrIf(wat: &wat)
         return { return try $0.visitBrIf(relativeDepth: relativeDepth) }
     case "br_table":
-        let (targets) = try expressionParser.visitBrTable(watModule: &watModule)
+        let (targets) = try expressionParser.visitBrTable(wat: &wat)
         return { return try $0.visitBrTable(targets: targets) }
     case "return": return { return try $0.visitReturn() }
     case "call":
-        let (functionIndex) = try expressionParser.visitCall(watModule: &watModule)
+        let (functionIndex) = try expressionParser.visitCall(wat: &wat)
         return { return try $0.visitCall(functionIndex: functionIndex) }
     case "call_indirect":
-        let (typeIndex, tableIndex) = try expressionParser.visitCallIndirect(watModule: &watModule)
+        let (typeIndex, tableIndex) = try expressionParser.visitCallIndirect(wat: &wat)
         return { return try $0.visitCallIndirect(typeIndex: typeIndex, tableIndex: tableIndex) }
     case "drop": return { return try $0.visitDrop() }
     case "select": return { return try $0.visitSelect() }
     case "local.get":
-        let (localIndex) = try expressionParser.visitLocalGet(watModule: &watModule)
+        let (localIndex) = try expressionParser.visitLocalGet(wat: &wat)
         return { return try $0.visitLocalGet(localIndex: localIndex) }
     case "local.set":
-        let (localIndex) = try expressionParser.visitLocalSet(watModule: &watModule)
+        let (localIndex) = try expressionParser.visitLocalSet(wat: &wat)
         return { return try $0.visitLocalSet(localIndex: localIndex) }
     case "local.tee":
-        let (localIndex) = try expressionParser.visitLocalTee(watModule: &watModule)
+        let (localIndex) = try expressionParser.visitLocalTee(wat: &wat)
         return { return try $0.visitLocalTee(localIndex: localIndex) }
     case "global.get":
-        let (globalIndex) = try expressionParser.visitGlobalGet(watModule: &watModule)
+        let (globalIndex) = try expressionParser.visitGlobalGet(wat: &wat)
         return { return try $0.visitGlobalGet(globalIndex: globalIndex) }
     case "global.set":
-        let (globalIndex) = try expressionParser.visitGlobalSet(watModule: &watModule)
+        let (globalIndex) = try expressionParser.visitGlobalSet(wat: &wat)
         return { return try $0.visitGlobalSet(globalIndex: globalIndex) }
     case "i32.load":
-        let (memarg) = try expressionParser.visitI32Load(watModule: &watModule)
+        let (memarg) = try expressionParser.visitI32Load(wat: &wat)
         return { return try $0.visitI32Load(memarg: memarg) }
     case "i64.load":
-        let (memarg) = try expressionParser.visitI64Load(watModule: &watModule)
+        let (memarg) = try expressionParser.visitI64Load(wat: &wat)
         return { return try $0.visitI64Load(memarg: memarg) }
     case "f32.load":
-        let (memarg) = try expressionParser.visitF32Load(watModule: &watModule)
+        let (memarg) = try expressionParser.visitF32Load(wat: &wat)
         return { return try $0.visitF32Load(memarg: memarg) }
     case "f64.load":
-        let (memarg) = try expressionParser.visitF64Load(watModule: &watModule)
+        let (memarg) = try expressionParser.visitF64Load(wat: &wat)
         return { return try $0.visitF64Load(memarg: memarg) }
     case "i32.load8_s":
-        let (memarg) = try expressionParser.visitI32Load8S(watModule: &watModule)
+        let (memarg) = try expressionParser.visitI32Load8S(wat: &wat)
         return { return try $0.visitI32Load8S(memarg: memarg) }
     case "i32.load8_u":
-        let (memarg) = try expressionParser.visitI32Load8U(watModule: &watModule)
+        let (memarg) = try expressionParser.visitI32Load8U(wat: &wat)
         return { return try $0.visitI32Load8U(memarg: memarg) }
     case "i32.load16_s":
-        let (memarg) = try expressionParser.visitI32Load16S(watModule: &watModule)
+        let (memarg) = try expressionParser.visitI32Load16S(wat: &wat)
         return { return try $0.visitI32Load16S(memarg: memarg) }
     case "i32.load16_u":
-        let (memarg) = try expressionParser.visitI32Load16U(watModule: &watModule)
+        let (memarg) = try expressionParser.visitI32Load16U(wat: &wat)
         return { return try $0.visitI32Load16U(memarg: memarg) }
     case "i64.load8_s":
-        let (memarg) = try expressionParser.visitI64Load8S(watModule: &watModule)
+        let (memarg) = try expressionParser.visitI64Load8S(wat: &wat)
         return { return try $0.visitI64Load8S(memarg: memarg) }
     case "i64.load8_u":
-        let (memarg) = try expressionParser.visitI64Load8U(watModule: &watModule)
+        let (memarg) = try expressionParser.visitI64Load8U(wat: &wat)
         return { return try $0.visitI64Load8U(memarg: memarg) }
     case "i64.load16_s":
-        let (memarg) = try expressionParser.visitI64Load16S(watModule: &watModule)
+        let (memarg) = try expressionParser.visitI64Load16S(wat: &wat)
         return { return try $0.visitI64Load16S(memarg: memarg) }
     case "i64.load16_u":
-        let (memarg) = try expressionParser.visitI64Load16U(watModule: &watModule)
+        let (memarg) = try expressionParser.visitI64Load16U(wat: &wat)
         return { return try $0.visitI64Load16U(memarg: memarg) }
     case "i64.load32_s":
-        let (memarg) = try expressionParser.visitI64Load32S(watModule: &watModule)
+        let (memarg) = try expressionParser.visitI64Load32S(wat: &wat)
         return { return try $0.visitI64Load32S(memarg: memarg) }
     case "i64.load32_u":
-        let (memarg) = try expressionParser.visitI64Load32U(watModule: &watModule)
+        let (memarg) = try expressionParser.visitI64Load32U(wat: &wat)
         return { return try $0.visitI64Load32U(memarg: memarg) }
     case "i32.store":
-        let (memarg) = try expressionParser.visitI32Store(watModule: &watModule)
+        let (memarg) = try expressionParser.visitI32Store(wat: &wat)
         return { return try $0.visitI32Store(memarg: memarg) }
     case "i64.store":
-        let (memarg) = try expressionParser.visitI64Store(watModule: &watModule)
+        let (memarg) = try expressionParser.visitI64Store(wat: &wat)
         return { return try $0.visitI64Store(memarg: memarg) }
     case "f32.store":
-        let (memarg) = try expressionParser.visitF32Store(watModule: &watModule)
+        let (memarg) = try expressionParser.visitF32Store(wat: &wat)
         return { return try $0.visitF32Store(memarg: memarg) }
     case "f64.store":
-        let (memarg) = try expressionParser.visitF64Store(watModule: &watModule)
+        let (memarg) = try expressionParser.visitF64Store(wat: &wat)
         return { return try $0.visitF64Store(memarg: memarg) }
     case "i32.store8":
-        let (memarg) = try expressionParser.visitI32Store8(watModule: &watModule)
+        let (memarg) = try expressionParser.visitI32Store8(wat: &wat)
         return { return try $0.visitI32Store8(memarg: memarg) }
     case "i32.store16":
-        let (memarg) = try expressionParser.visitI32Store16(watModule: &watModule)
+        let (memarg) = try expressionParser.visitI32Store16(wat: &wat)
         return { return try $0.visitI32Store16(memarg: memarg) }
     case "i64.store8":
-        let (memarg) = try expressionParser.visitI64Store8(watModule: &watModule)
+        let (memarg) = try expressionParser.visitI64Store8(wat: &wat)
         return { return try $0.visitI64Store8(memarg: memarg) }
     case "i64.store16":
-        let (memarg) = try expressionParser.visitI64Store16(watModule: &watModule)
+        let (memarg) = try expressionParser.visitI64Store16(wat: &wat)
         return { return try $0.visitI64Store16(memarg: memarg) }
     case "i64.store32":
-        let (memarg) = try expressionParser.visitI64Store32(watModule: &watModule)
+        let (memarg) = try expressionParser.visitI64Store32(wat: &wat)
         return { return try $0.visitI64Store32(memarg: memarg) }
     case "memory.size":
-        let (memory) = try expressionParser.visitMemorySize(watModule: &watModule)
+        let (memory) = try expressionParser.visitMemorySize(wat: &wat)
         return { return try $0.visitMemorySize(memory: memory) }
     case "memory.grow":
-        let (memory) = try expressionParser.visitMemoryGrow(watModule: &watModule)
+        let (memory) = try expressionParser.visitMemoryGrow(wat: &wat)
         return { return try $0.visitMemoryGrow(memory: memory) }
     case "i32.const":
-        let (value) = try expressionParser.visitI32Const(watModule: &watModule)
+        let (value) = try expressionParser.visitI32Const(wat: &wat)
         return { return try $0.visitI32Const(value: value) }
     case "i64.const":
-        let (value) = try expressionParser.visitI64Const(watModule: &watModule)
+        let (value) = try expressionParser.visitI64Const(wat: &wat)
         return { return try $0.visitI64Const(value: value) }
     case "f32.const":
-        let (value) = try expressionParser.visitF32Const(watModule: &watModule)
+        let (value) = try expressionParser.visitF32Const(wat: &wat)
         return { return try $0.visitF32Const(value: value) }
     case "f64.const":
-        let (value) = try expressionParser.visitF64Const(watModule: &watModule)
+        let (value) = try expressionParser.visitF64Const(wat: &wat)
         return { return try $0.visitF64Const(value: value) }
     case "ref.null":
-        let (type) = try expressionParser.visitRefNull(watModule: &watModule)
+        let (type) = try expressionParser.visitRefNull(wat: &wat)
         return { return try $0.visitRefNull(type: type) }
     case "ref.is_null": return { return try $0.visitRefIsNull() }
     case "ref.func":
-        let (functionIndex) = try expressionParser.visitRefFunc(watModule: &watModule)
+        let (functionIndex) = try expressionParser.visitRefFunc(wat: &wat)
         return { return try $0.visitRefFunc(functionIndex: functionIndex) }
     case "i32.eqz": return { return try $0.visitI32Eqz() }
     case "i32.eq": return { return try $0.visitI32Eq() }
@@ -280,40 +280,40 @@ func parseTextInstruction<V: InstructionVisitor>(keyword: String, expressionPars
     case "i64.extend16_s": return { return try $0.visitI64Extend16S() }
     case "i64.extend32_s": return { return try $0.visitI64Extend32S() }
     case "memory.init":
-        let (dataIndex) = try expressionParser.visitMemoryInit(watModule: &watModule)
+        let (dataIndex) = try expressionParser.visitMemoryInit(wat: &wat)
         return { return try $0.visitMemoryInit(dataIndex: dataIndex) }
     case "data.drop":
-        let (dataIndex) = try expressionParser.visitDataDrop(watModule: &watModule)
+        let (dataIndex) = try expressionParser.visitDataDrop(wat: &wat)
         return { return try $0.visitDataDrop(dataIndex: dataIndex) }
     case "memory.copy":
-        let (dstMem, srcMem) = try expressionParser.visitMemoryCopy(watModule: &watModule)
+        let (dstMem, srcMem) = try expressionParser.visitMemoryCopy(wat: &wat)
         return { return try $0.visitMemoryCopy(dstMem: dstMem, srcMem: srcMem) }
     case "memory.fill":
-        let (memory) = try expressionParser.visitMemoryFill(watModule: &watModule)
+        let (memory) = try expressionParser.visitMemoryFill(wat: &wat)
         return { return try $0.visitMemoryFill(memory: memory) }
     case "table.init":
-        let (elemIndex, table) = try expressionParser.visitTableInit(watModule: &watModule)
+        let (elemIndex, table) = try expressionParser.visitTableInit(wat: &wat)
         return { return try $0.visitTableInit(elemIndex: elemIndex, table: table) }
     case "elem.drop":
-        let (elemIndex) = try expressionParser.visitElemDrop(watModule: &watModule)
+        let (elemIndex) = try expressionParser.visitElemDrop(wat: &wat)
         return { return try $0.visitElemDrop(elemIndex: elemIndex) }
     case "table.copy":
-        let (dstTable, srcTable) = try expressionParser.visitTableCopy(watModule: &watModule)
+        let (dstTable, srcTable) = try expressionParser.visitTableCopy(wat: &wat)
         return { return try $0.visitTableCopy(dstTable: dstTable, srcTable: srcTable) }
     case "table.fill":
-        let (table) = try expressionParser.visitTableFill(watModule: &watModule)
+        let (table) = try expressionParser.visitTableFill(wat: &wat)
         return { return try $0.visitTableFill(table: table) }
     case "table.get":
-        let (table) = try expressionParser.visitTableGet(watModule: &watModule)
+        let (table) = try expressionParser.visitTableGet(wat: &wat)
         return { return try $0.visitTableGet(table: table) }
     case "table.set":
-        let (table) = try expressionParser.visitTableSet(watModule: &watModule)
+        let (table) = try expressionParser.visitTableSet(wat: &wat)
         return { return try $0.visitTableSet(table: table) }
     case "table.grow":
-        let (table) = try expressionParser.visitTableGrow(watModule: &watModule)
+        let (table) = try expressionParser.visitTableGrow(wat: &wat)
         return { return try $0.visitTableGrow(table: table) }
     case "table.size":
-        let (table) = try expressionParser.visitTableSize(watModule: &watModule)
+        let (table) = try expressionParser.visitTableSize(wat: &wat)
         return { return try $0.visitTableSize(table: table) }
     case "i32.trunc_sat_f32_s": return { return try $0.visitI32TruncSatF32S() }
     case "i32.trunc_sat_f32_u": return { return try $0.visitI32TruncSatF32U() }

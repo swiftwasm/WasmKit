@@ -104,7 +104,7 @@ struct WastParser {
 
 public enum WastExecute {
     case invoke(WastInvoke)
-    case wat(WatModule)
+    case wat(Wat)
     case get(module: String?, globalName: String)
 
     static func parse(wastParser: inout WastParser) throws -> WastExecute {
@@ -176,7 +176,7 @@ public enum WastDirective {
     case assertReturn(execute: WastExecute, results: [WastExpectValue])
     case assertTrap(execute: WastExecute, message: String)
     case assertExhaustion(call: WastInvoke, message: String)
-    case assertUnlinkable(module: WatModule, message: String)
+    case assertUnlinkable(module: Wat, message: String)
     case register(name: String, moduleId: String?)
     case invoke(WastInvoke)
 
@@ -274,7 +274,7 @@ public struct ModuleDirective {
 /// The source of a module in WAST.
 public enum ModuleSource {
     /// A parsed WAT module
-    case text(WatModule)
+    case text(Wat)
     /// A text form of WAT module
     case quote([UInt8])
     /// A binary form of WebAssembly module

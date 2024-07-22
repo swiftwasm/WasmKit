@@ -23,7 +23,7 @@ public func wat2wasm(_ input: String) throws -> [UInt8] {
 }
 
 /// A WAT module representation.
-public struct WatModule {
+public struct Wat {
     var types: TypesMap
     let functionsMap: NameMapping<WatParser.FunctionDecl>
     let tablesMap: NameMapping<WatParser.TableDecl>
@@ -39,8 +39,8 @@ public struct WatModule {
 
     let parser: Parser
 
-    static func empty() -> WatModule {
-        WatModule(
+    static func empty() -> Wat {
+        Wat(
             types: TypesMap(),
             functionsMap: NameMapping<WatParser.FunctionDecl>(),
             tablesMap: NameMapping<WatParser.TableDecl>(),
@@ -68,11 +68,11 @@ public struct WatModule {
     }
 }
 
-/// Parses a WebAssembly text format (WAT) string into a `WatModule` instance.
+/// Parses a WebAssembly text format (WAT) string into a `Wat` instance.
 /// - Parameter input: The WAT string to parse
-/// - Returns: The parsed `WatModule` instance
+/// - Returns: The parsed `Wat` instance
 ///
-/// The `WatModule` instance can be used to encode the module into a WebAssembly binary format byte array.
+/// The `Wat` instance can be used to encode the module into a WebAssembly binary format byte array.
 ///
 /// ```swift
 /// import WAT
@@ -89,7 +89,7 @@ public struct WatModule {
 ///
 /// let wasm = try wat.encode()
 /// ```
-public func parseWAT(_ input: String) throws -> WatModule {
+public func parseWAT(_ input: String) throws -> Wat {
     var parser = Parser(input)
     try parser.expect(.leftParen)
     try parser.expectKeyword("module")
@@ -147,7 +147,7 @@ public func parseWAST(_ input: String) throws -> Wast {
     return Wast(input)
 }
 
-func parseWAT(_ parser: inout Parser) throws -> WatModule {
+func parseWAT(_ parser: inout Parser) throws -> Wat {
     // This parser is 2-pass: first it collects all module items and creates a mapping of names to indices.
 
     let initialParser = parser
@@ -267,7 +267,7 @@ func parseWAT(_ parser: inout Parser) throws -> WatModule {
 
     parser = watParser.parser
 
-    return WatModule(
+    return Wat(
         types: typesMap,
         functionsMap: functionsMap,
         tablesMap: tablesMap,

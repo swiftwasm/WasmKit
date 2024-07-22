@@ -86,10 +86,10 @@ struct Encoder {
         }
     }
 
-    mutating func writeExpression(lexer: inout Lexer, watModule: inout WatModule) throws {
+    mutating func writeExpression(lexer: inout Lexer, wat: inout Wat) throws {
         var parser = ExpressionParser<ExpressionEncoder>(lexer: lexer)
         var exprEncoder = ExpressionEncoder()
-        try parser.parse(visitor: &exprEncoder, watModule: &watModule)
+        try parser.parse(visitor: &exprEncoder, wat: &wat)
         try exprEncoder.visitEnd()
         output.append(contentsOf: exprEncoder.encoder.output)
         lexer = parser.parser.lexer
@@ -150,20 +150,20 @@ struct ElementExprCollector: VoidInstructionVisitor {
     }
     let addFunctionIndex: (UInt32?) -> Void
 
-    mutating func parse(indices: WatParser.ElementDecl.Indices, watModule: inout WatModule) throws {
+    mutating func parse(indices: WatParser.ElementDecl.Indices, wat: inout Wat) throws {
         switch indices {
         case .elementExprList(let lexer):
             var parser = ExpressionParser<ElementExprCollector>(lexer: lexer)
-            try parser.parseElemExprList(visitor: &self, watModule: &watModule)
+            try parser.parseElemExprList(visitor: &self, wat: &wat)
         case .functionList(let lexer):
-            try self.parseFunctionList(lexer: lexer, watModule: watModule)
+            try self.parseFunctionList(lexer: lexer, wat: wat)
         }
     }
 
-    private mutating func parseFunctionList(lexer: Lexer, watModule: WatModule) throws {
+    private mutating func parseFunctionList(lexer: Lexer, wat: Wat) throws {
         var parser = Parser(lexer)
         while let funcUse = try parser.takeIndexOrId() {
-            let (_, funcIndex) = try watModule.functionsMap.resolve(use: funcUse)
+            let (_, funcIndex) = try wat.functionsMap.resolve(use: funcUse)
             addFunctionIndex(UInt32(funcIndex))
         }
     }
@@ -178,7 +178,7 @@ struct ElementExprCollector: VoidInstructionVisitor {
 }
 
 extension WAT.WatParser.ElementDecl {
-    func encode(to encoder: inout Encoder, watModule: inout WatModule) throws {
+    func encode(to encoder: inout Encoder, wat: inout Wat) throws {
         var flags: UInt32 = 0
         var tableIndex: UInt32? = nil
         var isPassive = false
@@ -187,7 +187,7 @@ extension WAT.WatParser.ElementDecl {
         case .active(let table, _):
             let index: Int?
             if let table {
-                index = try watModule.tablesMap.resolve(use: table).index
+                index = try wat.tablesMap.resolve(use: table).index
             } else {
                 index = nil
             }
@@ -211,7 +211,7 @@ extension WAT.WatParser.ElementDecl {
 
         var functionIndices: [UInt32?] = []
         var collector = ElementExprCollector(addFunctionIndex: { functionIndices.append($0) })
-        try collector.parse(indices: indices, watModule: &watModule)
+        try collector.parse(indices: indices, wat: &wat)
 
         if collector.useExpression {
             // use expression
@@ -225,7 +225,7 @@ extension WAT.WatParser.ElementDecl {
         if case let .active(_, offset) = self.mode {
             switch offset {
             case .source(var lexer):
-                try encoder.writeExpression(lexer: &lexer, watModule: &watModule)
+                try encoder.writeExpression(lexer: &lexer, wat: &wat)
             case .synthesized(let offset):
                 var exprEncoder = ExpressionEncoder()
                 try exprEncoder.visitI32Const(value: Int32(offset))
@@ -290,12 +290,12 @@ extension Export: WasmEncodable {
 }
 
 extension WatParser.GlobalDecl {
-    func encode(to encoder: inout Encoder, watModule: inout WatModule) throws {
+    func encode(to encoder: inout Encoder, wat: inout Wat) throws {
         encoder.encode(type)
         guard case var .definition(expr) = kind else {
             fatalError("imported global declaration should not be encoded here")
         }
-        try encoder.writeExpression(lexer: &expr, watModule: &watModule)
+        try encoder.writeExpression(lexer: &expr, wat: &wat)
     }
 }
 
@@ -360,10 +360,10 @@ extension Import: WasmEncodable {
 }
 
 extension WatParser.DataSegmentDecl.Offset {
-    func encode(to encoder: inout Encoder, watModule: inout WatModule, isMemory64: Bool) throws {
+    func encode(to encoder: inout Encoder, wat: inout Wat, isMemory64: Bool) throws {
         switch self {
         case .source(var offset):
-            try encoder.writeExpression(lexer: &offset, watModule: &watModule)
+            try encoder.writeExpression(lexer: &offset, wat: &wat)
         case .synthesized(let index):
             var exprEncoder = ExpressionEncoder()
             if isMemory64 {
@@ -378,21 +378,21 @@ extension WatParser.DataSegmentDecl.Offset {
 }
 
 extension WatParser.DataSegmentDecl {
-    func encode(to encoder: inout Encoder, watModule: inout WatModule) throws {
+    func encode(to encoder: inout Encoder, wat: inout Wat) throws {
         func isMemory64(memoryIndex: Int) -> Bool {
-            guard memoryIndex < watModule.memories.count else { return false }
-            return watModule.memories[memoryIndex].type.isMemory64
+            guard memoryIndex < wat.memories.count else { return false }
+            return wat.memories[memoryIndex].type.isMemory64
         }
         switch (self.memory, self.offset) {
         case (nil, let offset?):
             // active with default memory
             encoder.output.append(0x00)
-            try offset.encode(to: &encoder, watModule: &watModule, isMemory64: isMemory64(memoryIndex: 0))
+            try offset.encode(to: &encoder, wat: &wat, isMemory64: isMemory64(memoryIndex: 0))
         case (nil, nil):
             // passive
             encoder.output.append(0x01)
         case (let memory?, let offset?):
-            let memoryIndex = try watModule.memories.resolve(use: memory).index
+            let memoryIndex = try wat.memories.resolve(use: memory).index
             if memoryIndex == 0 {
                 // active with default memory
                 encoder.output.append(0x00)
@@ -401,7 +401,7 @@ extension WatParser.DataSegmentDecl {
                 encoder.output.append(0x02)
                 encoder.writeUnsignedLEB128(UInt32(memoryIndex))
             }
-            try offset.encode(to: &encoder, watModule: &watModule, isMemory64: isMemory64(memoryIndex: memoryIndex))
+            try offset.encode(to: &encoder, wat: &wat, isMemory64: isMemory64(memoryIndex: memoryIndex))
         case (_?, nil):
             fatalError("memory with memory index but no offset")
         }
@@ -503,7 +503,7 @@ struct ExpressionEncoder: InstructionEncoder {
     }
 }
 
-func encode(module: inout WatModule) throws -> [UInt8] {
+func encode(module: inout Wat) throws -> [UInt8] {
     var encoder = Encoder()
     encoder.writeHeader()
 
@@ -537,7 +537,7 @@ func encode(module: inout WatModule) throws -> [UInt8] {
                         encoder.writeUnsignedLEB128(local.count)
                         local.type.encode(to: &encoder)
                     }
-                    let funcTypeIndex = try function.parse(visitor: &exprEncoder, watModule: &module)
+                    let funcTypeIndex = try function.parse(visitor: &exprEncoder, wat: &module)
                     functionSection.append(UInt32(funcTypeIndex))
                     // TODO?
                     try exprEncoder.visitEnd()
@@ -594,7 +594,7 @@ func encode(module: inout WatModule) throws -> [UInt8] {
     if !globals.isEmpty {
         try encoder.section(id: 0x06) { encoder in
             try encoder.encodeVector(globals) { global, encoder in
-                try global.encode(to: &encoder, watModule: &module)
+                try global.encode(to: &encoder, wat: &module)
             }
         }
     }
@@ -619,7 +619,7 @@ func encode(module: inout WatModule) throws -> [UInt8] {
     if !module.elementsMap.isEmpty {
         try encoder.section(id: 0x09) { encoder in
             try encoder.encodeVector(module.elementsMap) {
-                try $0.encode(to: &$1, watModule: &module)
+                try $0.encode(to: &$1, wat: &module)
             }
         }
     }
@@ -638,7 +638,7 @@ func encode(module: inout WatModule) throws -> [UInt8] {
     if !module.data.isEmpty {
         try encoder.section(id: 0x0B) { encoder in
             try encoder.encodeVector(module.data) { data, encoder in
-                try data.encode(to: &encoder, watModule: &module)
+                try data.encode(to: &encoder, wat: &module)
             }
         }
     }

@@ -211,7 +211,7 @@ func generateTextParser(_ instructions: InstructionSet) -> String {
     /// - Returns: A closure that invokes the corresponding visitor method. Nil if the keyword is not recognized.
     ///
     /// Note: The returned closure does not consume any tokens.
-    func parseTextInstruction<V: InstructionVisitor>(keyword: String, expressionParser: inout ExpressionParser<V>, watModule: inout WatModule) throws -> ((inout V) throws -> V.Output)? {
+    func parseTextInstruction<V: InstructionVisitor>(keyword: String, expressionParser: inout ExpressionParser<V>, wat: inout Wat) throws -> ((inout V) throws -> V.Output)? {
         switch keyword {
 
     """
@@ -225,7 +225,7 @@ func generateTextParser(_ instructions: InstructionSet) -> String {
             code += "\n"
             code += "        let ("
             code += instruction.immediates.map(\.label).joined(separator: ", ")
-            code += ") = try expressionParser.\(instruction.visitMethodName)(watModule: &watModule)\n"
+            code += ") = try expressionParser.\(instruction.visitMethodName)(wat: &wat)\n"
             code += "        "
         } else {
             code += " "
