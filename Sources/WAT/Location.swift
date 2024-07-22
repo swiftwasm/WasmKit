@@ -16,6 +16,8 @@ public struct Location: Equatable, CustomDebugStringConvertible {
         return "Location\(sourceLocation(at: index, in: source))"
     }
 
+    /// Computes the line and column of the location in the source file.
+    /// - Returns: The line and column of the location. Line is 1-indexed and column is 0-indexed.
     public func computeLineAndColumn() -> (line: Int, column: Int) {
         return sourceLocation(at: index, in: source)
     }
