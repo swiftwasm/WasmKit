@@ -23,7 +23,7 @@ let wat = try parseWAT("""
 )
 """)
 
-let wasm = wat.encode()
+let wasm = try wat.encode()
 ```
 
 ### Parsing WAST
