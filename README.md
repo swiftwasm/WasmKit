@@ -55,13 +55,10 @@ You can find API documentation on the [Swift Package Index](https://swiftpackage
 To run the core spec test suite run this:
 
 ```sh
-# Checkout the core spec test suite
-$ ./Vendor/checkout-dependency spectest
-# Prepare core spec tests and check their assertions with WasmKit
-$ make spectest
+# Checkout test suite repositories
+$ ./Vendor/checkout-dependency
+$ swift test
 
-# Checkout WASI spec test suite
-$ ./Vendor/checkout-dependency wasi-testsuite
 # Install Python dependencies for running WASI spec tests
 $ python3 -m pip install -r ./Vendor/wasi-testsuite/test-runner/requirements.txt
 # Run WASI spec tests

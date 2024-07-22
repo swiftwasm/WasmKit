@@ -108,9 +108,9 @@ jobs:
             "hostSwiftExecutablePath": "/usr/bin/swift"
           }
           EOS
+      - run: ./build-exec ./CI/install-wabt.sh
       - run: ./Vendor/checkout-dependency testsuite
       - run: ./build-exec swift test
-      - run: ./build-exec ./CI/check-spectest.sh
       - run: ./build-exec ./CI/check-wasi-testsuite.sh
 
   build-windows:

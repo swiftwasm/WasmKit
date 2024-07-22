@@ -102,6 +102,8 @@ class EncoderTests: XCTestCase {
             }
         }
         print("Spectest compatibility: \(stats.run - stats.failed.count) / \(stats.run)")
-        print("Failed test cases: \(stats.failed.sorted())")
+        if !stats.failed.isEmpty {
+            print("Failed test cases: \(stats.failed.sorted())")
+        }
     }
 }

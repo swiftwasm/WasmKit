@@ -23,16 +23,12 @@ install_tools() {
   echo "Use wasm2wat $(wasm2wat --version): $(which wasm2wat)"
 }
 
-# Currently wabt is unavailable in amazonlinux2, so we skip the spectest on it.
+# Currently wabt is unavailable in amazonlinux2
 if is_amazonlinux2; then
-  echo "Skip spectest on amazonlinux2"
+  echo "Skip wabt installation on amazonlinux2"
   exit 0
 fi
 
 set -e
 
 install_tools
-
-SOURCE_DIR="$(cd $(dirname $0)/.. && pwd)"
-./Vendor/checkout-dependency testsuite
-exec make -C $SOURCE_DIR spectest

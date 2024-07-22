@@ -54,7 +54,6 @@ struct TestCase {
 
         var testCases: [TestCase] = []
         for filePath in filePaths where try matchesPattern(filePath) {
-            log?("loading \(filePath.lastPathComponent)")
             guard let data = fileManager.contents(atPath: filePath.path) else {
                 assertionFailure("failed to load \(filePath)")
                 continue
