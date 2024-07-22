@@ -1,5 +1,6 @@
-import XCTest
 import WIT
+import XCTest
+
 @testable import WITOverlayGenerator
 
 class RuntimeSmokeTests: XCTestCase {

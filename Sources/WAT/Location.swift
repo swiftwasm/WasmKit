@@ -23,7 +23,6 @@ public struct Location: Equatable, CustomDebugStringConvertible {
     }
 }
 
-
 /// Returns the location of the given index in the source
 /// - Parameters:
 ///   - index: The index in the source

@@ -11,7 +11,7 @@ public final class Runtime {
     }
 }
 
-@_documentation(visibility: internal)
+@_documentation(visibility:internal)
 public protocol RuntimeInterceptor {
     func onEnterFunction(_ address: FunctionAddress, store: Store)
     func onExitFunction(_ address: FunctionAddress, store: Store)
@@ -171,14 +171,14 @@ extension Runtime {
                     continue
                 }
             }
-            
+
             globalModuleInstance.types = module.types
-            
+
             for function in module.functions {
                 let address = store.allocate(function: function, module: globalModuleInstance)
                 globalModuleInstance.functionAddresses.append(address)
             }
-            
+
             let globalInitializers = try module.globals.map { global in
                 var instructions: [Instruction] = []
                 switch global.initializer.first {
@@ -207,7 +207,7 @@ extension Runtime {
                     }
                 }
             }
-            
+
             return globalInitializers
         }
     }

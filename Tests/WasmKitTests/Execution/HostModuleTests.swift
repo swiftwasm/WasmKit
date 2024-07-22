@@ -1,7 +1,7 @@
 import XCTest
-@testable import WasmParser
 
 @testable import WasmKit
+@testable import WasmParser
 
 final class HostModuleTests: XCTestCase {
     func testImportMemory() throws {

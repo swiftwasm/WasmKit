@@ -1,10 +1,10 @@
 enum InstructionCode: UInt8 {
     case unreachable = 0x00
-    case nop         = 0x01
-    case block       = 0x02
-    case loop        = 0x03
-    case `if`        = 0x04
-    case `else`      = 0x05
+    case nop = 0x01
+    case block = 0x02
+    case loop = 0x03
+    case `if` = 0x04
+    case `else` = 0x05
 
     case end = 0x0B
     case br
@@ -14,7 +14,7 @@ enum InstructionCode: UInt8 {
     case call
     case call_indirect
 
-    case drop   = 0x1A
+    case drop = 0x1A
     case select = 0x1B
     case typed_select = 0x1C
 
@@ -194,15 +194,15 @@ enum InstructionCode: UInt8 {
     case f32_reinterpret_i32 = 0xBE
     case f64_reinterpret_i64 = 0xBF
 
-    case i32_extend8_s  = 0xC0
+    case i32_extend8_s = 0xC0
     case i32_extend16_s = 0xC1
-    case i64_extend8_s  = 0xC2
+    case i64_extend8_s = 0xC2
     case i64_extend16_s = 0xC3
     case i64_extend32_s = 0xC4
 
-    case ref_null    = 0xD0
+    case ref_null = 0xD0
     case ref_is_null = 0xD1
-    case ref_func    = 0xD2
+    case ref_func = 0xD2
 
     case wasm2InstructionPrefix = 0xFC
 }

@@ -52,7 +52,7 @@ extension WasmParser.ValueType {
     }
 }
 
-public typealias ReferenceType =  WasmParser.ReferenceType
+public typealias ReferenceType = WasmParser.ReferenceType
 
 extension Value {
     var type: WasmParser.ValueType {

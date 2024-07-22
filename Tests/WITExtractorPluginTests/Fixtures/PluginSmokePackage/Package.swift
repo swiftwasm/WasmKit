@@ -5,9 +5,9 @@ import PackageDescription
 let package = Package(
     name: "PluginSmokePackage",
     dependencies: [
-        .package(path: "../../../../"),
+        .package(path: "../../../../")
     ],
     targets: [
-        .target(name: "PluginSmokeModule"),
+        .target(name: "PluginSmokeModule")
     ]
 )

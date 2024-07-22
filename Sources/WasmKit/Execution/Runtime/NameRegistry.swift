@@ -1,5 +1,5 @@
-import struct WasmParser.NameSectionParser
 import struct WasmParser.CustomSection
+import struct WasmParser.NameSectionParser
 import class WasmParser.StaticByteStream
 
 struct NameRegistry {

@@ -8,26 +8,26 @@ extension WASIAbi.FileType {
             return
         }
         #if !os(Windows)
-        if platformFileType.isSymlink {
-            self = .SYMBOLIC_LINK
-            return
-        }
-        if platformFileType.isFile {
-            self = .REGULAR_FILE
-            return
-        }
-        if platformFileType.isCharacterDevice {
-            self = .CHARACTER_DEVICE
-            return
-        }
-        if platformFileType.isBlockDevice {
-            self = .BLOCK_DEVICE
-            return
-        }
-        if platformFileType.isSocket {
-            self = .SOCKET_STREAM
-            return
-        }
+            if platformFileType.isSymlink {
+                self = .SYMBOLIC_LINK
+                return
+            }
+            if platformFileType.isFile {
+                self = .REGULAR_FILE
+                return
+            }
+            if platformFileType.isCharacterDevice {
+                self = .CHARACTER_DEVICE
+                return
+            }
+            if platformFileType.isBlockDevice {
+                self = .BLOCK_DEVICE
+                return
+            }
+            if platformFileType.isSocket {
+                self = .SOCKET_STREAM
+                return
+            }
         #endif
         self = .UNKNOWN
     }
@@ -137,10 +137,11 @@ extension WASIAbi.Timestamp {
 
     init(platformTimeSpec timespec: FileTime) {
         #if os(Windows)
-        self = UInt64(timespec.unixNanoseconds)
+            self = UInt64(timespec.unixNanoseconds)
         #else
-        self.init(seconds: UInt64(timespec.rawValue.tv_sec),
-                  nanoseconds: UInt64(timespec.rawValue.tv_nsec))
+            self.init(
+                seconds: UInt64(timespec.rawValue.tv_sec),
+                nanoseconds: UInt64(timespec.rawValue.tv_nsec))
         #endif
     }
 
@@ -189,8 +190,8 @@ extension WASIAbi.Errno {
         case .tooManyOpenFilesInSystem: self = .ENFILE
         case .tooManyOpenFiles: self = .EMFILE
         #if !os(Windows)
-        case .inappropriateIOCTLForDevice: self = .ENOTTY
-        case .textFileBusy: self = .ETXTBSY
+            case .inappropriateIOCTLForDevice: self = .ENOTTY
+            case .textFileBusy: self = .ETXTBSY
         #endif
         case .fileTooLarge: self = .EFBIG
         case .noSpace: self = .ENOSPC
@@ -232,21 +233,21 @@ extension WASIAbi.Errno {
         case .noLocks: self = .ENOLCK
         case .noFunction: self = .ENOSYS
         #if !os(Windows)
-        case .overflow: self = .EOVERFLOW
+            case .overflow: self = .EOVERFLOW
         #endif
         case .canceled: self = .ECANCELED
         #if !os(Windows)
-        case .identifierRemoved: self = .EIDRM
-        case .noMessage: self = .ENOMSG
+            case .identifierRemoved: self = .EIDRM
+            case .noMessage: self = .ENOMSG
         #endif
         case .illegalByteSequence: self = .EILSEQ
         #if !os(Windows)
-        case .badMessage: self = .EBADMSG
-        case .multiHop: self = .EMULTIHOP
-        case .noLink: self = .ENOLINK
-        case .protocolError: self = .EPROTO
-        case .notRecoverable: self = .ENOTRECOVERABLE
-        case .previousOwnerDied: self = .EOWNERDEAD
+            case .badMessage: self = .EBADMSG
+            case .multiHop: self = .EMULTIHOP
+            case .noLink: self = .ENOLINK
+            case .protocolError: self = .EPROTO
+            case .notRecoverable: self = .ENOTRECOVERABLE
+            case .previousOwnerDied: self = .EOWNERDEAD
         #endif
         default: return nil
         }

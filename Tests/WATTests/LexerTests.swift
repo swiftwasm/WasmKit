@@ -1,6 +1,6 @@
-import XCTest
 import Foundation
 import WasmParser
+import XCTest
 
 @testable import WAT
 
@@ -27,11 +27,11 @@ class LexerTests: XCTestCase {
     func testLexComment() {
         try XCTAssertEqual(
             collectToken(
-"""
-(;
-  multi-line comment
-;)
-"""
+                """
+                (;
+                  multi-line comment
+                ;)
+                """
             ),
             [.blockComment]
         )

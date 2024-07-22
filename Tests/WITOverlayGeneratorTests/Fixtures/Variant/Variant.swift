@@ -1,6 +1,6 @@
 struct VariantTestWorldExportsImpl: VariantTestWorldExports {
     static func returnSingle() -> Single {
-        return .a(33550336)
+        return .a(33_550_336)
     }
 
     static func returnLarge() -> Large {

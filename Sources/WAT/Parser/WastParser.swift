@@ -58,7 +58,7 @@ struct WastParser {
         mutating func visitI64Const(value: Int64) throws { addValue(.i64(UInt64(bitPattern: value))) }
         mutating func visitF32Const(value: IEEE754.Float32) throws { addValue(.f32(value.bitPattern)) }
         mutating func visitF64Const(value: IEEE754.Float64) throws { addValue(.f64(value.bitPattern)) }
-        mutating func visitRefFunc(functionIndex: UInt32) throws  {
+        mutating func visitRefFunc(functionIndex: UInt32) throws {
             addValue(.ref(.function(FunctionAddress(functionIndex))))
         }
         mutating func visitRefNull(type: ReferenceType) throws {

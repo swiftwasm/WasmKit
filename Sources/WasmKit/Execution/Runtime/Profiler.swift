@@ -3,7 +3,7 @@ import SystemPackage
 
 /// A simple time-profiler for guest process to emit `chrome://tracing` format
 /// This profiler works only when WasmKit is built with debug configuration (`swift build -c debug`)
-@_documentation(visibility: internal)
+@_documentation(visibility:internal)
 public class GuestTimeProfiler: RuntimeInterceptor {
     struct Event: Codable {
         enum Phase: String, Codable {
@@ -24,45 +24,44 @@ public class GuestTimeProfiler: RuntimeInterceptor {
     private var hasFirstEvent: Bool = false
 
     #if swift(>=5.7) && os(Windows)
-    // We can use ContinuousClock on platforms that doesn't ship stdlib as stable ABI
-    // Once we drop macOS 12.3, iOS 15.4, watchOS 8.5, and tvOS 15.4 support, we can remove
-    // this conditional compilation
-    private typealias Instant = ContinuousClock.Instant
+        // We can use ContinuousClock on platforms that doesn't ship stdlib as stable ABI
+        // Once we drop macOS 12.3, iOS 15.4, watchOS 8.5, and tvOS 15.4 support, we can remove
+        // this conditional compilation
+        private typealias Instant = ContinuousClock.Instant
 
-    private static func getTimestamp() -> Instant {
-        ContinuousClock.now
-    }
+        private static func getTimestamp() -> Instant {
+            ContinuousClock.now
+        }
 
-    private func getDurationSinceStart() -> Int {
-        let duration = self.startTime.duration(to: .now)
-        let (seconds, attoseconds) = duration.components
-        // Convert to microseconds
-        return Int(seconds * 1_000_000 + attoseconds / 1_000_000_000_000)
-    }
+        private func getDurationSinceStart() -> Int {
+            let duration = self.startTime.duration(to: .now)
+            let (seconds, attoseconds) = duration.components
+            // Convert to microseconds
+            return Int(seconds * 1_000_000 + attoseconds / 1_000_000_000_000)
+        }
 
     #else
 
-    private typealias Instant = UInt64
+        private typealias Instant = UInt64
 
-    private static func getTimestamp() -> UInt64 {
-        let clock: SystemExtras.Clock
-        #if os(Linux)
-            clock = .boottime
-        #elseif os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-            clock = .rawMonotonic
-        #elseif os(OpenBSD) || os(FreeBSD) || os(WASI)
-            clock = .monotonic
-        #else
-            #error("Unsupported platform")
-        #endif
-        let timeSpec = try! clock.currentTime()
-        return UInt64(timeSpec.nanoseconds / 1_000 + timeSpec.seconds * 1_000_000)
-    }
-    private func getDurationSinceStart() -> Int {
-        Int(Self.getTimestamp() - startTime)
-    }
+        private static func getTimestamp() -> UInt64 {
+            let clock: SystemExtras.Clock
+            #if os(Linux)
+                clock = .boottime
+            #elseif os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+                clock = .rawMonotonic
+            #elseif os(OpenBSD) || os(FreeBSD) || os(WASI)
+                clock = .monotonic
+            #else
+                #error("Unsupported platform")
+            #endif
+            let timeSpec = try! clock.currentTime()
+            return UInt64(timeSpec.nanoseconds / 1_000 + timeSpec.seconds * 1_000_000)
+        }
+        private func getDurationSinceStart() -> Int {
+            Int(Self.getTimestamp() - startTime)
+        }
     #endif
-
 
     private let startTime: Instant
 

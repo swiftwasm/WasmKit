@@ -153,7 +153,7 @@ extension ExecutionState {
         let memoryAddress = moduleInstance.memoryAddresses[0]
         try store.withMemory(at: memoryAddress) { memoryInstance in
             let isMemory64 = memoryInstance.limit.isMemory64
-            
+
             let value = stack.popValue()
             let pageCount: UInt64
             switch (isMemory64, value) {
@@ -178,13 +178,13 @@ extension ExecutionState {
         try store.withMemory(at: memoryAddress) { memoryInstance in
             let dataAddress = moduleInstance.dataAddresses[Int(dataIndex)]
             let dataInstance = store.datas[dataAddress]
-            
+
             let copyCounter = stack.popValue().i32
             let sourceIndex = stack.popValue().i32
             let destinationIndex = stack.popValue().asAddressOffset(memoryInstance.limit.isMemory64)
-            
+
             guard copyCounter > 0 else { return }
-            
+
             guard
                 !sourceIndex.addingReportingOverflow(copyCounter).overflow
                     && !destinationIndex.addingReportingOverflow(UInt64(copyCounter)).overflow
@@ -193,11 +193,11 @@ extension ExecutionState {
             else {
                 throw Trap.outOfBoundsMemoryAccess
             }
-            
+
             // FIXME: benchmark if using `replaceSubrange` is faster than this loop
             for i in 0..<copyCounter {
                 memoryInstance.data[Int(destinationIndex + UInt64(i))] =
-                dataInstance.data[Int(sourceIndex + i)]
+                    dataInstance.data[Int(sourceIndex + i)]
             }
         }
     }
@@ -247,14 +247,14 @@ extension ExecutionState {
             let copyCounter = Int(stack.popValue().i32)
             let value = stack.popValue()
             let destinationIndex = Int(stack.popValue().i32)
-            
+
             guard
                 !destinationIndex.addingReportingOverflow(copyCounter).overflow
                     && memoryInstance.data.count >= destinationIndex + copyCounter
             else {
                 throw Trap.outOfBoundsMemoryAccess
             }
-            
+
             memoryInstance.data.replaceSubrange(
                 destinationIndex..<destinationIndex + copyCounter,
                 with: [UInt8](repeating: value.bytes![0], count: copyCounter)

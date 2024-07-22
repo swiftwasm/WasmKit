@@ -1,7 +1,7 @@
 import Foundation
 import SystemPackage
-import WasmKit
 import WAT
+import WasmKit
 
 @available(macOS 11, *)
 public func spectest(
@@ -37,26 +37,28 @@ public func spectest(
     }
 
     // https://github.com/WebAssembly/spec/tree/8a352708cffeb71206ca49a0f743bdc57269fb1a/interpreter#spectest-host-module
-    let hostModule = try parseWasm(bytes: wat2wasm("""
-        (module
-          (global (export "global_i32") i32 (i32.const 666))
-          (global (export "global_i64") i64 (i64.const 666))
-          (global (export "global_f32") f32 (f32.const 666))
-          (global (export "global_f64") f64 (f64.const 666))
+    let hostModule = try parseWasm(
+        bytes: wat2wasm(
+            """
+                (module
+                  (global (export "global_i32") i32 (i32.const 666))
+                  (global (export "global_i64") i64 (i64.const 666))
+                  (global (export "global_f32") f32 (f32.const 666))
+                  (global (export "global_f64") f64 (f64.const 666))
 
-          (table (export "table") 10 20 funcref)
+                  (table (export "table") 10 20 funcref)
 
-          (memory (export "memory") 1 2)
+                  (memory (export "memory") 1 2)
 
-          (func (export "print"))
-          (func (export "print_i32") (param i32))
-          (func (export "print_i64") (param i64))
-          (func (export "print_f32") (param f32))
-          (func (export "print_f64") (param f64))
-          (func (export "print_i32_f32") (param i32 f32))
-          (func (export "print_f64_f64") (param f64 f64))
-        )
-    """))
+                  (func (export "print"))
+                  (func (export "print_i32") (param i32))
+                  (func (export "print_i64") (param i64))
+                  (func (export "print_f32") (param f32))
+                  (func (export "print_f64") (param f64))
+                  (func (export "print_i32_f32") (param i32 f32))
+                  (func (export "print_f64_f64") (param f64 f64))
+                )
+            """))
 
     @Sendable func runTestCase(testCase: TestCase) throws -> [Result] {
         var testCaseResults = [Result]()

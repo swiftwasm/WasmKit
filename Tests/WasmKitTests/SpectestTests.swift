@@ -12,7 +12,7 @@ final class SpectestTests: XCTestCase {
         let ok = try await spectest(
             path: [
                 testsuite.path,
-                testsuite.appendingPathComponent("proposals/memory64").path
+                testsuite.appendingPathComponent("proposals/memory64").path,
             ],
             include: environment["WASMKIT_SPECTEST_INCLUDE"],
             exclude: environment["WASMKIT_SPECTEST_EXCLUDE"]

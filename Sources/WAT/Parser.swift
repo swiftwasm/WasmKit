@@ -1,6 +1,5 @@
 import WasmParser
 
-
 internal struct Parser {
     var lexer: Lexer
 
@@ -468,11 +467,13 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
             return nil
         }
         if try parser.takeParenBlockStart("f64.const"),
-           let value = try takeNaNPattern(canonical: .f64CanonicalNaN, arithmetic: .f64ArithmeticNaN) {
+            let value = try takeNaNPattern(canonical: .f64CanonicalNaN, arithmetic: .f64ArithmeticNaN)
+        {
             return value
         }
         if try parser.takeParenBlockStart("f32.const"),
-           let value = try takeNaNPattern(canonical: .f32CanonicalNaN, arithmetic: .f32ArithmeticNaN) {
+            let value = try takeNaNPattern(canonical: .f32CanonicalNaN, arithmetic: .f32ArithmeticNaN)
+        {
             return value
         }
         parser = initialParser
@@ -850,10 +851,10 @@ extension ExpressionParser {
         return try memoryIndex(watModule: &watModule)
     }
     mutating func visitI32Const(watModule: inout WatModule) throws -> Int32 {
-        return try parser.expectSignedInt(fromBitPattern: Int32.init(bitPattern: ))
+        return try parser.expectSignedInt(fromBitPattern: Int32.init(bitPattern:))
     }
     mutating func visitI64Const(watModule: inout WatModule) throws -> Int64 {
-        return try parser.expectSignedInt(fromBitPattern: Int64.init(bitPattern: ))
+        return try parser.expectSignedInt(fromBitPattern: Int64.init(bitPattern:))
     }
     mutating func visitF32Const(watModule: inout WatModule) throws -> IEEE754.Float32 {
         return try parser.expectFloat32()

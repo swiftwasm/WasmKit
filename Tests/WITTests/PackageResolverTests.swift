@@ -62,33 +62,33 @@ class PackageResolverTests: XCTestCase {
                 fileName: "pkg",
                 node: [
                     "apple.wit": """
-                        package fruit:apple
+                    package fruit:apple
 
-                        interface apple {
-                          use fruit:banana/types.{size}
-                          use fruit:peach/types.{color}
-                          type check1 = size
-                          type check2 = color
-                        }
-                        """,
+                    interface apple {
+                      use fruit:banana/types.{size}
+                      use fruit:peach/types.{color}
+                      type check1 = size
+                      type check2 = color
+                    }
+                    """,
                     "deps": [
                         "banana": [
                             "banana.wit": """
-                                package fruit:banana
+                            package fruit:banana
 
-                                interface types {
-                                  type size = u32
-                                }
-                                """
+                            interface types {
+                              type size = u32
+                            }
+                            """
                         ],
                         "peach-x": [
                             "peach.wit": """
-                                package fruit:peach
+                            package fruit:peach
 
-                                interface types {
-                                  type color = string
-                                }
-                                """
+                            interface types {
+                              type color = string
+                            }
+                            """
                         ],
                     ],
                 ]
@@ -119,33 +119,33 @@ class PackageResolverTests: XCTestCase {
                 fileName: "pkg",
                 node: [
                     "apple.wit": """
-                        package fruit:apple
+                    package fruit:apple
 
-                        interface apple {
-                          use fruit:banana/types@1.0.0.{size as size-1}
-                          use fruit:banana/types@2.0.0.{size as size-2}
-                          type check1 = size-1
-                          type check2 = size-2
-                        }
-                        """,
+                    interface apple {
+                      use fruit:banana/types@1.0.0.{size as size-1}
+                      use fruit:banana/types@2.0.0.{size as size-2}
+                      type check1 = size-1
+                      type check2 = size-2
+                    }
+                    """,
                     "deps": [
                         "banana-1.0.0": [
                             "banana.wit": """
-                                package fruit:banana@1.0.0
+                            package fruit:banana@1.0.0
 
-                                interface types {
-                                  type size = u32
-                                }
-                                """
+                            interface types {
+                              type size = u32
+                            }
+                            """
                         ],
                         "banana-2.0.0": [
                             "banana.wit": """
-                                package fruit:banana@2.0.0
+                            package fruit:banana@2.0.0
 
-                                interface types {
-                                  type size = u8
-                                }
-                                """
+                            interface types {
+                              type size = u8
+                            }
+                            """
                         ],
                     ],
                 ]

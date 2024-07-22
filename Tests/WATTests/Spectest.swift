@@ -2,10 +2,11 @@ import Foundation
 
 enum Spectest {
     static let rootDirectory = URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent() // WATTests
-        .deletingLastPathComponent() // Tests
-        .deletingLastPathComponent() // Root
-    static let vendorDirectory: URL = rootDirectory
+        .deletingLastPathComponent()  // WATTests
+        .deletingLastPathComponent()  // Tests
+        .deletingLastPathComponent()  // Root
+    static let vendorDirectory: URL =
+        rootDirectory
         .appendingPathComponent("Vendor")
 
     static var testsuitePath: URL { Self.vendorDirectory.appendingPathComponent("testsuite") }

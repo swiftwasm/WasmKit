@@ -5,12 +5,12 @@ struct TestSupport {
     struct Configuration: Codable {
         let hostSwiftExecutablePath: URL
         let hostSdkRootPath: String?
-        
+
         static let `default`: Configuration? = {
             let decoder = JSONDecoder()
             let defaultsPath = URL(fileURLWithPath: #filePath)
-                .deletingLastPathComponent() // WITExtractorPluginTests
-                .deletingLastPathComponent() // Tests
+                .deletingLastPathComponent()  // WITExtractorPluginTests
+                .deletingLastPathComponent()  // Tests
                 .appendingPathComponent("default.json")
             guard let bytes = try? Data(contentsOf: defaultsPath) else { return nil }
             return try? decoder.decode(Configuration.self, from: bytes)

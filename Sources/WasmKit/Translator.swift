@@ -53,18 +53,21 @@ struct InstructionTranslator: InstructionVisitor {
             tables: [Table]
         ) {
             self.typeSection = typeSection
-            self.functionTypeIndices = importSection.compactMap { (entry) -> TypeIndex? in
-                guard case let .function(typeIndex) = entry.descriptor else { return nil }
-                return typeIndex
-            } + functionSection
-            self.globalTypes = importSection.compactMap { (entry) -> GlobalType? in
-                guard case let .global(type) = entry.descriptor else { return nil }
-                return type
-            } + globalTypes
-            self.memoryTypes = importSection.compactMap { (entry) -> MemoryType? in
-                guard case let .memory(type) = entry.descriptor else { return nil }
-                return type
-            } + memoryTypes
+            self.functionTypeIndices =
+                importSection.compactMap { (entry) -> TypeIndex? in
+                    guard case let .function(typeIndex) = entry.descriptor else { return nil }
+                    return typeIndex
+                } + functionSection
+            self.globalTypes =
+                importSection.compactMap { (entry) -> GlobalType? in
+                    guard case let .global(type) = entry.descriptor else { return nil }
+                    return type
+                } + globalTypes
+            self.memoryTypes =
+                importSection.compactMap { (entry) -> MemoryType? in
+                    guard case let .memory(type) = entry.descriptor else { return nil }
+                    return type
+                } + memoryTypes
             self.tables = tables
         }
 
@@ -183,7 +186,7 @@ struct InstructionTranslator: InstructionVisitor {
                 guard actual == expected else {
                     throw TranslationError("Expected \(expected) on the stack top but got \(actual)")
                 }
-            case .unknown: break // OK
+            case .unknown: break  // OK
             }
         }
         mutating func popRef() throws {
@@ -192,7 +195,7 @@ struct InstructionTranslator: InstructionVisitor {
                 guard case .ref = actual else {
                     throw TranslationError("Expected reference value on the stack top but got \(actual)")
                 }
-            case .unknown: break // OK
+            case .unknown: break  // OK
             }
         }
         mutating func truncate(height: Int) {
@@ -298,17 +301,17 @@ struct InstructionTranslator: InstructionVisitor {
         mutating func pinLabelHere(_ ref: LabelRef) {
             pinLabel(ref, pc: insertingPC)
         }
-        
+
         /// Emit an instruction at the current insertion point with resolved label position
         /// - Parameters:
         ///   - ref: Label reference to be resolved
         ///   - make: Factory closure to make an inserting instruction
         mutating func emitWithLabel(_ ref: LabelRef, line: UInt = #line, make: @escaping InstructionFactoryWithLabel) {
             let insertAt = insertingPC
-            emit(.nop) // Emit dummy instruction to be replaced later
+            emit(.nop)  // Emit dummy instruction to be replaced later
             emitWithLabel(ref, insertAt: insertAt, line: line, make: make)
         }
-        
+
         /// Emit an instruction at the specified position with resolved label position
         /// - Parameters:
         ///   - ref: Label reference to be resolved
@@ -376,7 +379,7 @@ struct InstructionTranslator: InstructionVisitor {
     private func checkBeforePop(typeHint: ValueType?) throws -> Bool {
         let controlFrame = controlStack.currentFrame()
         if _slowPath(valueStack.height <= controlFrame.stackHeight) {
-            if (controlFrame.reachable) {
+            if controlFrame.reachable {
                 let message: String
                 if let typeHint {
                     message = "Expected a \(typeHint) value on stack but it's empty"
@@ -416,8 +419,8 @@ struct InstructionTranslator: InstructionVisitor {
     public mutating func finalize() -> InstructionSequence {
         iseqBuilder.pinLabelHere(self.endOfFunctionLabel)
         #if DEBUG
-        // Check dangling labels
-        iseqBuilder.assertDanglingLabels()
+            // Check dangling labels
+            iseqBuilder.assertDanglingLabels()
         #endif
         let instructions = iseqBuilder.finalize()
         // TODO: Figure out a way to avoid the copy here while keeping the execution performance.
@@ -436,21 +439,21 @@ struct InstructionTranslator: InstructionVisitor {
         markUnreachable()
     }
     mutating func visitNop() -> Output { emit(.nop) }
-    
+
     mutating func visitBlock(blockType: WasmParser.BlockType) throws -> Output {
         let blockType = try module.resolveBlockType(blockType)
         let endLabel = iseqBuilder.allocLabel()
         let stackHeight = self.valueStack.height - Int(blockType.parameters.count)
         controlStack.pushFrame(ControlStack.ControlFrame(blockType: blockType, stackHeight: stackHeight, continuation: endLabel, kind: .block))
     }
-    
+
     mutating func visitLoop(blockType: WasmParser.BlockType) throws -> Output {
         let blockType = try module.resolveBlockType(blockType)
         let headLabel = iseqBuilder.putLabel()
         let stackHeight = self.valueStack.height - Int(blockType.parameters.count)
         controlStack.pushFrame(ControlStack.ControlFrame(blockType: blockType, stackHeight: stackHeight, continuation: headLabel, kind: .loop))
     }
-    
+
     mutating func visitIf(blockType: WasmParser.BlockType) throws -> Output {
         // Pop condition value
         try popOperand(.i32)
@@ -475,7 +478,7 @@ struct InstructionTranslator: InstructionVisitor {
             return .ifThen(elseOrEndRef: elseOrEndRef)
         }
     }
-    
+
     mutating func visitElse() throws -> Output {
         let frame = controlStack.currentFrame()
         guard case let .if(elseLabel, endLabel) = frame.kind else {
@@ -493,7 +496,7 @@ struct InstructionTranslator: InstructionVisitor {
         }
         iseqBuilder.pinLabelHere(elseLabel)
     }
-    
+
     mutating func visitEnd() -> Output {
         let poppedFrame = controlStack.popFrame()
 
@@ -567,7 +570,7 @@ struct InstructionTranslator: InstructionVisitor {
         }
         markUnreachable()
     }
-    
+
     mutating func visitBrIf(relativeDepth: UInt32) throws -> Output {
         try popOperand(.i32)
         emitBranch(relativeDepth: relativeDepth) { offset, copyCount, popCount in
@@ -577,9 +580,9 @@ struct InstructionTranslator: InstructionVisitor {
             )
         }
     }
-    
+
     mutating func visitBrTable(targets: WasmParser.BrTable) throws -> Output {
-        try popOperand(.i32) // Table index
+        try popOperand(.i32)  // Table index
 
         let allLabelIndices = targets.labelIndices + [targets.defaultIndex]
         let tableBuffer = allocator.allocateBrTable(capacity: allLabelIndices.count)
@@ -613,12 +616,12 @@ struct InstructionTranslator: InstructionVisitor {
         }
         markUnreachable()
     }
-    
+
     mutating func visitReturn() -> Output {
         translateReturn()
         markUnreachable()
     }
-    
+
     private mutating func visitCallLike(calleeType: FunctionType) throws {
         for parameter in calleeType.parameters.reversed() {
             try popOperand(parameter)
@@ -632,9 +635,9 @@ struct InstructionTranslator: InstructionVisitor {
         try visitCallLike(calleeType: calleeType)
         emit(.call(functionIndex: functionIndex))
     }
-    
+
     mutating func visitCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws -> Output {
-        try popOperand(.i32) // function address
+        try popOperand(.i32)  // function address
         let calleeType = self.module.resolveType(typeIndex)
         try visitCallLike(calleeType: calleeType)
         emit(.callIndirect(tableIndex: tableIndex, typeIndex: typeIndex))
@@ -759,10 +762,10 @@ struct InstructionTranslator: InstructionVisitor {
         // Just pop/push the same type (i64 or i32) value
         emit(.memoryGrow)
     }
-    mutating func visitI32Const(value: Int32)-> Output { pushEmit(.i32, .numericConst(.i32(UInt32(bitPattern: value)))) }
-    mutating func visitI64Const(value: Int64)-> Output { pushEmit(.i64, .numericConst(.i64(UInt64(bitPattern: value)))) }
-    mutating func visitF32Const(value: IEEE754.Float32)-> Output { pushEmit(.f32, .numericConst(.f32(value.bitPattern))) }
-    mutating func visitF64Const(value: IEEE754.Float64)-> Output { pushEmit(.f64, .numericConst(.f64(value.bitPattern))) }
+    mutating func visitI32Const(value: Int32) -> Output { pushEmit(.i32, .numericConst(.i32(UInt32(bitPattern: value)))) }
+    mutating func visitI64Const(value: Int64) -> Output { pushEmit(.i64, .numericConst(.i64(UInt64(bitPattern: value)))) }
+    mutating func visitF32Const(value: IEEE754.Float32) -> Output { pushEmit(.f32, .numericConst(.f32(value.bitPattern))) }
+    mutating func visitF64Const(value: IEEE754.Float64) -> Output { pushEmit(.f64, .numericConst(.f64(value.bitPattern))) }
     mutating func visitRefNull(type: WasmParser.ReferenceType) -> Output { pushEmit(.ref(type), .refNull(type)) }
     mutating func visitRefIsNull() throws -> Output {
         try valueStack.popRef()
@@ -827,46 +830,46 @@ struct InstructionTranslator: InstructionVisitor {
     mutating func visitI32Clz() throws -> Output { try visitUnary(.i32, .i32Clz) }
     mutating func visitI32Ctz() throws -> Output { try visitUnary(.i32, .i32Ctz) }
     mutating func visitI32Popcnt() throws -> Output { try visitUnary(.i32, .i32Popcnt) }
-    mutating func visitI32Add() throws-> Output { try visitBinary(.i32, .i32, .i32Add) }
-    mutating func visitI32Sub() throws-> Output { try visitBinary(.i32, .i32, .i32Sub) }
-    mutating func visitI32Mul() throws-> Output { try visitBinary(.i32, .i32, .i32Mul) }
-    mutating func visitI32DivS() throws-> Output { try visitBinary(.i32, .i32, .i32DivS) }
-    mutating func visitI32DivU() throws-> Output { try visitBinary(.i32, .i32, .i32DivU) }
-    mutating func visitI32RemS() throws-> Output { try visitBinary(.i32, .i32, .i32RemS) }
-    mutating func visitI32RemU() throws-> Output { try visitBinary(.i32, .i32, .i32RemU) }
-    mutating func visitI32And() throws-> Output { try visitBinary(.i32, .i32, .i32And) }
-    mutating func visitI32Or() throws-> Output { try visitBinary(.i32, .i32, .i32Or) }
-    mutating func visitI32Xor() throws-> Output { try visitBinary(.i32, .i32, .i32Xor) }
-    mutating func visitI32Shl() throws-> Output { try visitBinary(.i32, .i32, .i32Shl) }
-    mutating func visitI32ShrS() throws-> Output { try visitBinary(.i32, .i32, .i32ShrS) }
-    mutating func visitI32ShrU() throws-> Output { try visitBinary(.i32, .i32, .i32ShrU) }
-    mutating func visitI32Rotl() throws-> Output { try visitBinary(.i32, .i32, .i32Rotl) }
-    mutating func visitI32Rotr() throws-> Output { try visitBinary(.i32, .i32, .i32Rotr) }
+    mutating func visitI32Add() throws -> Output { try visitBinary(.i32, .i32, .i32Add) }
+    mutating func visitI32Sub() throws -> Output { try visitBinary(.i32, .i32, .i32Sub) }
+    mutating func visitI32Mul() throws -> Output { try visitBinary(.i32, .i32, .i32Mul) }
+    mutating func visitI32DivS() throws -> Output { try visitBinary(.i32, .i32, .i32DivS) }
+    mutating func visitI32DivU() throws -> Output { try visitBinary(.i32, .i32, .i32DivU) }
+    mutating func visitI32RemS() throws -> Output { try visitBinary(.i32, .i32, .i32RemS) }
+    mutating func visitI32RemU() throws -> Output { try visitBinary(.i32, .i32, .i32RemU) }
+    mutating func visitI32And() throws -> Output { try visitBinary(.i32, .i32, .i32And) }
+    mutating func visitI32Or() throws -> Output { try visitBinary(.i32, .i32, .i32Or) }
+    mutating func visitI32Xor() throws -> Output { try visitBinary(.i32, .i32, .i32Xor) }
+    mutating func visitI32Shl() throws -> Output { try visitBinary(.i32, .i32, .i32Shl) }
+    mutating func visitI32ShrS() throws -> Output { try visitBinary(.i32, .i32, .i32ShrS) }
+    mutating func visitI32ShrU() throws -> Output { try visitBinary(.i32, .i32, .i32ShrU) }
+    mutating func visitI32Rotl() throws -> Output { try visitBinary(.i32, .i32, .i32Rotl) }
+    mutating func visitI32Rotr() throws -> Output { try visitBinary(.i32, .i32, .i32Rotr) }
     mutating func visitI64Clz() throws -> Output { try visitUnary(.i64, .i64Clz) }
     mutating func visitI64Ctz() throws -> Output { try visitUnary(.i64, .i64Ctz) }
     mutating func visitI64Popcnt() throws -> Output { try visitUnary(.i64, .i64Popcnt) }
-    mutating func visitI64Add() throws-> Output { try visitBinary(.i64, .i64, .i64Add) }
-    mutating func visitI64Sub() throws-> Output { try visitBinary(.i64, .i64, .i64Sub) }
-    mutating func visitI64Mul() throws-> Output { try visitBinary(.i64, .i64, .i64Mul) }
-    mutating func visitI64DivS() throws-> Output { try visitBinary(.i64, .i64, .i64DivS)}
-    mutating func visitI64DivU() throws-> Output { try visitBinary(.i64, .i64, .i64DivU)}
-    mutating func visitI64RemS() throws-> Output { try visitBinary(.i64, .i64, .i64RemS)}
-    mutating func visitI64RemU() throws-> Output { try visitBinary(.i64, .i64, .i64RemU)}
-    mutating func visitI64And() throws-> Output { try visitBinary(.i64, .i64, .i64And)}
-    mutating func visitI64Or() throws-> Output { try visitBinary(.i64, .i64, .i64Or)}
-    mutating func visitI64Xor() throws-> Output { try visitBinary(.i64, .i64, .i64Xor)}
-    mutating func visitI64Shl() throws-> Output { try visitBinary(.i64, .i64, .i64Shl)}
-    mutating func visitI64ShrS() throws-> Output { try visitBinary(.i64, .i64, .i64ShrS)}
-    mutating func visitI64ShrU() throws-> Output { try visitBinary(.i64, .i64, .i64ShrU)}
-    mutating func visitI64Rotl() throws-> Output { try visitBinary(.i64, .i64, .i64Rotl)}
-    mutating func visitI64Rotr() throws-> Output { try visitBinary(.i64, .i64, .i64Rotr)}
-    mutating func visitF32Abs() throws -> Output { try visitUnary(.f32, .f32Abs)}
-    mutating func visitF32Neg() throws -> Output { try visitUnary(.f32, .f32Neg)}
-    mutating func visitF32Ceil() throws -> Output { try visitUnary(.f32, .f32Ceil)}
-    mutating func visitF32Floor() throws -> Output { try visitUnary(.f32, .f32Floor)}
-    mutating func visitF32Trunc() throws -> Output { try visitUnary(.f32, .f32Trunc)}
-    mutating func visitF32Nearest() throws -> Output { try visitUnary(.f32, .f32Nearest)}
-    mutating func visitF32Sqrt() throws -> Output { try visitUnary(.f32, .f32Sqrt)}
+    mutating func visitI64Add() throws -> Output { try visitBinary(.i64, .i64, .i64Add) }
+    mutating func visitI64Sub() throws -> Output { try visitBinary(.i64, .i64, .i64Sub) }
+    mutating func visitI64Mul() throws -> Output { try visitBinary(.i64, .i64, .i64Mul) }
+    mutating func visitI64DivS() throws -> Output { try visitBinary(.i64, .i64, .i64DivS) }
+    mutating func visitI64DivU() throws -> Output { try visitBinary(.i64, .i64, .i64DivU) }
+    mutating func visitI64RemS() throws -> Output { try visitBinary(.i64, .i64, .i64RemS) }
+    mutating func visitI64RemU() throws -> Output { try visitBinary(.i64, .i64, .i64RemU) }
+    mutating func visitI64And() throws -> Output { try visitBinary(.i64, .i64, .i64And) }
+    mutating func visitI64Or() throws -> Output { try visitBinary(.i64, .i64, .i64Or) }
+    mutating func visitI64Xor() throws -> Output { try visitBinary(.i64, .i64, .i64Xor) }
+    mutating func visitI64Shl() throws -> Output { try visitBinary(.i64, .i64, .i64Shl) }
+    mutating func visitI64ShrS() throws -> Output { try visitBinary(.i64, .i64, .i64ShrS) }
+    mutating func visitI64ShrU() throws -> Output { try visitBinary(.i64, .i64, .i64ShrU) }
+    mutating func visitI64Rotl() throws -> Output { try visitBinary(.i64, .i64, .i64Rotl) }
+    mutating func visitI64Rotr() throws -> Output { try visitBinary(.i64, .i64, .i64Rotr) }
+    mutating func visitF32Abs() throws -> Output { try visitUnary(.f32, .f32Abs) }
+    mutating func visitF32Neg() throws -> Output { try visitUnary(.f32, .f32Neg) }
+    mutating func visitF32Ceil() throws -> Output { try visitUnary(.f32, .f32Ceil) }
+    mutating func visitF32Floor() throws -> Output { try visitUnary(.f32, .f32Floor) }
+    mutating func visitF32Trunc() throws -> Output { try visitUnary(.f32, .f32Trunc) }
+    mutating func visitF32Nearest() throws -> Output { try visitUnary(.f32, .f32Nearest) }
+    mutating func visitF32Sqrt() throws -> Output { try visitUnary(.f32, .f32Sqrt) }
     mutating func visitF32Add() throws -> Output { try visitBinary(.f32, .f32, .f32Add) }
     mutating func visitF32Sub() throws -> Output { try visitBinary(.f32, .f32, .f32Sub) }
     mutating func visitF32Mul() throws -> Output { try visitBinary(.f32, .f32, .f32Mul) }
@@ -962,7 +965,6 @@ struct InstructionTranslator: InstructionVisitor {
     mutating func visitI64TruncSatF64U() throws -> Output { try visitConversion(.f64, .i64, .i64TruncSatF64U) }
 }
 
-
 struct TranslationError: Error, CustomStringConvertible {
     let description: String
 
@@ -971,14 +973,14 @@ struct TranslationError: Error, CustomStringConvertible {
     }
 }
 
-fileprivate extension ExpressionRef {
-    init(from source: InstructionTranslator.MetaProgramCounter, to destination: InstructionTranslator.MetaProgramCounter) {
+extension ExpressionRef {
+    fileprivate init(from source: InstructionTranslator.MetaProgramCounter, to destination: InstructionTranslator.MetaProgramCounter) {
         self.init(destination.offsetFromHead - source.offsetFromHead)
     }
 }
 
-fileprivate extension FunctionType {
-    init(blockType: WasmParser.BlockType, typeSection: [FunctionType]) throws {
+extension FunctionType {
+    fileprivate init(blockType: WasmParser.BlockType, typeSection: [FunctionType]) throws {
         switch blockType {
         case .type(let valueType):
             self.init(parameters: [], results: [valueType])

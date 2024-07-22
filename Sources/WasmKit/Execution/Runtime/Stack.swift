@@ -46,7 +46,7 @@ struct Stack {
         self.valueStack.truncate(length: popped.baseStackAddress.valueFrameIndex)
     }
 
-    mutating func popValues(count: Int) -> Array<Value> {
+    mutating func popValues(count: Int) -> [Value] {
         self.valueStack.popValues(count: count)
     }
     mutating func popValue() -> Value {
@@ -135,11 +135,11 @@ struct ValueStack {
     mutating func truncate(length: Int) {
         self.nextPointer = self.values.baseAddress!.advanced(by: length)
     }
-    mutating func popValues(count: Int) -> Array<Value> {
+    mutating func popValues(count: Int) -> [Value] {
         guard count > 0 else { return [] }
         var values = [Value]()
         values.reserveCapacity(count)
-        for idx in self.count-count..<self.count {
+        for idx in self.count - count..<self.count {
             values.append(self.values[idx])
         }
         self.nextPointer = self.nextPointer.advanced(by: -count)

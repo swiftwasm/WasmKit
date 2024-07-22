@@ -48,16 +48,16 @@ struct TestSupport {
         var template = [UInt8](templatePath.path.utf8).map({ Int8($0) }) + [Int8(0)]
 
         #if os(Windows)
-        if _mktemp_s(&template, template.count) != 0 {
-            throw Error(errno: errno)
-        }
-        if _mkdir(template) != 0 {
-            throw Error(errno: errno)
-        }
+            if _mktemp_s(&template, template.count) != 0 {
+                throw Error(errno: errno)
+            }
+            if _mkdir(template) != 0 {
+                throw Error(errno: errno)
+            }
         #else
-        if mkdtemp(&template) == nil {
-            throw Error(errno: errno)
-        }
+            if mkdtemp(&template) == nil {
+                throw Error(errno: errno)
+            }
         #endif
 
         let path = String(cString: template)

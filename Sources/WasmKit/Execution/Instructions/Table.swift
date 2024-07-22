@@ -137,7 +137,7 @@ extension ExecutionState {
         let elementAddress = currentModule(store: runtime.store, stack: &stack).elementAddresses[Int(elementIndex)]
         runtime.store.elements[elementAddress].drop()
     }
-    
+
     fileprivate func setTableElement(
         store: Store,
         tableAddress: TableAddress,

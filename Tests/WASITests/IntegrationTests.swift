@@ -1,8 +1,8 @@
-import XCTest
 import Foundation
-import WasmKitWASI
-import WasmKit
 import SystemPackage
+import WasmKit
+import WasmKitWASI
+import XCTest
 
 final class IntegrationTests: XCTestCase {
     func testRunAll() throws {
@@ -21,33 +21,32 @@ final class IntegrationTests: XCTestCase {
 
     static var skipTests: [String: [String: String]] {
         #if os(Windows)
-        return [
-            "WASI Assemblyscript tests": [:],
-            "WASI C tests": [
-                "fdopendir-with-access": "Not implemented",
-                "fopen-with-access": "Not implemented",
-                "lseek": "Not implemented",
-                "pread-with-access": "Not implemented",
-                "pwrite-with-access": "Not implemented",
-                "stat-dev-ino": "Not implemented"
-            ],
-            "WASI Rust tests": [
-                "close_preopen": "Not implemented",
-                "dangling_fd": "Not implemented",
-                "dangling_symlink": "Not implemented",
-                "directory_seek": "Not implemented",
-                "fd_advise": "Not implemented",
-                "fd_filestat_set": "Not implemented",
-                "fd_flags_set": "Not implemented",
-                "fd_readdir": "Not implemented",
-                "interesting_paths": "Not implemented"
+            return [
+                "WASI Assemblyscript tests": [:],
+                "WASI C tests": [
+                    "fdopendir-with-access": "Not implemented",
+                    "fopen-with-access": "Not implemented",
+                    "lseek": "Not implemented",
+                    "pread-with-access": "Not implemented",
+                    "pwrite-with-access": "Not implemented",
+                    "stat-dev-ino": "Not implemented",
+                ],
+                "WASI Rust tests": [
+                    "close_preopen": "Not implemented",
+                    "dangling_fd": "Not implemented",
+                    "dangling_symlink": "Not implemented",
+                    "directory_seek": "Not implemented",
+                    "fd_advise": "Not implemented",
+                    "fd_filestat_set": "Not implemented",
+                    "fd_flags_set": "Not implemented",
+                    "fd_readdir": "Not implemented",
+                    "interesting_paths": "Not implemented",
+                ],
             ]
-        ]
         #else
-        return [:]
+            return [:]
         #endif
     }
-
 
     func runTestSuite(path: URL) throws {
         let manifestPath = path.appendingPathComponent("manifest.json")

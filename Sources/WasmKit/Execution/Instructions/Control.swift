@@ -21,10 +21,10 @@ extension ExecutionState {
         fatalError()
     }
     mutating func `else`(runtime: Runtime, stack: inout Stack, endRef: ExpressionRef) {
-        programCounter += endRef.relativeOffset // if-then-else's continuation points the "end"
+        programCounter += endRef.relativeOffset  // if-then-else's continuation points the "end"
     }
     private mutating func branch(stack: inout Stack, offset: Int32, copyCount: UInt32, popCount: UInt32) throws {
-        if popCount > 0 { // TODO: Maybe worth to have a special instruction for popCount=0?
+        if popCount > 0 {  // TODO: Maybe worth to have a special instruction for popCount=0?
             stack.copyValues(copyCount: Int(copyCount), popCount: Int(popCount))
         }
         programCounter += Int(offset)
@@ -65,9 +65,9 @@ extension ExecutionState {
     private mutating func endOfFunction(runtime: Runtime, stack: inout Stack, currentFrame: Frame) throws {
         // When reached at "end" of function
         #if DEBUG
-        if let address = currentFrame.address {
-            runtime.interceptor?.onExitFunction(address, store: runtime.store)
-        }
+            if let address = currentFrame.address {
+                runtime.interceptor?.onExitFunction(address, store: runtime.store)
+            }
         #endif
         let values = stack.popValues(count: currentFrame.arity)
         stack.popFrame()

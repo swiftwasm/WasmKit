@@ -6,15 +6,16 @@ public typealias WASIBridgeToHost = WASI.WASIBridgeToHost
 extension WASIBridgeToHost {
     public var hostModules: [String: HostModule] {
         wasiHostModules.mapValues {
-            HostModule(functions: $0.functions.mapValues { function in
-                HostFunction(type: function.type) { caller, values in
-                    guard case let .memory(memoryAddr) = caller.instance.exports["memory"] else {
-                        throw WASIError(description: "Missing required \"memory\" export")
+            HostModule(
+                functions: $0.functions.mapValues { function in
+                    HostFunction(type: function.type) { caller, values in
+                        guard case let .memory(memoryAddr) = caller.instance.exports["memory"] else {
+                            throw WASIError(description: "Missing required \"memory\" export")
+                        }
+                        let memory = WasmKitGuestMemory(store: caller.store, address: memoryAddr)
+                        return try function.implementation(memory, values)
                     }
-                    let memory = WasmKitGuestMemory(store: caller.store, address: memoryAddr)
-                    return try function.implementation(memory, values)
-                }
-            })
+                })
         }
     }
 

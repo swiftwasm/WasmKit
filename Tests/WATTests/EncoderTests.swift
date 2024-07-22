@@ -1,6 +1,6 @@
-import XCTest
 import Foundation
 import WasmParser
+import XCTest
 
 @testable import WAT
 

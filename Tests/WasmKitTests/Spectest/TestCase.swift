@@ -1,8 +1,8 @@
 import Foundation
 import SystemPackage
+import WAT
 import WasmKit
 import WasmParser
-import WAT
 
 struct TestCase {
     enum Error: Swift.Error {
@@ -132,7 +132,7 @@ extension WastDirective {
         rootPath: String,
         handler: (WastDirective, Result) -> Void
     ) {
-        
+
         func deriveModuleInstance(from execute: WastExecute) throws -> ModuleInstance? {
             switch execute {
             case .invoke(let invoke):
@@ -507,18 +507,18 @@ extension Swift.Error {
 }
 
 #if os(Windows)
-import WinSDK
+    import WinSDK
 #endif
 internal func isDirectory(_ path: FilePath) -> Bool {
     #if os(Windows)
-    return path.withPlatformString {
-        let result = GetFileAttributesW($0)
-        return result != INVALID_FILE_ATTRIBUTES && result & DWORD(FILE_ATTRIBUTE_DIRECTORY) != 0
-    }
+        return path.withPlatformString {
+            let result = GetFileAttributesW($0)
+            return result != INVALID_FILE_ATTRIBUTES && result & DWORD(FILE_ATTRIBUTE_DIRECTORY) != 0
+        }
     #else
-    let fd = try? FileDescriptor.open(path, FileDescriptor.AccessMode.readOnly, options: .directory)
-    let isDirectory = fd != nil
-    try? fd?.close()
-    return isDirectory
+        let fd = try? FileDescriptor.open(path, FileDescriptor.AccessMode.readOnly, options: .directory)
+        let isDirectory = fd != nil
+        try? fd?.close()
+        return isDirectory
     #endif
 }

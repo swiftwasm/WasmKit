@@ -1,6 +1,7 @@
-import XCTest
-import WasmKit
 import WIT
+import WasmKit
+import XCTest
+
 @testable import WITOverlayGenerator
 
 class RuntimeTypesTests: XCTestCase {
@@ -99,7 +100,7 @@ class RuntimeTypesTests: XCTestCase {
             XCTAssertEqual(value4, .some(nil))
 
             let value5 = try component.returnSomeSome(runtime: runtime)
-            XCTAssertEqual(value5, .some(33550336))
+            XCTAssertEqual(value5, .some(33_550_336))
 
             for value in [.some(1), nil] as [UInt32?] {
                 let value6 = try component.roundtrip(runtime: runtime, v: value)
@@ -158,7 +159,7 @@ class RuntimeTypesTests: XCTestCase {
         var harness = try RuntimeTestHarness(fixture: "Variant")
         try harness.build(link: VariantTestWorld.link(_:)) { (runtime, instance) in
             let component = VariantTestWorld(moduleInstance: instance)
-            XCTAssertEqual(try component.returnSingle(runtime: runtime), .a(33550336))
+            XCTAssertEqual(try component.returnSingle(runtime: runtime), .a(33_550_336))
 
             let value1 = try component.returnLarge(runtime: runtime)
             guard case let .c256(value1) = value1 else {

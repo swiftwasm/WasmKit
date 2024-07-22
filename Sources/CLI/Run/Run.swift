@@ -1,7 +1,7 @@
 import ArgumentParser
 import SystemPackage
-import WasmKitWASI
 import WasmKit
+import WasmKitWASI
 
 struct Run: ParsableCommand {
     @Flag
@@ -54,9 +54,9 @@ struct Run: ParsableCommand {
 
         let interceptor = try deriveInterceptor()
         #if !DEBUG
-        guard interceptor == nil else {
-            fatalError("Internal Error: Interceptor API is unavailable with Release build due to performance reasons")
-        }
+            guard interceptor == nil else {
+                fatalError("Internal Error: Interceptor API is unavailable with Release build due to performance reasons")
+            }
         #endif
         defer { interceptor?.finalize() }
 

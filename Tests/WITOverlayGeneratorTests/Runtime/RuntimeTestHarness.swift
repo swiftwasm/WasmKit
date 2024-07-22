@@ -1,8 +1,9 @@
 import Foundation
+import WIT
 import WasmKit
 import WasmKitWASI
-import WIT
 import XCTest
+
 @testable import WITOverlayGenerator
 
 /// This harness expects the following directory structure:
@@ -51,28 +52,30 @@ struct RuntimeTestHarness {
         self.fixturePath = RuntimeTestHarness.testsDirectory
             .appendingPathComponent("Fixtures").appendingPathComponent(fixture)
         guard let configuration else {
-            throw XCTSkip("""
-            Please create 'Tests/default.json' with this or similar contents:
-            {
-                "swiftExecutablePath": "$HOME/Library/Developer/Toolchains/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a.xctoolchain/usr/bin/swift",
-                "wasiSwiftSDKPath": "$HOME/Library/org.swift.swiftpm/swift-sdks/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi.artifactbundle/DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi/wasm32-unknown-wasi"
-            }
+            throw XCTSkip(
+                """
+                Please create 'Tests/default.json' with this or similar contents:
+                {
+                    "swiftExecutablePath": "$HOME/Library/Developer/Toolchains/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a.xctoolchain/usr/bin/swift",
+                    "wasiSwiftSDKPath": "$HOME/Library/org.swift.swiftpm/swift-sdks/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi.artifactbundle/DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi/wasm32-unknown-wasi"
+                }
 
 
-            or specify `configuration` parameter in your test code.
-            """)
+                or specify `configuration` parameter in your test code.
+                """)
         }
         self.configuration = configuration
         self.fileManager = fileManager
     }
 
-    static let testsDirectory: URL =  URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent() // Runtime
-        .deletingLastPathComponent() // WITOverlayGeneratorTests
+    static let testsDirectory: URL = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()  // Runtime
+        .deletingLastPathComponent()  // WITOverlayGeneratorTests
 
-    static let sourcesDirectory: URL = testsDirectory
-        .deletingLastPathComponent() // Tests
-        .deletingLastPathComponent() // Package root
+    static let sourcesDirectory: URL =
+        testsDirectory
+        .deletingLastPathComponent()  // Tests
+        .deletingLastPathComponent()  // Package root
         .appendingPathComponent("Sources")
 
     static func createTemporaryFile(suffix: String = "") -> String {
@@ -126,11 +129,11 @@ struct RuntimeTestHarness {
         for compile in [compileForEmbedded, compileForWASI] {
             defer { cleanupTemporaryFiles() }
             let compiled = try compile(collectGuestInputFiles())
-            
+
             let wasi = try WASIBridgeToHost(args: [compiled.path])
             var hostModules: [String: HostModule] = wasi.hostModules
             link(&hostModules)
-            
+
             let module = try parseWasm(filePath: .init(compiled.path))
             let runtime = Runtime(hostModules: hostModules)
             let instance = try runtime.instantiate(module: module)
@@ -146,31 +149,37 @@ struct RuntimeTestHarness {
             .appendingPathComponent("Compiled")
             .appendingPathComponent("MinLibc.o")
         FileManager.default.createFile(atPath: libcObjFile.deletingLastPathComponent().path, contents: nil, attributes: nil)
-        try compileToObj(cInputFiles: [libc.path], arguments: [
-            "-target", "wasm32-unknown-none-wasm",
-            // Enable bulk memory operations for `realloc`
-            "-mbulk-memory",
-        ], outputPath: libcObjFile)
+        try compileToObj(
+            cInputFiles: [libc.path],
+            arguments: [
+                "-target", "wasm32-unknown-none-wasm",
+                // Enable bulk memory operations for `realloc`
+                "-mbulk-memory",
+            ], outputPath: libcObjFile)
 
-        return try compile(inputFiles: inputFiles + [libcObjFile.path], arguments: [
-            "-target", "wasm32-unknown-none-wasm",
-            "-enable-experimental-feature", "Embedded",
-            "-wmo", "-Xcc", "-fdeclspec",
-            "-Xfrontend", "-disable-stack-protector",
-            "-Xlinker", "--no-entry", "-Xclang-linker", "-nostdlib",
-        ])
+        return try compile(
+            inputFiles: inputFiles + [libcObjFile.path],
+            arguments: [
+                "-target", "wasm32-unknown-none-wasm",
+                "-enable-experimental-feature", "Embedded",
+                "-wmo", "-Xcc", "-fdeclspec",
+                "-Xfrontend", "-disable-stack-protector",
+                "-Xlinker", "--no-entry", "-Xclang-linker", "-nostdlib",
+            ])
     }
 
     func compileForWASI(inputFiles: [String]) throws -> URL {
-        return try compile(inputFiles: inputFiles, arguments: [
-            "-target", "wasm32-unknown-wasi",
-            "-static-stdlib",
-            "-Xclang-linker", "-mexec-model=reactor",
-            "-resource-dir", configuration.wasiSwiftSDKPath.appendingPathComponent( "/swift.xctoolchain/usr/lib/swift_static").path,
-            "-sdk", configuration.wasiSwiftSDKPath.appendingPathComponent("WASI.sdk").path,
-            "-Xclang-linker", "-resource-dir",
-            "-Xclang-linker", configuration.wasiSwiftSDKPath.appendingPathComponent("swift.xctoolchain/usr/lib/swift_static/clang").path
-        ])
+        return try compile(
+            inputFiles: inputFiles,
+            arguments: [
+                "-target", "wasm32-unknown-wasi",
+                "-static-stdlib",
+                "-Xclang-linker", "-mexec-model=reactor",
+                "-resource-dir", configuration.wasiSwiftSDKPath.appendingPathComponent("/swift.xctoolchain/usr/lib/swift_static").path,
+                "-sdk", configuration.wasiSwiftSDKPath.appendingPathComponent("WASI.sdk").path,
+                "-Xclang-linker", "-resource-dir",
+                "-Xclang-linker", configuration.wasiSwiftSDKPath.appendingPathComponent("swift.xctoolchain/usr/lib/swift_static/clang").path,
+            ])
     }
 
     /// Compile the given input Swift source files into core Wasm module
@@ -181,12 +190,13 @@ struct RuntimeTestHarness {
         try fileManager.createDirectory(at: outputPath.deletingLastPathComponent(), withIntermediateDirectories: true)
         let process = Process()
         process.launchPath = configuration.swiftCompilerExecutablePath.path
-        process.arguments = inputFiles + arguments + [
-            "-I\(Self.sourcesDirectory.appendingPathComponent("_CabiShims").appendingPathComponent("include").path)",
-            // TODO: Remove `--export-all` linker option by replacing `@_cdecl` with `@_expose(wasm)`
-            "-Xlinker", "--export-all",
-            "-o", outputPath.path
-        ]
+        process.arguments =
+            inputFiles + arguments + [
+                "-I\(Self.sourcesDirectory.appendingPathComponent("_CabiShims").appendingPathComponent("include").path)",
+                // TODO: Remove `--export-all` linker option by replacing `@_cdecl` with `@_expose(wasm)`
+                "-Xlinker", "--export-all",
+                "-o", outputPath.path,
+            ]
         // NOTE: Clear environment variables to avoid inheriting from the current process.
         //       A test process launched by SwiftPM includes SDKROOT environment variable
         //       and it makes Swift Driver wrongly pick the SDK root from the environment
@@ -200,15 +210,15 @@ struct RuntimeTestHarness {
                 // MARK: - \($0)
                 \((try? String(contentsOfFile: $0)) ?? "Failed to read \($0)")
                 """
-            }.joined(separator: "\n====================\n")      
+            }.joined(separator: "\n====================\n")
             let message = """
-            Failed to execute \(
+                Failed to execute \(
                 ([configuration.swiftCompilerExecutablePath.path] + (process.arguments ?? [])).joined(separator: " ")
-            )
-            Exit status: \(process.terminationStatus)
-            Input files:
-            \(fileContents)
-            """
+                )
+                Exit status: \(process.terminationStatus)
+                Input files:
+                \(fileContents)
+                """
             throw Error(description: message)
         }
         return outputPath
@@ -218,22 +228,24 @@ struct RuntimeTestHarness {
     func compileToObj(cInputFiles: [String], arguments: [String], outputPath: URL) throws {
         let process = Process()
         // Assume that clang is placed alongside swiftc
-        process.launchPath = configuration.swiftCompilerExecutablePath
+        process.launchPath =
+            configuration.swiftCompilerExecutablePath
             .deletingLastPathComponent().appendingPathComponent("clang").path
-        process.arguments = cInputFiles + arguments + [
-            "-c",
-            "-o", outputPath.path
-        ]
+        process.arguments =
+            cInputFiles + arguments + [
+                "-c",
+                "-o", outputPath.path,
+            ]
         process.environment = [:]
         process.launch()
         process.waitUntilExit()
         guard process.terminationStatus == 0 else {
             let message = """
-            Failed to execute \(
+                Failed to execute \(
                 ([configuration.swiftCompilerExecutablePath.path] + (process.arguments ?? [])).joined(separator: " ")
-            )
-            Exit status: \(process.terminationStatus)
-            """
+                )
+                Exit status: \(process.terminationStatus)
+                """
             throw Error(description: message)
         }
     }

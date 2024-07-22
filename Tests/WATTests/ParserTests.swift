@@ -1,6 +1,6 @@
-import XCTest
 import Foundation
 import WasmParser
+import XCTest
 
 @testable import WAT
 
@@ -34,13 +34,15 @@ class ParserTests: XCTestCase {
             parseBinaryModule(#"(module binary "\00asm\01\00\00\00")"#)?.source,
             [0, 97, 115, 109, 1, 0, 0, 0]
         )
-        try XCTAssertEqual(parseBinaryModule(#"""
-            (module binary
-            "\00asm" "\01\00\00\00"
-            ;; comment between strings
-            "foo"
-            )
-            """#)?.source,
+        try XCTAssertEqual(
+            parseBinaryModule(
+                #"""
+                (module binary
+                "\00asm" "\01\00\00\00"
+                ;; comment between strings
+                "foo"
+                )
+                """#)?.source,
             [0, 97, 115, 109, 1, 0, 0, 0, 102, 111, 111]
         )
 
@@ -52,18 +54,19 @@ class ParserTests: XCTestCase {
     }
 
     func testParseWastModule() throws {
-        var parser = WastParser(#"""
-        (module
-          ;; comment here
-          (memory 1)
+        var parser = WastParser(
+            #"""
+            (module
+              ;; comment here
+              (memory 1)
 
-          (func $dummy)
+              (func $dummy)
 
-          (func (export "empty")
-            (unknown expr)
-          )
-        )
-        """#)
+              (func (export "empty")
+                (unknown expr)
+              )
+            )
+            """#)
 
         while let directive = try parser.nextDirective() {
             switch directive {
@@ -77,25 +80,27 @@ class ParserTests: XCTestCase {
             }
         }
     }
-    
+
     func testParseWastModuleSkip() throws {
-        let directives = try parseWast(#"""
-        (module
-          ;; comment here
-          (memory 1)
+        let directives = try parseWast(
+            #"""
+            (module
+              ;; comment here
+              (memory 1)
 
-          (func $dummy)
+              (func $dummy)
 
-          (func (export "empty")
-            (unknown expr)
-          )
-        )
-        (module binary "ok")
-        """#)
+              (func (export "empty")
+                (unknown expr)
+              )
+            )
+            (module binary "ok")
+            """#)
 
         XCTAssertEqual(directives.count, 2)
         guard case let .module(directive) = try XCTUnwrap(directives.last),
-                case let .binary(content) = directive.source else {
+            case let .binary(content) = directive.source
+        else {
             return
         }
         XCTAssertEqual(content, Array("ok".utf8))
@@ -103,27 +108,27 @@ class ParserTests: XCTestCase {
 
     func testSpecForward() throws {
         let source = """
-        (module
-          (func $even (export "even") (param $n i32) (result i32)
-            (if (result i32) (i32.eq (local.get $n) (i32.const 0))
-              (then (i32.const 1))
-              (else (call $odd (i32.sub (local.get $n) (i32.const 1))))
+            (module
+              (func $even (export "even") (param $n i32) (result i32)
+                (if (result i32) (i32.eq (local.get $n) (i32.const 0))
+                  (then (i32.const 1))
+                  (else (call $odd (i32.sub (local.get $n) (i32.const 1))))
+                )
+              )
+
+              (func $odd (export "odd") (param $n i32) (result i32)
+                (if (result i32) (i32.eq (local.get $n) (i32.const 0))
+                  (then (i32.const 0))
+                  (else (call $even (i32.sub (local.get $n) (i32.const 1))))
+                )
+              )
             )
-          )
-        
-          (func $odd (export "odd") (param $n i32) (result i32)
-            (if (result i32) (i32.eq (local.get $n) (i32.const 0))
-              (then (i32.const 0))
-              (else (call $even (i32.sub (local.get $n) (i32.const 1))))
-            )
-          )
-        )
-        
-        (assert_return (invoke "even" (i32.const 13)) (i32.const 0))
-        (assert_return (invoke "even" (i32.const 20)) (i32.const 1))
-        (assert_return (invoke "odd" (i32.const 13)) (i32.const 1))
-        (assert_return (invoke "odd" (i32.const 20)) (i32.const 0))
-        """
+
+            (assert_return (invoke "even" (i32.const 13)) (i32.const 0))
+            (assert_return (invoke "even" (i32.const 20)) (i32.const 1))
+            (assert_return (invoke "odd" (i32.const 13)) (i32.const 1))
+            (assert_return (invoke "odd" (i32.const 20)) (i32.const 0))
+            """
         let wast = try parseWast(source)
         XCTAssertEqual(wast.count, 5)
         guard case let .module(module) = wast.first, case var .text(wat) = module.source else {
@@ -140,31 +145,31 @@ class ParserTests: XCTestCase {
 
     func testFuncIdBinding() throws {
         let source = """
-        (module
-          (table $t 10 funcref)
-          (func $f)
-          (func $g)
-        
-          ;; Passive
-          (elem funcref)
-          (elem funcref (ref.func $f) (item ref.func $f) (item (ref.null func)) (ref.func $g))
-          (elem func)
-          (elem func $f $f $g $g)
-        
-          (elem $p1 funcref)
-          (elem $p2 funcref (ref.func $f) (ref.func $f) (ref.null func) (ref.func $g))
-          (elem $p3 func)
-          (elem $p4 func $f $f $g $g)
+            (module
+              (table $t 10 funcref)
+              (func $f)
+              (func $g)
 
-          ;; Active
-          (elem (table $t) (i32.const 0) funcref)
-          (elem (table $t) (i32.const 0) funcref (ref.func $f) (ref.null func))
-          (elem (table $t) (i32.const 0) func)
-          (elem (table $t) (i32.const 0) func $f $g)
-          (elem (table $t) (offset (i32.const 0)) funcref)
-          (elem (table $t) (offset (i32.const 0)) func $f $g)
-        )
-        """
+              ;; Passive
+              (elem funcref)
+              (elem funcref (ref.func $f) (item ref.func $f) (item (ref.null func)) (ref.func $g))
+              (elem func)
+              (elem func $f $f $g $g)
+
+              (elem $p1 funcref)
+              (elem $p2 funcref (ref.func $f) (ref.func $f) (ref.null func) (ref.func $g))
+              (elem $p3 func)
+              (elem $p4 func $f $f $g $g)
+
+              ;; Active
+              (elem (table $t) (i32.const 0) funcref)
+              (elem (table $t) (i32.const 0) funcref (ref.func $f) (ref.null func))
+              (elem (table $t) (i32.const 0) func)
+              (elem (table $t) (i32.const 0) func $f $g)
+              (elem (table $t) (offset (i32.const 0)) funcref)
+              (elem (table $t) (offset (i32.const 0)) func $f $g)
+            )
+            """
         let wat = try parseWAT(source)
         XCTAssertEqual(wat.tables.count, 1)
         let table = wat.tables[0]

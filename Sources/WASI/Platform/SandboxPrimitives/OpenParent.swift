@@ -40,9 +40,9 @@ extension SandboxPrimitives {
         if !dirName.isEmpty {
             let options: FileDescriptor.OpenOptions
             #if os(Windows)
-            options = []
+                options = []
             #else
-            options = .directory
+                options = .directory
             #endif
             dirFd = try openAt(
                 start: start, path: dirName,

@@ -43,11 +43,11 @@ struct PathResolution {
             var intermediateOtions: FileDescriptor.OpenOptions = []
 
             #if !os(Windows)
-            // When trying to open an intermediate directory,
-            // we can assume it's directory.
-            intermediateOtions.insert(.directory)
-            // FIXME: Resolve symlink in safe way
-            intermediateOtions.insert(.noFollow)
+                // When trying to open an intermediate directory,
+                // we can assume it's directory.
+                intermediateOtions.insert(.directory)
+                // FIXME: Resolve symlink in safe way
+                intermediateOtions.insert(.noFollow)
             #endif
             options = intermediateOtions
             mode = .readOnly

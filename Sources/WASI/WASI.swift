@@ -1,15 +1,16 @@
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(Android)
-import Glibc
-#elseif os(Windows)
-import ucrt
-#else
-#error("Unsupported Platform")
-#endif
 import SystemExtras
 import SystemPackage
 import WasmTypes
+
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+    import Darwin
+#elseif os(Linux) || os(FreeBSD) || os(Android)
+    import Glibc
+#elseif os(Windows)
+    import ucrt
+#else
+    #error("Unsupported Platform")
+#endif
 
 protocol WASI {
     /// Reads command-line argument data.
@@ -1387,16 +1388,16 @@ public class WASIBridgeToHost: WASI {
 
         for (guestPath, hostPath) in preopens {
             #if os(Windows)
-            let fd = try FileDescriptor.open(FilePath(hostPath), .readWrite)
+                let fd = try FileDescriptor.open(FilePath(hostPath), .readWrite)
             #else
-            let fd = try hostPath.withCString { cHostPath in
-                let fd = open(cHostPath, O_DIRECTORY)
-                if fd < 0 {
-                    let errno = errno
-                    throw WASIError(description: "Failed to open preopen path '\(hostPath)': \(String(cString: strerror(errno)))")
+                let fd = try hostPath.withCString { cHostPath in
+                    let fd = open(cHostPath, O_DIRECTORY)
+                    if fd < 0 {
+                        let errno = errno
+                        throw WASIError(description: "Failed to open preopen path '\(hostPath)': \(String(cString: strerror(errno)))")
+                    }
+                    return FileDescriptor(rawValue: fd)
                 }
-                return FileDescriptor(rawValue: fd)
-            }
             #endif
 
             if try fd.attributes().fileType.isDirectory {
@@ -1762,39 +1763,39 @@ public class WASIBridgeToHost: WASI {
         fdflags: WASIAbi.Fdflags
     ) throws -> WASIAbi.Fd {
         #if os(Windows)
-        throw WASIAbi.Errno.ENOTSUP
+            throw WASIAbi.Errno.ENOTSUP
         #else
-        guard case let .directory(dirEntry) = fdTable[dirFd] else {
-            throw WASIAbi.Errno.ENOTDIR
-        }
-        var accessMode: FileAccessMode = []
-        if fsRightsBase.contains(.FD_READ) {
-            accessMode.insert(.read)
-        }
-        if fsRightsBase.contains(.FD_WRITE) {
-            accessMode.insert(.write)
-        }
-        let hostFd = try dirEntry.openFile(
-            symlinkFollow: dirFlags.contains(.SYMLINK_FOLLOW),
-            path: path, oflags: oflags, accessMode: accessMode,
-            fdflags: fdflags
-        )
+            guard case let .directory(dirEntry) = fdTable[dirFd] else {
+                throw WASIAbi.Errno.ENOTDIR
+            }
+            var accessMode: FileAccessMode = []
+            if fsRightsBase.contains(.FD_READ) {
+                accessMode.insert(.read)
+            }
+            if fsRightsBase.contains(.FD_WRITE) {
+                accessMode.insert(.write)
+            }
+            let hostFd = try dirEntry.openFile(
+                symlinkFollow: dirFlags.contains(.SYMLINK_FOLLOW),
+                path: path, oflags: oflags, accessMode: accessMode,
+                fdflags: fdflags
+            )
 
-        let actualFileType = try hostFd.attributes().fileType
-        if oflags.contains(.DIRECTORY), actualFileType != .directory {
-            // Check O_DIRECTORY validity just in case when the host system
-            // doesn't respects O_DIRECTORY.
-            throw WASIAbi.Errno.ENOTDIR
-        }
+            let actualFileType = try hostFd.attributes().fileType
+            if oflags.contains(.DIRECTORY), actualFileType != .directory {
+                // Check O_DIRECTORY validity just in case when the host system
+                // doesn't respects O_DIRECTORY.
+                throw WASIAbi.Errno.ENOTDIR
+            }
 
-        let newEntry: FdEntry
-        if actualFileType == .directory {
-            newEntry = .directory(DirEntry(preopenPath: nil, fd: hostFd))
-        } else {
-            newEntry = .file(RegularFileEntry(fd: hostFd, accessMode: accessMode))
-        }
-        let guestFd = try fdTable.push(newEntry)
-        return guestFd
+            let newEntry: FdEntry
+            if actualFileType == .directory {
+                newEntry = .directory(DirEntry(preopenPath: nil, fd: hostFd))
+            } else {
+                newEntry = .file(RegularFileEntry(fd: hostFd, accessMode: accessMode))
+            }
+            let guestFd = try fdTable.push(newEntry)
+            return guestFd
         #endif
     }
 

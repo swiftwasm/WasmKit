@@ -1,6 +1,7 @@
-@testable import WITOverlayGenerator
-import XCTest
 import WIT
+import XCTest
+
+@testable import WITOverlayGenerator
 
 class HostGeneratorTests: XCTestCase {
     // Host generators are already executed before running this test suite by SwiftPM build tool plugin,
