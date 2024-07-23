@@ -1,7 +1,7 @@
 {
   "testsuite": {
     "repository": "https://github.com/WebAssembly/testsuite.git",
-    "revision": "26d62d0ad297b14218807cd20d9b568e11ec7bd9"
+    "revision": "0a394e3cc9e08e0bcc3fc550916ccc9b1c71f981"
   },
   "wasi-testsuite": {
     "repository": "https://github.com/WebAssembly/wasi-testsuite.git",
