@@ -155,7 +155,7 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
                     features: features, hasDataCount: hasDataCount,
                     visitor: &translator
                 )
-                return translator.finalize()
+                return try translator.finalize()
             })
     }
     module.functions = functions

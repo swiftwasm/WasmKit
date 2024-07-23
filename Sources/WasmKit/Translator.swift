@@ -132,12 +132,14 @@ struct InstructionTranslator: InstructionVisitor {
 
         private var frames: [ControlFrame] = []
 
+        var numberOfFrames: Int { frames.count }
+
         mutating func pushFrame(_ frame: ControlFrame) {
             self.frames.append(frame)
         }
 
-        mutating func popFrame() -> ControlFrame {
-            self.frames.removeLast()
+        mutating func popFrame() -> ControlFrame? {
+            self.frames.popLast()
         }
 
         mutating func markUnreachable() {
@@ -416,7 +418,10 @@ struct InstructionTranslator: InstructionVisitor {
         valueStack.truncate(height: currentFrame.stackHeight)
     }
 
-    public mutating func finalize() -> InstructionSequence {
+    mutating func finalize() throws -> InstructionSequence {
+        if controlStack.numberOfFrames > 1 {
+            throw TranslationError("Expect \(controlStack.numberOfFrames - 1) more `end` instructions")
+        }
         iseqBuilder.pinLabelHere(self.endOfFunctionLabel)
         #if DEBUG
             // Check dangling labels
@@ -497,8 +502,10 @@ struct InstructionTranslator: InstructionVisitor {
         iseqBuilder.pinLabelHere(elseLabel)
     }
 
-    mutating func visitEnd() -> Output {
-        let poppedFrame = controlStack.popFrame()
+    mutating func visitEnd() throws -> Output {
+        guard let poppedFrame = controlStack.popFrame() else {
+            throw TranslationError("Unexpected `end` instruction")
+        }
 
         if case .block(root: true) = poppedFrame.kind {
             // TODO: Move endOfFunction emission from ISeq type
