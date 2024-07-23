@@ -17,6 +17,12 @@ public func spectest(
             fputs(message + "\n", stderr)
         }
     }
+    @Sendable func log(_ message: String, path: String, location: Location, verbose: Bool = false) {
+        if !verbose || printVerbose {
+            let (line, _) = location.computeLineAndColumn()
+            fputs("\(path):\(line): " + message + "\n", stderr)
+        }
+    }
     func percentage(_ numerator: Int, _ denominator: Int) -> String {
         "\(Int(Double(numerator) / Double(denominator) * 100))%"
     }
@@ -47,6 +53,7 @@ public func spectest(
                   (global (export "global_f64") f64 (f64.const 666.6))
 
                   (table (export "table") 10 20 funcref)
+                  (table (export "table64") 10 20 funcref)
 
                   (memory (export "memory") 1 2)
 
@@ -62,21 +69,33 @@ public func spectest(
 
     @Sendable func runTestCase(testCase: TestCase) throws -> [Result] {
         var testCaseResults = [Result]()
+        let logDuration: () -> Void
+        if #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) {
+            let start = ContinuousClock.now
+            logDuration = {
+                let elapsed = ContinuousClock.now - start
+                log("Finished \(testCase.path) in \(elapsed)")
+            }
+        } else {
+            // Fallback on earlier versions
+            logDuration = {}
+        }
         log("Testing \(testCase.path)")
         try testCase.run(spectestModule: hostModule) { testCase, location, result in
-            let (line, _) = location.computeLineAndColumn()
             switch result {
             case let .failed(reason):
-                log("\(testCase.path):\(line): \(result.banner) \(reason)")
+                log("\(result.banner) \(reason)", path: testCase.path, location: location)
             case let .skipped(reason):
-                log("\(testCase.path):\(line): \(result.banner) \(reason)", verbose: true)
+                log("\(result.banner) \(reason)", path: testCase.path, location: location, verbose: true)
             case .passed:
-                log("\(testCase.path):\(line): \(result.banner)", verbose: true)
+                log(result.banner, path: testCase.path, location: location, verbose: true)
             default:
-                log("\(testCase.path):\(line): \(result.banner)")
+                log(result.banner, path: testCase.path, location: location)
             }
             testCaseResults.append(result)
         }
+
+        logDuration()
 
         return testCaseResults
     }

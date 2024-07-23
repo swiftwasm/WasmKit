@@ -61,7 +61,7 @@ public struct FunctionInstance {
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#table-instances>
 public struct TableInstance {
     public internal(set) var elements: [Reference?]
-    public let max: UInt32?
+    public let limits: Limits
 
     init(_ tableType: TableType) {
         let emptyElement: Reference
@@ -73,20 +73,21 @@ public struct TableInstance {
         }
 
         elements = Array(repeating: emptyElement, count: Int(tableType.limits.min))
-        // NOTE: table uses 32-bit index space even with memory64 feature
-        max = tableType.limits.max.map(UInt32.init)
+        limits = tableType.limits
     }
 
     /// > Note: https://webassembly.github.io/spec/core/exec/modules.html#grow-table
     /// Returns true if gorwth succeeds, otherwise returns false
-    mutating func grow(by growthSize: UInt32, value: Reference) -> Bool {
-        let oldSize = UInt32(elements.count)
-        guard !UInt32(elements.count).addingReportingOverflow(growthSize).overflow else {
+    mutating func grow(by growthSize: UInt64, value: Reference) -> Bool {
+        let oldSize = UInt64(elements.count)
+        guard !UInt64(elements.count).addingReportingOverflow(growthSize).overflow else {
             return false
         }
 
+        let maxLimit = limits.max ?? (limits.isMemory64 ? UInt64.max : UInt64(UInt32.max))
+
         let newSize = oldSize + growthSize
-        if let limit = max, newSize > limit {
+        if newSize > maxLimit {
             return false
         }
         elements.append(contentsOf: Array(repeating: value, count: Int(growthSize)))

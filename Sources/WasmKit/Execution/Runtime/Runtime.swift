@@ -77,6 +77,8 @@ extension Runtime {
                     switch offsetExpression.first {
                     case .i32Const(let value):
                         instructions.append(.numericConst(.i32(UInt32(bitPattern: value))))
+                    case .i64Const(let value):
+                        instructions.append(.numericConst(.i64(UInt64(bitPattern: value))))
                     case .globalGet(let index):
                         instructions.append(.globalGet(index: index))
                     default:
