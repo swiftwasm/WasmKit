@@ -230,6 +230,8 @@ struct WatParser {
             let importNames = try inlineImport()
             let type: TableType
             var inlineElement: ElementDecl?
+            let isMemory64 = try expectAddressSpaceType()
+
             if let refType = try maybeRefType() {
                 guard try parser.takeParenBlockStart("elem") else {
                     throw WatParserError("expected elem", location: parser.lexer.location())
@@ -259,11 +261,11 @@ struct WatParser {
                     limits: Limits(
                         min: numberOfItems,
                         max: numberOfItems,
-                        isMemory64: false
+                        isMemory64: isMemory64
                     )
                 )
             } else {
-                type = try tableType()
+                type = try tableType(isMemory64: isMemory64)
             }
             kind = .table(
                 TableDecl(
@@ -280,13 +282,7 @@ struct WatParser {
             let exports = try inlineExports()
             let importNames = try inlineImport()
 
-            let isMemory64: Bool
-            if try parser.takeKeyword("i64") {
-                isMemory64 = true
-            } else {
-                _ = try parser.takeKeyword("i32")
-                isMemory64 = false
-            }
+            let isMemory64 = try expectAddressSpaceType()
             let type: MemoryType
             var data: DataSegmentDecl?
             if try parser.takeParenBlockStart("data") {
@@ -481,19 +477,9 @@ struct WatParser {
         return data
     }
 
-    mutating func tableType() throws -> TableType {
-        let limits: Limits
-        if try parser.takeKeyword("i64") {
-            limits = try limit64()
-        } else {
-            _ = try parser.takeKeyword("i32")
-            limits = try limit32()
-        }
-        let elementType = try refType()
-        return TableType(elementType: elementType, limits: limits)
-    }
-
-    mutating func memoryType() throws -> MemoryType {
+    /// Expect "i32", "i64", or any other
+    /// - Returns: `true` if "i64", otherwise `false`
+    mutating func expectAddressSpaceType() throws -> Bool {
         let isMemory64: Bool
         if try parser.takeKeyword("i64") {
             isMemory64 = true
@@ -501,7 +487,26 @@ struct WatParser {
             _ = try parser.takeKeyword("i32")
             isMemory64 = false
         }
-        return try memoryType(isMemory64: isMemory64)
+        return isMemory64
+    }
+
+    mutating func tableType() throws -> TableType {
+        return try tableType(isMemory64: expectAddressSpaceType())
+    }
+
+    mutating func tableType(isMemory64: Bool) throws -> TableType {
+        let limits: Limits
+        if isMemory64 {
+            limits = try limit64()
+        } else {
+            limits = try limit32()
+        }
+        let elementType = try refType()
+        return TableType(elementType: elementType, limits: limits)
+    }
+
+    mutating func memoryType() throws -> MemoryType {
+        return try memoryType(isMemory64: expectAddressSpaceType())
     }
 
     mutating func memoryType(isMemory64: Bool) throws -> MemoryType {

@@ -213,9 +213,10 @@ extension ExecutionState {
 
         let memoryAddress = moduleInstance.memoryAddresses[0]
         try store.withMemory(at: memoryAddress) { memoryInstance in
-            let copyCounter = stack.popValue().i32
-            let sourceIndex = stack.popValue().i32
-            let destinationIndex = stack.popValue().i32
+            let isMemory64 = memoryInstance.limit.isMemory64
+            let copyCounter = stack.popValue().asAddressOffset(isMemory64)
+            let sourceIndex = stack.popValue().asAddressOffset(isMemory64)
+            let destinationIndex = stack.popValue().asAddressOffset(isMemory64)
 
             guard copyCounter > 0 else { return }
 
@@ -244,9 +245,10 @@ extension ExecutionState {
         let store = runtime.store
         let memoryAddress = moduleInstance.memoryAddresses[0]
         try store.withMemory(at: memoryAddress) { memoryInstance in
-            let copyCounter = Int(stack.popValue().i32)
+            let isMemory64 = memoryInstance.limit.isMemory64
+            let copyCounter = Int(stack.popValue().asAddressOffset(isMemory64))
             let value = stack.popValue()
-            let destinationIndex = Int(stack.popValue().i32)
+            let destinationIndex = Int(stack.popValue().asAddressOffset(isMemory64))
 
             guard
                 !destinationIndex.addingReportingOverflow(copyCounter).overflow

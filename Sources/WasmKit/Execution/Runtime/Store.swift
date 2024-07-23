@@ -205,7 +205,7 @@ extension Store {
                 result.append(external)
 
             case let (.table(tableType), .table(tableAddress)):
-                if let max = tables[Int(tableAddress)].max, max < tableType.limits.min {
+                if let max = tables[Int(tableAddress)].limits.max, max < tableType.limits.min {
                     throw ImportError.incompatibleImportType
                 }
                 result.append(external)

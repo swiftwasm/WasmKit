@@ -91,11 +91,15 @@ public struct Wat {
 /// ```
 public func parseWAT(_ input: String) throws -> Wat {
     var parser = Parser(input)
-    try parser.expect(.leftParen)
-    try parser.expectKeyword("module")
-    let watModule = try parseWAT(&parser)
-    try parser.skipParenBlock()
-    return watModule
+    let wat: Wat
+    if try parser.takeParenBlockStart("module") {
+        wat = try parseWAT(&parser)
+        try parser.skipParenBlock()
+    } else {
+        // The root (module) may be omitted
+        wat = try parseWAT(&parser)
+    }
+    return wat
 }
 
 /// A WAST script representation.

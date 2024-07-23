@@ -185,6 +185,11 @@ struct ElementExprCollector: AnyInstructionVisitor {
 
 extension WAT.WatParser.ElementDecl {
     func encode(to encoder: inout Encoder, wat: inout Wat) throws {
+        func isMemory64(tableIndex: Int) -> Bool {
+            guard tableIndex < wat.tablesMap.count else { return false }
+            return wat.tablesMap[tableIndex].type.limits.isMemory64
+        }
+
         var flags: UInt32 = 0
         var tableIndex: UInt32? = nil
         var isPassive = false
@@ -233,7 +238,11 @@ extension WAT.WatParser.ElementDecl {
                 try encoder.writeExpression(lexer: &lexer, wat: &wat)
             case .synthesized(let offset):
                 var exprEncoder = ExpressionEncoder()
-                try exprEncoder.visitI32Const(value: Int32(offset))
+                if isMemory64(tableIndex: Int(tableIndex ?? 0)) {
+                    try exprEncoder.visitI64Const(value: Int64(offset))
+                } else {
+                    try exprEncoder.visitI32Const(value: Int32(offset))
+                }
                 try exprEncoder.visitEnd()
                 encoder.output.append(contentsOf: exprEncoder.encoder.output)
             }

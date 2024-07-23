@@ -42,7 +42,7 @@ struct InstructionTranslator: InstructionVisitor {
         private let functionTypeIndices: [TypeIndex]
         private let globalTypes: [GlobalType]
         private let memoryTypes: [MemoryType]
-        private let tables: [Table]
+        private let tableTypes: [TableType]
 
         init(
             typeSection: [FunctionType],
@@ -68,7 +68,11 @@ struct InstructionTranslator: InstructionVisitor {
                     guard case let .memory(type) = entry.descriptor else { return nil }
                     return type
                 } + memoryTypes
-            self.tables = tables
+            self.tableTypes =
+                importSection.compactMap { (entry) -> TableType? in
+                    guard case let .table(type) = entry.descriptor else { return nil }
+                    return type
+                } + tables.map(\.type)
         }
 
         func resolveType(_ index: TypeIndex) -> FunctionType {
@@ -84,14 +88,20 @@ struct InstructionTranslator: InstructionVisitor {
         func globalType(_ index: GlobalIndex) -> ValueType {
             self.globalTypes[Int(index)].valueType
         }
-        func isMemory64(_ index: MemoryIndex) -> Bool {
+        func isMemory64(memoryIndex index: MemoryIndex) -> Bool {
             self.memoryTypes[Int(index)].isMemory64
         }
-        func addressType(_ index: MemoryIndex) -> ValueType {
-            isMemory64(index) ? .i64 : .i32
+        func addressType(memoryIndex: MemoryIndex) -> ValueType {
+            isMemory64(memoryIndex: memoryIndex) ? .i64 : .i32
+        }
+        func isMemory64(tableIndex index: TableIndex) -> Bool {
+            self.tableTypes[Int(index)].limits.isMemory64
+        }
+        func addressType(tableIndex: TableIndex) -> ValueType {
+            isMemory64(tableIndex: tableIndex) ? .i64 : .i32
         }
         func elementType(_ index: TableIndex) -> ReferenceType {
-            self.tables[Int(index)].type.elementType
+            self.tableTypes[Int(index)].elementType
         }
     }
 
@@ -132,12 +142,14 @@ struct InstructionTranslator: InstructionVisitor {
 
         private var frames: [ControlFrame] = []
 
+        var numberOfFrames: Int { frames.count }
+
         mutating func pushFrame(_ frame: ControlFrame) {
             self.frames.append(frame)
         }
 
-        mutating func popFrame() -> ControlFrame {
-            self.frames.removeLast()
+        mutating func popFrame() -> ControlFrame? {
+            self.frames.popLast()
         }
 
         mutating func markUnreachable() {
@@ -416,7 +428,10 @@ struct InstructionTranslator: InstructionVisitor {
         valueStack.truncate(height: currentFrame.stackHeight)
     }
 
-    public mutating func finalize() -> InstructionSequence {
+    mutating func finalize() throws -> InstructionSequence {
+        if controlStack.numberOfFrames > 1 {
+            throw TranslationError("Expect \(controlStack.numberOfFrames - 1) more `end` instructions")
+        }
         iseqBuilder.pinLabelHere(self.endOfFunctionLabel)
         #if DEBUG
             // Check dangling labels
@@ -497,8 +512,10 @@ struct InstructionTranslator: InstructionVisitor {
         iseqBuilder.pinLabelHere(elseLabel)
     }
 
-    mutating func visitEnd() -> Output {
-        let poppedFrame = controlStack.popFrame()
+    mutating func visitEnd() throws -> Output {
+        guard let poppedFrame = controlStack.popFrame() else {
+            throw TranslationError("Unexpected `end` instruction")
+        }
 
         if case .block(root: true) = poppedFrame.kind {
             // TODO: Move endOfFunction emission from ISeq type
@@ -637,7 +654,8 @@ struct InstructionTranslator: InstructionVisitor {
     }
 
     mutating func visitCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws -> Output {
-        try popOperand(.i32)  // function address
+        let addressType = module.addressType(tableIndex: tableIndex)
+        try popOperand(addressType)  // function address
         let calleeType = self.module.resolveType(typeIndex)
         try visitCallLike(calleeType: calleeType)
         emit(.callIndirect(tableIndex: tableIndex, typeIndex: typeIndex))
@@ -724,11 +742,16 @@ struct InstructionTranslator: InstructionVisitor {
         emit(instruction)
     }
     private mutating func visitLoad(_ memarg: MemArg, _ type: ValueType, _ instruction: Instruction) throws {
-        try popPushEmit(module.addressType(0), type, instruction)
+        let isMemory64 = module.isMemory64(memoryIndex: 0)
+        let alignLog2Limit = isMemory64 ? 64 : 32
+        if memarg.align >= alignLog2Limit {
+            throw TranslationError("Alignment 2**\(memarg.align) is out of limit \(alignLog2Limit)")
+        }
+        try popPushEmit(.address(isMemory64: isMemory64), type, instruction)
     }
     private mutating func visitStore(_ memarg: MemArg, _ type: ValueType, _ instruction: Instruction) throws {
         try popOperand(type)
-        try popOperand(module.addressType(0))
+        try popOperand(module.addressType(memoryIndex: 0))
         emit(instruction)
     }
     mutating func visitI32Load(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i32, .i32Load(memarg: memarg)) }
@@ -755,7 +778,7 @@ struct InstructionTranslator: InstructionVisitor {
     mutating func visitI64Store16(memarg: MemArg) throws -> Output { try visitStore(memarg, .i64, .i64Store16(memarg: memarg)) }
     mutating func visitI64Store32(memarg: MemArg) throws -> Output { try visitStore(memarg, .i64, .i64Store32(memarg: memarg)) }
     mutating func visitMemorySize(memory: UInt32) -> Output {
-        let sizeType: ValueType = module.isMemory64(memory) ? .i64 : .i32
+        let sizeType: ValueType = module.isMemory64(memoryIndex: memory) ? .i64 : .i32
         pushEmit(sizeType, .memorySize)
     }
     mutating func visitMemoryGrow(memory: UInt32) throws -> Output {
@@ -922,38 +945,63 @@ struct InstructionTranslator: InstructionVisitor {
     mutating func visitI64Extend16S() throws -> Output { try visitUnary(.i64, .i64Extend16S) }
     mutating func visitI64Extend32S() throws -> Output { try visitUnary(.i64, .i64Extend32S) }
     mutating func visitMemoryInit(dataIndex: UInt32) throws -> Output {
-        let addressType = module.addressType(0)
-        try popPushEmit([.i32, addressType, addressType], [], .memoryInit(dataIndex))
+        let addressType = module.addressType(memoryIndex: 0)
+        try popPushEmit([.i32, .i32, addressType], [], .memoryInit(dataIndex))
     }
     mutating func visitDataDrop(dataIndex: UInt32) -> Output { emit(.memoryDataDrop(dataIndex)) }
     mutating func visitMemoryCopy(dstMem: UInt32, srcMem: UInt32) throws -> Output {
-        let addressType = module.addressType(0)
-        try popPushEmit([.i32, addressType, addressType], [], .memoryCopy)
+        //     C.mems[0] = it limits
+        // -----------------------------
+        // C ⊦ memory.fill : [it i32 it] → []
+        // https://github.com/WebAssembly/memory64/blob/main/proposals/memory64/Overview.md
+        let addressType = module.addressType(memoryIndex: 0)
+        try popPushEmit([addressType, addressType, addressType], [], .memoryCopy)
     }
     mutating func visitMemoryFill(memory: UInt32) throws -> Output {
-        try popPushEmit([.i32, .i32, .i32], [], .memoryFill)
+        //     C.mems[0] = it limits
+        // -----------------------------
+        // C ⊦ memory.fill : [it i32 it] → []
+        // https://github.com/WebAssembly/memory64/blob/main/proposals/memory64/Overview.md
+        let addressType = module.addressType(memoryIndex: 0)
+        try popPushEmit([addressType, .i32, addressType], [], .memoryFill)
     }
     mutating func visitTableInit(elemIndex: UInt32, table: UInt32) throws -> Output {
-        try popPushEmit([.i32, .i32, .i32], [], .tableInit(table, elemIndex))
+        try popPushEmit([.i32, .i32, module.addressType(tableIndex: table)], [], .tableInit(table, elemIndex))
     }
     mutating func visitElemDrop(elemIndex: UInt32) -> Output { emit(.tableElementDrop(elemIndex)) }
     mutating func visitTableCopy(dstTable: UInt32, srcTable: UInt32) throws -> Output {
-        try popPushEmit([.i32, .i32, .i32], [], .tableCopy(dest: dstTable, src: srcTable))
+        //   C.tables[d] = iN limits t   C.tables[s] = iM limits t    K = min {N, M}
+        // -----------------------------------------------------------------------------
+        // C ⊦ table.copy d s : [iN iM iK] → []
+        // https://github.com/WebAssembly/memory64/blob/main/proposals/memory64/Overview.md
+        let destIsMemory64 = module.isMemory64(tableIndex: dstTable)
+        let sourceIsMemory64 = module.isMemory64(tableIndex: srcTable)
+        let lengthIsMemory64 = destIsMemory64 || sourceIsMemory64
+        try popPushEmit(
+            [
+                .address(isMemory64: lengthIsMemory64),
+                .address(isMemory64: sourceIsMemory64),
+                .address(isMemory64: destIsMemory64),
+            ],
+            [],
+            .tableCopy(dest: dstTable, src: srcTable)
+        )
     }
     mutating func visitTableFill(table: UInt32) throws -> Output {
-        try popPushEmit([.i32, .ref(module.elementType(table)), .i32], [], .tableFill(table))
+        let address = module.addressType(tableIndex: table)
+        try popPushEmit([address, .ref(module.elementType(table)), address], [], .tableFill(table))
     }
     mutating func visitTableGet(table: UInt32) throws -> Output {
-        try popPushEmit(.i32, .ref(module.elementType(table)), .tableGet(table))
+        try popPushEmit(module.addressType(tableIndex: table), .ref(module.elementType(table)), .tableGet(table))
     }
     mutating func visitTableSet(table: UInt32) throws -> Output {
-        try popPushEmit([.ref(module.elementType(table)), .i32], [], .tableSet(table))
+        try popPushEmit([.ref(module.elementType(table)), module.addressType(tableIndex: table)], [], .tableSet(table))
     }
     mutating func visitTableGrow(table: UInt32) throws -> Output {
-        try popPushEmit([.i32, .ref(module.elementType(table))], [.i32], .tableGrow(table))
+        try popPushEmit([module.addressType(tableIndex: table), .ref(module.elementType(table))], [.i32], .tableGrow(table))
     }
     mutating func visitTableSize(table: UInt32) throws -> Output {
-        pushEmit(.i32, .tableSize(table))
+        pushEmit(module.addressType(tableIndex: table), .tableSize(table))
     }
     mutating func visitI32TruncSatF32S() throws -> Output { try visitConversion(.f32, .i32, .i32TruncSatF32S) }
     mutating func visitI32TruncSatF32U() throws -> Output { try visitConversion(.f32, .i32, .i32TruncSatF32U) }
@@ -997,5 +1045,11 @@ extension FunctionType {
                 results: funcType.results
             )
         }
+    }
+}
+
+extension ValueType {
+    fileprivate static func address(isMemory64: Bool) -> ValueType {
+        return isMemory64 ? .i64 : .i32
     }
 }

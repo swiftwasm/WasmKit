@@ -16,7 +16,7 @@ public enum Trap: Error {
 
     // Store
     /// Out of bounds table access
-    case outOfBoundsTableAccess(index: ElementIndex)
+    case outOfBoundsTableAccess(Int)
     /// Reading a dropped reference
     case readingDroppedReference(index: ElementIndex)
 

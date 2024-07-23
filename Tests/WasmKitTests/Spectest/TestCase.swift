@@ -372,9 +372,6 @@ extension WastDirective {
         var features = WasmFeatureSet.default
         if rootPath.ends(with: "proposals/memory64") {
             features.insert(.memory64)
-            // memory64 doesn't expect reference-types proposal
-            // and it depends on the fact reference-types is disabled
-            features.remove(.referenceTypes)
         }
         return features
     }

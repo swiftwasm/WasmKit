@@ -90,7 +90,7 @@ extension ExecutionState {
         let tableAddresses = moduleInstance.tableAddresses[Int(tableIndex)]
         let tableInstance = runtime.store.tables[tableAddresses]
         let expectedType = moduleInstance.types[Int(typeIndex)]
-        let value = stack.popValue().i32
+        let value = stack.popValue().asAddressOffset(tableInstance.limits.isMemory64)
         let elementIndex = Int(value)
         guard elementIndex < tableInstance.elements.count else {
             throw Trap.undefinedElement

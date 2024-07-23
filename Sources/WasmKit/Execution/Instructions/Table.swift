@@ -17,48 +17,44 @@ extension ExecutionState {
 
         let reference = stack.getReference()
         let elementIndex = try getElementIndex(stack: &stack, table)
-        setTableElement(store: runtime.store, tableAddress: tableAddress, elementIndex, reference)
+        setTableElement(store: runtime.store, tableAddress: tableAddress, Int(elementIndex), reference)
 
     }
     mutating func tableSize(runtime: Runtime, stack: inout Stack, tableIndex: TableIndex) {
         let (_, table) = getTable(tableIndex, stack: &stack, store: runtime.store)
-        stack.push(value: .i32(UInt32(table.elements.count)))
+        let elementsCount = table.elements.count
+        stack.push(value: table.limits.isMemory64 ? .i64(UInt64(elementsCount)) : .i32(UInt32(elementsCount)))
     }
     mutating func tableGrow(runtime: Runtime, stack: inout Stack, tableIndex: TableIndex) {
         let (tableAddress, table) = getTable(tableIndex, stack: &stack, store: runtime.store)
 
-        let growthSize = stack.popValue()
-
-        guard case let .i32(growthSize) = growthSize else {
-            fatalError("invalid value at the top of the stack \(growthSize)")
-        }
-
+        let growthSize = stack.popValue().asAddressOffset(table.limits.isMemory64)
         let growthValue = stack.getReference()
 
-        let oldSize = UInt32(table.elements.count)
+        let oldSize = table.elements.count
         guard runtime.store.tables[tableAddress].grow(by: growthSize, value: growthValue) else {
             stack.push(value: .i32(Int32(-1).unsigned))
             return
         }
 
-        stack.push(value: .i32(oldSize))
+        stack.push(value: table.limits.isMemory64 ? .i64(UInt64(oldSize)) : .i32(UInt32(oldSize)))
     }
     mutating func tableFill(runtime: Runtime, stack: inout Stack, tableIndex: TableIndex) throws {
         let (tableAddress, table) = getTable(tableIndex, stack: &stack, store: runtime.store)
-        let fillCounter = stack.popValue().i32
+        let fillCounter = stack.popValue().asAddressOffset(table.limits.isMemory64)
         let fillValue = stack.getReference()
-        let startIndex = stack.popValue().i32
+        let startIndex = stack.popValue().asAddressOffset(table.limits.isMemory64)
 
         guard fillCounter > 0 else {
             return
         }
 
         guard Int(startIndex + fillCounter) <= table.elements.count else {
-            throw Trap.outOfBoundsTableAccess(index: startIndex + fillCounter)
+            throw Trap.outOfBoundsTableAccess(Int(startIndex + fillCounter))
         }
 
         for i in 0..<fillCounter {
-            setTableElement(store: runtime.store, tableAddress: tableAddress, startIndex + i, fillValue)
+            setTableElement(store: runtime.store, tableAddress: tableAddress, Int(startIndex + i), fillValue)
         }
     }
     mutating func tableCopy(runtime: Runtime, stack: inout Stack, dest: TableIndex, src: TableIndex) throws {
@@ -67,9 +63,11 @@ extension ExecutionState {
         let (_, sourceTable) = getTable(sourceTableIndex, stack: &stack, store: runtime.store)
         let (destinationTableAddress, destinationTable) = getTable(destinationTableIndex, stack: &stack, store: runtime.store)
 
-        let copyCounter = stack.popValue().i32
-        let sourceIndex = stack.popValue().i32
-        let destinationIndex = stack.popValue().i32
+        let copyCounter = stack.popValue().asAddressOffset(
+            sourceTable.limits.isMemory64 || destinationTable.limits.isMemory64
+        )
+        let sourceIndex = stack.popValue().asAddressOffset(sourceTable.limits.isMemory64)
+        let destinationIndex = stack.popValue().asAddressOffset(destinationTable.limits.isMemory64)
 
         guard copyCounter > 0 else {
             return
@@ -81,17 +79,17 @@ extension ExecutionState {
             throw Trap.tableSizeOverflow
         }
         guard destinationIndex + copyCounter <= sourceTable.elements.count else {
-            throw Trap.outOfBoundsTableAccess(index: destinationIndex + copyCounter)
+            throw Trap.outOfBoundsTableAccess(Int(destinationIndex + copyCounter))
         }
         guard destinationIndex + copyCounter <= sourceTable.elements.count && sourceIndex + copyCounter <= destinationTable.elements.count else {
-            throw Trap.outOfBoundsTableAccess(index: destinationIndex + copyCounter)
+            throw Trap.outOfBoundsTableAccess(Int(destinationIndex + copyCounter))
         }
 
         for i in 0..<copyCounter {
             setTableElement(
                 store: runtime.store,
                 tableAddress: destinationTableAddress,
-                destinationIndex + i,
+                Int(destinationIndex + i),
                 sourceTable.elements[Int(sourceIndex + i)]
             )
         }
@@ -101,9 +99,9 @@ extension ExecutionState {
         let elementAddress = currentModule(store: runtime.store, stack: &stack).elementAddresses[Int(elementIndex)]
         let sourceElement = runtime.store.elements[elementAddress]
 
-        let copyCounter = stack.popValue().i32
-        let sourceIndex = stack.popValue().i32
-        let destinationIndex = stack.popValue().i32
+        let copyCounter = UInt64(stack.popValue().i32)
+        let sourceIndex = UInt64(stack.popValue().i32)
+        let destinationIndex = stack.popValue().asAddressOffset(destinationTable.limits.isMemory64)
 
         guard copyCounter > 0 else {
             return
@@ -116,10 +114,10 @@ extension ExecutionState {
         }
 
         guard sourceIndex + copyCounter <= sourceElement.references.count else {
-            throw Trap.outOfBoundsTableAccess(index: sourceIndex + copyCounter)
+            throw Trap.outOfBoundsTableAccess(Int(sourceIndex + copyCounter))
         }
         guard destinationIndex + copyCounter <= destinationTable.elements.count else {
-            throw Trap.outOfBoundsTableAccess(index: destinationIndex + copyCounter)
+            throw Trap.outOfBoundsTableAccess(Int(destinationIndex + copyCounter))
         }
 
         for i in 0..<copyCounter {
@@ -128,7 +126,7 @@ extension ExecutionState {
             setTableElement(
                 store: runtime.store,
                 tableAddress: destinationTableAddress,
-                destinationIndex + i,
+                Int(destinationIndex + i),
                 reference
             )
         }
@@ -141,10 +139,10 @@ extension ExecutionState {
     fileprivate func setTableElement(
         store: Store,
         tableAddress: TableAddress,
-        _ elementIndex: ElementIndex,
+        _ elementIndex: Int,
         _ reference: Reference?
     ) {
-        store.tables[tableAddress].elements[Int(elementIndex)] = reference
+        store.tables[tableAddress].elements[elementIndex] = reference
     }
 }
 
@@ -155,13 +153,13 @@ extension ExecutionState {
     }
 
     fileprivate mutating func getElementIndex(stack: inout Stack, _ table: TableInstance) throws -> ElementIndex {
-        let elementIndex = stack.popValue().i32
+        let elementIndex = stack.popValue().asAddressOffset(table.limits.isMemory64)
 
         guard elementIndex < table.elements.count else {
-            throw Trap.outOfBoundsTableAccess(index: elementIndex)
+            throw Trap.outOfBoundsTableAccess(Int(elementIndex))
         }
 
-        return elementIndex
+        return ElementIndex(elementIndex)
     }
 }
 
