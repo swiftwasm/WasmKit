@@ -56,6 +56,7 @@ while let payload = try parser.parseNext() {
 
 - ``InstructionVisitor``
 - ``VoidInstructionVisitor``
+- ``AnyInstructionVisitor``
 - ``InstructionTracingVisitor``
 
 
