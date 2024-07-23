@@ -14,7 +14,7 @@ install_tools() {
   if ! which wat2wasm > /dev/null; then
     local build_dir=$(mktemp -d /tmp/WasmKit-wabt.XXXXXX)
     mkdir -p $build_dir
-    curl -L https://github.com/WebAssembly/wabt/releases/download/1.0.33/wabt-1.0.33.tar.xz | tar xJ --strip-components=1 -C $build_dir
+    curl -L https://github.com/WebAssembly/wabt/releases/download/1.0.35/wabt-1.0.35.tar.xz | tar xJ --strip-components=1 -C $build_dir
     cmake -B $build_dir/build -GNinja -DBUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local $build_dir
     cmake --build $build_dir/build --target install
   fi
