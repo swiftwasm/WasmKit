@@ -742,7 +742,12 @@ struct InstructionTranslator: InstructionVisitor {
         emit(instruction)
     }
     private mutating func visitLoad(_ memarg: MemArg, _ type: ValueType, _ instruction: Instruction) throws {
-        try popPushEmit(module.addressType(memoryIndex: 0), type, instruction)
+        let isMemory64 = module.isMemory64(memoryIndex: 0)
+        let alignLog2Limit = isMemory64 ? 64 : 32
+        if memarg.align >= alignLog2Limit {
+            throw TranslationError("Alignment 2**\(memarg.align) is out of limit \(alignLog2Limit)")
+        }
+        try popPushEmit(.address(isMemory64: isMemory64), type, instruction)
     }
     private mutating func visitStore(_ memarg: MemArg, _ type: ValueType, _ instruction: Instruction) throws {
         try popOperand(type)
