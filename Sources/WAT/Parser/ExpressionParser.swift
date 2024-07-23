@@ -213,9 +213,15 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
 
                 // Condition may be absent
                 if try !parser.takeParenBlockStart("then") {
-                    // Visit condition expr
-                    _ = try foldedInstruction(visitor: &visitor, wat: &wat)
-                    try parser.expectParenBlockStart("then")
+                    // Visit condition instructions
+                    while true {
+                        guard try foldedInstruction(visitor: &visitor, wat: &wat) else {
+                            break
+                        }
+                        if try parser.takeParenBlockStart("then") {
+                            break
+                        }
+                    }
                 }
                 // Visit "if"
                 _ = try visit(&visitor)
