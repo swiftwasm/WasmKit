@@ -378,6 +378,9 @@ struct InstructionTranslator: InstructionVisitor {
         let types: [ValueType]
 
         func type(of localIndex: UInt32) throws -> ValueType {
+            guard Int(localIndex) < types.count else {
+                throw TranslationError("Local index \(localIndex) is out of range")
+            }
             return self.types[Int(localIndex)]
         }
     }
