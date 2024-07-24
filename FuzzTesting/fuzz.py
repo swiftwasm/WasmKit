@@ -29,14 +29,16 @@ def main():
     # Subcommands
     subparsers = parser.add_subparsers(required=True)
 
+    available_targets = list(os.listdir('Sources'))
+
     build_parser = subparsers.add_parser('build', help='Build the fuzzer')
     build_parser.add_argument(
-        'target_name', type=str, help='Name of the target')
+        'target_name', type=str, help='Name of the target', choices=available_targets)
     build_parser.set_defaults(func=build)
 
     run_parser = subparsers.add_parser('run', help='Run the fuzzer')
     run_parser.add_argument(
-        'target_name', type=str, help='Name of the target')
+        'target_name', type=str, help='Name of the target', choices=available_targets)
     run_parser.add_argument(
         '--skip-build', action='store_true',
         help='Skip building the fuzzer')
