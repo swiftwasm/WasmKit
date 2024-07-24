@@ -11,6 +11,7 @@ public struct Parser<Stream: ByteStream> {
     let stream: Stream
     public private(set) var hasDataCount: Bool = false
     public let features: WasmFeatureSet
+    let limits: ParsingLimits
 
     enum NextParseTarget {
         case header
@@ -27,6 +28,7 @@ public struct Parser<Stream: ByteStream> {
         self.features = features
         self.hasDataCount = hasDataCount
         self.nextParseTarget = .header
+        self.limits = .default
     }
 }
 
@@ -186,7 +188,7 @@ public enum WasmParserError: Swift.Error {
     /// The data count and data section length are inconsistent
     case inconsistentDataCountAndDataSectionLength(dataCount: UInt32, dataSection: Int)
     /// The local count is too large
-    case tooManyLocals
+    case tooManyLocals(UInt64, limit: UInt64)
     /// The type is expected to be a reference type, but it's not
     case expectedRefType(actual: ValueType)
     /// The instruction is not implemented
@@ -1014,8 +1016,8 @@ extension Parser {
                 return (n, t)
             }
             let totalLocals = localTypes.reduce(UInt64(0)) { $0 + UInt64($1.n) }
-            guard totalLocals < UInt32.max else {
-                throw WasmParserError.tooManyLocals
+            guard totalLocals < limits.maxFunctionLocals else {
+                throw WasmParserError.tooManyLocals(totalLocals, limit: limits.maxFunctionLocals)
             }
 
             let locals = localTypes.flatMap { (n: UInt32, type: ValueType) in
