@@ -170,7 +170,10 @@ struct InstructionTranslator: InstructionVisitor {
             self.frames.popLast()
         }
 
-        mutating func markUnreachable() {
+        mutating func markUnreachable() throws {
+            guard !self.frames.isEmpty else {
+                throw TranslationError("Control stack is empty. Instruction cannot be appeared after \"end\" of function")
+            }
             self.frames[self.frames.count - 1].reachable = false
         }
 
@@ -457,7 +460,7 @@ struct InstructionTranslator: InstructionVisitor {
         iseqBuilder.emit(.return)
     }
     private mutating func markUnreachable() throws {
-        controlStack.markUnreachable()
+        try controlStack.markUnreachable()
         let currentFrame = try controlStack.currentFrame()
         try valueStack.truncate(height: currentFrame.stackHeight)
     }
