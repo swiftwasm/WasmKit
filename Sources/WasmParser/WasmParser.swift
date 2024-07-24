@@ -217,6 +217,8 @@ public enum WasmParserError: Swift.Error {
     case malformedIndirectCall
     /// Invalid reference to a type section entry
     case invalidTypeSectionReference
+    /// The data segment kind is malformed
+    case malformedDataSegmentKind(UInt32)
     case raw(String)
 
     init(_ message: String) {
@@ -343,7 +345,9 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/types.html#result-types>
     func parseResultType() throws -> BlockType {
-        let nextByte = try stream.peek()!
+        guard let nextByte = try stream.peek() else {
+            throw WasmParserError.unexpectedEnd
+        }
         switch nextByte {
         case 0x40:
             _ = try stream.consumeAny()
@@ -1044,7 +1048,7 @@ extension Parser {
                 let initializer = try parseVectorBytes()
                 return .active(.init(index: index, offset: offset, initializer: initializer))
             default:
-                fatalError("unimplemented data segment kind")
+                throw WasmParserError.malformedDataSegmentKind(kind)
             }
         }
     }

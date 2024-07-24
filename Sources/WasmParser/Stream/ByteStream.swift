@@ -36,6 +36,7 @@ public final class StaticByteStream: ByteStream {
     }
 
     public func consume(count: Int) throws -> ArraySlice<UInt8> {
+        guard count > 0 else { return [] }
         let updatedIndex = currentIndex + count
 
         guard bytes.indices.contains(updatedIndex - 1) else {
