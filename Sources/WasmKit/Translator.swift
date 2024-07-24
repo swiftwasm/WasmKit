@@ -75,33 +75,51 @@ struct InstructionTranslator: InstructionVisitor {
                 } + tables.map(\.type)
         }
 
-        func resolveType(_ index: TypeIndex) -> FunctionType {
-            typeSection[Int(index)]
+        func resolveType(_ index: TypeIndex) throws -> FunctionType {
+            guard Int(index) < typeSection.count else {
+                throw TranslationError("Type index \(index) is out of range")
+            }
+            return typeSection[Int(index)]
         }
         func resolveBlockType(_ blockType: BlockType) throws -> FunctionType {
             try FunctionType(blockType: blockType, typeSection: typeSection)
         }
-        func functionType(_ index: FunctionIndex) -> FunctionType {
+        func functionType(_ index: FunctionIndex) throws -> FunctionType {
+            guard Int(index) < functionTypeIndices.count else {
+                throw TranslationError("Function index \(index) is out of range")
+            }
             let typeIndex = functionTypeIndices[Int(index)]
-            return typeSection[Int(typeIndex)]
+            return try resolveType(typeIndex)
         }
-        func globalType(_ index: GlobalIndex) -> ValueType {
-            self.globalTypes[Int(index)].valueType
+        func globalType(_ index: GlobalIndex) throws -> ValueType {
+            guard Int(index) < globalTypes.count else {
+                throw TranslationError("Global index \(index) is out of range")
+            }
+            return self.globalTypes[Int(index)].valueType
         }
-        func isMemory64(memoryIndex index: MemoryIndex) -> Bool {
-            self.memoryTypes[Int(index)].isMemory64
+        func isMemory64(memoryIndex index: MemoryIndex) throws -> Bool {
+            guard Int(index) < memoryTypes.count else {
+                throw TranslationError("Memory index \(index) is out of range")
+            }
+            return self.memoryTypes[Int(index)].isMemory64
         }
-        func addressType(memoryIndex: MemoryIndex) -> ValueType {
-            isMemory64(memoryIndex: memoryIndex) ? .i64 : .i32
+        func addressType(memoryIndex: MemoryIndex) throws -> ValueType {
+            try isMemory64(memoryIndex: memoryIndex) ? .i64 : .i32
         }
-        func isMemory64(tableIndex index: TableIndex) -> Bool {
-            self.tableTypes[Int(index)].limits.isMemory64
+        func isMemory64(tableIndex index: TableIndex) throws -> Bool {
+            guard Int(index) < tableTypes.count else {
+                throw TranslationError("Table index \(index) is out of range")
+            }
+            return self.tableTypes[Int(index)].limits.isMemory64
         }
-        func addressType(tableIndex: TableIndex) -> ValueType {
-            isMemory64(tableIndex: tableIndex) ? .i64 : .i32
+        func addressType(tableIndex: TableIndex) throws -> ValueType {
+            try isMemory64(tableIndex: tableIndex) ? .i64 : .i32
         }
-        func elementType(_ index: TableIndex) -> ReferenceType {
-            self.tableTypes[Int(index)].elementType
+        func elementType(_ index: TableIndex) throws -> ReferenceType {
+            guard Int(index) < tableTypes.count else {
+                throw TranslationError("Table index \(index) is out of range")
+            }
+            return self.tableTypes[Int(index)].elementType
         }
     }
 
@@ -152,20 +170,29 @@ struct InstructionTranslator: InstructionVisitor {
             self.frames.popLast()
         }
 
-        mutating func markUnreachable() {
+        mutating func markUnreachable() throws {
+            guard !self.frames.isEmpty else {
+                throw TranslationError("Control stack is empty. Instruction cannot be appeared after \"end\" of function")
+            }
             self.frames[self.frames.count - 1].reachable = false
         }
 
-        func currentFrame() -> ControlFrame {
-            self.frames.last!
+        func currentFrame() throws -> ControlFrame {
+            guard let frame = self.frames.last else {
+                throw TranslationError("Control stack is empty. Instruction cannot be appeared after \"end\" of function")
+            }
+            return frame
         }
 
         enum BranchTarget {
             case returnFunction
             case localJump(ControlFrame)
         }
-        func branchTarget(relativeDepth: UInt32) -> BranchTarget {
-            guard frames.count != relativeDepth else { return .returnFunction }
+        func branchTarget(relativeDepth: UInt32) throws -> BranchTarget {
+            if frames.count == relativeDepth { return .returnFunction }
+            if frames.count < relativeDepth {
+                throw TranslationError("Relative depth \(relativeDepth) is out of range")
+            }
             return .localJump(frames[frames.count - 1 - Int(relativeDepth)])
         }
     }
@@ -189,11 +216,14 @@ struct InstructionTranslator: InstructionVisitor {
             self.values.append(value)
         }
 
-        mutating func pop() -> MetaValue {
-            self.values.removeLast()
+        mutating func pop() throws -> MetaValue {
+            guard let value = self.values.popLast() else {
+                throw TranslationError("Expected a value on stack but it's empty")
+            }
+            return value
         }
         mutating func pop(_ expected: ValueType) throws {
-            switch pop() {
+            switch try pop() {
             case .some(let actual):
                 guard actual == expected else {
                     throw TranslationError("Expected \(expected) on the stack top but got \(actual)")
@@ -202,7 +232,7 @@ struct InstructionTranslator: InstructionVisitor {
             }
         }
         mutating func popRef() throws {
-            switch pop() {
+            switch try pop() {
             case .some(let actual):
                 guard case .ref = actual else {
                     throw TranslationError("Expected reference value on the stack top but got \(actual)")
@@ -210,10 +240,14 @@ struct InstructionTranslator: InstructionVisitor {
             case .unknown: break  // OK
             }
         }
-        mutating func truncate(height: Int) {
-            assert(height <= self.height)
+        mutating func truncate(height: Int) throws {
+            guard height <= self.height else {
+                throw TranslationError("Truncating to \(height) but the stack height is \(self.height)")
+            }
             while height != self.height {
-                _ = self.pop()
+                guard let _ = self.values.popLast() else {
+                    throw TranslationError("Internal consistency error: Stack height is \(self.height) but failed to pop")
+                }
             }
         }
     }
@@ -346,8 +380,11 @@ struct InstructionTranslator: InstructionVisitor {
     struct Locals {
         let types: [ValueType]
 
-        func type(of localIndex: UInt32) -> ValueType {
-            self.types[Int(localIndex)]
+        func type(of localIndex: UInt32) throws -> ValueType {
+            guard Int(localIndex) < types.count else {
+                throw TranslationError("Local index \(localIndex) is out of range")
+            }
+            return self.types[Int(localIndex)]
         }
     }
 
@@ -389,7 +426,7 @@ struct InstructionTranslator: InstructionVisitor {
     /// - Parameter typeHint: A type expected to be popped. Only used for diagnostic purpose.
     /// - Returns: `true` if check succeed. `false` if the pop operation is going to be performed in unreachable code path.
     private func checkBeforePop(typeHint: ValueType?) throws -> Bool {
-        let controlFrame = controlStack.currentFrame()
+        let controlFrame = try controlStack.currentFrame()
         if _slowPath(valueStack.height <= controlFrame.stackHeight) {
             if controlFrame.reachable {
                 let message: String
@@ -416,16 +453,16 @@ struct InstructionTranslator: InstructionVisitor {
         guard try checkBeforePop(typeHint: nil) else {
             return .unknown
         }
-        return valueStack.pop()
+        return try valueStack.pop()
     }
 
     private mutating func translateReturn() {
         iseqBuilder.emit(.return)
     }
-    private mutating func markUnreachable() {
-        controlStack.markUnreachable()
-        let currentFrame = controlStack.currentFrame()
-        valueStack.truncate(height: currentFrame.stackHeight)
+    private mutating func markUnreachable() throws {
+        try controlStack.markUnreachable()
+        let currentFrame = try controlStack.currentFrame()
+        try valueStack.truncate(height: currentFrame.stackHeight)
     }
 
     mutating func finalize() throws -> InstructionSequence {
@@ -449,9 +486,9 @@ struct InstructionTranslator: InstructionVisitor {
 
     // MARK: - Visitor
 
-    mutating func visitUnreachable() -> Output {
+    mutating func visitUnreachable() throws -> Output {
         emit(.unreachable)
-        markUnreachable()
+        try markUnreachable()
     }
     mutating func visitNop() -> Output { emit(.nop) }
 
@@ -495,7 +532,7 @@ struct InstructionTranslator: InstructionVisitor {
     }
 
     mutating func visitElse() throws -> Output {
-        let frame = controlStack.currentFrame()
+        let frame = try controlStack.currentFrame()
         guard case let .if(elseLabel, endLabel) = frame.kind else {
             throw TranslationError("Expected `if` control frame on top of the stack for `else` but got \(frame)")
         }
@@ -504,7 +541,7 @@ struct InstructionTranslator: InstructionVisitor {
             let endRef = ExpressionRef(from: selfPC, to: endPC)
             return .else(endRef: endRef)
         }
-        valueStack.truncate(height: frame.stackHeight)
+        try valueStack.truncate(height: frame.stackHeight)
         // Re-push parameters
         for parameter in frame.blockType.parameters {
             valueStack.push(parameter)
@@ -530,7 +567,7 @@ struct InstructionTranslator: InstructionVisitor {
         case .if:
             iseqBuilder.pinLabelHere(poppedFrame.continuation)
         }
-        valueStack.truncate(height: poppedFrame.stackHeight)
+        try valueStack.truncate(height: poppedFrame.stackHeight)
         for result in poppedFrame.blockType.results {
             valueStack.push(result)
         }
@@ -540,10 +577,14 @@ struct InstructionTranslator: InstructionVisitor {
         destination: ControlStack.ControlFrame,
         currentFrame: ControlStack.ControlFrame,
         currentHeight: Int
-    ) -> UInt32 {
+    ) throws -> UInt32 {
         let popCount: UInt32
         if _fastPath(currentFrame.reachable) {
-            popCount = UInt32(currentHeight - Int(destination.copyCount) - destination.stackHeight)
+            let count = currentHeight - Int(destination.copyCount) - destination.stackHeight
+            guard count >= 0 else {
+                throw TranslationError("Stack height underflow: available \(currentHeight), required \(destination.stackHeight + Int(destination.copyCount))")
+            }
+            popCount = UInt32(count)
         } else {
             // Slow path: This path is taken when "br" is placed after "unreachable"
             // It's ok to put the fake popCount because it will not be executed at runtime.
@@ -555,9 +596,9 @@ struct InstructionTranslator: InstructionVisitor {
     private mutating func emitBranch(
         relativeDepth: UInt32,
         make: @escaping (_ offset: Int32, _ copyCount: UInt32, _ popCount: UInt32) -> Instruction
-    ) {
+    ) throws {
         let frame: ControlStack.ControlFrame
-        switch controlStack.branchTarget(relativeDepth: relativeDepth) {
+        switch try controlStack.branchTarget(relativeDepth: relativeDepth) {
         case .returnFunction:
             // XX: unreachable?
             self.translateReturn()
@@ -568,9 +609,9 @@ struct InstructionTranslator: InstructionVisitor {
         let selfPC = iseqBuilder.insertingPC
         let copyCount = frame.copyCount
 
-        let popCount = Self.computePopCount(
+        let popCount = try Self.computePopCount(
             destination: frame,
-            currentFrame: controlStack.currentFrame(),
+            currentFrame: try controlStack.currentFrame(),
             currentHeight: valueStack.height
         )
         iseqBuilder.emitWithLabel(frame.continuation) { _, continuation in
@@ -578,19 +619,19 @@ struct InstructionTranslator: InstructionVisitor {
             return make(Int32(relativeOffset), UInt32(copyCount), popCount)
         }
     }
-    mutating func visitBr(relativeDepth: UInt32) -> Output {
-        emitBranch(relativeDepth: relativeDepth) { offset, copyCount, popCount in
+    mutating func visitBr(relativeDepth: UInt32) throws -> Output {
+        try emitBranch(relativeDepth: relativeDepth) { offset, copyCount, popCount in
             return .br(
                 offset: offset,
                 copyCount: copyCount, popCount: popCount
             )
         }
-        markUnreachable()
+        try markUnreachable()
     }
 
     mutating func visitBrIf(relativeDepth: UInt32) throws -> Output {
         try popOperand(.i32)
-        emitBranch(relativeDepth: relativeDepth) { offset, copyCount, popCount in
+        try emitBranch(relativeDepth: relativeDepth) { offset, copyCount, popCount in
             return .brIf(
                 offset: offset,
                 copyCount: copyCount, popCount: popCount
@@ -607,17 +648,20 @@ struct InstructionTranslator: InstructionVisitor {
         let insertAt = iseqBuilder.insertingPC
         iseqBuilder.emit(.brTable(brTable))
 
-        let currentFrame = controlStack.currentFrame()
+        let currentFrame = try controlStack.currentFrame()
         let currentHeight = valueStack.height
 
         for (entryIndex, labelIndex) in allLabelIndices.enumerated() {
             let frame: ControlStack.ControlFrame
-            switch controlStack.branchTarget(relativeDepth: labelIndex) {
-            case .returnFunction: fatalError()
+            switch try controlStack.branchTarget(relativeDepth: labelIndex) {
+            case .returnFunction:
+                // XX: unreachable?
+                self.translateReturn()
+                return
             case .localJump(let found):
                 frame = found
             }
-            let popCount = Self.computePopCount(
+            let popCount = try Self.computePopCount(
                 destination: frame, currentFrame: currentFrame, currentHeight: currentHeight
             )
 
@@ -631,12 +675,12 @@ struct InstructionTranslator: InstructionVisitor {
                 return .brTable(brTable)
             }
         }
-        markUnreachable()
+        try markUnreachable()
     }
 
-    mutating func visitReturn() -> Output {
+    mutating func visitReturn() throws -> Output {
         translateReturn()
-        markUnreachable()
+        try markUnreachable()
     }
 
     private mutating func visitCallLike(calleeType: FunctionType) throws {
@@ -648,15 +692,15 @@ struct InstructionTranslator: InstructionVisitor {
         }
     }
     mutating func visitCall(functionIndex: UInt32) throws -> Output {
-        let calleeType = self.module.functionType(functionIndex)
+        let calleeType = try self.module.functionType(functionIndex)
         try visitCallLike(calleeType: calleeType)
         emit(.call(functionIndex: functionIndex))
     }
 
     mutating func visitCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws -> Output {
-        let addressType = module.addressType(tableIndex: tableIndex)
+        let addressType = try module.addressType(tableIndex: tableIndex)
         try popOperand(addressType)  // function address
-        let calleeType = self.module.resolveType(typeIndex)
+        let calleeType = try self.module.resolveType(typeIndex)
         try visitCallLike(calleeType: calleeType)
         emit(.callIndirect(tableIndex: tableIndex, typeIndex: typeIndex))
     }
@@ -694,13 +738,13 @@ struct InstructionTranslator: InstructionVisitor {
         valueStack.push(value1)
         emit(.select)
     }
-    mutating func visitLocalGet(localIndex: UInt32) -> Output {
-        let type = locals.type(of: localIndex)
+    mutating func visitLocalGet(localIndex: UInt32) throws -> Output {
+        let type = try locals.type(of: localIndex)
         valueStack.push(type)
         emit(.localGet(index: localIndex))
     }
     mutating func visitLocalSet(localIndex: UInt32) throws -> Output {
-        let type = locals.type(of: localIndex)
+        let type = try locals.type(of: localIndex)
         try popOperand(type)
         emit(.localSet(index: localIndex))
     }
@@ -708,13 +752,13 @@ struct InstructionTranslator: InstructionVisitor {
         // No value stack traffic here
         emit(.localTee(index: localIndex))
     }
-    mutating func visitGlobalGet(globalIndex: UInt32) -> Output {
-        let type = module.globalType(globalIndex)
+    mutating func visitGlobalGet(globalIndex: UInt32) throws -> Output {
+        let type = try module.globalType(globalIndex)
         valueStack.push(type)
         emit(.globalGet(index: globalIndex))
     }
     mutating func visitGlobalSet(globalIndex: UInt32) throws -> Output {
-        let type = module.globalType(globalIndex)
+        let type = try module.globalType(globalIndex)
         try popOperand(type)
         emit(.globalSet(index: globalIndex))
     }
@@ -742,7 +786,7 @@ struct InstructionTranslator: InstructionVisitor {
         emit(instruction)
     }
     private mutating func visitLoad(_ memarg: MemArg, _ type: ValueType, _ instruction: Instruction) throws {
-        let isMemory64 = module.isMemory64(memoryIndex: 0)
+        let isMemory64 = try module.isMemory64(memoryIndex: 0)
         let alignLog2Limit = isMemory64 ? 64 : 32
         if memarg.align >= alignLog2Limit {
             throw TranslationError("Alignment 2**\(memarg.align) is out of limit \(alignLog2Limit)")
@@ -777,8 +821,8 @@ struct InstructionTranslator: InstructionVisitor {
     mutating func visitI64Store8(memarg: MemArg) throws -> Output { try visitStore(memarg, .i64, .i64Store8(memarg: memarg)) }
     mutating func visitI64Store16(memarg: MemArg) throws -> Output { try visitStore(memarg, .i64, .i64Store16(memarg: memarg)) }
     mutating func visitI64Store32(memarg: MemArg) throws -> Output { try visitStore(memarg, .i64, .i64Store32(memarg: memarg)) }
-    mutating func visitMemorySize(memory: UInt32) -> Output {
-        let sizeType: ValueType = module.isMemory64(memoryIndex: memory) ? .i64 : .i32
+    mutating func visitMemorySize(memory: UInt32) throws -> Output {
+        let sizeType: ValueType = try module.isMemory64(memoryIndex: memory) ? .i64 : .i32
         pushEmit(sizeType, .memorySize)
     }
     mutating func visitMemoryGrow(memory: UInt32) throws -> Output {
@@ -945,7 +989,7 @@ struct InstructionTranslator: InstructionVisitor {
     mutating func visitI64Extend16S() throws -> Output { try visitUnary(.i64, .i64Extend16S) }
     mutating func visitI64Extend32S() throws -> Output { try visitUnary(.i64, .i64Extend32S) }
     mutating func visitMemoryInit(dataIndex: UInt32) throws -> Output {
-        let addressType = module.addressType(memoryIndex: 0)
+        let addressType = try module.addressType(memoryIndex: 0)
         try popPushEmit([.i32, .i32, addressType], [], .memoryInit(dataIndex))
     }
     mutating func visitDataDrop(dataIndex: UInt32) -> Output { emit(.memoryDataDrop(dataIndex)) }
@@ -954,7 +998,7 @@ struct InstructionTranslator: InstructionVisitor {
         // -----------------------------
         // C ⊦ memory.fill : [it i32 it] → []
         // https://github.com/WebAssembly/memory64/blob/main/proposals/memory64/Overview.md
-        let addressType = module.addressType(memoryIndex: 0)
+        let addressType = try module.addressType(memoryIndex: 0)
         try popPushEmit([addressType, addressType, addressType], [], .memoryCopy)
     }
     mutating func visitMemoryFill(memory: UInt32) throws -> Output {
@@ -962,7 +1006,7 @@ struct InstructionTranslator: InstructionVisitor {
         // -----------------------------
         // C ⊦ memory.fill : [it i32 it] → []
         // https://github.com/WebAssembly/memory64/blob/main/proposals/memory64/Overview.md
-        let addressType = module.addressType(memoryIndex: 0)
+        let addressType = try module.addressType(memoryIndex: 0)
         try popPushEmit([addressType, .i32, addressType], [], .memoryFill)
     }
     mutating func visitTableInit(elemIndex: UInt32, table: UInt32) throws -> Output {
@@ -974,8 +1018,8 @@ struct InstructionTranslator: InstructionVisitor {
         // -----------------------------------------------------------------------------
         // C ⊦ table.copy d s : [iN iM iK] → []
         // https://github.com/WebAssembly/memory64/blob/main/proposals/memory64/Overview.md
-        let destIsMemory64 = module.isMemory64(tableIndex: dstTable)
-        let sourceIsMemory64 = module.isMemory64(tableIndex: srcTable)
+        let destIsMemory64 = try module.isMemory64(tableIndex: dstTable)
+        let sourceIsMemory64 = try module.isMemory64(tableIndex: srcTable)
         let lengthIsMemory64 = destIsMemory64 || sourceIsMemory64
         try popPushEmit(
             [
@@ -988,7 +1032,7 @@ struct InstructionTranslator: InstructionVisitor {
         )
     }
     mutating func visitTableFill(table: UInt32) throws -> Output {
-        let address = module.addressType(tableIndex: table)
+        let address = try module.addressType(tableIndex: table)
         try popPushEmit([address, .ref(module.elementType(table)), address], [], .tableFill(table))
     }
     mutating func visitTableGet(table: UInt32) throws -> Output {
@@ -1001,7 +1045,7 @@ struct InstructionTranslator: InstructionVisitor {
         try popPushEmit([module.addressType(tableIndex: table), .ref(module.elementType(table))], [.i32], .tableGrow(table))
     }
     mutating func visitTableSize(table: UInt32) throws -> Output {
-        pushEmit(module.addressType(tableIndex: table), .tableSize(table))
+        pushEmit(try module.addressType(tableIndex: table), .tableSize(table))
     }
     mutating func visitI32TruncSatF32S() throws -> Output { try visitConversion(.f32, .i32, .i32TruncSatF32S) }
     mutating func visitI32TruncSatF32U() throws -> Output { try visitConversion(.f32, .i32, .i32TruncSatF32U) }

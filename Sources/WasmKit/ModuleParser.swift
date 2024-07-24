@@ -138,9 +138,10 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
         tables: module.tables
     )
     let allocator = module.allocator
-    let functions = codes.enumerated().map { [hasDataCount = parser.hasDataCount, features] index, code in
+    let functions = try codes.enumerated().map { [hasDataCount = parser.hasDataCount, features] index, code in
+        // SAFETY: The number of typeIndices is guaranteed to be the same as the number of codes
         let funcTypeIndex = typeIndices[index]
-        let funcType = module.types[Int(funcTypeIndex)]
+        let funcType = try translatorContext.resolveType(funcTypeIndex)
         return GuestFunction(
             type: typeIndices[index], locals: code.locals, allocator: allocator,
             body: {
