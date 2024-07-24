@@ -1018,13 +1018,13 @@ extension Parser {
                 throw WasmParserError.tooManyLocals
             }
 
-            let locals = localTypes.map { (n: UInt32, type: ValueType) in
-                return (0..<n).map { _ in type }
+            let locals = localTypes.flatMap { (n: UInt32, type: ValueType) in
+                return Array(repeating: type, count: Int(n))
             }
             let expressionBytes = try stream.consume(
                 count: Int(size) - (stream.currentIndex - bodyStart)
             )
-            return Code(locals: locals.flatMap { $0 }, expression: expressionBytes)
+            return Code(locals: locals, expression: expressionBytes)
         }
     }
 
