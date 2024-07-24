@@ -27,10 +27,11 @@ class CheckoutDependency:
         dependency_path = os.path.join(os.path.dirname(__file__), dependency_name)
         if os.path.exists(dependency_path):
             print(f"Dependency '{dependency_name}' already exists at {dependency_path}")
-            return
+        else:
+            print(f"Cloning '{dependency_name}' to {dependency_path}")
+            subprocess.run(["git", "clone", dependency["repository"], dependency_path], check=True)
 
-        print(f"Checking out '{dependency_name}' to {dependency_path}")
-        subprocess.run(["git", "clone", dependency["repository"], dependency_path], check=True)
+        print(f"Checking out '{dependency_name}' to {dependency['revision']}")
         subprocess.run(["git", "-C", dependency_path, "checkout", dependency["revision"]], check=True)
 
     def checkout_all(self):
