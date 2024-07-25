@@ -5,20 +5,20 @@ import enum WasmParser.ValueType
 /// <https://webassembly.github.io/spec/core/syntax/types.html#value-types>
 
 /// Numeric types
-public enum NumericType: Equatable {
+enum NumericType: Equatable {
     /// Integer value type.
     case int(IntValueType)
     /// Floating-point value type.
     case float(FloatValueType)
 
     /// 32-bit signed or unsigned integer.
-    public static let i32: Self = .int(.i32)
+    static let i32: Self = .int(.i32)
     /// 64-bit signed or unsigned integer.
-    public static let i64: Self = .int(.i64)
+    static let i64: Self = .int(.i64)
     /// 32-bit IEEE 754 floating-point number.
-    public static let f32: Self = .float(.f32)
+    static let f32: Self = .float(.f32)
     /// 64-bit IEEE 754 floating-point number.
-    public static let f64: Self = .float(.f64)
+    static let f64: Self = .float(.f64)
 }
 
 extension WasmParser.ValueType {
@@ -207,7 +207,7 @@ extension Value: CustomStringConvertible {
 /// <https://webassembly.github.io/spec/core/syntax/values.html#integers>
 
 /// Integer value types
-public enum IntValueType {
+enum IntValueType {
     /// 32-bit signed or unsigned integer.
     case i32
     /// 64-bit signed or unsigned integer.
@@ -262,7 +262,7 @@ extension RawSignedInteger {
 /// <https://webassembly.github.io/spec/core/syntax/values.html#floating-point>
 
 /// Floating-point value types
-public enum FloatValueType {
+enum FloatValueType {
     /// 32-bit IEEE 754 floating-point number.
     case f32
     /// 64-bit IEEE 754 floating-point number.
