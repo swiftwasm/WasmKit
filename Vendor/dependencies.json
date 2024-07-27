@@ -6,5 +6,9 @@
   "wasi-testsuite": {
     "repository": "https://github.com/WebAssembly/wasi-testsuite.git",
     "revision": "c9c751586fd86b321d595bbef13f2c7403cfdbc5"
+  },
+  "coremark": {
+    "repository": "https://github.com/eembc/coremark.git",
+    "revision": "d5fad6bd094899101a4e5fd53af7298160ced6ab"
   }
 }
