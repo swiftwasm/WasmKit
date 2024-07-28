@@ -184,69 +184,77 @@ struct RuntimeTestHarness {
 
     /// Compile the given input Swift source files into core Wasm module
     func compile(inputFiles: [String], arguments: [String]) throws -> URL {
-        let outputPath = Self.testsDirectory
-            .appendingPathComponent("Compiled")
-            .appendingPathComponent("\(fixtureName).core.wasm")
-        try fileManager.createDirectory(at: outputPath.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let process = Process()
-        process.launchPath = configuration.swiftCompilerExecutablePath.path
-        process.arguments =
-            inputFiles + arguments + [
-                "-I\(Self.sourcesDirectory.appendingPathComponent("_CabiShims").appendingPathComponent("include").path)",
-                // TODO: Remove `--export-all` linker option by replacing `@_cdecl` with `@_expose(wasm)`
-                "-Xlinker", "--export-all",
-                "-o", outputPath.path,
-            ]
-        // NOTE: Clear environment variables to avoid inheriting from the current process.
-        //       A test process launched by SwiftPM includes SDKROOT environment variable
-        //       and it makes Swift Driver wrongly pick the SDK root from the environment
-        //       variable (typically host SDK root) instead of wasi-sysroot.
-        process.environment = [:]
-        process.launch()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
-            let fileContents = inputFiles.map {
-                """
-                // MARK: - \($0)
-                \((try? String(contentsOfFile: $0)) ?? "Failed to read \($0)")
-                """
-            }.joined(separator: "\n====================\n")
-            let message = """
-                Failed to execute \(
-                ([configuration.swiftCompilerExecutablePath.path] + (process.arguments ?? [])).joined(separator: " ")
-                )
-                Exit status: \(process.terminationStatus)
-                Input files:
-                \(fileContents)
-                """
-            throw Error(description: message)
-        }
-        return outputPath
+        #if os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
+            throw XCTSkip("WITOverlayGenerator test requires Foundation.Process")
+        #else
+            let outputPath = Self.testsDirectory
+                .appendingPathComponent("Compiled")
+                .appendingPathComponent("\(fixtureName).core.wasm")
+            try fileManager.createDirectory(at: outputPath.deletingLastPathComponent(), withIntermediateDirectories: true)
+            let process = Process()
+            process.launchPath = configuration.swiftCompilerExecutablePath.path
+            process.arguments =
+                inputFiles + arguments + [
+                    "-I\(Self.sourcesDirectory.appendingPathComponent("_CabiShims").appendingPathComponent("include").path)",
+                    // TODO: Remove `--export-all` linker option by replacing `@_cdecl` with `@_expose(wasm)`
+                    "-Xlinker", "--export-all",
+                    "-o", outputPath.path,
+                ]
+            // NOTE: Clear environment variables to avoid inheriting from the current process.
+            //       A test process launched by SwiftPM includes SDKROOT environment variable
+            //       and it makes Swift Driver wrongly pick the SDK root from the environment
+            //       variable (typically host SDK root) instead of wasi-sysroot.
+            process.environment = [:]
+            process.launch()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else {
+                let fileContents = inputFiles.map {
+                    """
+                    // MARK: - \($0)
+                    \((try? String(contentsOfFile: $0)) ?? "Failed to read \($0)")
+                    """
+                }.joined(separator: "\n====================\n")
+                let message = """
+                    Failed to execute \(
+                        ([configuration.swiftCompilerExecutablePath.path] + (process.arguments ?? [])).joined(separator: " ")
+                    )
+                    Exit status: \(process.terminationStatus)
+                    Input files:
+                    \(fileContents)
+                    """
+                throw Error(description: message)
+            }
+            return outputPath
+        #endif
     }
 
     /// Compile the given input Swift source files into an object file
     func compileToObj(cInputFiles: [String], arguments: [String], outputPath: URL) throws {
-        let process = Process()
-        // Assume that clang is placed alongside swiftc
-        process.launchPath =
-            configuration.swiftCompilerExecutablePath
-            .deletingLastPathComponent().appendingPathComponent("clang").path
-        process.arguments =
-            cInputFiles + arguments + [
-                "-c",
-                "-o", outputPath.path,
-            ]
-        process.environment = [:]
-        process.launch()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
-            let message = """
-                Failed to execute \(
-                ([configuration.swiftCompilerExecutablePath.path] + (process.arguments ?? [])).joined(separator: " ")
-                )
-                Exit status: \(process.terminationStatus)
-                """
-            throw Error(description: message)
-        }
+        #if os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
+            throw XCTSkip("WITOverlayGenerator test requires Foundation.Process")
+        #else
+            let process = Process()
+            // Assume that clang is placed alongside swiftc
+            process.launchPath =
+                configuration.swiftCompilerExecutablePath
+                .deletingLastPathComponent().appendingPathComponent("clang").path
+            process.arguments =
+                cInputFiles + arguments + [
+                    "-c",
+                    "-o", outputPath.path,
+                ]
+            process.environment = [:]
+            process.launch()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else {
+                let message = """
+                    Failed to execute \(
+                        ([configuration.swiftCompilerExecutablePath.path] + (process.arguments ?? [])).joined(separator: " ")
+                    )
+                    Exit status: \(process.terminationStatus)
+                    """
+                throw Error(description: message)
+            }
+        #endif
     }
 }

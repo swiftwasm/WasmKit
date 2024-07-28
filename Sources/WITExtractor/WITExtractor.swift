@@ -1,5 +1,9 @@
 import Foundation
 
+@available(iOS, unavailable)
+@available(watchOS, unavailable)
+@available(tvOS, unavailable)
+@available(visionOS, unavailable)
 public struct WITExtractor {
     public struct Output {
         public var witContents: String
@@ -31,7 +35,7 @@ public struct WITExtractor {
     }
 
     public func run(moduleName: String) throws -> Output {
-        guard #available(macOS 11, *) else {
+        guard #available(macOS 11, iOS 14.0, watchOS 7.0, tvOS 14.0, *) else {
             fatalError("WITExtractor requires macOS 11+")
         }
         let header = """
@@ -45,7 +49,7 @@ public struct WITExtractor {
         return output
     }
 
-    @available(macOS 11, *)
+    @available(macOS 11, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
     func runWithoutHeader(moduleName: String) throws -> Output {
         let output = try digester.dumpSDK(moduleName: moduleName, arguments: extraDigesterArguments)
         var typeMapping = TypeMapping()

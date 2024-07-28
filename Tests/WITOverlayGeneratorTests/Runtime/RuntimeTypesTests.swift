@@ -284,7 +284,7 @@ class RuntimeTypesTests: XCTestCase {
     func testNaming() throws {
         // Ensure compilation succeed for both host and guest
         var harness = try RuntimeTestHarness(fixture: "Naming")
-        XCTAssertNoThrow(try harness.build(link: NamingTestWorld.link(_:), run: { _, _ in }))
+        try harness.build(link: NamingTestWorld.link(_:), run: { _, _ in })
     }
 }
 

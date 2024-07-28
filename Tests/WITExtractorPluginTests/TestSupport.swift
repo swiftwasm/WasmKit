@@ -47,40 +47,44 @@ struct TestSupport {
 }
 
 func assertSwiftPackage(fixturePackage: String, _ trailingArguments: [String]) throws -> String {
-    guard let config = TestSupport.Configuration.default else {
-        throw XCTSkip("Please create 'Tests/default.json'")
-    }
-    let swiftExecutable = config.hostSwiftExecutablePath
-    let packagePath = URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent()
-        .appendingPathComponent("Fixtures")
-        .appendingPathComponent(fixturePackage)
+    #if os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
+        throw XCTSkip("WITExtractor does not support platforms where Foundation.Process is unavailable")
+    #else
+        guard let config = TestSupport.Configuration.default else {
+            throw XCTSkip("Please create 'Tests/default.json'")
+        }
+        let swiftExecutable = config.hostSwiftExecutablePath
+        let packagePath = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .appendingPathComponent("Fixtures")
+            .appendingPathComponent(fixturePackage)
 
-    return try TestSupport.withTemporaryDirectory { buildDir in
-        var arguments = ["package", "--package-path", packagePath.path, "--scratch-path", buildDir]
-        if let sdkRootPath = config.hostSdkRootPath {
-            arguments += ["--sdk", sdkRootPath]
-        }
-        arguments += trailingArguments
-        let stdoutPipe = Pipe()
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: swiftExecutable.path)
-        process.arguments = arguments
-        process.standardOutput = stdoutPipe
-        try process.run()
-        process.waitUntilExit()
+        return try TestSupport.withTemporaryDirectory { buildDir in
+            var arguments = ["package", "--package-path", packagePath.path, "--scratch-path", buildDir]
+            if let sdkRootPath = config.hostSdkRootPath {
+                arguments += ["--sdk", sdkRootPath]
+            }
+            arguments += trailingArguments
+            let stdoutPipe = Pipe()
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: swiftExecutable.path)
+            process.arguments = arguments
+            process.standardOutput = stdoutPipe
+            try process.run()
+            process.waitUntilExit()
 
-        guard process.terminationStatus == 0 else {
-            throw TestSupport.Error(
-                description: "Failed to execute \(([swiftExecutable.path] + arguments).joined(separator: " "))"
-            )
+            guard process.terminationStatus == 0 else {
+                throw TestSupport.Error(
+                    description: "Failed to execute \(([swiftExecutable.path] + arguments).joined(separator: " "))"
+                )
+            }
+            guard let stdoutBytes = try stdoutPipe.fileHandleForReading.readToEnd() else { return "" }
+            struct Output: Codable {
+                let witOutputPath: String
+                let swiftOutputPath: String
+            }
+            let jsonOutput = try JSONDecoder().decode(Output.self, from: stdoutBytes)
+            return try String(contentsOfFile: jsonOutput.witOutputPath)
         }
-        guard let stdoutBytes = try stdoutPipe.fileHandleForReading.readToEnd() else { return "" }
-        struct Output: Codable {
-            let witOutputPath: String
-            let swiftOutputPath: String
-        }
-        let jsonOutput = try JSONDecoder().decode(Output.self, from: stdoutBytes)
-        return try String(contentsOfFile: jsonOutput.witOutputPath)
-    }
+    #endif
 }

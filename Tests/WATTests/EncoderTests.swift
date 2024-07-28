@@ -75,35 +75,39 @@ class EncoderTests: XCTestCase {
     }
 
     func testSpectest() throws {
-        guard let wast2json = TestSupport.lookupExecutable("wast2json") else {
-            throw XCTSkip("wast2json not found in PATH")
-        }
+        #if os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
+            throw XCTSkip("Spectest compatibility test requires Foundation.Process")
+        #else
+            guard let wast2json = TestSupport.lookupExecutable("wast2json") else {
+                throw XCTSkip("wast2json not found in PATH")
+            }
 
-        var stats = CompatibilityTestStats()
-        let excluded: [String] = []
-        for wastFile in Spectest.wastFiles(include: [], exclude: excluded) {
-            try TestSupport.withTemporaryDirectory { tempDir, shouldRetain in
-                let jsonFileName = wastFile.deletingPathExtension().lastPathComponent + ".json"
-                let json = URL(fileURLWithPath: tempDir).appendingPathComponent(jsonFileName)
+            var stats = CompatibilityTestStats()
+            let excluded: [String] = []
+            for wastFile in Spectest.wastFiles(include: [], exclude: excluded) {
+                try TestSupport.withTemporaryDirectory { tempDir, shouldRetain in
+                    let jsonFileName = wastFile.deletingPathExtension().lastPathComponent + ".json"
+                    let json = URL(fileURLWithPath: tempDir).appendingPathComponent(jsonFileName)
 
-                let wast2jsonProcess = try Process.run(
-                    wast2json,
-                    arguments: [wastFile.path, "-o", json.path]
-                )
-                wast2jsonProcess.waitUntilExit()
+                    let wast2jsonProcess = try Process.run(
+                        wast2json,
+                        arguments: [wastFile.path, "-o", json.path]
+                    )
+                    wast2jsonProcess.waitUntilExit()
 
-                do {
-                    try checkWabtCompatibility(wast: wastFile, json: json, stats: &stats)
-                } catch {
-                    stats.failed.insert(wastFile.lastPathComponent)
-                    shouldRetain = true
-                    XCTFail("Error while checking compatibility between \(wastFile) and \(json.path): \(error)")
+                    do {
+                        try checkWabtCompatibility(wast: wastFile, json: json, stats: &stats)
+                    } catch {
+                        stats.failed.insert(wastFile.lastPathComponent)
+                        shouldRetain = true
+                        XCTFail("Error while checking compatibility between \(wastFile) and \(json.path): \(error)")
+                    }
                 }
             }
-        }
-        print("Spectest compatibility: \(stats.run - stats.failed.count) / \(stats.run)")
-        if !stats.failed.isEmpty {
-            print("Failed test cases: \(stats.failed.sorted())")
-        }
+            print("Spectest compatibility: \(stats.run - stats.failed.count) / \(stats.run)")
+            if !stats.failed.isEmpty {
+                print("Failed test cases: \(stats.failed.sorted())")
+            }
+        #endif
     }
 }

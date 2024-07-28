@@ -116,26 +116,30 @@ struct SwiftAPIDigester {
     typealias SDKNodeType = SDKNodeInherit<SDKNodeBody, SDKNodeTypeBody>
     typealias SDKNodeTypeNominal = SDKNodeInherit<SDKNodeType, SDKNodeTypeNominalBody>
 
-    @available(macOS 11, *)
+    @available(macOS 11, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
     func dumpSDK(moduleName: String, arguments: [String]) throws -> Output {
-        var args = [
-            "-dump-sdk",
-            "-module", moduleName,
-            // Emit output to stdout
-            "-o", "-",
-        ]
-        args += arguments
-        let process = Process()
-        process.executableURL = executableURL
-        process.arguments = args
-        let stdoutPipe = Pipe()
-        process.standardOutput = stdoutPipe
-        try process.run()
-        guard let output = try stdoutPipe.fileHandleForReading.readToEnd() else {
-            throw SwiftAPIDigesterError.unexpectedEmptyOutput
-        }
-        process.waitUntilExit()
-        return try Output.parse(output)
+        #if os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
+            fatalError("WITExtractor does not support platforms where Foundation.Process is unavailable")
+        #else
+            var args = [
+                "-dump-sdk",
+                "-module", moduleName,
+                // Emit output to stdout
+                "-o", "-",
+            ]
+            args += arguments
+            let process = Process()
+            process.executableURL = executableURL
+            process.arguments = args
+            let stdoutPipe = Pipe()
+            process.standardOutput = stdoutPipe
+            try process.run()
+            guard let output = try stdoutPipe.fileHandleForReading.readToEnd() else {
+                throw SwiftAPIDigesterError.unexpectedEmptyOutput
+            }
+            process.waitUntilExit()
+            return try Output.parse(output)
+        #endif
     }
 }
 

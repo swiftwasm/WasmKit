@@ -42,7 +42,7 @@ struct Run: ParsableCommand {
         log("Started parsing module", verbose: true)
 
         let module: Module
-        if verbose, #available(macOS 13.0, *) {
+        if verbose, #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) {
             let (parsedModule, parseTime) = try measure {
                 try parseWasm(filePath: FilePath(path))
             }
@@ -70,7 +70,7 @@ struct Run: ParsableCommand {
             invoke = entry
         }
 
-        if #available(macOS 13.0, *) {
+        if #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) {
             let (_, invokeTime) = try measure(execution: invoke)
             log("Finished invoking function \"\(path)\": \(invokeTime)", verbose: true)
         } else {

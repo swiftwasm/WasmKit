@@ -1,6 +1,6 @@
 import XCTest
 
-@available(macOS 11, *)
+@available(macOS 11, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 final class SpectestTests: XCTestCase {
 
     /// Run all the tests in the spectest suite.

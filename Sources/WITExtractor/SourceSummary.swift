@@ -49,7 +49,7 @@ public struct SwiftFunctionSource {
     let name: String
 }
 
-@available(macOS 11, *)
+@available(macOS 11, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 struct SourceSummaryBuilder {
     let diagnostics: DiagnosticCollection
     let typeMapping: TypeMapping

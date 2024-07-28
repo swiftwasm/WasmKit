@@ -123,45 +123,49 @@ struct ExtractWIT: ParsableCommand {
     var digesterArgs: [String] = []
 
     func run() throws {
-        guard #available(macOS 11, *) else {
-            fatalError("ExtractWIT requires macOS 11+")
-        }
+        #if os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
+            fatalError("WITExtractor does not support platforms where Foundation.Process is unavailable")
+        #else
+            guard #available(macOS 11, *) else {
+                fatalError("ExtractWIT requires macOS 11+")
+            }
 
-        let extractor = WITExtractor(
-            namespace: namespace,
-            packageName: packageName,
-            digesterPath: digesterPath,
-            extraDigesterArguments: digesterArgs
-        )
-        let output = try extractor.run(moduleName: moduleName)
-        try output.witContents.write(toFile: witOutputPath, atomically: true, encoding: .utf8)
-
-        for diagnostic in extractor.diagnostics {
-            try FileHandle.standardError.write(contentsOf: Data((diagnostic.description + "\n").utf8))
-        }
-
-        // Generate overlay shim to export extracted WIT interface
-        do {
-            let sourceFile = try SourceFileSyntax.parse(
-                output.witContents,
-                fileName: "<extracted>.wit"
+            let extractor = WITExtractor(
+                namespace: namespace,
+                packageName: packageName,
+                digesterPath: digesterPath,
+                extraDigesterArguments: digesterArgs
             )
-            let packageResolver = PackageResolver()
-            let packageUnit = try packageResolver.register(packageSources: [sourceFile])
-            let context = SemanticsContext(rootPackage: packageUnit, packageResolver: packageResolver)
-            let (interface, _) = try context.lookupInterface(name: output.interfaceName, contextPackage: packageUnit)
+            let output = try extractor.run(moduleName: moduleName)
+            try output.witContents.write(toFile: witOutputPath, atomically: true, encoding: .utf8)
 
-            let swiftSource = try generateGuestExportInterface(
-                context: context,
-                sourceFile: sourceFile,
-                interface: interface,
-                sourceSummaryProvider: SwiftSourceSummaryProvider(
-                    summary: output.sourceSummary,
-                    typeMapping: output.typeMapping
+            for diagnostic in extractor.diagnostics {
+                try FileHandle.standardError.write(contentsOf: Data((diagnostic.description + "\n").utf8))
+            }
+
+            // Generate overlay shim to export extracted WIT interface
+            do {
+                let sourceFile = try SourceFileSyntax.parse(
+                    output.witContents,
+                    fileName: "<extracted>.wit"
                 )
-            )
-            try swiftSource.write(toFile: swiftOutputPath, atomically: true, encoding: .utf8)
-        }
+                let packageResolver = PackageResolver()
+                let packageUnit = try packageResolver.register(packageSources: [sourceFile])
+                let context = SemanticsContext(rootPackage: packageUnit, packageResolver: packageResolver)
+                let (interface, _) = try context.lookupInterface(name: output.interfaceName, contextPackage: packageUnit)
+
+                let swiftSource = try generateGuestExportInterface(
+                    context: context,
+                    sourceFile: sourceFile,
+                    interface: interface,
+                    sourceSummaryProvider: SwiftSourceSummaryProvider(
+                        summary: output.sourceSummary,
+                        typeMapping: output.typeMapping
+                    )
+                )
+                try swiftSource.write(toFile: swiftOutputPath, atomically: true, encoding: .utf8)
+            }
+        #endif
     }
 
     private func writeFile(_ filePath: String, contents: String) throws {
