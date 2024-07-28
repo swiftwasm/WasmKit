@@ -114,8 +114,6 @@ public func parseExpression<V: InstructionVisitor, Stream: ByteStream>(
 /// ```swift
 /// import WasmParser
 ///
-/// let bytes = try wat2wasm(String(contentsOfFile: "wasm/factorial.wat"))
-///
 /// struct MyVisitor: VoidInstructionVisitor {
 ///     func visitLocalGet(localIndex: UInt32) {
 ///         print("local.get \(localIndex)")
