@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# A CI script to run "make spectest" with wabt installed.
+# A CI script to install wabt for testing WAT library
 #
 
 set -eu -o pipefail
