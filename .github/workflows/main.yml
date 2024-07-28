@@ -24,10 +24,9 @@ jobs:
             wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi
 
     runs-on: ${{ matrix.os }}
+    name: "build-macos (${{ matrix.xcode }})"
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
       - id: setup-development
         run: |
           toolchain_path="/Library/Developer/Toolchains/${{ matrix.development-toolchain-tag }}.xctoolchain"
@@ -54,6 +53,12 @@ jobs:
           EOS
       - run: ./Vendor/checkout-dependency
       - run: swift test --sanitize address
+
+  build-xcode:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - run: xcrun xcodebuild -skipMacroValidation -skipPackagePluginValidation build -scheme WasmKit-Package -destination generic/platform=macOS
       - run: xcrun xcodebuild -skipMacroValidation -skipPackagePluginValidation build -scheme WasmKit-Package -destination generic/platform=iOS
       - run: xcrun xcodebuild -skipMacroValidation -skipPackagePluginValidation build -scheme WasmKit-Package -destination generic/platform=watchOS
       - run: xcrun xcodebuild -skipMacroValidation -skipPackagePluginValidation build -scheme WasmKit-Package -destination generic/platform=tvOS
