@@ -33,7 +33,7 @@ WAST is an superset of WAT that includes additional directives for testing. You 
 ```swift
 import WAT
 
-let wat = try parseWAST("""
+var wast = try parseWAST("""
 (module
   (func $add (param i32 i32) (result i32)
     local.get 0
@@ -41,9 +41,12 @@ let wat = try parseWAST("""
     i32.add)
   (export "add" (func $add))
 )
-
 (assert_return (invoke "add" (i32.const 1) (i32.const 2)) (i32.const 3))
 """)
+
+while let (directive, location) = try wast.nextDirective() {
+    print("\(location): \(directive)")
+}
 ```
 
 
