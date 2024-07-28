@@ -6,9 +6,9 @@ import class Foundation.ProcessInfo
 
 let DarwinPlatforms: [Platform]
 #if swift(<5.9)
-DarwinPlatforms = [.macOS, .iOS, .watchOS, .tvOS]
+    DarwinPlatforms = [.macOS, .iOS, .watchOS, .tvOS]
 #else
-DarwinPlatforms = [.macOS, .iOS, .watchOS, .tvOS, .visionOS]
+    DarwinPlatforms = [.macOS, .iOS, .watchOS, .tvOS, .visionOS]
 #endif
 
 let package = Package(
@@ -82,7 +82,7 @@ let package = Package(
             ],
             exclude: ["CMakeLists.txt"],
             swiftSettings: [
-                .define("SYSTEM_PACKAGE_DARWIN", .when(platforms: DarwinPlatforms)),
+                .define("SYSTEM_PACKAGE_DARWIN", .when(platforms: DarwinPlatforms))
             ]
         ),
 
