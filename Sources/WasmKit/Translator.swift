@@ -245,7 +245,7 @@ struct InstructionTranslator: InstructionVisitor {
                 throw TranslationError("Truncating to \(height) but the stack height is \(self.height)")
             }
             while height != self.height {
-                guard let _ = self.values.popLast() else {
+                guard self.values.popLast() != nil else {
                     throw TranslationError("Internal consistency error: Stack height is \(self.height) but failed to pop")
                 }
             }

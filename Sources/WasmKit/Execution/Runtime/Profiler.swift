@@ -3,7 +3,7 @@ import SystemPackage
 
 /// A simple time-profiler for guest process to emit `chrome://tracing` format
 /// This profiler works only when WasmKit is built with debug configuration (`swift build -c debug`)
-@_documentation(visibility:internal)
+@_documentation(visibility: internal)
 public class GuestTimeProfiler: RuntimeInterceptor {
     struct Event: Codable {
         enum Phase: String, Codable {

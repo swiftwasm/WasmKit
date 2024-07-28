@@ -1,5 +1,5 @@
-import XCTest
 import WasmKit
+import XCTest
 
 final class FuzzTranslatorRegressionTests: XCTestCase {
     func testRunAll() async throws {
@@ -10,7 +10,7 @@ final class FuzzTranslatorRegressionTests: XCTestCase {
         for file in try FileManager.default.contentsOfDirectory(atPath: failCasesDir.path) {
             let path = failCasesDir.appendingPathComponent(file).path
             print("Fuzz regression test: \(path)")
-            
+
             let data = try Data(contentsOf: URL(fileURLWithPath: path))
             do {
                 var module = try WasmKit.parseWasm(bytes: Array(data))

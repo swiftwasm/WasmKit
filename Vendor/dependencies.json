@@ -7,6 +7,10 @@
     "repository": "https://github.com/WebAssembly/wasi-testsuite.git",
     "revision": "c9c751586fd86b321d595bbef13f2c7403cfdbc5"
   },
+  "swift-format": {
+    "repository": "https://github.com/swiftlang/swift-format.git",
+    "revision": "b268009b0d1182f9a573311c1a69eee9a7fd3d3f"
+  },
   "coremark": {
     "repository": "https://github.com/eembc/coremark.git",
     "revision": "d5fad6bd094899101a4e5fd53af7298160ced6ab"

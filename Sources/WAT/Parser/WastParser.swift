@@ -16,7 +16,7 @@ struct WastParser {
 
     mutating func nextDirective() throws -> WastDirective? {
         var originalParser = parser
-        guard let _ = try parser.peek(.leftParen) else { return nil }
+        guard (try parser.peek(.leftParen)) != nil else { return nil }
         try parser.consume()
         guard try WastDirective.peek(wastParser: self) else {
             if try peekModuleField() {
