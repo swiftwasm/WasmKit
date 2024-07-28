@@ -6,6 +6,8 @@
 
 ## Usage
 
+The best way to learn how to use WasmKit is to look at the [Examples](./Examples) directory.
+
 ### Command Line Tool
 
 WasmKit provides a command line tool to run WebAssembly binaries compliant with WASI.
@@ -31,6 +33,25 @@ dependencies: [
 
 You can find API documentation on the [Swift Package Index](https://swiftpackageindex.com/swiftwasm/WasmKit/main/documentation/wasmkit).
 
+## Features
+
+- Minimal dependencies
+    - The core runtime engine depends only on [swift-system](https://github.com/apple/swift-system).
+    - No Foundation dependency
+- Compact and embeddable
+    - Debug build complete in 5 seconds[^1]
+- Batteries included
+    - WASI support, WAT parser, etc.
+
+
+## Supported Platforms
+
+WasmKit engine works on all major platforms supported by Swift. It is continuously tested on macOS, Ubuntu, and Windows,
+and should work on the following platforms:
+
+- macOS 10.13+, iOS 12.0+, tvOS 12.0+, watchOS 6.0+
+- Ubuntu 20.04+
+- Windows 10+
 
 ## Implementation Status
 
@@ -50,6 +71,10 @@ You can find API documentation on the [Swift Package Index](https://swiftpackage
 | WASI | WASI Preview 1 | ✅ Implemented |
 
 
+## Minimum Supported Swift Version
+
+The minimum supported Swift version of WasmKit is 5.8, which is the version used to bootstrap the Swift toolchain in [ci.swift.org](https://ci.swift.org/).
+
 ## Testing
 
 To run the WasmKit test suite, you need to checkout the test suite repositories first.
@@ -63,4 +88,7 @@ $ swift test
 
 ## Acknowledgement
 
-This project is originally developed by [@akkyie](https://github.com/akkyie), and now maintained by the community.
+This project was originally developed by [@akkyie](https://github.com/akkyie), and is now maintained by the community.
+
+
+[^1]: On a 2020 Mac mini (M1, 16GB RAM) with Swift 5.10. Measured by `swift package resolve && swift package clean && time swift build --product PrintAdd`.
