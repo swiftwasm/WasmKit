@@ -48,7 +48,7 @@ public class GuestTimeProfiler: RuntimeInterceptor {
             let clock: SystemExtras.Clock
             #if os(Linux)
                 clock = .boottime
-            #elseif os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+            #elseif os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
                 clock = .rawMonotonic
             #elseif os(OpenBSD) || os(FreeBSD) || os(WASI)
                 clock = .monotonic

@@ -1,4 +1,4 @@
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if SYSTEM_PACKAGE_DARWIN
 import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(Android)
 import CSystem
@@ -30,12 +30,12 @@ extension Clock {
   public static var boottime: Clock { Clock(rawValue: CLOCK_BOOTTIME) }
   #endif
 
-  #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  #if SYSTEM_PACKAGE_DARWIN
   @_alwaysEmitIntoClient
   public static var rawMonotonic: Clock { Clock(rawValue: _CLOCK_MONOTONIC_RAW) }
   #endif
 
-  #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(Linux) || os(OpenBSD) || os(FreeBSD) || os(WASI)
+  #if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(OpenBSD) || os(FreeBSD) || os(WASI)
   @_alwaysEmitIntoClient
   public static var monotonic: Clock { Clock(rawValue: _CLOCK_MONOTONIC) }
   #endif
@@ -45,7 +45,7 @@ extension Clock {
   public static var uptime: Clock { Clock(rawValue: _CLOCK_UPTIME) }
   #endif
 
-  #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  #if SYSTEM_PACKAGE_DARWIN
   @_alwaysEmitIntoClient
   public static var rawUptime: Clock { Clock(rawValue: _CLOCK_UPTIME_RAW) }
   #endif

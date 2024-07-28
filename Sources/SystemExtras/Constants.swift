@@ -1,4 +1,4 @@
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if SYSTEM_PACKAGE_DARWIN
 import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(Android)
 import CSystem
@@ -22,7 +22,7 @@ internal var _AT_SYMLINK_FOLLOW: CInt { AT_SYMLINK_FOLLOW }
 @_alwaysEmitIntoClient
 internal var _AT_REMOVEDIR: CInt { AT_REMOVEDIR }
 #endif
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if SYSTEM_PACKAGE_DARWIN
 @_alwaysEmitIntoClient
 internal var _AT_REALDEV: CInt { AT_REALDEV }
 @_alwaysEmitIntoClient
@@ -117,16 +117,16 @@ internal var _S_IFSOCK: CInterop.Mode { S_IFSOCK }
 @_alwaysEmitIntoClient
 internal var _CLOCK_BOOTTIME: CInterop.ClockId { CLOCK_BOOTTIME }
 #endif
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if SYSTEM_PACKAGE_DARWIN
 @_alwaysEmitIntoClient
 internal var _CLOCK_MONOTONIC_RAW: CInterop.ClockId { CLOCK_MONOTONIC_RAW }
 #endif
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(Linux) || os(OpenBSD) || os(FreeBSD) || os(WASI)
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(OpenBSD) || os(FreeBSD) || os(WASI)
 @_alwaysEmitIntoClient
 internal var _CLOCK_MONOTONIC: CInterop.ClockId { CLOCK_MONOTONIC }
 #endif
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if SYSTEM_PACKAGE_DARWIN
 @_alwaysEmitIntoClient
 internal var _CLOCK_UPTIME_RAW: CInterop.ClockId { CLOCK_UPTIME_RAW }
 #endif

@@ -9,5 +9,10 @@ add_wasmkit_library(SystemExtras
   Syscalls.swift
 )
 
+set(SWIFT_SYSTEM_APPLE_PLATFORMS "Darwin" "iOS" "watchOS" "tvOS" "visionOS")
+if(CMAKE_SYSTEM_NAME IN_LIST SWIFT_SYSTEM_APPLE_PLATFORMS)
+  target_compile_definitions(SystemExtras PRIVATE SYSTEM_PACKAGE_DARWIN)
+endif()
+
 target_link_wasmkit_libraries(SystemExtras PUBLIC
   SystemPackage)

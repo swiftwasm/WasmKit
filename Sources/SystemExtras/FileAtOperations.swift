@@ -1,4 +1,4 @@
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if SYSTEM_PACKAGE_DARWIN
 import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(Android)
 import Glibc

@@ -1,4 +1,4 @@
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if SYSTEM_PACKAGE_DARWIN
 import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(Android)
 import Glibc
@@ -98,7 +98,7 @@ internal func system_symlinkat(
 }
 
 extension CInterop {
-  #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  #if SYSTEM_PACKAGE_DARWIN
   public typealias DirP = UnsafeMutablePointer<DIR>
   #elseif os(Linux)
   public typealias DirP = OpaquePointer

@@ -12,7 +12,7 @@
 
 // TODO: Should CSystem just include all the header files we need?
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if SYSTEM_PACKAGE_DARWIN
 import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(Android)
 import CSystem
@@ -30,7 +30,7 @@ internal typealias _COffT = off_t
 
 // MARK: syscalls and variables
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if SYSTEM_PACKAGE_DARWIN
 internal var system_errno: CInt {
   get { Darwin.errno }
   set { Darwin.errno = newValue }

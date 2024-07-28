@@ -94,7 +94,7 @@ public protocol MonotonicClock {
         private var underlying: SystemExtras.Clock {
             #if os(Linux)
                 return .monotonic
-            #elseif os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+            #elseif os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
                 return .rawUptime
             #elseif os(WASI)
                 return .monotonic
@@ -127,7 +127,7 @@ public protocol MonotonicClock {
         private var underlying: SystemExtras.Clock {
             #if os(Linux)
                 return .boottime
-            #elseif os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+            #elseif os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
                 return .rawMonotonic
             #elseif os(OpenBSD) || os(FreeBSD) || os(WASI)
                 return .monotonic

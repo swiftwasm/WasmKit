@@ -13,7 +13,7 @@ extension FdWASIEntry {
         offset: WASIAbi.FileSize, length: WASIAbi.FileSize,
         advice: WASIAbi.Advice
     ) throws {
-        #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+        #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
             guard let offset = Int64(exactly: offset),
                 let length = Int32(exactly: length)
             else {

@@ -1,4 +1,4 @@
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if SYSTEM_PACKAGE_DARWIN
 import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(Android)
 import Glibc
@@ -12,7 +12,7 @@ import WinSDK
 import SystemPackage
 
 extension FileDescriptor {
-  #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  #if SYSTEM_PACKAGE_DARWIN
 
   /// Announces an intention to read specific region of file data.
   ///
@@ -266,7 +266,7 @@ extension FileDescriptor {
 
     @_alwaysEmitIntoClient
     public var accessTime: Clock.TimeSpec {
-      #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+      #if SYSTEM_PACKAGE_DARWIN
       Clock.TimeSpec(rawValue: self.rawValue.st_atimespec)
       #else
       Clock.TimeSpec(rawValue: self.rawValue.st_atim)
@@ -275,7 +275,7 @@ extension FileDescriptor {
 
     @_alwaysEmitIntoClient
     public var modificationTime: Clock.TimeSpec {
-      #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+      #if SYSTEM_PACKAGE_DARWIN
       Clock.TimeSpec(rawValue: self.rawValue.st_mtimespec)
       #else
       Clock.TimeSpec(rawValue: self.rawValue.st_mtim)
@@ -284,7 +284,7 @@ extension FileDescriptor {
 
     @_alwaysEmitIntoClient
     public var creationTime: Clock.TimeSpec {
-      #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+      #if SYSTEM_PACKAGE_DARWIN
       Clock.TimeSpec(rawValue: self.rawValue.st_ctimespec)
       #else
       Clock.TimeSpec(rawValue: self.rawValue.st_ctim)

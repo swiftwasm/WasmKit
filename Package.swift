@@ -4,6 +4,13 @@ import PackageDescription
 
 import class Foundation.ProcessInfo
 
+let DarwinPlatforms: [Platform]
+#if swift(<5.9)
+DarwinPlatforms = [.macOS, .iOS, .watchOS, .tvOS]
+#else
+DarwinPlatforms = [.macOS, .iOS, .watchOS, .tvOS, .visionOS]
+#endif
+
 let package = Package(
     name: "WasmKit",
     platforms: [.macOS(.v10_13), .iOS(.v12)],
@@ -73,7 +80,10 @@ let package = Package(
             dependencies: [
                 .product(name: "SystemPackage", package: "swift-system")
             ],
-            exclude: ["CMakeLists.txt"]
+            exclude: ["CMakeLists.txt"],
+            swiftSettings: [
+                .define("SYSTEM_PACKAGE_DARWIN", .when(platforms: DarwinPlatforms)),
+            ]
         ),
 
         .executableTarget(
@@ -101,7 +111,7 @@ let package = Package(
 if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
     package.dependencies += [
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.2.2"),
-        .package(url: "https://github.com/apple/swift-system", .upToNextMinor(from: "1.2.1")),
+        .package(url: "https://github.com/apple/swift-system", .upToNextMinor(from: "1.3.0")),
     ]
 } else {
     package.dependencies += [
