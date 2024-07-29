@@ -2,7 +2,6 @@
 
 import WasmKit
 import WAT
-import Foundation
 
 // Convert a WAT file to a Wasm binary, then parse it.
 let module = try parseWasm(

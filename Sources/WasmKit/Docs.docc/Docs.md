@@ -14,7 +14,6 @@ This example shows how to instantiate a WebAssembly module, interact with the ho
 ```swift
 import WasmKit
 import WAT
-import Foundation
 
 // Convert a WAT file to a Wasm binary, then parse it.
 let module = try parseWasm(
