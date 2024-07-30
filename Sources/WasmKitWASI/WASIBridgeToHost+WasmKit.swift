@@ -9,7 +9,7 @@ extension WASIBridgeToHost {
             HostModule(
                 functions: $0.functions.mapValues { function in
                     HostFunction(type: function.type) { caller, values in
-                        guard case let .memory(memoryAddr) = caller.instance.exports["memory"] else {
+                        guard case let .memory(memoryAddr) = caller.instance?.exports["memory"] else {
                             throw WASIError(description: "Missing required \"memory\" export")
                         }
                         let memory = WasmKitGuestMemory(store: caller.store, address: memoryAddr)

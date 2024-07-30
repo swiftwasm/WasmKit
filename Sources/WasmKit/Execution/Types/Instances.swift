@@ -55,6 +55,12 @@ public struct FunctionInstance {
         self.module = module
         code = function
     }
+
+    internal static func stackRegBase(type: FunctionType, nonParamLocals: Int) -> Instruction.Register {
+        Instruction.Register(
+            max(type.parameters.count, type.results.count) + nonParamLocals
+        )
+    }
 }
 
 /// > Note:

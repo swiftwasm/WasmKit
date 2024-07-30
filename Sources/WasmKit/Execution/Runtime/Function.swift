@@ -6,36 +6,26 @@ public struct Function: Equatable {
 
     /// Invokes a function of the given address with the given parameters.
     public func invoke(_ arguments: [Value] = [], runtime: Runtime) throws -> [Value] {
-        try withExecution { execution in
-            var stack = Stack()
-            defer { stack.deallocate() }
-            let numberOfResults = try invoke(execution: &execution, stack: &stack, with: arguments, runtime: runtime)
-            try execution.run(runtime: runtime, stack: &stack)
-            return Array(stack.popValues(count: numberOfResults))
-        }
-    }
-
-    /// - Returns: Number of result values
-    private func invoke(execution: inout ExecutionState, stack: inout Stack, with arguments: [Value], runtime: Runtime) throws -> Int {
         switch try runtime.store.function(at: address) {
         case let .host(function):
             try check(functionType: function.type, parameters: arguments)
-
-            let parameters = stack.popValues(count: function.type.parameters.count)
-
-            let moduleInstance = runtime.store.module(address: stack.currentFrame.module)
-            let caller = Caller(runtime: runtime, instance: moduleInstance)
-            let results = try function.implementation(caller, Array(parameters))
+            let caller = Caller(runtime: runtime, instance: nil)
+            let results = try function.implementation(caller, arguments)
             try check(functionType: function.type, results: results)
-            stack.push(values: results)
-            return function.type.results.count
+            return results
 
         case let .wasm(function, _):
-            try check(functionType: function.type, parameters: arguments)
-            stack.push(values: arguments)
-
-            try execution.invoke(functionAddress: address, runtime: runtime, stack: &stack)
-            return function.type.results.count
+            return try withExecution { execution in
+                var stack = Stack()
+                defer { stack.deallocate() }
+                try check(functionType: function.type, parameters: arguments)
+                for (index, argument) in arguments.enumerated() {
+                    stack[Instruction.Register(index)] = argument
+                }
+                try execution.invoke(functionAddress: address, runtime: runtime, stack: &stack)
+                try execution.run(runtime: runtime, stack: &stack)
+                return (0..<function.type.results.count).map { stack[Instruction.Register($0)] }
+            }
         }
     }
 

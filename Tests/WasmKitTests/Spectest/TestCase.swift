@@ -79,7 +79,7 @@ enum Result {
     case passed
     case failed(String)
     case skipped(String)
-    case `internal`(Swift.Error)
+//    case `internal`(Swift.Error)
 
     var banner: String {
         switch self {
@@ -89,8 +89,8 @@ enum Result {
             return "[FAILED]"
         case .skipped:
             return "[SKIPPED]"
-        case .internal:
-            return "[INTERNAL]"
+//        case .internal:
+//            return "[INTERNAL]"
         }
     }
 }

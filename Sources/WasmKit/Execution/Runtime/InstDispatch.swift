@@ -3,24 +3,26 @@ extension ExecutionState {
     @inline(__always)
     mutating func doExecute(_ instruction: Instruction, runtime: Runtime, stack: inout Stack, locals: UnsafeMutablePointer<Value>) throws -> Bool {
         switch instruction {
-        case .localGet(let index):
-            self.localGet(runtime: runtime, stack: &stack, locals: locals, index: index)
-        case .localSet(let index):
-            self.localSet(runtime: runtime, stack: &stack, locals: locals, index: index)
-        case .localTee(let index):
-            self.localTee(runtime: runtime, stack: &stack, locals: locals, index: index)
-        case .globalGet(let index):
-            try self.globalGet(runtime: runtime, stack: &stack, index: index)
-        case .globalSet(let index):
-            try self.globalSet(runtime: runtime, stack: &stack, index: index)
+        case .localGet(let localGetOperand):
+            self.localGet(runtime: runtime, stack: &stack, locals: locals, localGetOperand: localGetOperand)
+        case .localSet(let localSetOperand):
+            self.localSet(runtime: runtime, stack: &stack, locals: locals, localSetOperand: localSetOperand)
+        case .localTee(let localTeeOperand):
+            self.localTee(runtime: runtime, stack: &stack, locals: locals, localTeeOperand: localTeeOperand)
+        case .globalGet(let globalGetOperand):
+            try self.globalGet(runtime: runtime, stack: &stack, globalGetOperand: globalGetOperand)
+        case .globalSet(let globalSetOperand):
+            try self.globalSet(runtime: runtime, stack: &stack, globalSetOperand: globalSetOperand)
+        case .copyStack(let copyStackOperand):
+            self.copyStack(runtime: runtime, stack: &stack, copyStackOperand: copyStackOperand)
         case .unreachable:
             try self.unreachable(runtime: runtime, stack: &stack)
             return true
         case .nop:
             try self.nop(runtime: runtime, stack: &stack)
             return true
-        case .ifThen(let elseOrEndRef):
-            self.ifThen(runtime: runtime, stack: &stack, elseOrEndRef: elseOrEndRef)
+        case .ifThen(let ifOperand):
+            self.ifThen(runtime: runtime, stack: &stack, ifOperand: ifOperand)
             return true
         case .end:
             self.end(runtime: runtime, stack: &stack)
@@ -28,210 +30,213 @@ extension ExecutionState {
         case .`else`(let endRef):
             self.`else`(runtime: runtime, stack: &stack, endRef: endRef)
             return true
-        case .br(let offset, let copyCount, let popCount):
-            try self.br(runtime: runtime, stack: &stack, offset: offset, copyCount: copyCount, popCount: popCount)
+        case .br(let offset):
+            try self.br(runtime: runtime, stack: &stack, offset: offset)
             return false
-        case .brIf(let offset, let copyCount, let popCount):
-            try self.brIf(runtime: runtime, stack: &stack, offset: offset, copyCount: copyCount, popCount: popCount)
+        case .brIf(let brIfOperand):
+            try self.brIf(runtime: runtime, stack: &stack, brIfOperand: brIfOperand)
             return false
-        case .brTable(let brTable):
-            try self.brTable(runtime: runtime, stack: &stack, brTable: brTable)
+        case .brIfNot(let brIfOperand):
+            try self.brIfNot(runtime: runtime, stack: &stack, brIfOperand: brIfOperand)
             return false
-        case .`return`:
-            try self.`return`(runtime: runtime, stack: &stack)
+        case .brTable(let brTableOperand):
+            try self.brTable(runtime: runtime, stack: &stack, brTableOperand: brTableOperand)
             return false
-        case .call(let functionIndex):
-            try self.call(runtime: runtime, stack: &stack, functionIndex: functionIndex)
+        case .`return`(let returnOperand):
+            try self.`return`(runtime: runtime, stack: &stack, returnOperand: returnOperand)
             return false
-        case .callIndirect(let tableIndex, let typeIndex):
-            try self.callIndirect(runtime: runtime, stack: &stack, tableIndex: tableIndex, typeIndex: typeIndex)
+        case .call(let callOperand):
+            try self.call(runtime: runtime, stack: &stack, callOperand: callOperand)
             return false
-        case .endOfFunction:
-            try self.endOfFunction(runtime: runtime, stack: &stack)
+        case .callIndirect(let callIndirectOperand):
+            try self.callIndirect(runtime: runtime, stack: &stack, callIndirectOperand: callIndirectOperand)
+            return false
+        case .endOfFunction(let returnOperand):
+            try self.endOfFunction(runtime: runtime, stack: &stack, returnOperand: returnOperand)
             return false
         case .endOfExecution:
             try self.endOfExecution(runtime: runtime, stack: &stack)
             return false
-        case .i32Load(let memarg):
-            try self.i32Load(runtime: runtime, stack: &stack, memarg: memarg)
-        case .i64Load(let memarg):
-            try self.i64Load(runtime: runtime, stack: &stack, memarg: memarg)
-        case .f32Load(let memarg):
-            try self.f32Load(runtime: runtime, stack: &stack, memarg: memarg)
-        case .f64Load(let memarg):
-            try self.f64Load(runtime: runtime, stack: &stack, memarg: memarg)
-        case .i32Load8S(let memarg):
-            try self.i32Load8S(runtime: runtime, stack: &stack, memarg: memarg)
-        case .i32Load8U(let memarg):
-            try self.i32Load8U(runtime: runtime, stack: &stack, memarg: memarg)
-        case .i32Load16S(let memarg):
-            try self.i32Load16S(runtime: runtime, stack: &stack, memarg: memarg)
-        case .i32Load16U(let memarg):
-            try self.i32Load16U(runtime: runtime, stack: &stack, memarg: memarg)
-        case .i64Load8S(let memarg):
-            try self.i64Load8S(runtime: runtime, stack: &stack, memarg: memarg)
-        case .i64Load8U(let memarg):
-            try self.i64Load8U(runtime: runtime, stack: &stack, memarg: memarg)
-        case .i64Load16S(let memarg):
-            try self.i64Load16S(runtime: runtime, stack: &stack, memarg: memarg)
-        case .i64Load16U(let memarg):
-            try self.i64Load16U(runtime: runtime, stack: &stack, memarg: memarg)
-        case .i64Load32S(let memarg):
-            try self.i64Load32S(runtime: runtime, stack: &stack, memarg: memarg)
-        case .i64Load32U(let memarg):
-            try self.i64Load32U(runtime: runtime, stack: &stack, memarg: memarg)
-        case .i32Store(let memarg):
-            try self.i32Store(runtime: runtime, stack: &stack, memarg: memarg)
-        case .i64Store(let memarg):
-            try self.i64Store(runtime: runtime, stack: &stack, memarg: memarg)
-        case .f32Store(let memarg):
-            try self.f32Store(runtime: runtime, stack: &stack, memarg: memarg)
-        case .f64Store(let memarg):
-            try self.f64Store(runtime: runtime, stack: &stack, memarg: memarg)
-        case .i32Store8(let memarg):
-            try self.i32Store8(runtime: runtime, stack: &stack, memarg: memarg)
-        case .i32Store16(let memarg):
-            try self.i32Store16(runtime: runtime, stack: &stack, memarg: memarg)
-        case .i64Store8(let memarg):
-            try self.i64Store8(runtime: runtime, stack: &stack, memarg: memarg)
-        case .i64Store16(let memarg):
-            try self.i64Store16(runtime: runtime, stack: &stack, memarg: memarg)
-        case .i64Store32(let memarg):
-            try self.i64Store32(runtime: runtime, stack: &stack, memarg: memarg)
-        case .memorySize:
-            self.memorySize(runtime: runtime, stack: &stack)
-        case .memoryGrow:
-            try self.memoryGrow(runtime: runtime, stack: &stack)
-        case .memoryInit(let dataIndex):
-            try self.memoryInit(runtime: runtime, stack: &stack, dataIndex: dataIndex)
+        case .i32Load(let loadOperand):
+            try self.i32Load(runtime: runtime, stack: &stack, loadOperand: loadOperand)
+        case .i64Load(let loadOperand):
+            try self.i64Load(runtime: runtime, stack: &stack, loadOperand: loadOperand)
+        case .f32Load(let loadOperand):
+            try self.f32Load(runtime: runtime, stack: &stack, loadOperand: loadOperand)
+        case .f64Load(let loadOperand):
+            try self.f64Load(runtime: runtime, stack: &stack, loadOperand: loadOperand)
+        case .i32Load8S(let loadOperand):
+            try self.i32Load8S(runtime: runtime, stack: &stack, loadOperand: loadOperand)
+        case .i32Load8U(let loadOperand):
+            try self.i32Load8U(runtime: runtime, stack: &stack, loadOperand: loadOperand)
+        case .i32Load16S(let loadOperand):
+            try self.i32Load16S(runtime: runtime, stack: &stack, loadOperand: loadOperand)
+        case .i32Load16U(let loadOperand):
+            try self.i32Load16U(runtime: runtime, stack: &stack, loadOperand: loadOperand)
+        case .i64Load8S(let loadOperand):
+            try self.i64Load8S(runtime: runtime, stack: &stack, loadOperand: loadOperand)
+        case .i64Load8U(let loadOperand):
+            try self.i64Load8U(runtime: runtime, stack: &stack, loadOperand: loadOperand)
+        case .i64Load16S(let loadOperand):
+            try self.i64Load16S(runtime: runtime, stack: &stack, loadOperand: loadOperand)
+        case .i64Load16U(let loadOperand):
+            try self.i64Load16U(runtime: runtime, stack: &stack, loadOperand: loadOperand)
+        case .i64Load32S(let loadOperand):
+            try self.i64Load32S(runtime: runtime, stack: &stack, loadOperand: loadOperand)
+        case .i64Load32U(let loadOperand):
+            try self.i64Load32U(runtime: runtime, stack: &stack, loadOperand: loadOperand)
+        case .i32Store(let storeOperand):
+            try self.i32Store(runtime: runtime, stack: &stack, storeOperand: storeOperand)
+        case .i64Store(let storeOperand):
+            try self.i64Store(runtime: runtime, stack: &stack, storeOperand: storeOperand)
+        case .f32Store(let storeOperand):
+            try self.f32Store(runtime: runtime, stack: &stack, storeOperand: storeOperand)
+        case .f64Store(let storeOperand):
+            try self.f64Store(runtime: runtime, stack: &stack, storeOperand: storeOperand)
+        case .i32Store8(let storeOperand):
+            try self.i32Store8(runtime: runtime, stack: &stack, storeOperand: storeOperand)
+        case .i32Store16(let storeOperand):
+            try self.i32Store16(runtime: runtime, stack: &stack, storeOperand: storeOperand)
+        case .i64Store8(let storeOperand):
+            try self.i64Store8(runtime: runtime, stack: &stack, storeOperand: storeOperand)
+        case .i64Store16(let storeOperand):
+            try self.i64Store16(runtime: runtime, stack: &stack, storeOperand: storeOperand)
+        case .i64Store32(let storeOperand):
+            try self.i64Store32(runtime: runtime, stack: &stack, storeOperand: storeOperand)
+        case .memorySize(let memorySizeOperand):
+            self.memorySize(runtime: runtime, stack: &stack, memorySizeOperand: memorySizeOperand)
+        case .memoryGrow(let memoryGrowOperand):
+            try self.memoryGrow(runtime: runtime, stack: &stack, memoryGrowOperand: memoryGrowOperand)
+        case .memoryInit(let memoryInitOperand):
+            try self.memoryInit(runtime: runtime, stack: &stack, memoryInitOperand: memoryInitOperand)
         case .memoryDataDrop(let dataIndex):
             self.memoryDataDrop(runtime: runtime, stack: &stack, dataIndex: dataIndex)
-        case .memoryCopy:
-            try self.memoryCopy(runtime: runtime, stack: &stack)
-        case .memoryFill:
-            try self.memoryFill(runtime: runtime, stack: &stack)
-        case .numericConst(let value):
-            self.numericConst(runtime: runtime, stack: &stack, value: value)
-        case .numericFloatUnary(let floatUnary):
-            self.numericFloatUnary(runtime: runtime, stack: &stack, floatUnary: floatUnary)
-        case .numericIntBinary(let intBinary):
-            try self.numericIntBinary(runtime: runtime, stack: &stack, intBinary: intBinary)
-        case .numericFloatBinary(let floatBinary):
-            self.numericFloatBinary(runtime: runtime, stack: &stack, floatBinary: floatBinary)
-        case .numericConversion(let conversion):
-            try self.numericConversion(runtime: runtime, stack: &stack, conversion: conversion)
-        case .i32Add:
-            self.i32Add(runtime: runtime, stack: &stack)
-        case .i64Add:
-            self.i64Add(runtime: runtime, stack: &stack)
-        case .f32Add:
-            self.f32Add(runtime: runtime, stack: &stack)
-        case .f64Add:
-            self.f64Add(runtime: runtime, stack: &stack)
-        case .i32Sub:
-            self.i32Sub(runtime: runtime, stack: &stack)
-        case .i64Sub:
-            self.i64Sub(runtime: runtime, stack: &stack)
-        case .f32Sub:
-            self.f32Sub(runtime: runtime, stack: &stack)
-        case .f64Sub:
-            self.f64Sub(runtime: runtime, stack: &stack)
-        case .i32Mul:
-            self.i32Mul(runtime: runtime, stack: &stack)
-        case .i64Mul:
-            self.i64Mul(runtime: runtime, stack: &stack)
-        case .f32Mul:
-            self.f32Mul(runtime: runtime, stack: &stack)
-        case .f64Mul:
-            self.f64Mul(runtime: runtime, stack: &stack)
-        case .i32Eq:
-            self.i32Eq(runtime: runtime, stack: &stack)
-        case .i64Eq:
-            self.i64Eq(runtime: runtime, stack: &stack)
-        case .f32Eq:
-            self.f32Eq(runtime: runtime, stack: &stack)
-        case .f64Eq:
-            self.f64Eq(runtime: runtime, stack: &stack)
-        case .i32Ne:
-            self.i32Ne(runtime: runtime, stack: &stack)
-        case .i64Ne:
-            self.i64Ne(runtime: runtime, stack: &stack)
-        case .f32Ne:
-            self.f32Ne(runtime: runtime, stack: &stack)
-        case .f64Ne:
-            self.f64Ne(runtime: runtime, stack: &stack)
-        case .i32LtS:
-            self.i32LtS(runtime: runtime, stack: &stack)
-        case .i64LtS:
-            self.i64LtS(runtime: runtime, stack: &stack)
-        case .i32LtU:
-            self.i32LtU(runtime: runtime, stack: &stack)
-        case .i64LtU:
-            self.i64LtU(runtime: runtime, stack: &stack)
-        case .i32GtS:
-            self.i32GtS(runtime: runtime, stack: &stack)
-        case .i64GtS:
-            self.i64GtS(runtime: runtime, stack: &stack)
-        case .i32GtU:
-            self.i32GtU(runtime: runtime, stack: &stack)
-        case .i64GtU:
-            self.i64GtU(runtime: runtime, stack: &stack)
-        case .i32LeS:
-            self.i32LeS(runtime: runtime, stack: &stack)
-        case .i64LeS:
-            self.i64LeS(runtime: runtime, stack: &stack)
-        case .i32LeU:
-            self.i32LeU(runtime: runtime, stack: &stack)
-        case .i64LeU:
-            self.i64LeU(runtime: runtime, stack: &stack)
-        case .i32GeS:
-            self.i32GeS(runtime: runtime, stack: &stack)
-        case .i64GeS:
-            self.i64GeS(runtime: runtime, stack: &stack)
-        case .i32GeU:
-            self.i32GeU(runtime: runtime, stack: &stack)
-        case .i64GeU:
-            self.i64GeU(runtime: runtime, stack: &stack)
-        case .i32Clz:
-            self.i32Clz(runtime: runtime, stack: &stack)
-        case .i64Clz:
-            self.i64Clz(runtime: runtime, stack: &stack)
-        case .i32Ctz:
-            self.i32Ctz(runtime: runtime, stack: &stack)
-        case .i64Ctz:
-            self.i64Ctz(runtime: runtime, stack: &stack)
-        case .i32Popcnt:
-            self.i32Popcnt(runtime: runtime, stack: &stack)
-        case .i64Popcnt:
-            self.i64Popcnt(runtime: runtime, stack: &stack)
-        case .i32Eqz:
-            self.i32Eqz(runtime: runtime, stack: &stack)
-        case .i64Eqz:
-            self.i64Eqz(runtime: runtime, stack: &stack)
+        case .memoryCopy(let memoryCopyOperand):
+            try self.memoryCopy(runtime: runtime, stack: &stack, memoryCopyOperand: memoryCopyOperand)
+        case .memoryFill(let memoryFillOperand):
+            try self.memoryFill(runtime: runtime, stack: &stack, memoryFillOperand: memoryFillOperand)
+        case .numericConst(let constOperand):
+            self.numericConst(runtime: runtime, stack: &stack, constOperand: constOperand)
+        case .numericFloatUnary(let floatUnary, let unaryOperand):
+            self.numericFloatUnary(runtime: runtime, stack: &stack, floatUnary: floatUnary, unaryOperand: unaryOperand)
+        case .numericIntBinary(let intBinary, let binaryOperand):
+            try self.numericIntBinary(runtime: runtime, stack: &stack, intBinary: intBinary, binaryOperand: binaryOperand)
+        case .numericFloatBinary(let floatBinary, let binaryOperand):
+            self.numericFloatBinary(runtime: runtime, stack: &stack, floatBinary: floatBinary, binaryOperand: binaryOperand)
+        case .numericConversion(let conversion, let unaryOperand):
+            try self.numericConversion(runtime: runtime, stack: &stack, conversion: conversion, unaryOperand: unaryOperand)
+        case .i32Add(let binaryOperand):
+            self.i32Add(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .i64Add(let binaryOperand):
+            self.i64Add(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .f32Add(let binaryOperand):
+            self.f32Add(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .f64Add(let binaryOperand):
+            self.f64Add(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .i32Sub(let binaryOperand):
+            self.i32Sub(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .i64Sub(let binaryOperand):
+            self.i64Sub(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .f32Sub(let binaryOperand):
+            self.f32Sub(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .f64Sub(let binaryOperand):
+            self.f64Sub(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .i32Mul(let binaryOperand):
+            self.i32Mul(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .i64Mul(let binaryOperand):
+            self.i64Mul(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .f32Mul(let binaryOperand):
+            self.f32Mul(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .f64Mul(let binaryOperand):
+            self.f64Mul(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .i32Eq(let binaryOperand):
+            self.i32Eq(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .i64Eq(let binaryOperand):
+            self.i64Eq(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .f32Eq(let binaryOperand):
+            self.f32Eq(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .f64Eq(let binaryOperand):
+            self.f64Eq(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .i32Ne(let binaryOperand):
+            self.i32Ne(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .i64Ne(let binaryOperand):
+            self.i64Ne(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .f32Ne(let binaryOperand):
+            self.f32Ne(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .f64Ne(let binaryOperand):
+            self.f64Ne(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .i32LtS(let binaryOperand):
+            self.i32LtS(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .i64LtS(let binaryOperand):
+            self.i64LtS(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .i32LtU(let binaryOperand):
+            self.i32LtU(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .i64LtU(let binaryOperand):
+            self.i64LtU(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .i32GtS(let binaryOperand):
+            self.i32GtS(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .i64GtS(let binaryOperand):
+            self.i64GtS(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .i32GtU(let binaryOperand):
+            self.i32GtU(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .i64GtU(let binaryOperand):
+            self.i64GtU(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .i32LeS(let binaryOperand):
+            self.i32LeS(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .i64LeS(let binaryOperand):
+            self.i64LeS(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .i32LeU(let binaryOperand):
+            self.i32LeU(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .i64LeU(let binaryOperand):
+            self.i64LeU(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .i32GeS(let binaryOperand):
+            self.i32GeS(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .i64GeS(let binaryOperand):
+            self.i64GeS(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .i32GeU(let binaryOperand):
+            self.i32GeU(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .i64GeU(let binaryOperand):
+            self.i64GeU(runtime: runtime, stack: &stack, binaryOperand: binaryOperand)
+        case .i32Clz(let unaryOperand):
+            self.i32Clz(runtime: runtime, stack: &stack, unaryOperand: unaryOperand)
+        case .i64Clz(let unaryOperand):
+            self.i64Clz(runtime: runtime, stack: &stack, unaryOperand: unaryOperand)
+        case .i32Ctz(let unaryOperand):
+            self.i32Ctz(runtime: runtime, stack: &stack, unaryOperand: unaryOperand)
+        case .i64Ctz(let unaryOperand):
+            self.i64Ctz(runtime: runtime, stack: &stack, unaryOperand: unaryOperand)
+        case .i32Popcnt(let unaryOperand):
+            self.i32Popcnt(runtime: runtime, stack: &stack, unaryOperand: unaryOperand)
+        case .i64Popcnt(let unaryOperand):
+            self.i64Popcnt(runtime: runtime, stack: &stack, unaryOperand: unaryOperand)
+        case .i32Eqz(let unaryOperand):
+            self.i32Eqz(runtime: runtime, stack: &stack, unaryOperand: unaryOperand)
+        case .i64Eqz(let unaryOperand):
+            self.i64Eqz(runtime: runtime, stack: &stack, unaryOperand: unaryOperand)
         case .drop:
             self.drop(runtime: runtime, stack: &stack)
-        case .select:
-            try self.select(runtime: runtime, stack: &stack)
-        case .refNull(let referenceType):
-            self.refNull(runtime: runtime, stack: &stack, referenceType: referenceType)
-        case .refIsNull:
-            self.refIsNull(runtime: runtime, stack: &stack)
-        case .refFunc(let functionIndex):
-            self.refFunc(runtime: runtime, stack: &stack, functionIndex: functionIndex)
-        case .tableGet(let tableIndex):
-            try self.tableGet(runtime: runtime, stack: &stack, tableIndex: tableIndex)
-        case .tableSet(let tableIndex):
-            try self.tableSet(runtime: runtime, stack: &stack, tableIndex: tableIndex)
-        case .tableSize(let tableIndex):
-            self.tableSize(runtime: runtime, stack: &stack, tableIndex: tableIndex)
-        case .tableGrow(let tableIndex):
-            self.tableGrow(runtime: runtime, stack: &stack, tableIndex: tableIndex)
-        case .tableFill(let tableIndex):
-            try self.tableFill(runtime: runtime, stack: &stack, tableIndex: tableIndex)
-        case .tableCopy(let dest, let src):
-            try self.tableCopy(runtime: runtime, stack: &stack, dest: dest, src: src)
-        case .tableInit(let tableIndex, let elementIndex):
-            try self.tableInit(runtime: runtime, stack: &stack, tableIndex: tableIndex, elementIndex: elementIndex)
+        case .select(let selectOperand):
+            try self.select(runtime: runtime, stack: &stack, selectOperand: selectOperand)
+        case .refNull(let refNullOperand):
+            self.refNull(runtime: runtime, stack: &stack, refNullOperand: refNullOperand)
+        case .refIsNull(let refIsNullOperand):
+            self.refIsNull(runtime: runtime, stack: &stack, refIsNullOperand: refIsNullOperand)
+        case .refFunc(let refFuncOperand):
+            self.refFunc(runtime: runtime, stack: &stack, refFuncOperand: refFuncOperand)
+        case .tableGet(let tableGetOperand):
+            try self.tableGet(runtime: runtime, stack: &stack, tableGetOperand: tableGetOperand)
+        case .tableSet(let tableSetOperand):
+            try self.tableSet(runtime: runtime, stack: &stack, tableSetOperand: tableSetOperand)
+        case .tableSize(let tableSizeOperand):
+            self.tableSize(runtime: runtime, stack: &stack, tableSizeOperand: tableSizeOperand)
+        case .tableGrow(let tableGrowOperand):
+            self.tableGrow(runtime: runtime, stack: &stack, tableGrowOperand: tableGrowOperand)
+        case .tableFill(let tableFillOperand):
+            try self.tableFill(runtime: runtime, stack: &stack, tableFillOperand: tableFillOperand)
+        case .tableCopy(let tableCopyOperand):
+            try self.tableCopy(runtime: runtime, stack: &stack, tableCopyOperand: tableCopyOperand)
+        case .tableInit(let tableInitOperand):
+            try self.tableInit(runtime: runtime, stack: &stack, tableInitOperand: tableInitOperand)
         case .tableElementDrop(let elementIndex):
             self.tableElementDrop(runtime: runtime, stack: &stack, elementIndex: elementIndex)
         }
@@ -248,6 +253,7 @@ extension Instruction {
         case .localTee: return "localTee"
         case .globalGet: return "globalGet"
         case .globalSet: return "globalSet"
+        case .copyStack: return "copyStack"
         case .unreachable: return "unreachable"
         case .nop: return "nop"
         case .ifThen: return "ifThen"
@@ -255,6 +261,7 @@ extension Instruction {
         case .`else`: return "`else`"
         case .br: return "br"
         case .brIf: return "brIf"
+        case .brIfNot: return "brIfNot"
         case .brTable: return "brTable"
         case .`return`: return "`return`"
         case .call: return "call"

@@ -69,7 +69,7 @@ public final class Store {
 /// A caller context passed to host functions
 public struct Caller {
     public let runtime: Runtime
-    public let instance: ModuleInstance
+    public let instance: ModuleInstance?
     public var store: Store {
         runtime.store
     }

@@ -1,30 +1,33 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#reference-instructions>
 extension ExecutionState {
-    mutating func refNull(runtime: Runtime, stack: inout Stack, referenceType: ReferenceType) {
-        switch referenceType {
+    mutating func refNull(runtime: Runtime, stack: inout Stack, refNullOperand: Instruction.RefNullOperand) {
+        let value: Value
+        switch refNullOperand.type {
         case .externRef:
-            stack.push(value: .ref(.extern(nil)))
+            value = .ref(.extern(nil))
         case .funcRef:
-            stack.push(value: .ref(.function(nil)))
+            value = .ref(.function(nil))
         }
+        stack[refNullOperand.result] = value
     }
-    mutating func refIsNull(runtime: Runtime, stack: inout Stack) {
-        let value = stack.popValue()
+    mutating func refIsNull(runtime: Runtime, stack: inout Stack, refIsNullOperand: Instruction.RefIsNullOperand) {
+        let value = stack[refIsNullOperand.value]
 
+        let result: Value
         switch value {
         case .ref(.extern(nil)), .ref(.function(nil)):
-            stack.push(value: .i32(1))
+            result = .i32(1)
         case .ref(.extern(_)), .ref(.function(_)):
-            stack.push(value: .i32(0))
+            result = .i32(0)
         default:
             fatalError("Invalid type \(value.type) for `\(#function)` implementation")
         }
+        stack[refIsNullOperand.result] = result
     }
-    mutating func refFunc(runtime: Runtime, stack: inout Stack, functionIndex: FunctionIndex) {
+    mutating func refFunc(runtime: Runtime, stack: inout Stack, refFuncOperand: Instruction.RefFuncOperand) {
         let module = runtime.store.module(address: stack.currentFrame.module)
-        let functionAddress = module.functionAddresses[Int(functionIndex)]
-
-        stack.push(value: .ref(.function(functionAddress)))
+        let functionAddress = module.functionAddresses[Int(refFuncOperand.index)]
+        stack[refFuncOperand.result] = .ref(.function(functionAddress))
     }
 }

@@ -1,111 +1,113 @@
 enum Instruction: Equatable {
-    case localGet(index: LocalIndex)
-    case localSet(index: LocalIndex)
-    case localTee(index: LocalIndex)
-    case globalGet(index: GlobalIndex)
-    case globalSet(index: GlobalIndex)
+    case localGet(Instruction.LocalGetOperand)
+    case localSet(Instruction.LocalSetOperand)
+    case localTee(Instruction.LocalTeeOperand)
+    case globalGet(Instruction.GlobalGetOperand)
+    case globalSet(Instruction.GlobalSetOperand)
+    case copyStack(Instruction.CopyStackOperand)
     case unreachable
     case nop
-    case ifThen(elseOrEndRef: ExpressionRef)
+    case ifThen(Instruction.IfOperand)
     case end
     case `else`(endRef: ExpressionRef)
-    case br(offset: Int32, copyCount: UInt32, popCount: UInt32)
-    case brIf(offset: Int32, copyCount: UInt32, popCount: UInt32)
-    case brTable(Instruction.BrTable)
-    case `return`
-    case call(functionIndex: UInt32)
-    case callIndirect(tableIndex: TableIndex, typeIndex: TypeIndex)
-    case endOfFunction
+    case br(offset: Int32)
+    case brIf(Instruction.BrIfOperand)
+    case brIfNot(Instruction.BrIfOperand)
+    case brTable(Instruction.BrTableOperand)
+    case `return`(Instruction.ReturnOperand)
+    case call(Instruction.CallOperand)
+    case callIndirect(Instruction.CallIndirectOperand)
+    case endOfFunction(Instruction.ReturnOperand)
     case endOfExecution
-    case i32Load(memarg: Memarg)
-    case i64Load(memarg: Memarg)
-    case f32Load(memarg: Memarg)
-    case f64Load(memarg: Memarg)
-    case i32Load8S(memarg: Memarg)
-    case i32Load8U(memarg: Memarg)
-    case i32Load16S(memarg: Memarg)
-    case i32Load16U(memarg: Memarg)
-    case i64Load8S(memarg: Memarg)
-    case i64Load8U(memarg: Memarg)
-    case i64Load16S(memarg: Memarg)
-    case i64Load16U(memarg: Memarg)
-    case i64Load32S(memarg: Memarg)
-    case i64Load32U(memarg: Memarg)
-    case i32Store(memarg: Memarg)
-    case i64Store(memarg: Memarg)
-    case f32Store(memarg: Memarg)
-    case f64Store(memarg: Memarg)
-    case i32Store8(memarg: Memarg)
-    case i32Store16(memarg: Memarg)
-    case i64Store8(memarg: Memarg)
-    case i64Store16(memarg: Memarg)
-    case i64Store32(memarg: Memarg)
-    case memorySize
-    case memoryGrow
-    case memoryInit(DataIndex)
+    case i32Load(Instruction.LoadOperand)
+    case i64Load(Instruction.LoadOperand)
+    case f32Load(Instruction.LoadOperand)
+    case f64Load(Instruction.LoadOperand)
+    case i32Load8S(Instruction.LoadOperand)
+    case i32Load8U(Instruction.LoadOperand)
+    case i32Load16S(Instruction.LoadOperand)
+    case i32Load16U(Instruction.LoadOperand)
+    case i64Load8S(Instruction.LoadOperand)
+    case i64Load8U(Instruction.LoadOperand)
+    case i64Load16S(Instruction.LoadOperand)
+    case i64Load16U(Instruction.LoadOperand)
+    case i64Load32S(Instruction.LoadOperand)
+    case i64Load32U(Instruction.LoadOperand)
+    case i32Store(Instruction.StoreOperand)
+    case i64Store(Instruction.StoreOperand)
+    case f32Store(Instruction.StoreOperand)
+    case f64Store(Instruction.StoreOperand)
+    case i32Store8(Instruction.StoreOperand)
+    case i32Store16(Instruction.StoreOperand)
+    case i64Store8(Instruction.StoreOperand)
+    case i64Store16(Instruction.StoreOperand)
+    case i64Store32(Instruction.StoreOperand)
+    case memorySize(Instruction.MemorySizeOperand)
+    case memoryGrow(Instruction.MemoryGrowOperand)
+    case memoryInit(Instruction.MemoryInitOperand)
     case memoryDataDrop(DataIndex)
-    case memoryCopy
-    case memoryFill
-    case numericConst(Value)
-    case numericFloatUnary(NumericInstruction.FloatUnary)
-    case numericIntBinary(NumericInstruction.IntBinary)
-    case numericFloatBinary(NumericInstruction.FloatBinary)
-    case numericConversion(NumericInstruction.Conversion)
-    case i32Add
-    case i64Add
-    case f32Add
-    case f64Add
-    case i32Sub
-    case i64Sub
-    case f32Sub
-    case f64Sub
-    case i32Mul
-    case i64Mul
-    case f32Mul
-    case f64Mul
-    case i32Eq
-    case i64Eq
-    case f32Eq
-    case f64Eq
-    case i32Ne
-    case i64Ne
-    case f32Ne
-    case f64Ne
-    case i32LtS
-    case i64LtS
-    case i32LtU
-    case i64LtU
-    case i32GtS
-    case i64GtS
-    case i32GtU
-    case i64GtU
-    case i32LeS
-    case i64LeS
-    case i32LeU
-    case i64LeU
-    case i32GeS
-    case i64GeS
-    case i32GeU
-    case i64GeU
-    case i32Clz
-    case i64Clz
-    case i32Ctz
-    case i64Ctz
-    case i32Popcnt
-    case i64Popcnt
-    case i32Eqz
-    case i64Eqz
+    case memoryCopy(Instruction.MemoryCopyOperand)
+    case memoryFill(Instruction.MemoryFillOperand)
+    case numericConst(Instruction.ConstOperand)
+    case numericFloatUnary(NumericInstruction.FloatUnary, Instruction.UnaryOperand)
+    case numericIntBinary(NumericInstruction.IntBinary, Instruction.BinaryOperand)
+    case numericFloatBinary(NumericInstruction.FloatBinary, Instruction.BinaryOperand)
+    case numericConversion(NumericInstruction.Conversion, Instruction.UnaryOperand)
+    case i32Add(Instruction.BinaryOperand)
+    case i64Add(Instruction.BinaryOperand)
+    case f32Add(Instruction.BinaryOperand)
+    case f64Add(Instruction.BinaryOperand)
+    case i32Sub(Instruction.BinaryOperand)
+    case i64Sub(Instruction.BinaryOperand)
+    case f32Sub(Instruction.BinaryOperand)
+    case f64Sub(Instruction.BinaryOperand)
+    case i32Mul(Instruction.BinaryOperand)
+    case i64Mul(Instruction.BinaryOperand)
+    case f32Mul(Instruction.BinaryOperand)
+    case f64Mul(Instruction.BinaryOperand)
+    case i32Eq(Instruction.BinaryOperand)
+    case i64Eq(Instruction.BinaryOperand)
+    case f32Eq(Instruction.BinaryOperand)
+    case f64Eq(Instruction.BinaryOperand)
+    case i32Ne(Instruction.BinaryOperand)
+    case i64Ne(Instruction.BinaryOperand)
+    case f32Ne(Instruction.BinaryOperand)
+    case f64Ne(Instruction.BinaryOperand)
+    case i32LtS(Instruction.BinaryOperand)
+    case i64LtS(Instruction.BinaryOperand)
+    case i32LtU(Instruction.BinaryOperand)
+    case i64LtU(Instruction.BinaryOperand)
+    case i32GtS(Instruction.BinaryOperand)
+    case i64GtS(Instruction.BinaryOperand)
+    case i32GtU(Instruction.BinaryOperand)
+    case i64GtU(Instruction.BinaryOperand)
+    case i32LeS(Instruction.BinaryOperand)
+    case i64LeS(Instruction.BinaryOperand)
+    case i32LeU(Instruction.BinaryOperand)
+    case i64LeU(Instruction.BinaryOperand)
+    case i32GeS(Instruction.BinaryOperand)
+    case i64GeS(Instruction.BinaryOperand)
+    case i32GeU(Instruction.BinaryOperand)
+    case i64GeU(Instruction.BinaryOperand)
+    case i32Clz(Instruction.UnaryOperand)
+    case i64Clz(Instruction.UnaryOperand)
+    case i32Ctz(Instruction.UnaryOperand)
+    case i64Ctz(Instruction.UnaryOperand)
+    case i32Popcnt(Instruction.UnaryOperand)
+    case i64Popcnt(Instruction.UnaryOperand)
+    case i32Eqz(Instruction.UnaryOperand)
+    case i64Eqz(Instruction.UnaryOperand)
     case drop
-    case select
-    case refNull(ReferenceType)
-    case refIsNull
-    case refFunc(FunctionIndex)
-    case tableGet(TableIndex)
-    case tableSet(TableIndex)
-    case tableSize(TableIndex)
-    case tableGrow(TableIndex)
-    case tableFill(TableIndex)
-    case tableCopy(dest: TableIndex, src: TableIndex)
-    case tableInit(TableIndex, ElementIndex)
+    case select(Instruction.SelectOperand)
+    case refNull(Instruction.RefNullOperand)
+    case refIsNull(Instruction.RefIsNullOperand)
+    case refFunc(Instruction.RefFuncOperand)
+    case tableGet(Instruction.TableGetOperand)
+    case tableSet(Instruction.TableSetOperand)
+    case tableSize(Instruction.TableSizeOperand)
+    case tableGrow(Instruction.TableGrowOperand)
+    case tableFill(Instruction.TableFillOperand)
+    case tableCopy(Instruction.TableCopyOperand)
+    case tableInit(Instruction.TableInitOperand)
     case tableElementDrop(ElementIndex)
 }

@@ -95,7 +95,8 @@ TBD
 
 ### Stack frame layout
 
-TBD
+```
+| Const Pool | Local Variables | Dynamic |
 
 ### VM instruction representation
 
@@ -113,3 +114,4 @@ TBD
 
 [^1]: https://github.com/swiftwasm/WasmKit/pull/70
 [^2]: Jun Xu, Liang He, Xin Wang, Wenyong Huang, Ning Wang. “A Fast WebAssembly Interpreter Design in WASM-Micro-Runtime.” Intel, 7 Oct. 2021, https://www.intel.com/content/www/us/en/developer/articles/technical/webassembly-interpreter-design-wasm-micro-runtime.html
+[^3]: [Baseline Compilation in Wasmtime](https://github.com/bytecodealliance/rfcs/blob/de8616ba2fe01f3e94467a0f6ef3e4195c274334/accepted/wasmtime-baseline-compilation.md)

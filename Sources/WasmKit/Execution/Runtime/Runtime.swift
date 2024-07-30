@@ -177,18 +177,7 @@ extension Runtime {
             }
 
             let globalInitializers = try module.internalGlobals.map { global in
-                return try withTemporaryTranslator(module: module) { translator in
-                    guard global.initializer.last == .end else {
-                        throw InstantiationError.unsupported("Expect `end` at the end of offset expression")
-                    }
-                    for instruction in global.initializer.dropLast() {
-                        try translator.visit(instruction)
-                    }
-                    let iseq = try translator.finalize()
-                    return try evaluateConstExpr(iseq, instance: globalModuleInstance, arity: 1) { _, stack in
-                        return stack.popValue()
-                    }
-                }
+                try global.initializer.evaluate(instance: globalModuleInstance, store: store)
             }
 
             return globalInitializers
@@ -214,7 +203,8 @@ extension Runtime {
                 module: instance.selfAddress,
                 argc: 0,
                 defaultLocals: nil,
-                returnPC: initExecution.programCounter + 1
+                returnPC: initExecution.programCounter + 1,
+                spAddend: 0
             )
             initExecution.programCounter = iseq.baseAddress
             try initExecution.run(runtime: self, stack: &stack)
@@ -252,5 +242,33 @@ extension Runtime {
     /// Invokes a function of the given address with the given parameters.
     public func invoke(_ address: FunctionAddress, with parameters: [Value] = []) throws -> [Value] {
         try Function(address: address).invoke(parameters, runtime: self)
+    }
+}
+
+extension ConstExpression {
+    fileprivate func evaluate(instance: ModuleInstance, store: Store) throws -> Value {
+        guard self.last == .end, self.count == 2 else {
+            throw InstantiationError.unsupported("Expect `end` at the end of offset expression")
+        }
+        let constInst = self[0]
+        switch constInst {
+        case .i32Const(let value): return .i32(UInt32(bitPattern: value))
+        case .i64Const(let value): return .i64(UInt64(bitPattern: value))
+        case .f32Const(let value): return .f32(value.bitPattern)
+        case .f64Const(let value): return .f64(value.bitPattern)
+        case .globalGet(let globalIndex):
+            let address = instance.globalAddresses[Int(globalIndex)]
+            return store.globals[address].value
+        case .refNull(let type):
+            switch type {
+            case .externRef: return .ref(.extern(nil))
+            case .funcRef: return .ref(.function(nil))
+            }
+        case .refFunc(let functionIndex):
+            let address = instance.functionAddresses[Int(functionIndex)]
+            return .ref(.function(address))
+        default:
+            throw InstantiationError.unsupported("illegal const expression instruction: \(constInst)")
+        }
     }
 }

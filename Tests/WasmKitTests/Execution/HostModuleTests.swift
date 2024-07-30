@@ -26,17 +26,6 @@ final class HostModuleTests: XCTestCase {
     func testReentrancy() throws {
         let runtime = Runtime()
         let voidSignature = WasmParser.FunctionType(parameters: [], results: [])
-        let allocator = ISeqAllocator()
-        func compile(_ instructions: [WasmKit.Instruction], maxStackHeight: Int) -> InstructionSequence {
-            let buffer = allocator.allocateInstructions(capacity: instructions.count + 1)
-            for (i, instruction) in instructions.enumerated() {
-                buffer[i] = instruction
-            }
-            buffer[instructions.count] = .endOfFunction
-            return InstructionSequence(
-                instructions: UnsafeBufferPointer(buffer), maxStackHeight: maxStackHeight
-            )
-        }
         let module = try parseWasm(
             bytes: wat2wasm(
                 """
@@ -64,7 +53,7 @@ final class HostModuleTests: XCTestCase {
                     XCTAssertFalse(isExecutingFoo, "bar should not be called recursively")
                     isExecutingFoo = true
                     defer { isExecutingFoo = false }
-                    let foo = try XCTUnwrap(caller.instance.exportedFunction(name: "baz"))
+                    let foo = try XCTUnwrap(caller.instance?.exportedFunction(name: "baz"))
                     _ = try foo.invoke([], runtime: caller.runtime)
                     return []
                 },

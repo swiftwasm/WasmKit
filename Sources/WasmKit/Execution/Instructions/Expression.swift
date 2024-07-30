@@ -8,7 +8,7 @@ struct InstructionSequence: Equatable {
 
     init(instructions: UnsafeBufferPointer<Instruction>, maxStackHeight: Int) {
         self.instructions = instructions
-        assert(self.instructions.last == .endOfFunction)
+        assert(self.instructions.last?.isEndOfFunction ?? false)
         self.maxStackHeight = maxStackHeight
     }
 
@@ -18,6 +18,15 @@ struct InstructionSequence: Equatable {
 
     static func == (lhs: InstructionSequence, rhs: InstructionSequence) -> Bool {
         lhs.instructions.baseAddress == rhs.instructions.baseAddress
+    }
+}
+
+extension Instruction {
+    fileprivate var isEndOfFunction: Bool {
+        if case .endOfFunction = self {
+            return true
+        }
+        return false
     }
 }
 

@@ -4,7 +4,6 @@ struct Stack {
 
     private var limit: UInt16 { UInt16.max }
     private var valueStack: ValueStack
-    private var numberOfValues: Int { valueStack.count }
     private var frames: FixedSizeStack<Frame>
     var currentFrame: Frame!
 
@@ -21,20 +20,21 @@ struct Stack {
         argc: Int,
         defaultLocals: UnsafeBufferPointer<Value>?,
         returnPC: ProgramCounter,
+        spAddend: UInt16,
         address: FunctionAddress? = nil
     ) throws {
-        guard frames.count < limit, (numberOfValues + iseq.maxStackHeight + (defaultLocals?.count ?? 0)) < limit else {
+        guard frames.count < limit else {
             throw Trap.callStackExhausted
         }
-        let valueFrameIndex = self.numberOfValues - argc
-        if let defaultLocals {
-            valueStack.push(values: defaultLocals)
-        }
         let baseStackAddress = BaseStackAddress(
-            valueFrameIndex: valueFrameIndex,
-            // Consume argment values from value stack
-            valueIndex: self.numberOfValues
+            valueFrameIndex: valueStack.frameBaseOffset
         )
+        try valueStack.extend(addend: spAddend, maxStackHeight: iseq.maxStackHeight)
+        if let defaultLocals {
+            for (offset, value) in defaultLocals.enumerated() {
+                valueStack[argc + offset] = value
+            }
+        }
         let frame = Frame(arity: arity, module: module, baseStackAddress: baseStackAddress, iseq: iseq, returnPC: returnPC, address: address)
         frames.push(frame)
         self.currentFrame = frame
@@ -43,23 +43,13 @@ struct Stack {
     mutating func popFrame() {
         let popped = self.frames.pop()
         self.currentFrame = self.frames.peek()
-        self.valueStack.truncate(length: popped.baseStackAddress.valueFrameIndex)
+        let resultsBase = popped.baseStackAddress.valueFrameIndex
+        self.valueStack.truncate(length: resultsBase)
     }
 
-    mutating func popValues(count: Int) -> [Value] {
-        self.valueStack.popValues(count: count)
-    }
-    mutating func popValue() -> Value {
-        self.valueStack.popValue()
-    }
-    mutating func push(values: [Value]) {
-        self.valueStack.push(values: values)
-    }
-    mutating func push(value: Value) {
-        self.valueStack.push(value: value)
-    }
-    mutating func copyValues(copyCount: Int, popCount: Int) {
-        self.valueStack.copyValues(copyCount: copyCount, popCount: popCount)
+    subscript(register: Instruction.Register) -> Value {
+        get { valueStack[Int(register)] }
+        set { valueStack[Int(register)] = newValue }
     }
 
     func deallocate() {
@@ -72,97 +62,56 @@ struct Stack {
     }
 
     var currentLocalsPointer: UnsafeMutablePointer<Value> {
-        self.valueStack.baseAddress.advanced(by: currentFrame?.baseStackAddress.valueFrameIndex ?? 0)
+        self.valueStack.frameBase
     }
 }
 
 struct ValueStack {
     private let values: UnsafeMutableBufferPointer<Value>
-    private var nextPointer: UnsafeMutablePointer<Value>
+    private(set) var frameBase: UnsafeMutablePointer<Value>
     var baseAddress: UnsafeMutablePointer<Value> {
         values.baseAddress!
     }
 
     init(capacity: Int) {
         self.values = .allocate(capacity: capacity)
-        self.nextPointer = self.values.baseAddress!
+        self.frameBase = self.values.baseAddress!
     }
 
     func deallocate() {
         self.values.deallocate()
     }
 
-    var count: Int { nextPointer - values.baseAddress! }
+    var frameBaseOffset: Int { frameBase - values.baseAddress! }
 
     var topValue: Value {
-        nextPointer.advanced(by: -1).pointee
+        frameBase.advanced(by: -1).pointee
+    }
+
+    private func checkPrecondition(_ index: Int) {
+        assert(frameBase.advanced(by: index) < values.baseAddress!.advanced(by: values.count))
     }
 
     subscript(_ index: Int) -> Value {
-        get { values[index] }
+        get {
+            checkPrecondition(index)
+            return frameBase[index]
+        }
         set {
-            values[index] = newValue
+            checkPrecondition(index)
+            return frameBase[index] = newValue
         }
     }
 
-    mutating func push(value: Value) {
-        self.nextPointer.pointee = value
-        self.nextPointer = self.nextPointer.advanced(by: 1)
-    }
-
-    mutating func push(values: [Value]) {
-        values.withUnsafeBufferPointer { copyingBuffer in
-            self.push(values: copyingBuffer)
+    mutating func extend(addend: UInt16, maxStackHeight: Int) throws {
+        frameBase = frameBase.advanced(by: Int(addend))
+        guard frameBase.advanced(by: maxStackHeight) < values.baseAddress!.advanced(by: values.count) else {
+            throw Trap.callStackExhausted
         }
-    }
-
-    mutating func push(values copyingBuffer: UnsafeBufferPointer<Value>) {
-        let rawBuffer = UnsafeMutableRawBufferPointer(
-            start: self.nextPointer,
-            count: MemoryLayout<Value>.stride * copyingBuffer.count
-        )
-        rawBuffer.copyMemory(from: UnsafeRawBufferPointer(copyingBuffer))
-        self.nextPointer = nextPointer.advanced(by: copyingBuffer.count)
-    }
-
-    mutating func popValue() -> Value {
-        // TODO: Check too many pop
-        self.nextPointer = nextPointer.advanced(by: -1)
-        let value = self.nextPointer.pointee
-        return value
     }
 
     mutating func truncate(length: Int) {
-        self.nextPointer = self.values.baseAddress!.advanced(by: length)
-    }
-    mutating func popValues(count: Int) -> [Value] {
-        guard count > 0 else { return [] }
-        var values = [Value]()
-        values.reserveCapacity(count)
-        for idx in self.count - count..<self.count {
-            values.append(self.values[idx])
-        }
-        self.nextPointer = self.nextPointer.advanced(by: -count)
-        return values
-    }
-    mutating func copyValues(copyCount: Int, popCount: Int) {
-        let newNextPointer = self.nextPointer - popCount
-        (newNextPointer - copyCount).moveUpdate(from: self.nextPointer - copyCount, count: copyCount)
-        self.nextPointer = newNextPointer
-    }
-}
-
-extension ValueStack: Sequence {
-    struct Iterator: IteratorProtocol {
-        fileprivate var base: UnsafeMutableBufferPointer<Value>.SubSequence.Iterator
-
-        mutating func next() -> Value? {
-            base.next()
-        }
-    }
-
-    func makeIterator() -> Iterator {
-        Iterator(base: self.values[..<count].makeIterator())
+        self.frameBase = self.values.baseAddress!.advanced(by: length)
     }
 }
 
@@ -231,8 +180,6 @@ extension FixedSizeStack: Sequence {
 struct BaseStackAddress {
     /// Locals are placed between `valueFrameIndex..<valueIndex`
     let valueFrameIndex: Int
-    /// The base index of Wasm value stack
-    let valueIndex: Int
 }
 
 /// > Note:
@@ -266,30 +213,5 @@ struct Frame {
 extension Frame: Equatable {
     static func == (_ lhs: Frame, _ rhs: Frame) -> Bool {
         lhs.module == rhs.module && lhs.arity == rhs.arity
-    }
-}
-
-extension Frame: CustomDebugStringConvertible {
-    var debugDescription: String {
-        "[A=\(arity), BA=\(baseStackAddress), F=\(address?.description ?? "nil")]"
-    }
-}
-
-extension Stack: CustomDebugStringConvertible {
-    public var debugDescription: String {
-        var result = ""
-
-        result += "==================================================\n"
-        for (index, frame) in frames.enumerated() {
-            result += "FRAME[\(index)]: \(frame.debugDescription)\n"
-        }
-        result += "==================================================\n"
-
-        for (index, value) in valueStack.enumerated() {
-            result += "VALUE[\(index)]: \(value)\n"
-        }
-        result += "==================================================\n"
-
-        return result
     }
 }

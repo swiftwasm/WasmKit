@@ -89,8 +89,6 @@ public func spectest(
                 log("\(result.banner) \(reason)", path: testCase.path, location: location, verbose: true)
             case .passed:
                 log(result.banner, path: testCase.path, location: location, verbose: true)
-            default:
-                log(result.banner, path: testCase.path, location: location)
             }
             testCaseResults.append(result)
         }
@@ -100,41 +98,70 @@ public func spectest(
         return testCaseResults
     }
 
-    let results: [Result]
+    struct SpectestResult {
+        var passed = 0
+        var skipped = 0
+        var failed = 0
+        var total: Int { passed + skipped + failed }
+        var failedCases: Set<String> = []
+
+        mutating func append(_ testCase: TestCase, _ result: Result) {
+            switch result {
+            case .passed:
+                passed += 1
+            case .skipped:
+                skipped += 1
+            case .failed:
+                failed += 1
+                failedCases.insert(testCase.path)
+            }
+        }
+
+        func dump() {
+            print(
+                "\(passed)/\(total) (\(percentage(passed, total)) passing, \(percentage(skipped, total)) skipped, \(percentage(failed, total)) failed)"
+            )
+            guard !failedCases.isEmpty else { return }
+            print("Failed cases:")
+            for testCase in failedCases.sorted() {
+                print("  \(testCase)")
+            }
+        }
+    }
+
+    let result: SpectestResult
 
     if parallel {
-        results = try await withThrowingTaskGroup(of: [Result].self) { group in
+        result = try await withThrowingTaskGroup(of: (TestCase, [Result]).self) { group in
             for testCase in testCases {
                 group.addTask {
-                    try await Task { try runTestCase(testCase: testCase) }.value
+                    try await Task {
+                        let results = try runTestCase(testCase: testCase)
+                        return (testCase, results)
+                    }.value
                 }
             }
 
-            var results = [Result]()
-            for try await testCaseResults in group {
-                results.append(contentsOf: testCaseResults)
+            var allResults = SpectestResult()
+            for try await (testCase, results) in group {
+                for result in results {
+                    allResults.append(testCase, result)
+                }
             }
-
-            return results
+            return allResults
         }
     } else {
-        results = try testCases.flatMap { try runTestCase(testCase: $0) }
+        var results = SpectestResult()
+        for testCase in testCases {
+            let testCaseResults = try runTestCase(testCase: testCase)
+            for result in testCaseResults {
+                results.append(testCase, result)
+            }
+        }
+        result = results
     }
 
-    let passingCount = results.filter { if case .passed = $0 { return true } else { return false } }.count
-    let skippedCount = results.filter { if case .skipped = $0 { return true } else { return false } }.count
-    let failedCount = results.filter { if case .failed = $0 { return true } else { return false } }.count
+    result.dump()
 
-    print(
-        """
-        \(passingCount)/\(results.count) (\(
-            percentage(passingCount, results.count)
-        ) passing, \(
-            percentage(skippedCount, results.count)
-        ) skipped, \(
-            percentage(failedCount, results.count)
-        ) failed)
-        """
-    )
-    return failedCount == 0
+    return result.failed == 0
 }

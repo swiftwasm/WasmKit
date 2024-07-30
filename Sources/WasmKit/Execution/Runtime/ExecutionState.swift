@@ -35,18 +35,27 @@ extension ExecutionState: CustomStringConvertible {
 extension ExecutionState {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/instructions.html#invocation-of-function-address>
-    mutating func invoke(functionAddress address: FunctionAddress, runtime: Runtime, stack: inout Stack) throws {
+    mutating func invoke(
+        functionAddress address: FunctionAddress,
+        runtime: Runtime,
+        stack: inout Stack,
+        callLike: Instruction.CallLikeOperand = Instruction.CallLikeOperand(spAddend: 0)
+    ) throws {
         #if DEBUG
             runtime.interceptor?.onEnterFunction(address, store: runtime.store)
         #endif
 
         switch try runtime.store.function(at: address) {
         case let .host(function):
-            let parameters = stack.popValues(count: function.type.parameters.count)
+            let parameters = (0..<function.type.parameters.count).map {
+                stack[callLike.spAddend + UInt16($0)]
+            }
             let moduleInstance = runtime.store.module(address: stack.currentFrame.module)
             let caller = Caller(runtime: runtime, instance: moduleInstance)
-            stack.push(values: try function.implementation(caller, Array(parameters)))
-
+            let results = try function.implementation(caller, Array(parameters))
+            for (index, result) in results.enumerated() {
+                stack[callLike.spAddend + UInt16(index)] = result
+            }
             programCounter += 1
 
         case let .wasm(function, body: body):
@@ -59,7 +68,7 @@ extension ExecutionState {
                 module: function.module,
                 argc: function.type.parameters.count,
                 defaultLocals: function.code.defaultLocals,
-                returnPC: programCounter.advanced(by: 1),
+                returnPC: programCounter.advanced(by: 1), spAddend: callLike.spAddend,
                 address: address
             )
             programCounter = expression.baseAddress
