@@ -266,20 +266,20 @@ extension Store {
         }
 
         // Step 3.
-        for table in module.tables {
-            let address = allocate(tableType: table.type)
+        for table in module.internalTables {
+            let address = allocate(tableType: table)
             moduleInstance.tableAddresses.append(address)
         }
 
         // Step 4.
-        for memory in module.memories {
-            let address = allocate(memoryType: memory.type)
+        for memory in module.internalMemories {
+            let address = allocate(memoryType: memory)
             moduleInstance.memoryAddresses.append(address)
         }
 
         // Step 5.
-        assert(module.globals.count == initialGlobals.count)
-        for (global, initialValue) in zip(module.globals, initialGlobals) {
+        assert(module.internalGlobals.count == initialGlobals.count)
+        for (global, initialValue) in zip(module.internalGlobals, initialGlobals) {
             let address = allocate(globalType: global.type, initialValue: initialValue)
             moduleInstance.globalAddresses.append(address)
         }

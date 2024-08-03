@@ -1,3 +1,5 @@
+import WasmParser
+
 /// A container to manage execution state of one or more module instances.
 public final class Runtime {
     public let store: Store
@@ -15,6 +17,17 @@ public final class Runtime {
 public protocol RuntimeInterceptor {
     func onEnterFunction(_ address: FunctionAddress, store: Store)
     func onExitFunction(_ address: FunctionAddress, store: Store)
+}
+
+/// Execute the given block with a temporary translator for const expression evaluation
+private func withTemporaryTranslator<R>(module: Module, _ body: (inout InstructionTranslator) throws -> R) rethrows -> R {
+    let allocator = ISeqAllocator()
+    var translator = InstructionTranslator(
+        allocator: allocator, module: module.translatorContext,
+        type: .init(parameters: [], results: []),
+        locals: []
+    )
+    return try body(&translator)
 }
 
 extension Runtime {
@@ -73,36 +86,26 @@ extension Runtime {
                 let elementIndex = UInt32(elementIndex)
                 switch element.mode {
                 case let .active(tableIndex, offsetExpression):
-                    var instructions: [Instruction] = []
-                    switch offsetExpression.first {
-                    case .i32Const(let value):
-                        instructions.append(.numericConst(.i32(UInt32(bitPattern: value))))
-                    case .i64Const(let value):
-                        instructions.append(.numericConst(.i64(UInt64(bitPattern: value))))
-                    case .globalGet(let index):
-                        instructions.append(.globalGet(index: index))
-                    default:
-                        throw InstantiationError.unsupported("init expr in element section \(offsetExpression)")
-                    }
-                    instructions.append(contentsOf: [
-                        .numericConst(.i32(0)),
-                        .numericConst(.i32(UInt32(element.initializer.count))),
-                        .tableInit(tableIndex, elementIndex),
-                        .tableElementDrop(elementIndex),
-                        .endOfFunction,
-                    ])
-                    try instructions.withUnsafeBufferPointer {
-                        let initIseq = InstructionSequence(instructions: $0, maxStackHeight: 2)
-                        try evaluateConstExpr(initIseq, instance: instance)
+                    try withTemporaryTranslator(module: module) { translator in
+                        guard offsetExpression.last == .end else {
+                            throw InstantiationError.unsupported("Expect `end` at the end of offset expression")
+                        }
+                        for instruction in offsetExpression.dropLast() {
+                            try translator.visit(instruction)
+                        }
+                        translator.visitI32Const(value: 0)
+                        translator.visitI32Const(value: Int32(element.initializer.count))
+                        try translator.visitTableInit(elemIndex: elementIndex, table: tableIndex)
+                        translator.visitElemDrop(elemIndex: elementIndex)
+                        try translator.visitEnd()
+                        try evaluateConstExpr(translator.finalize(), instance: instance)
                     }
 
                 case .declarative:
-                    let instructions: [Instruction] = [.tableElementDrop(elementIndex), .endOfFunction]
-                    try instructions.withUnsafeBufferPointer {
-                        let initIseq = InstructionSequence(
-                            instructions: $0, maxStackHeight: 0
-                        )
-                        try evaluateConstExpr(initIseq, instance: instance)
+                    try withTemporaryTranslator(module: module) { translator in
+                        translator.visitElemDrop(elemIndex: elementIndex)
+                        try translator.visitEnd()
+                        try evaluateConstExpr(translator.finalize(), instance: instance)
                     }
 
                 case .passive:
@@ -119,27 +122,19 @@ extension Runtime {
         do {
             for case let (dataIndex, .active(data)) in module.data.enumerated() {
                 assert(data.index == 0)
-                var instructions: [Instruction] = []
-                switch data.offset.first {
-                case .i32Const(let value):
-                    instructions.append(.numericConst(.i32(UInt32(bitPattern: value))))
-                case .i64Const(let value):
-                    instructions.append(.numericConst(.i64(UInt64(bitPattern: value))))
-                case .globalGet(let index):
-                    instructions.append(.globalGet(index: index))
-                default:
-                    throw InstantiationError.unsupported("init expr in data section \(data.offset)")
-                }
-                instructions.append(contentsOf: [
-                    .numericConst(.i32(0)),
-                    .numericConst(.i32(UInt32(data.initializer.count))),
-                    .memoryInit(UInt32(dataIndex)),
-                    .memoryDataDrop(UInt32(dataIndex)),
-                    .endOfFunction,
-                ])
-                try instructions.withUnsafeBufferPointer {
-                    let iseq = InstructionSequence(instructions: $0, maxStackHeight: 2)
-                    try evaluateConstExpr(iseq, instance: instance)
+                try withTemporaryTranslator(module: module) { translator in
+                    guard data.offset.last == .end else {
+                        throw InstantiationError.unsupported("Expect `end` at the end of offset expression")
+                    }
+                    for instruction in data.offset.dropLast() {
+                        try translator.visit(instruction)
+                    }
+                    translator.visitI32Const(value: 0)
+                    translator.visitI32Const(value: Int32(data.initializer.count))
+                    try translator.visitMemoryInit(dataIndex: UInt32(dataIndex))
+                    translator.visitDataDrop(dataIndex: UInt32(dataIndex))
+                    try translator.visitEnd()
+                    try evaluateConstExpr(translator.finalize(), instance: instance)
                 }
             }
         } catch Trap.outOfBoundsMemoryAccess {
@@ -181,29 +176,15 @@ extension Runtime {
                 globalModuleInstance.functionAddresses.append(address)
             }
 
-            let globalInitializers = try module.globals.map { global in
-                var instructions: [Instruction] = []
-                switch global.initializer.first {
-                case .i32Const(let value):
-                    instructions.append(.numericConst(.i32(UInt32(bitPattern: value))))
-                case .i64Const(let value):
-                    instructions.append(.numericConst(.i64(UInt64(bitPattern: value))))
-                case .f32Const(let value):
-                    instructions.append(.numericConst(.f32(value.bitPattern)))
-                case .f64Const(let value):
-                    instructions.append(.numericConst(.f64(value.bitPattern)))
-                case .refNull(let type):
-                    instructions.append(.refNull(type))
-                case .refFunc(let functionIndex):
-                    instructions.append(.refFunc(functionIndex))
-                case .globalGet(let globalIndex):
-                    instructions.append(.globalGet(index: globalIndex))
-                default:
-                    throw InstantiationError.unsupported("init expr in global section \(global.initializer)")
-                }
-                instructions.append(.endOfFunction)
-                return try instructions.withUnsafeBufferPointer {
-                    let iseq = InstructionSequence(instructions: $0, maxStackHeight: 1)
+            let globalInitializers = try module.internalGlobals.map { global in
+                return try withTemporaryTranslator(module: module) { translator in
+                    guard global.initializer.last == .end else {
+                        throw InstantiationError.unsupported("Expect `end` at the end of offset expression")
+                    }
+                    for instruction in global.initializer.dropLast() {
+                        try translator.visit(instruction)
+                    }
+                    let iseq = try translator.finalize()
                     return try evaluateConstExpr(iseq, instance: globalModuleInstance, arity: 1) { _, stack in
                         return stack.popValue()
                     }

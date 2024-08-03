@@ -1,3 +1,4 @@
+import WAT
 import XCTest
 
 @testable import WasmKit
@@ -10,11 +11,13 @@ final class HostModuleTests: XCTestCase {
         let memoryAddr = runtime.store.allocate(memoryType: memoryType)
         try runtime.store.register(HostModule(memories: ["memory": memoryAddr]), as: "env")
 
-        let module = Module(
-            imports: [
-                Import(module: "env", name: "memory", descriptor: .memory(memoryType))
-            ]
-        )
+        let module = try parseWasm(
+            bytes: wat2wasm(
+                """
+                (module
+                    (import "env" "memory" (memory 1))
+                )
+                """))
         XCTAssertNoThrow(try runtime.instantiate(module: module))
         // Ensure the allocated address is valid
         _ = runtime.store.memory(at: memoryAddr)
@@ -34,48 +37,22 @@ final class HostModuleTests: XCTestCase {
                 instructions: UnsafeBufferPointer(buffer), maxStackHeight: maxStackHeight
             )
         }
-        let module = Module(
-            types: [voidSignature],
-            functions: [
-                // [0] (import "env" "bar" func)
-                // [1] (import "env" "qux" func)
-                // [2] "foo"
-                GuestFunction(
-                    type: 0,
-                    locals: [],
-                    allocator: allocator,
-                    body: {
-                        compile(
-                            [
-                                .call(functionIndex: 0),
-                                .call(functionIndex: 0),
-                                .call(functionIndex: 0),
-                            ],
-                            maxStackHeight: 0
-                        )
-                    }),
-                // [3] "bar"
-                GuestFunction(
-                    type: 0,
-                    locals: [],
-                    allocator: allocator,
-                    body: {
-                        compile(
-                            [
-                                .call(functionIndex: 1)
-                            ],
-                            maxStackHeight: 0
-                        )
-                    }),
-            ],
-            imports: [
-                Import(module: "env", name: "bar", descriptor: .function(0)),
-                Import(module: "env", name: "qux", descriptor: .function(0)),
-            ],
-            exports: [
-                Export(name: "foo", descriptor: .function(2)),
-                Export(name: "baz", descriptor: .function(3)),
-            ]
+        let module = try parseWasm(
+            bytes: wat2wasm(
+                """
+                (module
+                    (import "env" "bar" (func $bar))
+                    (import "env" "qux" (func $qux))
+                    (func (export "foo")
+                        (call $bar)
+                        (call $bar)
+                        (call $bar)
+                    )
+                    (func (export "baz")
+                        (call $qux)
+                    )
+                )
+                """)
         )
 
         var isExecutingFoo = false
