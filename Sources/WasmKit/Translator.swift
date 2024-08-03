@@ -34,94 +34,99 @@ class ISeqAllocator {
     }
 }
 
+struct TranslatorContext {
+    internal let imports: ModuleImports
+    internal let typeSection: [FunctionType]
+    internal let functionTypeIndices: [TypeIndex]
+    internal let globalTypes: [GlobalType]
+    internal let internalGlobals: [Global]
+    internal let memoryTypes: [MemoryType]
+    internal let tableTypes: [TableType]
+
+    init(
+        typeSection: [FunctionType],
+        importSection: [Import],
+        functionSection: [TypeIndex],
+        globals: [Global],
+        memories: [Memory],
+        tables: [Table]
+    ) {
+        var functionTypeIndices: [TypeIndex] = []
+        var globalTypes: [GlobalType] = []
+        var memoryTypes: [MemoryType] = []
+        var tableTypes: [TableType] = []
+
+        self.imports = ModuleImports.build(
+            from: importSection,
+            functionTypeIndices: &functionTypeIndices,
+            globalTypes: &globalTypes,
+            memoryTypes: &memoryTypes,
+            tableTypes: &tableTypes
+        )
+
+        self.typeSection = typeSection
+        self.functionTypeIndices = functionTypeIndices + functionSection
+        var globalInits: [ConstExpression] = []
+        for global in globals {
+            globalTypes.append(global.type)
+            globalInits.append(global.initializer)
+        }
+        self.globalTypes = globalTypes
+        self.internalGlobals = globals
+        self.memoryTypes = memoryTypes + memories.map(\.type)
+        self.tableTypes = tableTypes + tables.map(\.type)
+    }
+
+    func resolveType(_ index: TypeIndex) throws -> FunctionType {
+        guard Int(index) < typeSection.count else {
+            throw TranslationError("Type index \(index) is out of range")
+        }
+        return typeSection[Int(index)]
+    }
+    func resolveBlockType(_ blockType: BlockType) throws -> FunctionType {
+        try FunctionType(blockType: blockType, typeSection: typeSection)
+    }
+    func functionType(_ index: FunctionIndex) throws -> FunctionType {
+        guard Int(index) < functionTypeIndices.count else {
+            throw TranslationError("Function index \(index) is out of range")
+        }
+        let typeIndex = functionTypeIndices[Int(index)]
+        return try resolveType(typeIndex)
+    }
+    func globalType(_ index: GlobalIndex) throws -> ValueType {
+        guard Int(index) < globalTypes.count else {
+            throw TranslationError("Global index \(index) is out of range")
+        }
+        return self.globalTypes[Int(index)].valueType
+    }
+    func isMemory64(memoryIndex index: MemoryIndex) throws -> Bool {
+        guard Int(index) < memoryTypes.count else {
+            throw TranslationError("Memory index \(index) is out of range")
+        }
+        return self.memoryTypes[Int(index)].isMemory64
+    }
+    func addressType(memoryIndex: MemoryIndex) throws -> ValueType {
+        try isMemory64(memoryIndex: memoryIndex) ? .i64 : .i32
+    }
+    func isMemory64(tableIndex index: TableIndex) throws -> Bool {
+        guard Int(index) < tableTypes.count else {
+            throw TranslationError("Table index \(index) is out of range")
+        }
+        return self.tableTypes[Int(index)].limits.isMemory64
+    }
+    func addressType(tableIndex: TableIndex) throws -> ValueType {
+        try isMemory64(tableIndex: tableIndex) ? .i64 : .i32
+    }
+    func elementType(_ index: TableIndex) throws -> ReferenceType {
+        guard Int(index) < tableTypes.count else {
+            throw TranslationError("Table index \(index) is out of range")
+        }
+        return self.tableTypes[Int(index)].elementType
+    }
+}
+
 struct InstructionTranslator: InstructionVisitor {
     typealias Output = Void
-
-    struct Module {
-        private let typeSection: [FunctionType]
-        private let functionTypeIndices: [TypeIndex]
-        private let globalTypes: [GlobalType]
-        private let memoryTypes: [MemoryType]
-        private let tableTypes: [TableType]
-
-        init(
-            typeSection: [FunctionType],
-            importSection: [Import],
-            functionSection: [TypeIndex],
-            globalTypes: [GlobalType],
-            memoryTypes: [MemoryType],
-            tables: [Table]
-        ) {
-            self.typeSection = typeSection
-            self.functionTypeIndices =
-                importSection.compactMap { (entry) -> TypeIndex? in
-                    guard case let .function(typeIndex) = entry.descriptor else { return nil }
-                    return typeIndex
-                } + functionSection
-            self.globalTypes =
-                importSection.compactMap { (entry) -> GlobalType? in
-                    guard case let .global(type) = entry.descriptor else { return nil }
-                    return type
-                } + globalTypes
-            self.memoryTypes =
-                importSection.compactMap { (entry) -> MemoryType? in
-                    guard case let .memory(type) = entry.descriptor else { return nil }
-                    return type
-                } + memoryTypes
-            self.tableTypes =
-                importSection.compactMap { (entry) -> TableType? in
-                    guard case let .table(type) = entry.descriptor else { return nil }
-                    return type
-                } + tables.map(\.type)
-        }
-
-        func resolveType(_ index: TypeIndex) throws -> FunctionType {
-            guard Int(index) < typeSection.count else {
-                throw TranslationError("Type index \(index) is out of range")
-            }
-            return typeSection[Int(index)]
-        }
-        func resolveBlockType(_ blockType: BlockType) throws -> FunctionType {
-            try FunctionType(blockType: blockType, typeSection: typeSection)
-        }
-        func functionType(_ index: FunctionIndex) throws -> FunctionType {
-            guard Int(index) < functionTypeIndices.count else {
-                throw TranslationError("Function index \(index) is out of range")
-            }
-            let typeIndex = functionTypeIndices[Int(index)]
-            return try resolveType(typeIndex)
-        }
-        func globalType(_ index: GlobalIndex) throws -> ValueType {
-            guard Int(index) < globalTypes.count else {
-                throw TranslationError("Global index \(index) is out of range")
-            }
-            return self.globalTypes[Int(index)].valueType
-        }
-        func isMemory64(memoryIndex index: MemoryIndex) throws -> Bool {
-            guard Int(index) < memoryTypes.count else {
-                throw TranslationError("Memory index \(index) is out of range")
-            }
-            return self.memoryTypes[Int(index)].isMemory64
-        }
-        func addressType(memoryIndex: MemoryIndex) throws -> ValueType {
-            try isMemory64(memoryIndex: memoryIndex) ? .i64 : .i32
-        }
-        func isMemory64(tableIndex index: TableIndex) throws -> Bool {
-            guard Int(index) < tableTypes.count else {
-                throw TranslationError("Table index \(index) is out of range")
-            }
-            return self.tableTypes[Int(index)].limits.isMemory64
-        }
-        func addressType(tableIndex: TableIndex) throws -> ValueType {
-            try isMemory64(tableIndex: tableIndex) ? .i64 : .i32
-        }
-        func elementType(_ index: TableIndex) throws -> ReferenceType {
-            guard Int(index) < tableTypes.count else {
-                throw TranslationError("Table index \(index) is out of range")
-            }
-            return self.tableTypes[Int(index)].elementType
-        }
-    }
 
     struct MetaProgramCounter {
         let offsetFromHead: Int
@@ -389,14 +394,14 @@ struct InstructionTranslator: InstructionVisitor {
     }
 
     let allocator: ISeqAllocator
-    let module: Module
+    let module: TranslatorContext
     var iseqBuilder: ISeqBuilder
     var controlStack: ControlStack
     var valueStack: ValueStack
     let locals: Locals
     let endOfFunctionLabel: LabelRef
 
-    init(allocator: ISeqAllocator, module: Module, type: FunctionType, locals: [WasmParser.ValueType]) {
+    init(allocator: ISeqAllocator, module: TranslatorContext, type: FunctionType, locals: [WasmParser.ValueType]) {
         self.allocator = allocator
         self.module = module
         self.iseqBuilder = ISeqBuilder()

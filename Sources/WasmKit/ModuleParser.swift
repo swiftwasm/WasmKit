@@ -61,54 +61,63 @@ private struct OrderTracking {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-module>
 func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = .default) throws -> Module {
-    var module = Module()
-
     var orderTracking = OrderTracking()
-    var typeIndices = [TypeIndex]()
-    var codes = [Code]()
+    var types: [FunctionType] = []
+    var typeIndices: [TypeIndex] = []
+    var codes: [Code] = []
+    var tables: [Table] = []
+    var memories: [Memory] = []
+    var globals: [Global] = []
+    var elements: [ElementSegment] = []
+    var data: [DataSegment] = []
+    var start: FunctionIndex?
+    var imports: [Import] = []
+    var exports: [Export] = []
+    var customSections: [CustomSection] = []
+    var dataCount: UInt32?
+
     var parser = WasmParser.Parser<Stream>(
         stream: stream, features: features
     )
-    var dataCount: UInt32?
 
     while let payload = try parser.parseNext() {
         switch payload {
         case .header: break
         case .customSection(let customSection):
-            module.customSections.append(customSection)
-        case .typeSection(let types):
+            customSections.append(customSection)
+        case .typeSection(let typeSection):
             try orderTracking.track(order: .type)
-            module.types = types
+            types = typeSection
         case .importSection(let importSection):
             try orderTracking.track(order: ._import)
-            module.imports = importSection
+            imports = importSection
         case .functionSection(let types):
             try orderTracking.track(order: .function)
             typeIndices = types
         case .tableSection(let tableSection):
             try orderTracking.track(order: .table)
-            module.tables = tableSection
+            tables = tableSection
         case .memorySection(let memorySection):
             try orderTracking.track(order: .memory)
-            module.memories = memorySection
+            memories = memorySection
         case .globalSection(let globalSection):
             try orderTracking.track(order: .global)
-            module.globals = globalSection
+            globals = globalSection
         case .exportSection(let exportSection):
             try orderTracking.track(order: .export)
-            module.exports = exportSection
+            exports = exportSection
         case .startSection(let functionIndex):
             try orderTracking.track(order: .start)
-            module.start = functionIndex
+            start = functionIndex
         case .elementSection(let elementSection):
             try orderTracking.track(order: .element)
-            module.elements = elementSection
+            elements = elementSection
         case .codeSection(let codeSection):
             try orderTracking.track(order: .code)
             codes = codeSection
         case .dataSection(let dataSection):
             try orderTracking.track(order: .data)
-            module.data = dataSection
+            data = dataSection
         case .dataCount(let count):
             try orderTracking.track(order: .dataCount)
             dataCount = count
@@ -122,22 +131,22 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
         )
     }
 
-    if let dataCount = dataCount, dataCount != UInt32(module.data.count) {
+    if let dataCount = dataCount, dataCount != UInt32(data.count) {
         throw WasmParserError.inconsistentDataCountAndDataSectionLength(
             dataCount: dataCount,
-            dataSection: module.data.count
+            dataSection: data.count
         )
     }
 
-    let translatorContext = InstructionTranslator.Module(
-        typeSection: module.types,
-        importSection: module.imports,
+    let translatorContext = TranslatorContext(
+        typeSection: types,
+        importSection: imports,
         functionSection: typeIndices,
-        globalTypes: module.globals.map { $0.type },
-        memoryTypes: module.memories.map { $0.type },
-        tables: module.tables
+        globals: globals,
+        memories: memories,
+        tables: tables
     )
-    let allocator = module.allocator
+    let allocator = ISeqAllocator()
     let functions = try codes.enumerated().map { [hasDataCount = parser.hasDataCount, features] index, code in
         // SAFETY: The number of typeIndices is guaranteed to be the same as the number of codes
         let funcTypeIndex = typeIndices[index]
@@ -159,7 +168,15 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
                 return try translator.finalize()
             })
     }
-    module.functions = functions
 
-    return module
+    return Module(
+        functions: functions,
+        elements: elements,
+        data: data,
+        start: start,
+        imports: imports,
+        exports: exports,
+        translatorContext: translatorContext,
+        allocator: allocator
+    )
 }

@@ -88,6 +88,35 @@ enum GenerateWasmInstruction {
         code += """
 
 
+        extension InstructionVisitor {
+            /// Visits an instruction.
+            public mutating func visit(_ instruction: Instruction) throws -> Output {
+                switch instruction {
+
+        """
+
+        for instruction in instructions {
+            if instruction.immediates.isEmpty {
+                code += "        case .\(instruction.enumCaseName): return try \(instruction.visitMethodName)()\n"
+            } else {
+                code += "        case let .\(instruction.enumCaseName)("
+                code += instruction.immediates.map(\.label).joined(separator: ", ")
+                code += "): return try \(instruction.visitMethodName)("
+                code += instruction.immediates.map {
+                    "\($0.label): \($0.label)"
+                }.joined(separator: ", ")
+                code += ")\n"
+            }
+        }
+
+        code += "        }\n"
+        code += "    }\n"
+        code += "}\n"
+
+
+        code += """
+
+
             /// A visitor for WebAssembly instructions that returns `Void` with default implementations.
             public protocol VoidInstructionVisitor: InstructionVisitor where Output == Void {}
 
