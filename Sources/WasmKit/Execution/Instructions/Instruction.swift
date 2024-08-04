@@ -1,7 +1,4 @@
 enum Instruction: Equatable {
-    case localGet(Instruction.LocalGetOperand)
-    case localSet(Instruction.LocalSetOperand)
-    case localTee(Instruction.LocalTeeOperand)
     case globalGet(Instruction.GlobalGetOperand)
     case globalSet(Instruction.GlobalSetOperand)
     case copyStack(Instruction.CopyStackOperand)

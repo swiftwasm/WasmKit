@@ -12,15 +12,13 @@ enum GenerateInternalInstruction {
         let isControl: Bool
         let mayThrow: Bool
         let mayUpdateFrame: Bool
-        let hasLocals: Bool
         let immediates: [Immediate]
 
-        init(name: String, isControl: Bool = false, mayThrow: Bool = false, mayUpdateFrame: Bool = false, hasLocals: Bool = false, immediates: [Immediate]) {
+        init(name: String, isControl: Bool = false, mayThrow: Bool = false, mayUpdateFrame: Bool = false, immediates: [Immediate]) {
             self.name = name
             self.isControl = isControl
             self.mayThrow = mayThrow
             self.mayUpdateFrame = mayUpdateFrame
-            self.hasLocals = hasLocals
             self.immediates = immediates
             assert(isControl || !mayUpdateFrame, "non-control instruction should not update frame")
         }
@@ -36,7 +34,6 @@ enum GenerateInternalInstruction {
             }
             return
                 (Self.commonParameters
-                + (hasLocals ? [("locals", "UnsafeMutablePointer<Value>", false)] : [])
                 + immediates)
         }
     }
@@ -152,9 +149,6 @@ enum GenerateInternalInstruction {
     static let instructions: [Instruction] =
         [
             // Variable
-            Instruction(name: "localGet", hasLocals: true, immediates: [Immediate(name: nil, type: "Instruction.LocalGetOperand")]),
-            Instruction(name: "localSet", hasLocals: true, immediates: [Immediate(name: nil, type: "Instruction.LocalSetOperand")]),
-            Instruction(name: "localTee", hasLocals: true, immediates: [Immediate(name: nil, type: "Instruction.LocalTeeOperand")]),
             Instruction(name: "globalGet", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.GlobalGetOperand")]),
             Instruction(name: "globalSet", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.GlobalSetOperand")]),
             Instruction(name: "copyStack", immediates: [Immediate(name: nil, type: "Instruction.CopyStackOperand")]),
@@ -227,7 +221,6 @@ enum GenerateInternalInstruction {
         let doExecuteParams =
             [("instruction", "Instruction", false)]
             + Instruction.commonParameters
-            + [("locals", "UnsafeMutablePointer<Value>", false)]
         var output = """
             extension ExecutionState {
                 @inline(__always)

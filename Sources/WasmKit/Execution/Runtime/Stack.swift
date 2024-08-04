@@ -56,14 +56,6 @@ struct Stack {
         self.valueStack.deallocate()
         self.frames.deallocate()
     }
-
-    var topValue: Value {
-        self.valueStack.topValue
-    }
-
-    var currentLocalsPointer: UnsafeMutablePointer<Value> {
-        self.valueStack.frameBase
-    }
 }
 
 struct ValueStack {

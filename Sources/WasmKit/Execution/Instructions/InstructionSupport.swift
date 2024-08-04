@@ -148,21 +148,6 @@ extension Instruction {
         let size: Register
     }
 
-    struct LocalGetOperand: Equatable {
-        let result: Register
-        let index: LocalIndex
-    }
-
-    struct LocalSetOperand: Equatable {
-        let value: Register
-        let index: LocalIndex
-    }
-
-    struct LocalTeeOperand: Equatable {
-        let value: Register
-        let index: LocalIndex
-    }
-
     struct GlobalGetOperand: Equatable {
         let result: Register
         let index: GlobalIndex

@@ -935,18 +935,18 @@ struct InstructionTranslator: InstructionVisitor {
     mutating func visitLocalGet(localIndex: UInt32) throws -> Output {
         let type = try locals.type(of: localIndex)
         let result = valueStack.push(type)
-        emit(.localGet(Instruction.LocalGetOperand(result: result, index: localIndex)))
+        emit(.copyStack(Instruction.CopyStackOperand(source: localReg(localIndex), dest: result)))
     }
     mutating func visitLocalSet(localIndex: UInt32) throws -> Output {
         let type = try locals.type(of: localIndex)
         guard let value = try popOperand(type)?.intoRegister() else { return }
-        emit(.localSet(Instruction.LocalSetOperand(value: value, index: localIndex)))
+        emit(.copyStack(Instruction.CopyStackOperand(source: value, dest: localReg(localIndex))))
     }
     mutating func visitLocalTee(localIndex: UInt32) throws -> Output {
         let type = try locals.type(of: localIndex)
         guard let value = try popOperand(type)?.intoRegister() else { return }
         _ = valueStack.push(type)
-        emit(.localTee(Instruction.LocalTeeOperand(value: value, index: localIndex)))
+        emit(.copyStack(Instruction.CopyStackOperand(source: value, dest: localReg(localIndex))))
     }
     mutating func visitGlobalGet(globalIndex: UInt32) throws -> Output {
         let type = try module.globalType(globalIndex)

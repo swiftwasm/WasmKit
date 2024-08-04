@@ -77,13 +77,12 @@ extension ExecutionState {
 
     mutating func run(runtime: Runtime, stack: inout Stack) throws {
         while !reachedEndOfExecution {
-            let locals = stack.currentLocalsPointer
             // Regular path
             var inst: Instruction
             // `doExecute` returns false when current frame *may* be updated
             repeat {
                 inst = programCounter.pointee
-            } while try doExecute(inst, runtime: runtime, stack: &stack, locals: locals)
+            } while try doExecute(inst, runtime: runtime, stack: &stack)
         }
     }
 
