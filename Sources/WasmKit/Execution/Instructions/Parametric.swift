@@ -1,8 +1,6 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#parametric-instructions>
 extension ExecutionState {
-    mutating func drop(runtime: Runtime, stack: inout Stack) {
-    }
     mutating func select(runtime: Runtime, stack: inout Stack, selectOperand: Instruction.SelectOperand) throws {
         let flagValue = stack[selectOperand.condition]
         guard case let .i32(flag) = flagValue else {

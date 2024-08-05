@@ -129,7 +129,6 @@ enum GenerateInternalInstruction {
 
     static let miscInsts: [Instruction] = [
         // Parametric
-        Instruction(name: "drop", immediates: []),
         Instruction(name: "select", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.SelectOperand")]),
         // Reference
         Instruction(name: "refNull", immediates: [Immediate(name: nil, type: "Instruction.RefNullOperand")]),

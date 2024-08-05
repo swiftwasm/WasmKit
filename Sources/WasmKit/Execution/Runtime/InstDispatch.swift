@@ -207,8 +207,6 @@ extension ExecutionState {
             self.i32Eqz(runtime: runtime, stack: &stack, unaryOperand: unaryOperand)
         case .i64Eqz(let unaryOperand):
             self.i64Eqz(runtime: runtime, stack: &stack, unaryOperand: unaryOperand)
-        case .drop:
-            self.drop(runtime: runtime, stack: &stack)
         case .select(let selectOperand):
             try self.select(runtime: runtime, stack: &stack, selectOperand: selectOperand)
         case .refNull(let refNullOperand):
@@ -337,7 +335,6 @@ extension Instruction {
         case .i64Popcnt: return "i64Popcnt"
         case .i32Eqz: return "i32Eqz"
         case .i64Eqz: return "i64Eqz"
-        case .drop: return "drop"
         case .select: return "select"
         case .refNull: return "refNull"
         case .refIsNull: return "refIsNull"

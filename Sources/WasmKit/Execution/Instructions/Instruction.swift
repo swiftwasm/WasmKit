@@ -94,7 +94,6 @@ enum Instruction: Equatable {
     case i64Popcnt(Instruction.UnaryOperand)
     case i32Eqz(Instruction.UnaryOperand)
     case i64Eqz(Instruction.UnaryOperand)
-    case drop
     case select(Instruction.SelectOperand)
     case refNull(Instruction.RefNullOperand)
     case refIsNull(Instruction.RefIsNullOperand)

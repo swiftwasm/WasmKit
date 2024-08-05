@@ -944,7 +944,6 @@ struct InstructionTranslator: InstructionVisitor {
 
     mutating func visitDrop() throws -> Output {
         _ = try popAnyOperand()
-        emit(.drop)
     }
     mutating func visitSelect() throws -> Output {
         let condition = try popOperand(.i32)
