@@ -51,25 +51,19 @@ extension ExecutionState {
         runtime: Runtime, stack: inout Stack, currentMemory: CurrentMemory, loadOperand: Instruction.LoadOperand, loadAs _: T.Type = T.self, castToValue: (T) -> Value
     ) throws {
         let memarg = loadOperand.memarg
-        let store = runtime.store
 
-        let memoryAddress = currentMemory.address!
-        let memoryInstance = store.memories[memoryAddress]
-        let i = stack[loadOperand.pointer].asAddressOffset(memoryInstance.limit.isMemory64)
+        let i = stack[loadOperand.pointer].asAddressOffset(loadOperand.isMemory64)
         let (address, isOverflow) = memarg.offset.addingReportingOverflow(i)
         guard !isOverflow else {
             throw Trap.outOfBoundsMemoryAccess
         }
         let length = UInt64(T.bitWidth) / 8
         let (endAddress, isEndOverflow) = address.addingReportingOverflow(length)
-        guard !isEndOverflow, endAddress <= memoryInstance.data.count else {
+        guard !isEndOverflow, endAddress <= currentMemory.count else {
             throw Trap.outOfBoundsMemoryAccess
         }
 
-        let loaded = memoryInstance.data.withUnsafeBufferPointer { buffer in
-            let rawBuffer = UnsafeRawBufferPointer(buffer)
-            return rawBuffer.loadUnaligned(fromByteOffset: Int(address), as: T.self)
-        }
+        let loaded = currentMemory.buffer.loadUnaligned(fromByteOffset: Int(address), as: T.self)
         stack[loadOperand.result] = castToValue(loaded)
 
     }
@@ -105,18 +99,15 @@ extension ExecutionState {
     /// `[type].store[bitWidth]`
     @_transparent
     private mutating func memoryStore<T: FixedWidthInteger>(runtime: Runtime, stack: inout Stack, currentMemory: CurrentMemory, storeOperand: Instruction.StoreOperand, castFromValue: (Value) -> T) throws {
-        let store = runtime.store
         let memarg = storeOperand.memarg
 
         let value = stack[storeOperand.value]
 
-        let memoryAddress = currentMemory.address!
         let address: UInt64
         let endAddress: UInt64
         let length: UInt64
         do {
-            let memoryInstance = store.memories[memoryAddress]
-            let i = stack[storeOperand.pointer].asAddressOffset(memoryInstance.limit.isMemory64)
+            let i = stack[storeOperand.pointer].asAddressOffset(storeOperand.isMemory64)
             var isOverflow: Bool
             (address, isOverflow) = memarg.offset.addingReportingOverflow(i)
             guard !isOverflow else {
@@ -124,16 +115,14 @@ extension ExecutionState {
             }
             length = UInt64(T.bitWidth) / 8
             (endAddress, isOverflow) = address.addingReportingOverflow(length)
-            guard !isOverflow, endAddress <= memoryInstance.data.count else {
+            guard !isOverflow, endAddress <= currentMemory.count else {
                 throw Trap.outOfBoundsMemoryAccess
             }
         }
 
         let toStore = castFromValue(value)
-        store.memories[memoryAddress].data.withUnsafeMutableBufferPointer { buffer in
-            let rawBuffer = UnsafeMutableRawBufferPointer(buffer)
-            rawBuffer.baseAddress!.advanced(by: Int(address)).bindMemory(to: T.self, capacity: 1).pointee = toStore.littleEndian
-        }
+        currentMemory.buffer.baseAddress!.advanced(by: Int(address))
+            .bindMemory(to: T.self, capacity: 1).pointee = toStore.littleEndian
     }
 
     mutating func memorySize(runtime: Runtime, stack: inout Stack, memorySizeOperand: Instruction.MemorySizeOperand) {

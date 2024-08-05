@@ -1104,7 +1104,7 @@ struct InstructionTranslator: InstructionVisitor {
         try popPushEmit(.address(isMemory64: isMemory64), type) { [stackLayout] value, result, stack in
             let loadOperand = Instruction.LoadOperand(
                 pointer: value.intoRegister(layout: stackLayout),
-                result: result, memarg: memarg
+                result: result, memarg: memarg, isMemory64: isMemory64
             )
             return instruction(loadOperand)
         }
@@ -1114,11 +1114,18 @@ struct InstructionTranslator: InstructionVisitor {
         _ type: ValueType,
         _ instruction: (Instruction.StoreOperand) -> Instruction
     ) throws {
+        let isMemory64 = try module.isMemory64(memoryIndex: 0)
         let value = try popOperand(type)
-        let pointer = try popOperand(module.addressType(memoryIndex: 0))
+        let pointer = try popOperand(.address(isMemory64: isMemory64))
         if let value = value?.intoRegister(layout: stackLayout),
            let pointer = pointer?.intoRegister(layout: stackLayout) {
-            emit(instruction(Instruction.StoreOperand(pointer: pointer, value: value, memarg: memarg)))
+            let storeOperand = Instruction.StoreOperand(
+                pointer: pointer,
+                value: value,
+                memarg: memarg,
+                isMemory64: isMemory64
+            )
+            emit(instruction(storeOperand))
         }
     }
     mutating func visitI32Load(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i32, Instruction.i32Load) }

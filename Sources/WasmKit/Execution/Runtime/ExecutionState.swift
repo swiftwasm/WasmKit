@@ -12,7 +12,7 @@ struct ExecutionState {
 
     fileprivate init(programCounter: ProgramCounter) {
         self.programCounter = programCounter
-        self.currentMemory = CurrentMemory(address: nil)
+        self.currentMemory = CurrentMemory()
     }
 }
 
@@ -86,7 +86,20 @@ extension ExecutionState {
     }
 
     struct CurrentMemory {
-        let address: MemoryAddress?
+        let baseAddress: UnsafeMutablePointer<UInt8>?
+        let count: Int
+
+        var buffer: UnsafeMutableRawBufferPointer {
+            UnsafeMutableRawBufferPointer(UnsafeMutableBufferPointer(start: baseAddress, count: count))
+        }
+
+        init(baseAddress: UnsafeMutablePointer<UInt8>?, count: Int) {
+            self.baseAddress = baseAddress
+            self.count = count
+        }
+        init() {
+            self.init(baseAddress: nil, count: 0)
+        }
     }
 
     mutating func run(runtime: Runtime, stack: inout Stack) throws {
@@ -103,7 +116,7 @@ extension ExecutionState {
 
     mutating func mayUpdateCurrentInstance(store: Store, stack: Stack) {
         guard let instanceAddr = stack.currentFrame?.module else {
-            currentMemory = CurrentMemory(address: nil)
+            currentMemory = CurrentMemory(baseAddress: nil, count: 0)
             return
         }
         mayUpdateCurrentInstance(instanceAddr: instanceAddr, store: store)
@@ -113,8 +126,12 @@ extension ExecutionState {
     }
     func resolveCurrentMemory(instanceAddr: ModuleAddress, store: Store) -> CurrentMemory {
         let instance = store.module(address: instanceAddr)
-        let memoryAddr = instance.memoryAddresses.first
-        return CurrentMemory(address: memoryAddr)
+        guard let memoryAddr = instance.memoryAddresses.first else {
+            return CurrentMemory()
+        }
+        let memory = store.memory(at: memoryAddr).data
+        let baseAddress = memory._baseAddressIfContiguous
+        return CurrentMemory(baseAddress: baseAddress, count: memory.count)
     }
     func currentModule(store: Store, stack: inout Stack) -> ModuleInstance {
         store.module(address: stack.currentFrame.module)

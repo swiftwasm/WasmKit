@@ -38,12 +38,14 @@ extension Instruction {
         let pointer: Register
         let result: Register
         let memarg: MemArg
+        let isMemory64: Bool
     }
     
     struct StoreOperand: Equatable {
         let pointer: Register
         let value: Register
         let memarg: MemArg
+        let isMemory64: Bool
     }
     
     struct MemorySizeOperand: Equatable {
