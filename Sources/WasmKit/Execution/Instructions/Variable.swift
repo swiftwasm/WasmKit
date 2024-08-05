@@ -5,12 +5,12 @@ extension ExecutionState {
         let address = Int(currentModule(store: runtime.store, stack: &context).globalAddresses[Int(globalGetOperand.index)])
         let globals = runtime.store.globals
         let value = globals[address].value
-        stack[globalGetOperand.result] = value
+        stack[globalGetOperand.result] = UntypedValue(value)
     }
     mutating func globalSet(runtime: Runtime, context: inout StackContext, stack: FrameBase, globalSetOperand: Instruction.GlobalSetOperand) throws {
         let address = Int(currentModule(store: runtime.store, stack: &context).globalAddresses[Int(globalSetOperand.index)])
         let value = stack[globalSetOperand.value]
-        runtime.store.globals[address].value = value
+        runtime.store.globals[address].assign(value)
     }
 
     mutating func copyStack(runtime: Runtime, context: inout StackContext, stack: FrameBase, copyStackOperand: Instruction.CopyStackOperand) {

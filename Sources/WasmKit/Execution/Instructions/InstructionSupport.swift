@@ -30,7 +30,7 @@ extension Instruction {
     }
     
     struct ConstOperand: Equatable {
-        let value: Value
+        let value: UntypedValue
         let result: Register
     }
     

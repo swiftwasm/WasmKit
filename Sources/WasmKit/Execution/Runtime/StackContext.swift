@@ -36,8 +36,8 @@ struct StackContext {
         try valueStack.extend(addend: spAddend, maxStackHeight: iseq.maxStackHeight)
         if let defaultLocals {
             let base = FunctionInstance.nonParamLocalBase(parameters: argc, results: arity)
-            for (offset, value) in defaultLocals.enumerated() {
-                valueStack[Int(base) + offset] = value
+            for (offset, _) in defaultLocals.enumerated() {
+                valueStack[Int(base) + offset] = .default
             }
         }
         let frame = Frame(arity: arity, module: module, baseStackAddress: baseStackAddress, iseq: iseq, returnPC: returnPC, address: address)
@@ -52,7 +52,7 @@ struct StackContext {
         self.valueStack.truncate(length: resultsBase)
     }
 
-    subscript(register: Instruction.Register) -> Value {
+    subscript(register: Instruction.Register) -> UntypedValue {
         get { valueStack[Int(register)] }
         set { valueStack[Int(register)] = newValue }
     }
@@ -64,9 +64,9 @@ struct StackContext {
 }
 
 struct ValueStack {
-    private let values: UnsafeMutableBufferPointer<Value>
-    private(set) var frameBase: UnsafeMutablePointer<Value>
-    var baseAddress: UnsafeMutablePointer<Value> {
+    private let values: UnsafeMutableBufferPointer<UntypedValue>
+    private(set) var frameBase: UnsafeMutablePointer<UntypedValue>
+    var baseAddress: UnsafeMutablePointer<UntypedValue> {
         values.baseAddress!
     }
 
@@ -81,15 +81,12 @@ struct ValueStack {
 
     var frameBaseOffset: Int { frameBase - values.baseAddress! }
 
-    var topValue: Value {
-        frameBase.advanced(by: -1).pointee
-    }
 
     private func checkPrecondition(_ index: Int) {
         assert(frameBase.advanced(by: index) < values.baseAddress!.advanced(by: values.count))
     }
 
-    subscript(_ index: Int) -> Value {
+    subscript(_ index: Int) -> UntypedValue {
         get {
             checkPrecondition(index)
             return frameBase[index]
@@ -210,5 +207,103 @@ struct Frame {
 extension Frame: Equatable {
     static func == (_ lhs: Frame, _ rhs: Frame) -> Bool {
         lhs.module == rhs.module && lhs.arity == rhs.arity
+    }
+}
+
+struct UntypedValue: Equatable {
+    let storage: UInt64
+
+    static var `default`: UntypedValue {
+        UntypedValue(storage: 0)
+    }
+
+    private static var isNullMaskPattern: UInt64 { (0x1 << 63) }
+
+    private init(storage: UInt64) {
+        self.storage = storage
+    }
+
+    init(_ value: Value) {
+        func encodeOptionalInt(_ value: Int?) -> UInt64 {
+            guard let value = value else { return Self.isNullMaskPattern }
+            let unsigned = UInt64(bitPattern: Int64(value))
+            precondition(unsigned & Self.isNullMaskPattern == 0)
+            return unsigned
+        }
+        switch value {
+        case .i32(let value):
+            storage = UInt64(value)
+        case .i64(let value):
+            storage = value
+        case .f32(let value):
+            storage = UInt64(value)
+        case .f64(let value):
+            storage = value
+        case .ref(.function(let value)), .ref(.extern(let value)):
+            storage = encodeOptionalInt(value)
+        }
+    }
+
+    var i32: UInt32 {
+        return UInt32(truncatingIfNeeded: storage & 0x00000000ffffffff)
+    }
+
+    var i64: UInt64 {
+        return storage
+    }
+
+    var f32: UInt32 {
+        return i32
+    }
+
+    var f64: UInt64 {
+        return i64
+    }
+
+    var isNullRef: Bool {
+        return storage & Self.isNullMaskPattern != 0
+    }
+
+    
+    func asReference(_ type: ReferenceType) -> Reference {
+        func decodeOptionalInt() -> Int? {
+            guard storage & Self.isNullMaskPattern == 0 else { return nil }
+            return Int(storage)
+        }
+        switch type {
+        case .funcRef:
+            return .function(decodeOptionalInt())
+        case .externRef:
+            return .extern(decodeOptionalInt())
+        }
+    }
+
+    func asAddressOffset(_ isMemory64: Bool) -> UInt64 {
+        return isMemory64 ? i64 : UInt64(i32)
+    }
+
+    func cast(to type: NumericType) -> Value {
+        switch type {
+        case .int(let type):
+            switch type {
+            case .i32: return .i32(i32)
+            case .i64: return .i64(i64)
+            }
+        case .float(let type):
+            switch type {
+            case .f32: return .f32(f32)
+            case .f64: return .f64(f64)
+            }
+        }
+    }
+    func cast(to type: ValueType) -> Value {
+        switch type {
+        case .i32: return .i32(i32)
+        case .i64: return .i64(i64)
+        case .f32: return .f32(f32)
+        case .f64: return .f64(f64)
+        case .ref(let referenceType):
+            return .ref(asReference(referenceType))
+        }
     }
 }

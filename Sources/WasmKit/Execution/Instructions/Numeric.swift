@@ -5,21 +5,21 @@ extension ExecutionState {
         stack[constOperand.result] = constOperand.value
     }
     @inline(__always)
-    private mutating func numericUnary<T>(stack: FrameBase, operand: Instruction.UnaryOperand, castTo: (Value) -> T, unary: (T) -> Value) {
+    private mutating func numericUnary<T>(stack: FrameBase, operand: Instruction.UnaryOperand, castTo: (UntypedValue) -> T, unary: (T) -> Value) {
         let value = stack[operand.input]
 
-        stack[operand.result] = unary(castTo(value))
+        stack[operand.result] = UntypedValue(unary(castTo(value)))
     }
     mutating func numericFloatUnary(runtime: Runtime, context: inout StackContext, stack: FrameBase, floatUnary: NumericInstruction.FloatUnary, unaryOperand: Instruction.UnaryOperand) {
         let value = stack[unaryOperand.input]
-        stack[unaryOperand.result] = floatUnary(value)
+        stack[unaryOperand.result] = UntypedValue(floatUnary(value.cast(to: floatUnary.type)))
     }
     @inline(__always)
-    private mutating func numericBinary<T>(stack: FrameBase, operand: Instruction.BinaryOperand, castTo: (Value) -> T, binary: (T, T) -> Value) {
+    private mutating func numericBinary<T>(stack: FrameBase, operand: Instruction.BinaryOperand, castTo: (UntypedValue) -> T, binary: (T, T) -> Value) {
         let value2 = stack[operand.rhs]
         let value1 = stack[operand.lhs]
 
-        stack[operand.result] = binary(castTo(value1), castTo(value2))
+        stack[operand.result] = UntypedValue(binary(castTo(value1), castTo(value2)))
     }
 
     mutating func i32Add(runtime: Runtime, context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
@@ -175,18 +175,18 @@ extension ExecutionState {
         numericUnary(stack: stack, operand: unaryOperand, castTo: \.i64, unary: { $0 == 0 ? true : false })
     }
     mutating func numericIntBinary(runtime: Runtime, context: inout StackContext, stack: FrameBase, intBinary: NumericInstruction.IntBinary, binaryOperand: Instruction.BinaryOperand) throws {
-        let value2 = stack[binaryOperand.rhs]
-        let value1 = stack[binaryOperand.lhs]
-        stack[binaryOperand.result] = try intBinary(value1, value2)
+        let value2 = stack[binaryOperand.rhs].cast(to: intBinary.type)
+        let value1 = stack[binaryOperand.lhs].cast(to: intBinary.type)
+        stack[binaryOperand.result] = UntypedValue(try intBinary(value1, value2))
     }
     mutating func numericFloatBinary(runtime: Runtime, context: inout StackContext, stack: FrameBase, floatBinary: NumericInstruction.FloatBinary, binaryOperand: Instruction.BinaryOperand) {
-        let value2 = stack[binaryOperand.rhs]
-        let value1 = stack[binaryOperand.lhs]
-        stack[binaryOperand.result] = floatBinary(value1, value2)
+        let value2 = stack[binaryOperand.rhs].cast(to: floatBinary.type)
+        let value1 = stack[binaryOperand.lhs].cast(to: floatBinary.type)
+        stack[binaryOperand.result] = UntypedValue(floatBinary(value1, value2))
     }
     mutating func numericConversion(runtime: Runtime, context: inout StackContext, stack: FrameBase, conversion: NumericInstruction.Conversion, unaryOperand: Instruction.UnaryOperand) throws {
         let value = stack[unaryOperand.input]
-        stack[unaryOperand.result] = try conversion(value)
+        stack[unaryOperand.result] = UntypedValue(try conversion(value))
     }
 }
 
@@ -430,68 +430,38 @@ extension NumericInstruction {
         case reinterpret(NumericType, NumericType)
 
         func callAsFunction(
-            _ value: Value
+            _ value: UntypedValue
         ) throws -> Value {
             switch self {
             case .wrap:
-                switch value {
-                case let .i64(rawValue):
-                    return .i32(UInt32(truncatingIfNeeded: rawValue))
-
-                default:
-                    fatalError("unsupported operand types passed to instruction \(self)")
-                }
-
+                return .i32(UInt32(truncatingIfNeeded: value.i64))
             case .extendSigned:
-                switch value {
-                case let .i32(rawValue):
-                    return .i64(UInt64(bitPattern: Int64(rawValue.signed)))
-
-                default:
-                    fatalError("unsupported operand types passed to instruction \(self)")
-                }
-
+                return .i64(UInt64(bitPattern: Int64(value.i32.signed)))
             case .extendUnsigned:
-                switch value {
-                case let .i32(rawValue):
-                    return .i64(UInt64(rawValue))
-
-                default:
-                    fatalError("unsupported operand types passed to instruction \(self)")
-                }
-
+                return .i64(UInt64(value.i32))
             case let .extend8Signed(target):
-                switch (target, value) {
-                case let (.i32, .i32(rawValue)):
-                    return .i32(UInt32(bitPattern: Int32(Int8(truncatingIfNeeded: rawValue))))
-                case let (.i64, .i64(rawValue)):
-                    return .i64(UInt64(bitPattern: Int64(Int8(truncatingIfNeeded: rawValue))))
-                default:
-                    fatalError("unsupported operand types passed to instruction \(self)")
+                switch target {
+                case .i32:
+                    return .i32(UInt32(bitPattern: Int32(Int8(truncatingIfNeeded: value.i32))))
+                case .i64:
+                    return .i64(UInt64(bitPattern: Int64(Int8(truncatingIfNeeded: value.i64))))
                 }
 
             case let .extend16Signed(target):
-                switch (target, value) {
-                case let (.i32, .i32(rawValue)):
-                    return .i32(UInt32(bitPattern: Int32(Int16(truncatingIfNeeded: rawValue))))
-                case let (.i64, .i64(rawValue)):
-                    return .i64(UInt64(bitPattern: Int64(Int16(truncatingIfNeeded: rawValue))))
-                default:
-                    fatalError("unsupported operand types passed to instruction \(self)")
+                switch target {
+                case .i32:
+                    return .i32(UInt32(bitPattern: Int32(Int16(truncatingIfNeeded: value.i32))))
+                case .i64:
+                    return .i64(UInt64(bitPattern: Int64(Int16(truncatingIfNeeded: value.i64))))
                 }
 
             case .extend32Signed:
-                switch value {
-                case let .i64(rawValue):
-                    return .i64(UInt64(bitPattern: Int64(Int32(truncatingIfNeeded: rawValue))))
-                default:
-                    fatalError("unsupported operand types passed to instruction \(self)")
-                }
+                return .i64(UInt64(bitPattern: Int64(Int32(truncatingIfNeeded: value.i64))))
 
-            case let .truncSigned(target, _):
-                switch (target, value) {
-                case let (.i32, .f32(bitPattern)):
-                    var rawValue = Float32(bitPattern: bitPattern)
+            case let .truncSigned(target, source):
+                switch (target, source) {
+                case (.i32, .f32):
+                    var rawValue = Float32(bitPattern: value.f32)
                     guard !rawValue.isNaN else {
                         throw Trap.invalidConversionToInteger
                     }
@@ -505,8 +475,8 @@ extension NumericInstruction {
 
                     return .i32(result.unsigned)
 
-                case let (.i32, .f64(bitPattern)):
-                    var rawValue = Float64(bitPattern: bitPattern)
+                case (.i32, .f64):
+                    var rawValue = Float64(bitPattern: value.f64)
                     guard !rawValue.isNaN else { throw Trap.invalidConversionToInteger }
                     guard let result = Int32(exactly: rawValue) else {
                         rawValue.round(.towardZero)
@@ -518,8 +488,8 @@ extension NumericInstruction {
 
                     return .i32(result.unsigned)
 
-                case let (.i64, .f32(bitPattern)):
-                    var rawValue = Float32(bitPattern: bitPattern)
+                case (.i64, .f32):
+                    var rawValue = Float32(bitPattern: value.f32)
                     guard !rawValue.isNaN else { throw Trap.invalidConversionToInteger }
                     guard let result = Int64(exactly: rawValue) else {
                         rawValue.round(.towardZero)
@@ -531,8 +501,8 @@ extension NumericInstruction {
 
                     return .i64(result.unsigned)
 
-                case let (.i64, .f64(bitPattern)):
-                    var rawValue = Float64(bitPattern: bitPattern)
+                case (.i64, .f64):
+                    var rawValue = Float64(bitPattern: value.f64)
                     guard !rawValue.isNaN else { throw Trap.invalidConversionToInteger }
                     guard let result = Int64(exactly: rawValue) else {
                         rawValue.round(.towardZero)
@@ -543,15 +513,12 @@ extension NumericInstruction {
                     }
 
                     return .i64(result.unsigned)
-
-                default:
-                    fatalError("unsupported operand types passed to instruction \(self)")
                 }
 
-            case let .truncUnsigned(target, _):
-                switch (target, value) {
-                case let (.i32, .f32(bitPattern)):
-                    var rawValue = Float32(bitPattern: bitPattern)
+            case let .truncUnsigned(target, source):
+                switch (target, source) {
+                case (.i32, .f32):
+                    var rawValue = Float32(bitPattern: value.f32)
                     guard !rawValue.isNaN else { throw Trap.invalidConversionToInteger }
                     guard let result = UInt32(exactly: rawValue) else {
                         rawValue.round(.towardZero)
@@ -563,8 +530,8 @@ extension NumericInstruction {
 
                     return Value(result)
 
-                case let (.i32, .f64(bitPattern)):
-                    var rawValue = Float64(bitPattern: bitPattern)
+                case (.i32, .f64):
+                    var rawValue = Float64(bitPattern: value.f64)
                     guard !rawValue.isNaN else { throw Trap.invalidConversionToInteger }
                     guard let result = UInt32(exactly: rawValue) else {
                         rawValue.round(.towardZero)
@@ -576,8 +543,8 @@ extension NumericInstruction {
 
                     return Value(result)
 
-                case let (.i64, .f32(bitPattern)):
-                    var rawValue = Float32(bitPattern: bitPattern)
+                case (.i64, .f32):
+                    var rawValue = Float32(bitPattern: value.f32)
                     guard !rawValue.isNaN else { throw Trap.invalidConversionToInteger }
                     guard let result = UInt64(exactly: rawValue) else {
                         rawValue.round(.towardZero)
@@ -589,8 +556,8 @@ extension NumericInstruction {
 
                     return Value(result)
 
-                case let (.i64, .f64(bitPattern)):
-                    var rawValue = Float64(bitPattern: bitPattern)
+                case (.i64, .f64):
+                    var rawValue = Float64(bitPattern: value.f64)
                     guard !rawValue.isNaN else { throw Trap.invalidConversionToInteger }
                     guard let result = UInt64(exactly: rawValue) else {
                         rawValue.round(.towardZero)
@@ -601,14 +568,12 @@ extension NumericInstruction {
                     }
 
                     return Value(result)
-                default:
-                    fatalError("unsupported operand types passed to instruction \(self)")
                 }
 
-            case let .truncSaturatingSigned(target, _):
-                switch (target, value) {
-                case let (.i32, .f32(bitPattern)):
-                    var rawValue = Float32(bitPattern: bitPattern)
+            case let .truncSaturatingSigned(target, source):
+                switch (target, source) {
+                case (.i32, .f32):
+                    var rawValue = Float32(bitPattern: value.f32)
                     guard !rawValue.isNaN else { return .i32(0) }
                     guard let result = Int32(exactly: rawValue) else {
                         rawValue.round(.towardZero)
@@ -624,8 +589,8 @@ extension NumericInstruction {
 
                     return .i32(result.unsigned)
 
-                case let (.i32, .f64(bitPattern)):
-                    var rawValue = Float64(bitPattern: bitPattern)
+                case (.i32, .f64):
+                    var rawValue = Float64(bitPattern: value.f64)
                     guard !rawValue.isNaN else { return .i32(0) }
                     guard let result = Int32(exactly: rawValue) else {
                         rawValue.round(.towardZero)
@@ -641,8 +606,8 @@ extension NumericInstruction {
 
                     return .i32(result.unsigned)
 
-                case let (.i64, .f32(bitPattern)):
-                    var rawValue = Float32(bitPattern: bitPattern)
+                case (.i64, .f32):
+                    var rawValue = Float32(bitPattern: value.f32)
                     guard !rawValue.isNaN else { return .i64(0) }
                     guard let result = Int64(exactly: rawValue) else {
                         rawValue.round(.towardZero)
@@ -658,8 +623,8 @@ extension NumericInstruction {
 
                     return .i64(result.unsigned)
 
-                case let (.i64, .f64(bitPattern)):
-                    var rawValue = Float64(bitPattern: bitPattern)
+                case (.i64, .f64):
+                    var rawValue = Float64(bitPattern: value.f64)
                     guard !rawValue.isNaN else { return .i64(0) }
                     guard let result = Int64(exactly: rawValue) else {
                         rawValue.round(.towardZero)
@@ -674,15 +639,12 @@ extension NumericInstruction {
                     }
 
                     return .i64(result.unsigned)
-
-                default:
-                    fatalError("unsupported operand types passed to instruction \(self)")
                 }
 
-            case let .truncSaturatingUnsigned(target, _):
-                switch (target, value) {
-                case let (.i32, .f32(bitPattern)):
-                    var rawValue = Float32(bitPattern: bitPattern)
+            case let .truncSaturatingUnsigned(target, source):
+                switch (target, source) {
+                case (.i32, .f32):
+                    var rawValue = Float32(bitPattern: value.f32)
                     guard !rawValue.isNaN else { return .i32(0) }
                     guard let result = UInt32(exactly: rawValue) else {
                         rawValue.round(.towardZero)
@@ -698,8 +660,8 @@ extension NumericInstruction {
 
                     return .i32(result)
 
-                case let (.i32, .f64(bitPattern)):
-                    var rawValue = Float64(bitPattern: bitPattern)
+                case (.i32, .f64):
+                    var rawValue = Float64(bitPattern: value.f64)
                     guard !rawValue.isNaN else { return .i32(0) }
                     guard let result = UInt32(exactly: rawValue) else {
                         rawValue.round(.towardZero)
@@ -715,8 +677,8 @@ extension NumericInstruction {
 
                     return .i32(result)
 
-                case let (.i64, .f32(bitPattern)):
-                    var rawValue = Float32(bitPattern: bitPattern)
+                case (.i64, .f32):
+                    var rawValue = Float32(bitPattern: value.f32)
                     guard !rawValue.isNaN else { return .i64(0) }
                     guard let result = UInt64(exactly: rawValue) else {
                         rawValue.round(.towardZero)
@@ -732,8 +694,8 @@ extension NumericInstruction {
 
                     return .i64(result)
 
-                case let (.i64, .f64(bitPattern)):
-                    var rawValue = Float64(bitPattern: bitPattern)
+                case (.i64, .f64):
+                    var rawValue = Float64(bitPattern: value.f64)
                     guard !rawValue.isNaN else { return .i64(0) }
                     guard let result = UInt64(exactly: rawValue) else {
                         rawValue.round(.towardZero)
@@ -748,78 +710,55 @@ extension NumericInstruction {
                     }
 
                     return .i64(result)
-
-                default:
-                    fatalError("unsupported operand types passed to instruction \(self)")
                 }
 
-            case let .convertSigned(target, _):
-                switch (target, value) {
-                case let (.f32, .i32(rawValue)):
-                    return .fromFloat32(Float32(rawValue.signed))
+            case let .convertSigned(target, source):
+                switch (target, source) {
+                case (.f32, .i32):
+                    return .fromFloat32(Float32(value.i32.signed))
 
-                case let (.f32, .i64(rawValue)):
-                    return .fromFloat32(Float32(rawValue.signed))
+                case (.f32, .i64):
+                    return .fromFloat32(Float32(value.i64.signed))
 
-                case let (.f64, .i32(rawValue)):
-                    return .fromFloat64(Float64(rawValue.signed))
+                case (.f64, .i32):
+                    return .fromFloat64(Float64(value.i32.signed))
 
-                case let (.f64, .i64(rawValue)):
-                    return .fromFloat64(Float64(rawValue.signed))
-
-                default:
-                    fatalError("unsupported operand types passed to instruction \(self)")
+                case (.f64, .i64):
+                    return .fromFloat64(Float64(value.f64.signed))
                 }
 
-            case let .convertUnsigned(target, _):
-                switch (target, value) {
-                case let (.f32, .i32(rawValue)):
-                    return .fromFloat32(Float32(rawValue))
+            case let .convertUnsigned(target, source):
+                switch (target, source) {
+                case (.f32, .i32):
+                    return .fromFloat32(Float32(value.i32))
 
-                case let (.f32, .i64(rawValue)):
-                    return .fromFloat32(Float32(rawValue))
+                case (.f32, .i64):
+                    return .fromFloat32(Float32(value.i64))
 
-                case let (.f64, .i32(rawValue)):
-                    return .fromFloat64(Float64(rawValue))
+                case (.f64, .i32):
+                    return .fromFloat64(Float64(value.i32))
 
-                case let (.f64, .i64(rawValue)):
-                    return .fromFloat64(Float64(rawValue))
-
-                default:
-                    fatalError("unsupported operand types passed to instruction \(self)")
+                case (.f64, .i64):
+                    return .fromFloat64(Float64(value.i64))
                 }
 
             case .demote:
-                switch value {
-                case let .f64(rawValue):
-                    return .fromFloat32(Float32(Float64(bitPattern: rawValue)))
-
-                default:
-                    fatalError("unsupported operand types passed to instruction \(self)")
-                }
-
+                return .fromFloat32(Float32(Float64(bitPattern: value.f64)))
             case .promote:
-                switch value {
-                case let .f32(rawValue):
-                    return .fromFloat64(Float64(Float32(bitPattern: rawValue)))
+                return .fromFloat64(Float64(Float32(bitPattern: value.f32)))
+            case let .reinterpret(target, source):
+                switch (target, source) {
+                case (.int(.i32), .f32):
+                    return .i32(value.f32)
 
-                default:
-                    fatalError("unsupported operand types passed to instruction \(self)")
-                }
+                case (.int(.i64), .f64):
+                    return .i64(value.f64)
 
-            case let .reinterpret(target, _):
-                switch (target, value) {
-                case let (.int(.i32), .f32(rawValue)):
-                    return .i32(rawValue)
+                case (.float(.f32), .i32):
+                    return .f32(value.i32)
 
-                case let (.int(.i64), .f64(rawValue)):
-                    return .i64(rawValue)
-
-                case let (.float(.f32), .i32(rawValue)):
-                    return .f32(rawValue)
-
-                case let (.float(.f64), .i64(rawValue)):
-                    return .f64(rawValue)
+                case (.float(.f64), .i64):
+                    return .f64(value.i64)
                 default:
                     fatalError("unsupported operand types passed to instruction \(self)")
                 }

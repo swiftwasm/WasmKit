@@ -64,7 +64,7 @@ extension ExecutionState {
         }
 
         let loaded = currentMemory.buffer.loadUnaligned(fromByteOffset: Int(address), as: T.self)
-        stack[loadOperand.result] = castToValue(loaded)
+        stack[loadOperand.result] = UntypedValue(castToValue(loaded))
 
     }
 
@@ -98,7 +98,7 @@ extension ExecutionState {
 
     /// `[type].store[bitWidth]`
     @_transparent
-    private mutating func memoryStore<T: FixedWidthInteger>(runtime: Runtime, stack: FrameBase, currentMemory: CurrentMemory, storeOperand: Instruction.StoreOperand, castFromValue: (Value) -> T) throws {
+    private mutating func memoryStore<T: FixedWidthInteger>(runtime: Runtime, stack: FrameBase, currentMemory: CurrentMemory, storeOperand: Instruction.StoreOperand, castFromValue: (UntypedValue) -> T) throws {
         let memarg = storeOperand.memarg
 
         let value = stack[storeOperand.value]
@@ -134,30 +134,20 @@ extension ExecutionState {
         let memoryInstance = store.memories[memoryAddress]
         let pageCount = memoryInstance.data.count / MemoryInstance.pageSize
         let value: Value = memoryInstance.limit.isMemory64 ? .i64(UInt64(pageCount)) : .i32(UInt32(pageCount))
-        stack[memorySizeOperand.result] = value
+        stack[memorySizeOperand.result] = UntypedValue(value)
     }
     mutating func memoryGrow(runtime: Runtime, context: inout StackContext, stack: FrameBase, memoryGrowOperand: Instruction.MemoryGrowOperand) throws {
         let moduleInstance = currentModule(store: runtime.store, stack: &context)
         let store = runtime.store
 
         let memoryAddress = moduleInstance.memoryAddresses[0]
-        try store.withMemory(at: memoryAddress) { memoryInstance in
+        store.withMemory(at: memoryAddress) { memoryInstance in
             let isMemory64 = memoryInstance.limit.isMemory64
 
             let value = stack[memoryGrowOperand.delta]
-            let pageCount: UInt64
-            switch (isMemory64, value) {
-            case let (true, .i64(value)):
-                pageCount = value
-            case let (false, .i32(value)):
-                pageCount = UInt64(value)
-            default:
-                throw Trap.stackValueTypesMismatch(
-                    expected: isMemory64 ? .i64 : .i32, actual: value.type
-                )
-            }
+            let pageCount: UInt64 = isMemory64 ? value.i64 : UInt64(value.i32)
             let oldPageCount = memoryInstance.grow(by: Int(pageCount))
-            stack[memoryGrowOperand.result] = oldPageCount
+            stack[memoryGrowOperand.result] = UntypedValue(oldPageCount)
         }
         mayUpdateCurrentInstance(store: store, stack: context)
     }
@@ -238,7 +228,7 @@ extension ExecutionState {
         try store.withMemory(at: memoryAddress) { memoryInstance in
             let isMemory64 = memoryInstance.limit.isMemory64
             let copyCounter = Int(stack[memoryFillOperand.size].asAddressOffset(isMemory64))
-            let value = stack[memoryFillOperand.value]
+            let value = stack[memoryFillOperand.value].i32
             let destinationIndex = Int(stack[memoryFillOperand.destOffset].asAddressOffset(isMemory64))
 
             guard
@@ -250,7 +240,7 @@ extension ExecutionState {
 
             memoryInstance.data.replaceSubrange(
                 destinationIndex..<destinationIndex + copyCounter,
-                with: [UInt8](repeating: value.bytes![0], count: copyCounter)
+                with: [UInt8](repeating: value.littleEndianBytes[0], count: copyCounter)
             )
         }
     }

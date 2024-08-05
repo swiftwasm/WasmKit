@@ -9,25 +9,22 @@ extension ExecutionState {
         case .funcRef:
             value = .ref(.function(nil))
         }
-        stack[refNullOperand.result] = value
+        stack[refNullOperand.result] = UntypedValue(value)
     }
     mutating func refIsNull(runtime: Runtime, context: inout StackContext, stack: FrameBase, refIsNullOperand: Instruction.RefIsNullOperand) {
         let value = stack[refIsNullOperand.value]
 
         let result: Value
-        switch value {
-        case .ref(.extern(nil)), .ref(.function(nil)):
+        if value.isNullRef {
             result = .i32(1)
-        case .ref(.extern(_)), .ref(.function(_)):
+        } else {
             result = .i32(0)
-        default:
-            fatalError("Invalid type \(value.type) for `\(#function)` implementation")
         }
-        stack[refIsNullOperand.result] = result
+        stack[refIsNullOperand.result] = UntypedValue(result)
     }
     mutating func refFunc(runtime: Runtime, context: inout StackContext, stack: FrameBase, refFuncOperand: Instruction.RefFuncOperand) {
         let module = runtime.store.module(address: context.currentFrame.module)
         let functionAddress = module.functionAddresses[Int(refFuncOperand.index)]
-        stack[refFuncOperand.result] = .ref(.function(functionAddress))
+        stack[refFuncOperand.result] = UntypedValue(.ref(.function(functionAddress)))
     }
 }

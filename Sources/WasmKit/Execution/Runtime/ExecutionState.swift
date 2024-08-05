@@ -51,14 +51,14 @@ extension ExecutionState {
 
         switch try runtime.store.function(at: address) {
         case let .host(function):
-            let parameters = (0..<function.type.parameters.count).map {
-                stack[callLike.spAddend + UInt16($0)]
+            let parameters = function.type.parameters.enumerated().map { (i, type) in
+                stack[callLike.spAddend + UInt16(i)].cast(to: type)
             }
             let moduleInstance = runtime.store.module(address: stack.currentFrame.module)
             let caller = Caller(runtime: runtime, instance: moduleInstance)
             let results = try function.implementation(caller, Array(parameters))
             for (index, result) in results.enumerated() {
-                stack[callLike.spAddend + UInt16(index)] = result
+                stack[callLike.spAddend + UInt16(index)] = UntypedValue(result)
             }
             programCounter += 1
 
@@ -103,8 +103,9 @@ extension ExecutionState {
     }
 
     struct FrameBase {
-        let pointer: UnsafeMutablePointer<Value>
-        subscript(_ index: Instruction.Register) -> Value {
+        let pointer: UnsafeMutablePointer<UntypedValue>
+
+        subscript(_ index: Instruction.Register) -> UntypedValue {
             get {
                 return pointer[Int(index)]
             }
@@ -118,7 +119,7 @@ extension ExecutionState {
         mayUpdateCurrentInstance(store: runtime.store, stack: stack)
         while !reachedEndOfExecution {
             // Regular path
-            var frameBase = stack.frameBase
+            let frameBase = stack.frameBase
             var inst: Instruction
             // `doExecute` returns false when current frame *may* be updated
             repeat {

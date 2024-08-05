@@ -1,5 +1,7 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#table-instructions>
+
+import WasmParser
 extension ExecutionState {
     mutating func tableGet(runtime: Runtime, context: inout StackContext, stack: FrameBase, tableGetOperand: Instruction.TableGetOperand) throws {
         let (_, table) = getTable(tableGetOperand.tableIndex, stack: &context, store: runtime.store)
@@ -9,12 +11,12 @@ extension ExecutionState {
         guard let reference = table.elements[Int(elementIndex)] else {
             throw Trap.readingDroppedReference(index: elementIndex)
         }
-        stack[tableGetOperand.result] = .ref(reference)
+        stack[tableGetOperand.result] = UntypedValue(.ref(reference))
     }
     mutating func tableSet(runtime: Runtime, context: inout StackContext, stack: FrameBase, tableSetOperand: Instruction.TableSetOperand) throws {
         let (tableAddress, table) = getTable(tableSetOperand.tableIndex, stack: &context, store: runtime.store)
 
-        let reference = context.getReference(tableSetOperand.value)
+        let reference = context.getReference(tableSetOperand.value, type: table.tableType)
         let elementIndex = try getElementIndex(stack: &context, tableSetOperand.index, table)
         setTableElement(store: runtime.store, tableAddress: tableAddress, Int(elementIndex), reference)
 
@@ -22,25 +24,25 @@ extension ExecutionState {
     mutating func tableSize(runtime: Runtime, context: inout StackContext, stack: FrameBase, tableSizeOperand: Instruction.TableSizeOperand) {
         let (_, table) = getTable(tableSizeOperand.tableIndex, stack: &context, store: runtime.store)
         let elementsCount = table.elements.count
-        stack[tableSizeOperand.result] = table.limits.isMemory64 ? .i64(UInt64(elementsCount)) : .i32(UInt32(elementsCount))
+        stack[tableSizeOperand.result] = UntypedValue(table.limits.isMemory64 ? .i64(UInt64(elementsCount)) : .i32(UInt32(elementsCount)))
     }
     mutating func tableGrow(runtime: Runtime, context: inout StackContext, stack: FrameBase, tableGrowOperand: Instruction.TableGrowOperand) {
         let (tableAddress, table) = getTable(tableGrowOperand.tableIndex, stack: &context, store: runtime.store)
 
         let growthSize = stack[tableGrowOperand.delta].asAddressOffset(table.limits.isMemory64)
-        let growthValue = context.getReference(tableGrowOperand.value)
+        let growthValue = context.getReference(tableGrowOperand.value, type: table.tableType)
 
         let oldSize = table.elements.count
         guard runtime.store.tables[tableAddress].grow(by: growthSize, value: growthValue) else {
-            stack[tableGrowOperand.result] = .i32(Int32(-1).unsigned)
+            stack[tableGrowOperand.result] = UntypedValue(.i32(Int32(-1).unsigned))
             return
         }
-        stack[tableGrowOperand.result] = table.limits.isMemory64 ? .i64(UInt64(oldSize)) : .i32(UInt32(oldSize))
+        stack[tableGrowOperand.result] = UntypedValue(table.limits.isMemory64 ? .i64(UInt64(oldSize)) : .i32(UInt32(oldSize)))
     }
     mutating func tableFill(runtime: Runtime, context: inout StackContext, stack: FrameBase, tableFillOperand: Instruction.TableFillOperand) throws {
         let (tableAddress, table) = getTable(tableFillOperand.tableIndex, stack: &context, store: runtime.store)
         let fillCounter = stack[tableFillOperand.size].asAddressOffset(table.limits.isMemory64)
-        let fillValue = context.getReference(tableFillOperand.value)
+        let fillValue = context.getReference(tableFillOperand.value, type: table.tableType)
         let startIndex = stack[tableFillOperand.destOffset].asAddressOffset(table.limits.isMemory64)
 
         guard fillCounter > 0 else {
@@ -165,13 +167,7 @@ extension ExecutionState {
 }
 
 extension StackContext {
-    fileprivate mutating func getReference(_ register: Instruction.Register) -> Reference {
-        let value = self[register]
-
-        guard case let .ref(reference) = value else {
-            fatalError("invalid value at the top of the stack \(value)")
-        }
-
-        return reference
+    fileprivate mutating func getReference(_ register: Instruction.Register, type: TableType) -> Reference {
+        return self[register].asReference(type.elementType)
     }
 }

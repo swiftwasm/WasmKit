@@ -20,11 +20,13 @@ public struct Function: Equatable {
                 defer { stack.deallocate() }
                 try check(functionType: function.type, parameters: arguments)
                 for (index, argument) in arguments.enumerated() {
-                    stack[Instruction.Register(index)] = argument
+                    stack[Instruction.Register(index)] = UntypedValue(argument)
                 }
                 try execution.invoke(functionAddress: address, runtime: runtime, stack: &stack)
                 try execution.run(runtime: runtime, stack: &stack)
-                return (0..<function.type.results.count).map { stack[Instruction.Register($0)] }
+                return function.type.results.enumerated().map { (i, type) in
+                    stack[Instruction.Register(i)].cast(to: type)
+                }
             }
         }
     }

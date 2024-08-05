@@ -71,7 +71,8 @@ public struct FunctionInstance {
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#table-instances>
 public struct TableInstance {
     public internal(set) var elements: [Reference?]
-    public let limits: Limits
+    let tableType: TableType
+    public var limits: Limits { tableType.limits }
 
     init(_ tableType: TableType) {
         let emptyElement: Reference
@@ -83,7 +84,7 @@ public struct TableInstance {
         }
 
         elements = Array(repeating: emptyElement, count: Int(tableType.limits.min))
-        limits = tableType.limits
+        self.tableType = tableType
     }
 
     /// > Note: https://webassembly.github.io/spec/core/exec/modules.html#grow-table
@@ -169,6 +170,10 @@ public struct GlobalInstance {
     init(globalType: GlobalType, initialValue: Value) {
         value = initialValue
         self.globalType = globalType
+    }
+
+    mutating func assign(_ value: UntypedValue) {
+        self.value = value.cast(to: globalType.valueType)
     }
 }
 

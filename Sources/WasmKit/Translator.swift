@@ -1165,7 +1165,7 @@ struct InstructionTranslator: InstructionVisitor {
     }
 
     private mutating func visitConst(_ type: ValueType, _ value: Value) {
-        pushEmit(type, { .numericConst(Instruction.ConstOperand(value: value, result: $0)) })
+        pushEmit(type, { .numericConst(Instruction.ConstOperand(value: UntypedValue(value), result: $0)) })
     }
     mutating func visitI32Const(value: Int32) -> Output { visitConst(.i32, .i32(UInt32(bitPattern: value))) }
     mutating func visitI64Const(value: Int64) -> Output { visitConst(.i64, .i64(UInt64(bitPattern: value))) }
