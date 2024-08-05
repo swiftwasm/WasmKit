@@ -8,9 +8,11 @@ struct ExecutionState {
     /// Index of an instruction to be executed in the current function.
     var programCounter: ProgramCounter
     var reachedEndOfExecution: Bool = false
+    var currentMemory: CurrentMemory
 
     fileprivate init(programCounter: ProgramCounter) {
         self.programCounter = programCounter
+        self.currentMemory = CurrentMemory(address: nil)
     }
 }
 
@@ -35,10 +37,12 @@ extension ExecutionState: CustomStringConvertible {
 extension ExecutionState {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/instructions.html#invocation-of-function-address>
+    @inline(__always)
     mutating func invoke(
         functionAddress address: FunctionAddress,
         runtime: Runtime,
         stack: inout Stack,
+        callerModule: ModuleAddress? = nil,
         callLike: Instruction.CallLikeOperand = Instruction.CallLikeOperand(spAddend: 0)
     ) throws {
         #if DEBUG
@@ -72,6 +76,12 @@ extension ExecutionState {
                 address: address
             )
             programCounter = expression.baseAddress
+            // TODO(optimize):
+            // If the callee is known to be a function defined within the same module,
+            // a special `callInternal` instruction can skip updating the current instance
+            if callerModule != function.module {
+                mayUpdateCurrentInstance(instanceAddr: function.module, store: runtime.store)
+            }
         }
     }
 
@@ -80,8 +90,8 @@ extension ExecutionState {
     }
 
     mutating func run(runtime: Runtime, stack: inout Stack) throws {
+        mayUpdateCurrentInstance(store: runtime.store, stack: stack)
         while !reachedEndOfExecution {
-            let currentMemory = currentMemory(store: runtime.store, stack: stack)
             // Regular path
             var inst: Instruction
             // `doExecute` returns false when current frame *may* be updated
@@ -91,8 +101,17 @@ extension ExecutionState {
         }
     }
 
-    func currentMemory(store: Store, stack: Stack) -> CurrentMemory {
-        guard let instanceAddr = stack.currentFrame?.module else { return CurrentMemory(address: nil) }
+    mutating func mayUpdateCurrentInstance(store: Store, stack: Stack) {
+        guard let instanceAddr = stack.currentFrame?.module else {
+            currentMemory = CurrentMemory(address: nil)
+            return
+        }
+        mayUpdateCurrentInstance(instanceAddr: instanceAddr, store: store)
+    }
+    mutating func mayUpdateCurrentInstance(instanceAddr: ModuleAddress, store: Store) {
+        currentMemory = resolveCurrentMemory(instanceAddr: instanceAddr, store: store)
+    }
+    func resolveCurrentMemory(instanceAddr: ModuleAddress, store: Store) -> CurrentMemory {
         let instance = store.module(address: instanceAddr)
         let memoryAddr = instance.memoryAddresses.first
         return CurrentMemory(address: memoryAddr)

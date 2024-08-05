@@ -170,6 +170,7 @@ extension ExecutionState {
             let oldPageCount = memoryInstance.grow(by: Int(pageCount))
             stack[memoryGrowOperand.result] = oldPageCount
         }
+        mayUpdateCurrentInstance(store: store, stack: stack)
     }
     mutating func memoryInit(runtime: Runtime, stack: inout Stack, memoryInitOperand: Instruction.MemoryInitOperand) throws {
         let moduleInstance = currentModule(store: runtime.store, stack: &stack)

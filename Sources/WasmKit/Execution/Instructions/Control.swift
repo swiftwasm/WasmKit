@@ -72,8 +72,10 @@ extension ExecutionState {
         #endif
         stack.popFrame()
         programCounter = currentFrame.returnPC
+        mayUpdateCurrentInstance(instanceAddr: currentFrame.module, store: runtime.store)
     }
 
+    @inline(__always)
     mutating func call(runtime: Runtime, stack: inout Stack, callOperand: Instruction.CallOperand) throws {
         let functionAddresses = runtime.store.module(address: stack.currentFrame.module).functionAddresses
         let functionIndex = callOperand.index
@@ -82,11 +84,21 @@ extension ExecutionState {
             throw Trap.invalidFunctionIndex(functionIndex)
         }
 
-        try invoke(functionAddress: functionAddresses[Int(functionIndex)], runtime: runtime, stack: &stack, callLike: callOperand.callLike)
+        try invoke(
+            functionAddress: functionAddresses[Int(
+                functionIndex
+            )],
+            runtime: runtime,
+            stack: &stack,
+            callerModule: stack.currentFrame.module,
+            callLike: callOperand.callLike
+        )
     }
 
+    @inline(__always)
     mutating func callIndirect(runtime: Runtime, stack: inout Stack, callIndirectOperand: Instruction.CallIndirectOperand) throws {
-        let moduleInstance = runtime.store.module(address: stack.currentFrame.module)
+        let callerModuleAddr = stack.currentFrame.module
+        let moduleInstance = runtime.store.module(address: callerModuleAddr)
         let tableAddresses = moduleInstance.tableAddresses[Int(callIndirectOperand.tableIndex)]
         let tableInstance = runtime.store.tables[tableAddresses]
         let expectedType = moduleInstance.types[Int(callIndirectOperand.typeIndex)]
@@ -104,6 +116,12 @@ extension ExecutionState {
             throw Trap.callIndirectFunctionTypeMismatch(actual: function.type, expected: expectedType)
         }
 
-        try invoke(functionAddress: functionAddress, runtime: runtime, stack: &stack, callLike: callIndirectOperand.callLike)
+        try invoke(
+            functionAddress: functionAddress,
+            runtime: runtime,
+            stack: &stack,
+            callerModule: callerModuleAddr,
+            callLike: callIndirectOperand.callLike
+        )
     }
 }

@@ -844,9 +844,6 @@ struct InstructionTranslator: InstructionVisitor {
         let brTableAt = iseqBuilder.insertingPC
         iseqBuilder.emit(.brTable(operand))
 
-        let currentFrame = try controlStack.currentFrame()
-        let currentHeight = valueStack.height
-
         // (block $l1 (result i32)
         //   (i32.const 63)
         //   (block $l2 (result i32)
