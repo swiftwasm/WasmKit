@@ -1,11 +1,15 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#stack>
-struct Stack {
+struct StackContext {
 
     private var limit: UInt16 { UInt16.max }
     private var valueStack: ValueStack
     private var frames: FixedSizeStack<Frame>
     var currentFrame: Frame!
+
+    var frameBase: ExecutionState.FrameBase {
+        return ExecutionState.FrameBase(pointer: self.valueStack.frameBase)
+    }
 
     init() {
         let limit = UInt16.max

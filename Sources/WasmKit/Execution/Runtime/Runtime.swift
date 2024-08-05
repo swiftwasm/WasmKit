@@ -146,7 +146,7 @@ extension Runtime {
         // Step 17.
         if let startIndex = module.start {
             try withExecution { initExecution in
-                var stack = Stack()
+                var stack = StackContext()
                 defer { stack.deallocate() }
                 try initExecution.invoke(functionAddress: instance.functionAddresses[Int(startIndex)], runtime: self, stack: &stack)
                 try initExecution.run(runtime: self, stack: &stack)
@@ -192,10 +192,10 @@ extension Runtime {
         _ iseq: InstructionSequence,
         instance: ModuleInstance,
         arity: Int = 0,
-        body: (inout ExecutionState, inout Stack) throws -> T
+        body: (inout ExecutionState, inout StackContext) throws -> T
     ) throws -> T {
         try withExecution { initExecution in
-            var stack = Stack()
+            var stack = StackContext()
             defer { stack.deallocate() }
             try stack.pushFrame(
                 iseq: iseq,

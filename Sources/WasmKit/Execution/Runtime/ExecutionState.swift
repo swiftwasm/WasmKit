@@ -41,7 +41,7 @@ extension ExecutionState {
     mutating func invoke(
         functionAddress address: FunctionAddress,
         runtime: Runtime,
-        stack: inout Stack,
+        stack: inout StackContext,
         callerModule: ModuleAddress? = nil,
         callLike: Instruction.CallLikeOperand = Instruction.CallLikeOperand(spAddend: 0)
     ) throws {
@@ -102,19 +102,32 @@ extension ExecutionState {
         }
     }
 
-    mutating func run(runtime: Runtime, stack: inout Stack) throws {
+    struct FrameBase {
+        let pointer: UnsafeMutablePointer<Value>
+        subscript(_ index: Instruction.Register) -> Value {
+            get {
+                return pointer[Int(index)]
+            }
+            nonmutating set {
+                return pointer[Int(index)] = newValue
+            }
+        }
+    }
+
+    mutating func run(runtime: Runtime, stack: inout StackContext) throws {
         mayUpdateCurrentInstance(store: runtime.store, stack: stack)
         while !reachedEndOfExecution {
             // Regular path
+            var frameBase = stack.frameBase
             var inst: Instruction
             // `doExecute` returns false when current frame *may* be updated
             repeat {
                 inst = programCounter.pointee
-            } while try doExecute(inst, currentMemory: currentMemory, runtime: runtime, stack: &stack)
+            } while try doExecute(inst, currentMemory: currentMemory, runtime: runtime, context: &stack, stack: frameBase)
         }
     }
 
-    mutating func mayUpdateCurrentInstance(store: Store, stack: Stack) {
+    mutating func mayUpdateCurrentInstance(store: Store, stack: StackContext) {
         guard let instanceAddr = stack.currentFrame?.module else {
             currentMemory = CurrentMemory(baseAddress: nil, count: 0)
             return
@@ -133,7 +146,7 @@ extension ExecutionState {
         let baseAddress = memory._baseAddressIfContiguous
         return CurrentMemory(baseAddress: baseAddress, count: memory.count)
     }
-    func currentModule(store: Store, stack: inout Stack) -> ModuleInstance {
+    func currentModule(store: Store, stack: inout StackContext) -> ModuleInstance {
         store.module(address: stack.currentFrame.module)
     }
 }

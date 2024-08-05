@@ -31,7 +31,7 @@ enum GenerateInternalInstruction {
         }
 
         static var commonParameters: [(label: String, type: String, isInout: Bool)] {
-            [("runtime", "Runtime", false), ("stack", "Stack", true)]
+            [("runtime", "Runtime", false), ("context", "StackContext", true), ("stack", "FrameBase", false)]
         }
 
         var parameters: [(label: String, type: String, isInout: Bool)] {

@@ -16,7 +16,7 @@ public struct Function: Equatable {
 
         case let .wasm(function, _):
             return try withExecution { execution in
-                var stack = Stack()
+                var stack = StackContext()
                 defer { stack.deallocate() }
                 try check(functionType: function.type, parameters: arguments)
                 for (index, argument) in arguments.enumerated() {
