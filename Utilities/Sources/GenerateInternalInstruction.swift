@@ -12,13 +12,20 @@ enum GenerateInternalInstruction {
         let isControl: Bool
         let mayThrow: Bool
         let mayUpdateFrame: Bool
+        let useCurrentMemory: Bool
         let immediates: [Immediate]
 
-        init(name: String, isControl: Bool = false, mayThrow: Bool = false, mayUpdateFrame: Bool = false, immediates: [Immediate]) {
+        init(
+            name: String, isControl: Bool = false,
+            mayThrow: Bool = false, mayUpdateFrame: Bool = false,
+            useCurrentMemory: Bool = false,
+            immediates: [Immediate]
+        ) {
             self.name = name
             self.isControl = isControl
             self.mayThrow = mayThrow
             self.mayUpdateFrame = mayUpdateFrame
+            self.useCurrentMemory = useCurrentMemory
             self.immediates = immediates
             assert(isControl || !mayUpdateFrame, "non-control instruction should not update frame")
         }
@@ -34,6 +41,7 @@ enum GenerateInternalInstruction {
             }
             return
                 (Self.commonParameters
+                + (useCurrentMemory ? [("currentMemory", "CurrentMemory", false)] : [])
                 + immediates)
         }
     }
@@ -94,7 +102,7 @@ enum GenerateInternalInstruction {
         "i64Load32S",
         "i64Load32U",
     ].map {
-        Instruction(name: $0, mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.LoadOperand")])
+        Instruction(name: $0, mayThrow: true, useCurrentMemory: true, immediates: [Immediate(name: nil, type: "Instruction.LoadOperand")])
     }
     static let memoryStoreInsts: [Instruction] = [
         "i32Store",
@@ -107,7 +115,7 @@ enum GenerateInternalInstruction {
         "i64Store16",
         "i64Store32",
     ].map {
-        Instruction(name: $0, mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.StoreOperand")])
+        Instruction(name: $0, mayThrow: true, useCurrentMemory: true, immediates: [Immediate(name: nil, type: "Instruction.StoreOperand")])
     }
     static let memoryLoadStoreInsts: [Instruction] = memoryLoadInsts + memoryStoreInsts
     static let memoryOpInsts: [Instruction] = [
@@ -218,6 +226,7 @@ enum GenerateInternalInstruction {
     static func generateDispatcher(instructions: [Instruction]) -> String {
         let doExecuteParams =
             [("instruction", "Instruction", false)]
+            + [("currentMemory", "CurrentMemory", false)]
             + Instruction.commonParameters
         var output = """
             extension ExecutionState {

@@ -3,58 +3,57 @@
 extension ExecutionState {
     typealias Memarg = Instruction.Memarg
 
-    mutating func i32Load(runtime: Runtime, stack: inout Stack, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(runtime: runtime, stack: &stack, loadOperand: loadOperand, loadAs: UInt32.self, castToValue: { .i32($0) })
+    mutating func i32Load(runtime: Runtime, stack: inout Stack, currentMemory: CurrentMemory, loadOperand: Instruction.LoadOperand) throws {
+        try memoryLoad(runtime: runtime, stack: &stack, currentMemory: currentMemory, loadOperand: loadOperand, loadAs: UInt32.self, castToValue: { .i32($0) })
     }
-    mutating func i64Load(runtime: Runtime, stack: inout Stack, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(runtime: runtime, stack: &stack, loadOperand: loadOperand, loadAs: UInt64.self, castToValue: { .i64($0) })
+    mutating func i64Load(runtime: Runtime, stack: inout Stack, currentMemory: CurrentMemory, loadOperand: Instruction.LoadOperand) throws {
+        try memoryLoad(runtime: runtime, stack: &stack, currentMemory: currentMemory, loadOperand: loadOperand, loadAs: UInt64.self, castToValue: { .i64($0) })
     }
-    mutating func f32Load(runtime: Runtime, stack: inout Stack, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(runtime: runtime, stack: &stack, loadOperand: loadOperand, loadAs: UInt32.self, castToValue: { .f32($0) })
+    mutating func f32Load(runtime: Runtime, stack: inout Stack, currentMemory: CurrentMemory, loadOperand: Instruction.LoadOperand) throws {
+        try memoryLoad(runtime: runtime, stack: &stack, currentMemory: currentMemory, loadOperand: loadOperand, loadAs: UInt32.self, castToValue: { .f32($0) })
     }
-    mutating func f64Load(runtime: Runtime, stack: inout Stack, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(runtime: runtime, stack: &stack, loadOperand: loadOperand, loadAs: UInt64.self, castToValue: { .f64($0) })
+    mutating func f64Load(runtime: Runtime, stack: inout Stack, currentMemory: CurrentMemory, loadOperand: Instruction.LoadOperand) throws {
+        try memoryLoad(runtime: runtime, stack: &stack, currentMemory: currentMemory, loadOperand: loadOperand, loadAs: UInt64.self, castToValue: { .f64($0) })
     }
-    mutating func i32Load8S(runtime: Runtime, stack: inout Stack, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(runtime: runtime, stack: &stack, loadOperand: loadOperand, loadAs: Int8.self, castToValue: { .init(signed: Int32($0)) })
+    mutating func i32Load8S(runtime: Runtime, stack: inout Stack, currentMemory: CurrentMemory, loadOperand: Instruction.LoadOperand) throws {
+        try memoryLoad(runtime: runtime, stack: &stack, currentMemory: currentMemory, loadOperand: loadOperand, loadAs: Int8.self, castToValue: { .init(signed: Int32($0)) })
     }
-    mutating func i32Load8U(runtime: Runtime, stack: inout Stack, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(runtime: runtime, stack: &stack, loadOperand: loadOperand, loadAs: UInt8.self, castToValue: { .i32(UInt32($0)) })
+    mutating func i32Load8U(runtime: Runtime, stack: inout Stack, currentMemory: CurrentMemory, loadOperand: Instruction.LoadOperand) throws {
+        try memoryLoad(runtime: runtime, stack: &stack, currentMemory: currentMemory, loadOperand: loadOperand, loadAs: UInt8.self, castToValue: { .i32(UInt32($0)) })
     }
-    mutating func i32Load16S(runtime: Runtime, stack: inout Stack, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(runtime: runtime, stack: &stack, loadOperand: loadOperand, loadAs: Int16.self, castToValue: { .init(signed: Int32($0)) })
+    mutating func i32Load16S(runtime: Runtime, stack: inout Stack, currentMemory: CurrentMemory, loadOperand: Instruction.LoadOperand) throws {
+        try memoryLoad(runtime: runtime, stack: &stack, currentMemory: currentMemory, loadOperand: loadOperand, loadAs: Int16.self, castToValue: { .init(signed: Int32($0)) })
     }
-    mutating func i32Load16U(runtime: Runtime, stack: inout Stack, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(runtime: runtime, stack: &stack, loadOperand: loadOperand, loadAs: UInt16.self, castToValue: { .i32(UInt32($0)) })
+    mutating func i32Load16U(runtime: Runtime, stack: inout Stack, currentMemory: CurrentMemory, loadOperand: Instruction.LoadOperand) throws {
+        try memoryLoad(runtime: runtime, stack: &stack, currentMemory: currentMemory, loadOperand: loadOperand, loadAs: UInt16.self, castToValue: { .i32(UInt32($0)) })
     }
-    mutating func i64Load8S(runtime: Runtime, stack: inout Stack, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(runtime: runtime, stack: &stack, loadOperand: loadOperand, loadAs: Int8.self, castToValue: { .init(signed: Int64($0)) })
+    mutating func i64Load8S(runtime: Runtime, stack: inout Stack, currentMemory: CurrentMemory, loadOperand: Instruction.LoadOperand) throws {
+        try memoryLoad(runtime: runtime, stack: &stack, currentMemory: currentMemory, loadOperand: loadOperand, loadAs: Int8.self, castToValue: { .init(signed: Int64($0)) })
     }
-    mutating func i64Load8U(runtime: Runtime, stack: inout Stack, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(runtime: runtime, stack: &stack, loadOperand: loadOperand, loadAs: UInt8.self, castToValue: { .i64(UInt64($0)) })
+    mutating func i64Load8U(runtime: Runtime, stack: inout Stack, currentMemory: CurrentMemory, loadOperand: Instruction.LoadOperand) throws {
+        try memoryLoad(runtime: runtime, stack: &stack, currentMemory: currentMemory, loadOperand: loadOperand, loadAs: UInt8.self, castToValue: { .i64(UInt64($0)) })
     }
-    mutating func i64Load16S(runtime: Runtime, stack: inout Stack, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(runtime: runtime, stack: &stack, loadOperand: loadOperand, loadAs: Int16.self, castToValue: { .init(signed: Int64($0)) })
+    mutating func i64Load16S(runtime: Runtime, stack: inout Stack, currentMemory: CurrentMemory, loadOperand: Instruction.LoadOperand) throws {
+        try memoryLoad(runtime: runtime, stack: &stack, currentMemory: currentMemory, loadOperand: loadOperand, loadAs: Int16.self, castToValue: { .init(signed: Int64($0)) })
     }
-    mutating func i64Load16U(runtime: Runtime, stack: inout Stack, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(runtime: runtime, stack: &stack, loadOperand: loadOperand, loadAs: UInt16.self, castToValue: { .i64(UInt64($0)) })
+    mutating func i64Load16U(runtime: Runtime, stack: inout Stack, currentMemory: CurrentMemory, loadOperand: Instruction.LoadOperand) throws {
+        try memoryLoad(runtime: runtime, stack: &stack, currentMemory: currentMemory, loadOperand: loadOperand, loadAs: UInt16.self, castToValue: { .i64(UInt64($0)) })
     }
-    mutating func i64Load32S(runtime: Runtime, stack: inout Stack, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(runtime: runtime, stack: &stack, loadOperand: loadOperand, loadAs: Int32.self, castToValue: { .init(signed: Int64($0)) })
+    mutating func i64Load32S(runtime: Runtime, stack: inout Stack, currentMemory: CurrentMemory, loadOperand: Instruction.LoadOperand) throws {
+        try memoryLoad(runtime: runtime, stack: &stack, currentMemory: currentMemory, loadOperand: loadOperand, loadAs: Int32.self, castToValue: { .init(signed: Int64($0)) })
     }
-    mutating func i64Load32U(runtime: Runtime, stack: inout Stack, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(runtime: runtime, stack: &stack, loadOperand: loadOperand, loadAs: UInt32.self, castToValue: { .i64(UInt64($0)) })
+    mutating func i64Load32U(runtime: Runtime, stack: inout Stack, currentMemory: CurrentMemory, loadOperand: Instruction.LoadOperand) throws {
+        try memoryLoad(runtime: runtime, stack: &stack, currentMemory: currentMemory, loadOperand: loadOperand, loadAs: UInt32.self, castToValue: { .i64(UInt64($0)) })
     }
 
     @_transparent
     private mutating func memoryLoad<T: FixedWidthInteger>(
-        runtime: Runtime, stack: inout Stack, loadOperand: Instruction.LoadOperand, loadAs _: T.Type = T.self, castToValue: (T) -> Value
+        runtime: Runtime, stack: inout Stack, currentMemory: CurrentMemory, loadOperand: Instruction.LoadOperand, loadAs _: T.Type = T.self, castToValue: (T) -> Value
     ) throws {
         let memarg = loadOperand.memarg
-        let moduleInstance = currentModule(store: runtime.store, stack: &stack)
         let store = runtime.store
 
-        let memoryAddress = moduleInstance.memoryAddresses[0]
+        let memoryAddress = currentMemory.address!
         let memoryInstance = store.memories[memoryAddress]
         let i = stack[loadOperand.pointer].asAddressOffset(memoryInstance.limit.isMemory64)
         let (address, isOverflow) = memarg.offset.addingReportingOverflow(i)
@@ -75,44 +74,43 @@ extension ExecutionState {
 
     }
 
-    mutating func i32Store(runtime: Runtime, stack: inout Stack, storeOperand: Instruction.StoreOperand) throws {
-        try memoryStore(runtime: runtime, stack: &stack, storeOperand: storeOperand, castFromValue: { $0.i32 })
+    mutating func i32Store(runtime: Runtime, stack: inout Stack, currentMemory: CurrentMemory, storeOperand: Instruction.StoreOperand) throws {
+        try memoryStore(runtime: runtime, stack: &stack, currentMemory: currentMemory, storeOperand: storeOperand, castFromValue: { $0.i32 })
     }
-    mutating func i64Store(runtime: Runtime, stack: inout Stack, storeOperand: Instruction.StoreOperand) throws {
-        try memoryStore(runtime: runtime, stack: &stack, storeOperand: storeOperand, castFromValue: { $0.i64 })
+    mutating func i64Store(runtime: Runtime, stack: inout Stack, currentMemory: CurrentMemory, storeOperand: Instruction.StoreOperand) throws {
+        try memoryStore(runtime: runtime, stack: &stack, currentMemory: currentMemory, storeOperand: storeOperand, castFromValue: { $0.i64 })
     }
-    mutating func f32Store(runtime: Runtime, stack: inout Stack, storeOperand: Instruction.StoreOperand) throws {
-        try memoryStore(runtime: runtime, stack: &stack, storeOperand: storeOperand, castFromValue: { $0.f32 })
+    mutating func f32Store(runtime: Runtime, stack: inout Stack, currentMemory: CurrentMemory, storeOperand: Instruction.StoreOperand) throws {
+        try memoryStore(runtime: runtime, stack: &stack, currentMemory: currentMemory, storeOperand: storeOperand, castFromValue: { $0.f32 })
     }
-    mutating func f64Store(runtime: Runtime, stack: inout Stack, storeOperand: Instruction.StoreOperand) throws {
-        try memoryStore(runtime: runtime, stack: &stack, storeOperand: storeOperand, castFromValue: { $0.f64 })
+    mutating func f64Store(runtime: Runtime, stack: inout Stack, currentMemory: CurrentMemory, storeOperand: Instruction.StoreOperand) throws {
+        try memoryStore(runtime: runtime, stack: &stack, currentMemory: currentMemory, storeOperand: storeOperand, castFromValue: { $0.f64 })
     }
-    mutating func i32Store8(runtime: Runtime, stack: inout Stack, storeOperand: Instruction.StoreOperand) throws {
-        try memoryStore(runtime: runtime, stack: &stack, storeOperand: storeOperand, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) })
+    mutating func i32Store8(runtime: Runtime, stack: inout Stack, currentMemory: CurrentMemory, storeOperand: Instruction.StoreOperand) throws {
+        try memoryStore(runtime: runtime, stack: &stack, currentMemory: currentMemory, storeOperand: storeOperand, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) })
     }
-    mutating func i32Store16(runtime: Runtime, stack: inout Stack, storeOperand: Instruction.StoreOperand) throws {
-        try memoryStore(runtime: runtime, stack: &stack, storeOperand: storeOperand, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) })
+    mutating func i32Store16(runtime: Runtime, stack: inout Stack, currentMemory: CurrentMemory, storeOperand: Instruction.StoreOperand) throws {
+        try memoryStore(runtime: runtime, stack: &stack, currentMemory: currentMemory, storeOperand: storeOperand, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) })
     }
-    mutating func i64Store8(runtime: Runtime, stack: inout Stack, storeOperand: Instruction.StoreOperand) throws {
-        try memoryStore(runtime: runtime, stack: &stack, storeOperand: storeOperand, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) })
+    mutating func i64Store8(runtime: Runtime, stack: inout Stack, currentMemory: CurrentMemory, storeOperand: Instruction.StoreOperand) throws {
+        try memoryStore(runtime: runtime, stack: &stack, currentMemory: currentMemory, storeOperand: storeOperand, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) })
     }
-    mutating func i64Store16(runtime: Runtime, stack: inout Stack, storeOperand: Instruction.StoreOperand) throws {
-        try memoryStore(runtime: runtime, stack: &stack, storeOperand: storeOperand, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) })
+    mutating func i64Store16(runtime: Runtime, stack: inout Stack, currentMemory: CurrentMemory, storeOperand: Instruction.StoreOperand) throws {
+        try memoryStore(runtime: runtime, stack: &stack, currentMemory: currentMemory, storeOperand: storeOperand, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) })
     }
-    mutating func i64Store32(runtime: Runtime, stack: inout Stack, storeOperand: Instruction.StoreOperand) throws {
-        try memoryStore(runtime: runtime, stack: &stack, storeOperand: storeOperand, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) })
+    mutating func i64Store32(runtime: Runtime, stack: inout Stack, currentMemory: CurrentMemory, storeOperand: Instruction.StoreOperand) throws {
+        try memoryStore(runtime: runtime, stack: &stack, currentMemory: currentMemory, storeOperand: storeOperand, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) })
     }
 
     /// `[type].store[bitWidth]`
     @_transparent
-    private mutating func memoryStore<T: FixedWidthInteger>(runtime: Runtime, stack: inout Stack, storeOperand: Instruction.StoreOperand, castFromValue: (Value) -> T) throws {
-        let moduleInstance = currentModule(store: runtime.store, stack: &stack)
+    private mutating func memoryStore<T: FixedWidthInteger>(runtime: Runtime, stack: inout Stack, currentMemory: CurrentMemory, storeOperand: Instruction.StoreOperand, castFromValue: (Value) -> T) throws {
         let store = runtime.store
         let memarg = storeOperand.memarg
 
         let value = stack[storeOperand.value]
 
-        let memoryAddress = moduleInstance.memoryAddresses[0]
+        let memoryAddress = currentMemory.address!
         let address: UInt64
         let endAddress: UInt64
         let length: UInt64

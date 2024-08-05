@@ -75,17 +75,28 @@ extension ExecutionState {
         }
     }
 
+    struct CurrentMemory {
+        let address: MemoryAddress?
+    }
+
     mutating func run(runtime: Runtime, stack: inout Stack) throws {
         while !reachedEndOfExecution {
+            let currentMemory = currentMemory(store: runtime.store, stack: stack)
             // Regular path
             var inst: Instruction
             // `doExecute` returns false when current frame *may* be updated
             repeat {
                 inst = programCounter.pointee
-            } while try doExecute(inst, runtime: runtime, stack: &stack)
+            } while try doExecute(inst, currentMemory: currentMemory, runtime: runtime, stack: &stack)
         }
     }
 
+    func currentMemory(store: Store, stack: Stack) -> CurrentMemory {
+        guard let instanceAddr = stack.currentFrame?.module else { return CurrentMemory(address: nil) }
+        let instance = store.module(address: instanceAddr)
+        let memoryAddr = instance.memoryAddresses.first
+        return CurrentMemory(address: memoryAddr)
+    }
     func currentModule(store: Store, stack: inout Stack) -> ModuleInstance {
         store.module(address: stack.currentFrame.module)
     }
