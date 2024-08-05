@@ -31,8 +31,9 @@ struct Stack {
         )
         try valueStack.extend(addend: spAddend, maxStackHeight: iseq.maxStackHeight)
         if let defaultLocals {
+            let base = FunctionInstance.nonParamLocalBase(parameters: argc, results: arity)
             for (offset, value) in defaultLocals.enumerated() {
-                valueStack[argc + offset] = value
+                valueStack[Int(base) + offset] = value
             }
         }
         let frame = Frame(arity: arity, module: module, baseStackAddress: baseStackAddress, iseq: iseq, returnPC: returnPC, address: address)

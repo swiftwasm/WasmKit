@@ -56,10 +56,14 @@ public struct FunctionInstance {
         code = function
     }
 
+    internal static func nonParamLocalBase(type: FunctionType) -> Instruction.Register {
+        nonParamLocalBase(parameters: type.parameters.count, results: type.results.count)
+    }
+    internal static func nonParamLocalBase(parameters: Int, results: Int) -> Instruction.Register {
+        Instruction.Register(max(parameters, results))
+    }
     internal static func stackRegBase(type: FunctionType, nonParamLocals: Int) -> Instruction.Register {
-        Instruction.Register(
-            max(type.parameters.count, type.results.count) + nonParamLocals
-        )
+        nonParamLocalBase(type: type) + Instruction.Register(nonParamLocals)
     }
 }
 
