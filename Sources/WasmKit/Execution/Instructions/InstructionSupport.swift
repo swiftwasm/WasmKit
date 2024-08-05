@@ -334,3 +334,63 @@ extension Instruction {
     static func i64TruncSatF64S(_ op: UnaryOperand) -> Instruction { .numericConversion(.truncSaturatingSigned(.i64, .f64), op) }
     static func i64TruncSatF64U(_ op: UnaryOperand) -> Instruction { .numericConversion(.truncSaturatingUnsigned(.i64, .f64), op) }
 }
+
+extension Instruction {
+    func print<Target>(to target: inout Target) where Target : TextOutputStream {
+        func reg(_ reg: Register) -> String {
+            let regColor = reg < 15 ? "\u{001B}[3\(reg + 1)m" : ""
+            return "\(regColor)reg:\(reg)\u{001B}[0m"
+        }
+        func memarg(_ memarg: Memarg) -> String {
+            "offset: \(memarg.offset), align: \(memarg.align)"
+        }
+        switch self {
+        case .unreachable:
+            target.write("unreachable")
+        case .nop:
+            target.write("nop")
+        case .globalGet(let op):
+            target.write("\(reg(op.result)) = global.get \(op.index)")
+        case .globalSet(let op):
+            target.write("global.set \(op.index), \(reg(op.value))")
+        case .numericConst(let op):
+            target.write("\(reg(op.result)) = \(op.value)")
+        case .call(let op):
+            target.write("call \(op.index), sp: +\(op.callLike.spAddend)")
+        case .callIndirect(let op):
+            target.write("call_indirect \(reg(op.index)), \(op.tableIndex), \(op.typeIndex), sp: +\(op.callLike.spAddend)")
+        case .i32Load(let op):
+            target.write("\(reg(op.result)) = i32.load \(reg(op.pointer)), \(memarg(op.memarg))")
+        case .i64Load(let op):
+            target.write("\(reg(op.result)) = i64.load \(reg(op.pointer)), \(memarg(op.memarg))")
+        case .f32Load(let op):
+            target.write("\(reg(op.result)) = f32.load \(reg(op.pointer)), \(memarg(op.memarg))")
+        case .f64Load(let op):
+            target.write("\(reg(op.result)) = f64.load \(reg(op.pointer)), \(memarg(op.memarg))")
+        case .copyStack(let op):
+            target.write("\(reg(op.dest)) = copy \(reg(op.source))")
+        case .i32Add(let op):
+            target.write("\(reg(op.result)) = i32.add \(reg(op.lhs)), \(reg(op.rhs))")
+        case .i32Sub(let op):
+            target.write("\(reg(op.result)) = i32.sub \(reg(op.lhs)), \(reg(op.rhs))")
+        case .i32LtU(let op):
+            target.write("\(reg(op.result)) = i32.lt_u \(reg(op.lhs)), \(reg(op.rhs))")
+        case .i32Eq(let op):
+            target.write("\(reg(op.result)) = i32.eq \(reg(op.lhs)), \(reg(op.rhs))")
+        case .i32Store(let op):
+            target.write("i32.store \(reg(op.pointer)), \(reg(op.value)), \(memarg(op.memarg))")
+        case .numericIntBinary(let op, let operands):
+            target.write("\(reg(operands.result)) = \(op) \(reg(operands.lhs)), \(reg(operands.rhs))")
+        case .brIfNot(let op):
+            target.write("br_if_not \(reg(op.condition)), +\(op.offset)")
+        case .br(let offset):
+            target.write("br \(offset > 0 ? "+" : "")\(offset)")
+        case .return:
+            target.write("return")
+        case .endOfFunction:
+            target.write("end")
+        default:
+            target.write(String(describing: self))
+        }
+    }
+}

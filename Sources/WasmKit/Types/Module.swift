@@ -58,7 +58,7 @@ public struct Module {
     let start: FunctionIndex?
     public let imports: [Import]
     public let exports: [Export]
-    public let customSections = [CustomSection]()
+    public let customSections: [CustomSection]
 
     let translatorContext: TranslatorContext
     let allocator: ISeqAllocator
@@ -70,6 +70,7 @@ public struct Module {
         start: FunctionIndex?,
         imports: [Import],
         exports: [Export],
+        customSections: [CustomSection],
         translatorContext: TranslatorContext,
         allocator: ISeqAllocator
     ) {
@@ -79,6 +80,7 @@ public struct Module {
         self.start = start
         self.imports = imports
         self.exports = exports
+        self.customSections = customSections
         self.translatorContext = translatorContext
         self.allocator = allocator
     }
@@ -87,6 +89,29 @@ public struct Module {
     public mutating func materializeAll() throws {
         for functionIndex in functions.indices {
             _ = try functions[functionIndex].body
+        }
+    }
+
+    public func _functions<Target>(to target: inout Target) throws where Target: TextOutputStream {
+        var nameMap = [UInt32: String]()
+        if let nameSection = customSections.first(where: { $0.name == "name" }) {
+            let nameParser = WasmParser.NameSectionParser(stream: StaticByteStream(bytes: Array(nameSection.bytes)))
+            for name in try nameParser.parseAll() {
+                switch name {
+                case .functions(let names):
+                    nameMap = names
+                }
+            }
+        }
+        for (offset, function) in functions.enumerated() {
+            var function = function
+            let index = translatorContext.imports.numberOfFunctions + offset
+            target.write("==== Function[\(index)]")
+            if let name = nameMap[UInt32(index)] {
+                target.write(" '\(name)'")
+            }
+            target.write(" ====\n")
+            try function.body.write(to: &target)
         }
     }
 }

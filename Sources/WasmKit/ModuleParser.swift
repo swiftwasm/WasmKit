@@ -176,6 +176,7 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
         start: start,
         imports: imports,
         exports: exports,
+        customSections: customSections,
         translatorContext: translatorContext,
         allocator: allocator
     )

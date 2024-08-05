@@ -21,6 +21,22 @@ struct InstructionSequence: Equatable {
     }
 }
 
+extension InstructionSequence: TextOutputStreamable {
+    func write<Target>(to target: inout Target) where Target : TextOutputStream {
+        var hexOffsetWidth = String(self.instructions.count - 1, radix: 16).count
+        hexOffsetWidth = (hexOffsetWidth + 1) & ~1
+        for (index, instruction) in instructions.enumerated() {
+            var hexOffset = String(index, radix: 16)
+            while hexOffset.count < hexOffsetWidth {
+                hexOffset = "0" + hexOffset
+            }
+            target.write("0x\(hexOffset): ")
+            instruction.print(to: &target)
+            target.write("\n")
+        }
+    }
+}
+
 extension Instruction {
     fileprivate var isEndOfFunction: Bool {
         if case .endOfFunction = self {
