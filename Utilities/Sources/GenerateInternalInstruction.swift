@@ -159,7 +159,6 @@ enum GenerateInternalInstruction {
                 immediates: [
                     Immediate(name: nil, type: "Instruction.IfOperand")
                 ]),
-            Instruction(name: "end", isControl: true, immediates: []),
             Instruction(
                 name: "`else`", isControl: true,
                 immediates: [

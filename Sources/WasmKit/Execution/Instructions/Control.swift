@@ -17,16 +17,10 @@ extension ExecutionState {
         }
     }
 
-    mutating func end(runtime: Runtime, stack: inout Stack) {
-        fatalError()
-    }
     mutating func `else`(runtime: Runtime, stack: inout Stack, endRef: ExpressionRef) {
         programCounter += endRef.relativeOffset  // if-then-else's continuation points the "end"
     }
     private mutating func branch(stack: inout Stack, offset: Int32) throws {
-        // if popCount > 0 {  // TODO: Maybe worth to have a special instruction for popCount=0?
-        //     stack.copyValues(copyCount: Int(copyCount), popCount: Int(popCount))
-        // }
         programCounter += Int(offset)
     }
     mutating func br(runtime: Runtime, stack: inout Stack, offset: Int32) throws {

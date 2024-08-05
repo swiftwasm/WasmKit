@@ -18,9 +18,6 @@ extension ExecutionState {
         case .ifThen(let ifOperand):
             self.ifThen(runtime: runtime, stack: &stack, ifOperand: ifOperand)
             return true
-        case .end:
-            self.end(runtime: runtime, stack: &stack)
-            return true
         case .`else`(let endRef):
             self.`else`(runtime: runtime, stack: &stack, endRef: endRef)
             return true
@@ -246,7 +243,6 @@ extension Instruction {
         case .unreachable: return "unreachable"
         case .nop: return "nop"
         case .ifThen: return "ifThen"
-        case .end: return "end"
         case .`else`: return "`else`"
         case .br: return "br"
         case .brIf: return "brIf"
