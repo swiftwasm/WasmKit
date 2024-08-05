@@ -5,10 +5,7 @@ extension Instruction {
     
     struct BrTable: Equatable {
         struct Entry {
-            var labelIndex: LabelIndex
             var offset: Int32
-            var copyCount: UInt16
-            var popCount: UInt16
         }
         let buffer: UnsafeBufferPointer<Entry>
         

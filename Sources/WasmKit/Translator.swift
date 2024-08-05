@@ -877,16 +877,11 @@ struct InstructionTranslator: InstructionVisitor {
         //     +---> [0x0b] ...
         for (entryIndex, labelIndex) in allLabelIndices.enumerated() {
             let frame = try controlStack.branchTarget(relativeDepth: labelIndex)
-            let popCount = try Self.computePopCount(
-                destination: frame, currentFrame: currentFrame, currentHeight: currentHeight
-            )
             do {
                 let relativeOffset = iseqBuilder.insertingPC.offsetFromHead - brTableAt.offsetFromHead
                 tableBuffer[entryIndex] = Instruction.BrTable.Entry(
-                    labelIndex: labelIndex, offset: Int32(relativeOffset),
-                    copyCount: frame.copyCount, popCount: UInt16(popCount)
+                    offset: Int32(relativeOffset)
                 )
-                assert(tableBuffer[entryIndex].labelIndex == labelIndex)
             }
             try copyOnBranch(targetFrame: frame)
             let brAt = iseqBuilder.insertingPC
