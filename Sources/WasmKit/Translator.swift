@@ -1141,8 +1141,7 @@ struct InstructionTranslator: InstructionVisitor {
             let storeOperand = Instruction.StoreOperand(
                 pointer: pointer,
                 value: value,
-                memarg: Instruction.MemArg(offset: memarg.offset),
-                isMemory64: isMemory64
+                memarg: Instruction.MemArg(offset: memarg.offset)
             )
             emit(instruction(storeOperand))
         }

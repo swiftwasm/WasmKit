@@ -97,24 +97,14 @@ extension ExecutionState {
         let memarg = storeOperand.memarg
 
         let value = stack[storeOperand.value]
-
-        let address: UInt64
-        let endAddress: UInt64
-        let length: UInt64
-        do {
-            let i = stack[storeOperand.pointer].asAddressOffset(storeOperand.isMemory64)
-            var isOverflow: Bool
-            (address, isOverflow) = memarg.offset.addingReportingOverflow(i)
-            guard !isOverflow else {
-                throw Trap.outOfBoundsMemoryAccess
-            }
-            length = UInt64(T.bitWidth) / 8
-            (endAddress, isOverflow) = address.addingReportingOverflow(length)
-            guard !isOverflow, endAddress <= currentMemory.count else {
-                throw Trap.outOfBoundsMemoryAccess
-            }
+        let length = UInt64(T.bitWidth) / 8
+        let i = stack[storeOperand.pointer].asAddressOffset()
+        let (endAddress, isEndOverflow) = i.addingReportingOverflow(length + memarg.offset)
+        guard !isEndOverflow, endAddress <= currentMemory.count else {
+            // TODO(optimize): Swift-native exception leads code-bloating
+            throw Trap.outOfBoundsMemoryAccess
         }
-
+        let address = memarg.offset + i
         let toStore = castFromValue(value)
         currentMemory.buffer.baseAddress!.advanced(by: Int(address))
             .bindMemory(to: T.self, capacity: 1).pointee = toStore.littleEndian

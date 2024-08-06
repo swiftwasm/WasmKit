@@ -46,7 +46,6 @@ extension Instruction {
         let pointer: Register
         let value: Register
         let memarg: MemArg
-        let isMemory64: Bool
     }
     
     struct MemorySizeOperand: Equatable {
