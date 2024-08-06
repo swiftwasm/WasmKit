@@ -38,7 +38,7 @@ struct StackContext {
         // Initialize the locals with zeros (all types of value have the same representation)
         valueStack.frameBase.advanced(by: Int(base))
             .initialize(repeating: .default, count: numberOfNonParameterLocals)
-        let frame = Frame(arity: arity, module: module, baseStackAddress: baseStackAddress, iseq: iseq, returnPC: returnPC, address: address)
+        let frame = Frame(module: module, baseStackAddress: baseStackAddress, iseq: iseq, returnPC: returnPC, address: address)
         frames.push(frame)
         self.currentFrame = frame
     }
@@ -177,7 +177,6 @@ struct BaseStackAddress {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#frames>
 struct Frame {
-    let arity: Int
     let module: ModuleAddress
     let baseStackAddress: BaseStackAddress
     let iseq: InstructionSequence
@@ -186,14 +185,12 @@ struct Frame {
     let address: FunctionAddress?
 
     init(
-        arity: Int,
         module: ModuleAddress,
         baseStackAddress: BaseStackAddress,
         iseq: InstructionSequence,
         returnPC: ProgramCounter,
         address: FunctionAddress? = nil
     ) {
-        self.arity = arity
         self.module = module
         self.baseStackAddress = baseStackAddress
         self.iseq = iseq
@@ -204,7 +201,7 @@ struct Frame {
 
 extension Frame: Equatable {
     static func == (_ lhs: Frame, _ rhs: Frame) -> Bool {
-        lhs.module == rhs.module && lhs.arity == rhs.arity
+        lhs.module == rhs.module
     }
 }
 
