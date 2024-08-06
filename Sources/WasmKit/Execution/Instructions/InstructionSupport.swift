@@ -1,7 +1,9 @@
 import WasmParser
 
 extension Instruction {
-    typealias Memarg = MemArg
+    struct MemArg: Equatable {
+        let offset: UInt64
+    }
     
     struct BrTable: Equatable {
         struct Entry {
@@ -309,8 +311,8 @@ extension Instruction {
             let regColor = reg < 15 ? "\u{001B}[3\(reg + 1)m" : ""
             return "\(regColor)reg:\(reg)\u{001B}[0m"
         }
-        func memarg(_ memarg: Memarg) -> String {
-            "offset: \(memarg.offset), align: \(memarg.align)"
+        func memarg(_ memarg: MemArg) -> String {
+            "offset: \(memarg.offset)"
         }
         switch self {
         case .unreachable:

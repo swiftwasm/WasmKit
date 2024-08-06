@@ -1,8 +1,6 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#memory-instructions>
 extension ExecutionState {
-    typealias Memarg = Instruction.Memarg
-
     mutating func i32Load(runtime: Runtime, context: inout StackContext, stack: FrameBase, currentMemory: CurrentMemory, loadOperand: Instruction.LoadOperand) throws {
         try memoryLoad(runtime: runtime, stack: stack, currentMemory: currentMemory, loadOperand: loadOperand, loadAs: UInt32.self, castToValue: { .i32($0) })
     }
