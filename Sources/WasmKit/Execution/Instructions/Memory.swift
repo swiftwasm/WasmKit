@@ -52,12 +52,12 @@ extension ExecutionState {
 
         let length = UInt64(T.bitWidth) / 8
         let i = stack[loadOperand.pointer].asAddressOffset(loadOperand.isMemory64)
-        let (address, isOverflow) = memarg.offset.addingReportingOverflow(i)
-        let (endAddress, isEndOverflow) = address.addingReportingOverflow(length)
-        guard !isOverflow, !isEndOverflow, endAddress <= currentMemory.count else {
+        let (endAddress, isEndOverflow) = i.addingReportingOverflow(length + memarg.offset)
+        guard !isEndOverflow, endAddress <= currentMemory.count else {
+            // TODO(optimize): Swift-native exception leads code-bloating
             throw Trap.outOfBoundsMemoryAccess
         }
-
+        let address = memarg.offset + i
         let loaded = currentMemory.buffer.loadUnaligned(fromByteOffset: Int(address), as: T.self)
         stack[loadOperand.result] = castToValue(loaded)
 
