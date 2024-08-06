@@ -9,10 +9,12 @@ struct ExecutionState {
     var programCounter: ProgramCounter
     var reachedEndOfExecution: Bool = false
     var currentMemory: CurrentMemory
+    var currentGlobalCache: CurrentGlobalCache
 
     fileprivate init(programCounter: ProgramCounter) {
         self.programCounter = programCounter
         self.currentMemory = CurrentMemory()
+        self.currentGlobalCache = CurrentGlobalCache()
     }
 }
 
@@ -100,6 +102,40 @@ extension ExecutionState {
         }
     }
 
+    struct CurrentGlobalCache {
+        private let _0: UnsafeMutablePointer<GlobalInstance>?
+        init(instance: ModuleInstance, store: Store) {
+            guard instance.globalAddresses.count > 0 else {
+                _0 = nil
+                return
+            }
+            let _0Addr = instance.globalAddresses[0]
+            self._0 = store.globals._baseAddressIfContiguous?.advanced(by: _0Addr)
+        }
+        init() {
+            self._0 = nil
+        }
+
+        func get(index: GlobalIndex, runtime: Runtime, context: inout StackContext) -> Value {
+            if index == 0 {
+                return _0!.pointee.value
+            }
+            let address = Int(currentModule(store: runtime.store, stack: &context).globalAddresses[Int(index)])
+            let globals = runtime.store.globals
+            let value = globals[address].value
+            return value
+        }
+
+        func set(index: GlobalIndex, value: UntypedValue, runtime: Runtime, context: inout StackContext) {
+            if index == 0 {
+                _0!.pointee.assign(value)
+                return
+            }
+            let address = Int(currentModule(store: runtime.store, stack: &context).globalAddresses[Int(index)])
+            runtime.store.globals[address].assign(value)
+        }
+    }
+
     struct FrameBase {
         let pointer: UnsafeMutablePointer<UntypedValue>
 
@@ -144,10 +180,11 @@ extension ExecutionState {
         }
     }
     mutating func mayUpdateCurrentInstance(instanceAddr: ModuleAddress, store: Store) {
-        currentMemory = resolveCurrentMemory(instanceAddr: instanceAddr, store: store)
-    }
-    func resolveCurrentMemory(instanceAddr: ModuleAddress, store: Store) -> CurrentMemory {
         let instance = store.module(address: instanceAddr)
+        currentMemory = resolveCurrentMemory(instance: instance, store: store)
+        currentGlobalCache = CurrentGlobalCache(instance: instance, store: store)
+    }
+    private func resolveCurrentMemory(instance: ModuleInstance, store: Store) -> CurrentMemory {
         guard let memoryAddr = instance.memoryAddresses.first else {
             return CurrentMemory()
         }
@@ -155,7 +192,8 @@ extension ExecutionState {
         let baseAddress = memory._baseAddressIfContiguous
         return CurrentMemory(baseAddress: baseAddress, count: memory.count)
     }
-    func currentModule(store: Store, stack: inout StackContext) -> ModuleInstance {
-        store.module(address: stack.currentFrame.module)
-    }
+}
+
+func currentModule(store: Store, stack: inout StackContext) -> ModuleInstance {
+    store.module(address: stack.currentFrame.module)
 }

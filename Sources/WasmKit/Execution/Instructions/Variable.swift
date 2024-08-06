@@ -2,15 +2,12 @@
 /// <https://webassembly.github.io/spec/core/syntax/instructions.html#variable-instructions>
 extension ExecutionState {
     mutating func globalGet(runtime: Runtime, context: inout StackContext, stack: FrameBase, globalGetOperand: Instruction.GlobalGetOperand) throws {
-        let address = Int(currentModule(store: runtime.store, stack: &context).globalAddresses[Int(globalGetOperand.index)])
-        let globals = runtime.store.globals
-        let value = globals[address].value
+        let value = currentGlobalCache.get(index: globalGetOperand.index, runtime: runtime, context: &context)
         stack[globalGetOperand.result] = UntypedValue(value)
     }
     mutating func globalSet(runtime: Runtime, context: inout StackContext, stack: FrameBase, globalSetOperand: Instruction.GlobalSetOperand) throws {
-        let address = Int(currentModule(store: runtime.store, stack: &context).globalAddresses[Int(globalSetOperand.index)])
         let value = stack[globalSetOperand.value]
-        runtime.store.globals[address].assign(value)
+        currentGlobalCache.set(index: globalSetOperand.index, value: value, runtime: runtime, context: &context)
     }
 
     mutating func copyStack(runtime: Runtime, context: inout StackContext, stack: FrameBase, copyStackOperand: Instruction.CopyStackOperand) {
