@@ -52,14 +52,11 @@ extension ExecutionState {
     ) throws {
         let memarg = loadOperand.memarg
 
+        let length = UInt64(T.bitWidth) / 8
         let i = stack[loadOperand.pointer].asAddressOffset(loadOperand.isMemory64)
         let (address, isOverflow) = memarg.offset.addingReportingOverflow(i)
-        guard !isOverflow else {
-            throw Trap.outOfBoundsMemoryAccess
-        }
-        let length = UInt64(T.bitWidth) / 8
         let (endAddress, isEndOverflow) = address.addingReportingOverflow(length)
-        guard !isEndOverflow, endAddress <= currentMemory.count else {
+        guard !isOverflow, !isEndOverflow, endAddress <= currentMemory.count else {
             throw Trap.outOfBoundsMemoryAccess
         }
 
