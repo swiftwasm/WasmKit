@@ -243,11 +243,11 @@ extension ByteStream {
 /// <https://webassembly.github.io/spec/core/binary/values.html#integers>
 extension ByteStream {
     fileprivate func parseUnsigned<T: RawUnsignedInteger>(_: T.Type = T.self) throws -> T {
-        return try T(LEB: { try? self.consumeAny() })
+        return try T(LEB: self)
     }
 
     fileprivate func parseSigned<T: FixedWidthInteger & SignedInteger>() throws -> T {
-        return try T(LEB: { try? self.consumeAny() })
+        return try T(LEB: self)
     }
 
     fileprivate func parseInteger<T: RawUnsignedInteger>() throws -> T {

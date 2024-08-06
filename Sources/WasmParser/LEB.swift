@@ -5,18 +5,13 @@ enum LEBError: Swift.Error, Equatable {
 }
 
 extension FixedWidthInteger where Self: UnsignedInteger {
-    init(LEB nextByte: () -> UInt8?) throws {
+    init<Stream: ByteStream>(LEB stream: Stream) throws {
         var result: Self = 0
         var shift: UInt = 0
 
         var byte: UInt8
         repeat {
-            byte = try {
-                guard let byte = nextByte() else {
-                    throw LEBError.insufficientBytes
-                }
-                return byte
-            }()
+            byte = try stream.consumeAny()
 
             guard shift < Self.bitWidth else {
                 throw LEBError.integerRepresentationTooLong
@@ -35,18 +30,13 @@ extension FixedWidthInteger where Self: UnsignedInteger {
 }
 
 extension FixedWidthInteger where Self: SignedInteger {
-    init(LEB nextByte: () -> UInt8?) throws {
+    init<Stream: ByteStream>(LEB stream: Stream) throws {
         var result: Self = 0
         var shift: Self = 0
 
         var byte: UInt8
         repeat {
-            byte = try {
-                guard let byte = nextByte() else {
-                    throw LEBError.insufficientBytes
-                }
-                return byte
-            }()
+            byte = try stream.consumeAny()
 
             let slice = Self(byte & 0b0111_1111)
             result |= slice << shift

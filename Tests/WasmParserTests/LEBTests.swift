@@ -101,14 +101,14 @@ final class LEBTest: XCTestCase {
 
 extension FixedWidthInteger where Self: UnsignedInteger {
     fileprivate init(LEB bytes: [UInt8]) throws {
-        var iterator = bytes.makeIterator()
-        try self.init(LEB: { iterator.next() })
+        let stream = StaticByteStream(bytes: bytes)
+        try self.init(LEB: stream)
     }
 }
 
 extension FixedWidthInteger where Self: SignedInteger {
     fileprivate init(LEB bytes: [UInt8]) throws {
-        var iterator = bytes.makeIterator()
-        try self.init(LEB: { iterator.next() })
+        let stream = StaticByteStream(bytes: bytes)
+        try self.init(LEB: stream)
     }
 }
