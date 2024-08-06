@@ -1123,7 +1123,7 @@ struct InstructionTranslator: InstructionVisitor {
         try popPushEmit(.address(isMemory64: isMemory64), type) { [stackLayout] value, result, stack in
             let loadOperand = Instruction.LoadOperand(
                 pointer: value.intoRegister(layout: stackLayout),
-                result: result, memarg: Instruction.MemArg(offset: memarg.offset), isMemory64: isMemory64
+                result: result, memarg: Instruction.MemArg(offset: memarg.offset)
             )
             return instruction(loadOperand)
         }

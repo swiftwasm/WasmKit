@@ -51,7 +51,7 @@ extension ExecutionState {
         let memarg = loadOperand.memarg
 
         let length = UInt64(T.bitWidth) / 8
-        let i = stack[loadOperand.pointer].asAddressOffset(loadOperand.isMemory64)
+        let i = stack[loadOperand.pointer].asAddressOffset()
         let (endAddress, isEndOverflow) = i.addingReportingOverflow(length + memarg.offset)
         guard !isEndOverflow, endAddress <= currentMemory.count else {
             // TODO(optimize): Swift-native exception leads code-bloating

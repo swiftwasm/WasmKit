@@ -289,8 +289,14 @@ struct UntypedValue: Equatable {
         }
     }
 
+    func asAddressOffset() -> UInt64 {
+        // NOTE: It's ok to load address offset as i64 because
+        //       it's always evaluated as unsigned and the higher
+        //       32-bits of i32 are always zero.
+        return i64
+    }
     func asAddressOffset(_ isMemory64: Bool) -> UInt64 {
-        return isMemory64 ? i64 : UInt64(i32)
+        return asAddressOffset()
     }
 
     func cast(to type: NumericType) -> Value {
