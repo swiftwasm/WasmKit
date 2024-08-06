@@ -79,9 +79,7 @@ extension ExecutionState {
             // TODO(optimize):
             // If the callee is known to be a function defined within the same module,
             // a special `callInternal` instruction can skip updating the current instance
-            if callerModule != function.module {
-                mayUpdateCurrentInstance(instanceAddr: function.module, store: runtime.store)
-            }
+            mayUpdateCurrentInstance(instanceAddr: function.module, store: runtime.store, from: callerModule)
         }
     }
 
@@ -134,6 +132,16 @@ extension ExecutionState {
             return
         }
         mayUpdateCurrentInstance(instanceAddr: instanceAddr, store: store)
+    }
+
+    mutating func mayUpdateCurrentInstance(
+        instanceAddr: ModuleAddress,
+        store: Store,
+        from lastInstanceAddr: ModuleAddress?
+    ) {
+        if lastInstanceAddr != instanceAddr {
+            mayUpdateCurrentInstance(instanceAddr: instanceAddr, store: store)
+        }
     }
     mutating func mayUpdateCurrentInstance(instanceAddr: ModuleAddress, store: Store) {
         currentMemory = resolveCurrentMemory(instanceAddr: instanceAddr, store: store)

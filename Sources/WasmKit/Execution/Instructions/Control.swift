@@ -70,9 +70,9 @@ extension ExecutionState {
                 runtime.interceptor?.onExitFunction(address, store: runtime.store)
             }
         #endif
-        context.popFrame()
+        let lastInstanceAddr = context.popFrame()
         programCounter = currentFrame.returnPC
-        mayUpdateCurrentInstance(instanceAddr: currentFrame.module, store: runtime.store)
+        mayUpdateCurrentInstance(instanceAddr: currentFrame.module, store: runtime.store, from: lastInstanceAddr)
     }
 
     @inline(__always)

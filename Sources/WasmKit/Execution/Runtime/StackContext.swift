@@ -43,11 +43,12 @@ struct StackContext {
         self.currentFrame = frame
     }
 
-    mutating func popFrame() {
+    mutating func popFrame() -> ModuleAddress {
         let popped = self.frames.pop()
         self.currentFrame = self.frames.peek()
         let resultsBase = popped.baseStackAddress.valueFrameIndex
         self.valueStack.truncate(length: resultsBase)
+        return popped.module
     }
 
     subscript(register: Instruction.Register) -> UntypedValue {
