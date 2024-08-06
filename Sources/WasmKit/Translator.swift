@@ -341,8 +341,15 @@ struct InstructionTranslator: InstructionVisitor {
             case pinned(MetaProgramCounter)
         }
 
+        typealias ResultRelink = (_ result: Instruction.Register) -> Instruction
+        struct LastEmission {
+            let position: MetaProgramCounter
+            let resultRelink: ResultRelink?
+        }
+
         private var labels: [LabelEntry] = []
         private var instructions: [WasmKit.Instruction] = []
+        private var lastEmission: LastEmission?
         var insertingPC: MetaProgramCounter {
             MetaProgramCounter(offsetFromHead: instructions.count)
         }
@@ -357,6 +364,19 @@ struct InstructionTranslator: InstructionVisitor {
             }
         }
 
+        mutating func resetLastEmission() {
+            lastEmission = nil
+        }
+
+        mutating func relinkLastInstructionResult(_ newResult: Instruction.Register) -> Bool {
+            guard let lastEmission = self.lastEmission,
+                  let resultRelink = lastEmission.resultRelink else { return false }
+            let newInstruction = resultRelink(newResult)
+            self.instructions[lastEmission.position.offsetFromHead] = newInstruction
+            resetLastEmission()
+            return true
+        }
+
         func dump() {
             for instruction in instructions {
                 print(instruction)
@@ -367,7 +387,8 @@ struct InstructionTranslator: InstructionVisitor {
             return instructions
         }
 
-        mutating func emit(_ instruction: Instruction) {
+        mutating func emit(_ instruction: Instruction, resultRelink: ResultRelink? = nil) {
+            self.lastEmission = LastEmission(position: insertingPC, resultRelink: resultRelink)
             self.instructions.append(instruction)
         }
 
@@ -513,11 +534,12 @@ struct InstructionTranslator: InstructionVisitor {
         return stackLayout.localReg(index)
     }
 
-    private mutating func emit(_ instruction: Instruction) {
-        iseqBuilder.emit(instruction)
+    private mutating func emit(_ instruction: Instruction, resultRelink: ISeqBuilder.ResultRelink? = nil) {
+        iseqBuilder.emit(instruction, resultRelink: resultRelink)
     }
 
     private mutating func emitCopyStack(from source: Instruction.Register, to dest: Instruction.Register) {
+        guard source != dest else { return }
         emit(.copyStack(Instruction.CopyStackOperand(source: source, dest: dest)))
     }
 
@@ -654,6 +676,7 @@ struct InstructionTranslator: InstructionVisitor {
     mutating func visitLoop(blockType: WasmParser.BlockType) throws -> Output {
         let blockType = try module.resolveBlockType(blockType)
         preserveAllLocalsOnStack()
+        iseqBuilder.resetLastEmission()
         let headLabel = iseqBuilder.putLabel()
         let stackHeight = self.valueStack.height - Int(blockType.parameters.count)
         controlStack.pushFrame(ControlStack.ControlFrame(blockType: blockType, stackHeight: stackHeight, continuation: headLabel, kind: .loop))
@@ -695,6 +718,7 @@ struct InstructionTranslator: InstructionVisitor {
         }
         preserveAllLocalsOnStack()
         try controlStack.resetReachability()
+        iseqBuilder.resetLastEmission()
         let selfPC = iseqBuilder.insertingPC
         iseqBuilder.emitWithLabel(endLabel) { _, endPC in
             let endRef = ExpressionRef(from: selfPC, to: endPC)
@@ -712,7 +736,7 @@ struct InstructionTranslator: InstructionVisitor {
         guard let poppedFrame = controlStack.popFrame() else {
             throw TranslationError("Unexpected `end` instruction")
         }
-
+        iseqBuilder.resetLastEmission()
         if case .block(root: true) = poppedFrame.kind {
             if poppedFrame.reachable {
                 try translateReturn()
@@ -980,16 +1004,24 @@ struct InstructionTranslator: InstructionVisitor {
     mutating func visitLocalGet(localIndex: UInt32) throws -> Output {
         try valueStack.pushLocal(localIndex, locals: &locals)
     }
-    mutating func visitLocalSet(localIndex: UInt32) throws -> Output {
+    mutating func visitLocalSetOrTee(localIndex: UInt32, isTee: Bool) throws {
         guard try controlStack.currentFrame().reachable else { return }
         preserveLocalsOnStack(localIndex)
         let type = try locals.type(of: localIndex)
         guard let value = try popOperand(type)?.intoRegister(layout: stackLayout) else { return }
-        emitCopyStack(from: value, to: localReg(localIndex))
+        let result = localReg(localIndex)
+        if !isTee, iseqBuilder.relinkLastInstructionResult(result) {
+            // Good news, copyStack is optimized out :)
+            return
+        }
+        emitCopyStack(from: value, to: result)
+    }
+    mutating func visitLocalSet(localIndex: UInt32) throws -> Output {
+        try visitLocalSetOrTee(localIndex: localIndex, isTee: false)
     }
     mutating func visitLocalTee(localIndex: UInt32) throws -> Output {
         guard try controlStack.currentFrame().reachable else { return }
-        try visitLocalSet(localIndex: localIndex)
+        try visitLocalSetOrTee(localIndex: localIndex, isTee: true)
         _ = try valueStack.pushLocal(localIndex, locals: &locals)
     }
     mutating func visitGlobalGet(globalIndex: UInt32) throws -> Output {
@@ -1017,12 +1049,14 @@ struct InstructionTranslator: InstructionVisitor {
     private mutating func popPushEmit(
         _ pop: ValueType,
         _ push: ValueType,
-        _ instruction: (_ popped: ValueSource, _ result: Instruction.Register, inout ValueStack) -> Instruction
+        _ instruction: @escaping (_ popped: ValueSource, _ result: Instruction.Register, ValueStack) -> Instruction
     ) throws {
         let value = try popOperand(pop)
         let result = valueStack.push(push)
         if let value = value {
-            emit(instruction(value, result, &valueStack))
+            emit(instruction(value, result, valueStack), resultRelink: { [valueStack] newResult in
+                instruction(value, newResult, valueStack)
+            })
         }
     }
 
@@ -1085,7 +1119,7 @@ struct InstructionTranslator: InstructionVisitor {
     private mutating func visitLoad(
         _ memarg: MemArg,
         _ type: ValueType,
-        _ instruction: (Instruction.LoadOperand) -> Instruction
+        _ instruction: @escaping (Instruction.LoadOperand) -> Instruction
     ) throws {
         let isMemory64 = try module.isMemory64(memoryIndex: 0)
         let alignLog2Limit = isMemory64 ? 64 : 32
@@ -1174,7 +1208,7 @@ struct InstructionTranslator: InstructionVisitor {
         pushEmit(.ref(.funcRef), { .refFunc(Instruction.RefFuncOperand(index: functionIndex, result: $0)) })
     }
 
-    private mutating func visitUnary(_ operand: ValueType, _ instruction: (Instruction.UnaryOperand) -> Instruction) throws {
+    private mutating func visitUnary(_ operand: ValueType, _ instruction: @escaping (Instruction.UnaryOperand) -> Instruction) throws {
         try popPushEmit(operand, operand) { [stackLayout] value, result, stack in
             return instruction(Instruction.UnaryOperand(result: result, input: value.intoRegister(layout: stackLayout)))
         }
@@ -1182,19 +1216,24 @@ struct InstructionTranslator: InstructionVisitor {
     private mutating func visitBinary(
         _ operand: ValueType,
         _ result: ValueType,
-        _ instruction: (Instruction.BinaryOperand) -> Instruction
+        _ instruction: @escaping (Instruction.BinaryOperand) -> Instruction
     ) throws {
         let rhs = try popOperand(operand)
         let lhs = try popOperand(operand)
         let result = valueStack.push(result)
         if let lhs = lhs?.intoRegister(layout: stackLayout), let rhs = rhs?.intoRegister(layout: stackLayout) {
-            emit(instruction(Instruction.BinaryOperand(result: result, lhs: lhs, rhs: rhs)))
+            emit(
+                instruction(Instruction.BinaryOperand(result: result, lhs: lhs, rhs: rhs)),
+                resultRelink: { result in
+                    return instruction(Instruction.BinaryOperand(result: result, lhs: lhs, rhs: rhs))
+                }
+            )
         }
     }
-    private mutating func visitCmp(_ operand: ValueType, _ instruction: (Instruction.BinaryOperand) -> Instruction) throws {
+    private mutating func visitCmp(_ operand: ValueType, _ instruction: @escaping (Instruction.BinaryOperand) -> Instruction) throws {
         try visitBinary(operand, .i32, instruction)
     }
-    private mutating func visitConversion(_ from: ValueType, _ to: ValueType, _ instruction: (Instruction.UnaryOperand) -> Instruction) throws {
+    private mutating func visitConversion(_ from: ValueType, _ to: ValueType, _ instruction: @escaping (Instruction.UnaryOperand) -> Instruction) throws {
         try popPushEmit(from, to) { [stackLayout] value, result, stack in
             return instruction(Instruction.UnaryOperand(result: result, input: value.intoRegister(layout: stackLayout)))
         }
