@@ -48,7 +48,7 @@ extension ExecutionState {
 
     @_transparent
     private mutating func memoryLoad<T: FixedWidthInteger>(
-        runtime: Runtime, stack: FrameBase, currentMemory: CurrentMemory, loadOperand: Instruction.LoadOperand, loadAs _: T.Type = T.self, castToValue: (T) -> Value
+        runtime: Runtime, stack: FrameBase, currentMemory: CurrentMemory, loadOperand: Instruction.LoadOperand, loadAs _: T.Type = T.self, castToValue: (T) -> UntypedValue
     ) throws {
         let memarg = loadOperand.memarg
 
@@ -61,7 +61,7 @@ extension ExecutionState {
         }
 
         let loaded = currentMemory.buffer.loadUnaligned(fromByteOffset: Int(address), as: T.self)
-        stack[loadOperand.result] = UntypedValue(castToValue(loaded))
+        stack[loadOperand.result] = castToValue(loaded)
 
     }
 

@@ -18,12 +18,6 @@ class ISeqAllocator {
         return buffer
     }
 
-    func allocateRegisterSet(_ params: [Instruction.Register]) -> Instruction.RegisterSet {
-        let buffer = UnsafeMutableBufferPointer<Instruction.Register>.allocate(capacity: params.count)
-        _ = buffer.initialize(fromContentsOf: params)
-        return Instruction.RegisterSet(registers: UnsafeBufferPointer(buffer))
-    }
-
     deinit {
         for buffer in buffers {
             buffer.deallocate()
@@ -264,7 +258,7 @@ struct InstructionTranslator: InstructionVisitor {
             for i in 0..<values.count {
                 guard case .local(let type, localIndex) = self.values[i] else { continue }
                 self.values[i] = .stack(.some(type))
-                copyTo.append(stackRegBase + UInt16(i))
+                copyTo.append(stackRegBase + Instruction.Register(i))
             }
             return copyTo
         }
@@ -522,7 +516,7 @@ struct InstructionTranslator: InstructionVisitor {
                 return Instruction.Register(index)
             } else {
                 return FunctionInstance.nonParamLocalBase(type: type)
-                    + UInt16(index) - UInt16(type.parameters.count)
+                    + Instruction.Register(index) - Instruction.Register(type.parameters.count)
             }
         }
     }
@@ -613,16 +607,16 @@ struct InstructionTranslator: InstructionVisitor {
 
     private mutating func copyOnBranch(targetFrame frame: ControlStack.ControlFrame) throws {
         preserveAllLocalsOnStack()
-        let copyCount = frame.copyCount
-        let sourceBase = valueStack.stackRegBase + UInt16(valueStack.height)
-        let destBase = valueStack.stackRegBase + UInt16(frame.stackHeight)
+        let copyCount = Instruction.Register(frame.copyCount)
+        let sourceBase = valueStack.stackRegBase + Instruction.Register(valueStack.height)
+        let destBase = valueStack.stackRegBase + Instruction.Register(frame.stackHeight)
         for i in (0..<copyCount).reversed() {
-            let source = sourceBase - 1 - UInt16(i)
+            let source = sourceBase - 1 - Instruction.Register(i)
             let dest: Instruction.Register
             if case .block(root: true) = frame.kind {
                 dest = returnReg(Int(copyCount - 1 - i))
             } else {
-                dest = destBase + copyCount - 1 - UInt16(i)
+                dest = destBase + copyCount - 1 - Instruction.Register(i)
             }
             emitCopyStack(from: source, to: dest)
         }
@@ -911,17 +905,17 @@ struct InstructionTranslator: InstructionVisitor {
         try markUnreachable()
     }
 
-    private mutating func visitCallLike(calleeType: FunctionType) throws -> UInt16? {
+    private mutating func visitCallLike(calleeType: FunctionType) throws -> Instruction.Register? {
         for parameter in calleeType.parameters.reversed() {
             guard try popOnStackOperand(parameter) else { return nil }
         }
 
-        let spAddend = valueStack.stackRegBase + UInt16(valueStack.height)
+        let spAddend = valueStack.stackRegBase + Instruction.Register(valueStack.height)
 
         for result in calleeType.results {
             _ = valueStack.push(result)
         }
-        return UInt16(spAddend)
+        return Instruction.Register(spAddend)
     }
     mutating func visitCall(functionIndex: UInt32) throws -> Output {
         let calleeType = try self.module.functionType(functionIndex)

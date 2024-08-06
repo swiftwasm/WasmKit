@@ -24,7 +24,7 @@ struct StackContext {
         argc: Int,
         numberOfNonParameterLocals: Int,
         returnPC: ProgramCounter,
-        spAddend: UInt16,
+        spAddend: Instruction.Register,
         address: FunctionAddress? = nil
     ) throws {
         guard frames.count < limit else {
@@ -96,7 +96,7 @@ struct ValueStack {
         }
     }
 
-    mutating func extend(addend: UInt16, maxStackHeight: Int) throws {
+    mutating func extend(addend: Instruction.Register, maxStackHeight: Int) throws {
         frameBase = frameBase.advanced(by: Int(addend))
         guard frameBase.advanced(by: maxStackHeight) < values.baseAddress!.advanced(by: values.count) else {
             throw Trap.callStackExhausted
@@ -215,6 +215,25 @@ struct UntypedValue: Equatable {
 
     private static var isNullMaskPattern: UInt64 { (0x1 << 63) }
 
+    init(signed value: Int32) {
+        self = .i32(UInt32(bitPattern: value))
+    }
+    init(signed value: Int64) {
+        self = .i64(UInt64(bitPattern: value))
+    }
+    static func i32(_ value: UInt32) -> UntypedValue {
+        return UntypedValue(storage: UInt64(value))
+    }
+    static func i64(_ value: UInt64) -> UntypedValue {
+        return UntypedValue(storage: value)
+    }
+    static func f32(_ value: UInt32) -> UntypedValue {
+        return UntypedValue(storage: UInt64(value))
+    }
+    static func f64(_ value: UInt64) -> UntypedValue {
+        return UntypedValue(storage: value)
+    }
+
     private init(storage: UInt64) {
         self.storage = storage
     }
@@ -227,14 +246,10 @@ struct UntypedValue: Equatable {
             return unsigned
         }
         switch value {
-        case .i32(let value):
-            storage = UInt64(value)
-        case .i64(let value):
-            storage = value
-        case .f32(let value):
-            storage = UInt64(value)
-        case .f64(let value):
-            storage = value
+        case .i32(let value): self = .i32(value)
+        case .i64(let value): self = .i64(value)
+        case .f32(let value): self = .f32(value)
+        case .f64(let value): self = .f64(value)
         case .ref(.function(let value)), .ref(.extern(let value)):
             storage = encodeOptionalInt(value)
         }

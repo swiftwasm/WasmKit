@@ -52,13 +52,13 @@ extension ExecutionState {
         switch try runtime.store.function(at: address) {
         case let .host(function):
             let parameters = function.type.parameters.enumerated().map { (i, type) in
-                stack[callLike.spAddend + UInt16(i)].cast(to: type)
+                stack[callLike.spAddend + Instruction.Register(i)].cast(to: type)
             }
             let moduleInstance = runtime.store.module(address: stack.currentFrame.module)
             let caller = Caller(runtime: runtime, instance: moduleInstance)
             let results = try function.implementation(caller, Array(parameters))
             for (index, result) in results.enumerated() {
-                stack[callLike.spAddend + UInt16(index)] = UntypedValue(result)
+                stack[callLike.spAddend + Instruction.Register(index)] = UntypedValue(result)
             }
             programCounter += 1
 

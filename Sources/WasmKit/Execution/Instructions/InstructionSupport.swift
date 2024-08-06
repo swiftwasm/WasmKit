@@ -13,9 +13,9 @@ extension Instruction {
             lhs.buffer.baseAddress == rhs.buffer.baseAddress
         }
     }
-    
-    typealias Register = UInt16
-    
+
+    typealias Register = Int
+
     /// size = 6, alignment = 2
     struct BinaryOperand: Equatable {
         let result: Register
@@ -177,40 +177,9 @@ extension Instruction {
         let index: Register
         let table: Instruction.BrTable
     }
-    
-    struct RegisterSet: Equatable, Sequence {
-        typealias Element = Register
-        let registers: UnsafeBufferPointer<Register>
-
-        func makeIterator() -> UnsafeBufferPointer<Register>.Iterator {
-            registers.makeIterator()
-        }
-
-        static func == (lhs: Instruction.RegisterSet, rhs: Instruction.RegisterSet) -> Bool {
-            lhs.registers.elementsEqual(rhs.registers)
-        }
-    }
-
-    enum RegisterRange: Equatable {
-        case empty
-        case some(start: Register, count: Int)
-
-        init() {
-            self = .empty
-        }
-
-        mutating func append(_ register: Register) {
-            switch self {
-            case .empty:
-                self = .some(start: register, count: 1)
-            case .some(let start, let count):
-                self = .some(start: start, count: count + 1)
-            }
-        }
-    }
 
     struct CallLikeOperand: Equatable {
-        let spAddend: UInt16
+        let spAddend: Instruction.Register
     }
     struct CallOperand: Equatable {
         let index: FunctionIndex
