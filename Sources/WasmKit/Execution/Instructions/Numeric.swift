@@ -102,6 +102,55 @@ extension ExecutionState {
         numericBinary(stack: stack, operand: binaryOperand, castTo: \.f64, binary: { Float64(bitPattern: $0) == Float64(bitPattern: $1) ? false : true })
     }
 
+    mutating func i32And(runtime: Runtime, context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(stack: stack, operand: binaryOperand, castTo: \.i32, binary: { .i32($0 & $1) })
+    }
+    mutating func i64And(runtime: Runtime, context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(stack: stack, operand: binaryOperand, castTo: \.i64, binary: { .i64($0 & $1) })
+    }
+    mutating func i32Or(runtime: Runtime, context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(stack: stack, operand: binaryOperand, castTo: \.i32, binary: { .i32($0 | $1) })
+    }
+    mutating func i64Or(runtime: Runtime, context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(stack: stack, operand: binaryOperand, castTo: \.i64, binary: { .i64($0 | $1) })
+    }
+    mutating func i32Xor(runtime: Runtime, context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(stack: stack, operand: binaryOperand, castTo: \.i32, binary: { .i32($0 ^ $1) })
+    }
+    mutating func i64Xor(runtime: Runtime, context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(stack: stack, operand: binaryOperand, castTo: \.i64, binary: { .i64($0 ^ $1) })
+    }
+    mutating func i32Shl(runtime: Runtime, context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(stack: stack, operand: binaryOperand, castTo: \.i32, binary: Value.i32Shl)
+    }
+    mutating func i64Shl(runtime: Runtime, context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(stack: stack, operand: binaryOperand, castTo: \.i64, binary: Value.i64Shl)
+    }
+    mutating func i32ShrS(runtime: Runtime, context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(stack: stack, operand: binaryOperand, castTo: \.i32, binary: Value.i32ShrS)
+    }
+    mutating func i64ShrS(runtime: Runtime, context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(stack: stack, operand: binaryOperand, castTo: \.i64, binary: Value.i64ShrS)
+    }
+    mutating func i32ShrU(runtime: Runtime, context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(stack: stack, operand: binaryOperand, castTo: \.i32, binary: Value.i32ShrU)
+    }
+    mutating func i64ShrU(runtime: Runtime, context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(stack: stack, operand: binaryOperand, castTo: \.i64, binary: Value.i64ShrU)
+    }
+    mutating func i32Rotl(runtime: Runtime, context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(stack: stack, operand: binaryOperand, castTo: \.i32, binary: Value.i32Rotl)
+    }
+    mutating func i64Rotl(runtime: Runtime, context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(stack: stack, operand: binaryOperand, castTo: \.i64, binary: Value.i64Rotl)
+    }
+    mutating func i32Rotr(runtime: Runtime, context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(stack: stack, operand: binaryOperand, castTo: \.i32, binary: Value.i32Rotr)
+    }
+    mutating func i64Rotr(runtime: Runtime, context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(stack: stack, operand: binaryOperand, castTo: \.i64, binary: Value.i64Rotr)
+    }
+
     mutating func i32LtS(runtime: Runtime, context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
         numericBinary(stack: stack, operand: binaryOperand, castTo: \.i32, binary: { $0.signed < $1.signed ? true : false })
     }
@@ -249,29 +298,13 @@ extension NumericInstruction {
         case divU(IntValueType)
         case remS(IntValueType)
         case remU(IntValueType)
-        case and(IntValueType)
-        case or(IntValueType)
-        case xor(IntValueType)
-        case shl(IntValueType)
-        case shrS(IntValueType)
-        case shrU(IntValueType)
-        case rotl(IntValueType)
-        case rotr(IntValueType)
 
         var type: NumericType {
             switch self {
             case let .divS(type),
                 let .divU(type),
                 let .remS(type),
-                let .remU(type),
-                let .and(type),
-                let .or(type),
-                let .xor(type),
-                let .shl(type),
-                let .shrS(type),
-                let .shrU(type),
-                let .rotl(type),
-                let .rotr(type):
+                let .remU(type):
                 return .int(type)
             }
         }
@@ -293,22 +326,6 @@ extension NumericInstruction {
             case .remU:
                 guard !value2.isZero else { throw Trap.integerDividedByZero }
                 return try Value.remainderUnsigned(value1, value2)
-            case .and:
-                return value1 & value2
-            case .or:
-                return value1 | value2
-            case .xor:
-                return value1 ^ value2
-            case .shl:
-                return value1 << value2
-            case .shrS:
-                return Value.rightShiftSigned(value1, value2)
-            case .shrU:
-                return Value.rightShiftUnsigned(value1, value2)
-            case .rotl:
-                return value1.rotl(value2)
-            case .rotr:
-                return value1.rotr(value2)
             }
         }
     }

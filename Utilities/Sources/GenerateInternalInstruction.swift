@@ -48,12 +48,17 @@ enum GenerateInternalInstruction {
 
     static let intValueTypes = ["i32", "i64"]
     static let valueTypes = intValueTypes + ["f32", "f64"]
-    static let numericBinaryInsts: [Instruction] = ["Add", "Sub", "Mul", "Eq", "Ne"].flatMap { op -> [Instruction] in
+    static let numericBinaryInsts: [Instruction] = [
+        "Add", "Sub", "Mul", "Eq", "Ne",
+    ].flatMap { op -> [Instruction] in
         valueTypes.map { type in
             Instruction(name: "\(type)\(op)", immediates: [Immediate(name: nil, type: "Instruction.BinaryOperand")])
         }
     }
-    static let numericIntBinaryInsts: [Instruction] = ["LtS", "LtU", "GtS", "GtU", "LeS", "LeU", "GeS", "GeU"].flatMap { op -> [Instruction] in
+    static let numericIntBinaryInsts: [Instruction] = [
+        "LtS", "LtU", "GtS", "GtU", "LeS", "LeU", "GeS", "GeU",
+        "And", "Or", "Xor", "Shl", "ShrS", "ShrU", "Rotl", "Rotr",
+    ].flatMap { op -> [Instruction] in
         intValueTypes.map { type in
             Instruction(name: "\(type)\(op)", immediates: [Immediate(name: nil, type: "Instruction.BinaryOperand")])
         }

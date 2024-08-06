@@ -188,6 +188,38 @@ extension ExecutionState {
             self.i32GeU(runtime: runtime, context: &context, stack: stack, binaryOperand: binaryOperand)
         case .i64GeU(let binaryOperand):
             self.i64GeU(runtime: runtime, context: &context, stack: stack, binaryOperand: binaryOperand)
+        case .i32And(let binaryOperand):
+            self.i32And(runtime: runtime, context: &context, stack: stack, binaryOperand: binaryOperand)
+        case .i64And(let binaryOperand):
+            self.i64And(runtime: runtime, context: &context, stack: stack, binaryOperand: binaryOperand)
+        case .i32Or(let binaryOperand):
+            self.i32Or(runtime: runtime, context: &context, stack: stack, binaryOperand: binaryOperand)
+        case .i64Or(let binaryOperand):
+            self.i64Or(runtime: runtime, context: &context, stack: stack, binaryOperand: binaryOperand)
+        case .i32Xor(let binaryOperand):
+            self.i32Xor(runtime: runtime, context: &context, stack: stack, binaryOperand: binaryOperand)
+        case .i64Xor(let binaryOperand):
+            self.i64Xor(runtime: runtime, context: &context, stack: stack, binaryOperand: binaryOperand)
+        case .i32Shl(let binaryOperand):
+            self.i32Shl(runtime: runtime, context: &context, stack: stack, binaryOperand: binaryOperand)
+        case .i64Shl(let binaryOperand):
+            self.i64Shl(runtime: runtime, context: &context, stack: stack, binaryOperand: binaryOperand)
+        case .i32ShrS(let binaryOperand):
+            self.i32ShrS(runtime: runtime, context: &context, stack: stack, binaryOperand: binaryOperand)
+        case .i64ShrS(let binaryOperand):
+            self.i64ShrS(runtime: runtime, context: &context, stack: stack, binaryOperand: binaryOperand)
+        case .i32ShrU(let binaryOperand):
+            self.i32ShrU(runtime: runtime, context: &context, stack: stack, binaryOperand: binaryOperand)
+        case .i64ShrU(let binaryOperand):
+            self.i64ShrU(runtime: runtime, context: &context, stack: stack, binaryOperand: binaryOperand)
+        case .i32Rotl(let binaryOperand):
+            self.i32Rotl(runtime: runtime, context: &context, stack: stack, binaryOperand: binaryOperand)
+        case .i64Rotl(let binaryOperand):
+            self.i64Rotl(runtime: runtime, context: &context, stack: stack, binaryOperand: binaryOperand)
+        case .i32Rotr(let binaryOperand):
+            self.i32Rotr(runtime: runtime, context: &context, stack: stack, binaryOperand: binaryOperand)
+        case .i64Rotr(let binaryOperand):
+            self.i64Rotr(runtime: runtime, context: &context, stack: stack, binaryOperand: binaryOperand)
         case .i32Clz(let unaryOperand):
             self.i32Clz(runtime: runtime, context: &context, stack: stack, unaryOperand: unaryOperand)
         case .i64Clz(let unaryOperand):
@@ -323,6 +355,22 @@ extension Instruction {
         case .i64GeS: return "i64GeS"
         case .i32GeU: return "i32GeU"
         case .i64GeU: return "i64GeU"
+        case .i32And: return "i32And"
+        case .i64And: return "i64And"
+        case .i32Or: return "i32Or"
+        case .i64Or: return "i64Or"
+        case .i32Xor: return "i32Xor"
+        case .i64Xor: return "i64Xor"
+        case .i32Shl: return "i32Shl"
+        case .i64Shl: return "i64Shl"
+        case .i32ShrS: return "i32ShrS"
+        case .i64ShrS: return "i64ShrS"
+        case .i32ShrU: return "i32ShrU"
+        case .i64ShrU: return "i64ShrU"
+        case .i32Rotl: return "i32Rotl"
+        case .i64Rotl: return "i64Rotl"
+        case .i32Rotr: return "i32Rotr"
+        case .i64Rotr: return "i64Rotr"
         case .i32Clz: return "i32Clz"
         case .i64Clz: return "i64Clz"
         case .i32Ctz: return "i32Ctz"

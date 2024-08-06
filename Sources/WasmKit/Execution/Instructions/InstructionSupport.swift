@@ -211,28 +211,11 @@ extension Instruction {
     static func i32RemS(_ op: BinaryOperand) -> Instruction { .numericIntBinary(.remS(.i32), op) }
     static func i32RemU(_ op: BinaryOperand) -> Instruction { .numericIntBinary(.remU(.i32), op) }
     
-    static func i32And(_ op: BinaryOperand) -> Instruction { .numericIntBinary(.and(.i32), op) }
-    static func i32Or(_ op: BinaryOperand) -> Instruction { .numericIntBinary(.or(.i32), op) }
-    static func i32Xor(_ op: BinaryOperand) -> Instruction { .numericIntBinary(.xor(.i32), op) }
-    static func i32Shl(_ op: BinaryOperand) -> Instruction { .numericIntBinary(.shl(.i32), op) }
-    static func i32ShrS(_ op: BinaryOperand) -> Instruction { .numericIntBinary(.shrS(.i32), op) }
-    static func i32ShrU(_ op: BinaryOperand) -> Instruction { .numericIntBinary(.shrU(.i32), op) }
-    static func i32Rotl(_ op: BinaryOperand) -> Instruction { .numericIntBinary(.rotl(.i32), op) }
-    static func i32Rotr(_ op: BinaryOperand) -> Instruction { .numericIntBinary(.rotr(.i32), op) }
-    
+
     static func i64DivS(_ op: BinaryOperand) -> Instruction { .numericIntBinary(.divS(.i64), op) }
     static func i64DivU(_ op: BinaryOperand) -> Instruction { .numericIntBinary(.divU(.i64), op) }
     static func i64RemS(_ op: BinaryOperand) -> Instruction { .numericIntBinary(.remS(.i64), op) }
     static func i64RemU(_ op: BinaryOperand) -> Instruction { .numericIntBinary(.remU(.i64), op) }
-
-    static func i64And(_ op: BinaryOperand) -> Instruction { .numericIntBinary(.and(.i64), op) }
-    static func i64Or(_ op: BinaryOperand) -> Instruction { .numericIntBinary(.or(.i64), op) }
-    static func i64Xor(_ op: BinaryOperand) -> Instruction { .numericIntBinary(.xor(.i64), op) }
-    static func i64Shl(_ op: BinaryOperand) -> Instruction { .numericIntBinary(.shl(.i64), op) }
-    static func i64ShrS(_ op: BinaryOperand) -> Instruction { .numericIntBinary(.shrS(.i64), op) }
-    static func i64ShrU(_ op: BinaryOperand) -> Instruction { .numericIntBinary(.shrU(.i64), op) }
-    static func i64Rotl(_ op: BinaryOperand) -> Instruction { .numericIntBinary(.rotl(.i64), op) }
-    static func i64Rotr(_ op: BinaryOperand) -> Instruction { .numericIntBinary(.rotr(.i64), op) }
 
     static func f32Abs(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.abs(.f32), op) }
     static func f32Neg(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.neg(.f32), op) }

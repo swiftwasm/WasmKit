@@ -445,28 +445,21 @@ extension Value {
         }
     }
 
-    func rotl(_ l: Self) -> Self {
-        switch (self, l) {
-        case let (.i32(rawValue), .i32(l)):
-            let shift = l % UInt32(type.bitWidth!)
-            return .i32(rawValue << shift | rawValue >> (32 - shift))
-        case let (.i64(rawValue), .i64(l)):
-            let shift = l % UInt64(type.bitWidth!)
-            return .i64(rawValue << shift | rawValue >> (64 - shift))
-        default: fatalError("Invalid type \(type) for `Value.\(#function)` implementation")
-        }
+    static func i32Rotl(_ lhs: UInt32, _ rhs: UInt32) -> Value {
+        let shift = rhs % 32
+        return .i32(lhs << shift | lhs >> (32 - shift))
     }
-
-    func rotr(_ r: Self) -> Self {
-        switch (self, r) {
-        case let (.i32(rawValue), .i32(r)):
-            let shift = r % UInt32(type.bitWidth!)
-            return .i32(rawValue >> shift | rawValue << (32 - shift))
-        case let (.i64(rawValue), .i64(r)):
-            let shift = r % UInt64(type.bitWidth!)
-            return .i64(rawValue >> shift | rawValue << (64 - shift))
-        default: fatalError("Invalid type \(type) for `Value.\(#function)` implementation")
-        }
+    static func i64Rotl(_ lhs: UInt64, _ rhs: UInt64) -> Value {
+        let shift = rhs % 64
+        return .i64(lhs << shift | lhs >> (64 - shift))
+    }
+    static func i32Rotr(_ lhs: UInt32, _ rhs: UInt32) -> Value {
+        let shift = rhs % 32
+        return .i32(lhs >> shift | lhs << (32 - shift))
+    }
+    static func i64Rotr(_ lhs: UInt64, _ rhs: UInt64) -> Value {
+        let shift = rhs % 64
+        return .i64(lhs >> shift | lhs << (64 - shift))
     }
 
     static prefix func - (_ value: Self) -> Self {
@@ -511,64 +504,31 @@ extension Value {
         }
     }
 
-    static func & (lhs: Self, rhs: Self) -> Self {
-        switch (lhs, rhs) {
-        case let (.i32(lhs), .i32(rhs)): return .i32(lhs & rhs)
-        case let (.i64(lhs), .i64(rhs)): return .i64(lhs & rhs)
-        default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value.\(#function)` implementation")
-        }
+    static func i32Shl(_ lhs: UInt32, _ rhs: UInt32) -> Value {
+        let shift = rhs % 32
+        return .i32(lhs << shift)
+    }
+    static func i64Shl(_ lhs: UInt64, _ rhs: UInt64) -> Value {
+        let shift = rhs % 64
+        return .i64(lhs << shift)
     }
 
-    static func | (lhs: Self, rhs: Self) -> Self {
-        switch (lhs, rhs) {
-        case let (.i32(lhs), .i32(rhs)): return .i32(lhs | rhs)
-        case let (.i64(lhs), .i64(rhs)): return .i64(lhs | rhs)
-        default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value.\(#function)` implementation")
-        }
+    static func i32ShrS(_ lhs: UInt32, _ rhs: UInt32) -> Value {
+        let shift = rhs.signed % 32
+        return .i32((lhs.signed >> shift.unsigned).unsigned)
+    }
+    static func i64ShrS(_ lhs: UInt64, _ rhs: UInt64) -> Value {
+        let shift = rhs.signed % 64
+        return .i64((lhs.signed >> shift.unsigned).unsigned)
     }
 
-    static func ^ (lhs: Self, rhs: Self) -> Self {
-        switch (lhs, rhs) {
-        case let (.i32(lhs), .i32(rhs)): return .i32(lhs ^ rhs)
-        case let (.i64(lhs), .i64(rhs)): return .i64(lhs ^ rhs)
-        default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value.\(#function)` implementation")
-        }
+    static func i32ShrU(_ lhs: UInt32, _ rhs: UInt32) -> Value {
+        let shift = rhs % 32
+        return .i32(lhs >> shift)
     }
-
-    static func << (lhs: Self, rhs: Self) -> Self {
-        switch (lhs, rhs) {
-        case let (.i32(lhs), .i32(rhs)):
-            let shift = rhs % 32
-            return .i32(lhs << shift)
-        case let (.i64(lhs), .i64(rhs)):
-            let shift = rhs % 64
-            return .i64(lhs << shift)
-        default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value.\(#function)` implementation")
-        }
-    }
-
-    static func rightShiftSigned(_ lhs: Self, _ rhs: Self) -> Self {
-        switch (lhs, rhs) {
-        case let (.i32(lhs), .i32(rhs)):
-            let shift = rhs.signed % 32
-            return .i32((lhs.signed >> shift.unsigned).unsigned)
-        case let (.i64(lhs), .i64(rhs)):
-            let shift = rhs.signed % 64
-            return .i64((lhs.signed >> shift.unsigned).unsigned)
-        default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value.\(#function)` implementation")
-        }
-    }
-
-    static func rightShiftUnsigned(_ lhs: Self, _ rhs: Self) -> Self {
-        switch (lhs, rhs) {
-        case let (.i32(lhs), .i32(rhs)):
-            let shift = rhs % 32
-            return .i32(lhs >> shift)
-        case let (.i64(lhs), .i64(rhs)):
-            let shift = rhs % 64
-            return .i64(lhs >> shift)
-        default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value.\(#function)` implementation")
-        }
+    static func i64ShrU(_ lhs: UInt64, _ rhs: UInt64) -> Value {
+        let shift = rhs % 64
+        return .i64(lhs >> shift)
     }
 
     static func divisionSigned(_ lhs: Self, _ rhs: Self) throws -> Self {
