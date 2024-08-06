@@ -8,8 +8,20 @@ final class HostModuleTests: XCTestCase {
     func testImportMemory() throws {
         let runtime = Runtime()
         let memoryType = MemoryType(min: 1, max: nil)
-        let memoryAddr = runtime.store.allocate(memoryType: memoryType)
-        try runtime.store.register(HostModule(memories: ["memory": memoryAddr]), as: "env")
+        let memory = runtime.store.allocator.allocate(memoryType: memoryType)
+        try runtime.store.register(
+            HostModule(
+                memories: [
+                    "memory": Memory(
+                        handle: memory,
+                        allocator: runtime.store
+                            .allocator
+                    )
+                ]
+            ),
+            as: "env",
+            runtime: runtime
+        )
 
         let module = try parseWasm(
             bytes: wat2wasm(
@@ -20,7 +32,7 @@ final class HostModuleTests: XCTestCase {
                 """))
         XCTAssertNoThrow(try runtime.instantiate(module: module))
         // Ensure the allocated address is valid
-        _ = runtime.store.memory(at: memoryAddr)
+        _ = memory.data
     }
 
     func testReentrancy() throws {
@@ -64,7 +76,7 @@ final class HostModuleTests: XCTestCase {
                 },
             ]
         )
-        try runtime.store.register(hostModule, as: "env")
+        try runtime.store.register(hostModule, as: "env", runtime: runtime)
         let instance = try runtime.instantiate(module: module)
         // Check foo(wasm) -> bar(host) -> baz(wasm) -> qux(host)
         _ = try runtime.invoke(instance, function: "foo")

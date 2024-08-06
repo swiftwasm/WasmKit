@@ -82,24 +82,24 @@ public class GuestTimeProfiler: RuntimeInterceptor {
         }
     }
 
-    public func onEnterFunction(_ address: FunctionAddress, store: Store) {
-        let functionName = try? store.nameRegistry.lookup(address)
+    public func onEnterFunction(_ function: Function, store: Store) {
+        let functionName = try? store.nameRegistry.lookup(function.handle)
         let event = Event(
             ph: .begin, pid: 1,
-            name: functionName ?? "unknown function(0x\(String(address, radix: 16)))",
+            name: functionName ?? "unknown function(0x\(function))",
             ts: getDurationSinceStart()
         )
         addEventLine(event)
     }
 
-    public func onExitFunction(_ address: FunctionAddress, store: Store) {
-        let functionName = try? store.nameRegistry.lookup(address)
-        let event = Event(
-            ph: .end, pid: 1,
-            name: functionName ?? "unknown function(0x\(String(address, radix: 16)))",
-            ts: getDurationSinceStart()
-        )
-        addEventLine(event)
+    public func onExitFunction(_ address: Function, store: Store) {
+//        let functionName = try? store.nameRegistry.lookup(address)
+//        let event = Event(
+//            ph: .end, pid: 1,
+//            name: functionName ?? "unknown function(0x\(String(address, radix: 16)))",
+//            ts: getDurationSinceStart()
+//        )
+//        addEventLine(event)
     }
 
     public func finalize() {

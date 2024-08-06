@@ -13,18 +13,24 @@ public struct CanonicalCallContext {
     /// The options used for lifting or lowering operations.
     public let options: CanonicalOptions
     /// The module instance that defines the lift/lower operation.
-    public let moduleInstance: ModuleInstance
+    public let instance: Instance
     /// The executing `Runtime` instance
     public let runtime: Runtime
     /// A reference to the guest memory.
-    public var guestMemory: WasmKitGuestMemory {
-        WasmKitGuestMemory(store: runtime.store, address: options.memory)
+    public var guestMemory: Memory {
+//        WasmKitGuestMemory(store: runtime.store, address: options.memory)
+        fatalError()
     }
 
-    public init(options: CanonicalOptions, moduleInstance: ModuleInstance, runtime: Runtime) {
+    public init(options: CanonicalOptions, instance: Instance, runtime: Runtime) {
         self.options = options
-        self.moduleInstance = moduleInstance
+        self.instance = instance
         self.runtime = runtime
+    }
+    
+    @available(*, deprecated)
+    public init(options: CanonicalOptions, moduleInstance: Instance, runtime: Runtime) {
+        self.init(options: options, instance: moduleInstance, runtime: runtime)
     }
 
     /// Call `cabi_realloc` export with the given arguments.
@@ -49,23 +55,23 @@ public struct CanonicalCallContext {
         return UnsafeGuestRawPointer(memorySpace: guestMemory, offset: new)
     }
 }
-
-public struct WasmKitGuestMemory: GuestMemory {
-    private let store: Store
-    private let address: MemoryAddress
-
-    /// Creates a new memory instance from the given store and address
-    public init(store: Store, address: MemoryAddress) {
-        self.store = store
-        self.address = address
-    }
-
-    /// Executes the given closure with a mutable buffer pointer to the host memory region mapped as guest memory.
-    public func withUnsafeMutableBufferPointer<T>(offset: UInt, count: Int, _ body: (UnsafeMutableRawBufferPointer) throws -> T) rethrows -> T {
-        try store.withMemory(at: address) { memory in
-            try memory.data.withUnsafeMutableBufferPointer { buffer in
-                try body(UnsafeMutableRawBufferPointer(start: buffer.baseAddress! + Int(offset), count: count))
-            }
-        }
-    }
-}
+//
+//public struct WasmKitGuestMemory: GuestMemory {
+//    private let store: Store
+//    private let address: InternalMemory
+//
+//    /// Creates a new memory instance from the given store and address
+//    public init(store: Store, memory: InternalMemory) {
+//        self.store = store
+//        self.address = address
+//    }
+//
+//    /// Executes the given closure with a mutable buffer pointer to the host memory region mapped as guest memory.
+//    public func withUnsafeMutableBufferPointer<T>(offset: UInt, count: Int, _ body: (UnsafeMutableRawBufferPointer) throws -> T) rethrows -> T {
+//        try store.withMemory(at: address) { memory in
+//            try memory.data.withUnsafeMutableBufferPointer { buffer in
+//                try body(UnsafeMutableRawBufferPointer(start: buffer.baseAddress! + Int(offset), count: count))
+//            }
+//        }
+//    }
+//}

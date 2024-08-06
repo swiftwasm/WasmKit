@@ -1,0 +1,5 @@
+- Variadic width instructions
+- Constant space on stack
+  - Trade space and time on prologue for time by fewer instructions
+  - |locals|dynamic stack| -> |locals|dynamic stack|constant|
+- Stack caching

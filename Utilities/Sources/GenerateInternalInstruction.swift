@@ -7,18 +7,24 @@ enum GenerateInternalInstruction {
         let name: String?
         let type: String
     }
+    enum RegisterUse {
+        case none
+        case read
+        case write
+    }
+
     struct Instruction {
         let name: String
         let isControl: Bool
         let mayThrow: Bool
         let mayUpdateFrame: Bool
-        let useCurrentMemory: Bool
+        let useCurrentMemory: RegisterUse
         let immediates: [Immediate]
 
         init(
             name: String, isControl: Bool = false,
             mayThrow: Bool = false, mayUpdateFrame: Bool = false,
-            useCurrentMemory: Bool = false,
+            useCurrentMemory: RegisterUse = .none,
             immediates: [Immediate]
         ) {
             self.name = name
@@ -31,17 +37,27 @@ enum GenerateInternalInstruction {
         }
 
         static var commonParameters: [(label: String, type: String, isInout: Bool)] {
-            [("runtime", "Runtime", false), ("context", "StackContext", true), ("stack", "FrameBase", false)]
+            [("context", "StackContext", true), ("stack", "FrameBase", false)]
         }
 
-        var parameters: [(label: String, type: String, isInout: Bool)] {
+        typealias Parameter = (label: String, type: String, isInout: Bool)
+        var parameters: [Parameter] {
             let immediates = immediates.map {
                 let label = $0.name ?? camelCase(pascalCase: String($0.type.split(separator: ".").last!))
                 return (label, $0.type, false)
             }
+            let memoryParameters: [Parameter]
+            switch useCurrentMemory {
+            case .none:
+                memoryParameters = []
+            case .read:
+                memoryParameters = [("md", "Md", false), ("ms", "Ms", false)]
+            case .write:
+                memoryParameters = [("md", "Md", true), ("ms", "Ms", true)]
+            }
             return
                 (Self.commonParameters
-                + (useCurrentMemory ? [("currentMemory", "CurrentMemory", false)] : [])
+                + memoryParameters
                 + immediates)
         }
     }
@@ -107,7 +123,7 @@ enum GenerateInternalInstruction {
         "i64Load32S",
         "i64Load32U",
     ].map {
-        Instruction(name: $0, mayThrow: true, useCurrentMemory: true, immediates: [Immediate(name: nil, type: "Instruction.LoadOperand")])
+        Instruction(name: $0, mayThrow: true, useCurrentMemory: .read, immediates: [Immediate(name: nil, type: "Instruction.LoadOperand")])
     }
     static let memoryStoreInsts: [Instruction] = [
         "i32Store",
@@ -120,12 +136,12 @@ enum GenerateInternalInstruction {
         "i64Store16",
         "i64Store32",
     ].map {
-        Instruction(name: $0, mayThrow: true, useCurrentMemory: true, immediates: [Immediate(name: nil, type: "Instruction.StoreOperand")])
+        Instruction(name: $0, mayThrow: true, useCurrentMemory: .read, immediates: [Immediate(name: nil, type: "Instruction.StoreOperand")])
     }
     static let memoryLoadStoreInsts: [Instruction] = memoryLoadInsts + memoryStoreInsts
     static let memoryOpInsts: [Instruction] = [
         Instruction(name: "memorySize", immediates: [Immediate(name: nil, type: "Instruction.MemorySizeOperand")]),
-        Instruction(name: "memoryGrow", mayThrow: true, immediates: [
+        Instruction(name: "memoryGrow", mayThrow: true, useCurrentMemory: .write, immediates: [
             Immediate(name: nil, type: "Instruction.MemoryGrowOperand"),
         ]),
         Instruction(name: "memoryInit", mayThrow: true, immediates: [
@@ -161,10 +177,30 @@ enum GenerateInternalInstruction {
     static let instructions: [Instruction] =
         [
             // Variable
+            Instruction(name: "copyStack", immediates: [Immediate(name: nil, type: "Instruction.CopyStackOperand")]),
             Instruction(name: "globalGet", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.GlobalGetOperand")]),
             Instruction(name: "globalSet", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.GlobalSetOperand")]),
-            Instruction(name: "copyStack", immediates: [Immediate(name: nil, type: "Instruction.CopyStackOperand")]),
             // Controls
+            Instruction(
+                name: "call", isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write,
+                immediates: [
+                    Immediate(name: nil, type: "Instruction.CallOperand")
+                ]),
+            Instruction(
+                name: "compilingCall", isControl: true, mayThrow: true, mayUpdateFrame: true,
+                immediates: [
+                    Immediate(name: nil, type: "Instruction.CompilingCallOperand")
+                ]),
+            Instruction(
+                name: "internalCall", isControl: true, mayThrow: true, mayUpdateFrame: true,
+                immediates: [
+                    Immediate(name: nil, type: "Instruction.InternalCallOperand")
+                ]),
+            Instruction(
+                name: "callIndirect", isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write,
+                immediates: [
+                    Immediate(name: nil, type: "Instruction.CallIndirectOperand")
+                ]),
             Instruction(name: "unreachable", isControl: true, mayThrow: true, immediates: []),
             Instruction(name: "nop", isControl: true, mayThrow: true, immediates: []),
             Instruction(
@@ -197,20 +233,10 @@ enum GenerateInternalInstruction {
                 immediates: [
                     Immediate(name: nil, type: "Instruction.BrTableOperand")
                 ]),
-            Instruction(name: "`return`", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: [
+            Instruction(name: "`return`", isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write, immediates: [
                 Immediate(name: nil, type: "Instruction.ReturnOperand")
             ]),
-            Instruction(
-                name: "call", isControl: true, mayThrow: true, mayUpdateFrame: true,
-                immediates: [
-                    Immediate(name: nil, type: "Instruction.CallOperand")
-                ]),
-            Instruction(
-                name: "callIndirect", isControl: true, mayThrow: true, mayUpdateFrame: true,
-                immediates: [
-                    Immediate(name: nil, type: "Instruction.CallIndirectOperand")
-                ]),
-            Instruction(name: "endOfFunction", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: [
+            Instruction(name: "endOfFunction", isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write, immediates: [
                 Immediate(name: nil, type: "Instruction.ReturnOperand")
             ]),
             Instruction(name: "endOfExecution", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: []),
@@ -231,7 +257,7 @@ enum GenerateInternalInstruction {
     static func generateDispatcher(instructions: [Instruction]) -> String {
         let doExecuteParams =
             [("instruction", "Instruction", false)]
-            + [("currentMemory", "CurrentMemory", false)]
+            + [("md", "Md", true), ("ms", "Ms", true)]
             + Instruction.commonParameters
         var output = """
             extension ExecutionState {

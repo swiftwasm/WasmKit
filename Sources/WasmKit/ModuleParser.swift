@@ -65,9 +65,9 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
     var types: [FunctionType] = []
     var typeIndices: [TypeIndex] = []
     var codes: [Code] = []
-    var tables: [Table] = []
-    var memories: [Memory] = []
-    var globals: [Global] = []
+    var tables: [TableType] = []
+    var memories: [MemoryType] = []
+    var globals: [WasmParser.Global] = []
     var elements: [ElementSegment] = []
     var data: [DataSegment] = []
     var start: FunctionIndex?
@@ -96,10 +96,10 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
             typeIndices = types
         case .tableSection(let tableSection):
             try orderTracking.track(order: .table)
-            tables = tableSection
+            tables = tableSection.map(\.type)
         case .memorySection(let memorySection):
             try orderTracking.track(order: .memory)
-            memories = memorySection
+            memories = memorySection.map(\.type)
         case .globalSection(let globalSection):
             try orderTracking.track(order: .global)
             globals = globalSection
@@ -138,35 +138,23 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
         )
     }
 
-    let translatorContext = TranslatorContext(
+    let translatorContext = TranslatorModuleContext(
         typeSection: types,
         importSection: imports,
         functionSection: typeIndices,
-        globals: globals,
+        globals: globals.map(\.type),
         memories: memories,
         tables: tables
     )
     let allocator = ISeqAllocator()
-    let functions = try codes.enumerated().map { [hasDataCount = parser.hasDataCount, features] index, code in
+    let functions = try codes.enumerated().map { index, code in
         // SAFETY: The number of typeIndices is guaranteed to be the same as the number of codes
         let funcTypeIndex = typeIndices[index]
         let funcType = try translatorContext.resolveType(funcTypeIndex)
         return GuestFunction(
-            type: typeIndices[index], locals: code.locals, allocator: allocator,
-            body: {
-                var translator = InstructionTranslator(
-                    allocator: allocator,
-                    module: translatorContext,
-                    type: funcType, locals: code.locals
-                )
-
-                try WasmParser.parseExpression(
-                    bytes: Array(code.expression),
-                    features: features, hasDataCount: hasDataCount,
-                    visitor: &translator
-                )
-                return try translator.finalize()
-            })
+            type: funcType,
+            code: code
+        )
     }
 
     return Module(
@@ -176,8 +164,11 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
         start: start,
         imports: imports,
         exports: exports,
+        globals: globals,
         customSections: customSections,
         translatorContext: translatorContext,
-        allocator: allocator
+        allocator: allocator,
+        features: features,
+        hasDataCount: dataCount != nil
     )
 }

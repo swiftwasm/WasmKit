@@ -10,6 +10,9 @@ struct StackContext {
     var frameBase: ExecutionState.FrameBase {
         return ExecutionState.FrameBase(pointer: self.valueStack.frameBase)
     }
+    var currentInstance: InternalInstance {
+        currentFrame.instance
+    }
 
     init() {
         let limit = UInt16.max
@@ -19,52 +22,42 @@ struct StackContext {
 
     mutating func pushFrame(
         iseq: InstructionSequence,
-        arity: Int,
-        module: ModuleAddress,
-        argc: Int,
+        instance: InternalInstance,
         numberOfNonParameterLocals: Int,
         returnPC: ProgramCounter,
-        spAddend: Instruction.Register,
-        address: FunctionAddress? = nil
+        spAddend: Instruction.Register
     ) throws {
         guard frames.count < limit else {
             throw Trap.callStackExhausted
         }
-        let baseStackAddress = BaseStackAddress(
-            valueFrameIndex: valueStack.frameBaseOffset
-        )
-        try valueStack.extend(addend: spAddend, maxStackHeight: iseq.maxStackHeight)
-        let base = FunctionInstance.nonParamLocalBase(parameters: argc, results: arity)
+        let savedFrameBase = valueStack.frameBase
+        let frameBase = try valueStack.extend(addend: spAddend, maxStackHeight: iseq.maxStackHeight)
         // Initialize the locals with zeros (all types of value have the same representation)
-        valueStack.frameBase.advanced(by: Int(base))
-            .initialize(repeating: .default, count: numberOfNonParameterLocals)
-        let frame = Frame(module: module, baseStackAddress: baseStackAddress, iseq: iseq, returnPC: returnPC, address: address)
+        frameBase.initialize(repeating: .default, count: numberOfNonParameterLocals)
+        let frame = Frame(instance: instance, savedFrameBase: savedFrameBase, returnPC: returnPC)
         frames.push(frame)
         self.currentFrame = frame
     }
 
-    mutating func popFrame() -> ModuleAddress {
+    mutating func popFrame() -> InternalInstance {
         let popped = self.frames.pop()
         self.currentFrame = self.frames.peek()
-        let resultsBase = popped.baseStackAddress.valueFrameIndex
-        self.valueStack.truncate(length: resultsBase)
-        return popped.module
-    }
-
-    subscript(register: Instruction.Register) -> UntypedValue {
-        get { valueStack[Int(register)] }
-        set { valueStack[Int(register)] = newValue }
+        self.valueStack.frameBase = popped.savedFrameBase
+        return popped.instance
     }
 
     func deallocate() {
         self.valueStack.deallocate()
         self.frames.deallocate()
     }
+
+    func dump(store: Store) throws {
+    }
 }
 
 struct ValueStack {
     private let values: UnsafeMutableBufferPointer<UntypedValue>
-    private(set) var frameBase: UnsafeMutablePointer<UntypedValue>
+    fileprivate(set) var frameBase: UnsafeMutablePointer<UntypedValue>
     var baseAddress: UnsafeMutablePointer<UntypedValue> {
         values.baseAddress!
     }
@@ -96,15 +89,13 @@ struct ValueStack {
         }
     }
 
-    mutating func extend(addend: Instruction.Register, maxStackHeight: Int) throws {
-        frameBase = frameBase.advanced(by: Int(addend))
-        guard frameBase.advanced(by: maxStackHeight) < values.baseAddress!.advanced(by: values.count) else {
+    mutating func extend(addend: Instruction.Register, maxStackHeight: Int) throws -> UnsafeMutablePointer<UntypedValue> {
+        let newFrameBase = frameBase.advanced(by: Int(addend))
+        guard newFrameBase.advanced(by: maxStackHeight) < values.baseAddress!.advanced(by: values.count) else {
             throw Trap.callStackExhausted
         }
-    }
-
-    mutating func truncate(length: Int) {
-        self.frameBase = self.values.baseAddress!.advanced(by: length)
+        frameBase = newFrameBase
+        return newFrameBase
     }
 }
 
@@ -178,31 +169,24 @@ struct BaseStackAddress {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#frames>
 struct Frame {
-    let module: ModuleAddress
-    let baseStackAddress: BaseStackAddress
-    let iseq: InstructionSequence
+    let instance: InternalInstance
+    let savedFrameBase: UnsafeMutablePointer<UntypedValue>
     let returnPC: ProgramCounter
-    /// An optional function address for debugging/profiling purpose
-    let address: FunctionAddress?
 
     init(
-        module: ModuleAddress,
-        baseStackAddress: BaseStackAddress,
-        iseq: InstructionSequence,
-        returnPC: ProgramCounter,
-        address: FunctionAddress? = nil
+        instance: InternalInstance,
+        savedFrameBase: UnsafeMutablePointer<UntypedValue>,
+        returnPC: ProgramCounter
     ) {
-        self.module = module
-        self.baseStackAddress = baseStackAddress
-        self.iseq = iseq
+        self.instance = instance
+        self.savedFrameBase = savedFrameBase
         self.returnPC = returnPC
-        self.address = address
     }
 }
 
 extension Frame: Equatable {
     static func == (_ lhs: Frame, _ rhs: Frame) -> Bool {
-        lhs.module == rhs.module
+        lhs.instance == rhs.instance
     }
 }
 
@@ -275,7 +259,11 @@ struct UntypedValue: Equatable {
         return storage & Self.isNullMaskPattern != 0
     }
 
-    
+    static func asI32(_ v: UntypedValue) -> UInt32 { v.i32 }
+    static func asI64(_ v: UntypedValue) -> UInt64 { v.i64}
+    static func asF32(_ v: UntypedValue) -> UInt32 { v.f32 }
+    static func asF64(_ v: UntypedValue) -> UInt64 { v.f64}
+
     func asReference(_ type: ReferenceType) -> Reference {
         func decodeOptionalInt() -> Int? {
             guard storage & Self.isNullMaskPattern == 0 else { return nil }

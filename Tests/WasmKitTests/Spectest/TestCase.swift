@@ -1,7 +1,7 @@
 import Foundation
 import SystemPackage
 import WAT
-import WasmKit
+@testable import WasmKit
 import WasmParser
 
 struct TestCase {
@@ -11,21 +11,26 @@ struct TestCase {
 
     let content: Wast
     let path: String
+    var relativePath: String {
+        // Relative path from the current working directory
+        let currentDirectory = FileManager.default.currentDirectoryPath
+        if path.hasPrefix(currentDirectory) {
+            return String(path.dropFirst(currentDirectory.count + 1))
+        }
+        return path
+    }
 
     static func load(include: [String], exclude: [String], in path: [String], log: ((String) -> Void)? = nil) throws -> [TestCase] {
         let fileManager = FileManager.default
         var filePaths: [URL] = []
         for path in path {
-            let dirPath: String
             let filePath = FilePath(path)
             if isDirectory(filePath) {
-                dirPath = path
                 filePaths += try self.computeTestSources(inDirectory: filePath, fileManager: fileManager).map {
-                    URL(fileURLWithPath: dirPath).appendingPathComponent($0)
+                    URL(fileURLWithPath: path).appendingPathComponent($0)
                 }
             } else if fileManager.isReadableFile(atPath: path) {
                 let url = URL(fileURLWithPath: path)
-                dirPath = url.deletingLastPathComponent().path
                 filePaths += [url]
             } else {
                 throw Error.invalidPath
@@ -102,14 +107,14 @@ extension TestCase {
 
         try runtime.store.register(hostModuleInstance, as: "spectest")
 
-        var currentModuleInstance: ModuleInstance?
+        var currentInstance: Instance?
         let rootPath = FilePath(path).removingLastComponent().string
         var content = content
         do {
             while let (directive, location) = try content.nextDirective() {
                 directive.run(
                     runtime: runtime,
-                    module: &currentModuleInstance,
+                    instance: &currentInstance,
                     rootPath: rootPath
                 ) { command, result in
                     handler(self, location, result)
@@ -128,18 +133,18 @@ extension TestCase {
 extension WastDirective {
     func run(
         runtime: Runtime,
-        module currentModuleInstance: inout ModuleInstance?,
+        instance currentInstance: inout Instance?,
         rootPath: String,
         handler: (WastDirective, Result) -> Void
     ) {
 
-        func deriveModuleInstance(from execute: WastExecute) throws -> ModuleInstance? {
+        func deriveModuleInstance(from execute: WastExecute) throws -> Instance? {
             switch execute {
             case .invoke(let invoke):
                 if let module = invoke.module {
-                    return runtime.store.namedModuleInstances[module]
+                    return runtime.store.lookupInstance(module)
                 } else {
-                    return currentModuleInstance
+                    return currentInstance
                 }
             case .wat(var wat):
                 let module = try parseModule(rootPath: rootPath, moduleSource: .binary(wat.encode()))
@@ -147,16 +152,16 @@ extension WastDirective {
                 return instance
             case .get(let module, _):
                 if let module {
-                    return runtime.store.namedModuleInstances[module]
+                    return runtime.store.lookupInstance(module)
                 } else {
-                    return currentModuleInstance
+                    return currentInstance
                 }
             }
         }
 
         switch self {
         case .module(let moduleDirective):
-            currentModuleInstance = nil
+            currentInstance = nil
 
             let module: Module
             do {
@@ -166,7 +171,7 @@ extension WastDirective {
             }
 
             do {
-                currentModuleInstance = try runtime.instantiate(module: module, name: moduleDirective.id)
+                currentInstance = try runtime.instantiate(module: module, name: moduleDirective.id)
             } catch {
                 return handler(self, .failed("module could not be instantiated: \(error)"))
             }
@@ -174,17 +179,17 @@ extension WastDirective {
             return handler(self, .passed)
 
         case .register(let name, let moduleId):
-            let module: ModuleInstance
+            let module: Instance
             if let moduleId {
-                guard let found = runtime.store.namedModuleInstances[moduleId] else {
+                guard let found = runtime.store.lookupInstance(moduleId) else {
                     return handler(self, .failed("module \(moduleId) not found"))
                 }
                 module = found
             } else {
-                guard let currentModuleInstance else {
+                guard let currentInstance else {
                     return handler(self, .failed("no current module to register"))
                 }
-                module = currentModuleInstance
+                module = currentInstance
             }
 
             do {
@@ -194,7 +199,7 @@ extension WastDirective {
             }
 
         case .assertMalformed(let module, let message):
-            currentModuleInstance = nil
+            currentInstance = nil
             guard case .binary = module.source else {
                 return handler(self, .skipped("assert_malformed is only supported for binary modules for now"))
             }
@@ -209,7 +214,7 @@ extension WastDirective {
             return handler(self, .failed("module should not be parsed: expected \"\(message)\""))
 
         case .assertTrap(execute: .wat(var wat), let message):
-            currentModuleInstance = nil
+            currentInstance = nil
 
             let module: Module
             do {
@@ -234,7 +239,7 @@ extension WastDirective {
             return handler(self, .passed)
 
         case .assertReturn(let execute, let results):
-            let moduleInstance: ModuleInstance?
+            let moduleInstance: Instance?
             do {
                 moduleInstance = try deriveModuleInstance(from: execute)
             } catch {
@@ -274,7 +279,7 @@ extension WastDirective {
             }
 
         case .assertTrap(let execute, let message):
-            let moduleInstance: ModuleInstance?
+            let moduleInstance: Instance?
             do {
                 moduleInstance = try deriveModuleInstance(from: execute)
             } catch {
@@ -303,7 +308,7 @@ extension WastDirective {
                 return handler(self, .failed("assert_trap is not implemented non-invoke actions"))
             }
         case .assertExhaustion(let call, let message):
-            let moduleInstance: ModuleInstance?
+            let moduleInstance: Instance?
             do {
                 moduleInstance = try deriveModuleInstance(from: .invoke(call))
             } catch {
@@ -325,7 +330,7 @@ extension WastDirective {
                 return handler(self, .failed("\(error)"))
             }
         case .assertUnlinkable(let wat, let message):
-            currentModuleInstance = nil
+            currentInstance = nil
 
             let module: Module
             do {
@@ -349,7 +354,7 @@ extension WastDirective {
             return handler(self, .skipped("validation is no implemented yet"))
 
         case .invoke(let invoke):
-            let moduleInstance: ModuleInstance?
+            let moduleInstance: Instance?
             do {
                 moduleInstance = try deriveModuleInstance(from: .invoke(invoke))
             } catch {
@@ -518,4 +523,15 @@ internal func isDirectory(_ path: FilePath) -> Bool {
         try? fd?.close()
         return isDirectory
     #endif
+}
+
+extension Store {
+    fileprivate func lookupInstance(_ name: String) -> Instance? {
+        return namedModuleInstances[name].map {
+            Instance(
+                handle: $0,
+                allocator: allocator
+            )
+        }
+    }
 }

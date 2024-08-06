@@ -56,12 +56,15 @@ public struct Module {
     let elements: [ElementSegment]
     let data: [DataSegment]
     let start: FunctionIndex?
+    let globals: [WasmParser.Global]
     public let imports: [Import]
     public let exports: [Export]
     public let customSections: [CustomSection]
 
-    let translatorContext: TranslatorContext
+    let translatorContext: TranslatorModuleContext
     let allocator: ISeqAllocator
+    let features: WasmFeatureSet
+    let hasDataCount: Bool
 
     init(
         functions: [GuestFunction],
@@ -70,9 +73,12 @@ public struct Module {
         start: FunctionIndex?,
         imports: [Import],
         exports: [Export],
+        globals: [WasmParser.Global],
         customSections: [CustomSection],
-        translatorContext: TranslatorContext,
-        allocator: ISeqAllocator
+        translatorContext: TranslatorModuleContext,
+        allocator: ISeqAllocator,
+        features: WasmFeatureSet,
+        hasDataCount: Bool
     ) {
         self.functions = functions
         self.elements = elements
@@ -80,15 +86,20 @@ public struct Module {
         self.start = start
         self.imports = imports
         self.exports = exports
+        self.globals = globals
         self.customSections = customSections
         self.translatorContext = translatorContext
         self.allocator = allocator
+        self.features = features
+        self.hasDataCount = hasDataCount
     }
 
     /// Materialize lazily-computed elements in this module
     public mutating func materializeAll() throws {
-        for functionIndex in functions.indices {
-            _ = try functions[functionIndex].body
+        let allocator = ISeqAllocator()
+        let funcTypeInterner = Interner<FunctionType>()
+        for function in functions {
+            _ = try function.compile(module: self, funcTypeInterner: funcTypeInterner, allocator: allocator)
         }
     }
 
@@ -103,22 +114,30 @@ public struct Module {
                 }
             }
         }
+        let funcTypeInterner = Interner<FunctionType>()
         for (offset, function) in functions.enumerated() {
-            var function = function
             let index = translatorContext.imports.numberOfFunctions + offset
             target.write("==== Function[\(index)]")
             if let name = nameMap[UInt32(index)] {
                 target.write(" '\(name)'")
             }
             target.write(" ====\n")
-            try function.body.write(to: &target)
+            let iseq = try function.compile(
+                module: self,
+                funcTypeInterner: funcTypeInterner,
+                allocator: allocator
+            )
+            iseq.write(to: &target)
         }
     }
 }
 
 extension Module {
-    var internalGlobals: [Global] {
-        return translatorContext.internalGlobals
+    var globalTypes: [GlobalType] {
+        return translatorContext.globalTypes
+    }
+    var internalGlobalTypes: ArraySlice<GlobalType> {
+        return translatorContext.globalTypes[translatorContext.imports.numberOfGlobals...]
     }
     var internalMemories: ArraySlice<MemoryType> {
         return translatorContext.memoryTypes[translatorContext.imports.numberOfMemories...]
@@ -152,33 +171,29 @@ typealias LabelIndex = UInt32
 
 // MARK: - Module Entities
 
+/// TODO: Rename to `GuestFunctionEntity`
+///
 /// An executable function representation in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#functions>
 struct GuestFunction {
-    init(
-        type: TypeIndex,
-        locals: [WasmParser.ValueType],
-        allocator: ISeqAllocator,
-        body: @escaping () throws -> InstructionSequence
-    ) {
-        self.type = type
-        self.numberOfNonParameterLocals = locals.count
-        self.materializer = body
-    }
+    let type: FunctionType
+    let code: Code
 
-    public let type: TypeIndex
-    let numberOfNonParameterLocals: Int
-    private var _bodyStorage: InstructionSequence? = nil
-    private let materializer: () throws -> InstructionSequence
-    var body: InstructionSequence {
-        mutating get throws {
-            if let materialized = _bodyStorage {
-                return materialized
-            }
-            let result = try materializer()
-            self._bodyStorage = result
-            return result
-        }
+    func compile(module: Module, funcTypeInterner: Interner<FunctionType>, allocator: ISeqAllocator) throws -> InstructionSequence {
+        var translator = InstructionTranslator(
+            allocator: allocator,
+            funcTypeInterner: funcTypeInterner,
+            module: module.translatorContext,
+            type: type,
+            locals: code.locals
+        )
+
+        try WasmParser.parseExpression(
+            bytes: Array(code.expression),
+            features: module.features, hasDataCount: module.hasDataCount,
+            visitor: &translator
+        )
+        return try translator.finalize()
     }
 }

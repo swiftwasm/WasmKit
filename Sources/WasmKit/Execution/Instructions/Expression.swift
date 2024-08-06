@@ -1,18 +1,18 @@
 import WasmParser
 
 struct InstructionSequence: Equatable {
-    let instructions: UnsafeBufferPointer<Instruction>
+    let instructions: UnsafeMutableBufferPointer<Instruction>
     /// The maximum height of the value stack during execution of this function.
     /// This height does not count the locals.
     let maxStackHeight: Int
 
-    init(instructions: UnsafeBufferPointer<Instruction>, maxStackHeight: Int) {
+    init(instructions: UnsafeMutableBufferPointer<Instruction>, maxStackHeight: Int) {
         self.instructions = instructions
         assert(self.instructions.last?.isEndOfFunction ?? false)
         self.maxStackHeight = maxStackHeight
     }
 
-    var baseAddress: UnsafePointer<Instruction> {
+    var baseAddress: UnsafeMutablePointer<Instruction> {
         self.instructions.baseAddress!
     }
 

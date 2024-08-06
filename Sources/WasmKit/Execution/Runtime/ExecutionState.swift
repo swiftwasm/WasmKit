@@ -1,4 +1,4 @@
-typealias ProgramCounter = UnsafePointer<Instruction>
+typealias ProgramCounter = UnsafeMutablePointer<Instruction>
 
 /// An execution state of an invocation of exported function.
 ///
@@ -8,23 +8,45 @@ struct ExecutionState {
     /// Index of an instruction to be executed in the current function.
     var programCounter: ProgramCounter
     var reachedEndOfExecution: Bool = false
-    var currentMemory: CurrentMemory
-    var currentGlobalCache: CurrentGlobalCache
+    let runtime: RuntimeRef
 
-    fileprivate init(programCounter: ProgramCounter) {
+    fileprivate init(programCounter: ProgramCounter, runtime: RuntimeRef) {
         self.programCounter = programCounter
-        self.currentMemory = CurrentMemory()
-        self.currentGlobalCache = CurrentGlobalCache()
+        self.runtime = runtime
     }
 }
 
-@_transparent
-func withExecution<Return>(_ body: (inout ExecutionState) throws -> Return) rethrows -> Return {
+
+typealias Md = UnsafeMutableRawPointer?
+typealias Ms = Int
+
+@inline(never)
+func executeWasm(
+    runtime: Runtime,
+    function handle: InternalFunction,
+    type: FunctionType,
+    arguments: [Value],
+    callerInstance: InternalInstance
+) throws -> [Value] {
+    var stack = StackContext()
+    defer { stack.deallocate() }
+    for (index, argument) in arguments.enumerated() {
+        stack.frameBase[Instruction.Register(index)] = UntypedValue(argument)
+    }
+    let runtime = RuntimeRef(runtime)
     try withUnsafeTemporaryAllocation(of: Instruction.self, capacity: 1) { rootISeq in
         rootISeq.baseAddress?.pointee = .endOfExecution
         // NOTE: unwinding a function jump into previous frame's PC + 1, so initial PC is -1ed
-        var execution = ExecutionState(programCounter: rootISeq.baseAddress! - 1)
-        return try body(&execution)
+        try ExecutionState.execute(
+            programCounter: rootISeq.baseAddress! - 1,
+            runtime: runtime,
+            handle: handle,
+            type: type,
+            stack: &stack
+        )
+    }
+    return type.results.enumerated().map { (i, type) in
+        stack.frameBase[Instruction.Register(i)].cast(to: type)
     }
 }
 
@@ -41,98 +63,93 @@ extension ExecutionState {
     /// <https://webassembly.github.io/spec/core/exec/instructions.html#invocation-of-function-address>
     @inline(__always)
     mutating func invoke(
-        functionAddress address: FunctionAddress,
-        runtime: Runtime,
+        function: InternalFunction,
         stack: inout StackContext,
-        callerModule: ModuleAddress? = nil,
-        callLike: Instruction.CallLikeOperand = Instruction.CallLikeOperand(spAddend: 0)
+        callerInstance: InternalInstance?,
+        callLike: Instruction.CallLikeOperand = Instruction.CallLikeOperand(spAddend: 0),
+        md: inout Md, ms: inout Ms
     ) throws {
         #if DEBUG
-            runtime.interceptor?.onEnterFunction(address, store: runtime.store)
+            // runtime.interceptor?.onEnterFunction(address, store: runtime.store)
         #endif
 
-        switch try runtime.store.function(at: address) {
-        case let .host(function):
-            let parameters = function.type.parameters.enumerated().map { (i, type) in
-                stack[callLike.spAddend + Instruction.Register(i)].cast(to: type)
-            }
-            let moduleInstance = runtime.store.module(address: stack.currentFrame.module)
-            let caller = Caller(runtime: runtime, instance: moduleInstance)
-            let results = try function.implementation(caller, Array(parameters))
-            for (index, result) in results.enumerated() {
-                stack[callLike.spAddend + Instruction.Register(index)] = UntypedValue(result)
-            }
-            programCounter += 1
-
-        case let .wasm(function, body: body):
-            let expression = body
-
-            let arity = function.type.results.count
-            try stack.pushFrame(
-                iseq: expression,
-                arity: arity,
-                module: function.module,
-                argc: function.type.parameters.count,
-                numberOfNonParameterLocals: function.code.numberOfNonParameterLocals,
-                returnPC: programCounter.advanced(by: 1), spAddend: callLike.spAddend,
-                address: address
-            )
-            programCounter = expression.baseAddress
-            // TODO(optimize):
-            // If the callee is known to be a function defined within the same module,
-            // a special `callInternal` instruction can skip updating the current instance
-            mayUpdateCurrentInstance(instanceAddr: function.module, store: runtime.store, from: callerModule)
-        }
+        try function.execute(
+            stack: &stack,
+            executionState: &self,
+            callerInstance: callerInstance,
+            callLike: callLike,
+            md: &md, ms: &ms
+        )
     }
 
     struct CurrentMemory {
-        let baseAddress: UnsafeMutablePointer<UInt8>?
-        let count: Int
-
-        var buffer: UnsafeMutableRawBufferPointer {
-            UnsafeMutableRawBufferPointer(UnsafeMutableBufferPointer(start: baseAddress, count: count))
+        @inline(__always)
+        static func assign(md: inout Md, ms: inout Ms, memory: InternalMemory) {
+            md = UnsafeMutableRawPointer(memory.data._baseAddressIfContiguous)
+            ms = memory.data.count
         }
 
-        init(baseAddress: UnsafeMutablePointer<UInt8>?, count: Int) {
-            self.baseAddress = baseAddress
-            self.count = count
+        @inline(__always)
+        static func assignNil(md: inout Md, ms: inout Ms) {
+            md = nil
+            ms = 0
         }
-        init() {
-            self.init(baseAddress: nil, count: 0)
+
+        @inline(__always)
+        static func mayUpdateCurrentInstance(stack: StackContext, md: inout Md, ms: inout Ms) {
+            guard let instance = stack.currentFrame?.instance else {
+                assignNil(md: &md, ms: &ms)
+                return
+            }
+            mayUpdateCurrentInstance(instance: instance, md: &md, ms: &ms)
+        }
+
+        @inline(__always)
+        static func mayUpdateCurrentInstance(
+            instance: InternalInstance,
+            from lastInstance: InternalInstance?,
+            md: inout Md, ms: inout Ms
+        ) {
+            if lastInstance != instance {
+                mayUpdateCurrentInstance(instance: instance, md: &md, ms: &ms)
+            }
+        }
+        @inline(__always)
+        static func mayUpdateCurrentInstance(instance: InternalInstance, md: inout Md, ms: inout Ms) {
+            guard let memory = instance.memories.first else {
+                assignNil(md: &md, ms: &ms)
+                return
+            }
+            CurrentMemory.assign(md: &md, ms: &ms, memory: memory)
         }
     }
 
     struct CurrentGlobalCache {
-        private let _0: UnsafeMutablePointer<GlobalInstance>?
-        init(instance: ModuleInstance, store: Store) {
-            guard instance.globalAddresses.count > 0 else {
-                _0 = nil
-                return
-            }
-            let _0Addr = instance.globalAddresses[0]
-            self._0 = store.globals._baseAddressIfContiguous?.advanced(by: _0Addr)
+        private let _0: InternalGlobal?
+        init(instance: InternalInstance) {
+            self._0 = instance.globals.first
         }
         init() {
             self._0 = nil
         }
 
-        func get(index: GlobalIndex, runtime: Runtime, context: inout StackContext) -> Value {
+        func get(index: GlobalIndex, context: inout StackContext) -> Value {
             if index == 0 {
-                return _0!.pointee.value
+                return _0!.value
             }
-            let address = Int(currentModule(store: runtime.store, stack: &context).globalAddresses[Int(index)])
-            let globals = runtime.store.globals
-            let value = globals[address].value
-            return value
+            let instance = context.currentFrame.instance
+            let global = instance.globals[Int(index)]
+            return global.value
         }
 
-        func set(index: GlobalIndex, value: UntypedValue, runtime: Runtime, context: inout StackContext) {
+        func set(index: GlobalIndex, value: UntypedValue, context: inout StackContext) {
             if index == 0 {
-                _0!.pointee.assign(value)
+                _0!.withValue { $0.assign(value) }
                 return
             }
-            let address = Int(currentModule(store: runtime.store, stack: &context).globalAddresses[Int(index)])
-            runtime.store.globals[address].assign(value)
+            let instance = context.currentFrame.instance
+            let global = instance.globals[Int(index)]
+            global.withValue { $0.assign(value) }
         }
     }
 
@@ -149,8 +166,31 @@ extension ExecutionState {
         }
     }
 
-    mutating func run(runtime: Runtime, stack: inout StackContext) throws {
-        mayUpdateCurrentInstance(store: runtime.store, stack: stack)
+    @inline(never)
+    static func execute(
+        programCounter: ProgramCounter,
+        runtime: RuntimeRef,
+        handle: InternalFunction,
+        type: FunctionType,
+        stack: inout StackContext
+    ) throws {
+        var md: Md = nil, ms: Ms = 0
+        var execution = ExecutionState(programCounter: programCounter, runtime: runtime)
+        try execution.invoke(
+            function: handle,
+            stack: &stack,
+            callerInstance: nil,
+            callLike: Instruction.CallLikeOperand(
+                spAddend: StackLayout.paramResultSize(type: type)
+            ),
+            md: &md, ms: &ms
+        )
+        try execution.run(stack: &stack, md: &md, ms: &ms)
+    }
+
+    @inline(__always)
+    mutating func run(stack: inout StackContext, md: inout Md, ms: inout Ms) throws {
+        CurrentMemory.mayUpdateCurrentInstance(stack: stack, md: &md, ms: &ms)
         while !reachedEndOfExecution {
             // Regular path
             let frameBase = stack.frameBase
@@ -158,42 +198,59 @@ extension ExecutionState {
             // `doExecute` returns false when current frame *may* be updated
             repeat {
                 inst = programCounter.pointee
-            } while try doExecute(inst, currentMemory: currentMemory, runtime: runtime, context: &stack, stack: frameBase)
+            } while try doExecute(inst, md: &md, ms: &ms, context: &stack, stack: frameBase)
         }
-    }
-
-    mutating func mayUpdateCurrentInstance(store: Store, stack: StackContext) {
-        guard let instanceAddr = stack.currentFrame?.module else {
-            currentMemory = CurrentMemory(baseAddress: nil, count: 0)
-            return
-        }
-        mayUpdateCurrentInstance(instanceAddr: instanceAddr, store: store)
-    }
-
-    mutating func mayUpdateCurrentInstance(
-        instanceAddr: ModuleAddress,
-        store: Store,
-        from lastInstanceAddr: ModuleAddress?
-    ) {
-        if lastInstanceAddr != instanceAddr {
-            mayUpdateCurrentInstance(instanceAddr: instanceAddr, store: store)
-        }
-    }
-    mutating func mayUpdateCurrentInstance(instanceAddr: ModuleAddress, store: Store) {
-        let instance = store.module(address: instanceAddr)
-        currentMemory = resolveCurrentMemory(instance: instance, store: store)
-        currentGlobalCache = CurrentGlobalCache(instance: instance, store: store)
-    }
-    private func resolveCurrentMemory(instance: ModuleInstance, store: Store) -> CurrentMemory {
-        guard let memoryAddr = instance.memoryAddresses.first else {
-            return CurrentMemory()
-        }
-        let memory = store.memory(at: memoryAddr).data
-        let baseAddress = memory._baseAddressIfContiguous
-        return CurrentMemory(baseAddress: baseAddress, count: memory.count)
     }
 }
 
-func currentModule(store: Store, stack: inout StackContext) -> ModuleInstance {
-    store.module(address: stack.currentFrame.module)
+extension InternalFunction {
+    @inline(__always)
+    func execute(
+        stack: inout StackContext,
+        executionState: inout ExecutionState,
+        callerInstance: InternalInstance?,
+        callLike: Instruction.CallLikeOperand,
+        md: inout Md, ms: inout Ms
+    ) throws {
+        if self.isWasm {
+            let function = wasm
+            let iseq = try function.withValue {
+                try $0.ensureCompiled(executionState: &executionState)
+            }
+            
+            try stack.pushFrame(
+                iseq: iseq,
+                instance: function.instance,
+                numberOfNonParameterLocals: function.numberOfNonParameterLocals,
+                returnPC: executionState.programCounter.advanced(by: 1),
+                spAddend: callLike.spAddend
+            )
+            executionState.programCounter = iseq.baseAddress
+            // TODO(optimize):
+            // If the callee is known to be a function defined within the same module,
+            // a special `callInternal` instruction can skip updating the current instance
+            ExecutionState.CurrentMemory.mayUpdateCurrentInstance(
+                instance: function.instance,
+                from: callerInstance, md: &md, ms: &ms
+            )
+        } else {
+            let function = host
+            let runtime = executionState.runtime
+            let resolvedType = runtime.value.resolveType(function.type)
+            let layout = StackLayout(type: resolvedType)
+            let parameters = resolvedType.parameters.enumerated().map { (i, type) in
+                stack.frameBase[callLike.spAddend + layout.paramReg(i)].cast(to: type)
+            }
+            let instance = stack.currentFrame.instance
+            let caller = Caller(
+                instanceHandle: instance,
+                runtime: runtime.value
+            )
+            let results = try function.implementation(caller, Array(parameters))
+            for (index, result) in results.enumerated() {
+                stack.frameBase[callLike.spAddend + layout.returnReg(index)] = UntypedValue(result)
+            }
+            executionState.programCounter += 1
+        }
+    }
 }

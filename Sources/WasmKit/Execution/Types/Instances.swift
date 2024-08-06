@@ -1,30 +1,74 @@
 import WasmParser
 
+@dynamicMemberLookup
+struct EntityHandle<T>: Equatable, Hashable {
+    private let pointer: UnsafeMutablePointer<T>
+
+    init(unsafe pointer: UnsafeMutablePointer<T>) {
+        self.pointer = pointer
+    }
+
+    subscript<R>(dynamicMember keyPath: KeyPath<T, R>) -> R {
+        pointer.pointee[keyPath: keyPath]
+    }
+
+    @inline(__always)
+    func withValue<R>(_ body: (inout T) throws -> R) rethrows -> R {
+        return try body(&pointer.pointee)
+    }
+
+    var bitPattern: Int {
+        return Int(bitPattern: pointer)
+    }
+}
+
+struct ImmutableBumpPtrVector<T> {
+    private let buffer: UnsafeMutableBufferPointer<T>
+    init(buffer: UnsafeMutableBufferPointer<T>) {
+        self.buffer = buffer
+    }
+
+    subscript(index: Int) -> T {
+        buffer[index]
+    }
+
+    var first: T? { buffer.first }
+    var count: Int { buffer.count }
+}
+
+struct InstanceEntity /* : ~Copyable */ {
+    var types: [FunctionType]
+    var functions: ImmutableBumpPtrVector<InternalFunction>
+    var tables: ImmutableBumpPtrVector<InternalTable>
+    var memories: ImmutableBumpPtrVector<InternalMemory>
+    var globals: ImmutableBumpPtrVector<InternalGlobal>
+    var elementSegments: ImmutableBumpPtrVector<InternalElementSegment>
+    var dataSegments: ImmutableBumpPtrVector<InternalDataSegment>
+    var exports: [Export]
+    var features: WasmFeatureSet
+    var hasDataCount: Bool
+}
+
+typealias InternalInstance = EntityHandle<InstanceEntity>
+
 /// A stateful runtime representation of a ``Module``.
 /// Usually instantiated by ``Runtime/instantiate(module:name:)``.
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#module-instances>
-public final class ModuleInstance {
-    public internal(set) var types: [FunctionType] = []
-    var functionAddresses: [FunctionAddress] = []
-    public internal(set) var tableAddresses: [TableAddress] = []
-    public internal(set) var memoryAddresses: [MemoryAddress] = []
-    public internal(set) var globalAddresses: [GlobalAddress] = []
-    public internal(set) var elementAddresses: [ElementAddress] = []
-    public internal(set) var dataAddresses: [DataAddress] = []
-    public internal(set) var exportInstances: [ExportInstance] = []
-    internal let selfAddress: ModuleAddress
+public struct Instance {
+    let handle: InternalInstance
+    let allocator: StoreAllocator
 
-    init(selfAddress: ModuleAddress) {
-        self.selfAddress = selfAddress
+    init(handle: InternalInstance, allocator: StoreAllocator) {
+        self.handle = handle
+        self.allocator = allocator
     }
 
-    public typealias Exports = [String: ExternalValue]
-
-    public var exports: Exports {
-        exportInstances.reduce(into: [:]) { exports, export in
-            exports[export.name] = export.value
+    public func export(_ name: String) -> ExternalValue? {
+        guard let export = handle.exports.first(where: { $0.name == name }) else {
+            return nil
         }
+        return ExternalValue(export, instance: handle, allocator: allocator)
     }
 
     /// Finds an exported function by name.
@@ -32,45 +76,23 @@ public final class ModuleInstance {
     /// - Parameter name: The name of the exported function.
     /// - Returns: The address of the exported function if found, otherwise `nil`.
     func exportedFunction(name: String) -> Function? {
-        switch exports[name] {
-        case .function(let function): return function
-        default: return nil
+        guard case .function(let function) = self.export(name) else { return nil }
+        return function
+    }
+
+    var exports: [String: ExternalValue] {
+        handle.exports.reduce(into: [:]) { exports, export in
+            exports[export.name] = ExternalValue(export, instance: handle, allocator: allocator)
         }
     }
 }
 
-/// > Note:
-/// <https://webassembly.github.io/spec/core/exec/runtime.html#function-instances>
-public struct FunctionInstance {
-    public let type: FunctionType
-    let module: ModuleAddress
-    var code: GuestFunction
-
-    init(_ function: GuestFunction, module: ModuleInstance) {
-        self.init(function, module: module.selfAddress, type: module.types[Int(function.type)])
-    }
-
-    init(_ function: GuestFunction, module: ModuleAddress, type: FunctionType) {
-        self.type = type
-        self.module = module
-        code = function
-    }
-
-    internal static func nonParamLocalBase(type: FunctionType) -> Instruction.Register {
-        nonParamLocalBase(parameters: type.parameters.count, results: type.results.count)
-    }
-    internal static func nonParamLocalBase(parameters: Int, results: Int) -> Instruction.Register {
-        Instruction.Register(max(parameters, results))
-    }
-    internal static func stackRegBase(type: FunctionType, nonParamLocals: Int) -> Instruction.Register {
-        nonParamLocalBase(type: type) + Instruction.Register(nonParamLocals)
-    }
-}
+public typealias ModuleInstance = Instance
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#table-instances>
-public struct TableInstance {
-    public internal(set) var elements: [Reference?]
+struct TableEntity /* : ~Copyable */ {
+    public internal(set) var elements: [Reference]
     let tableType: TableType
     public var limits: Limits { tableType.limits }
 
@@ -104,11 +126,36 @@ public struct TableInstance {
         elements.append(contentsOf: Array(repeating: value, count: Int(growthSize)))
         return true
     }
+
+    mutating func initialize(elements source: [Reference], from fromIndex: Int, to toIndex: Int, count: Int) throws {
+        guard count > 0 else { return }
+
+        guard !fromIndex.addingReportingOverflow(count).overflow,
+              !toIndex.addingReportingOverflow(count).overflow
+        else {
+            throw Trap.tableSizeOverflow
+        }
+
+        guard fromIndex + count <= source.count else {
+            throw Trap.outOfBoundsTableAccess(fromIndex + count)
+        }
+        guard toIndex + count <= self.elements.count else {
+            throw Trap.outOfBoundsTableAccess(toIndex + count)
+        }
+        elements[toIndex..<(toIndex + count)] = source[fromIndex..<fromIndex + count]
+    }
+}
+
+typealias InternalTable = EntityHandle<TableEntity>
+
+public struct Table: Equatable {
+    let handle: InternalTable
+    let allocator: StoreAllocator
 }
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#memory-instances>
-public struct MemoryInstance {
+struct MemoryEntity /* : ~Copyable */ {
     static let pageSize = 64 * 1024
 
     public var data: [UInt8]
@@ -116,7 +163,7 @@ public struct MemoryInstance {
     let limit: Limits
 
     init(_ memoryType: MemoryType) {
-        data = Array(repeating: 0, count: Int(memoryType.min) * MemoryInstance.pageSize)
+        data = Array(repeating: 0, count: Int(memoryType.min) * Self.pageSize)
         let defaultMaxPageCount = (memoryType.isMemory64 ? UInt64.max : UInt64(UInt32.max)) / UInt64(Self.pageSize)
         maxPageCount = memoryType.max ?? defaultMaxPageCount
         limit = memoryType
@@ -131,10 +178,18 @@ public struct MemoryInstance {
             return limit.isMemory64 ? .i64((-1 as Int64).unsigned) : .i32((-1 as Int32).unsigned)
         }
 
-        let result = Int32(data.count / MemoryInstance.pageSize).unsigned
-        data.append(contentsOf: Array(repeating: 0, count: Int(pageCount) * MemoryInstance.pageSize))
+        let result = Int32(data.count / MemoryEntity.pageSize).unsigned
+        data.append(contentsOf: Array(repeating: 0, count: Int(pageCount) * MemoryEntity.pageSize))
 
         return limit.isMemory64 ? .i64(UInt64(result)) : .i32(result)
+    }
+
+    mutating func write(offset: Int, bytes: ArraySlice<UInt8>) throws {
+        let endOffset = offset + bytes.count
+        guard endOffset <= data.count else {
+            throw Trap.outOfBoundsMemoryAccess
+        }
+        data[offset..<endOffset] = bytes
     }
 
     public subscript(i32 address: UInt32) -> UInt32 {
@@ -160,10 +215,31 @@ public struct MemoryInstance {
     }
 }
 
+typealias InternalMemory = EntityHandle<MemoryEntity>
+
+public struct Memory: Equatable {
+    let handle: InternalMemory
+    let allocator: StoreAllocator
+}
+
+extension Memory: GuestMemory {
+    public func withUnsafeMutableBufferPointer<T>(
+        offset: UInt,
+        count: Int,
+        _ body: (UnsafeMutableRawBufferPointer) throws -> T
+    ) rethrows -> T {
+        try handle.withValue { memory in
+            try memory.data.withUnsafeMutableBufferPointer { buffer in
+                try body(UnsafeMutableRawBufferPointer(start: buffer.baseAddress! + Int(offset), count: count))
+            }
+        }
+    }
+}
+
 /// Instance of a global
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#global-instances>
-public struct GlobalInstance {
+struct GlobalEntity {
     public internal(set) var value: Value
     public let globalType: GlobalType
 
@@ -177,9 +253,30 @@ public struct GlobalInstance {
     }
 }
 
+typealias InternalGlobal = EntityHandle<GlobalEntity>
+
+public struct Global: Equatable {
+    let handle: InternalGlobal
+    let allocator: StoreAllocator
+
+    var value: Value {
+        return handle.value
+    }
+
+    init(handle: InternalGlobal, allocator: StoreAllocator) {
+        self.handle = handle
+        self.allocator = allocator
+    }
+
+    public init(globalType: GlobalType, initialValue: Value, store: Store) {
+        let handle = store.allocator.allocate(globalType: globalType, initialValue: initialValue)
+        self.init(handle: handle, allocator: store.allocator)
+    }
+}
+
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#element-instances>
-struct ElementInstance {
+struct ElementSegmentEntity {
     public let type: ReferenceType
     public var references: [Reference]
 
@@ -188,20 +285,49 @@ struct ElementInstance {
     }
 }
 
+typealias InternalElementSegment = EntityHandle<ElementSegmentEntity>
+
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#syntax-datainst>
-struct DataInstance {
+struct DataSegmentEntity {
     /// Bytes stored in this data instance.
-    let data: [UInt8]
+    let data: ArraySlice<UInt8>
+
+    mutating func drop() {
+        self = DataSegmentEntity(data: [])
+    }
 }
+
+typealias InternalDataSegment = EntityHandle<DataSegmentEntity>
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#syntax-externval>
 public enum ExternalValue: Equatable {
     case function(Function)
-    case table(TableAddress)
-    case memory(MemoryAddress)
-    case global(GlobalAddress)
+    case table(Table)
+    case memory(Memory)
+    case global(Global)
+
+    init(_ export: WasmParser.Export, instance: InternalInstance, allocator: StoreAllocator) {
+        switch export.descriptor {
+        case let .function(index):
+            self = .function(
+                Function(handle: instance.functions[Int(index)], allocator: allocator)
+            )
+        case let .table(index):
+            self = .table(
+                Table(handle: instance.tables[Int(index)], allocator: allocator)
+            )
+        case let .memory(index):
+            self = .memory(
+                Memory(handle: instance.memories[Int(index)], allocator: allocator)
+            )
+        case let .global(index):
+            self = .global(
+                Global(handle: instance.globals[Int(index)], allocator: allocator)
+            )
+        }
+    }
 }
 
 /// > Note:
@@ -210,19 +336,8 @@ public struct ExportInstance: Equatable {
     public let name: String
     public let value: ExternalValue
 
-    init(_ export: Export, moduleInstance: ModuleInstance) {
+    init(_ export: WasmParser.Export, instance: InternalInstance, allocator: StoreAllocator) {
         name = export.name
-        switch export.descriptor {
-        case let .function(index):
-            value = ExternalValue.function(
-                Function(address: moduleInstance.functionAddresses[Int(index)])
-            )
-        case let .table(index):
-            value = ExternalValue.table(moduleInstance.tableAddresses[Int(index)])
-        case let .memory(index):
-            value = ExternalValue.memory(moduleInstance.memoryAddresses[Int(index)])
-        case let .global(index):
-            value = ExternalValue.global(moduleInstance.globalAddresses[Int(index)])
-        }
+        value = .init(export, instance: instance, allocator: allocator)
     }
 }

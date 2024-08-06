@@ -58,6 +58,7 @@ void enter(const struct Inst *iseq, int *regs) {
     return;
   }
   const struct Inst *pc = iseq;
+  int32_t rax = 0;
   #define NEXT do { \
     goto *(void *)((++pc)->ty); \
   } while (0)
@@ -71,7 +72,7 @@ void enter(const struct Inst *iseq, int *regs) {
   }
   do_brIf: {
     struct BrIfOp op = pc->op.brIf;
-    if (regs[op.cond] != 0) {
+    if (rax != 0) {
       pc += op.offset;
     }
     NEXT;
@@ -83,7 +84,7 @@ void enter(const struct Inst *iseq, int *regs) {
   }
   do_i32Ltu: {
     struct I32LtuOp op = pc->op.i32Ltu;
-    regs[op.result] = regs[op.lhs] < op.rhs ? 1 : 0;
+    rax = regs[op.lhs] < op.rhs ? 1 : 0;
     NEXT;
   }
   do_endOfFunction: {
@@ -99,7 +100,7 @@ int main(void) {
     (struct Inst){ .ty = randomGet, .op = { .randomGet = xReg } },
     (struct Inst){ .ty = i32AddImm, .op = { .i32AddImm = { .lhs = 1, .rhs = iReg, .result = iReg } } },
     (struct Inst){ .ty = i32AddImm, .op = { .i32AddImm = { .lhs = 1, .rhs = xReg, .result = xReg } } },
-    (struct Inst){ .ty = i32Ltu, .op = { .i32Ltu = { .lhs = iReg, .rhs = 10000000, .result = condReg } } },
+    (struct Inst){ .ty = i32Ltu, .op = { .i32Ltu = { .lhs = iReg, .rhs = 60000000, .result = condReg } } },
     (struct Inst){ .ty = brIf, .op = { .brIf = { .cond = condReg, .offset = -4 } } },
     (struct Inst){ .ty = endOfFunction },
   };

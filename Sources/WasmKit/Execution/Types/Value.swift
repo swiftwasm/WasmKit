@@ -87,6 +87,14 @@ extension Value {
         return isMemory64 ? i64 : UInt64(i32)
     }
 
+    func maybeAddressOffset(_ isMemory64: Bool) -> UInt64? {
+        switch (isMemory64, self) {
+        case (true, .i64(let value)): return value
+        case (false, .i32(let value)): return UInt64(value)
+        default: return nil
+        }
+    }
+
     /// Returns if the given values are equal.
     public static func == (lhs: Self, rhs: Self) -> Bool {
         switch (lhs, rhs) {
@@ -585,5 +593,11 @@ extension Value {
             return .i64(signed)
         default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value.\(#function)` implementation")
         }
+    }
+}
+
+extension ValueType {
+    static func addressType(isMemory64: Bool) -> ValueType {
+        return isMemory64 ? .i64 : .i32
     }
 }

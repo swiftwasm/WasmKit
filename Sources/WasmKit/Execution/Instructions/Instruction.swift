@@ -1,7 +1,11 @@
 enum Instruction: Equatable {
+    case copyStack(Instruction.CopyStackOperand)
     case globalGet(Instruction.GlobalGetOperand)
     case globalSet(Instruction.GlobalSetOperand)
-    case copyStack(Instruction.CopyStackOperand)
+    case call(Instruction.CallOperand)
+    case compilingCall(Instruction.CompilingCallOperand)
+    case internalCall(Instruction.InternalCallOperand)
+    case callIndirect(Instruction.CallIndirectOperand)
     case unreachable
     case nop
     case ifThen(Instruction.IfOperand)
@@ -11,8 +15,6 @@ enum Instruction: Equatable {
     case brIfNot(Instruction.BrIfOperand)
     case brTable(Instruction.BrTableOperand)
     case `return`(Instruction.ReturnOperand)
-    case call(Instruction.CallOperand)
-    case callIndirect(Instruction.CallIndirectOperand)
     case endOfFunction(Instruction.ReturnOperand)
     case endOfExecution
     case i32Load(Instruction.LoadOperand)

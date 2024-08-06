@@ -74,13 +74,13 @@ public func spectest(
             let start = ContinuousClock.now
             logDuration = {
                 let elapsed = ContinuousClock.now - start
-                log("Finished \(testCase.path) in \(elapsed)")
+                log("Finished \(testCase.relativePath) in \(elapsed)")
             }
         } else {
             // Fallback on earlier versions
             logDuration = {}
         }
-        log("Testing \(testCase.path)")
+        log("Testing  \(testCase.relativePath)")
         try testCase.run(spectestModule: hostModule) { testCase, location, result in
             switch result {
             case let .failed(reason):

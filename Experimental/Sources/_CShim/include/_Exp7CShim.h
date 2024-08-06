@@ -23,8 +23,8 @@ struct Inst {
 extern void * _Nonnull labelTable[numberOfInstTypes];
 
 const struct Inst * _Nonnull handle_randomGet(const struct Inst * _Nonnull , int * _Nonnull regs);
-const struct Inst * _Nonnull handle_brIf(const struct Inst * _Nonnull , int * _Nonnull regs);
-const struct Inst * _Nonnull handle_i32Ltu(const struct Inst * _Nonnull , int * _Nonnull regs);
+const struct Inst * _Nonnull handle_brIf(const struct Inst * _Nonnull , int * _Nonnull regs, int32_t rax);
+const int32_t handle_i32Ltu(const struct Inst * _Nonnull , int * _Nonnull regs);
 const struct Inst * _Nonnull handle_i32AddImm(const struct Inst * _Nonnull , int * _Nonnull regs);
 
 
@@ -41,6 +41,7 @@ static inline void enter(const struct Inst * _Nullable iseq,
     labelTable[endOfFunction] = &&do_endOfFunction;
     return;
   }
+  int32_t rax = 0;
   const struct Inst *pc = iseq;
   #define NEXT do { \
     goto *(void *)((++pc)->ty); \
@@ -53,7 +54,7 @@ static inline void enter(const struct Inst * _Nullable iseq,
     NEXT;
   }
   do_brIf: {
-    pc = handle_brIf(pc, regs);
+    pc = handle_brIf(pc, regs, rax);
     NEXT;
   }
   do_i32AddImm: {
@@ -61,7 +62,7 @@ static inline void enter(const struct Inst * _Nullable iseq,
     NEXT;
   }
   do_i32Ltu: {
-    pc = handle_i32Ltu(pc, regs);
+    rax = handle_i32Ltu(pc, regs);
     NEXT;
   }
   do_endOfFunction: {

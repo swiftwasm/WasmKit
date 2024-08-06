@@ -25,12 +25,86 @@ class ISeqAllocator {
     }
 }
 
-struct TranslatorContext {
+protocol TranslatorContext {
+    func resolveType(_ index: TypeIndex) throws -> FunctionType
+    func resolveBlockType(_ blockType: BlockType) throws -> FunctionType
+    func functionType(_ index: FunctionIndex, interner: Interner<FunctionType>) throws -> FunctionType
+    func globalType(_ index: GlobalIndex) throws -> ValueType
+    func isMemory64(memoryIndex index: MemoryIndex) throws -> Bool
+    func isMemory64(tableIndex index: TableIndex) throws -> Bool
+    func elementType(_ index: TableIndex) throws -> ReferenceType
+    func resolveCallee(_ index: FunctionIndex) -> InternalFunction?
+    func isSameInstance(_ instance: InternalInstance) -> Bool
+    func resolveGlobal(_ index: GlobalIndex) -> InternalGlobal?
+}
+
+extension TranslatorContext {
+    func addressType(memoryIndex: MemoryIndex) throws -> ValueType {
+        return ValueType.addressType(isMemory64: try isMemory64(memoryIndex: memoryIndex))
+    }
+    func addressType(tableIndex: TableIndex) throws -> ValueType {
+        return ValueType.addressType(isMemory64: try isMemory64(tableIndex: tableIndex))
+    }
+}
+
+extension InternalInstance: TranslatorContext {
+    func resolveType(_ index: TypeIndex) throws -> FunctionType {
+        guard Int(index) < self.types.count else {
+            throw TranslationError("Type index \(index) is out of range")
+        }
+        return self.types[Int(index)]
+    }
+    func resolveBlockType(_ blockType: BlockType) throws -> FunctionType {
+        try FunctionType(blockType: blockType, typeSection: self.types)
+    }
+    func functionType(_ index: FunctionIndex, interner: Interner<FunctionType>) throws -> FunctionType {
+        guard Int(index) < self.functions.count else {
+            throw TranslationError("Function index \(index) is out of range")
+        }
+        return interner.resolve(self.functions[Int(index)].type)
+    }
+    func globalType(_ index: GlobalIndex) throws -> ValueType {
+        guard Int(index) < self.globals.count else {
+            throw TranslationError("Global index \(index) is out of range")
+        }
+        return self.globals[Int(index)].globalType.valueType
+    }
+    func isMemory64(memoryIndex index: MemoryIndex) throws -> Bool {
+        guard Int(index) < self.memories.count else {
+            throw TranslationError("Memory index \(index) is out of range")
+        }
+        return self.memories[Int(index)].limit.isMemory64
+    }
+    func isMemory64(tableIndex index: TableIndex) throws -> Bool {
+        guard Int(index) < self.tables.count else {
+            throw TranslationError("Table index \(index) is out of range")
+        }
+        return self.tables[Int(index)].limits.isMemory64
+    }
+    func elementType(_ index: TableIndex) throws -> ReferenceType {
+        guard Int(index) < self.tables.count else {
+            throw TranslationError("Table index \(index) is out of range")
+        }
+        return self.tables[Int(index)].tableType.elementType
+    }
+
+    func resolveCallee(_ index: FunctionIndex) -> InternalFunction? {
+        return self.functions[Int(index)]
+    }
+    func resolveGlobal(_ index: GlobalIndex) -> InternalGlobal? {
+        return self.globals[Int(index)]
+    }
+    func isSameInstance(_ instance: InternalInstance) -> Bool {
+        return instance == self
+    }
+}
+
+
+struct TranslatorModuleContext: TranslatorContext {
     internal let imports: ModuleImports
     internal let typeSection: [FunctionType]
     internal let functionTypeIndices: [TypeIndex]
     internal let globalTypes: [GlobalType]
-    internal let internalGlobals: [Global]
     internal let memoryTypes: [MemoryType]
     internal let tableTypes: [TableType]
 
@@ -38,9 +112,9 @@ struct TranslatorContext {
         typeSection: [FunctionType],
         importSection: [Import],
         functionSection: [TypeIndex],
-        globals: [Global],
-        memories: [Memory],
-        tables: [Table]
+        globals: [GlobalType],
+        memories: [MemoryType],
+        tables: [TableType]
     ) {
         var functionTypeIndices: [TypeIndex] = []
         var globalTypes: [GlobalType] = []
@@ -57,15 +131,12 @@ struct TranslatorContext {
 
         self.typeSection = typeSection
         self.functionTypeIndices = functionTypeIndices + functionSection
-        var globalInits: [ConstExpression] = []
         for global in globals {
-            globalTypes.append(global.type)
-            globalInits.append(global.initializer)
+            globalTypes.append(global)
         }
         self.globalTypes = globalTypes
-        self.internalGlobals = globals
-        self.memoryTypes = memoryTypes + memories.map(\.type)
-        self.tableTypes = tableTypes + tables.map(\.type)
+        self.memoryTypes = memoryTypes + memories
+        self.tableTypes = tableTypes + tables
     }
 
     func resolveType(_ index: TypeIndex) throws -> FunctionType {
@@ -77,7 +148,7 @@ struct TranslatorContext {
     func resolveBlockType(_ blockType: BlockType) throws -> FunctionType {
         try FunctionType(blockType: blockType, typeSection: typeSection)
     }
-    func functionType(_ index: FunctionIndex) throws -> FunctionType {
+    func functionType(_ index: FunctionIndex, interner: Interner<FunctionType>) throws -> FunctionType {
         guard Int(index) < functionTypeIndices.count else {
             throw TranslationError("Function index \(index) is out of range")
         }
@@ -96,17 +167,11 @@ struct TranslatorContext {
         }
         return self.memoryTypes[Int(index)].isMemory64
     }
-    func addressType(memoryIndex: MemoryIndex) throws -> ValueType {
-        try isMemory64(memoryIndex: memoryIndex) ? .i64 : .i32
-    }
     func isMemory64(tableIndex index: TableIndex) throws -> Bool {
         guard Int(index) < tableTypes.count else {
             throw TranslationError("Table index \(index) is out of range")
         }
         return self.tableTypes[Int(index)].limits.isMemory64
-    }
-    func addressType(tableIndex: TableIndex) throws -> ValueType {
-        try isMemory64(tableIndex: tableIndex) ? .i64 : .i32
     }
     func elementType(_ index: TableIndex) throws -> ReferenceType {
         guard Int(index) < tableTypes.count else {
@@ -114,14 +179,57 @@ struct TranslatorContext {
         }
         return self.tableTypes[Int(index)].elementType
     }
+    func resolveCallee(_ index: FunctionIndex) -> InternalFunction? {
+        return nil
+    }
+    func resolveGlobal(_ index: GlobalIndex) -> InternalGlobal? {
+        return nil
+    }
+    func isSameInstance(_ instance: InternalInstance) -> Bool {
+        fatalError()
+    }
 }
 
-struct InstructionTranslator: InstructionVisitor {
+fileprivate struct MetaProgramCounter {
+    let offsetFromHead: Int
+}
+
+struct StackLayout {
+    let type: FunctionType
+    let paramResultBase: Instruction.Register
+
+    init(type: FunctionType) {
+        self.type = type
+        self.paramResultBase = Self.paramResultSize(type: type)
+    }
+
+    func paramReg(_ index: Int) -> Instruction.Register {
+        Instruction.Register(index) - paramResultBase
+    }
+
+    func returnReg(_ index: Int) -> Instruction.Register {
+        return Instruction.Register(index) - paramResultBase
+    }
+
+    func localReg(_ index: LocalIndex) -> Instruction.Register {
+        if index < type.parameters.count {
+            return paramReg(Int(index))
+        } else {
+            return Instruction.Register(index) - Instruction.Register(type.parameters.count)
+        }
+    }
+
+    internal static func paramResultSize(type: FunctionType) -> Instruction.Register {
+        paramResultSize(parameters: type.parameters.count, results: type.results.count)
+    }
+    internal static func paramResultSize(parameters: Int, results: Int) -> Instruction.Register {
+        Instruction.Register(max(parameters, results))
+    }
+}
+
+struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     typealias Output = Void
 
-    struct MetaProgramCounter {
-        let offsetFromHead: Int
-    }
     typealias LabelRef = Int
     typealias ValueType = WasmParser.ValueType
 
@@ -310,7 +418,7 @@ struct InstructionTranslator: InstructionVisitor {
         }
     }
 
-    struct ISeqBuilder {
+    fileprivate struct ISeqBuilder {
         typealias InstructionFactoryWithLabel = (ISeqBuilder, MetaProgramCounter) -> (WasmKit.Instruction)
         typealias BrTableEntryFactory = (ISeqBuilder, MetaProgramCounter) -> Instruction.BrTable.Entry
         typealias BuildingBrTable = UnsafeMutableBufferPointer<Instruction.BrTable.Entry>
@@ -336,7 +444,7 @@ struct InstructionTranslator: InstructionVisitor {
         }
 
         typealias ResultRelink = (_ result: Instruction.Register) -> Instruction
-        struct LastEmission {
+        fileprivate struct LastEmission {
             let position: MetaProgramCounter
             let resultRelink: ResultRelink?
         }
@@ -344,7 +452,7 @@ struct InstructionTranslator: InstructionVisitor {
         private var labels: [LabelEntry] = []
         private var instructions: [WasmKit.Instruction] = []
         private var lastEmission: LastEmission?
-        var insertingPC: MetaProgramCounter {
+        fileprivate var insertingPC: MetaProgramCounter {
             MetaProgramCounter(offsetFromHead: instructions.count)
         }
 
@@ -398,7 +506,7 @@ struct InstructionTranslator: InstructionVisitor {
             return ref
         }
 
-        func resolveLabel(_ ref: LabelRef) -> MetaProgramCounter? {
+        fileprivate func resolveLabel(_ ref: LabelRef) -> MetaProgramCounter? {
             let entry = self.labels[ref]
             switch entry {
             case .pinned(let pc): return pc
@@ -406,7 +514,7 @@ struct InstructionTranslator: InstructionVisitor {
             }
         }
 
-        mutating func pinLabel(_ ref: LabelRef, pc: MetaProgramCounter) {
+        fileprivate mutating func pinLabel(_ ref: LabelRef, pc: MetaProgramCounter) {
             switch self.labels[ref] {
             case .pinned(let oldPC):
                 fatalError("Internal consistency error: Label \(ref) is already pinned at \(oldPC), but tried to pin at \(pc) again")
@@ -442,7 +550,7 @@ struct InstructionTranslator: InstructionVisitor {
         ///   - ref: Label reference to be resolved
         ///   - insertAt: Instruction sequence offset to insert at
         ///   - make: Factory closure to make an inserting instruction
-        mutating func emitWithLabel(
+        fileprivate mutating func emitWithLabel(
             _ ref: LabelRef, insertAt: MetaProgramCounter,
             line: UInt = #line, make: @escaping InstructionFactoryWithLabel
         ) {
@@ -470,8 +578,9 @@ struct InstructionTranslator: InstructionVisitor {
     }
 
     let allocator: ISeqAllocator
-    let module: TranslatorContext
-    var iseqBuilder: ISeqBuilder
+    let funcTypeInterner: Interner<FunctionType>
+    let module: Context
+    private var iseqBuilder: ISeqBuilder
     var controlStack: ControlStack
     var valueStack: ValueStack
     var locals: Locals
@@ -479,15 +588,20 @@ struct InstructionTranslator: InstructionVisitor {
     let endOfFunctionLabel: LabelRef
     let stackLayout: StackLayout
 
-    init(allocator: ISeqAllocator, module: TranslatorContext, type: FunctionType, locals: [WasmParser.ValueType]) {
+    init(
+        allocator: ISeqAllocator,
+        funcTypeInterner: Interner<FunctionType>,
+        module: Context,
+        type: FunctionType,
+        locals: [WasmParser.ValueType]
+    ) {
         self.allocator = allocator
+        self.funcTypeInterner = funcTypeInterner
         self.type = type
         self.module = module
         self.iseqBuilder = ISeqBuilder()
         self.controlStack = ControlStack()
-        self.valueStack = ValueStack(
-            stackRegBase: FunctionInstance.stackRegBase(type: type, nonParamLocals: locals.count)
-        )
+        self.valueStack = ValueStack(stackRegBase: Instruction.Register(locals.count))
         self.locals = Locals(types: type.parameters + locals)
         self.stackLayout = StackLayout(type: type)
 
@@ -501,23 +615,6 @@ struct InstructionTranslator: InstructionVisitor {
             )
             self.endOfFunctionLabel = endLabel
             self.controlStack.pushFrame(rootFrame)
-        }
-    }
-
-    struct StackLayout {
-        let type: FunctionType
-
-        func returnReg(_ index: Int) -> Instruction.Register {
-            return Instruction.Register(index)
-        }
-
-        func localReg(_ index: LocalIndex) -> Instruction.Register {
-            if index < type.parameters.count {
-                return Instruction.Register(index)
-            } else {
-                return FunctionInstance.nonParamLocalBase(type: type)
-                    + Instruction.Register(index) - Instruction.Register(type.parameters.count)
-            }
         }
     }
 
@@ -646,7 +743,7 @@ struct InstructionTranslator: InstructionVisitor {
         }
         buffer[instructions.count] = .endOfFunction(Instruction.ReturnOperand())
         return InstructionSequence(
-            instructions: UnsafeBufferPointer(buffer),
+            instructions: buffer,
             maxStackHeight: Int(valueStack.stackRegBase) + valueStack.maxHeight
         )
     }
@@ -700,7 +797,7 @@ struct InstructionTranslator: InstructionVisitor {
                 elseOrEndRef = ExpressionRef(from: selfPC, to: endPC)
             }
             return .ifThen(Instruction.IfOperand(
-                condition: condition.intoRegister(layout: stackLayout), elseOrEndRef: elseOrEndRef
+                elseOrEndRef: elseOrEndRef, condition: condition.intoRegister(layout: stackLayout)
             ))
         }
     }
@@ -832,7 +929,7 @@ struct InstructionTranslator: InstructionVisitor {
         let conditionCheckAt = iseqBuilder.insertingPC
         iseqBuilder.emitWithLabel(onBranchNotTaken) { _, continuation in
             let relativeOffset = continuation.offsetFromHead - conditionCheckAt.offsetFromHead
-            return .brIfNot(Instruction.BrIfOperand(condition: condition, offset: Int32(relativeOffset)))
+            return .brIfNot(Instruction.BrIfOperand(offset: Int32(relativeOffset), condition: condition))
         }
         try copyOnBranch(targetFrame: frame)
         try emitBranch(relativeDepth: relativeDepth) { offset, copyCount, popCount in
@@ -848,8 +945,11 @@ struct InstructionTranslator: InstructionVisitor {
         preserveAllLocalsOnStack()
         let allLabelIndices = targets.labelIndices + [targets.defaultIndex]
         let tableBuffer = allocator.allocateBrTable(capacity: allLabelIndices.count)
-        let brTable = Instruction.BrTable(buffer: UnsafeBufferPointer(tableBuffer))
-        let operand = Instruction.BrTableOperand(index: index, table: brTable)
+        let brTable = Instruction.BrTable(
+            baseAddress: tableBuffer.baseAddress!,
+            count: UInt16(tableBuffer.count)
+        )
+        let operand = Instruction.BrTableOperand(table: brTable, index: index)
         let brTableAt = iseqBuilder.insertingPC
         iseqBuilder.emit(.brTable(operand))
 
@@ -911,6 +1011,7 @@ struct InstructionTranslator: InstructionVisitor {
         }
 
         let spAddend = valueStack.stackRegBase + Instruction.Register(valueStack.height)
+            + StackLayout.paramResultSize(type: calleeType)
 
         for result in calleeType.results {
             _ = valueStack.push(result)
@@ -918,11 +1019,27 @@ struct InstructionTranslator: InstructionVisitor {
         return Instruction.Register(spAddend)
     }
     mutating func visitCall(functionIndex: UInt32) throws -> Output {
-        let calleeType = try self.module.functionType(functionIndex)
+        let calleeType = try self.module.functionType(functionIndex, interner: funcTypeInterner)
         guard let spAddend = try visitCallLike(calleeType: calleeType) else { return }
+        guard let callee = self.module.resolveCallee(functionIndex) else {
+            // Skip actual code emission if validation-only mode
+            return
+        }
+        let callLike = Instruction.CallLikeOperand(spAddend: spAddend)
+        if callee.isWasm {
+            if module.isSameInstance(callee.wasm.instance) {
+                emit(.compilingCall(
+                    Instruction.InternalCallOperand(
+                        callee: callee,
+                        callLike: callLike
+                    )
+                ))
+                return
+            }
+        }
         emit(.call(
             Instruction.CallOperand(
-                index: functionIndex,
+                callee: callee,
                 callLike: Instruction.CallLikeOperand(spAddend: spAddend)
             )
         ))
@@ -934,10 +1051,11 @@ struct InstructionTranslator: InstructionVisitor {
         let calleeType = try self.module.resolveType(typeIndex)
         guard let spAddend = try visitCallLike(calleeType: calleeType) else { return }
         guard let addressRegister = address?.intoRegister(layout: stackLayout) else { return }
+        let internType = funcTypeInterner.intern(calleeType)
         let operand = Instruction.CallIndirectOperand(
-            index: addressRegister,
             tableIndex: tableIndex,
-            typeIndex: typeIndex,
+            type: internType,
+            index: addressRegister,
             callLike: Instruction.CallLikeOperand(spAddend: spAddend)
         )
         emit(.callIndirect(operand))
@@ -1021,14 +1139,21 @@ struct InstructionTranslator: InstructionVisitor {
     mutating func visitGlobalGet(globalIndex: UInt32) throws -> Output {
         let type = try module.globalType(globalIndex)
         let result = valueStack.push(type)
-        emit(.globalGet(Instruction.GlobalGetOperand(result: result, index: globalIndex)))
+        guard let global = module.resolveGlobal(globalIndex) else {
+            // Skip actual code emission if validation-only mode
+            return
+        }
+        emit(.globalGet(Instruction.GlobalGetOperand(global: global, result: result)))
     }
     mutating func visitGlobalSet(globalIndex: UInt32) throws -> Output {
         let type = try module.globalType(globalIndex)
         guard let value = try popOperand(type) else { return }
+        guard let global = module.resolveGlobal(globalIndex) else {
+            // Skip actual code emission if validation-only mode
+            return
+        }
         let operand = Instruction.GlobalSetOperand(
-            value: value.intoRegister(layout: stackLayout),
-            index: globalIndex
+            global: global, value: value.intoRegister(layout: stackLayout)
         )
         emit(.globalSet(operand))
     }
@@ -1122,8 +1247,9 @@ struct InstructionTranslator: InstructionVisitor {
         }
         try popPushEmit(.address(isMemory64: isMemory64), type) { [stackLayout] value, result, stack in
             let loadOperand = Instruction.LoadOperand(
+                memarg: Instruction.MemArg(offset: memarg.offset),
                 pointer: value.intoRegister(layout: stackLayout),
-                result: result, memarg: Instruction.MemArg(offset: memarg.offset)
+                result: result
             )
             return instruction(loadOperand)
         }
@@ -1139,9 +1265,9 @@ struct InstructionTranslator: InstructionVisitor {
         if let value = value?.intoRegister(layout: stackLayout),
            let pointer = pointer?.intoRegister(layout: stackLayout) {
             let storeOperand = Instruction.StoreOperand(
+                memarg: Instruction.MemArg(offset: memarg.offset),
                 pointer: pointer,
-                value: value,
-                memarg: Instruction.MemArg(offset: memarg.offset)
+                value: value
             )
             emit(instruction(storeOperand))
         }
@@ -1171,7 +1297,7 @@ struct InstructionTranslator: InstructionVisitor {
     mutating func visitI64Store32(memarg: MemArg) throws -> Output { try visitStore(memarg, .i64, Instruction.i64Store32) }
     mutating func visitMemorySize(memory: UInt32) throws -> Output {
         let sizeType: ValueType = try module.isMemory64(memoryIndex: memory) ? .i64 : .i32
-        pushEmit(sizeType, { .memorySize(Instruction.MemorySizeOperand(result: $0, memoryIndex: memory)) })
+        pushEmit(sizeType, { .memorySize(Instruction.MemorySizeOperand(memoryIndex: memory, result: $0)) })
     }
     mutating func visitMemoryGrow(memory: UInt32) throws -> Output {
         let isMemory64 = try module.isMemory64(memoryIndex: memory)
@@ -1536,7 +1662,7 @@ struct TranslationError: Error, CustomStringConvertible {
 }
 
 extension ExpressionRef {
-    fileprivate init(from source: InstructionTranslator.MetaProgramCounter, to destination: InstructionTranslator.MetaProgramCounter) {
+    fileprivate init(from source: MetaProgramCounter, to destination: MetaProgramCounter) {
         self.init(destination.offsetFromHead - source.offsetFromHead)
     }
 }

@@ -20,6 +20,7 @@ extension Stream {
         try consume(Set([expected]))
     }
 
+    @usableFromInline
     func hasReachedEnd() throws -> Bool {
         try peek() == nil
     }

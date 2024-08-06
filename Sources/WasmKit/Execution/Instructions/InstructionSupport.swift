@@ -9,14 +9,15 @@ extension Instruction {
         struct Entry {
             var offset: Int32
         }
-        let buffer: UnsafeBufferPointer<Entry>
+        let baseAddress: UnsafePointer<Entry>
+        let count: UInt16
         
         static func == (lhs: Instruction.BrTable, rhs: Instruction.BrTable) -> Bool {
-            lhs.buffer.baseAddress == rhs.buffer.baseAddress
+            lhs.baseAddress == rhs.baseAddress
         }
     }
 
-    typealias Register = Int
+    typealias Register = Int16
 
     /// size = 6, alignment = 2
     struct BinaryOperand: Equatable {
@@ -31,26 +32,28 @@ extension Instruction {
         let input: Register
     }
     
+    /// size = 10, alignment = 8
     struct ConstOperand: Equatable {
         let value: UntypedValue
         let result: Register
     }
-    
+
+    /// size = 12, alignment = 8
     struct LoadOperand: Equatable {
+        let memarg: MemArg
         let pointer: Register
         let result: Register
-        let memarg: MemArg
     }
     
     struct StoreOperand: Equatable {
+        let memarg: MemArg
         let pointer: Register
         let value: Register
-        let memarg: MemArg
     }
     
     struct MemorySizeOperand: Equatable {
-        let result: Register
         let memoryIndex: MemoryIndex
+        let result: Register
     }
     
     struct MemoryGrowOperand: Equatable {
@@ -148,13 +151,13 @@ extension Instruction {
     }
 
     struct GlobalGetOperand: Equatable {
+        let global: InternalGlobal
         let result: Register
-        let index: GlobalIndex
     }
     
     struct GlobalSetOperand: Equatable {
+        let global: InternalGlobal
         let value: Register
-        let index: GlobalIndex
     }
 
     struct CopyStackOperand: Equatable {
@@ -163,33 +166,40 @@ extension Instruction {
     }
 
     struct IfOperand: Equatable {
-        let condition: Register
         // elseRef for if-then-else-end sequence, endRef for if-then-end sequence
         let elseOrEndRef: ExpressionRef
+        let condition: Register
     }
     
     struct BrIfOperand: Equatable {
-        let condition: Register
         let offset: Int32
+        let condition: Register
     }
     
     struct BrTableOperand: Equatable {
-        let index: Register
         let table: Instruction.BrTable
+        let index: Register
     }
 
     struct CallLikeOperand: Equatable {
         let spAddend: Instruction.Register
     }
     struct CallOperand: Equatable {
-        let index: FunctionIndex
+        let callee: InternalFunction
         let callLike: CallLikeOperand
     }
+
+    struct InternalCallOperand: Equatable {
+        let callee: InternalFunction
+        let callLike: CallLikeOperand
+    }
+
+    typealias CompilingCallOperand = InternalCallOperand
     
     struct CallIndirectOperand: Equatable {
-        let index: Register
         let tableIndex: TableIndex
-        let typeIndex: TypeIndex
+        let type: InternedFuncType
+        let index: Register
         let callLike: CallLikeOperand
     }
 
@@ -301,15 +311,15 @@ extension Instruction {
         case .nop:
             target.write("nop")
         case .globalGet(let op):
-            target.write("\(reg(op.result)) = global.get \(op.index)")
+            target.write("\(reg(op.result)) = global.get \(op.global)")
         case .globalSet(let op):
-            target.write("global.set \(op.index), \(reg(op.value))")
+            target.write("global.set \(op.global), \(reg(op.value))")
         case .numericConst(let op):
             target.write("\(reg(op.result)) = \(op.value)")
         case .call(let op):
-            target.write("call \(op.index), sp: +\(op.callLike.spAddend)")
+            target.write("call \(op.callee), sp: +\(op.callLike.spAddend)")
         case .callIndirect(let op):
-            target.write("call_indirect \(reg(op.index)), \(op.tableIndex), \(op.typeIndex), sp: +\(op.callLike.spAddend)")
+            target.write("call_indirect \(reg(op.index)), \(op.tableIndex), \(op.type), sp: +\(op.callLike.spAddend)")
         case .i32Load(let op):
             target.write("\(reg(op.result)) = i32.load \(reg(op.pointer)), \(memarg(op.memarg))")
         case .i64Load(let op):

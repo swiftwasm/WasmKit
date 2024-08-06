@@ -86,7 +86,7 @@ var iseq: [Inst] = [
     .randomGet(xReg),
     .i32AddImm(lhs: 1, rhs: iReg, result: iReg),
     .i32AddImm(lhs: 1, rhs: xReg, result: xReg),
-    .i32Ltu(lhs: iReg, rhs: 10000000, result: condReg),
+    .i32Ltu(lhs: iReg, rhs: 60000000, result: condReg),
     .brIf(cond: condReg, offset: -4),
     .endOfFunction(),
 ]
@@ -124,18 +124,16 @@ func handle_i32AddImm(pc: UnsafePointer<Inst>, regs: UnsafeMutablePointer<Int32>
 
 @_cdecl("handle_i32Ltu")
 @inline(__always)
-func handle_i32Ltu(pc: UnsafePointer<Inst>, regs: UnsafeMutablePointer<Int32>) -> UnsafePointer<Inst> {
+func handle_i32Ltu(pc: UnsafePointer<Inst>, regs: UnsafeMutablePointer<Int32>) -> Int32 {
     let op = pc.op(Inst.I32LtuOp.self).pointee
-    regs[Int(op.result)] = regs[Int(op.lhs)] < op.rhs ? 1 : 0
-    return pc
+    return regs[Int(op.lhs)] < op.rhs ? 1 : 0
 }
 
 @_cdecl("handle_brIf")
 @inline(__always)
-func handle_brIf(pc: UnsafePointer<Inst>, regs: UnsafeMutablePointer<Int32>) -> UnsafePointer<Inst> {
+func handle_brIf(pc: UnsafePointer<Inst>, regs: UnsafeMutablePointer<Int32>, rax: Int32) -> UnsafePointer<Inst> {
     let op = pc.op(Inst.BrIfOp.self)
-    let cond = op.advanced(by: \.cond).pointee
-    if regs[Int(cond)] != 0 {
+    if rax != 0 {
         let offset = op.advanced(by: \.offset).pointee
         return pc.advanced(by: Int(offset))
     }
