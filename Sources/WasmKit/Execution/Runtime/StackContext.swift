@@ -22,7 +22,7 @@ struct StackContext {
         arity: Int,
         module: ModuleAddress,
         argc: Int,
-        defaultLocals: UnsafeBufferPointer<Value>?,
+        numberOfNonParameterLocals: Int,
         returnPC: ProgramCounter,
         spAddend: UInt16,
         address: FunctionAddress? = nil
@@ -34,12 +34,10 @@ struct StackContext {
             valueFrameIndex: valueStack.frameBaseOffset
         )
         try valueStack.extend(addend: spAddend, maxStackHeight: iseq.maxStackHeight)
-        if let defaultLocals {
-            let base = FunctionInstance.nonParamLocalBase(parameters: argc, results: arity)
-            for (offset, _) in defaultLocals.enumerated() {
-                valueStack[Int(base) + offset] = .default
-            }
-        }
+        let base = FunctionInstance.nonParamLocalBase(parameters: argc, results: arity)
+        // Initialize the locals with zeros (all types of value have the same representation)
+        valueStack.frameBase.advanced(by: Int(base))
+            .initialize(repeating: .default, count: numberOfNonParameterLocals)
         let frame = Frame(arity: arity, module: module, baseStackAddress: baseStackAddress, iseq: iseq, returnPC: returnPC, address: address)
         frames.push(frame)
         self.currentFrame = frame

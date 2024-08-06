@@ -71,7 +71,7 @@ extension ExecutionState {
                 arity: arity,
                 module: function.module,
                 argc: function.type.parameters.count,
-                defaultLocals: function.code.defaultLocals,
+                numberOfNonParameterLocals: function.code.numberOfNonParameterLocals,
                 returnPC: programCounter.advanced(by: 1), spAddend: callLike.spAddend,
                 address: address
             )

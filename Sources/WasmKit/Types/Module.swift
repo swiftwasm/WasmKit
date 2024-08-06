@@ -163,12 +163,12 @@ struct GuestFunction {
         body: @escaping () throws -> InstructionSequence
     ) {
         self.type = type
-        self.defaultLocals = allocator.allocateDefaultLocals(locals)
+        self.numberOfNonParameterLocals = locals.count
         self.materializer = body
     }
 
     public let type: TypeIndex
-    let defaultLocals: UnsafeBufferPointer<Value>
+    let numberOfNonParameterLocals: Int
     private var _bodyStorage: InstructionSequence? = nil
     private let materializer: () throws -> InstructionSequence
     var body: InstructionSequence {

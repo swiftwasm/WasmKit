@@ -202,7 +202,7 @@ extension Runtime {
                 arity: arity,
                 module: instance.selfAddress,
                 argc: 0,
-                defaultLocals: nil,
+                numberOfNonParameterLocals: 0,
                 returnPC: initExecution.programCounter + 1,
                 spAddend: 0
             )

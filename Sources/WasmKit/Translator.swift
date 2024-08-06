@@ -11,15 +11,6 @@ class ISeqAllocator {
         return buffer
     }
 
-    func allocateDefaultLocals(_ locals: [ValueType]) -> UnsafeBufferPointer<Value> {
-        let buffer = UnsafeMutableBufferPointer<Value>.allocate(capacity: locals.count)
-        for (index, localType) in locals.enumerated() {
-            buffer[index] = localType.defaultValue
-        }
-        self.buffers.append(UnsafeMutableRawBufferPointer(buffer))
-        return UnsafeBufferPointer(buffer)
-    }
-
     func allocateInstructions(capacity: Int) -> UnsafeMutableBufferPointer<Instruction> {
         assert(_isPOD(Instruction.self), "Instruction must be POD")
         let buffer = UnsafeMutableBufferPointer<Instruction>.allocate(capacity: capacity)
