@@ -4,7 +4,7 @@ import WasmKit
 import WAT
 
 @main
-struct exampleExec {
+struct Example {
     static func main() throws {
         // Convert a WAT file to a Wasm binary, then parse it.
         let module = try parseWasm(

@@ -6,7 +6,7 @@ import WAT
 import Foundation
 
 @main
-struct exampleExec {
+struct Example {
     static func main() throws {
         // Parse a WASI-compliant WebAssembly module from a file.
         let module = try parseWasm(filePath: "wasm/hello.wasm")
