@@ -30,9 +30,6 @@ extension ExecutionState {
         case .ifThen(let ifOperand):
             self.ifThen(context: &context, stack: stack, ifOperand: ifOperand)
             return true
-        case .`else`(let endRef):
-            self.`else`(context: &context, stack: stack, endRef: endRef)
-            return true
         case .br(let offset):
             try self.br(context: &context, stack: stack, offset: offset)
             return false
@@ -285,7 +282,6 @@ extension Instruction {
         case .unreachable: return "unreachable"
         case .nop: return "nop"
         case .ifThen: return "ifThen"
-        case .`else`: return "`else`"
         case .br: return "br"
         case .brIf: return "brIf"
         case .brIfNot: return "brIfNot"

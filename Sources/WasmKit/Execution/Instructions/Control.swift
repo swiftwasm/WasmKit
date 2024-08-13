@@ -17,28 +17,25 @@ extension ExecutionState {
         }
     }
 
-    mutating func `else`(context: inout StackContext, stack: FrameBase, endRef: ExpressionRef) {
-        programCounter += endRef.relativeOffset  // if-then-else's continuation points the "end"
-    }
-    private mutating func branch(context: inout StackContext, offset: Int32) throws {
+    private mutating func branch(offset: Int32) throws {
         programCounter += Int(offset)
     }
     mutating func br(context: inout StackContext, stack: FrameBase, offset: Int32) throws {
-        try branch(context: &context, offset: offset)
+        try branch(offset: offset)
     }
     mutating func brIf(context: inout StackContext, stack: FrameBase, brIfOperand: Instruction.BrIfOperand) throws {
         guard stack[brIfOperand.condition].i32 != 0 else {
             programCounter += 1
             return
         }
-        try branch(context: &context, offset: brIfOperand.offset)
+        try branch(offset: brIfOperand.offset)
     }
     mutating func brIfNot(context: inout StackContext, stack: FrameBase, brIfOperand: Instruction.BrIfOperand) throws {
         guard stack[brIfOperand.condition].i32 == 0 else {
             programCounter += 1
             return
         }
-        try branch(context: &context, offset: brIfOperand.offset)
+        try branch(offset: brIfOperand.offset)
     }
     mutating func brTable(context: inout StackContext, stack: FrameBase, brTableOperand: Instruction.BrTableOperand) throws {
         let brTable = brTableOperand.table
@@ -46,10 +43,7 @@ extension ExecutionState {
         let normalizedOffset = min(Int(index), Int(brTable.count - 1))
         let entry = brTable.baseAddress[normalizedOffset]
 
-        try branch(
-            context: &context,
-            offset: entry.offset
-        )
+        try branch(offset: entry.offset)
     }
     mutating func `return`(context: inout StackContext, stack: FrameBase, md: inout Md, ms: inout Ms, returnOperand: Instruction.ReturnOperand) throws {
         try self.endOfFunction(context: &context, stack: stack, md: &md, ms: &ms, returnOperand: returnOperand)

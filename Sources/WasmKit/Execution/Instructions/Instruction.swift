@@ -9,7 +9,6 @@ enum Instruction: Equatable {
     case unreachable
     case nop
     case ifThen(Instruction.IfOperand)
-    case `else`(endRef: ExpressionRef)
     case br(offset: Int32)
     case brIf(Instruction.BrIfOperand)
     case brIfNot(Instruction.BrIfOperand)

@@ -812,8 +812,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         iseqBuilder.resetLastEmission()
         let selfPC = iseqBuilder.insertingPC
         iseqBuilder.emitWithLabel(endLabel) { _, endPC in
-            let endRef = ExpressionRef(from: selfPC, to: endPC)
-            return .else(endRef: endRef)
+            let offset = endPC.offsetFromHead - selfPC.offsetFromHead
+            return .br(offset: Int32(offset))
         }
         try valueStack.truncate(height: frame.stackHeight)
         // Re-push parameters
