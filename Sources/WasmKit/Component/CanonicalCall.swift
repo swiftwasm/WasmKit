@@ -18,8 +18,7 @@ public struct CanonicalCallContext {
     public let runtime: Runtime
     /// A reference to the guest memory.
     public var guestMemory: Memory {
-//        WasmKitGuestMemory(store: runtime.store, address: options.memory)
-        fatalError()
+        options.memory
     }
 
     public init(options: CanonicalOptions, instance: Instance, runtime: Runtime) {
@@ -27,7 +26,7 @@ public struct CanonicalCallContext {
         self.instance = instance
         self.runtime = runtime
     }
-    
+
     @available(*, deprecated)
     public init(options: CanonicalOptions, moduleInstance: Instance, runtime: Runtime) {
         self.init(options: options, instance: moduleInstance, runtime: runtime)

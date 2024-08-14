@@ -86,6 +86,11 @@ extension ExecutionState {
     struct CurrentMemory {
         @inline(__always)
         static func assign(md: inout Md, ms: inout Ms, memory: InternalMemory) {
+            memory.withValue { assign(md: &md, ms: &ms, memory: &$0) }
+        }
+
+        @inline(__always)
+        static func assign(md: inout Md, ms: inout Ms, memory: inout MemoryEntity) {
             md = UnsafeMutableRawPointer(memory.data._baseAddressIfContiguous)
             ms = memory.data.count
         }

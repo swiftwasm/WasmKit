@@ -54,6 +54,7 @@ extension ExecutionState {
             let value = sp[memoryGrowOperand.delta]
             let pageCount: UInt64 = isMemory64 ? value.i64 : UInt64(value.i32)
             let oldPageCount = memory.grow(by: Int(pageCount))
+            CurrentMemory.assign(md: &md, ms: &ms, memory: &memory)
             sp[memoryGrowOperand.result] = UntypedValue(oldPageCount)
         }
         mayUpdateCurrentInstance(store: store, stack: context)
