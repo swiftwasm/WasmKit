@@ -908,7 +908,22 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     mutating func visitBrIf(relativeDepth: UInt32) throws -> Output {
         guard let condition = try popOperand(.i32)?.intoRegister(layout: stackLayout) else { return }
         let frame = try controlStack.branchTarget(relativeDepth: relativeDepth)
-        // TODO: Optimization where we don't need copying values when the branch taken
+        if frame.copyCount == 0 {
+            // Optimization where we don't need copying values when the branch taken
+            let selfPC = iseqBuilder.insertingPC
+            iseqBuilder.emitWithLabel(frame.continuation) { _, continuation in
+                let relativeOffset = continuation.offsetFromHead - selfPC.offsetFromHead
+                return .brIf(Instruction.BrIfOperand(
+                    offset: Int32(relativeOffset), condition: condition
+                ))
+            }
+            return
+        }
+
+        // If branch taken, fallthrough to landing pad, copy stack values
+        // then branch to the actual place
+        // If branch not taken, branch to the next of the landing pad
+        //
         // (block (result i32)
         //   (i32.const 42)
         //   (i32.const 24)
