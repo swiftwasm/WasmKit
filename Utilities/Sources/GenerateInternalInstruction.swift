@@ -62,26 +62,39 @@ enum GenerateInternalInstruction {
         }
     }
 
+    struct OpInstruction {
+        let op: String
+        let type: String
+        let base: Instruction
+    }
+
     static let intValueTypes = ["i32", "i64"]
     static let valueTypes = intValueTypes + ["f32", "f64"]
-    static let numericBinaryInsts: [Instruction] = [
+    static let numericBinaryInsts: [OpInstruction] = [
         "Add", "Sub", "Mul", "Eq", "Ne",
-    ].flatMap { op -> [Instruction] in
+    ].flatMap { op -> [OpInstruction] in
         valueTypes.map { type in
-            Instruction(name: "\(type)\(op)", immediates: [Immediate(name: nil, type: "Instruction.BinaryOperand")])
+            let base = Instruction(
+                name: "\(type)\(op)", immediates: [Immediate(name: nil, type: "Instruction.BinaryOperand")]
+            )
+            return OpInstruction(op: op, type: type, base: base)
         }
     }
-    static let numericIntBinaryInsts: [Instruction] = [
+    static let numericIntBinaryInsts: [OpInstruction] = [
         "LtS", "LtU", "GtS", "GtU", "LeS", "LeU", "GeS", "GeU",
         "And", "Or", "Xor", "Shl", "ShrS", "ShrU", "Rotl", "Rotr",
-    ].flatMap { op -> [Instruction] in
+    ].flatMap { op -> [OpInstruction] in
         intValueTypes.map { type in
-            Instruction(name: "\(type)\(op)", immediates: [Immediate(name: nil, type: "Instruction.BinaryOperand")])
+            let base = Instruction(
+                name: "\(type)\(op)", immediates: [Immediate(name: nil, type: "Instruction.BinaryOperand")]
+            )
+            return OpInstruction(op: op, type: type, base: base)
         }
     }
-    static let numericIntUnaryInsts: [Instruction] = ["Clz", "Ctz", "Popcnt", "Eqz"].flatMap { op -> [Instruction] in
+    static let numericIntUnaryInsts: [OpInstruction] = ["Clz", "Ctz", "Popcnt", "Eqz"].flatMap { op -> [OpInstruction] in
         intValueTypes.map { type in
-            Instruction(name: "\(type)\(op)", immediates: [Immediate(name: nil, type: "Instruction.UnaryOperand")])
+            let base = Instruction(name: "\(type)\(op)", immediates: [Immediate(name: nil, type: "Instruction.UnaryOperand")])
+            return OpInstruction(op: op, type: type, base: base)
         }
     }
     static let numericOtherInsts: [Instruction] = [
@@ -239,9 +252,9 @@ enum GenerateInternalInstruction {
         + memoryLoadStoreInsts
         + memoryOpInsts
         + numericOtherInsts
-        + numericBinaryInsts
-        + numericIntBinaryInsts
-        + numericIntUnaryInsts
+        + numericBinaryInsts.map(\.base)
+        + numericIntBinaryInsts.map(\.base)
+        + numericIntUnaryInsts.map(\.base)
         + miscInsts
 
     static func camelCase(pascalCase: String) -> String {
@@ -298,6 +311,36 @@ enum GenerateInternalInstruction {
                     return true
                 }
             }
+            """
+        return output
+    }
+
+    static func generateNumericInstImplementations() -> String {
+        var output = """
+            extension ExecutionState {
+            """
+
+        for inst in numericBinaryInsts + numericIntBinaryInsts {
+            output += """
+
+                mutating \(instMethodDecl(inst.base)) {
+                    sp[binaryOperand.result] = sp[binaryOperand.lhs].\(inst.type).\(inst.op.lowercased())(sp[binaryOperand.rhs].\(inst.type)).untyped
+                }
+            """
+        }
+        for inst in numericIntUnaryInsts {
+            output += """
+
+                mutating \(instMethodDecl(inst.base)) {
+                    sp[unaryOperand.result] = sp[unaryOperand.input].\(inst.type).\(inst.op.lowercased()).untyped
+                }
+            """
+        }
+
+        output += """
+
+            }
+
             """
         return output
     }
@@ -428,6 +471,8 @@ enum GenerateInternalInstruction {
             output += generateDispatcher(instructions: instructions)
             output += "\n\n"
             output += generateInstName(instructions: instructions)
+            output += "\n\n"
+            output += generateNumericInstImplementations()
 
             let outputFile = sourceRoot.appending(path: "Sources/WasmKit/Execution/Runtime/InstDispatch.swift")
             try output.write(to: outputFile, atomically: true, encoding: .utf8)

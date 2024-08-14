@@ -453,23 +453,6 @@ extension Value {
         }
     }
 
-    static func i32Rotl(_ lhs: UInt32, _ rhs: UInt32) -> Value {
-        let shift = rhs % 32
-        return .i32(lhs << shift | lhs >> (32 - shift))
-    }
-    static func i64Rotl(_ lhs: UInt64, _ rhs: UInt64) -> Value {
-        let shift = rhs % 64
-        return .i64(lhs << shift | lhs >> (64 - shift))
-    }
-    static func i32Rotr(_ lhs: UInt32, _ rhs: UInt32) -> Value {
-        let shift = rhs % 32
-        return .i32(lhs >> shift | lhs << (32 - shift))
-    }
-    static func i64Rotr(_ lhs: UInt64, _ rhs: UInt64) -> Value {
-        let shift = rhs % 64
-        return .i64(lhs >> shift | lhs << (64 - shift))
-    }
-
     static prefix func - (_ value: Self) -> Self {
         switch value {
         case let .f32(rawValue):
@@ -510,33 +493,6 @@ extension Value {
         case let (.f64(lhs), .f64(rhs)): return .f64((Float64(bitPattern: lhs) / Float64(bitPattern: rhs)).bitPattern)
         default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value.\(#function)` implementation")
         }
-    }
-
-    static func i32Shl(_ lhs: UInt32, _ rhs: UInt32) -> Value {
-        let shift = rhs % 32
-        return .i32(lhs << shift)
-    }
-    static func i64Shl(_ lhs: UInt64, _ rhs: UInt64) -> Value {
-        let shift = rhs % 64
-        return .i64(lhs << shift)
-    }
-
-    static func i32ShrS(_ lhs: UInt32, _ rhs: UInt32) -> Value {
-        let shift = rhs.signed % 32
-        return .i32((lhs.signed >> shift.unsigned).unsigned)
-    }
-    static func i64ShrS(_ lhs: UInt64, _ rhs: UInt64) -> Value {
-        let shift = rhs.signed % 64
-        return .i64((lhs.signed >> shift.unsigned).unsigned)
-    }
-
-    static func i32ShrU(_ lhs: UInt32, _ rhs: UInt32) -> Value {
-        let shift = rhs % 32
-        return .i32(lhs >> shift)
-    }
-    static func i64ShrU(_ lhs: UInt64, _ rhs: UInt64) -> Value {
-        let shift = rhs % 64
-        return .i64(lhs >> shift)
     }
 
     static func divisionSigned(_ lhs: Self, _ rhs: Self) throws -> Self {
@@ -600,4 +556,77 @@ extension ValueType {
     static func addressType(isMemory64: Bool) -> ValueType {
         return isMemory64 ? .i64 : .i32
     }
+}
+
+
+extension FixedWidthInteger {
+    func add(_ other: Self) -> Self { self &+ other }
+    func sub(_ other: Self) -> Self { self &- other }
+    func mul(_ other: Self) -> Self { self &* other }
+    func eq(_ other: Self) -> UInt32 { self == other ? 1 : 0 }
+    func ne(_ other: Self) -> UInt32 { self == other ? 0 : 1 }
+    func and(_ other: Self) -> Self { self & other }
+    func or(_ other: Self) -> Self { self | other }
+    func xor(_ other: Self) -> Self { self ^ other }
+
+    var clz: UInt32 { UInt32(leadingZeroBitCount) }
+    var ctz: UInt32 { UInt32(trailingZeroBitCount) }
+    var popcnt: UInt32 { UInt32(nonzeroBitCount) }
+    var eqz: UInt32 { self == 0 ? 1 : 0 }
+}
+
+extension RawUnsignedInteger {
+    func lts(_ other: Self) -> UInt32 { self.signed < other.signed ? 1 : 0 }
+    func ltu(_ other: Self) -> UInt32 { self < other ? 1 : 0 }
+    func gts(_ other: Self) -> UInt32 { self.signed > other.signed ? 1 : 0 }
+    func gtu(_ other: Self) -> UInt32 { self > other ? 1 : 0 }
+    func les(_ other: Self) -> UInt32 { self.signed <= other.signed ? 1 : 0 }
+    func leu(_ other: Self) -> UInt32 { self <= other ? 1 : 0 }
+    func ges(_ other: Self) -> UInt32 { self.signed >= other.signed ? 1 : 0 }
+    func geu(_ other: Self) -> UInt32 { self >= other ? 1 : 0 }
+
+    func shl(_ other: Self) -> Self {
+        let shift = other % Self(Self.bitWidth)
+        return self << shift
+    }
+    func shrs(_ other: Self) -> Self {
+        let shift = other.signed % Self.Signed(Self.bitWidth)
+        return (self.signed >> shift.unsigned).unsigned
+    }
+    func shru(_ other: Self) -> Self {
+        let shift = other % Self(Self.bitWidth)
+        return self >> shift
+    }
+    func rotl(_ other: Self) -> Self {
+        let shift = other % Self(Self.bitWidth)
+        return self << shift | self >> (Self(Self.bitWidth) - shift)
+    }
+    func rotr(_ other: Self) -> Self {
+        let shift = other % Self(Self.bitWidth)
+        return self >> shift | self << (Self(Self.bitWidth) - shift)
+    }
+}
+
+extension FloatingPoint {
+    func add(_ other: Self) -> Self { self + other }
+    func sub(_ other: Self) -> Self { self - other }
+    func mul(_ other: Self) -> Self { self * other }
+    func eq(_ other: Self) -> UInt32 { self == other ? 1 : 0 }
+    func ne(_ other: Self) -> UInt32 { self == other ? 0 : 1 }
+}
+
+extension UInt32 {
+    var untyped: UntypedValue { UntypedValue.i32(self) }
+}
+
+extension UInt64 {
+    var untyped: UntypedValue { UntypedValue.i64(self) }
+}
+
+extension Float32 {
+    var untyped: UntypedValue { UntypedValue.f32(self) }
+}
+
+extension Float64 {
+    var untyped: UntypedValue { UntypedValue.f64(self) }
 }

@@ -398,3 +398,187 @@ extension Instruction {
         }
     }
 }
+
+
+extension ExecutionState {
+    mutating func i32Add(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.add(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64Add(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.add(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func f32Add(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.add(sp[binaryOperand.rhs].f32).untyped
+    }
+    mutating func f64Add(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.add(sp[binaryOperand.rhs].f64).untyped
+    }
+    mutating func i32Sub(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.sub(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64Sub(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.sub(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func f32Sub(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.sub(sp[binaryOperand.rhs].f32).untyped
+    }
+    mutating func f64Sub(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.sub(sp[binaryOperand.rhs].f64).untyped
+    }
+    mutating func i32Mul(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.mul(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64Mul(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.mul(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func f32Mul(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.mul(sp[binaryOperand.rhs].f32).untyped
+    }
+    mutating func f64Mul(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.mul(sp[binaryOperand.rhs].f64).untyped
+    }
+    mutating func i32Eq(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.eq(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64Eq(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.eq(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func f32Eq(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.eq(sp[binaryOperand.rhs].f32).untyped
+    }
+    mutating func f64Eq(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.eq(sp[binaryOperand.rhs].f64).untyped
+    }
+    mutating func i32Ne(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.ne(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64Ne(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.ne(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func f32Ne(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.ne(sp[binaryOperand.rhs].f32).untyped
+    }
+    mutating func f64Ne(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.ne(sp[binaryOperand.rhs].f64).untyped
+    }
+    mutating func i32LtS(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.lts(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64LtS(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.lts(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func i32LtU(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.ltu(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64LtU(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.ltu(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func i32GtS(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.gts(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64GtS(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.gts(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func i32GtU(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.gtu(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64GtU(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.gtu(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func i32LeS(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.les(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64LeS(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.les(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func i32LeU(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.leu(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64LeU(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.leu(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func i32GeS(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.ges(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64GeS(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.ges(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func i32GeU(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.geu(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64GeU(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.geu(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func i32And(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.and(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64And(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.and(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func i32Or(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.or(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64Or(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.or(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func i32Xor(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.xor(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64Xor(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.xor(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func i32Shl(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.shl(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64Shl(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.shl(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func i32ShrS(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.shrs(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64ShrS(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.shrs(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func i32ShrU(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.shru(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64ShrU(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.shru(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func i32Rotl(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.rotl(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64Rotl(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.rotl(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func i32Rotr(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.rotr(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64Rotr(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.rotr(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func i32Clz(context: inout StackContext, sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        sp[unaryOperand.result] = sp[unaryOperand.input].i32.clz.untyped
+    }
+    mutating func i64Clz(context: inout StackContext, sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        sp[unaryOperand.result] = sp[unaryOperand.input].i64.clz.untyped
+    }
+    mutating func i32Ctz(context: inout StackContext, sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        sp[unaryOperand.result] = sp[unaryOperand.input].i32.ctz.untyped
+    }
+    mutating func i64Ctz(context: inout StackContext, sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        sp[unaryOperand.result] = sp[unaryOperand.input].i64.ctz.untyped
+    }
+    mutating func i32Popcnt(context: inout StackContext, sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        sp[unaryOperand.result] = sp[unaryOperand.input].i32.popcnt.untyped
+    }
+    mutating func i64Popcnt(context: inout StackContext, sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        sp[unaryOperand.result] = sp[unaryOperand.input].i64.popcnt.untyped
+    }
+    mutating func i32Eqz(context: inout StackContext, sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        sp[unaryOperand.result] = sp[unaryOperand.input].i32.eqz.untyped
+    }
+    mutating func i64Eqz(context: inout StackContext, sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        sp[unaryOperand.result] = sp[unaryOperand.input].i64.eqz.untyped
+    }
+}
