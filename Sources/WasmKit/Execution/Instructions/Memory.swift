@@ -1,51 +1,8 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#memory-instructions>
 extension ExecutionState {
-    mutating func i32Load(context: inout StackContext, sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt32.self, castToValue: { .i32($0) })
-    }
-    mutating func i64Load(context: inout StackContext, sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt64.self, castToValue: { .i64($0) })
-    }
-    mutating func f32Load(context: inout StackContext, sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt32.self, castToValue: { .rawF32($0) })
-    }
-    mutating func f64Load(context: inout StackContext, sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt64.self, castToValue: { .rawF64($0) })
-    }
-    mutating func i32Load8S(context: inout StackContext, sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: Int8.self, castToValue: { .init(signed: Int32($0)) })
-    }
-    mutating func i32Load8U(context: inout StackContext, sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt8.self, castToValue: { .i32(UInt32($0)) })
-    }
-    mutating func i32Load16S(context: inout StackContext, sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: Int16.self, castToValue: { .init(signed: Int32($0)) })
-    }
-    mutating func i32Load16U(context: inout StackContext, sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt16.self, castToValue: { .i32(UInt32($0)) })
-    }
-    mutating func i64Load8S(context: inout StackContext, sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: Int8.self, castToValue: { .init(signed: Int64($0)) })
-    }
-    mutating func i64Load8U(context: inout StackContext, sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt8.self, castToValue: { .i64(UInt64($0)) })
-    }
-    mutating func i64Load16S(context: inout StackContext, sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: Int16.self, castToValue: { .init(signed: Int64($0)) })
-    }
-    mutating func i64Load16U(context: inout StackContext, sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt16.self, castToValue: { .i64(UInt64($0)) })
-    }
-    mutating func i64Load32S(context: inout StackContext, sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: Int32.self, castToValue: { .init(signed: Int64($0)) })
-    }
-    mutating func i64Load32U(context: inout StackContext, sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt32.self, castToValue: { .i64(UInt64($0)) })
-    }
-
     @_transparent
-    private mutating func memoryLoad<T: FixedWidthInteger>(
+    mutating func memoryLoad<T: FixedWidthInteger>(
         sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand, loadAs _: T.Type = T.self, castToValue: (T) -> UntypedValue
     ) throws {
         let memarg = loadOperand.memarg

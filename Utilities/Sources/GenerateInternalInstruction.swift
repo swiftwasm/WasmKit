@@ -120,23 +120,30 @@ enum GenerateInternalInstruction {
         ]),
     ]
 
-    static let memoryLoadInsts: [Instruction] = [
-        "i32Load",
-        "i64Load",
-        "f32Load",
-        "f64Load",
-        "i32Load8S",
-        "i32Load8U",
-        "i32Load16S",
-        "i32Load16U",
-        "i64Load8S",
-        "i64Load8U",
-        "i64Load16S",
-        "i64Load16U",
-        "i64Load32S",
-        "i64Load32U",
-    ].map {
-        Instruction(name: $0, mayThrow: true, useCurrentMemory: .read, immediates: [Immediate(name: nil, type: "Instruction.LoadOperand")])
+    struct LoadInstruction {
+        let loadAs: String
+        let castToValue: String
+        let base: Instruction
+    }
+
+    static let memoryLoadInsts: [LoadInstruction] = [
+        ("i32Load", "UInt32", ".i32($0)"),
+        ("i64Load", "UInt64", ".i64($0)"),
+        ("f32Load", "UInt32", ".rawF32($0)"),
+        ("f64Load", "UInt64", ".rawF64($0)"),
+        ("i32Load8S", "Int8", ".init(signed: Int32($0))"),
+        ("i32Load8U", "UInt8", ".i32(UInt32($0))"),
+        ("i32Load16S", "Int16", ".init(signed: Int32($0))"),
+        ("i32Load16U", "UInt16", ".i32(UInt32($0))"),
+        ("i64Load8S", "Int8", ".init(signed: Int64($0))"),
+        ("i64Load8U", "UInt8", ".i64(UInt64($0))"),
+        ("i64Load16S", "Int16", ".init(signed: Int64($0))"),
+        ("i64Load16U", "UInt16", ".i64(UInt64($0))"),
+        ("i64Load32S", "Int32", ".init(signed: Int64($0))"),
+        ("i64Load32U", "UInt32", ".i64(UInt64($0))"),
+    ].map { (name, loadAs, castToValue) in
+        let base = Instruction(name: name, mayThrow: true, useCurrentMemory: .read, immediates: [Immediate(name: nil, type: "Instruction.LoadOperand")])
+        return LoadInstruction(loadAs: loadAs, castToValue: castToValue, base: base)
     }
     static let memoryStoreInsts: [Instruction] = [
         "i32Store",
@@ -151,7 +158,7 @@ enum GenerateInternalInstruction {
     ].map {
         Instruction(name: $0, mayThrow: true, useCurrentMemory: .read, immediates: [Immediate(name: nil, type: "Instruction.StoreOperand")])
     }
-    static let memoryLoadStoreInsts: [Instruction] = memoryLoadInsts + memoryStoreInsts
+    static let memoryLoadStoreInsts: [Instruction] = memoryLoadInsts.map(\.base) + memoryStoreInsts
     static let memoryOpInsts: [Instruction] = [
         Instruction(name: "memorySize", immediates: [Immediate(name: nil, type: "Instruction.MemorySizeOperand")]),
         Instruction(name: "memoryGrow", mayThrow: true, useCurrentMemory: .write, immediates: [
@@ -315,7 +322,7 @@ enum GenerateInternalInstruction {
         return output
     }
 
-    static func generateNumericInstImplementations() -> String {
+    static func generateBasicInstImplementations() -> String {
         var output = """
             extension ExecutionState {
             """
@@ -333,6 +340,15 @@ enum GenerateInternalInstruction {
 
                 mutating \(instMethodDecl(inst.base)) {
                     sp[unaryOperand.result] = sp[unaryOperand.input].\(inst.type).\(inst.op.lowercased()).untyped
+                }
+            """
+        }
+
+        for inst in memoryLoadInsts {
+            output += """
+
+                mutating \(instMethodDecl(inst.base)) {
+                    try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: \(inst.loadAs).self, castToValue: { \(inst.castToValue) })
                 }
             """
         }
@@ -472,7 +488,7 @@ enum GenerateInternalInstruction {
             output += "\n\n"
             output += generateInstName(instructions: instructions)
             output += "\n\n"
-            output += generateNumericInstImplementations()
+            output += generateBasicInstImplementations()
 
             let outputFile = sourceRoot.appending(path: "Sources/WasmKit/Execution/Runtime/InstDispatch.swift")
             try output.write(to: outputFile, atomically: true, encoding: .utf8)
