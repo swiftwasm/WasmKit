@@ -100,6 +100,16 @@ enum Result {
     }
 }
 
+class WastRunContext {
+    private var namedModuleInstances: [String: Instance] = [:]
+    func lookupInstance(_ name: String) -> Instance? {
+        return namedModuleInstances[name]
+    }
+    func register(_ name: String, instance: Instance) {
+        self.namedModuleInstances[name] = instance
+    }
+}
+
 extension TestCase {
     func run(spectestModule: Module, handler: @escaping (TestCase, Location, Result) -> Void) throws {
         let runtime = Runtime()
@@ -110,10 +120,12 @@ extension TestCase {
         var currentInstance: Instance?
         let rootPath = FilePath(path).removingLastComponent().string
         var content = content
+        let context = WastRunContext()
         do {
             while let (directive, location) = try content.nextDirective() {
                 directive.run(
                     runtime: runtime,
+                    context: context,
                     instance: &currentInstance,
                     rootPath: rootPath
                 ) { command, result in
@@ -133,26 +145,33 @@ extension TestCase {
 extension WastDirective {
     func run(
         runtime: Runtime,
+        context: WastRunContext,
         instance currentInstance: inout Instance?,
         rootPath: String,
         handler: (WastDirective, Result) -> Void
     ) {
-
+        func instantiate(module: Module, name: String? = nil) throws -> Instance {
+            let instance = try runtime.instantiate(module: module)
+            if let name {
+                context.register(name, instance: instance)
+            }
+            return instance
+        }
         func deriveModuleInstance(from execute: WastExecute) throws -> Instance? {
             switch execute {
             case .invoke(let invoke):
                 if let module = invoke.module {
-                    return runtime.store.lookupInstance(module)
+                    return context.lookupInstance(module)
                 } else {
                     return currentInstance
                 }
             case .wat(var wat):
                 let module = try parseModule(rootPath: rootPath, moduleSource: .binary(wat.encode()))
-                let instance = try runtime.instantiate(module: module)
+                let instance = try instantiate(module: module)
                 return instance
             case .get(let module, _):
                 if let module {
-                    return runtime.store.lookupInstance(module)
+                    return context.lookupInstance(module)
                 } else {
                     return currentInstance
                 }
@@ -171,7 +190,7 @@ extension WastDirective {
             }
 
             do {
-                currentInstance = try runtime.instantiate(module: module, name: moduleDirective.id)
+                currentInstance = try instantiate(module: module, name: moduleDirective.id)
             } catch {
                 return handler(self, .failed("module could not be instantiated: \(error)"))
             }
@@ -181,7 +200,7 @@ extension WastDirective {
         case .register(let name, let moduleId):
             let module: Instance
             if let moduleId {
-                guard let found = runtime.store.lookupInstance(moduleId) else {
+                guard let found = context.lookupInstance(moduleId) else {
                     return handler(self, .failed("module \(moduleId) not found"))
                 }
                 module = found
@@ -224,7 +243,7 @@ extension WastDirective {
             }
 
             do {
-                _ = try runtime.instantiate(module: module)
+                _ = try instantiate(module: module)
             } catch let error as InstantiationError {
                 guard error.assertionText.contains(message) else {
                     return handler(self, .failed("assertion mismatch: expected: \(message), actual: \(error.assertionText)"))
@@ -340,7 +359,7 @@ extension WastDirective {
             }
 
             do {
-                _ = try runtime.instantiate(module: module)
+                _ = try instantiate(module: module)
             } catch let error as ImportError {
                 guard error.assertionText.contains(message) else {
                     return handler(self, .failed("assertion mismatch: expected: \(message), actual: \(error.assertionText)"))
@@ -523,15 +542,4 @@ internal func isDirectory(_ path: FilePath) -> Bool {
         try? fd?.close()
         return isDirectory
     #endif
-}
-
-extension Store {
-    fileprivate func lookupInstance(_ name: String) -> Instance? {
-        return namedModuleInstances[name].map {
-            Instance(
-                handle: $0,
-                allocator: allocator
-            )
-        }
-    }
 }

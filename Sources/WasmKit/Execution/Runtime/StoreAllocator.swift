@@ -136,7 +136,10 @@ class StoreAllocator {
     var pointerVectors: BumpAllocator<UnsafeMutableRawPointer>
     let iseqAllocator: ISeqAllocator
 
-    init() {
+    /// Function type interner shared across stores associated with the same `Runtime`.
+    let funcTypeInterner: Interner<FunctionType>
+
+    init(funcTypeInterner: Interner<FunctionType>) {
         instances = BumpAllocator(initialCapacity: 2)
         functions = BumpAllocator(initialCapacity: 64)
         hostFunctions = BumpAllocator(initialCapacity: 32)
@@ -148,6 +151,7 @@ class StoreAllocator {
         datas = BumpAllocator(initialCapacity: 64)
         pointerVectors = BumpAllocator(initialCapacity: 1024)
         iseqAllocator = ISeqAllocator()
+        self.funcTypeInterner = funcTypeInterner
     }
 }
 

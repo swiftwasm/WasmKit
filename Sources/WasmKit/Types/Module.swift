@@ -103,7 +103,8 @@ public struct Module {
         }
     }
 
-    public func _functions<Target>(to target: inout Target) throws where Target: TextOutputStream {
+    @_spi(OnlyForCLI)
+    public func dumpFunctions<Target>(to target: inout Target) throws where Target: TextOutputStream {
         var nameMap = [UInt32: String]()
         if let nameSection = customSections.first(where: { $0.name == "name" }) {
             let nameParser = WasmParser.NameSectionParser(stream: StaticByteStream(bytes: Array(nameSection.bytes)))

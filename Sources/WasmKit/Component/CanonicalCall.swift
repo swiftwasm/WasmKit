@@ -27,11 +27,6 @@ public struct CanonicalCallContext {
         self.runtime = runtime
     }
 
-    @available(*, deprecated)
-    public init(options: CanonicalOptions, moduleInstance: Instance, runtime: Runtime) {
-        self.init(options: options, instance: moduleInstance, runtime: runtime)
-    }
-
     /// Call `cabi_realloc` export with the given arguments.
     public func realloc(
         old: UInt32,
@@ -54,23 +49,26 @@ public struct CanonicalCallContext {
         return UnsafeGuestRawPointer(memorySpace: guestMemory, offset: new)
     }
 }
-//
-//public struct WasmKitGuestMemory: GuestMemory {
-//    private let store: Store
-//    private let address: InternalMemory
-//
-//    /// Creates a new memory instance from the given store and address
-//    public init(store: Store, memory: InternalMemory) {
-//        self.store = store
-//        self.address = address
-//    }
-//
-//    /// Executes the given closure with a mutable buffer pointer to the host memory region mapped as guest memory.
-//    public func withUnsafeMutableBufferPointer<T>(offset: UInt, count: Int, _ body: (UnsafeMutableRawBufferPointer) throws -> T) rethrows -> T {
-//        try store.withMemory(at: address) { memory in
-//            try memory.data.withUnsafeMutableBufferPointer { buffer in
-//                try body(UnsafeMutableRawBufferPointer(start: buffer.baseAddress! + Int(offset), count: count))
-//            }
-//        }
-//    }
-//}
+
+extension CanonicalCallContext {
+    @available(*, deprecated, renamed: "instance")
+    public var moduleInstance: Instance {
+        return instance
+    }
+
+    @available(*, deprecated, renamed: "init(options:instance:runtime:)")
+    public init(options: CanonicalOptions, moduleInstance: Instance, runtime: Runtime) {
+        self.init(options: options, instance: moduleInstance, runtime: runtime)
+    }
+}
+
+@available(*, deprecated, renamed: "Memory", message: "WasmKitGuestMemory has been removed; use Memory instead")
+public typealias WasmKitGuestMemory = Memory
+
+extension Memory {
+    /// Creates a new memory instance from the given store and address
+    @available(*, unavailable, message: "WasmKitGuestMemory has been removed; use Memory instead")
+    public init(store: Store, memory: Memory) {
+        fatalError()
+    }
+}

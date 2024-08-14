@@ -5,11 +5,18 @@ public struct Function: Equatable {
     internal let handle: InternalFunction
     let allocator: StoreAllocator
 
+    public var type: FunctionType {
+        allocator.funcTypeInterner.resolve(handle.type)
+    }
+
     /// Invokes a function of the given address with the given parameters.
     public func invoke(_ arguments: [Value] = [], runtime: Runtime) throws -> [Value] {
         return try handle.invoke(arguments, runtime: runtime)
     }
 }
+
+@available(*, deprecated, renamed: "Function")
+public typealias FunctionInstance = Function
 
 struct InternalFunction: Equatable, Hashable {
     private let _storage: Int

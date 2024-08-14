@@ -3,15 +3,13 @@ import WasmParser
 /// A container to manage execution state of one or more module instances.
 public final class Runtime {
     public let store: Store
-    var funcTypeInterner: Interner<FunctionType>
-    let interceptor: RuntimeInterceptor?
+    let funcTypeInterner: Interner<FunctionType>
 
     /// Initializes a new instant of a WebAssembly interpreter runtime.
     /// - Parameter hostModules: Host module names mapped to their corresponding ``HostModule`` definitions.
-    public init(hostModules: [String: HostModule] = [:], interceptor: RuntimeInterceptor? = nil) {
-        store = Store()
-        self.interceptor = interceptor
+    public init(hostModules: [String: HostModule] = [:]) {
         self.funcTypeInterner = Interner<FunctionType>()
+        store = Store(funcTypeInterner: funcTypeInterner)
 
         for (moduleName, hostModule) in hostModules {
             store.registerUniqueHostModule(hostModule, as: moduleName, runtime: self)
@@ -27,21 +25,18 @@ public final class Runtime {
 }
 
 @_documentation(visibility: internal)
+@available(*, unavailable, message: "Interceptors are not supported anymore for performance reasons")
 public protocol RuntimeInterceptor {
     func onEnterFunction(_ function: Function, store: Store)
     func onExitFunction(_ function: Function, store: Store)
 }
 
 extension Runtime {
-    public func instantiate(module: Module, name: String? = nil) throws -> Instance {
+    public func instantiate(module: Module) throws -> Instance {
         let instance = try instantiate(
             module: module,
             externalValues: store.getExternalValues(module, runtime: self)
         )
-
-        if let name {
-            store.namedModuleInstances[name] = instance
-        }
 
         return Instance(handle: instance, allocator: store.allocator)
     }
@@ -154,24 +149,24 @@ extension Runtime {
         fatalError()
     }
 
-    public func getGlobal(_ moduleInstance: Instance, globalName: String) throws -> Value {
-        guard case let .global(global) = moduleInstance.export(globalName) else {
-            throw Trap._raw("no global export with name \(globalName) in a module instance \(moduleInstance)")
+    public func getGlobal(_ instance: Instance, globalName: String) throws -> Value {
+        guard case let .global(global) = instance.export(globalName) else {
+            throw Trap._raw("no global export with name \(globalName) in a module instance \(instance)")
         }
         return global.value
     }
 
-    public func invoke(_ moduleInstance: Instance, function: String, with arguments: [Value] = []) throws -> [Value] {
-        guard case let .function(function)? = moduleInstance.export(function) else {
-            throw Trap.exportedFunctionNotFound(moduleInstance, name: function)
+    public func invoke(_ instance: Instance, function: String, with arguments: [Value] = []) throws -> [Value] {
+        guard case let .function(function)? = instance.export(function) else {
+            throw Trap.exportedFunctionNotFound(instance, name: function)
         }
         return try function.invoke(arguments, runtime: self)
     }
 
-//    /// Invokes a function of the given address with the given parameters.
-//    public func invoke(_ address: FunctionAddress, with parameters: [Value] = []) throws -> [Value] {
-//        try Function(address: address).invoke(parameters, runtime: self)
-//    }
+    @available(*, unavailable, message: "Use `Function.invoke` instead")
+    public func invoke(_ address: FunctionAddress, with parameters: [Value] = []) throws -> [Value] {
+        fatalError()
+    }
 }
 
 protocol ConstEvaluationContextProtocol {

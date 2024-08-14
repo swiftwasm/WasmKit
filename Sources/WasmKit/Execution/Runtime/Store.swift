@@ -32,7 +32,10 @@ public final class Store {
     private var hostGlobals: [Global] = []
     var nameRegistry = NameRegistry()
 
-    var namedModuleInstances: [String: InternalInstance] = [:]
+    @available(*, unavailable)
+    public var namedModuleInstances: [String: Any] {
+        fatalError()
+    }
 
     /// This property is separate from `registeredModuleInstances`, as host exports
     /// won't have a corresponding module instance.
@@ -40,19 +43,26 @@ public final class Store {
 
     let allocator: StoreAllocator
 
-    init() {
-        self.allocator = StoreAllocator()
+    init(funcTypeInterner: Interner<FunctionType>) {
+        self.allocator = StoreAllocator(funcTypeInterner: funcTypeInterner)
     }
 }
 
 /// A caller context passed to host functions
 public struct Caller {
     private let instanceHandle: InternalInstance?
+    /// The instance that called the host function.
+    /// - Note: This property is `nil` if a `Function` backed by a host function is called directly.
     public var instance: Instance? {
         guard let instanceHandle else { return nil }
         return Instance(handle: instanceHandle, allocator: runtime.store.allocator)
     }
+    /// The runtime that called the host function.
     public let runtime: Runtime
+    /// The store associated with the caller execution context.
+    public var store: Store {
+        runtime.store
+    }
 
     init(instanceHandle: InternalInstance?, runtime: Runtime) {
         self.instanceHandle = instanceHandle
@@ -152,9 +162,14 @@ extension Store {
         availableExports[name] = moduleExports
     }
 
-    @available(*, unavailable)
-    func memory(at address: MemoryAddress) -> Memory {
-        fatalError()
+    @available(*, deprecated, message: "Address-based APIs has been removed; use `Memory` instead")
+    public func memory(at address: Memory) -> Memory {
+        address
+    }
+
+    @available(*, deprecated, message: "Address-based APIs has been removed; use `Memory` instead")
+    public func withMemory<T>(at address: Memory, _ body: (Memory) throws -> T) rethrows -> T {
+        try body(address)
     }
 
     func getExternalValues(_ module: Module, runtime: Runtime) throws -> [ExternalValue] {

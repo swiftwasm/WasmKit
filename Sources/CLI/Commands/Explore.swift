@@ -1,6 +1,6 @@
 import ArgumentParser
 import SystemPackage
-import WasmKit
+@_spi(OnlyForCLI) import WasmKit
 
 struct Explore: ParsableCommand {
     @Argument
@@ -15,6 +15,6 @@ struct Explore: ParsableCommand {
     func run() throws {
         let module = try parseWasm(filePath: FilePath(path))
         var stdout = Stdout()
-        try module._functions(to: &stdout)
+        try module.dumpFunctions(to: &stdout)
     }
 }

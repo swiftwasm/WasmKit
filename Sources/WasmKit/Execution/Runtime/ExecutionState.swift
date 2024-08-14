@@ -70,10 +70,6 @@ extension ExecutionState {
         callLike: Instruction.CallLikeOperand = Instruction.CallLikeOperand(spAddend: 0),
         md: inout Md, ms: inout Ms
     ) throws {
-        #if DEBUG
-            // runtime.interceptor?.onEnterFunction(address, store: runtime.store)
-        #endif
-
         try function.execute(
             stack: &stack,
             executionState: &self,

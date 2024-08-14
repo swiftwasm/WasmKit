@@ -51,7 +51,7 @@ struct InstanceEntity /* : ~Copyable */ {
 
 typealias InternalInstance = EntityHandle<InstanceEntity>
 
-/// A stateful runtime representation of a ``Module``.
+/// A stateful instance of a WebAssembly module.
 /// Usually instantiated by ``Runtime/instantiate(module:name:)``.
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#module-instances>
@@ -80,13 +80,29 @@ public struct Instance {
         return function
     }
 
-    var exports: [String: ExternalValue] {
+    public typealias Exports = [String: ExternalValue]
+
+    public var exports: Exports {
         handle.exports.reduce(into: [:]) { exports, export in
             exports[export.name] = ExternalValue(export, instance: handle, allocator: allocator)
         }
     }
 }
 
+extension Instance {
+    @available(*, unavailable, message: "Address-based APIs has been removed; use `Instance/export` to access exported memories")
+    public var memoryAddresses: [Never] { [] }
+    @available(*, unavailable, message: "Address-based APIs has been removed; use `Instance/export` to access exported globals")
+    public var globalAddresses: [Never] { [] }
+    @available(*, unavailable, message: "Address-based APIs has been removed;")
+    public var elementAddresses: [Never] { [] }
+    @available(*, unavailable, message: "Address-based APIs has been removed;")
+    public var dataAddresses: [Never] { [] }
+    @available(*, unavailable, message: "Address-based APIs has been removed;")
+    public var exportInstances: [Never] { [] }
+}
+
+@available(*, deprecated, renamed: "Instance")
 public typealias ModuleInstance = Instance
 
 /// > Note:
@@ -223,6 +239,7 @@ public struct Memory: Equatable {
 }
 
 extension Memory: GuestMemory {
+    /// Executes the given closure with a mutable buffer pointer to the host memory region mapped as guest memory.
     public func withUnsafeMutableBufferPointer<T>(
         offset: UInt,
         count: Int,
