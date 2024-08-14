@@ -1,241 +1,241 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#numeric-instructions>
 extension ExecutionState {
-    mutating func numericConst(context: inout StackContext, stack: FrameBase, constOperand: Instruction.ConstOperand) {
-        stack[constOperand.result] = constOperand.value
+    mutating func numericConst(context: inout StackContext, sp: Sp, constOperand: Instruction.ConstOperand) {
+        sp[constOperand.result] = constOperand.value
     }
     @inline(__always)
-    private mutating func numericUnary<T>(stack: FrameBase, operand: Instruction.UnaryOperand, castTo: (UntypedValue) -> T, unary: (T) -> Value) {
-        let value = stack[operand.input]
+    private mutating func numericUnary<T>(sp: Sp, operand: Instruction.UnaryOperand, castTo: (UntypedValue) -> T, unary: (T) -> Value) {
+        let value = sp[operand.input]
 
-        stack[operand.result] = UntypedValue(unary(castTo(value)))
+        sp[operand.result] = UntypedValue(unary(castTo(value)))
     }
-    mutating func numericFloatUnary(context: inout StackContext, stack: FrameBase, floatUnary: NumericInstruction.FloatUnary, unaryOperand: Instruction.UnaryOperand) {
-        let value = stack[unaryOperand.input]
-        stack[unaryOperand.result] = UntypedValue(floatUnary(value.cast(to: floatUnary.type)))
+    mutating func numericFloatUnary(context: inout StackContext, sp: Sp, floatUnary: NumericInstruction.FloatUnary, unaryOperand: Instruction.UnaryOperand) {
+        let value = sp[unaryOperand.input]
+        sp[unaryOperand.result] = UntypedValue(floatUnary(value.cast(to: floatUnary.type)))
     }
     @inline(__always)
-    private mutating func numericBinary<T>(stack: FrameBase, operand: Instruction.BinaryOperand, castTo: (UntypedValue) -> T, binary: (T, T) -> Value) {
-        let value2 = stack[operand.rhs]
-        let value1 = stack[operand.lhs]
+    private mutating func numericBinary<T>(sp: Sp, operand: Instruction.BinaryOperand, castTo: (UntypedValue) -> T, binary: (T, T) -> Value) {
+        let value2 = sp[operand.rhs]
+        let value1 = sp[operand.lhs]
 
-        stack[operand.result] = UntypedValue(binary(castTo(value1), castTo(value2)))
-    }
-
-    mutating func i32Add(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { .i32($0 &+ $1) })
+        sp[operand.result] = UntypedValue(binary(castTo(value1), castTo(value2)))
     }
 
-    mutating func i64Add(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { .i64($0 &+ $1) })
+    mutating func i32Add(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { .i32($0 &+ $1) })
     }
 
-    mutating func f32Add(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asF32, binary: { .f32((Float32(bitPattern: $0) + Float32(bitPattern: $1)).bitPattern) })
+    mutating func i64Add(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { .i64($0 &+ $1) })
     }
 
-    mutating func f64Add(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asF64, binary: { .f64((Float64(bitPattern: $0) + Float64(bitPattern: $1)).bitPattern) })
+    mutating func f32Add(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asF32, binary: { .f32((Float32(bitPattern: $0) + Float32(bitPattern: $1)).bitPattern) })
     }
 
-    mutating func i32Sub(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { .i32($0 &- $1) })
+    mutating func f64Add(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asF64, binary: { .f64((Float64(bitPattern: $0) + Float64(bitPattern: $1)).bitPattern) })
     }
 
-    mutating func i64Sub(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { .i64($0 &- $1) })
+    mutating func i32Sub(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { .i32($0 &- $1) })
     }
 
-    mutating func f32Sub(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asF32, binary: { .f32((Float32(bitPattern: $0) - Float32(bitPattern: $1)).bitPattern) })
+    mutating func i64Sub(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { .i64($0 &- $1) })
     }
 
-    mutating func f64Sub(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asF64, binary: { .f64((Float64(bitPattern: $0) - Float64(bitPattern: $1)).bitPattern) })
+    mutating func f32Sub(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asF32, binary: { .f32((Float32(bitPattern: $0) - Float32(bitPattern: $1)).bitPattern) })
     }
 
-    mutating func i32Mul(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { .i32($0 &* $1) })
+    mutating func f64Sub(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asF64, binary: { .f64((Float64(bitPattern: $0) - Float64(bitPattern: $1)).bitPattern) })
     }
 
-    mutating func i64Mul(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { .i64($0 &* $1) })
+    mutating func i32Mul(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { .i32($0 &* $1) })
     }
 
-    mutating func f32Mul(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asF32, binary: { .f32((Float32(bitPattern: $0) * Float32(bitPattern: $1)).bitPattern) })
+    mutating func i64Mul(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { .i64($0 &* $1) })
     }
 
-    mutating func f64Mul(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asF64, binary: { .f64((Float64(bitPattern: $0) * Float64(bitPattern: $1)).bitPattern) })
+    mutating func f32Mul(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asF32, binary: { .f32((Float32(bitPattern: $0) * Float32(bitPattern: $1)).bitPattern) })
     }
 
-    mutating func i32Eq(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { $0 == $1 ? true : false })
+    mutating func f64Mul(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asF64, binary: { .f64((Float64(bitPattern: $0) * Float64(bitPattern: $1)).bitPattern) })
     }
 
-    mutating func i64Eq(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { $0 == $1 ? true : false })
+    mutating func i32Eq(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { $0 == $1 ? true : false })
     }
 
-    mutating func f32Eq(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asF32, binary: { Float32(bitPattern: $0) == Float32(bitPattern: $1) ? true : false })
+    mutating func i64Eq(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { $0 == $1 ? true : false })
     }
 
-    mutating func f64Eq(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asF64, binary: { Float64(bitPattern: $0) == Float64(bitPattern: $1) ? true : false })
+    mutating func f32Eq(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asF32, binary: { Float32(bitPattern: $0) == Float32(bitPattern: $1) ? true : false })
     }
 
-    mutating func i32Ne(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { $0 == $1 ? false : true })
+    mutating func f64Eq(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asF64, binary: { Float64(bitPattern: $0) == Float64(bitPattern: $1) ? true : false })
     }
 
-    mutating func i64Ne(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { $0 == $1 ? false : true })
+    mutating func i32Ne(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { $0 == $1 ? false : true })
     }
 
-    mutating func f32Ne(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asF32, binary: { Float32(bitPattern: $0) == Float32(bitPattern: $1) ? false : true })
+    mutating func i64Ne(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { $0 == $1 ? false : true })
     }
 
-    mutating func f64Ne(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asF64, binary: { Float64(bitPattern: $0) == Float64(bitPattern: $1) ? false : true })
+    mutating func f32Ne(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asF32, binary: { Float32(bitPattern: $0) == Float32(bitPattern: $1) ? false : true })
     }
 
-    mutating func i32And(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { .i32($0 & $1) })
-    }
-    mutating func i64And(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { .i64($0 & $1) })
-    }
-    mutating func i32Or(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { .i32($0 | $1) })
-    }
-    mutating func i64Or(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { .i64($0 | $1) })
-    }
-    mutating func i32Xor(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { .i32($0 ^ $1) })
-    }
-    mutating func i64Xor(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { .i64($0 ^ $1) })
-    }
-    mutating func i32Shl(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI32, binary: Value.i32Shl)
-    }
-    mutating func i64Shl(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI64, binary: Value.i64Shl)
-    }
-    mutating func i32ShrS(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI32, binary: Value.i32ShrS)
-    }
-    mutating func i64ShrS(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI64, binary: Value.i64ShrS)
-    }
-    mutating func i32ShrU(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI32, binary: Value.i32ShrU)
-    }
-    mutating func i64ShrU(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI64, binary: Value.i64ShrU)
-    }
-    mutating func i32Rotl(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI32, binary: Value.i32Rotl)
-    }
-    mutating func i64Rotl(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI64, binary: Value.i64Rotl)
-    }
-    mutating func i32Rotr(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI32, binary: Value.i32Rotr)
-    }
-    mutating func i64Rotr(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI64, binary: Value.i64Rotr)
+    mutating func f64Ne(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asF64, binary: { Float64(bitPattern: $0) == Float64(bitPattern: $1) ? false : true })
     }
 
-    mutating func i32LtS(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { $0.signed < $1.signed ? true : false })
+    mutating func i32And(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { .i32($0 & $1) })
     }
-    mutating func i64LtS(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { $0.signed < $1.signed ? true : false })
+    mutating func i64And(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { .i64($0 & $1) })
     }
-    mutating func i32LtU(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { $0 < $1 ? true : false })
+    mutating func i32Or(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { .i32($0 | $1) })
     }
-    mutating func i64LtU(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { $0 < $1 ? true : false })
+    mutating func i64Or(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { .i64($0 | $1) })
     }
-    mutating func i32GtS(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { $0.signed > $1.signed ? true : false })
+    mutating func i32Xor(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { .i32($0 ^ $1) })
     }
-    mutating func i64GtS(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { $0.signed > $1.signed ? true : false })
+    mutating func i64Xor(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { .i64($0 ^ $1) })
     }
-    mutating func i32GtU(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { $0 > $1 ? true : false })
+    mutating func i32Shl(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI32, binary: Value.i32Shl)
     }
-    mutating func i64GtU(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { $0 > $1 ? true : false })
+    mutating func i64Shl(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI64, binary: Value.i64Shl)
     }
-    mutating func i32LeS(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { $0.signed <= $1.signed ? true : false })
+    mutating func i32ShrS(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI32, binary: Value.i32ShrS)
     }
-    mutating func i64LeS(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { $0.signed <= $1.signed ? true : false })
+    mutating func i64ShrS(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI64, binary: Value.i64ShrS)
     }
-    mutating func i32LeU(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { $0 <= $1 ? true : false })
+    mutating func i32ShrU(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI32, binary: Value.i32ShrU)
     }
-    mutating func i64LeU(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { $0 <= $1 ? true : false })
+    mutating func i64ShrU(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI64, binary: Value.i64ShrU)
     }
-    mutating func i32GeS(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { $0.signed >= $1.signed ? true : false })
+    mutating func i32Rotl(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI32, binary: Value.i32Rotl)
     }
-    mutating func i64GeS(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { $0.signed >= $1.signed ? true : false })
+    mutating func i64Rotl(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI64, binary: Value.i64Rotl)
     }
-    mutating func i32GeU(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { $0 >= $1 ? true : false })
+    mutating func i32Rotr(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI32, binary: Value.i32Rotr)
     }
-    mutating func i64GeU(context: inout StackContext, stack: FrameBase, binaryOperand: Instruction.BinaryOperand) {
-        numericBinary(stack: stack, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { $0 >= $1 ? true : false })
+    mutating func i64Rotr(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI64, binary: Value.i64Rotr)
     }
-    mutating func i32Clz(context: inout StackContext, stack: FrameBase, unaryOperand: Instruction.UnaryOperand) {
-        numericUnary(stack: stack, operand: unaryOperand, castTo: UntypedValue.asI32, unary: { .i32(UInt32($0.leadingZeroBitCount)) })
+
+    mutating func i32LtS(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { $0.signed < $1.signed ? true : false })
     }
-    mutating func i64Clz(context: inout StackContext, stack: FrameBase, unaryOperand: Instruction.UnaryOperand) {
-        numericUnary(stack: stack, operand: unaryOperand, castTo: UntypedValue.asI64, unary: { .i64(UInt64($0.leadingZeroBitCount)) })
+    mutating func i64LtS(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { $0.signed < $1.signed ? true : false })
     }
-    mutating func i32Ctz(context: inout StackContext, stack: FrameBase, unaryOperand: Instruction.UnaryOperand) {
-        numericUnary(stack: stack, operand: unaryOperand, castTo: UntypedValue.asI32, unary: { .i32(UInt32($0.trailingZeroBitCount)) })
+    mutating func i32LtU(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { $0 < $1 ? true : false })
     }
-    mutating func i64Ctz(context: inout StackContext, stack: FrameBase, unaryOperand: Instruction.UnaryOperand) {
-        numericUnary(stack: stack, operand: unaryOperand, castTo: UntypedValue.asI64, unary: { .i64(UInt64($0.trailingZeroBitCount)) })
+    mutating func i64LtU(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { $0 < $1 ? true : false })
     }
-    mutating func i32Popcnt(context: inout StackContext, stack: FrameBase, unaryOperand: Instruction.UnaryOperand) {
-        numericUnary(stack: stack, operand: unaryOperand, castTo: UntypedValue.asI32, unary: { .i32(UInt32($0.nonzeroBitCount)) })
+    mutating func i32GtS(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { $0.signed > $1.signed ? true : false })
     }
-    mutating func i64Popcnt(context: inout StackContext, stack: FrameBase, unaryOperand: Instruction.UnaryOperand) {
-        numericUnary(stack: stack, operand: unaryOperand, castTo: UntypedValue.asI64, unary: { .i64(UInt64($0.nonzeroBitCount)) })
+    mutating func i64GtS(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { $0.signed > $1.signed ? true : false })
     }
-    mutating func i32Eqz(context: inout StackContext, stack: FrameBase, unaryOperand: Instruction.UnaryOperand) {
-        numericUnary(stack: stack, operand: unaryOperand, castTo: UntypedValue.asI32, unary: { $0 == 0 ? true : false })
+    mutating func i32GtU(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { $0 > $1 ? true : false })
     }
-    mutating func i64Eqz(context: inout StackContext, stack: FrameBase, unaryOperand: Instruction.UnaryOperand) {
-        numericUnary(stack: stack, operand: unaryOperand, castTo: UntypedValue.asI64, unary: { $0 == 0 ? true : false })
+    mutating func i64GtU(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { $0 > $1 ? true : false })
     }
-    mutating func numericIntBinary(context: inout StackContext, stack: FrameBase, intBinary: NumericInstruction.IntBinary, binaryOperand: Instruction.BinaryOperand) throws {
-        let value2 = stack[binaryOperand.rhs].cast(to: intBinary.type)
-        let value1 = stack[binaryOperand.lhs].cast(to: intBinary.type)
-        stack[binaryOperand.result] = UntypedValue(try intBinary(value1, value2))
+    mutating func i32LeS(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { $0.signed <= $1.signed ? true : false })
     }
-    mutating func numericFloatBinary(context: inout StackContext, stack: FrameBase, floatBinary: NumericInstruction.FloatBinary, binaryOperand: Instruction.BinaryOperand) {
-        let value2 = stack[binaryOperand.rhs].cast(to: floatBinary.type)
-        let value1 = stack[binaryOperand.lhs].cast(to: floatBinary.type)
-        stack[binaryOperand.result] = UntypedValue(floatBinary(value1, value2))
+    mutating func i64LeS(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { $0.signed <= $1.signed ? true : false })
     }
-    mutating func numericConversion(context: inout StackContext, stack: FrameBase, conversion: NumericInstruction.Conversion, unaryOperand: Instruction.UnaryOperand) throws {
-        let value = stack[unaryOperand.input]
-        stack[unaryOperand.result] = UntypedValue(try conversion(value))
+    mutating func i32LeU(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { $0 <= $1 ? true : false })
+    }
+    mutating func i64LeU(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { $0 <= $1 ? true : false })
+    }
+    mutating func i32GeS(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { $0.signed >= $1.signed ? true : false })
+    }
+    mutating func i64GeS(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { $0.signed >= $1.signed ? true : false })
+    }
+    mutating func i32GeU(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI32, binary: { $0 >= $1 ? true : false })
+    }
+    mutating func i64GeU(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        numericBinary(sp: sp, operand: binaryOperand, castTo: UntypedValue.asI64, binary: { $0 >= $1 ? true : false })
+    }
+    mutating func i32Clz(context: inout StackContext, sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        numericUnary(sp: sp, operand: unaryOperand, castTo: UntypedValue.asI32, unary: { .i32(UInt32($0.leadingZeroBitCount)) })
+    }
+    mutating func i64Clz(context: inout StackContext, sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        numericUnary(sp: sp, operand: unaryOperand, castTo: UntypedValue.asI64, unary: { .i64(UInt64($0.leadingZeroBitCount)) })
+    }
+    mutating func i32Ctz(context: inout StackContext, sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        numericUnary(sp: sp, operand: unaryOperand, castTo: UntypedValue.asI32, unary: { .i32(UInt32($0.trailingZeroBitCount)) })
+    }
+    mutating func i64Ctz(context: inout StackContext, sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        numericUnary(sp: sp, operand: unaryOperand, castTo: UntypedValue.asI64, unary: { .i64(UInt64($0.trailingZeroBitCount)) })
+    }
+    mutating func i32Popcnt(context: inout StackContext, sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        numericUnary(sp: sp, operand: unaryOperand, castTo: UntypedValue.asI32, unary: { .i32(UInt32($0.nonzeroBitCount)) })
+    }
+    mutating func i64Popcnt(context: inout StackContext, sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        numericUnary(sp: sp, operand: unaryOperand, castTo: UntypedValue.asI64, unary: { .i64(UInt64($0.nonzeroBitCount)) })
+    }
+    mutating func i32Eqz(context: inout StackContext, sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        numericUnary(sp: sp, operand: unaryOperand, castTo: UntypedValue.asI32, unary: { $0 == 0 ? true : false })
+    }
+    mutating func i64Eqz(context: inout StackContext, sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        numericUnary(sp: sp, operand: unaryOperand, castTo: UntypedValue.asI64, unary: { $0 == 0 ? true : false })
+    }
+    mutating func numericIntBinary(context: inout StackContext, sp: Sp, intBinary: NumericInstruction.IntBinary, binaryOperand: Instruction.BinaryOperand) throws {
+        let value2 = sp[binaryOperand.rhs].cast(to: intBinary.type)
+        let value1 = sp[binaryOperand.lhs].cast(to: intBinary.type)
+        sp[binaryOperand.result] = UntypedValue(try intBinary(value1, value2))
+    }
+    mutating func numericFloatBinary(context: inout StackContext, sp: Sp, floatBinary: NumericInstruction.FloatBinary, binaryOperand: Instruction.BinaryOperand) {
+        let value2 = sp[binaryOperand.rhs].cast(to: floatBinary.type)
+        let value1 = sp[binaryOperand.lhs].cast(to: floatBinary.type)
+        sp[binaryOperand.result] = UntypedValue(floatBinary(value1, value2))
+    }
+    mutating func numericConversion(context: inout StackContext, sp: Sp, conversion: NumericInstruction.Conversion, unaryOperand: Instruction.UnaryOperand) throws {
+        let value = sp[unaryOperand.input]
+        sp[unaryOperand.result] = UntypedValue(try conversion(value))
     }
 }
 

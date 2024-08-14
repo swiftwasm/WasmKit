@@ -37,7 +37,7 @@ enum GenerateInternalInstruction {
         }
 
         static var commonParameters: [(label: String, type: String, isInout: Bool)] {
-            [("context", "StackContext", true), ("stack", "FrameBase", false)]
+            [("context", "StackContext", true), ("sp", "Sp", false)]
         }
 
         typealias Parameter = (label: String, type: String, isInout: Bool)

@@ -19,6 +19,7 @@ struct ExecutionState {
 
 typealias Md = UnsafeMutableRawPointer?
 typealias Ms = Int
+typealias Sp = ExecutionState.FrameBase
 
 @inline(never)
 func executeWasm(
@@ -193,12 +194,12 @@ extension ExecutionState {
         CurrentMemory.mayUpdateCurrentInstance(stack: stack, md: &md, ms: &ms)
         while !reachedEndOfExecution {
             // Regular path
-            let frameBase = stack.frameBase
+            let sp = stack.frameBase
             var inst: Instruction
             // `doExecute` returns false when current frame *may* be updated
             repeat {
                 inst = programCounter.pointee
-            } while try doExecute(inst, md: &md, ms: &ms, context: &stack, stack: frameBase)
+            } while try doExecute(inst, md: &md, ms: &ms, context: &stack, sp: sp)
         }
     }
 }
