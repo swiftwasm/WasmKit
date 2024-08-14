@@ -21,12 +21,13 @@ add_wasmkit_library(WasmKit
   Execution/Types/Errors.swift
   Execution/Types/Value.swift
   Execution/Runtime/InstDispatch.swift
-  Execution/Runtime/Stack.swift
+  Execution/Runtime/StackContext.swift
   Execution/Runtime/Runtime.swift
   Execution/Runtime/ExecutionState.swift
   Execution/Runtime/Profiler.swift
   Execution/Runtime/NameRegistry.swift
   Execution/Runtime/Store.swift
+  Execution/Runtime/StoreAllocator.swift
   Execution/Runtime/Function.swift
 )
 
