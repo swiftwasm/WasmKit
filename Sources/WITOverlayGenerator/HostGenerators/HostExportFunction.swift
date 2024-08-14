@@ -257,8 +257,8 @@ struct HostExportFunction {
         printer.write(line: signature.description + " {")
         try printer.indent {
             let optionsVar = builder.variable("options")
-            printer.write(line: "let \(optionsVar) = CanonicalOptions._derive(from: moduleInstance, exportName: \"\(name.abiName)\")")
-            printer.write(line: "let \(context.contextVar) = CanonicalCallContext(options: \(optionsVar), moduleInstance: moduleInstance, runtime: runtime)")
+            printer.write(line: "let \(optionsVar) = CanonicalOptions._derive(from: instance, exportName: \"\(name.abiName)\")")
+            printer.write(line: "let \(context.contextVar) = CanonicalCallContext(options: \(optionsVar), instance: instance, runtime: runtime)")
             // Supress unused variable warning for "context"
             printer.write(line: "_ = \(context.contextVar)")
 
@@ -266,7 +266,7 @@ struct HostExportFunction {
                 parameterNames: witParameters, coreSignature: coreSignature,
                 typeResolver: typeResolver, printer: printer
             )
-            var call = "try runtime.invoke(moduleInstance, function: \"\(name.abiName)\""
+            var call = "try runtime.invoke(instance, function: \"\(name.abiName)\""
             if !arguments.isEmpty {
                 call += ", with: [\(arguments.map(\.description).joined(separator: ", "))]"
             }
