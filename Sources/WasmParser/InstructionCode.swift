@@ -1,3 +1,4 @@
+@usableFromInline
 enum InstructionCode: UInt8 {
     case unreachable = 0x00
     case nop = 0x01

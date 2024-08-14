@@ -13,6 +13,11 @@ public protocol CanonicalStoring {
     func storeFloat32(at pointer: Pointer, _ value: Operand)
     func storeFloat64(at pointer: Pointer, _ value: Operand)
     func storeFlags(at pointer: Pointer, _ value: Operand, type: WITFlags) throws
+    func storeEnum(
+        at pointer: Pointer, _ value: Operand,
+        type: WITEnum,
+        storeDiscriminant: (Operand) throws -> Void
+    ) throws
     func storeOption(
         at pointer: Pointer, _ value: Operand,
         storeDiscriminant: (Operand) throws -> Void,
@@ -70,7 +75,16 @@ extension CanonicalABI {
         case .float64: storing.storeFloat64(at: pointer, value)
         case .char: storing.storeUInt32(at: pointer, lowering.lowerChar(value))
         case .enum(let enumType):
-            storing.storeUInt32(at: pointer, try lowering.lowerEnum(value, type: enumType))
+            let discriminantType = CanonicalABI.discriminantType(numberOfCases: UInt32(enumType.cases.count))
+            try storing.storeEnum(
+                at: pointer, value, type: enumType,
+                storeDiscriminant: { discriminant in
+                    try store(
+                        type: discriminantType.asWITType, value: discriminant,
+                        pointer: pointer, storing: &storing, lowering: &lowering
+                    )
+                }
+            )
         case .flags(let flags):
             try storing.storeFlags(at: pointer, value, type: flags)
         case .string:

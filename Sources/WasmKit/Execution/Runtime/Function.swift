@@ -2,40 +2,84 @@ import WasmParser
 
 /// A WebAssembly guest function or host function
 public struct Function: Equatable {
-    internal let address: FunctionAddress
+    internal let handle: InternalFunction
+    let allocator: StoreAllocator
+
+    public var type: FunctionType {
+        allocator.funcTypeInterner.resolve(handle.type)
+    }
 
     /// Invokes a function of the given address with the given parameters.
     public func invoke(_ arguments: [Value] = [], runtime: Runtime) throws -> [Value] {
-        try withExecution { execution in
-            var stack = Stack()
-            defer { stack.deallocate() }
-            let numberOfResults = try invoke(execution: &execution, stack: &stack, with: arguments, runtime: runtime)
-            try execution.run(runtime: runtime, stack: &stack)
-            return Array(stack.popValues(count: numberOfResults))
+        assert(allocator === runtime.store.allocator, "Function is not from the same store as the runtime")
+        return try handle.invoke(arguments, runtime: runtime)
+    }
+}
+
+@available(*, deprecated, renamed: "Function")
+public typealias FunctionInstance = Function
+
+struct InternalFunction: Equatable, Hashable {
+    private let _storage: Int
+
+    var bitPattern: Int { _storage }
+
+    init(bitPattern: Int) {
+        _storage = bitPattern
+    }
+
+    var isWasm: Bool {
+        _storage & 0b1 == 0
+    }
+
+    var type: InternedFuncType {
+        if isWasm {
+            return wasm.type
+        } else {
+            return host.type
         }
     }
 
-    /// - Returns: Number of result values
-    private func invoke(execution: inout ExecutionState, stack: inout Stack, with arguments: [Value], runtime: Runtime) throws -> Int {
-        switch try runtime.store.function(at: address) {
-        case let .host(function):
-            try check(functionType: function.type, parameters: arguments)
+    static func wasm(_ handle: EntityHandle<WasmFunctionEntity>) -> InternalFunction {
+        assert(MemoryLayout<WasmFunctionEntity>.alignment >= 2)
+        return InternalFunction(bitPattern: handle.bitPattern | 0b0)
+    }
 
-            let parameters = stack.popValues(count: function.type.parameters.count)
+    static func host(_ handle: EntityHandle<HostFunctionEntity>) -> InternalFunction {
+        assert(MemoryLayout<HostFunctionEntity>.alignment >= 2)
+        return InternalFunction(bitPattern: handle.bitPattern | 0b1)
+    }
 
-            let moduleInstance = runtime.store.module(address: stack.currentFrame.module)
-            let caller = Caller(runtime: runtime, instance: moduleInstance)
-            let results = try function.implementation(caller, Array(parameters))
-            try check(functionType: function.type, results: results)
-            stack.push(values: results)
-            return function.type.results.count
+    var wasm: EntityHandle<WasmFunctionEntity> {
+        EntityHandle(unsafe: UnsafeMutablePointer(bitPattern: bitPattern & ~0b0)!)
+    }
+    var host: EntityHandle<HostFunctionEntity> {
+        EntityHandle(unsafe: UnsafeMutablePointer(bitPattern: bitPattern & ~0b1)!)
+    }
+}
 
-        case let .wasm(function, _):
-            try check(functionType: function.type, parameters: arguments)
-            stack.push(values: arguments)
 
-            try execution.invoke(functionAddress: address, runtime: runtime, stack: &stack)
-            return function.type.results.count
+extension InternalFunction {
+    func invoke(_ arguments: [Value], runtime: Runtime) throws -> [Value] {
+        if isWasm {
+            let entity = wasm
+            let resolvedType = runtime.resolveType(entity.type)
+            try check(functionType: resolvedType, parameters: arguments)
+            return try executeWasm(
+                runtime: runtime,
+                function: self,
+                type: resolvedType,
+                arguments: arguments,
+                callerInstance: entity.instance
+            )
+        } else {
+            let entity = host
+            let resolvedType = runtime.resolveType(entity.type)
+            try check(functionType: resolvedType, parameters: arguments)
+            let caller = Caller(instanceHandle: nil, runtime: runtime)
+            let results = try entity.implementation(caller, arguments)
+            try check(functionType: resolvedType, results: results)
+            return results
         }
     }
 
@@ -53,5 +97,95 @@ public struct Function: Equatable {
         guard resultTypes == functionType.results else {
             throw Trap._raw("result types don't match, expected \(functionType.results), got \(resultTypes)")
         }
+    }
+
+    @inline(never)
+    func ensureCompiled(executionState: inout ExecutionState) throws {
+        let entity = self.wasm
+        switch entity.code {
+        case .uncompiled(let code):
+            try entity.withValue {
+                let iseq = try $0.compile(runtime: executionState.runtime, code: code)
+                $0.code = .compiled(iseq)
+            }
+        case .compiled: break
+        }
+    }
+
+    func assumeCompiled() -> (
+        InstructionSequence,
+        locals: Int,
+        instance: InternalInstance
+    ) {
+        let entity = self.wasm
+        guard case let .compiled(iseq) = entity.code else {
+            preconditionFailure()
+        }
+        return (iseq, entity.numberOfNonParameterLocals, entity.instance)
+    }
+}
+
+/// > Note:
+/// <https://webassembly.github.io/spec/core/exec/runtime.html#function-instances>
+struct WasmFunctionEntity {
+    let type: InternedFuncType
+    let instance: InternalInstance
+    let numberOfNonParameterLocals: Int
+    var code: CodeBody
+
+    init(type: InternedFuncType, code: InternalUncompiledCode, instance: InternalInstance) {
+        self.type = type
+        self.instance = instance
+        self.code = .uncompiled(code)
+        self.numberOfNonParameterLocals = code.locals.count
+    }
+
+    mutating func ensureCompiled(executionState: inout ExecutionState) throws -> InstructionSequence {
+        try ensureCompiled(runtime: executionState.runtime)
+    }
+
+    mutating func ensureCompiled(runtime: RuntimeRef) throws -> InstructionSequence {
+        switch code {
+        case .uncompiled(let code):
+            return try compile(runtime: runtime, code: code)
+        case .compiled(let iseq):
+            return iseq
+        }
+    }
+
+    @inline(never)
+    mutating func compile(runtime: RuntimeRef, code: InternalUncompiledCode) throws -> InstructionSequence {
+        let type = self.type
+        var translator = InstructionTranslator(
+            allocator: runtime.value.store.allocator.iseqAllocator,
+            funcTypeInterner: runtime.value.funcTypeInterner,
+            module: instance,
+            type: runtime.value.resolveType(type),
+            locals: code.locals
+        )
+
+        try WasmParser.parseExpression(
+            bytes: Array(code.expression),
+            features: instance.features, hasDataCount: instance.hasDataCount,
+            visitor: &translator
+        )
+        let iseq = try translator.finalize()
+        self.code = .compiled(iseq)
+        return iseq
+    }
+}
+
+typealias InternalUncompiledCode = EntityHandle<Code>
+
+enum CodeBody {
+    case uncompiled(InternalUncompiledCode)
+    case compiled(InstructionSequence)
+}
+
+extension Reference {
+    static func function(from value: InternalFunction) -> Reference {
+        // TODO: Consider having internal reference representation instead
+        //       of public one in WasmTypes
+        return .function(value.bitPattern)
     }
 }

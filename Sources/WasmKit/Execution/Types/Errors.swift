@@ -22,7 +22,7 @@ public enum Trap: Error {
 
     // Invocation
     /// Exported function not found
-    case exportedFunctionNotFound(ModuleInstance, name: String)
+    case exportedFunctionNotFound(Instance, name: String)
     /// The table element is not initialized
     case tableUninitialized(ElementIndex)
     /// Undefined element in the table

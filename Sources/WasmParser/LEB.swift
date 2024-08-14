@@ -5,48 +5,50 @@ enum LEBError: Swift.Error, Equatable {
 }
 
 extension FixedWidthInteger where Self: UnsignedInteger {
-    init(LEB nextByte: () -> UInt8?) throws {
-        var result: Self = 0
-        var shift: UInt = 0
+    @inline(__always)
+    init<Stream: ByteStream>(LEB stream: Stream) throws {
+        let firstByte = try stream.consumeAny()
+        var result: Self = Self(firstByte & 0b0111_1111)
+        if _fastPath(firstByte & 0b1000_0000 == 0) {
+            self = result
+            return
+        }
 
-        var byte: UInt8
-        repeat {
-            byte = try {
-                guard let byte = nextByte() else {
-                    throw LEBError.insufficientBytes
-                }
-                return byte
-            }()
+        var shift: UInt = 7
 
-            guard shift < Self.bitWidth else {
+        while true {
+            let byte = try stream.consumeAny()
+            let slice = Self(byte & 0b0111_1111)
+            let nextShift = shift + 7
+            if nextShift >= Self.bitWidth, (byte >> (UInt(Self.bitWidth) - shift)) != 0 {
                 throw LEBError.integerRepresentationTooLong
             }
-
-            let slice = Self(byte & 0b0111_1111)
-            guard (slice << shift) >> shift == slice else {
-                throw LEBError.overflow
-            }
             result |= slice << shift
-            shift += 7
-        } while byte & 0b1000_0000 != 0
+            shift = nextShift
+
+            guard byte & 0b1000_0000 != 0 else { break }
+        }
 
         self = result
     }
 }
 
 extension FixedWidthInteger where Self: SignedInteger {
-    init(LEB nextByte: () -> UInt8?) throws {
-        var result: Self = 0
-        var shift: Self = 0
+    @inline(__always)
+    init<Stream: ByteStream>(LEB stream: Stream) throws {
+        let firstByte = try stream.consumeAny()
+        var result: Self = Self(firstByte & 0b0111_1111)
+        if _fastPath(firstByte & 0b1000_0000 == 0) {
+            // Interpret Int${Self.bitWidth-1} as Int${Self.bitWidth}
+            self = (result << (Self.bitWidth - 7)) >> (Self.bitWidth - 7)
+            return
+        }
+
+        var shift: Self = 7
 
         var byte: UInt8
         repeat {
-            byte = try {
-                guard let byte = nextByte() else {
-                    throw LEBError.insufficientBytes
-                }
-                return byte
-            }()
+            byte = try stream.consumeAny()
 
             let slice = Self(byte & 0b0111_1111)
             result |= slice << shift

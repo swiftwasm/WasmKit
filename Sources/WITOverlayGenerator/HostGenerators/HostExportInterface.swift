@@ -25,7 +25,7 @@ struct HostExportInterface: ASTVisitor {
     func visit(_ interface: SyntaxNode<InterfaceSyntax>) throws {
         try printer.write(line: "struct \(structName) {")
         printer.indent()
-        printer.write(line: "let moduleInstance: ModuleInstance")
+        printer.write(line: "let instance: WasmKit.Instance")
     }
 
     func visitPost(_ interface: SyntaxNode<InterfaceSyntax>) throws {

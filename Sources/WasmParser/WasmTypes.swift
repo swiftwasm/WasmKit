@@ -214,7 +214,7 @@ public enum DataSegment: Equatable {
         public let initializer: ArraySlice<UInt8>
     }
 
-    case passive([UInt8])
+    case passive(ArraySlice<UInt8>)
     case active(Active)
 }
 
@@ -275,30 +275,32 @@ public enum ImportDescriptor: Equatable {
     case global(GlobalType)
 }
 
+@usableFromInline
 protocol RawUnsignedInteger: FixedWidthInteger & UnsignedInteger {
     associatedtype Signed: RawSignedInteger where Signed.Unsigned == Self
     init(bitPattern: Signed)
 }
 
+@usableFromInline
 protocol RawSignedInteger: FixedWidthInteger & SignedInteger {
     associatedtype Unsigned: RawUnsignedInteger where Unsigned.Signed == Self
     init(bitPattern: Unsigned)
 }
 
 extension UInt8: RawUnsignedInteger {
-    typealias Signed = Int8
+    @usableFromInline typealias Signed = Int8
 }
 
 extension UInt16: RawUnsignedInteger {
-    typealias Signed = Int16
+    @usableFromInline typealias Signed = Int16
 }
 
 extension UInt32: RawUnsignedInteger {
-    typealias Signed = Int32
+    @usableFromInline typealias Signed = Int32
 }
 
 extension UInt64: RawUnsignedInteger {
-    typealias Signed = Int64
+    @usableFromInline typealias Signed = Int64
 }
 
 extension Int8: RawSignedInteger {}

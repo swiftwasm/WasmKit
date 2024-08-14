@@ -124,7 +124,7 @@ struct RuntimeTestHarness {
     /// Build up WebAssembly module from the fixture and instantiate WasmKit runtime with the module.
     mutating func build(
         link: (inout [String: HostModule]) -> Void,
-        run: (Runtime, ModuleInstance) throws -> Void
+        run: (Runtime, Instance) throws -> Void
     ) throws {
         for compile in [compileForEmbedded, compileForWASI] {
             defer { cleanupTemporaryFiles() }

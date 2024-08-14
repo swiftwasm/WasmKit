@@ -11,15 +11,6 @@ class ISeqAllocator {
         return buffer
     }
 
-    func allocateDefaultLocals(_ locals: [ValueType]) -> UnsafeBufferPointer<Value> {
-        let buffer = UnsafeMutableBufferPointer<Value>.allocate(capacity: locals.count)
-        for (index, localType) in locals.enumerated() {
-            buffer[index] = localType.defaultValue
-        }
-        self.buffers.append(UnsafeMutableRawBufferPointer(buffer))
-        return UnsafeBufferPointer(buffer)
-    }
-
     func allocateInstructions(capacity: Int) -> UnsafeMutableBufferPointer<Instruction> {
         assert(_isPOD(Instruction.self), "Instruction must be POD")
         let buffer = UnsafeMutableBufferPointer<Instruction>.allocate(capacity: capacity)
@@ -34,12 +25,86 @@ class ISeqAllocator {
     }
 }
 
-struct TranslatorContext {
+protocol TranslatorContext {
+    func resolveType(_ index: TypeIndex) throws -> FunctionType
+    func resolveBlockType(_ blockType: BlockType) throws -> FunctionType
+    func functionType(_ index: FunctionIndex, interner: Interner<FunctionType>) throws -> FunctionType
+    func globalType(_ index: GlobalIndex) throws -> ValueType
+    func isMemory64(memoryIndex index: MemoryIndex) throws -> Bool
+    func isMemory64(tableIndex index: TableIndex) throws -> Bool
+    func elementType(_ index: TableIndex) throws -> ReferenceType
+    func resolveCallee(_ index: FunctionIndex) -> InternalFunction?
+    func isSameInstance(_ instance: InternalInstance) -> Bool
+    func resolveGlobal(_ index: GlobalIndex) -> InternalGlobal?
+}
+
+extension TranslatorContext {
+    func addressType(memoryIndex: MemoryIndex) throws -> ValueType {
+        return ValueType.addressType(isMemory64: try isMemory64(memoryIndex: memoryIndex))
+    }
+    func addressType(tableIndex: TableIndex) throws -> ValueType {
+        return ValueType.addressType(isMemory64: try isMemory64(tableIndex: tableIndex))
+    }
+}
+
+extension InternalInstance: TranslatorContext {
+    func resolveType(_ index: TypeIndex) throws -> FunctionType {
+        guard Int(index) < self.types.count else {
+            throw TranslationError("Type index \(index) is out of range")
+        }
+        return self.types[Int(index)]
+    }
+    func resolveBlockType(_ blockType: BlockType) throws -> FunctionType {
+        try FunctionType(blockType: blockType, typeSection: self.types)
+    }
+    func functionType(_ index: FunctionIndex, interner: Interner<FunctionType>) throws -> FunctionType {
+        guard Int(index) < self.functions.count else {
+            throw TranslationError("Function index \(index) is out of range")
+        }
+        return interner.resolve(self.functions[Int(index)].type)
+    }
+    func globalType(_ index: GlobalIndex) throws -> ValueType {
+        guard Int(index) < self.globals.count else {
+            throw TranslationError("Global index \(index) is out of range")
+        }
+        return self.globals[Int(index)].globalType.valueType
+    }
+    func isMemory64(memoryIndex index: MemoryIndex) throws -> Bool {
+        guard Int(index) < self.memories.count else {
+            throw TranslationError("Memory index \(index) is out of range")
+        }
+        return self.memories[Int(index)].limit.isMemory64
+    }
+    func isMemory64(tableIndex index: TableIndex) throws -> Bool {
+        guard Int(index) < self.tables.count else {
+            throw TranslationError("Table index \(index) is out of range")
+        }
+        return self.tables[Int(index)].limits.isMemory64
+    }
+    func elementType(_ index: TableIndex) throws -> ReferenceType {
+        guard Int(index) < self.tables.count else {
+            throw TranslationError("Table index \(index) is out of range")
+        }
+        return self.tables[Int(index)].tableType.elementType
+    }
+
+    func resolveCallee(_ index: FunctionIndex) -> InternalFunction? {
+        return self.functions[Int(index)]
+    }
+    func resolveGlobal(_ index: GlobalIndex) -> InternalGlobal? {
+        return self.globals[Int(index)]
+    }
+    func isSameInstance(_ instance: InternalInstance) -> Bool {
+        return instance == self
+    }
+}
+
+
+struct TranslatorModuleContext: TranslatorContext {
     internal let imports: ModuleImports
     internal let typeSection: [FunctionType]
     internal let functionTypeIndices: [TypeIndex]
     internal let globalTypes: [GlobalType]
-    internal let internalGlobals: [Global]
     internal let memoryTypes: [MemoryType]
     internal let tableTypes: [TableType]
 
@@ -47,9 +112,9 @@ struct TranslatorContext {
         typeSection: [FunctionType],
         importSection: [Import],
         functionSection: [TypeIndex],
-        globals: [Global],
-        memories: [Memory],
-        tables: [Table]
+        globals: [GlobalType],
+        memories: [MemoryType],
+        tables: [TableType]
     ) {
         var functionTypeIndices: [TypeIndex] = []
         var globalTypes: [GlobalType] = []
@@ -66,15 +131,12 @@ struct TranslatorContext {
 
         self.typeSection = typeSection
         self.functionTypeIndices = functionTypeIndices + functionSection
-        var globalInits: [ConstExpression] = []
         for global in globals {
-            globalTypes.append(global.type)
-            globalInits.append(global.initializer)
+            globalTypes.append(global)
         }
         self.globalTypes = globalTypes
-        self.internalGlobals = globals
-        self.memoryTypes = memoryTypes + memories.map(\.type)
-        self.tableTypes = tableTypes + tables.map(\.type)
+        self.memoryTypes = memoryTypes + memories
+        self.tableTypes = tableTypes + tables
     }
 
     func resolveType(_ index: TypeIndex) throws -> FunctionType {
@@ -86,7 +148,7 @@ struct TranslatorContext {
     func resolveBlockType(_ blockType: BlockType) throws -> FunctionType {
         try FunctionType(blockType: blockType, typeSection: typeSection)
     }
-    func functionType(_ index: FunctionIndex) throws -> FunctionType {
+    func functionType(_ index: FunctionIndex, interner: Interner<FunctionType>) throws -> FunctionType {
         guard Int(index) < functionTypeIndices.count else {
             throw TranslationError("Function index \(index) is out of range")
         }
@@ -105,17 +167,11 @@ struct TranslatorContext {
         }
         return self.memoryTypes[Int(index)].isMemory64
     }
-    func addressType(memoryIndex: MemoryIndex) throws -> ValueType {
-        try isMemory64(memoryIndex: memoryIndex) ? .i64 : .i32
-    }
     func isMemory64(tableIndex index: TableIndex) throws -> Bool {
         guard Int(index) < tableTypes.count else {
             throw TranslationError("Table index \(index) is out of range")
         }
         return self.tableTypes[Int(index)].limits.isMemory64
-    }
-    func addressType(tableIndex: TableIndex) throws -> ValueType {
-        try isMemory64(tableIndex: tableIndex) ? .i64 : .i32
     }
     func elementType(_ index: TableIndex) throws -> ReferenceType {
         guard Int(index) < tableTypes.count else {
@@ -123,14 +179,105 @@ struct TranslatorContext {
         }
         return self.tableTypes[Int(index)].elementType
     }
+    func resolveCallee(_ index: FunctionIndex) -> InternalFunction? {
+        return nil
+    }
+    func resolveGlobal(_ index: GlobalIndex) -> InternalGlobal? {
+        return nil
+    }
+    func isSameInstance(_ instance: InternalInstance) -> Bool {
+        fatalError()
+    }
 }
 
-struct InstructionTranslator: InstructionVisitor {
+fileprivate struct MetaProgramCounter {
+    let offsetFromHead: Int
+}
+
+/// The layout of the function stack frame.
+///
+/// A function call frame starts with a "frame header" which contains
+/// the function parameters and the result values. The size of the frame
+/// header is determined by the maximum number of parameters and results
+/// of the function type. While executing the function, the frame header
+/// is used as a storage for parameters. On function return, the frame
+/// header is used as a storage for the result values.
+///
+/// On function entry, the stack frame looks like:
+///
+/// | Offset                             | Description          |
+/// |------------------------------------|----------------------|
+/// | 0                                  | Function parameter 0 |
+/// | 1                                  | Function parameter 1 |
+/// | ...                                | ...                  |
+/// | len(params)-1                      | Function parameter N |
+///
+/// On function return, the stack frame looks like:
+/// | Offset                             | Description          |
+/// |------------------------------------|----------------------|
+/// | 0                                  | Function result 0    |
+/// | 1                                  | Function result 1    |
+/// | ...                                | ...                  |
+/// | len(results)-1                     | Function result N    |
+///
+/// The end of the frame header is usually referred to as "stack pointer"
+/// (SP). "local" variables and the value stack space are allocated after
+/// the frame header. The value stack space is used to store intermediate
+/// values usually corresponding to Wasm's value stack. Unlike the Wasm's
+/// value stack, a value slot in the value stack space might be absent if
+/// the value is backed by a local variable.
+/// The slot index is referred to as "register". The register index is
+/// relative to the stack pointer, so the register indices for parameters
+/// and results are negative.
+///
+/// | Offset                             | Description          |
+/// |------------------------------------|----------------------|
+/// | 0 ~ max(params, results)-1         | Frame header         |
+/// | SP+0                               | Local variable 0     |
+/// | SP+1                               | Local variable 1     |
+/// | ...                                | ...                  |
+/// | SP+len(locals)-1                   | Local variable N     |
+/// | SP+len(locals)                     | Value stack 0        |
+/// | SP+len(locals)+1                   | Value stack 1        |
+/// | ...                                | ...                  |
+/// | SP+len(locals)+heighest(stack)-1   | Value stack N        |
+///
+struct StackLayout {
+    let type: FunctionType
+    let paramResultBase: Instruction.Register
+
+    init(type: FunctionType) {
+        self.type = type
+        self.paramResultBase = Self.frameHeaderSize(type: type)
+    }
+
+    func paramReg(_ index: Int) -> Instruction.Register {
+        Instruction.Register(index) - paramResultBase
+    }
+
+    func returnReg(_ index: Int) -> Instruction.Register {
+        return Instruction.Register(index) - paramResultBase
+    }
+
+    func localReg(_ index: LocalIndex) -> Instruction.Register {
+        if index < type.parameters.count {
+            return paramReg(Int(index))
+        } else {
+            return Instruction.Register(index) - Instruction.Register(type.parameters.count)
+        }
+    }
+
+    internal static func frameHeaderSize(type: FunctionType) -> Instruction.Register {
+        frameHeaderSize(parameters: type.parameters.count, results: type.results.count)
+    }
+    internal static func frameHeaderSize(parameters: Int, results: Int) -> Instruction.Register {
+        Instruction.Register(max(parameters, results))
+    }
+}
+
+struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     typealias Output = Void
 
-    struct MetaProgramCounter {
-        let offsetFromHead: Int
-    }
     typealias LabelRef = Int
     typealias ValueType = WasmParser.ValueType
 
@@ -176,10 +323,17 @@ struct InstructionTranslator: InstructionVisitor {
         }
 
         mutating func markUnreachable() throws {
+            try setReachability(false)
+        }
+        mutating func resetReachability() throws {
+            try setReachability(true)
+        }
+
+        private mutating func setReachability(_ value: Bool) throws {
             guard !self.frames.isEmpty else {
                 throw TranslationError("Control stack is empty. Instruction cannot be appeared after \"end\" of function")
             }
-            self.frames[self.frames.count - 1].reachable = false
+            self.frames[self.frames.count - 1].reachable = value
         }
 
         func currentFrame() throws -> ControlFrame {
@@ -189,16 +343,12 @@ struct InstructionTranslator: InstructionVisitor {
             return frame
         }
 
-        enum BranchTarget {
-            case returnFunction
-            case localJump(ControlFrame)
-        }
-        func branchTarget(relativeDepth: UInt32) throws -> BranchTarget {
-            if frames.count == relativeDepth { return .returnFunction }
-            if frames.count < relativeDepth {
+        func branchTarget(relativeDepth: UInt32) throws -> ControlFrame {
+            let index = frames.count - 1 - Int(relativeDepth)
+            guard frames.indices.contains(index) else {
                 throw TranslationError("Relative depth \(relativeDepth) is out of range")
             }
-            return .localJump(frames[frames.count - 1 - Int(relativeDepth)])
+            return frames[index]
         }
     }
 
@@ -206,44 +356,103 @@ struct InstructionTranslator: InstructionVisitor {
         case some(ValueType)
         case unknown
     }
+
+    enum MetaValueOnStack {
+        case local(ValueType, LocalIndex)
+        case stack(MetaValue)
+
+        var type: MetaValue {
+            switch self {
+            case .local(let type, _): return .some(type)
+            case .stack(let type): return type
+            }
+        }
+    }
+
+    enum ValueSource {
+        case register(Instruction.Register)
+        case local(LocalIndex)
+        
+        func intoRegister(layout: StackLayout) -> Instruction.Register {
+            switch self {
+            case .register(let register):
+                return register
+            case .local(let index):
+                return layout.localReg(index)
+            }
+        }
+    }
+
     struct ValueStack {
-        private var values: [MetaValue] = []
+        private var values: [MetaValueOnStack] = []
         /// The maximum height of the stack within the function
         private(set) var maxHeight: Int = 0
         var height: Int { values.count }
+        let stackRegBase: Instruction.Register
+    
+        init(stackRegBase: Instruction.Register) {
+            self.stackRegBase = stackRegBase
+        }
 
-        mutating func push(_ value: ValueType) {
+        mutating func push(_ value: ValueType) -> Instruction.Register {
             push(.some(value))
         }
-        mutating func push(_ value: MetaValue) {
+        mutating func push(_ value: MetaValue) -> Instruction.Register {
             // Record the maximum height of the stack we have seen
             maxHeight = max(maxHeight, height)
-            self.values.append(value)
+            let usedRegister = self.values.count
+            self.values.append(.stack(value))
+            assert(height < UInt16.max)
+            return stackRegBase + Instruction.Register(usedRegister)
+        }
+        mutating func pushLocal(_ localIndex: LocalIndex, locals: inout Locals) throws {
+            let type = try locals.type(of: localIndex)
+            self.values.append(.local(type, localIndex))
+        }
+        mutating func preserveLocalsOnStack(_ localIndex: LocalIndex) -> [Instruction.Register] {
+            var copyTo: [Instruction.Register] = []
+            for i in 0..<values.count {
+                guard case .local(let type, localIndex) = self.values[i] else { continue }
+                self.values[i] = .stack(.some(type))
+                copyTo.append(stackRegBase + Instruction.Register(i))
+            }
+            return copyTo
         }
 
-        mutating func pop() throws -> MetaValue {
+        mutating func pop() throws -> (MetaValue, ValueSource) {
             guard let value = self.values.popLast() else {
                 throw TranslationError("Expected a value on stack but it's empty")
             }
-            return value
+            let source: ValueSource
+            switch value {
+            case .local(_, let localIndex):
+                source = .local(localIndex)
+            case .stack:
+                source = .register(stackRegBase + Instruction.Register(height))
+            }
+            return (value.type, source)
         }
-        mutating func pop(_ expected: ValueType) throws {
-            switch try pop() {
+        mutating func pop(_ expected: ValueType) throws -> ValueSource {
+            let (value, register) = try pop()
+            switch value {
             case .some(let actual):
                 guard actual == expected else {
                     throw TranslationError("Expected \(expected) on the stack top but got \(actual)")
                 }
             case .unknown: break  // OK
             }
+            return register
         }
-        mutating func popRef() throws {
-            switch try pop() {
+        mutating func popRef() throws -> ValueSource {
+            let (value, register) = try pop()
+            switch value {
             case .some(let actual):
                 guard case .ref = actual else {
                     throw TranslationError("Expected reference value on the stack top but got \(actual)")
                 }
             case .unknown: break  // OK
             }
+            return register
         }
         mutating func truncate(height: Int) throws {
             guard height <= self.height else {
@@ -257,7 +466,7 @@ struct InstructionTranslator: InstructionVisitor {
         }
     }
 
-    struct ISeqBuilder {
+    fileprivate struct ISeqBuilder {
         typealias InstructionFactoryWithLabel = (ISeqBuilder, MetaProgramCounter) -> (WasmKit.Instruction)
         typealias BrTableEntryFactory = (ISeqBuilder, MetaProgramCounter) -> Instruction.BrTable.Entry
         typealias BuildingBrTable = UnsafeMutableBufferPointer<Instruction.BrTable.Entry>
@@ -282,9 +491,16 @@ struct InstructionTranslator: InstructionVisitor {
             case pinned(MetaProgramCounter)
         }
 
+        typealias ResultRelink = (_ result: Instruction.Register) -> Instruction
+        fileprivate struct LastEmission {
+            let position: MetaProgramCounter
+            let resultRelink: ResultRelink?
+        }
+
         private var labels: [LabelEntry] = []
         private var instructions: [WasmKit.Instruction] = []
-        var insertingPC: MetaProgramCounter {
+        private var lastEmission: LastEmission?
+        fileprivate var insertingPC: MetaProgramCounter {
             MetaProgramCounter(offsetFromHead: instructions.count)
         }
 
@@ -298,6 +514,19 @@ struct InstructionTranslator: InstructionVisitor {
             }
         }
 
+        mutating func resetLastEmission() {
+            lastEmission = nil
+        }
+
+        mutating func relinkLastInstructionResult(_ newResult: Instruction.Register) -> Bool {
+            guard let lastEmission = self.lastEmission,
+                  let resultRelink = lastEmission.resultRelink else { return false }
+            let newInstruction = resultRelink(newResult)
+            self.instructions[lastEmission.position.offsetFromHead] = newInstruction
+            resetLastEmission()
+            return true
+        }
+
         func dump() {
             for instruction in instructions {
                 print(instruction)
@@ -308,7 +537,8 @@ struct InstructionTranslator: InstructionVisitor {
             return instructions
         }
 
-        mutating func emit(_ instruction: Instruction) {
+        mutating func emit(_ instruction: Instruction, resultRelink: ResultRelink? = nil) {
+            self.lastEmission = LastEmission(position: insertingPC, resultRelink: resultRelink)
             self.instructions.append(instruction)
         }
 
@@ -324,7 +554,7 @@ struct InstructionTranslator: InstructionVisitor {
             return ref
         }
 
-        func resolveLabel(_ ref: LabelRef) -> MetaProgramCounter? {
+        fileprivate func resolveLabel(_ ref: LabelRef) -> MetaProgramCounter? {
             let entry = self.labels[ref]
             switch entry {
             case .pinned(let pc): return pc
@@ -332,7 +562,7 @@ struct InstructionTranslator: InstructionVisitor {
             }
         }
 
-        mutating func pinLabel(_ ref: LabelRef, pc: MetaProgramCounter) {
+        fileprivate mutating func pinLabel(_ ref: LabelRef, pc: MetaProgramCounter) {
             switch self.labels[ref] {
             case .pinned(let oldPC):
                 fatalError("Internal consistency error: Label \(ref) is already pinned at \(oldPC), but tried to pin at \(pc) again")
@@ -368,7 +598,7 @@ struct InstructionTranslator: InstructionVisitor {
         ///   - ref: Label reference to be resolved
         ///   - insertAt: Instruction sequence offset to insert at
         ///   - make: Factory closure to make an inserting instruction
-        mutating func emitWithLabel(
+        fileprivate mutating func emitWithLabel(
             _ ref: LabelRef, insertAt: MetaProgramCounter,
             line: UInt = #line, make: @escaping InstructionFactoryWithLabel
         ) {
@@ -385,6 +615,8 @@ struct InstructionTranslator: InstructionVisitor {
     struct Locals {
         let types: [ValueType]
 
+        var count: Int { types.count }
+
         func type(of localIndex: UInt32) throws -> ValueType {
             guard Int(localIndex) < types.count else {
                 throw TranslationError("Local index \(localIndex) is out of range")
@@ -394,20 +626,32 @@ struct InstructionTranslator: InstructionVisitor {
     }
 
     let allocator: ISeqAllocator
-    let module: TranslatorContext
-    var iseqBuilder: ISeqBuilder
+    let funcTypeInterner: Interner<FunctionType>
+    let module: Context
+    private var iseqBuilder: ISeqBuilder
     var controlStack: ControlStack
     var valueStack: ValueStack
-    let locals: Locals
+    var locals: Locals
+    let type: FunctionType
     let endOfFunctionLabel: LabelRef
+    let stackLayout: StackLayout
 
-    init(allocator: ISeqAllocator, module: TranslatorContext, type: FunctionType, locals: [WasmParser.ValueType]) {
+    init(
+        allocator: ISeqAllocator,
+        funcTypeInterner: Interner<FunctionType>,
+        module: Context,
+        type: FunctionType,
+        locals: [WasmParser.ValueType]
+    ) {
         self.allocator = allocator
+        self.funcTypeInterner = funcTypeInterner
+        self.type = type
         self.module = module
         self.iseqBuilder = ISeqBuilder()
         self.controlStack = ControlStack()
-        self.valueStack = ValueStack()
+        self.valueStack = ValueStack(stackRegBase: Instruction.Register(locals.count))
         self.locals = Locals(types: type.parameters + locals)
+        self.stackLayout = StackLayout(type: type)
 
         do {
             let endLabel = self.iseqBuilder.allocLabel()
@@ -422,8 +666,32 @@ struct InstructionTranslator: InstructionVisitor {
         }
     }
 
-    private mutating func emit(_ instruction: Instruction) {
-        iseqBuilder.emit(instruction)
+    private func returnReg(_ index: Int) -> Instruction.Register {
+        return stackLayout.returnReg(index)
+    }
+    private func localReg(_ index: LocalIndex) -> Instruction.Register {
+        return stackLayout.localReg(index)
+    }
+
+    private mutating func emit(_ instruction: Instruction, resultRelink: ISeqBuilder.ResultRelink? = nil) {
+        iseqBuilder.emit(instruction, resultRelink: resultRelink)
+    }
+
+    private mutating func emitCopyStack(from source: Instruction.Register, to dest: Instruction.Register) {
+        guard source != dest else { return }
+        emit(.copyStack(Instruction.CopyStackOperand(source: source, dest: dest)))
+    }
+
+    private mutating func preserveLocalsOnStack(_ localIndex: LocalIndex) {
+        for copyTo in valueStack.preserveLocalsOnStack(localIndex) {
+            emitCopyStack(from: localReg(localIndex), to: copyTo)
+        }
+    }
+
+    private mutating func preserveAllLocalsOnStack() {
+        for localIndex in 0..<locals.count {
+            preserveLocalsOnStack(LocalIndex(localIndex))
+        }
     }
 
     /// Perform a precondition check for pop operation on value stack.
@@ -447,22 +715,59 @@ struct InstructionTranslator: InstructionVisitor {
         }
         return true
     }
-    private mutating func popOperand(_ type: ValueType) throws {
+    private mutating func popOperand(_ type: ValueType) throws -> ValueSource? {
         guard try checkBeforePop(typeHint: type) else {
-            return
+            return nil
         }
-        try valueStack.pop(type)
+        return try valueStack.pop(type)
     }
 
-    private mutating func popAnyOperand() throws -> MetaValue {
+    private mutating func popOnStackOperand(_ type: ValueType) throws -> Bool {
+        let stackHeight = valueStack.height
+        guard let op = try popOperand(type) else { return false }
+        let copyTo = valueStack.stackRegBase + Instruction.Register(stackHeight) - 1
+        if case .local(let localIndex) = op {
+            emitCopyStack(from: localReg(localIndex), to: copyTo)
+        }
+        return true
+    }
+
+    private mutating func popAnyOperand() throws -> (MetaValue, ValueSource?) {
         guard try checkBeforePop(typeHint: nil) else {
-            return .unknown
+            return (.unknown, nil)
         }
         return try valueStack.pop()
     }
 
-    private mutating func translateReturn() {
-        iseqBuilder.emit(.return)
+    private mutating func visitReturnLike() throws -> Instruction.ReturnOperand {
+        preserveAllLocalsOnStack()
+        for (index, resultType) in self.type.results.enumerated().reversed() {
+            let result = try valueStack.pop(resultType)
+            let source = result.intoRegister(layout: stackLayout)
+            let dest = returnReg(index)
+            emitCopyStack(from: source, to: dest)
+        }
+        return Instruction.ReturnOperand()
+    }
+
+    private mutating func copyOnBranch(targetFrame frame: ControlStack.ControlFrame) throws {
+        preserveAllLocalsOnStack()
+        let copyCount = Instruction.Register(frame.copyCount)
+        let sourceBase = valueStack.stackRegBase + Instruction.Register(valueStack.height)
+        let destBase = valueStack.stackRegBase + Instruction.Register(frame.stackHeight)
+        for i in (0..<copyCount).reversed() {
+            let source = sourceBase - 1 - Instruction.Register(i)
+            let dest: Instruction.Register
+            if case .block(root: true) = frame.kind {
+                dest = returnReg(Int(copyCount - 1 - i))
+            } else {
+                dest = destBase + copyCount - 1 - Instruction.Register(i)
+            }
+            emitCopyStack(from: source, to: dest)
+        }
+    }
+    private mutating func translateReturn() throws {
+        try iseqBuilder.emit(.return(visitReturnLike()))
     }
     private mutating func markUnreachable() throws {
         try controlStack.markUnreachable()
@@ -474,7 +779,6 @@ struct InstructionTranslator: InstructionVisitor {
         if controlStack.numberOfFrames > 1 {
             throw TranslationError("Expect \(controlStack.numberOfFrames - 1) more `end` instructions")
         }
-        iseqBuilder.pinLabelHere(self.endOfFunctionLabel)
         #if DEBUG
             // Check dangling labels
             iseqBuilder.assertDanglingLabels()
@@ -485,8 +789,11 @@ struct InstructionTranslator: InstructionVisitor {
         for (idx, instruction) in instructions.enumerated() {
             buffer[idx] = instruction
         }
-        buffer[instructions.count] = .endOfFunction
-        return InstructionSequence(instructions: UnsafeBufferPointer(buffer), maxStackHeight: valueStack.maxHeight)
+        buffer[instructions.count] = .endOfFunction(Instruction.ReturnOperand())
+        return InstructionSequence(
+            instructions: buffer,
+            maxStackHeight: Int(valueStack.stackRegBase) + valueStack.maxHeight
+        )
     }
 
     // MARK: - Visitor
@@ -501,11 +808,14 @@ struct InstructionTranslator: InstructionVisitor {
         let blockType = try module.resolveBlockType(blockType)
         let endLabel = iseqBuilder.allocLabel()
         let stackHeight = self.valueStack.height - Int(blockType.parameters.count)
+        preserveAllLocalsOnStack()
         controlStack.pushFrame(ControlStack.ControlFrame(blockType: blockType, stackHeight: stackHeight, continuation: endLabel, kind: .block))
     }
 
     mutating func visitLoop(blockType: WasmParser.BlockType) throws -> Output {
         let blockType = try module.resolveBlockType(blockType)
+        preserveAllLocalsOnStack()
+        iseqBuilder.resetLastEmission()
         let headLabel = iseqBuilder.putLabel()
         let stackHeight = self.valueStack.height - Int(blockType.parameters.count)
         controlStack.pushFrame(ControlStack.ControlFrame(blockType: blockType, stackHeight: stackHeight, continuation: headLabel, kind: .loop))
@@ -513,26 +823,30 @@ struct InstructionTranslator: InstructionVisitor {
 
     mutating func visitIf(blockType: WasmParser.BlockType) throws -> Output {
         // Pop condition value
-        try popOperand(.i32)
+        let condition = try popOperand(.i32)
         let blockType = try module.resolveBlockType(blockType)
         let endLabel = iseqBuilder.allocLabel()
         let elseLabel = iseqBuilder.allocLabel()
         let stackHeight = self.valueStack.height - Int(blockType.parameters.count)
+        preserveAllLocalsOnStack()
         controlStack.pushFrame(
             ControlStack.ControlFrame(
                 blockType: blockType, stackHeight: stackHeight, continuation: endLabel,
                 kind: .if(elseLabel: elseLabel, endLabel: endLabel)
             )
         )
+        guard let condition = condition else { return }
         let selfPC = iseqBuilder.insertingPC
-        iseqBuilder.emitWithLabel(endLabel) { iseqBuilder, endPC in
+        iseqBuilder.emitWithLabel(endLabel) { [stackLayout] iseqBuilder, endPC in
             let elseOrEndRef: ExpressionRef
             if let elsePC = iseqBuilder.resolveLabel(elseLabel) {
                 elseOrEndRef = ExpressionRef(from: selfPC, to: elsePC)
             } else {
                 elseOrEndRef = ExpressionRef(from: selfPC, to: endPC)
             }
-            return .ifThen(elseOrEndRef: elseOrEndRef)
+            return .ifThen(Instruction.IfOperand(
+                elseOrEndRef: elseOrEndRef, condition: condition.intoRegister(layout: stackLayout)
+            ))
         }
     }
 
@@ -541,15 +855,18 @@ struct InstructionTranslator: InstructionVisitor {
         guard case let .if(elseLabel, endLabel) = frame.kind else {
             throw TranslationError("Expected `if` control frame on top of the stack for `else` but got \(frame)")
         }
+        preserveAllLocalsOnStack()
+        try controlStack.resetReachability()
+        iseqBuilder.resetLastEmission()
         let selfPC = iseqBuilder.insertingPC
         iseqBuilder.emitWithLabel(endLabel) { _, endPC in
-            let endRef = ExpressionRef(from: selfPC, to: endPC)
-            return .else(endRef: endRef)
+            let offset = endPC.offsetFromHead - selfPC.offsetFromHead
+            return .br(offset: Int32(offset))
         }
         try valueStack.truncate(height: frame.stackHeight)
         // Re-push parameters
         for parameter in frame.blockType.parameters {
-            valueStack.push(parameter)
+            _ = valueStack.push(parameter)
         }
         iseqBuilder.pinLabelHere(elseLabel)
     }
@@ -558,10 +875,12 @@ struct InstructionTranslator: InstructionVisitor {
         guard let poppedFrame = controlStack.popFrame() else {
             throw TranslationError("Unexpected `end` instruction")
         }
-
+        iseqBuilder.resetLastEmission()
         if case .block(root: true) = poppedFrame.kind {
-            // TODO: Move endOfFunction emission from ISeq type
-            // iseqBuilder.emit(.endOfFunction)
+            if poppedFrame.reachable {
+                try translateReturn()
+            }
+            iseqBuilder.pinLabelHere(poppedFrame.continuation)
             return
         }
 
@@ -572,9 +891,10 @@ struct InstructionTranslator: InstructionVisitor {
         case .if:
             iseqBuilder.pinLabelHere(poppedFrame.continuation)
         }
+        preserveAllLocalsOnStack()
         try valueStack.truncate(height: poppedFrame.stackHeight)
         for result in poppedFrame.blockType.results {
-            valueStack.push(result)
+            _ = valueStack.push(result)
         }
     }
 
@@ -602,18 +922,9 @@ struct InstructionTranslator: InstructionVisitor {
         relativeDepth: UInt32,
         make: @escaping (_ offset: Int32, _ copyCount: UInt32, _ popCount: UInt32) -> Instruction
     ) throws {
-        let frame: ControlStack.ControlFrame
-        switch try controlStack.branchTarget(relativeDepth: relativeDepth) {
-        case .returnFunction:
-            // XX: unreachable?
-            self.translateReturn()
-            return
-        case .localJump(let found):
-            frame = found
-        }
-        let selfPC = iseqBuilder.insertingPC
+        let frame = try controlStack.branchTarget(relativeDepth: relativeDepth)
         let copyCount = frame.copyCount
-
+        let selfPC = iseqBuilder.insertingPC
         let popCount = try Self.computePopCount(
             destination: frame,
             currentFrame: try controlStack.currentFrame(),
@@ -625,114 +936,229 @@ struct InstructionTranslator: InstructionVisitor {
         }
     }
     mutating func visitBr(relativeDepth: UInt32) throws -> Output {
+        let frame = try controlStack.branchTarget(relativeDepth: relativeDepth)
+
+        // Copy from the stack top to the bottom to avoid overwrites
+        //              [BLOCK1]
+        //              [      ]
+        //              [      ]
+        //              [BLOCK2] () -> (i32, i64)
+        // copy [1] +-->[  i32 ]
+        //          +---[  i32 ]<--+ copy [2]
+        //              [  i64 ]---+
+        try copyOnBranch(targetFrame: frame)
         try emitBranch(relativeDepth: relativeDepth) { offset, copyCount, popCount in
-            return .br(
-                offset: offset,
-                copyCount: copyCount, popCount: popCount
-            )
+            return .br(offset: offset)
         }
         try markUnreachable()
     }
 
     mutating func visitBrIf(relativeDepth: UInt32) throws -> Output {
-        try popOperand(.i32)
-        try emitBranch(relativeDepth: relativeDepth) { offset, copyCount, popCount in
-            return .brIf(
-                offset: offset,
-                copyCount: copyCount, popCount: popCount
-            )
+        guard let condition = try popOperand(.i32)?.intoRegister(layout: stackLayout) else { return }
+        let frame = try controlStack.branchTarget(relativeDepth: relativeDepth)
+        if frame.copyCount == 0 {
+            // Optimization where we don't need copying values when the branch taken
+            let selfPC = iseqBuilder.insertingPC
+            iseqBuilder.emitWithLabel(frame.continuation) { _, continuation in
+                let relativeOffset = continuation.offsetFromHead - selfPC.offsetFromHead
+                return .brIf(Instruction.BrIfOperand(
+                    offset: Int32(relativeOffset), condition: condition
+                ))
+            }
+            return
         }
+
+        // If branch taken, fallthrough to landing pad, copy stack values
+        // then branch to the actual place
+        // If branch not taken, branch to the next of the landing pad
+        //
+        // (block (result i32)
+        //   (i32.const 42)
+        //   (i32.const 24)
+        //   (local.get 0)
+        //   (br_if 0) ------+
+        //   (local.get 1)   |
+        // )         <-------+
+        //
+        // [0x00] (i32.const 42 reg:0)
+        // [0x01] (i32.const 24 reg:1)
+        // [0x02] (local.get 0 result=reg:2)
+        // [0x03] (br_if_z offset=+0x3 cond=reg:2) --+
+        // [0x04] (stack.copy reg:1 -> reg:0)        |
+        // [0x05] (br offset=+0x2) --------+         |
+        // [0x06] (local.get 1 reg:2) <----|---------+
+        // [0x07] ...              <-------+
+        let onBranchNotTaken = iseqBuilder.allocLabel()
+        let conditionCheckAt = iseqBuilder.insertingPC
+        iseqBuilder.emitWithLabel(onBranchNotTaken) { _, continuation in
+            let relativeOffset = continuation.offsetFromHead - conditionCheckAt.offsetFromHead
+            return .brIfNot(Instruction.BrIfOperand(offset: Int32(relativeOffset), condition: condition))
+        }
+        try copyOnBranch(targetFrame: frame)
+        try emitBranch(relativeDepth: relativeDepth) { offset, copyCount, popCount in
+            return .br(offset: offset)
+        }
+        iseqBuilder.pinLabelHere(onBranchNotTaken)
     }
 
     mutating func visitBrTable(targets: WasmParser.BrTable) throws -> Output {
-        try popOperand(.i32)  // Table index
+        guard let index = try popOperand(.i32)?.intoRegister(layout: stackLayout) else { return }
+        guard try controlStack.currentFrame().reachable else { return }
 
+        preserveAllLocalsOnStack()
         let allLabelIndices = targets.labelIndices + [targets.defaultIndex]
         let tableBuffer = allocator.allocateBrTable(capacity: allLabelIndices.count)
-        let brTable = Instruction.BrTable(buffer: UnsafeBufferPointer(tableBuffer))
-        let insertAt = iseqBuilder.insertingPC
-        iseqBuilder.emit(.brTable(brTable))
+        let brTable = Instruction.BrTable(
+            baseAddress: tableBuffer.baseAddress!,
+            count: UInt16(tableBuffer.count)
+        )
+        let operand = Instruction.BrTableOperand(table: brTable, index: index)
+        let brTableAt = iseqBuilder.insertingPC
+        iseqBuilder.emit(.brTable(operand))
 
-        let currentFrame = try controlStack.currentFrame()
-        let currentHeight = valueStack.height
-
+        // TODO(optimize): Eliminate landing pads when copyCount of a destination is 0
+        //
+        // (block $l1 (result i32)
+        //   (i32.const 63)
+        //   (block $l2 (result i32)
+        //     (i32.const 42)
+        //     (i32.const 24)
+        //     (local.get 0)
+        //     (br_table $l1 $l2) ---+
+        //                           |
+        //   )               <-------+
+        //   (i32.const 36)          |
+        // )              <----------+
+        //
+        //
+        //           [0x00] (i32.const 63 reg:0)
+        //           [0x01] (i32.const 42 reg:1)
+        //           [0x02] (i32.const 24 reg:2)
+        //           [0x03] (local.get 0 result=reg:3)
+        //           [0x04] (br_table index=reg:3 offsets=[
+        //                    +0x01       -----------------+
+        //                    +0x03       -----------------|----+
+        //                  ])                             |    |
+        //           [0x05] (stack.copy reg:2 -> reg:0) <--+    |
+        //  +------- [0x06] (br offset=+0x03)                   |
+        //  |        [0x07] (stack.copy reg:2 -> reg:1)  <------+
+        //  |  +---- [0x08] (br offset=+0x03)
+        //  +--|---> [0x09] (i32.const 36 reg:2)
+        //     |     [0x0a] (stack.copy reg:2 -> reg:0)
+        //     +---> [0x0b] ...
         for (entryIndex, labelIndex) in allLabelIndices.enumerated() {
-            let frame: ControlStack.ControlFrame
-            switch try controlStack.branchTarget(relativeDepth: labelIndex) {
-            case .returnFunction:
-                // XX: unreachable?
-                self.translateReturn()
-                return
-            case .localJump(let found):
-                frame = found
-            }
-            let popCount = try Self.computePopCount(
-                destination: frame, currentFrame: currentFrame, currentHeight: currentHeight
-            )
-
-            iseqBuilder.emitWithLabel(frame.continuation, insertAt: insertAt) { iseqBuilder, continuation in
-                let relativeOffset = continuation.offsetFromHead - insertAt.offsetFromHead
+            let frame = try controlStack.branchTarget(relativeDepth: labelIndex)
+            do {
+                let relativeOffset = iseqBuilder.insertingPC.offsetFromHead - brTableAt.offsetFromHead
                 tableBuffer[entryIndex] = Instruction.BrTable.Entry(
-                    labelIndex: labelIndex, offset: Int32(relativeOffset),
-                    copyCount: frame.copyCount, popCount: UInt16(popCount)
+                    offset: Int32(relativeOffset)
                 )
-                assert(tableBuffer[entryIndex].labelIndex == labelIndex)
-                return .brTable(brTable)
+            }
+            try copyOnBranch(targetFrame: frame)
+            let brAt = iseqBuilder.insertingPC
+            iseqBuilder.emitWithLabel(frame.continuation) { _, continuation in
+                let relativeOffset = continuation.offsetFromHead - brAt.offsetFromHead
+                return .br(offset: Int32(relativeOffset))
             }
         }
         try markUnreachable()
     }
 
     mutating func visitReturn() throws -> Output {
-        translateReturn()
+        guard try controlStack.currentFrame().reachable else { return }
+        try translateReturn()
         try markUnreachable()
     }
 
-    private mutating func visitCallLike(calleeType: FunctionType) throws {
+    private mutating func visitCallLike(calleeType: FunctionType) throws -> Instruction.Register? {
         for parameter in calleeType.parameters.reversed() {
-            try popOperand(parameter)
+            guard try popOnStackOperand(parameter) else { return nil }
         }
+
+        let spAddend = valueStack.stackRegBase + Instruction.Register(valueStack.height)
+            + StackLayout.frameHeaderSize(type: calleeType)
+
         for result in calleeType.results {
-            valueStack.push(result)
+            _ = valueStack.push(result)
         }
+        return Instruction.Register(spAddend)
     }
     mutating func visitCall(functionIndex: UInt32) throws -> Output {
-        let calleeType = try self.module.functionType(functionIndex)
-        try visitCallLike(calleeType: calleeType)
-        emit(.call(functionIndex: functionIndex))
+        let calleeType = try self.module.functionType(functionIndex, interner: funcTypeInterner)
+        guard let spAddend = try visitCallLike(calleeType: calleeType) else { return }
+        guard let callee = self.module.resolveCallee(functionIndex) else {
+            // Skip actual code emission if validation-only mode
+            return
+        }
+        let callLike = Instruction.CallLikeOperand(spAddend: spAddend)
+        if callee.isWasm {
+            if module.isSameInstance(callee.wasm.instance) {
+                emit(.compilingCall(
+                    Instruction.InternalCallOperand(
+                        callee: callee,
+                        callLike: callLike
+                    )
+                ))
+                return
+            }
+        }
+        emit(.call(
+            Instruction.CallOperand(
+                callee: callee,
+                callLike: Instruction.CallLikeOperand(spAddend: spAddend)
+            )
+        ))
     }
 
     mutating func visitCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws -> Output {
         let addressType = try module.addressType(tableIndex: tableIndex)
-        try popOperand(addressType)  // function address
+        let address = try popOperand(addressType)  // function address
         let calleeType = try self.module.resolveType(typeIndex)
-        try visitCallLike(calleeType: calleeType)
-        emit(.callIndirect(tableIndex: tableIndex, typeIndex: typeIndex))
+        guard let spAddend = try visitCallLike(calleeType: calleeType) else { return }
+        guard let addressRegister = address?.intoRegister(layout: stackLayout) else { return }
+        let internType = funcTypeInterner.intern(calleeType)
+        let operand = Instruction.CallIndirectOperand(
+            tableIndex: tableIndex,
+            type: internType,
+            index: addressRegister,
+            callLike: Instruction.CallLikeOperand(spAddend: spAddend)
+        )
+        emit(.callIndirect(operand))
     }
 
     mutating func visitDrop() throws -> Output {
         _ = try popAnyOperand()
-        emit(.drop)
+        iseqBuilder.resetLastEmission()
     }
     mutating func visitSelect() throws -> Output {
-        try popOperand(.i32)
-        let value1 = try popAnyOperand()
-        let value2 = try popAnyOperand()
-        switch (value1, value2) {
+        let condition = try popOperand(.i32)
+        let (value1Type, value1) = try popAnyOperand()
+        let (value2Type, value2) = try popAnyOperand()
+        switch (value1Type, value2Type) {
         case let (.some(type1), .some(type2)):
             guard type1 == type2 else {
-                throw TranslationError("Type mismatch on `select`. Expected \(value1) and \(value2) to be same")
+                throw TranslationError("Type mismatch on `select`. Expected \(value1Type) and \(value2Type) to be same")
             }
         case (.unknown, _), (_, .unknown):
             break
         }
-        valueStack.push(value1)
-        emit(.select)
+        let result = valueStack.push(value1Type)
+        if let condition = condition?.intoRegister(layout: stackLayout),
+           let value1 = value1?.intoRegister(layout: stackLayout),
+           let value2 = value2?.intoRegister(layout: stackLayout) {
+            let operand = Instruction.SelectOperand(
+                result: result,
+                condition: condition,
+                onTrue: value2,
+                onFalse: value1
+            )
+            emit(.select(operand))
+        }
     }
     mutating func visitTypedSelect(type: WasmParser.ValueType) throws -> Output {
-        try popOperand(.i32)
-        let value1 = try popAnyOperand()
-        _ = try popAnyOperand()
+        let condition = try popOperand(.i32)
+        let (value1Type, value1) = try popAnyOperand()
+        let (_, value2) = try popAnyOperand()
         // TODO: Perform actual validation
         // guard value1 == ValueType(type) else {
         //     throw TranslationError("Type mismatch on `select`. Expected \(value1) and \(type) to be same")
@@ -740,262 +1166,412 @@ struct InstructionTranslator: InstructionVisitor {
         // guard value2 == ValueType(type) else {
         //     throw TranslationError("Type mismatch on `select`. Expected \(value2) and \(type) to be same")
         // }
-        valueStack.push(value1)
-        emit(.select)
+        let result = valueStack.push(value1Type)
+        if let condition = condition?.intoRegister(layout: stackLayout),
+           let value1 = value1?.intoRegister(layout: stackLayout),
+           let value2 = value2?.intoRegister(layout: stackLayout) {
+            let operand = Instruction.SelectOperand(
+                result: result,
+                condition: condition,
+                onTrue: value2,
+                onFalse: value1
+            )
+            emit(.select(operand))
+        }
     }
     mutating func visitLocalGet(localIndex: UInt32) throws -> Output {
+        try valueStack.pushLocal(localIndex, locals: &locals)
+    }
+    mutating func visitLocalSetOrTee(localIndex: UInt32, isTee: Bool) throws {
+        guard try controlStack.currentFrame().reachable else { return }
+        preserveLocalsOnStack(localIndex)
         let type = try locals.type(of: localIndex)
-        valueStack.push(type)
-        emit(.localGet(index: localIndex))
+        guard let value = try popOperand(type)?.intoRegister(layout: stackLayout) else { return }
+        let result = localReg(localIndex)
+        if !isTee, iseqBuilder.relinkLastInstructionResult(result) {
+            // Good news, copyStack is optimized out :)
+            return
+        }
+        emitCopyStack(from: value, to: result)
     }
     mutating func visitLocalSet(localIndex: UInt32) throws -> Output {
-        let type = try locals.type(of: localIndex)
-        try popOperand(type)
-        emit(.localSet(index: localIndex))
+        try visitLocalSetOrTee(localIndex: localIndex, isTee: false)
     }
-    mutating func visitLocalTee(localIndex: UInt32) -> Output {
-        // No value stack traffic here
-        emit(.localTee(index: localIndex))
+    mutating func visitLocalTee(localIndex: UInt32) throws -> Output {
+        guard try controlStack.currentFrame().reachable else { return }
+        try visitLocalSetOrTee(localIndex: localIndex, isTee: true)
+        _ = try valueStack.pushLocal(localIndex, locals: &locals)
     }
     mutating func visitGlobalGet(globalIndex: UInt32) throws -> Output {
         let type = try module.globalType(globalIndex)
-        valueStack.push(type)
-        emit(.globalGet(index: globalIndex))
+        let result = valueStack.push(type)
+        guard let global = module.resolveGlobal(globalIndex) else {
+            // Skip actual code emission if validation-only mode
+            return
+        }
+        emit(.globalGet(Instruction.GlobalGetOperand(global: global, result: result)))
     }
     mutating func visitGlobalSet(globalIndex: UInt32) throws -> Output {
         let type = try module.globalType(globalIndex)
-        try popOperand(type)
-        emit(.globalSet(index: globalIndex))
+        guard let value = try popOperand(type) else { return }
+        guard let global = module.resolveGlobal(globalIndex) else {
+            // Skip actual code emission if validation-only mode
+            return
+        }
+        let operand = Instruction.GlobalSetOperand(
+            global: global, value: value.intoRegister(layout: stackLayout)
+        )
+        emit(.globalSet(operand))
     }
 
-    private mutating func pushEmit(_ type: ValueType, _ instruction: Instruction) {
-        valueStack.push(type)
-        emit(instruction)
+    private mutating func pushEmit(
+        _ type: ValueType,
+        _ instruction: (Instruction.Register) -> Instruction
+    ) {
+        let register = valueStack.push(type)
+        emit(instruction(register))
     }
-    private mutating func popEmit(_ type: ValueType, _ instruction: Instruction) throws {
-        try popOperand(type)
-        emit(instruction)
-    }
-    private mutating func popPushEmit(_ pop: ValueType, _ push: ValueType, _ instruction: Instruction) throws {
-        try popOperand(pop)
-        valueStack.push(push)
-        emit(instruction)
-    }
-    private mutating func popPushEmit(_ pops: [ValueType], _ pushs: [ValueType], _ instruction: Instruction) throws {
-        for pop in pops {
-            try popOperand(pop)
+    private mutating func popPushEmit(
+        _ pop: ValueType,
+        _ push: ValueType,
+        _ instruction: @escaping (_ popped: ValueSource, _ result: Instruction.Register, ValueStack) -> Instruction
+    ) throws {
+        let value = try popOperand(pop)
+        let result = valueStack.push(push)
+        if let value = value {
+            emit(instruction(value, result, valueStack), resultRelink: { [valueStack] newResult in
+                instruction(value, newResult, valueStack)
+            })
         }
-        for push in pushs {
-            valueStack.push(push)
-        }
-        emit(instruction)
     }
-    private mutating func visitLoad(_ memarg: MemArg, _ type: ValueType, _ instruction: Instruction) throws {
+
+    private mutating func popPushEmit(
+        _ pops: (ValueType, ValueType, ValueType),
+        _ push: ValueType,
+        _ instruction: (
+            _ popped: (ValueSource, ValueSource, ValueSource),
+            _ result: Instruction.Register,
+            inout ValueStack
+        ) -> Instruction
+    ) throws {
+        let pop1 = try valueStack.pop(pops.0)
+        let pop2 = try valueStack.pop(pops.1)
+        let pop3 = try valueStack.pop(pops.2)
+        let result = valueStack.push(push)
+        emit(instruction((pop1, pop2, pop3), result, &valueStack))
+    }
+
+    private mutating func popEmit(
+        _ pops: (ValueType, ValueType, ValueType),
+        _ instruction: (
+            _ popped: (ValueSource, ValueSource, ValueSource),
+            inout ValueStack
+        ) -> Instruction
+    ) throws {
+        let pop1 = try valueStack.pop(pops.0)
+        let pop2 = try valueStack.pop(pops.1)
+        let pop3 = try valueStack.pop(pops.2)
+        emit(instruction((pop1, pop2, pop3), &valueStack))
+    }
+
+    private mutating func popPushEmit(
+        _ pops: (ValueType, ValueType),
+        _ instruction: (
+            _ popped: (ValueSource, ValueSource),
+            inout ValueStack
+        ) -> Instruction
+    ) throws {
+        let pop1 = try valueStack.pop(pops.0)
+        let pop2 = try valueStack.pop(pops.1)
+        emit(instruction((pop1, pop2), &valueStack))
+    }
+
+    private mutating func popPushEmit(
+        _ pops: (ValueType, ValueType),
+        _ push: ValueType,
+        _ instruction: (
+            _ popped: (ValueSource, ValueSource),
+            _ result: Instruction.Register,
+            inout ValueStack
+        ) -> Instruction
+    ) throws {
+        let pop1 = try valueStack.pop(pops.0)
+        let pop2 = try valueStack.pop(pops.1)
+        let result = valueStack.push(push)
+        emit(instruction((pop1, pop2), result, &valueStack))
+    }
+
+    private mutating func visitLoad(
+        _ memarg: MemArg,
+        _ type: ValueType,
+        _ instruction: @escaping (Instruction.LoadOperand) -> Instruction
+    ) throws {
         let isMemory64 = try module.isMemory64(memoryIndex: 0)
         let alignLog2Limit = isMemory64 ? 64 : 32
         if memarg.align >= alignLog2Limit {
             throw TranslationError("Alignment 2**\(memarg.align) is out of limit \(alignLog2Limit)")
         }
-        try popPushEmit(.address(isMemory64: isMemory64), type, instruction)
+        try popPushEmit(.address(isMemory64: isMemory64), type) { [stackLayout] value, result, stack in
+            let loadOperand = Instruction.LoadOperand(
+                memarg: Instruction.MemArg(offset: memarg.offset),
+                pointer: value.intoRegister(layout: stackLayout),
+                result: result
+            )
+            return instruction(loadOperand)
+        }
     }
-    private mutating func visitStore(_ memarg: MemArg, _ type: ValueType, _ instruction: Instruction) throws {
-        try popOperand(type)
-        try popOperand(module.addressType(memoryIndex: 0))
-        emit(instruction)
+    private mutating func visitStore(
+        _ memarg: MemArg,
+        _ type: ValueType,
+        _ instruction: (Instruction.StoreOperand) -> Instruction
+    ) throws {
+        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        let value = try popOperand(type)
+        let pointer = try popOperand(.address(isMemory64: isMemory64))
+        if let value = value?.intoRegister(layout: stackLayout),
+           let pointer = pointer?.intoRegister(layout: stackLayout) {
+            let storeOperand = Instruction.StoreOperand(
+                memarg: Instruction.MemArg(offset: memarg.offset),
+                pointer: pointer,
+                value: value
+            )
+            emit(instruction(storeOperand))
+        }
     }
-    mutating func visitI32Load(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i32, .i32Load(memarg: memarg)) }
-    mutating func visitI64Load(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, .i64Load(memarg: memarg)) }
-    mutating func visitF32Load(memarg: MemArg) throws -> Output { try visitLoad(memarg, .f32, .f32Load(memarg: memarg)) }
-    mutating func visitF64Load(memarg: MemArg) throws -> Output { try visitLoad(memarg, .f64, .f64Load(memarg: memarg)) }
-    mutating func visitI32Load8S(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i32, .i32Load8S(memarg: memarg)) }
-    mutating func visitI32Load8U(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i32, .i32Load8U(memarg: memarg)) }
-    mutating func visitI32Load16S(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i32, .i32Load16S(memarg: memarg)) }
-    mutating func visitI32Load16U(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i32, .i32Load16U(memarg: memarg)) }
-    mutating func visitI64Load8S(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, .i64Load8S(memarg: memarg)) }
-    mutating func visitI64Load8U(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, .i64Load8U(memarg: memarg)) }
-    mutating func visitI64Load16S(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, .i64Load16S(memarg: memarg)) }
-    mutating func visitI64Load16U(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, .i64Load16U(memarg: memarg)) }
-    mutating func visitI64Load32S(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, .i64Load32S(memarg: memarg)) }
-    mutating func visitI64Load32U(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, .i64Load32U(memarg: memarg)) }
-    mutating func visitI32Store(memarg: MemArg) throws -> Output { try visitStore(memarg, .i32, .i32Store(memarg: memarg)) }
-    mutating func visitI64Store(memarg: MemArg) throws -> Output { try visitStore(memarg, .i64, .i64Store(memarg: memarg)) }
-    mutating func visitF32Store(memarg: MemArg) throws -> Output { try visitStore(memarg, .f32, .f32Store(memarg: memarg)) }
-    mutating func visitF64Store(memarg: MemArg) throws -> Output { try visitStore(memarg, .f64, .f64Store(memarg: memarg)) }
-    mutating func visitI32Store8(memarg: MemArg) throws -> Output { try visitStore(memarg, .i32, .i32Store8(memarg: memarg)) }
-    mutating func visitI32Store16(memarg: MemArg) throws -> Output { try visitStore(memarg, .i32, .i32Store16(memarg: memarg)) }
-    mutating func visitI64Store8(memarg: MemArg) throws -> Output { try visitStore(memarg, .i64, .i64Store8(memarg: memarg)) }
-    mutating func visitI64Store16(memarg: MemArg) throws -> Output { try visitStore(memarg, .i64, .i64Store16(memarg: memarg)) }
-    mutating func visitI64Store32(memarg: MemArg) throws -> Output { try visitStore(memarg, .i64, .i64Store32(memarg: memarg)) }
+    mutating func visitI32Load(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i32, Instruction.i32Load) }
+    mutating func visitI64Load(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, Instruction.i64Load) }
+    mutating func visitF32Load(memarg: MemArg) throws -> Output { try visitLoad(memarg, .f32, Instruction.f32Load) }
+    mutating func visitF64Load(memarg: MemArg) throws -> Output { try visitLoad(memarg, .f64, Instruction.f64Load) }
+    mutating func visitI32Load8S(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i32, Instruction.i32Load8S) }
+    mutating func visitI32Load8U(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i32, Instruction.i32Load8U) }
+    mutating func visitI32Load16S(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i32, Instruction.i32Load16S) }
+    mutating func visitI32Load16U(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i32, Instruction.i32Load16U) }
+    mutating func visitI64Load8S(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, Instruction.i64Load8S) }
+    mutating func visitI64Load8U(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, Instruction.i64Load8U) }
+    mutating func visitI64Load16S(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, Instruction.i64Load16S) }
+    mutating func visitI64Load16U(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, Instruction.i64Load16U) }
+    mutating func visitI64Load32S(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, Instruction.i64Load32S) }
+    mutating func visitI64Load32U(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, Instruction.i64Load32U) }
+    mutating func visitI32Store(memarg: MemArg) throws -> Output { try visitStore(memarg, .i32, Instruction.i32Store) }
+    mutating func visitI64Store(memarg: MemArg) throws -> Output { try visitStore(memarg, .i64, Instruction.i64Store) }
+    mutating func visitF32Store(memarg: MemArg) throws -> Output { try visitStore(memarg, .f32, Instruction.f32Store) }
+    mutating func visitF64Store(memarg: MemArg) throws -> Output { try visitStore(memarg, .f64, Instruction.f64Store) }
+    mutating func visitI32Store8(memarg: MemArg) throws -> Output { try visitStore(memarg, .i32, Instruction.i32Store8) }
+    mutating func visitI32Store16(memarg: MemArg) throws -> Output { try visitStore(memarg, .i32, Instruction.i32Store16) }
+    mutating func visitI64Store8(memarg: MemArg) throws -> Output { try visitStore(memarg, .i64, Instruction.i64Store8) }
+    mutating func visitI64Store16(memarg: MemArg) throws -> Output { try visitStore(memarg, .i64, Instruction.i64Store16) }
+    mutating func visitI64Store32(memarg: MemArg) throws -> Output { try visitStore(memarg, .i64, Instruction.i64Store32) }
     mutating func visitMemorySize(memory: UInt32) throws -> Output {
         let sizeType: ValueType = try module.isMemory64(memoryIndex: memory) ? .i64 : .i32
-        pushEmit(sizeType, .memorySize)
+        pushEmit(sizeType, { .memorySize(Instruction.MemorySizeOperand(memoryIndex: memory, result: $0)) })
     }
     mutating func visitMemoryGrow(memory: UInt32) throws -> Output {
+        let isMemory64 = try module.isMemory64(memoryIndex: memory)
+        let sizeType = ValueType.address(isMemory64: isMemory64)
         // Just pop/push the same type (i64 or i32) value
-        emit(.memoryGrow)
+        try popPushEmit(sizeType, sizeType) { [stackLayout] value, result, stack in
+            .memoryGrow(Instruction.MemoryGrowOperand(result: result, delta: value.intoRegister(layout: stackLayout), memoryIndex: memory))
+        }
     }
-    mutating func visitI32Const(value: Int32) -> Output { pushEmit(.i32, .numericConst(.i32(UInt32(bitPattern: value)))) }
-    mutating func visitI64Const(value: Int64) -> Output { pushEmit(.i64, .numericConst(.i64(UInt64(bitPattern: value)))) }
-    mutating func visitF32Const(value: IEEE754.Float32) -> Output { pushEmit(.f32, .numericConst(.f32(value.bitPattern))) }
-    mutating func visitF64Const(value: IEEE754.Float64) -> Output { pushEmit(.f64, .numericConst(.f64(value.bitPattern))) }
-    mutating func visitRefNull(type: WasmParser.ReferenceType) -> Output { pushEmit(.ref(type), .refNull(type)) }
-    mutating func visitRefIsNull() throws -> Output {
-        try valueStack.popRef()
-        valueStack.push(.i32)
-        emit(.refIsNull)
-    }
-    mutating func visitRefFunc(functionIndex: UInt32) -> Output { pushEmit(.ref(.funcRef), .refFunc(functionIndex)) }
 
-    private mutating func visitUnary(_ operand: ValueType, _ instruction: Instruction) throws {
-        try popPushEmit(operand, operand, instruction)
+    private mutating func visitConst(_ type: ValueType, _ value: Value) {
+        pushEmit(type, { .numericConst(Instruction.ConstOperand(value: UntypedValue(value), result: $0)) })
     }
-    private mutating func visitBinary(_ operand: ValueType, _ result: ValueType, _ instruction: Instruction) throws {
-        try popOperand(operand)
-        try popOperand(operand)
-        valueStack.push(result)
-        emit(instruction)
+    mutating func visitI32Const(value: Int32) -> Output { visitConst(.i32, .i32(UInt32(bitPattern: value))) }
+    mutating func visitI64Const(value: Int64) -> Output { visitConst(.i64, .i64(UInt64(bitPattern: value))) }
+    mutating func visitF32Const(value: IEEE754.Float32) -> Output { visitConst(.f32, .f32(value.bitPattern)) }
+    mutating func visitF64Const(value: IEEE754.Float64) -> Output { visitConst(.f64, .f64(value.bitPattern)) }
+    mutating func visitRefNull(type: WasmParser.ReferenceType) -> Output {
+        pushEmit(.ref(type), { .refNull(Instruction.RefNullOperand(type: type, result: $0)) })
     }
-    private mutating func visitCmp(_ operand: ValueType, _ instruction: Instruction) throws {
-        try popPushEmit([operand, operand], [.i32], instruction)
+    mutating func visitRefIsNull() throws -> Output {
+        let value = try valueStack.popRef()
+        let result = valueStack.push(.i32)
+        emit(.refIsNull(Instruction.RefIsNullOperand(value: value.intoRegister(layout: stackLayout), result: result)))
     }
-    private mutating func visitConversion(_ from: ValueType, _ to: ValueType, _ instruction: Instruction) throws {
-        try popPushEmit(from, to, instruction)
+    mutating func visitRefFunc(functionIndex: UInt32) -> Output {
+        pushEmit(.ref(.funcRef), { .refFunc(Instruction.RefFuncOperand(index: functionIndex, result: $0)) })
+    }
+
+    private mutating func visitUnary(_ operand: ValueType, _ instruction: @escaping (Instruction.UnaryOperand) -> Instruction) throws {
+        try popPushEmit(operand, operand) { [stackLayout] value, result, stack in
+            return instruction(Instruction.UnaryOperand(result: result, input: value.intoRegister(layout: stackLayout)))
+        }
+    }
+    private mutating func visitBinary(
+        _ operand: ValueType,
+        _ result: ValueType,
+        _ instruction: @escaping (Instruction.BinaryOperand) -> Instruction
+    ) throws {
+        let rhs = try popOperand(operand)
+        let lhs = try popOperand(operand)
+        let result = valueStack.push(result)
+        if let lhs = lhs?.intoRegister(layout: stackLayout), let rhs = rhs?.intoRegister(layout: stackLayout) {
+            emit(
+                instruction(Instruction.BinaryOperand(result: result, lhs: lhs, rhs: rhs)),
+                resultRelink: { result in
+                    return instruction(Instruction.BinaryOperand(result: result, lhs: lhs, rhs: rhs))
+                }
+            )
+        }
+    }
+    private mutating func visitCmp(_ operand: ValueType, _ instruction: @escaping (Instruction.BinaryOperand) -> Instruction) throws {
+        try visitBinary(operand, .i32, instruction)
+    }
+    private mutating func visitConversion(_ from: ValueType, _ to: ValueType, _ instruction: @escaping (Instruction.UnaryOperand) -> Instruction) throws {
+        try popPushEmit(from, to) { [stackLayout] value, result, stack in
+            return instruction(Instruction.UnaryOperand(result: result, input: value.intoRegister(layout: stackLayout)))
+        }
     }
     mutating func visitI32Eqz() throws -> Output {
-        try popPushEmit(.i32, .i32, .i32Eqz)
+        try popPushEmit(.i32, .i32) { [stackLayout] value, result, stack in
+            .i32Eqz(Instruction.UnaryOperand(result: result, input: value.intoRegister(layout: stackLayout)))
+        }
     }
-    mutating func visitI32Eq() throws -> Output { try visitCmp(.i32, .i32Eq) }
-    mutating func visitI32Ne() throws -> Output { try visitCmp(.i32, .i32Ne) }
-    mutating func visitI32LtS() throws -> Output { try visitCmp(.i32, .i32LtS) }
-    mutating func visitI32LtU() throws -> Output { try visitCmp(.i32, .i32LtU) }
-    mutating func visitI32GtS() throws -> Output { try visitCmp(.i32, .i32GtS) }
-    mutating func visitI32GtU() throws -> Output { try visitCmp(.i32, .i32GtU) }
-    mutating func visitI32LeS() throws -> Output { try visitCmp(.i32, .i32LeS) }
-    mutating func visitI32LeU() throws -> Output { try visitCmp(.i32, .i32LeU) }
-    mutating func visitI32GeS() throws -> Output { try visitCmp(.i32, .i32GeS) }
-    mutating func visitI32GeU() throws -> Output { try visitCmp(.i32, .i32GeU) }
+    mutating func visitI32Eq() throws -> Output { try visitCmp(.i32, Instruction.i32Eq) }
+    mutating func visitI32Ne() throws -> Output { try visitCmp(.i32, Instruction.i32Ne) }
+    mutating func visitI32LtS() throws -> Output { try visitCmp(.i32, Instruction.i32LtS) }
+    mutating func visitI32LtU() throws -> Output { try visitCmp(.i32, Instruction.i32LtU) }
+    mutating func visitI32GtS() throws -> Output { try visitCmp(.i32, Instruction.i32GtS) }
+    mutating func visitI32GtU() throws -> Output { try visitCmp(.i32, Instruction.i32GtU) }
+    mutating func visitI32LeS() throws -> Output { try visitCmp(.i32, Instruction.i32LeS) }
+    mutating func visitI32LeU() throws -> Output { try visitCmp(.i32, Instruction.i32LeU) }
+    mutating func visitI32GeS() throws -> Output { try visitCmp(.i32, Instruction.i32GeS) }
+    mutating func visitI32GeU() throws -> Output { try visitCmp(.i32, Instruction.i32GeU) }
     mutating func visitI64Eqz() throws -> Output {
-        try popPushEmit(.i64, .i32, .i64Eqz)
+        try popPushEmit(.i64, .i32) { [stackLayout] value, result, stack in
+            .i64Eqz(Instruction.UnaryOperand(result: result, input: value.intoRegister(layout: stackLayout)))
+        }
     }
-    mutating func visitI64Eq() throws -> Output { try visitCmp(.i64, .i64Eq) }
-    mutating func visitI64Ne() throws -> Output { try visitCmp(.i64, .i64Ne) }
-    mutating func visitI64LtS() throws -> Output { try visitCmp(.i64, .i64LtS) }
-    mutating func visitI64LtU() throws -> Output { try visitCmp(.i64, .i64LtU) }
-    mutating func visitI64GtS() throws -> Output { try visitCmp(.i64, .i64GtS) }
-    mutating func visitI64GtU() throws -> Output { try visitCmp(.i64, .i64GtU) }
-    mutating func visitI64LeS() throws -> Output { try visitCmp(.i64, .i64LeS) }
-    mutating func visitI64LeU() throws -> Output { try visitCmp(.i64, .i64LeU) }
-    mutating func visitI64GeS() throws -> Output { try visitCmp(.i64, .i64GeS) }
-    mutating func visitI64GeU() throws -> Output { try visitCmp(.i64, .i64GeU) }
-    mutating func visitF32Eq() throws -> Output { try visitCmp(.f32, .f32Eq) }
-    mutating func visitF32Ne() throws -> Output { try visitCmp(.f32, .f32Ne) }
-    mutating func visitF32Lt() throws -> Output { try visitCmp(.f32, .f32Lt) }
-    mutating func visitF32Gt() throws -> Output { try visitCmp(.f32, .f32Gt) }
-    mutating func visitF32Le() throws -> Output { try visitCmp(.f32, .f32Le) }
-    mutating func visitF32Ge() throws -> Output { try visitCmp(.f32, .f32Ge) }
-    mutating func visitF64Eq() throws -> Output { try visitCmp(.f64, .f64Eq) }
-    mutating func visitF64Ne() throws -> Output { try visitCmp(.f64, .f64Ne) }
-    mutating func visitF64Lt() throws -> Output { try visitCmp(.f64, .f64Lt) }
-    mutating func visitF64Gt() throws -> Output { try visitCmp(.f64, .f64Gt) }
-    mutating func visitF64Le() throws -> Output { try visitCmp(.f64, .f64Le) }
-    mutating func visitF64Ge() throws -> Output { try visitCmp(.f64, .f64Ge) }
-    mutating func visitI32Clz() throws -> Output { try visitUnary(.i32, .i32Clz) }
-    mutating func visitI32Ctz() throws -> Output { try visitUnary(.i32, .i32Ctz) }
-    mutating func visitI32Popcnt() throws -> Output { try visitUnary(.i32, .i32Popcnt) }
-    mutating func visitI32Add() throws -> Output { try visitBinary(.i32, .i32, .i32Add) }
-    mutating func visitI32Sub() throws -> Output { try visitBinary(.i32, .i32, .i32Sub) }
-    mutating func visitI32Mul() throws -> Output { try visitBinary(.i32, .i32, .i32Mul) }
-    mutating func visitI32DivS() throws -> Output { try visitBinary(.i32, .i32, .i32DivS) }
-    mutating func visitI32DivU() throws -> Output { try visitBinary(.i32, .i32, .i32DivU) }
-    mutating func visitI32RemS() throws -> Output { try visitBinary(.i32, .i32, .i32RemS) }
-    mutating func visitI32RemU() throws -> Output { try visitBinary(.i32, .i32, .i32RemU) }
-    mutating func visitI32And() throws -> Output { try visitBinary(.i32, .i32, .i32And) }
-    mutating func visitI32Or() throws -> Output { try visitBinary(.i32, .i32, .i32Or) }
-    mutating func visitI32Xor() throws -> Output { try visitBinary(.i32, .i32, .i32Xor) }
-    mutating func visitI32Shl() throws -> Output { try visitBinary(.i32, .i32, .i32Shl) }
-    mutating func visitI32ShrS() throws -> Output { try visitBinary(.i32, .i32, .i32ShrS) }
-    mutating func visitI32ShrU() throws -> Output { try visitBinary(.i32, .i32, .i32ShrU) }
-    mutating func visitI32Rotl() throws -> Output { try visitBinary(.i32, .i32, .i32Rotl) }
-    mutating func visitI32Rotr() throws -> Output { try visitBinary(.i32, .i32, .i32Rotr) }
-    mutating func visitI64Clz() throws -> Output { try visitUnary(.i64, .i64Clz) }
-    mutating func visitI64Ctz() throws -> Output { try visitUnary(.i64, .i64Ctz) }
-    mutating func visitI64Popcnt() throws -> Output { try visitUnary(.i64, .i64Popcnt) }
-    mutating func visitI64Add() throws -> Output { try visitBinary(.i64, .i64, .i64Add) }
-    mutating func visitI64Sub() throws -> Output { try visitBinary(.i64, .i64, .i64Sub) }
-    mutating func visitI64Mul() throws -> Output { try visitBinary(.i64, .i64, .i64Mul) }
-    mutating func visitI64DivS() throws -> Output { try visitBinary(.i64, .i64, .i64DivS) }
-    mutating func visitI64DivU() throws -> Output { try visitBinary(.i64, .i64, .i64DivU) }
-    mutating func visitI64RemS() throws -> Output { try visitBinary(.i64, .i64, .i64RemS) }
-    mutating func visitI64RemU() throws -> Output { try visitBinary(.i64, .i64, .i64RemU) }
-    mutating func visitI64And() throws -> Output { try visitBinary(.i64, .i64, .i64And) }
-    mutating func visitI64Or() throws -> Output { try visitBinary(.i64, .i64, .i64Or) }
-    mutating func visitI64Xor() throws -> Output { try visitBinary(.i64, .i64, .i64Xor) }
-    mutating func visitI64Shl() throws -> Output { try visitBinary(.i64, .i64, .i64Shl) }
-    mutating func visitI64ShrS() throws -> Output { try visitBinary(.i64, .i64, .i64ShrS) }
-    mutating func visitI64ShrU() throws -> Output { try visitBinary(.i64, .i64, .i64ShrU) }
-    mutating func visitI64Rotl() throws -> Output { try visitBinary(.i64, .i64, .i64Rotl) }
-    mutating func visitI64Rotr() throws -> Output { try visitBinary(.i64, .i64, .i64Rotr) }
-    mutating func visitF32Abs() throws -> Output { try visitUnary(.f32, .f32Abs) }
-    mutating func visitF32Neg() throws -> Output { try visitUnary(.f32, .f32Neg) }
-    mutating func visitF32Ceil() throws -> Output { try visitUnary(.f32, .f32Ceil) }
-    mutating func visitF32Floor() throws -> Output { try visitUnary(.f32, .f32Floor) }
-    mutating func visitF32Trunc() throws -> Output { try visitUnary(.f32, .f32Trunc) }
-    mutating func visitF32Nearest() throws -> Output { try visitUnary(.f32, .f32Nearest) }
-    mutating func visitF32Sqrt() throws -> Output { try visitUnary(.f32, .f32Sqrt) }
-    mutating func visitF32Add() throws -> Output { try visitBinary(.f32, .f32, .f32Add) }
-    mutating func visitF32Sub() throws -> Output { try visitBinary(.f32, .f32, .f32Sub) }
-    mutating func visitF32Mul() throws -> Output { try visitBinary(.f32, .f32, .f32Mul) }
-    mutating func visitF32Div() throws -> Output { try visitBinary(.f32, .f32, .f32Div) }
-    mutating func visitF32Min() throws -> Output { try visitBinary(.f32, .f32, .f32Min) }
-    mutating func visitF32Max() throws -> Output { try visitBinary(.f32, .f32, .f32Max) }
-    mutating func visitF32Copysign() throws -> Output { try visitBinary(.f32, .f32, .f32Copysign) }
-    mutating func visitF64Abs() throws -> Output { try visitUnary(.f64, .f64Abs) }
-    mutating func visitF64Neg() throws -> Output { try visitUnary(.f64, .f64Neg) }
-    mutating func visitF64Ceil() throws -> Output { try visitUnary(.f64, .f64Ceil) }
-    mutating func visitF64Floor() throws -> Output { try visitUnary(.f64, .f64Floor) }
-    mutating func visitF64Trunc() throws -> Output { try visitUnary(.f64, .f64Trunc) }
-    mutating func visitF64Nearest() throws -> Output { try visitUnary(.f64, .f64Nearest) }
-    mutating func visitF64Sqrt() throws -> Output { try visitUnary(.f64, .f64Sqrt) }
-    mutating func visitF64Add() throws -> Output { try visitBinary(.f64, .f64, .f64Add) }
-    mutating func visitF64Sub() throws -> Output { try visitBinary(.f64, .f64, .f64Sub) }
-    mutating func visitF64Mul() throws -> Output { try visitBinary(.f64, .f64, .f64Mul) }
-    mutating func visitF64Div() throws -> Output { try visitBinary(.f64, .f64, .f64Div) }
-    mutating func visitF64Min() throws -> Output { try visitBinary(.f64, .f64, .f64Min) }
-    mutating func visitF64Max() throws -> Output { try visitBinary(.f64, .f64, .f64Max) }
-    mutating func visitF64Copysign() throws -> Output { try visitBinary(.f64, .f64, .f64Copysign) }
-    mutating func visitI32WrapI64() throws -> Output { try visitConversion(.i64, .i32, .i32WrapI64) }
-    mutating func visitI32TruncF32S() throws -> Output { try visitConversion(.f32, .i32, .i32TruncF32S) }
-    mutating func visitI32TruncF32U() throws -> Output { try visitConversion(.f32, .i32, .i32TruncF32U) }
-    mutating func visitI32TruncF64S() throws -> Output { try visitConversion(.f64, .i32, .i32TruncF64S) }
-    mutating func visitI32TruncF64U() throws -> Output { try visitConversion(.f64, .i32, .i32TruncF64U) }
-    mutating func visitI64ExtendI32S() throws -> Output { try visitConversion(.i32, .i64, .i64ExtendI32S) }
-    mutating func visitI64ExtendI32U() throws -> Output { try visitConversion(.i32, .i64, .i64ExtendI32U) }
-    mutating func visitI64TruncF32S() throws -> Output { try visitConversion(.f32, .i64, .i64TruncF32S) }
-    mutating func visitI64TruncF32U() throws -> Output { try visitConversion(.f32, .i64, .i64TruncF32U) }
-    mutating func visitI64TruncF64S() throws -> Output { try visitConversion(.f64, .i64, .i64TruncF64S) }
-    mutating func visitI64TruncF64U() throws -> Output { try visitConversion(.f64, .i64, .i64TruncF64U) }
-    mutating func visitF32ConvertI32S() throws -> Output { try visitConversion(.i32, .f32, .f32ConvertI32S) }
-    mutating func visitF32ConvertI32U() throws -> Output { try visitConversion(.i32, .f32, .f32ConvertI32U) }
-    mutating func visitF32ConvertI64S() throws -> Output { try visitConversion(.i64, .f32, .f32ConvertI64S) }
-    mutating func visitF32ConvertI64U() throws -> Output { try visitConversion(.i64, .f32, .f32ConvertI64U) }
-    mutating func visitF32DemoteF64() throws -> Output { try visitConversion(.f64, .f32, .f32DemoteF64) }
-    mutating func visitF64ConvertI32S() throws -> Output { try visitConversion(.i32, .f64, .f64ConvertI32S) }
-    mutating func visitF64ConvertI32U() throws -> Output { try visitConversion(.i32, .f64, .f64ConvertI32U) }
-    mutating func visitF64ConvertI64S() throws -> Output { try visitConversion(.i64, .f64, .f64ConvertI64S) }
-    mutating func visitF64ConvertI64U() throws -> Output { try visitConversion(.i64, .f64, .f64ConvertI64U) }
-    mutating func visitF64PromoteF32() throws -> Output { try visitConversion(.f32, .f64, .f64PromoteF32) }
-    mutating func visitI32ReinterpretF32() throws -> Output { try visitConversion(.f32, .i32, .i32ReinterpretF32) }
-    mutating func visitI64ReinterpretF64() throws -> Output { try visitConversion(.f64, .i64, .i64ReinterpretF64) }
-    mutating func visitF32ReinterpretI32() throws -> Output { try visitConversion(.i32, .f32, .f32ReinterpretI32) }
-    mutating func visitF64ReinterpretI64() throws -> Output { try visitConversion(.i64, .f64, .f64ReinterpretI64) }
-    mutating func visitI32Extend8S() throws -> Output { try visitUnary(.i32, .i32Extend8S) }
-    mutating func visitI32Extend16S() throws -> Output { try visitUnary(.i32, .i32Extend16S) }
-    mutating func visitI64Extend8S() throws -> Output { try visitUnary(.i64, .i64Extend8S) }
-    mutating func visitI64Extend16S() throws -> Output { try visitUnary(.i64, .i64Extend16S) }
-    mutating func visitI64Extend32S() throws -> Output { try visitUnary(.i64, .i64Extend32S) }
+    mutating func visitI64Eq() throws -> Output { try visitCmp(.i64, Instruction.i64Eq) }
+    mutating func visitI64Ne() throws -> Output { try visitCmp(.i64, Instruction.i64Ne) }
+    mutating func visitI64LtS() throws -> Output { try visitCmp(.i64, Instruction.i64LtS) }
+    mutating func visitI64LtU() throws -> Output { try visitCmp(.i64, Instruction.i64LtU) }
+    mutating func visitI64GtS() throws -> Output { try visitCmp(.i64, Instruction.i64GtS) }
+    mutating func visitI64GtU() throws -> Output { try visitCmp(.i64, Instruction.i64GtU) }
+    mutating func visitI64LeS() throws -> Output { try visitCmp(.i64, Instruction.i64LeS) }
+    mutating func visitI64LeU() throws -> Output { try visitCmp(.i64, Instruction.i64LeU) }
+    mutating func visitI64GeS() throws -> Output { try visitCmp(.i64, Instruction.i64GeS) }
+    mutating func visitI64GeU() throws -> Output { try visitCmp(.i64, Instruction.i64GeU) }
+    mutating func visitF32Eq() throws -> Output { try visitCmp(.f32, Instruction.f32Eq) }
+    mutating func visitF32Ne() throws -> Output { try visitCmp(.f32, Instruction.f32Ne) }
+    mutating func visitF32Lt() throws -> Output { try visitCmp(.f32, Instruction.f32Lt) }
+    mutating func visitF32Gt() throws -> Output { try visitCmp(.f32, Instruction.f32Gt) }
+    mutating func visitF32Le() throws -> Output { try visitCmp(.f32, Instruction.f32Le) }
+    mutating func visitF32Ge() throws -> Output { try visitCmp(.f32, Instruction.f32Ge) }
+    mutating func visitF64Eq() throws -> Output { try visitCmp(.f64, Instruction.f64Eq) }
+    mutating func visitF64Ne() throws -> Output { try visitCmp(.f64, Instruction.f64Ne) }
+    mutating func visitF64Lt() throws -> Output { try visitCmp(.f64, Instruction.f64Lt) }
+    mutating func visitF64Gt() throws -> Output { try visitCmp(.f64, Instruction.f64Gt) }
+    mutating func visitF64Le() throws -> Output { try visitCmp(.f64, Instruction.f64Le) }
+    mutating func visitF64Ge() throws -> Output { try visitCmp(.f64, Instruction.f64Ge) }
+    mutating func visitI32Clz() throws -> Output { try visitUnary(.i32, Instruction.i32Clz) }
+    mutating func visitI32Ctz() throws -> Output { try visitUnary(.i32, Instruction.i32Ctz) }
+    mutating func visitI32Popcnt() throws -> Output { try visitUnary(.i32, Instruction.i32Popcnt) }
+    mutating func visitI32Add() throws -> Output { try visitBinary(.i32, .i32, Instruction.i32Add) }
+    mutating func visitI32Sub() throws -> Output { try visitBinary(.i32, .i32, Instruction.i32Sub) }
+    mutating func visitI32Mul() throws -> Output { try visitBinary(.i32, .i32, Instruction.i32Mul) }
+    mutating func visitI32DivS() throws -> Output { try visitBinary(.i32, .i32, Instruction.i32DivS) }
+    mutating func visitI32DivU() throws -> Output { try visitBinary(.i32, .i32, Instruction.i32DivU) }
+    mutating func visitI32RemS() throws -> Output { try visitBinary(.i32, .i32, Instruction.i32RemS) }
+    mutating func visitI32RemU() throws -> Output { try visitBinary(.i32, .i32, Instruction.i32RemU) }
+    mutating func visitI32And() throws -> Output { try visitBinary(.i32, .i32, Instruction.i32And) }
+    mutating func visitI32Or() throws -> Output { try visitBinary(.i32, .i32, Instruction.i32Or) }
+    mutating func visitI32Xor() throws -> Output { try visitBinary(.i32, .i32, Instruction.i32Xor) }
+    mutating func visitI32Shl() throws -> Output { try visitBinary(.i32, .i32, Instruction.i32Shl) }
+    mutating func visitI32ShrS() throws -> Output { try visitBinary(.i32, .i32, Instruction.i32ShrS) }
+    mutating func visitI32ShrU() throws -> Output { try visitBinary(.i32, .i32, Instruction.i32ShrU) }
+    mutating func visitI32Rotl() throws -> Output { try visitBinary(.i32, .i32, Instruction.i32Rotl) }
+    mutating func visitI32Rotr() throws -> Output { try visitBinary(.i32, .i32, Instruction.i32Rotr) }
+    mutating func visitI64Clz() throws -> Output { try visitUnary(.i64, Instruction.i64Clz) }
+    mutating func visitI64Ctz() throws -> Output { try visitUnary(.i64, Instruction.i64Ctz) }
+    mutating func visitI64Popcnt() throws -> Output { try visitUnary(.i64, Instruction.i64Popcnt) }
+    mutating func visitI64Add() throws -> Output { try visitBinary(.i64, .i64, Instruction.i64Add) }
+    mutating func visitI64Sub() throws -> Output { try visitBinary(.i64, .i64, Instruction.i64Sub) }
+    mutating func visitI64Mul() throws -> Output { try visitBinary(.i64, .i64, Instruction.i64Mul) }
+    mutating func visitI64DivS() throws -> Output { try visitBinary(.i64, .i64, Instruction.i64DivS) }
+    mutating func visitI64DivU() throws -> Output { try visitBinary(.i64, .i64, Instruction.i64DivU) }
+    mutating func visitI64RemS() throws -> Output { try visitBinary(.i64, .i64, Instruction.i64RemS) }
+    mutating func visitI64RemU() throws -> Output { try visitBinary(.i64, .i64, Instruction.i64RemU) }
+    mutating func visitI64And() throws -> Output { try visitBinary(.i64, .i64, Instruction.i64And) }
+    mutating func visitI64Or() throws -> Output { try visitBinary(.i64, .i64, Instruction.i64Or) }
+    mutating func visitI64Xor() throws -> Output { try visitBinary(.i64, .i64, Instruction.i64Xor) }
+    mutating func visitI64Shl() throws -> Output { try visitBinary(.i64, .i64, Instruction.i64Shl) }
+    mutating func visitI64ShrS() throws -> Output { try visitBinary(.i64, .i64, Instruction.i64ShrS) }
+    mutating func visitI64ShrU() throws -> Output { try visitBinary(.i64, .i64, Instruction.i64ShrU) }
+    mutating func visitI64Rotl() throws -> Output { try visitBinary(.i64, .i64, Instruction.i64Rotl) }
+    mutating func visitI64Rotr() throws -> Output { try visitBinary(.i64, .i64, Instruction.i64Rotr) }
+    mutating func visitF32Abs() throws -> Output { try visitUnary(.f32, Instruction.f32Abs) }
+    mutating func visitF32Neg() throws -> Output { try visitUnary(.f32, Instruction.f32Neg) }
+    mutating func visitF32Ceil() throws -> Output { try visitUnary(.f32, Instruction.f32Ceil) }
+    mutating func visitF32Floor() throws -> Output { try visitUnary(.f32, Instruction.f32Floor) }
+    mutating func visitF32Trunc() throws -> Output { try visitUnary(.f32, Instruction.f32Trunc) }
+    mutating func visitF32Nearest() throws -> Output { try visitUnary(.f32, Instruction.f32Nearest) }
+    mutating func visitF32Sqrt() throws -> Output { try visitUnary(.f32, Instruction.f32Sqrt) }
+    mutating func visitF32Add() throws -> Output { try visitBinary(.f32, .f32, Instruction.f32Add) }
+    mutating func visitF32Sub() throws -> Output { try visitBinary(.f32, .f32, Instruction.f32Sub) }
+    mutating func visitF32Mul() throws -> Output { try visitBinary(.f32, .f32, Instruction.f32Mul) }
+    mutating func visitF32Div() throws -> Output { try visitBinary(.f32, .f32, Instruction.f32Div) }
+    mutating func visitF32Min() throws -> Output { try visitBinary(.f32, .f32, Instruction.f32Min) }
+    mutating func visitF32Max() throws -> Output { try visitBinary(.f32, .f32, Instruction.f32Max) }
+    mutating func visitF32Copysign() throws -> Output { try visitBinary(.f32, .f32, Instruction.f32Copysign) }
+    mutating func visitF64Abs() throws -> Output { try visitUnary(.f64, Instruction.f64Abs) }
+    mutating func visitF64Neg() throws -> Output { try visitUnary(.f64, Instruction.f64Neg) }
+    mutating func visitF64Ceil() throws -> Output { try visitUnary(.f64, Instruction.f64Ceil) }
+    mutating func visitF64Floor() throws -> Output { try visitUnary(.f64, Instruction.f64Floor) }
+    mutating func visitF64Trunc() throws -> Output { try visitUnary(.f64, Instruction.f64Trunc) }
+    mutating func visitF64Nearest() throws -> Output { try visitUnary(.f64, Instruction.f64Nearest) }
+    mutating func visitF64Sqrt() throws -> Output { try visitUnary(.f64, Instruction.f64Sqrt) }
+    mutating func visitF64Add() throws -> Output { try visitBinary(.f64, .f64, Instruction.f64Add) }
+    mutating func visitF64Sub() throws -> Output { try visitBinary(.f64, .f64, Instruction.f64Sub) }
+    mutating func visitF64Mul() throws -> Output { try visitBinary(.f64, .f64, Instruction.f64Mul) }
+    mutating func visitF64Div() throws -> Output { try visitBinary(.f64, .f64, Instruction.f64Div) }
+    mutating func visitF64Min() throws -> Output { try visitBinary(.f64, .f64, Instruction.f64Min) }
+    mutating func visitF64Max() throws -> Output { try visitBinary(.f64, .f64, Instruction.f64Max) }
+    mutating func visitF64Copysign() throws -> Output { try visitBinary(.f64, .f64, Instruction.f64Copysign) }
+    mutating func visitI32WrapI64() throws -> Output { try visitConversion(.i64, .i32, Instruction.i32WrapI64) }
+    mutating func visitI32TruncF32S() throws -> Output { try visitConversion(.f32, .i32, Instruction.i32TruncF32S) }
+    mutating func visitI32TruncF32U() throws -> Output { try visitConversion(.f32, .i32, Instruction.i32TruncF32U) }
+    mutating func visitI32TruncF64S() throws -> Output { try visitConversion(.f64, .i32, Instruction.i32TruncF64S) }
+    mutating func visitI32TruncF64U() throws -> Output { try visitConversion(.f64, .i32, Instruction.i32TruncF64U) }
+    mutating func visitI64ExtendI32S() throws -> Output { try visitConversion(.i32, .i64, Instruction.i64ExtendI32S) }
+    mutating func visitI64ExtendI32U() throws -> Output { try visitConversion(.i32, .i64, Instruction.i64ExtendI32U) }
+    mutating func visitI64TruncF32S() throws -> Output { try visitConversion(.f32, .i64, Instruction.i64TruncF32S) }
+    mutating func visitI64TruncF32U() throws -> Output { try visitConversion(.f32, .i64, Instruction.i64TruncF32U) }
+    mutating func visitI64TruncF64S() throws -> Output { try visitConversion(.f64, .i64, Instruction.i64TruncF64S) }
+    mutating func visitI64TruncF64U() throws -> Output { try visitConversion(.f64, .i64, Instruction.i64TruncF64U) }
+    mutating func visitF32ConvertI32S() throws -> Output { try visitConversion(.i32, .f32, Instruction.f32ConvertI32S) }
+    mutating func visitF32ConvertI32U() throws -> Output { try visitConversion(.i32, .f32, Instruction.f32ConvertI32U) }
+    mutating func visitF32ConvertI64S() throws -> Output { try visitConversion(.i64, .f32, Instruction.f32ConvertI64S) }
+    mutating func visitF32ConvertI64U() throws -> Output { try visitConversion(.i64, .f32, Instruction.f32ConvertI64U) }
+    mutating func visitF32DemoteF64() throws -> Output { try visitConversion(.f64, .f32, Instruction.f32DemoteF64) }
+    mutating func visitF64ConvertI32S() throws -> Output { try visitConversion(.i32, .f64, Instruction.f64ConvertI32S) }
+    mutating func visitF64ConvertI32U() throws -> Output { try visitConversion(.i32, .f64, Instruction.f64ConvertI32U) }
+    mutating func visitF64ConvertI64S() throws -> Output { try visitConversion(.i64, .f64, Instruction.f64ConvertI64S) }
+    mutating func visitF64ConvertI64U() throws -> Output { try visitConversion(.i64, .f64, Instruction.f64ConvertI64U) }
+    mutating func visitF64PromoteF32() throws -> Output { try visitConversion(.f32, .f64, Instruction.f64PromoteF32) }
+    mutating func visitI32ReinterpretF32() throws -> Output { try visitConversion(.f32, .i32, Instruction.i32ReinterpretF32) }
+    mutating func visitI64ReinterpretF64() throws -> Output { try visitConversion(.f64, .i64, Instruction.i64ReinterpretF64) }
+    mutating func visitF32ReinterpretI32() throws -> Output { try visitConversion(.i32, .f32, Instruction.f32ReinterpretI32) }
+    mutating func visitF64ReinterpretI64() throws -> Output { try visitConversion(.i64, .f64, Instruction.f64ReinterpretI64) }
+    mutating func visitI32Extend8S() throws -> Output { try visitUnary(.i32, Instruction.i32Extend8S) }
+    mutating func visitI32Extend16S() throws -> Output { try visitUnary(.i32, Instruction.i32Extend16S) }
+    mutating func visitI64Extend8S() throws -> Output { try visitUnary(.i64, Instruction.i64Extend8S) }
+    mutating func visitI64Extend16S() throws -> Output { try visitUnary(.i64, Instruction.i64Extend16S) }
+    mutating func visitI64Extend32S() throws -> Output { try visitUnary(.i64, Instruction.i64Extend32S) }
     mutating func visitMemoryInit(dataIndex: UInt32) throws -> Output {
         let addressType = try module.addressType(memoryIndex: 0)
-        try popPushEmit([.i32, .i32, addressType], [], .memoryInit(dataIndex))
+        try popEmit((.i32, .i32, addressType)) { [stackLayout] values, stack in
+            let (size, sourceOffset, destOffset) = values
+            return .memoryInit(
+                Instruction.MemoryInitOperand(
+                    segmentIndex: dataIndex,
+                    destOffset: destOffset.intoRegister(layout: stackLayout),
+                    sourceOffset: sourceOffset.intoRegister(layout: stackLayout),
+                    size: size.intoRegister(layout: stackLayout)
+                )
+            )
+        }
     }
     mutating func visitDataDrop(dataIndex: UInt32) -> Output { emit(.memoryDataDrop(dataIndex)) }
     mutating func visitMemoryCopy(dstMem: UInt32, srcMem: UInt32) throws -> Output {
@@ -1004,7 +1580,16 @@ struct InstructionTranslator: InstructionVisitor {
         // C ⊦ memory.fill : [it i32 it] → []
         // https://github.com/WebAssembly/memory64/blob/main/proposals/memory64/Overview.md
         let addressType = try module.addressType(memoryIndex: 0)
-        try popPushEmit([addressType, addressType, addressType], [], .memoryCopy)
+        try popEmit((addressType, addressType, addressType)) { [stackLayout] values, stack in
+            let (size, sourceOffset, destOffset) = values
+            return .memoryCopy(
+                Instruction.MemoryCopyOperand(
+                    destOffset: destOffset.intoRegister(layout: stackLayout),
+                    sourceOffset: sourceOffset.intoRegister(layout: stackLayout),
+                    size: size.intoRegister(layout: stackLayout)
+                )
+            )
+        }
     }
     mutating func visitMemoryFill(memory: UInt32) throws -> Output {
         //     C.mems[0] = it limits
@@ -1012,10 +1597,30 @@ struct InstructionTranslator: InstructionVisitor {
         // C ⊦ memory.fill : [it i32 it] → []
         // https://github.com/WebAssembly/memory64/blob/main/proposals/memory64/Overview.md
         let addressType = try module.addressType(memoryIndex: 0)
-        try popPushEmit([addressType, .i32, addressType], [], .memoryFill)
+        try popEmit((addressType, .i32, addressType)) { [stackLayout] values, stack in
+            let (size, value, destOffset) = values
+            return .memoryFill(
+                Instruction.MemoryFillOperand(
+                    destOffset: destOffset.intoRegister(layout: stackLayout),
+                    value: value.intoRegister(layout: stackLayout),
+                    size: size.intoRegister(layout: stackLayout)
+                )
+            )
+        }
     }
     mutating func visitTableInit(elemIndex: UInt32, table: UInt32) throws -> Output {
-        try popPushEmit([.i32, .i32, module.addressType(tableIndex: table)], [], .tableInit(table, elemIndex))
+        try popEmit((.i32, .i32, module.addressType(tableIndex: table))) { [stackLayout] values, stack in
+            let (size, sourceOffset, destOffset) = values
+            return .tableInit(
+                Instruction.TableInitOperand(
+                    tableIndex: table,
+                    segmentIndex: elemIndex,
+                    destOffset: destOffset.intoRegister(layout: stackLayout),
+                    sourceOffset: sourceOffset.intoRegister(layout: stackLayout),
+                    size: size.intoRegister(layout: stackLayout)
+                )
+            )
+        }
     }
     mutating func visitElemDrop(elemIndex: UInt32) -> Output { emit(.tableElementDrop(elemIndex)) }
     mutating func visitTableCopy(dstTable: UInt32, srcTable: UInt32) throws -> Output {
@@ -1026,40 +1631,92 @@ struct InstructionTranslator: InstructionVisitor {
         let destIsMemory64 = try module.isMemory64(tableIndex: dstTable)
         let sourceIsMemory64 = try module.isMemory64(tableIndex: srcTable)
         let lengthIsMemory64 = destIsMemory64 || sourceIsMemory64
-        try popPushEmit(
-            [
+        try popEmit(
+            (
                 .address(isMemory64: lengthIsMemory64),
                 .address(isMemory64: sourceIsMemory64),
-                .address(isMemory64: destIsMemory64),
-            ],
-            [],
-            .tableCopy(dest: dstTable, src: srcTable)
-        )
+                .address(isMemory64: destIsMemory64)
+            )
+        ) { [stackLayout] values, stack in
+            let (size, sourceOffset, destOffset) = values
+            return .tableCopy(
+                Instruction.TableCopyOperand(
+                    sourceIndex: srcTable,
+                    destIndex: dstTable,
+                    sourceOffset: sourceOffset.intoRegister(layout: stackLayout),
+                    destOffset: destOffset.intoRegister(layout: stackLayout),
+                    size: size.intoRegister(layout: stackLayout)
+                )
+            )
+        }
     }
     mutating func visitTableFill(table: UInt32) throws -> Output {
         let address = try module.addressType(tableIndex: table)
-        try popPushEmit([address, .ref(module.elementType(table)), address], [], .tableFill(table))
+        try popEmit((address, .ref(module.elementType(table)), address)) { [stackLayout] values, stack in
+            let (size, value, destOffset) = values
+            return .tableFill(
+                Instruction.TableFillOperand(
+                    tableIndex: table,
+                    destOffset: destOffset.intoRegister(layout: stackLayout),
+                    value: value.intoRegister(layout: stackLayout),
+                    size: size.intoRegister(layout: stackLayout)
+                )
+            )
+        }
     }
     mutating func visitTableGet(table: UInt32) throws -> Output {
-        try popPushEmit(module.addressType(tableIndex: table), .ref(module.elementType(table)), .tableGet(table))
+        try popPushEmit(
+            module.addressType(tableIndex: table),
+            .ref(module.elementType(table))
+        ) { [stackLayout] index, result, stack in
+            return .tableGet(
+                Instruction.TableGetOperand(
+                    index: index.intoRegister(layout: stackLayout),
+                    result: result,
+                    tableIndex: table
+                )
+            )
+        }
     }
     mutating func visitTableSet(table: UInt32) throws -> Output {
-        try popPushEmit([.ref(module.elementType(table)), module.addressType(tableIndex: table)], [], .tableSet(table))
+        try popPushEmit((.ref(module.elementType(table)), module.addressType(tableIndex: table))) { [stackLayout] values, stack in
+            let (value, index) = values
+            return .tableSet(
+                Instruction.TableSetOperand(
+                    index: index.intoRegister(layout: stackLayout),
+                    value: value.intoRegister(layout: stackLayout),
+                    tableIndex: table
+                )
+            )
+        }
     }
     mutating func visitTableGrow(table: UInt32) throws -> Output {
-        try popPushEmit([module.addressType(tableIndex: table), .ref(module.elementType(table))], [.i32], .tableGrow(table))
+        let address = try module.addressType(tableIndex: table)
+        try popPushEmit((address, .ref(module.elementType(table))), address) { [stackLayout] values, result, stack in
+            let (delta, value) = values
+            return .tableGrow(
+                Instruction.TableGrowOperand(
+                    tableIndex: table,
+                    result: result,
+                    delta: delta.intoRegister(layout: stackLayout),
+                    value: value.intoRegister(layout: stackLayout)
+                )
+            )
+        }
     }
     mutating func visitTableSize(table: UInt32) throws -> Output {
-        pushEmit(try module.addressType(tableIndex: table), .tableSize(table))
+        pushEmit(try module.addressType(tableIndex: table)) { result in
+            return .tableSize(Instruction.TableSizeOperand(tableIndex: table, result: result))
+        }
     }
-    mutating func visitI32TruncSatF32S() throws -> Output { try visitConversion(.f32, .i32, .i32TruncSatF32S) }
-    mutating func visitI32TruncSatF32U() throws -> Output { try visitConversion(.f32, .i32, .i32TruncSatF32U) }
-    mutating func visitI32TruncSatF64S() throws -> Output { try visitConversion(.f64, .i32, .i32TruncSatF64S) }
-    mutating func visitI32TruncSatF64U() throws -> Output { try visitConversion(.f64, .i32, .i32TruncSatF64U) }
-    mutating func visitI64TruncSatF32S() throws -> Output { try visitConversion(.f32, .i64, .i64TruncSatF32S) }
-    mutating func visitI64TruncSatF32U() throws -> Output { try visitConversion(.f32, .i64, .i64TruncSatF32U) }
-    mutating func visitI64TruncSatF64S() throws -> Output { try visitConversion(.f64, .i64, .i64TruncSatF64S) }
-    mutating func visitI64TruncSatF64U() throws -> Output { try visitConversion(.f64, .i64, .i64TruncSatF64U) }
+    mutating func visitI32TruncSatF32S() throws -> Output { try visitConversion(.f32, .i32, Instruction.i32TruncSatF32S) }
+    mutating func visitI32TruncSatF32U() throws -> Output { try visitConversion(.f32, .i32, Instruction.i32TruncSatF32U) }
+    mutating func visitI32TruncSatF64S() throws -> Output { try visitConversion(.f64, .i32, Instruction.i32TruncSatF64S) }
+    mutating func visitI32TruncSatF64U() throws -> Output { try visitConversion(.f64, .i32, Instruction.i32TruncSatF64U) }
+    mutating func visitI64TruncSatF32S() throws -> Output { try visitConversion(.f32, .i64, Instruction.i64TruncSatF32S) }
+    mutating func visitI64TruncSatF32U() throws -> Output { try visitConversion(.f32, .i64, Instruction.i64TruncSatF32U) }
+    mutating func visitI64TruncSatF64S() throws -> Output { try visitConversion(.f64, .i64, Instruction.i64TruncSatF64S) }
+    mutating func visitI64TruncSatF64U() throws -> Output { try visitConversion(.f64, .i64, Instruction.i64TruncSatF64U) }
 }
 
 struct TranslationError: Error, CustomStringConvertible {
@@ -1071,7 +1728,7 @@ struct TranslationError: Error, CustomStringConvertible {
 }
 
 extension ExpressionRef {
-    fileprivate init(from source: InstructionTranslator.MetaProgramCounter, to destination: InstructionTranslator.MetaProgramCounter) {
+    fileprivate init(from source: MetaProgramCounter, to destination: MetaProgramCounter) {
         self.init(destination.offsetFromHead - source.offsetFromHead)
     }
 }

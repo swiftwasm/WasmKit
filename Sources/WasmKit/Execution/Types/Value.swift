@@ -22,32 +22,12 @@ enum NumericType: Equatable {
 }
 
 extension WasmParser.ValueType {
-    var defaultValue: Value {
-        switch self {
-        case .i32: return .i32(0)
-        case .i64: return .i64(0)
-        case .f32: return .f32(0)
-        case .f64: return .f64(0)
-        case .ref(.externRef):
-            return .ref(.extern(nil))
-        case .ref(.funcRef):
-            return .ref(.function(nil))
-        }
-    }
-
     var float: FloatValueType {
         switch self {
         case .f32: return .f32
         case .f64: return .f64
         default:
             fatalError("unexpected value type \(self)")
-        }
-    }
-    var bitWidth: Int? {
-        switch self {
-        case .i32, .f32: return 32
-        case .i64, .f64: return 64
-        case .ref: return nil
         }
     }
 }
@@ -83,8 +63,12 @@ extension Value {
         }
     }
 
-    func asAddressOffset(_ isMemory64: Bool) -> UInt64 {
-        return isMemory64 ? i64 : UInt64(i32)
+    func maybeAddressOffset(_ isMemory64: Bool) -> UInt64? {
+        switch (isMemory64, self) {
+        case (true, .i64(let value)): return value
+        case (false, .i32(let value)): return UInt64(value)
+        default: return nil
+        }
     }
 
     /// Returns if the given values are equal.
@@ -98,25 +82,6 @@ extension Value {
             return Float32(bitPattern: lhs) == Float32(bitPattern: rhs)
         case let (.f64(lhs), .f64(rhs)):
             return Float64(bitPattern: lhs) == Float64(bitPattern: rhs)
-        case let (.ref(.extern(lhs)), .ref(.extern(rhs))):
-            return lhs == rhs
-        case let (.ref(.function(lhs)), .ref(.function(rhs))):
-            return lhs == rhs
-        default:
-            return false
-        }
-    }
-
-    static func isBitwiseEqual(_ lhs: Self, _ rhs: Self) -> Bool {
-        switch (lhs, rhs) {
-        case let (.i32(lhs), .i32(rhs)):
-            return lhs == rhs
-        case let (.i64(lhs), .i64(rhs)):
-            return lhs == rhs
-        case let (.f32(lhs), .f32(rhs)):
-            return lhs == rhs
-        case let (.f64(lhs), .f64(rhs)):
-            return lhs == rhs
         case let (.ref(.extern(lhs)), .ref(.extern(rhs))):
             return lhs == rhs
         case let (.ref(.function(lhs)), .ref(.function(rhs))):
@@ -277,33 +242,12 @@ enum FloatValueType {
         }
     }
 
-    var zero: Value {
-        switch self {
-        case .f32:
-            return .f32(.zero)
-        case .f64:
-            return .f64(.zero)
-        }
-    }
-
     func infinity(isNegative: Bool) -> Value {
         switch self {
         case .f32:
             return .fromFloat32(isNegative ? -.infinity : .infinity)
         case .f64:
             return .fromFloat64(isNegative ? -.infinity : .infinity)
-        }
-    }
-}
-
-extension Value {
-    var bytes: [UInt8]? {
-        switch self {
-        case let .i32(rawValue): return rawValue.littleEndianBytes
-        case let .i64(rawValue): return rawValue.littleEndianBytes
-        case let .f32(rawValue): return rawValue.littleEndianBytes
-        case let .f64(rawValue): return rawValue.littleEndianBytes
-        case .ref(.function), .ref(.extern): return nil
         }
     }
 }
@@ -323,19 +267,6 @@ extension RawUnsignedInteger {
     // FIXME: shouldn't use arrays with potential heap allocations for this
     var littleEndianBytes: [UInt8] {
         withUnsafeBytes(of: littleEndian) { Array($0) }
-    }
-}
-
-extension Array where Element == ValueType {
-    static func == (lhs: [ValueType], rhs: [ValueType]) -> Bool {
-        guard lhs.count == rhs.count else { return false }
-        return zip(lhs, rhs).reduce(true) { result, zipped in
-            result && zipped.0 == zipped.1
-        }
-    }
-
-    static func != (lhs: [ValueType], rhs: [ValueType]) -> Bool {
-        return !(lhs == rhs)
     }
 }
 
@@ -445,30 +376,6 @@ extension Value {
         }
     }
 
-    func rotl(_ l: Self) -> Self {
-        switch (self, l) {
-        case let (.i32(rawValue), .i32(l)):
-            let shift = l % UInt32(type.bitWidth!)
-            return .i32(rawValue << shift | rawValue >> (32 - shift))
-        case let (.i64(rawValue), .i64(l)):
-            let shift = l % UInt64(type.bitWidth!)
-            return .i64(rawValue << shift | rawValue >> (64 - shift))
-        default: fatalError("Invalid type \(type) for `Value.\(#function)` implementation")
-        }
-    }
-
-    func rotr(_ r: Self) -> Self {
-        switch (self, r) {
-        case let (.i32(rawValue), .i32(r)):
-            let shift = r % UInt32(type.bitWidth!)
-            return .i32(rawValue >> shift | rawValue << (32 - shift))
-        case let (.i64(rawValue), .i64(r)):
-            let shift = r % UInt64(type.bitWidth!)
-            return .i64(rawValue >> shift | rawValue << (64 - shift))
-        default: fatalError("Invalid type \(type) for `Value.\(#function)` implementation")
-        }
-    }
-
     static prefix func - (_ value: Self) -> Self {
         switch value {
         case let .f32(rawValue):
@@ -507,66 +414,6 @@ extension Value {
         switch (lhs, rhs) {
         case let (.f32(lhs), .f32(rhs)): return .f32((Float32(bitPattern: lhs) / Float32(bitPattern: rhs)).bitPattern)
         case let (.f64(lhs), .f64(rhs)): return .f64((Float64(bitPattern: lhs) / Float64(bitPattern: rhs)).bitPattern)
-        default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value.\(#function)` implementation")
-        }
-    }
-
-    static func & (lhs: Self, rhs: Self) -> Self {
-        switch (lhs, rhs) {
-        case let (.i32(lhs), .i32(rhs)): return .i32(lhs & rhs)
-        case let (.i64(lhs), .i64(rhs)): return .i64(lhs & rhs)
-        default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value.\(#function)` implementation")
-        }
-    }
-
-    static func | (lhs: Self, rhs: Self) -> Self {
-        switch (lhs, rhs) {
-        case let (.i32(lhs), .i32(rhs)): return .i32(lhs | rhs)
-        case let (.i64(lhs), .i64(rhs)): return .i64(lhs | rhs)
-        default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value.\(#function)` implementation")
-        }
-    }
-
-    static func ^ (lhs: Self, rhs: Self) -> Self {
-        switch (lhs, rhs) {
-        case let (.i32(lhs), .i32(rhs)): return .i32(lhs ^ rhs)
-        case let (.i64(lhs), .i64(rhs)): return .i64(lhs ^ rhs)
-        default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value.\(#function)` implementation")
-        }
-    }
-
-    static func << (lhs: Self, rhs: Self) -> Self {
-        switch (lhs, rhs) {
-        case let (.i32(lhs), .i32(rhs)):
-            let shift = rhs % 32
-            return .i32(lhs << shift)
-        case let (.i64(lhs), .i64(rhs)):
-            let shift = rhs % 64
-            return .i64(lhs << shift)
-        default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value.\(#function)` implementation")
-        }
-    }
-
-    static func rightShiftSigned(_ lhs: Self, _ rhs: Self) -> Self {
-        switch (lhs, rhs) {
-        case let (.i32(lhs), .i32(rhs)):
-            let shift = rhs.signed % 32
-            return .i32((lhs.signed >> shift.unsigned).unsigned)
-        case let (.i64(lhs), .i64(rhs)):
-            let shift = rhs.signed % 64
-            return .i64((lhs.signed >> shift.unsigned).unsigned)
-        default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value.\(#function)` implementation")
-        }
-    }
-
-    static func rightShiftUnsigned(_ lhs: Self, _ rhs: Self) -> Self {
-        switch (lhs, rhs) {
-        case let (.i32(lhs), .i32(rhs)):
-            let shift = rhs % 32
-            return .i32(lhs >> shift)
-        case let (.i64(lhs), .i64(rhs)):
-            let shift = rhs % 64
-            return .i64(lhs >> shift)
         default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value.\(#function)` implementation")
         }
     }
@@ -626,4 +473,83 @@ extension Value {
         default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value.\(#function)` implementation")
         }
     }
+}
+
+extension ValueType {
+    static func addressType(isMemory64: Bool) -> ValueType {
+        return isMemory64 ? .i64 : .i32
+    }
+}
+
+
+extension FixedWidthInteger {
+    func add(_ other: Self) -> Self { self &+ other }
+    func sub(_ other: Self) -> Self { self &- other }
+    func mul(_ other: Self) -> Self { self &* other }
+    func eq(_ other: Self) -> UInt32 { self == other ? 1 : 0 }
+    func ne(_ other: Self) -> UInt32 { self == other ? 0 : 1 }
+    func and(_ other: Self) -> Self { self & other }
+    func or(_ other: Self) -> Self { self | other }
+    func xor(_ other: Self) -> Self { self ^ other }
+
+    var clz: UInt32 { UInt32(leadingZeroBitCount) }
+    var ctz: UInt32 { UInt32(trailingZeroBitCount) }
+    var popcnt: UInt32 { UInt32(nonzeroBitCount) }
+    var eqz: UInt32 { self == 0 ? 1 : 0 }
+}
+
+extension RawUnsignedInteger {
+    func lts(_ other: Self) -> UInt32 { self.signed < other.signed ? 1 : 0 }
+    func ltu(_ other: Self) -> UInt32 { self < other ? 1 : 0 }
+    func gts(_ other: Self) -> UInt32 { self.signed > other.signed ? 1 : 0 }
+    func gtu(_ other: Self) -> UInt32 { self > other ? 1 : 0 }
+    func les(_ other: Self) -> UInt32 { self.signed <= other.signed ? 1 : 0 }
+    func leu(_ other: Self) -> UInt32 { self <= other ? 1 : 0 }
+    func ges(_ other: Self) -> UInt32 { self.signed >= other.signed ? 1 : 0 }
+    func geu(_ other: Self) -> UInt32 { self >= other ? 1 : 0 }
+
+    func shl(_ other: Self) -> Self {
+        let shift = other % Self(Self.bitWidth)
+        return self << shift
+    }
+    func shrs(_ other: Self) -> Self {
+        let shift = other.signed % Self.Signed(Self.bitWidth)
+        return (self.signed >> shift.unsigned).unsigned
+    }
+    func shru(_ other: Self) -> Self {
+        let shift = other % Self(Self.bitWidth)
+        return self >> shift
+    }
+    func rotl(_ other: Self) -> Self {
+        let shift = other % Self(Self.bitWidth)
+        return self << shift | self >> (Self(Self.bitWidth) - shift)
+    }
+    func rotr(_ other: Self) -> Self {
+        let shift = other % Self(Self.bitWidth)
+        return self >> shift | self << (Self(Self.bitWidth) - shift)
+    }
+}
+
+extension FloatingPoint {
+    func add(_ other: Self) -> Self { self + other }
+    func sub(_ other: Self) -> Self { self - other }
+    func mul(_ other: Self) -> Self { self * other }
+    func eq(_ other: Self) -> UInt32 { self == other ? 1 : 0 }
+    func ne(_ other: Self) -> UInt32 { self == other ? 0 : 1 }
+}
+
+extension UInt32 {
+    var untyped: UntypedValue { UntypedValue.i32(self) }
+}
+
+extension UInt64 {
+    var untyped: UntypedValue { UntypedValue.i64(self) }
+}
+
+extension Float32 {
+    var untyped: UntypedValue { UntypedValue.f32(self) }
+}
+
+extension Float64 {
+    var untyped: UntypedValue { UntypedValue.f64(self) }
 }

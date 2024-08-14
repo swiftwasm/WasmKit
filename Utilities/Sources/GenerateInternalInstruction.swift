@@ -7,188 +7,267 @@ enum GenerateInternalInstruction {
         let name: String?
         let type: String
     }
+    enum RegisterUse {
+        case none
+        case read
+        case write
+    }
+
     struct Instruction {
         let name: String
         let isControl: Bool
         let mayThrow: Bool
         let mayUpdateFrame: Bool
-        let hasLocals: Bool
+        let useCurrentMemory: RegisterUse
         let immediates: [Immediate]
 
-        init(name: String, isControl: Bool = false, mayThrow: Bool = false, mayUpdateFrame: Bool = false, hasLocals: Bool = false, immediates: [Immediate]) {
+        init(
+            name: String, isControl: Bool = false,
+            mayThrow: Bool = false, mayUpdateFrame: Bool = false,
+            useCurrentMemory: RegisterUse = .none,
+            immediates: [Immediate]
+        ) {
             self.name = name
             self.isControl = isControl
             self.mayThrow = mayThrow
             self.mayUpdateFrame = mayUpdateFrame
-            self.hasLocals = hasLocals
+            self.useCurrentMemory = useCurrentMemory
             self.immediates = immediates
             assert(isControl || !mayUpdateFrame, "non-control instruction should not update frame")
         }
 
         static var commonParameters: [(label: String, type: String, isInout: Bool)] {
-            [("runtime", "Runtime", false), ("stack", "Stack", true)]
+            [("context", "StackContext", true), ("sp", "Sp", false)]
         }
 
-        var parameters: [(label: String, type: String, isInout: Bool)] {
+        typealias Parameter = (label: String, type: String, isInout: Bool)
+        var parameters: [Parameter] {
             let immediates = immediates.map {
                 let label = $0.name ?? camelCase(pascalCase: String($0.type.split(separator: ".").last!))
                 return (label, $0.type, false)
             }
+            let memoryParameters: [Parameter]
+            switch useCurrentMemory {
+            case .none:
+                memoryParameters = []
+            case .read:
+                memoryParameters = [("md", "Md", false), ("ms", "Ms", false)]
+            case .write:
+                memoryParameters = [("md", "Md", true), ("ms", "Ms", true)]
+            }
             return
                 (Self.commonParameters
-                + (hasLocals ? [("locals", "UnsafeMutablePointer<Value>", false)] : [])
+                + memoryParameters
                 + immediates)
         }
     }
 
+    struct OpInstruction {
+        let op: String
+        let type: String
+        let base: Instruction
+    }
+
     static let intValueTypes = ["i32", "i64"]
     static let valueTypes = intValueTypes + ["f32", "f64"]
-    static let numericBinaryInsts: [Instruction] = ["Add", "Sub", "Mul", "Eq", "Ne"].flatMap { op -> [Instruction] in
+    static let numericBinaryInsts: [OpInstruction] = [
+        "Add", "Sub", "Mul", "Eq", "Ne",
+    ].flatMap { op -> [OpInstruction] in
         valueTypes.map { type in
-            Instruction(name: "\(type)\(op)", immediates: [])
+            let base = Instruction(
+                name: "\(type)\(op)", immediates: [Immediate(name: nil, type: "Instruction.BinaryOperand")]
+            )
+            return OpInstruction(op: op, type: type, base: base)
         }
     }
-    static let numericIntBinaryInsts: [Instruction] = ["LtS", "LtU", "GtS", "GtU", "LeS", "LeU", "GeS", "GeU"].flatMap { op -> [Instruction] in
+    static let numericIntBinaryInsts: [OpInstruction] = [
+        "LtS", "LtU", "GtS", "GtU", "LeS", "LeU", "GeS", "GeU",
+        "And", "Or", "Xor", "Shl", "ShrS", "ShrU", "Rotl", "Rotr",
+    ].flatMap { op -> [OpInstruction] in
         intValueTypes.map { type in
-            Instruction(name: "\(type)\(op)", immediates: [])
+            let base = Instruction(
+                name: "\(type)\(op)", immediates: [Immediate(name: nil, type: "Instruction.BinaryOperand")]
+            )
+            return OpInstruction(op: op, type: type, base: base)
         }
     }
-    static let numericIntUnaryInsts: [Instruction] = ["Clz", "Ctz", "Popcnt", "Eqz"].flatMap { op -> [Instruction] in
+    static let numericIntUnaryInsts: [OpInstruction] = ["Clz", "Ctz", "Popcnt", "Eqz"].flatMap { op -> [OpInstruction] in
         intValueTypes.map { type in
-            Instruction(name: "\(type)\(op)", immediates: [])
+            let base = Instruction(name: "\(type)\(op)", immediates: [Immediate(name: nil, type: "Instruction.UnaryOperand")])
+            return OpInstruction(op: op, type: type, base: base)
         }
     }
     static let numericOtherInsts: [Instruction] = [
         // Numeric
-        Instruction(name: "numericConst", immediates: [Immediate(name: nil, type: "Value")]),
-        Instruction(name: "numericFloatUnary", immediates: [Immediate(name: nil, type: "NumericInstruction.FloatUnary")]),
-        Instruction(name: "numericIntBinary", mayThrow: true, immediates: [Immediate(name: nil, type: "NumericInstruction.IntBinary")]),
-        Instruction(name: "numericFloatBinary", immediates: [Immediate(name: nil, type: "NumericInstruction.FloatBinary")]),
-        Instruction(name: "numericConversion", mayThrow: true, immediates: [Immediate(name: nil, type: "NumericInstruction.Conversion")]),
+        Instruction(name: "numericConst", immediates: [
+            Immediate(name: nil, type: "Instruction.ConstOperand")
+        ]),
+        Instruction(name: "numericFloatUnary", immediates: [
+            Immediate(name: nil, type: "NumericInstruction.FloatUnary"),
+            Immediate(name: nil, type: "Instruction.UnaryOperand"),
+        ]),
+        Instruction(name: "numericIntBinary", mayThrow: true, immediates: [
+            Immediate(name: nil, type: "NumericInstruction.IntBinary"),
+            Immediate(name: nil, type: "Instruction.BinaryOperand"),
+        ]),
+        Instruction(name: "numericFloatBinary", immediates: [
+            Immediate(name: nil, type: "NumericInstruction.FloatBinary"),
+            Immediate(name: nil, type: "Instruction.BinaryOperand"),
+        ]),
+        Instruction(name: "numericConversion", mayThrow: true, immediates: [
+            Immediate(name: nil, type: "NumericInstruction.Conversion"),
+            Immediate(name: nil, type: "Instruction.UnaryOperand"),
+        ]),
     ]
 
-    static let memoryLoadStoreInsts: [Instruction] = [
-        "i32Load",
-        "i64Load",
-        "f32Load",
-        "f64Load",
-        "i32Load8S",
-        "i32Load8U",
-        "i32Load16S",
-        "i32Load16U",
-        "i64Load8S",
-        "i64Load8U",
-        "i64Load16S",
-        "i64Load16U",
-        "i64Load32S",
-        "i64Load32U",
-        "i32Store",
-        "i64Store",
-        "f32Store",
-        "f64Store",
-        "i32Store8",
-        "i32Store16",
-        "i64Store8",
-        "i64Store16",
-        "i64Store32",
-    ].map {
-        Instruction(name: $0, mayThrow: true, immediates: [Immediate(name: "memarg", type: "Memarg")])
+    struct LoadInstruction {
+        let loadAs: String
+        let castToValue: String
+        let base: Instruction
     }
+
+    static let memoryLoadInsts: [LoadInstruction] = [
+        ("i32Load", "UInt32", ".i32($0)"),
+        ("i64Load", "UInt64", ".i64($0)"),
+        ("f32Load", "UInt32", ".rawF32($0)"),
+        ("f64Load", "UInt64", ".rawF64($0)"),
+        ("i32Load8S", "Int8", ".init(signed: Int32($0))"),
+        ("i32Load8U", "UInt8", ".i32(UInt32($0))"),
+        ("i32Load16S", "Int16", ".init(signed: Int32($0))"),
+        ("i32Load16U", "UInt16", ".i32(UInt32($0))"),
+        ("i64Load8S", "Int8", ".init(signed: Int64($0))"),
+        ("i64Load8U", "UInt8", ".i64(UInt64($0))"),
+        ("i64Load16S", "Int16", ".init(signed: Int64($0))"),
+        ("i64Load16U", "UInt16", ".i64(UInt64($0))"),
+        ("i64Load32S", "Int32", ".init(signed: Int64($0))"),
+        ("i64Load32U", "UInt32", ".i64(UInt64($0))"),
+    ].map { (name, loadAs, castToValue) in
+        let base = Instruction(name: name, mayThrow: true, useCurrentMemory: .read, immediates: [Immediate(name: nil, type: "Instruction.LoadOperand")])
+        return LoadInstruction(loadAs: loadAs, castToValue: castToValue, base: base)
+    }
+
+    struct StoreInstruction {
+        let castFromValue: String
+        let base: Instruction
+    }
+    static let memoryStoreInsts: [StoreInstruction] = [
+        ("i32Store", "$0.i32"),
+        ("i64Store", "$0.i64"),
+        ("f32Store", "$0.rawF32"),
+        ("f64Store", "$0.rawF64"),
+        ("i32Store8", "UInt8(truncatingIfNeeded: $0.i32)"),
+        ("i32Store16", "UInt16(truncatingIfNeeded: $0.i32)"),
+        ("i64Store8", "UInt8(truncatingIfNeeded: $0.i64)"),
+        ("i64Store16", "UInt16(truncatingIfNeeded: $0.i64)"),
+        ("i64Store32", "UInt32(truncatingIfNeeded: $0.i64)"),
+    ].map { (name, castFromValue) in
+        let base = Instruction(name: name, mayThrow: true, useCurrentMemory: .read, immediates: [Immediate(name: nil, type: "Instruction.StoreOperand")])
+        return StoreInstruction(castFromValue: castFromValue, base: base)
+    }
+    static let memoryLoadStoreInsts: [Instruction] = memoryLoadInsts.map(\.base) + memoryStoreInsts.map(\.base)
     static let memoryOpInsts: [Instruction] = [
-        Instruction(name: "memorySize", immediates: []),
-        Instruction(name: "memoryGrow", mayThrow: true, immediates: []),
-        Instruction(name: "memoryInit", mayThrow: true, immediates: [Immediate(name: nil, type: "DataIndex")]),
+        Instruction(name: "memorySize", immediates: [Immediate(name: nil, type: "Instruction.MemorySizeOperand")]),
+        Instruction(name: "memoryGrow", mayThrow: true, useCurrentMemory: .write, immediates: [
+            Immediate(name: nil, type: "Instruction.MemoryGrowOperand"),
+        ]),
+        Instruction(name: "memoryInit", mayThrow: true, immediates: [
+            Immediate(name: nil, type: "Instruction.MemoryInitOperand"),
+        ]),
         Instruction(name: "memoryDataDrop", immediates: [Immediate(name: nil, type: "DataIndex")]),
-        Instruction(name: "memoryCopy", mayThrow: true, immediates: []),
-        Instruction(name: "memoryFill", mayThrow: true, immediates: []),
+        Instruction(name: "memoryCopy", mayThrow: true, immediates: [
+            Immediate(name: nil, type: "Instruction.MemoryCopyOperand"),
+        ]),
+        Instruction(name: "memoryFill", mayThrow: true, immediates: [
+            Immediate(name: nil, type: "Instruction.MemoryFillOperand"),
+        ]),
     ]
 
     static let miscInsts: [Instruction] = [
         // Parametric
-        Instruction(name: "drop", immediates: []),
-        Instruction(name: "select", mayThrow: true, immediates: []),
+        Instruction(name: "select", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.SelectOperand")]),
         // Reference
-        Instruction(name: "refNull", immediates: [Immediate(name: nil, type: "ReferenceType")]),
-        Instruction(name: "refIsNull", immediates: []),
-        Instruction(name: "refFunc", immediates: [Immediate(name: nil, type: "FunctionIndex")]),
+        Instruction(name: "refNull", immediates: [Immediate(name: nil, type: "Instruction.RefNullOperand")]),
+        Instruction(name: "refIsNull", immediates: [Immediate(name: nil, type: "Instruction.RefIsNullOperand")]),
+        Instruction(name: "refFunc", immediates: [Immediate(name: nil, type: "Instruction.RefFuncOperand")]),
         // Table
-        Instruction(name: "tableGet", mayThrow: true, immediates: [Immediate(name: nil, type: "TableIndex")]),
-        Instruction(name: "tableSet", mayThrow: true, immediates: [Immediate(name: nil, type: "TableIndex")]),
-        Instruction(name: "tableSize", immediates: [Immediate(name: nil, type: "TableIndex")]),
-        Instruction(name: "tableGrow", immediates: [Immediate(name: nil, type: "TableIndex")]),
-        Instruction(name: "tableFill", mayThrow: true, immediates: [Immediate(name: nil, type: "TableIndex")]),
-        Instruction(name: "tableCopy", mayThrow: true, immediates: [Immediate(name: "dest", type: "TableIndex"), Immediate(name: "src", type: "TableIndex")]),
-        Instruction(name: "tableInit", mayThrow: true, immediates: [Immediate(name: nil, type: "TableIndex"), Immediate(name: nil, type: "ElementIndex")]),
+        Instruction(name: "tableGet", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.TableGetOperand")]),
+        Instruction(name: "tableSet", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.TableSetOperand")]),
+        Instruction(name: "tableSize", immediates: [Immediate(name: nil, type: "Instruction.TableSizeOperand")]),
+        Instruction(name: "tableGrow", immediates: [Immediate(name: nil, type: "Instruction.TableGrowOperand")]),
+        Instruction(name: "tableFill", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.TableFillOperand")]),
+        Instruction(name: "tableCopy", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.TableCopyOperand")]),
+        Instruction(name: "tableInit", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.TableInitOperand")]),
         Instruction(name: "tableElementDrop", immediates: [Immediate(name: nil, type: "ElementIndex")]),
     ]
 
     static let instructions: [Instruction] =
         [
             // Variable
-            Instruction(name: "localGet", hasLocals: true, immediates: [Immediate(name: "index", type: "LocalIndex")]),
-            Instruction(name: "localSet", hasLocals: true, immediates: [Immediate(name: "index", type: "LocalIndex")]),
-            Instruction(name: "localTee", hasLocals: true, immediates: [Immediate(name: "index", type: "LocalIndex")]),
-            Instruction(name: "globalGet", mayThrow: true, immediates: [Immediate(name: "index", type: "GlobalIndex")]),
-            Instruction(name: "globalSet", mayThrow: true, immediates: [Immediate(name: "index", type: "GlobalIndex")]),
+            Instruction(name: "copyStack", immediates: [Immediate(name: nil, type: "Instruction.CopyStackOperand")]),
+            Instruction(name: "globalGet", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.GlobalGetOperand")]),
+            Instruction(name: "globalSet", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.GlobalSetOperand")]),
             // Controls
+            Instruction(
+                name: "call", isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write,
+                immediates: [
+                    Immediate(name: nil, type: "Instruction.CallOperand")
+                ]),
+            Instruction(
+                name: "compilingCall", isControl: true, mayThrow: true, mayUpdateFrame: true,
+                immediates: [
+                    Immediate(name: nil, type: "Instruction.CompilingCallOperand")
+                ]),
+            Instruction(
+                name: "internalCall", isControl: true, mayThrow: true, mayUpdateFrame: true,
+                immediates: [
+                    Immediate(name: nil, type: "Instruction.InternalCallOperand")
+                ]),
+            Instruction(
+                name: "callIndirect", isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write,
+                immediates: [
+                    Immediate(name: nil, type: "Instruction.CallIndirectOperand")
+                ]),
             Instruction(name: "unreachable", isControl: true, mayThrow: true, immediates: []),
             Instruction(name: "nop", isControl: true, mayThrow: true, immediates: []),
             Instruction(
                 name: "ifThen", isControl: true,
                 immediates: [
-                    // elseRef for if-then-else-end sequence, endRef for if-then-end sequence
-                    Immediate(name: "elseOrEndRef", type: "ExpressionRef")
-                ]),
-            Instruction(name: "end", isControl: true, immediates: []),
-            Instruction(
-                name: "`else`", isControl: true,
-                immediates: [
-                    Immediate(name: "endRef", type: "ExpressionRef")
+                    Immediate(name: nil, type: "Instruction.IfOperand")
                 ]),
             Instruction(
-                name: "br", isControl: true, mayThrow: true, mayUpdateFrame: true,
+                name: "br", isControl: true, mayThrow: true, mayUpdateFrame: false,
                 immediates: [
                     Immediate(name: "offset", type: "Int32"),
-                    // Number of values that will be copied if the branch is taken
-                    Immediate(name: "copyCount", type: "UInt32"),
-                    // Number of values that will be popped if the branch is taken
-                    Immediate(name: "popCount", type: "UInt32"),
                 ]),
             Instruction(
-                name: "brIf", isControl: true, mayThrow: true, mayUpdateFrame: true,
+                name: "brIf", isControl: true, mayThrow: true, mayUpdateFrame: false,
                 immediates: [
-                    Immediate(name: "offset", type: "Int32"),
-                    // Number of values that will be copied if the branch is taken
-                    Immediate(name: "copyCount", type: "UInt32"),
-                    // Number of values that will be popped if the branch is taken
-                    Immediate(name: "popCount", type: "UInt32"),
+                    Immediate(name: nil, type: "Instruction.BrIfOperand")
                 ]),
             Instruction(
-                name: "brTable", isControl: true, mayThrow: true, mayUpdateFrame: true,
+                name: "brIfNot", isControl: true, mayThrow: true, mayUpdateFrame: false,
                 immediates: [
-                    Immediate(name: nil, type: "Instruction.BrTable")
-                ]),
-            Instruction(name: "`return`", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: []),
-            Instruction(
-                name: "call", isControl: true, mayThrow: true, mayUpdateFrame: true,
-                immediates: [
-                    Immediate(name: "functionIndex", type: "UInt32")
+                    Immediate(name: nil, type: "Instruction.BrIfOperand")
                 ]),
             Instruction(
-                name: "callIndirect", isControl: true, mayThrow: true, mayUpdateFrame: true,
+                name: "brTable", isControl: true, mayThrow: true, mayUpdateFrame: false,
                 immediates: [
-                    Immediate(name: "tableIndex", type: "TableIndex"),
-                    Immediate(name: "typeIndex", type: "TypeIndex"),
+                    Immediate(name: nil, type: "Instruction.BrTableOperand")
                 ]),
-            Instruction(name: "endOfFunction", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: []),
+            Instruction(name: "`return`", isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write, immediates: [
+                Immediate(name: nil, type: "Instruction.ReturnOperand")
+            ]),
+            Instruction(name: "endOfFunction", isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write, immediates: [
+                Immediate(name: nil, type: "Instruction.ReturnOperand")
+            ]),
             Instruction(name: "endOfExecution", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: []),
         ]
         + memoryLoadStoreInsts
         + memoryOpInsts
         + numericOtherInsts
-        + numericBinaryInsts
-        + numericIntBinaryInsts
-        + numericIntUnaryInsts
+        + numericBinaryInsts.map(\.base)
+        + numericIntBinaryInsts.map(\.base)
+        + numericIntUnaryInsts.map(\.base)
         + miscInsts
 
     static func camelCase(pascalCase: String) -> String {
@@ -199,8 +278,8 @@ enum GenerateInternalInstruction {
     static func generateDispatcher(instructions: [Instruction]) -> String {
         let doExecuteParams =
             [("instruction", "Instruction", false)]
+            + [("md", "Md", true), ("ms", "Ms", true)]
             + Instruction.commonParameters
-            + [("locals", "UnsafeMutablePointer<Value>", false)]
         var output = """
             extension ExecutionState {
                 @inline(__always)
@@ -245,6 +324,53 @@ enum GenerateInternalInstruction {
                     return true
                 }
             }
+            """
+        return output
+    }
+
+    static func generateBasicInstImplementations() -> String {
+        var output = """
+            extension ExecutionState {
+            """
+
+        for inst in numericBinaryInsts + numericIntBinaryInsts {
+            output += """
+
+                mutating \(instMethodDecl(inst.base)) {
+                    sp[binaryOperand.result] = sp[binaryOperand.lhs].\(inst.type).\(inst.op.lowercased())(sp[binaryOperand.rhs].\(inst.type)).untyped
+                }
+            """
+        }
+        for inst in numericIntUnaryInsts {
+            output += """
+
+                mutating \(instMethodDecl(inst.base)) {
+                    sp[unaryOperand.result] = sp[unaryOperand.input].\(inst.type).\(inst.op.lowercased()).untyped
+                }
+            """
+        }
+
+        for inst in memoryLoadInsts {
+            output += """
+
+                mutating \(instMethodDecl(inst.base)) {
+                    try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: \(inst.loadAs).self, castToValue: { \(inst.castToValue) })
+                }
+            """
+        }
+        for inst in memoryStoreInsts {
+            output += """
+
+                mutating \(instMethodDecl(inst.base)) {
+                    try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { \(inst.castFromValue) })
+                }
+            """
+        }
+
+        output += """
+
+            }
+
             """
         return output
     }
@@ -375,6 +501,8 @@ enum GenerateInternalInstruction {
             output += generateDispatcher(instructions: instructions)
             output += "\n\n"
             output += generateInstName(instructions: instructions)
+            output += "\n\n"
+            output += generateBasicInstImplementations()
 
             let outputFile = sourceRoot.appending(path: "Sources/WasmKit/Execution/Runtime/InstDispatch.swift")
             try output.write(to: outputFile, atomically: true, encoding: .utf8)

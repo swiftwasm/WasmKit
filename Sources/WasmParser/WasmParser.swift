@@ -8,6 +8,7 @@ import SystemPackage
 ///
 /// The parser is designed to be used to incrementally parse a WebAssembly binary bytestream.
 public struct Parser<Stream: ByteStream> {
+    @usableFromInline
     let stream: Stream
     public private(set) var hasDataCount: Bool = false
     public let features: WasmFeatureSet
@@ -19,6 +20,7 @@ public struct Parser<Stream: ByteStream> {
     }
     private var nextParseTarget: NextParseTarget
 
+    @usableFromInline
     var currentIndex: Int {
         return stream.currentIndex
     }
@@ -82,6 +84,7 @@ extension Parser where Stream == FileHandleStream {
 ///   - hasDataCount: Whether the module has a data count section
 ///   - visitor: The instruction visitor to visit the parsed instructions
 /// - Throws: `WasmParserError` if the parsing fails
+@inlinable
 public func parseExpression<V: InstructionVisitor, Stream: ByteStream>(
     stream: Stream,
     features: WasmFeatureSet = .default,
@@ -221,6 +224,7 @@ public enum WasmParserError: Swift.Error {
     case malformedDataSegmentKind(UInt32)
     case raw(String)
 
+    @usableFromInline
     init(_ message: String) {
         self = .raw(message)
     }
@@ -242,15 +246,21 @@ extension ByteStream {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/values.html#integers>
 extension ByteStream {
-    fileprivate func parseUnsigned<T: RawUnsignedInteger>(_: T.Type = T.self) throws -> T {
-        return try T(LEB: { try? self.consumeAny() })
+    @inline(__always)
+    @usableFromInline
+    func parseUnsigned<T: RawUnsignedInteger>(_: T.Type = T.self) throws -> T {
+        return try T(LEB: self)
     }
 
-    fileprivate func parseSigned<T: FixedWidthInteger & SignedInteger>() throws -> T {
-        return try T(LEB: { try? self.consumeAny() })
+    @inline(__always)
+    @usableFromInline
+    func parseSigned<T: FixedWidthInteger & SignedInteger>() throws -> T {
+        return try T(LEB: self)
     }
 
-    fileprivate func parseInteger<T: RawUnsignedInteger>() throws -> T {
+    @inline(__always)
+    @usableFromInline
+    func parseInteger<T: RawUnsignedInteger>() throws -> T {
         let signed: T.Signed = try parseSigned()
         return signed.unsigned
     }
@@ -281,18 +291,25 @@ extension ByteStream {
 }
 
 extension Parser {
+    @usableFromInline
     func parseVector<Content>(content parser: () throws -> Content) throws -> [Content] {
         try stream.parseVector(content: parser)
     }
 
+    @inline(__always)
+    @inlinable
     func parseUnsigned<T: RawUnsignedInteger>(_: T.Type = T.self) throws -> T {
         try stream.parseUnsigned(T.self)
     }
 
+    @inline(__always)
+    @inlinable
     func parseSigned<T: FixedWidthInteger & SignedInteger>() throws -> T {
         try stream.parseSigned()
     }
 
+    @inline(__always)
+    @inlinable
     func parseInteger<T: RawUnsignedInteger>() throws -> T {
         try stream.parseInteger()
     }
@@ -305,6 +322,7 @@ extension Parser {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/values.html#floating-point>
 extension Parser {
+    @usableFromInline
     func parseFloat() throws -> UInt32 {
         let consumedLittleEndian = try stream.consume(count: 4).reversed()
         let bitPattern = consumedLittleEndian.reduce(UInt32(0)) { acc, byte in
@@ -313,6 +331,7 @@ extension Parser {
         return bitPattern
     }
 
+    @usableFromInline
     func parseDouble() throws -> UInt64 {
         let consumedLittleEndian = try stream.consume(count: 8).reversed()
         let bitPattern = consumedLittleEndian.reduce(UInt64(0)) { acc, byte in
@@ -327,6 +346,7 @@ extension Parser {
 extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/types.html#value-types>
+    @usableFromInline
     func parseValueType() throws -> ValueType {
         let b = try stream.consumeAny()
 
@@ -344,6 +364,7 @@ extension Parser {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/types.html#result-types>
+    @usableFromInline
     func parseResultType() throws -> BlockType {
         guard let nextByte = try stream.peek() else {
             throw WasmParserError.unexpectedEnd
@@ -464,6 +485,7 @@ extension Parser {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/instructions.html#memory-instructions>
+    @usableFromInline
     func parseMemarg() throws -> MemArg {
         let align: UInt32 = try parseUnsigned()
         let offset: UInt64 = try features.contains(.memory64) ? parseUnsigned(UInt64.self) : UInt64(parseUnsigned(UInt32.self))
@@ -479,6 +501,7 @@ extension Parser {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/instructions.html>
 extension Parser {
+    @inlinable
     func parseInstruction<V: InstructionVisitor>(visitor v: inout V) throws -> (InstructionCode, V.Output) {
         let rawCode = try stream.consumeAny()
         guard let code = InstructionCode(rawValue: rawCode) else {
@@ -487,6 +510,7 @@ extension Parser {
         return (code, try doParseInstruction(code: code, visitor: &v))
     }
 
+    @inlinable
     func doParseInstruction<V: InstructionVisitor>(code: InstructionCode, visitor v: inout V) throws -> V.Output {
         switch code {
         case .unreachable: return try v.visitUnreachable()
@@ -1040,7 +1064,7 @@ extension Parser {
                 return .active(.init(index: 0, offset: offset, initializer: initializer))
 
             case 1:
-                return try .passive(parseVector { try stream.consumeAny() })
+                return try .passive(parseVectorBytes())
 
             case 2:
                 let index: UInt32 = try parseUnsigned()

@@ -35,15 +35,21 @@ public enum ValueType: Equatable, Hashable {
     case ref(ReferenceType)
 }
 
-/// > Note:
-/// <https://webassembly.github.io/spec/core/exec/runtime.html#addresses>
+/// Runtime representation of a WebAssembly function reference.
 public typealias FunctionAddress = Int
-public typealias TableAddress = Int
-public typealias MemoryAddress = Int
-public typealias GlobalAddress = Int
-public typealias ElementAddress = Int
-public typealias DataAddress = Int
+/// Runtime representation of an external entity reference.
 public typealias ExternAddress = Int
+
+@available(*, unavailable, message: "Address-based APIs has been removed; use `Table` instead")
+public typealias TableAddress = Int
+@available(*, unavailable, message: "Address-based APIs has been removed; use `Memory` instead")
+public typealias MemoryAddress = Int
+@available(*, unavailable, message: "Address-based APIs has been removed; use `Global` instead")
+public typealias GlobalAddress = Int
+@available(*, unavailable, message: "Address-based APIs has been removed")
+public typealias ElementAddress = Int
+@available(*, unavailable, message: "Address-based APIs has been removed")
+public typealias DataAddress = Int
 
 public enum Reference: Hashable {
     /// A reference to a function.

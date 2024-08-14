@@ -1,12 +1,10 @@
 import WasmParser
 
-internal typealias ModuleAddress = Int
-
 /// A collection of globals and functions that are exported from a host module.
 public struct HostModule {
     public init(
-        globals: [String: GlobalInstance] = [:],
-        memories: [String: MemoryAddress] = [:],
+        globals: [String: Global] = [:],
+        memories: [String: Memory] = [:],
         functions: [String: HostFunction] = [:]
     ) {
         self.globals = globals
@@ -15,10 +13,10 @@ public struct HostModule {
     }
 
     /// Names of globals exported by this module mapped to corresponding global instances.
-    public let globals: [String: GlobalInstance]
+    public let globals: [String: Global]
 
     /// Names of memories exported by this module mapped to corresponding addresses of memory instances.
-    public let memories: [String: MemoryAddress]
+    public let memories: [String: Memory]
 
     /// Names of functions exported by this module mapped to corresponding host functions.
     public let functions: [String: HostFunction]
@@ -29,49 +27,44 @@ public struct HostModule {
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#store>
 public final class Store {
     var hostFunctions: [HostFunction] = []
-    private var hostGlobals: [GlobalInstance] = []
+    private var hostGlobals: [Global] = []
     var nameRegistry = NameRegistry()
 
-    private var modules: [ModuleInstance] = []
-    public internal(set) var namedModuleInstances: [String: ModuleInstance] = [:]
+    @available(*, unavailable)
+    public var namedModuleInstances: [String: Any] {
+        fatalError()
+    }
 
     /// This property is separate from `registeredModuleInstances`, as host exports
     /// won't have a corresponding module instance.
-    fileprivate var availableExports: [String: ModuleInstance.Exports] = [:]
+    fileprivate var availableExports: [String: [String: ExternalValue]] = [:]
 
-    var functions: [FunctionInstance] = []
-    var tables: [TableInstance] = []
-    var memories: [MemoryInstance] = []
-    var globals: [GlobalInstance] = []
-    var elements: [ElementInstance] = []
-    var datas: [DataInstance] = []
+    let allocator: StoreAllocator
 
-    init(_ hostModules: [String: HostModule]) {
-        for (moduleName, hostModule) in hostModules {
-            registerUniqueHostModule(hostModule, as: moduleName)
-        }
-    }
-
-    internal func module(address: ModuleAddress) -> ModuleInstance {
-        return self.modules[address]
-    }
-
-    internal func withTemporaryModuleInstance<T>(_ body: (ModuleInstance) throws -> T) rethrows -> T {
-        let tempAddress = self.modules.count
-        let module = ModuleInstance(selfAddress: tempAddress)
-        self.modules.append(module)
-        let result = try body(module)
-        self.modules.removeLast()
-        return result
+    init(funcTypeInterner: Interner<FunctionType>) {
+        self.allocator = StoreAllocator(funcTypeInterner: funcTypeInterner)
     }
 }
 
 /// A caller context passed to host functions
 public struct Caller {
+    private let instanceHandle: InternalInstance?
+    /// The instance that called the host function.
+    /// - Note: This property is `nil` if a `Function` backed by a host function is called directly.
+    public var instance: Instance? {
+        guard let instanceHandle else { return nil }
+        return Instance(handle: instanceHandle, allocator: runtime.store.allocator)
+    }
+    /// The runtime that called the host function.
     public let runtime: Runtime
-    public let instance: ModuleInstance
+    /// The store associated with the caller execution context.
     public var store: Store {
         runtime.store
+    }
+
+    init(instanceHandle: InternalInstance?, runtime: Runtime) {
+        self.instanceHandle = instanceHandle
+        self.runtime = runtime
     }
 }
 
@@ -114,18 +107,18 @@ public struct HostFunction {
     public let implementation: (Caller, [Value]) throws -> [Value]
 }
 
-enum StoreFunction {
-    case wasm(FunctionInstance, body: InstructionSequence)
-    case host(HostFunction)
+struct HostFunctionEntity {
+    let type: InternedFuncType
+    let implementation: (Caller, [Value]) throws -> [Value]
 }
 
 extension Store {
-    public func register(_ moduleInstance: ModuleInstance, as name: String) throws {
+    public func register(_ instance: Instance, as name: String) throws {
         guard availableExports[name] == nil else {
             throw ImportError.moduleInstanceAlreadyRegistered(name)
         }
 
-        availableExports[name] = moduleInstance.exports
+        availableExports[name] = instance.exports
     }
 
     /// Register the given host module in this store with the given name.
@@ -133,25 +126,30 @@ extension Store {
     /// - Parameters:
     ///   - hostModule: A host module to register.
     ///   - name: A name to register the given host module.
-    public func register(_ hostModule: HostModule, as name: String) throws {
+    public func register(_ hostModule: HostModule, as name: String, runtime: Runtime) throws {
         guard availableExports[name] == nil else {
             throw ImportError.moduleInstanceAlreadyRegistered(name)
         }
 
-        registerUniqueHostModule(hostModule, as: name)
+        registerUniqueHostModule(hostModule, as: name, runtime: runtime)
     }
 
     /// Register the given host module assuming that the given name is not registered yet.
-    func registerUniqueHostModule(_ hostModule: HostModule, as name: String) {
-        var moduleExports = ModuleInstance.Exports()
+    func registerUniqueHostModule(_ hostModule: HostModule, as name: String, runtime: Runtime) {
+        var moduleExports = [String: ExternalValue]()
 
         for (globalName, global) in hostModule.globals {
-            moduleExports[globalName] = .global(-hostGlobals.count - 1)
+            moduleExports[globalName] = .global(global)
             hostGlobals.append(global)
         }
 
         for (functionName, function) in hostModule.functions {
-            moduleExports[functionName] = .function(Function(address: -hostFunctions.count - 1))
+            moduleExports[functionName] = .function(
+                Function(
+                    handle: allocator.allocate(hostFunction: function, runtime: runtime),
+                    allocator: allocator
+                )
+            )
             hostFunctions.append(function)
         }
 
@@ -162,25 +160,17 @@ extension Store {
         availableExports[name] = moduleExports
     }
 
-    public func memory(at address: MemoryAddress) -> MemoryInstance {
-        return self.memories[address]
+    @available(*, deprecated, message: "Address-based APIs has been removed; use `Memory` instead")
+    public func memory(at address: Memory) -> Memory {
+        address
     }
 
-    public func withMemory<T>(at address: MemoryAddress, _ body: (inout MemoryInstance) throws -> T) rethrows -> T {
-        try body(&self.memories[address])
+    @available(*, deprecated, message: "Address-based APIs has been removed; use `Memory` instead")
+    public func withMemory<T>(at address: Memory, _ body: (Memory) throws -> T) rethrows -> T {
+        try body(address)
     }
 
-    @_transparent
-    func function(at address: FunctionAddress) throws -> StoreFunction {
-        if address < 0 {
-            return .host(hostFunctions[-address - 1])
-        } else {
-            let body = try functions[address].code.body
-            return .wasm(functions[address], body: body)
-        }
-    }
-
-    func getExternalValues(_ module: Module) throws -> [ExternalValue] {
+    func getExternalValues(_ module: Module, runtime: Runtime) throws -> [ExternalValue] {
         var result = [ExternalValue]()
 
         for i in module.imports {
@@ -190,34 +180,26 @@ extension Store {
 
             switch (i.descriptor, external) {
             case let (.function(typeIndex), .function(externalFunc)):
-                let type: FunctionType
-                switch try function(at: externalFunc.address) {
-                case let .host(function):
-                    type = function.type
-
-                case let .wasm(function, _):
-                    type = function.type
-                }
-
-                guard module.types[Int(typeIndex)] == type else {
+                let type = externalFunc.handle.type
+                guard runtime.internType(module.types[Int(typeIndex)]) == type else {
                     throw ImportError.incompatibleImportType
                 }
                 result.append(external)
 
-            case let (.table(tableType), .table(tableAddress)):
-                if let max = tables[Int(tableAddress)].limits.max, max < tableType.limits.min {
+            case let (.table(tableType), .table(table)):
+                if let max = table.handle.limits.max, max < tableType.limits.min {
                     throw ImportError.incompatibleImportType
                 }
                 result.append(external)
 
-            case let (.memory(memoryType), .memory(memoryAddress)):
-                if let max = memories[Int(memoryAddress)].limit.max, max < memoryType.min {
+            case let (.memory(memoryType), .memory(memory)):
+                if let max = memory.handle.limit.max, max < memoryType.min {
                     throw ImportError.incompatibleImportType
                 }
                 result.append(external)
 
-            case let (.global(globalType), .global(globalAddress))
-            where globalType == globals[globalAddress].globalType:
+            case let (.global(globalType), .global(global))
+                where globalType == global.handle.globalType:
                 result.append(external)
 
             default:
@@ -226,171 +208,5 @@ extension Store {
         }
 
         return result
-    }
-
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-module>
-    func allocate(
-        module: Module,
-        externalValues: [ExternalValue],
-        initialGlobals: [Value]
-    ) throws -> ModuleInstance {
-        // Step 1 of module allocation algorithm, according to Wasm 2.0 spec.
-        let moduleInstance = ModuleInstance(selfAddress: modules.count)
-
-        moduleInstance.types = module.types
-
-        // External values imported in this module should be included in corresponding index spaces before definitions
-        // local to to the module are added.
-        for external in externalValues {
-            switch external {
-            case let .function(address):
-                // Step 14.
-                moduleInstance.functionAddresses.append(address.address)
-            case let .table(address):
-                // Step 15.
-                moduleInstance.tableAddresses.append(address)
-            case let .memory(address):
-                // Step 16.
-                moduleInstance.memoryAddresses.append(address)
-            case let .global(address):
-                // Step 17.
-                moduleInstance.globalAddresses.append(address)
-            }
-        }
-
-        // Step 2.
-        for function in module.functions {
-            let address = allocate(function: function, module: moduleInstance)
-            moduleInstance.functionAddresses.append(address)
-        }
-
-        // Step 3.
-        for table in module.internalTables {
-            let address = allocate(tableType: table)
-            moduleInstance.tableAddresses.append(address)
-        }
-
-        // Step 4.
-        for memory in module.internalMemories {
-            let address = allocate(memoryType: memory)
-            moduleInstance.memoryAddresses.append(address)
-        }
-
-        // Step 5.
-        assert(module.internalGlobals.count == initialGlobals.count)
-        for (global, initialValue) in zip(module.internalGlobals, initialGlobals) {
-            let address = allocate(globalType: global.type, initialValue: initialValue)
-            moduleInstance.globalAddresses.append(address)
-        }
-
-        // Step 6.
-        for element in module.elements {
-            let references = try element.initializer.map { expression -> Reference in
-                switch expression[0] {
-                case let .refFunc(index):
-                    let addr = moduleInstance.functionAddresses[Int(index)]
-                    return .function(addr)
-                case .refNull(.funcRef):
-                    return .function(nil)
-                case .refNull(.externRef):
-                    return .extern(nil)
-                case .globalGet(let index):
-                    let globalAddr = moduleInstance.globalAddresses[Int(index)]
-                    switch globals[globalAddr].value {
-                    case .ref(.function(let addr)):
-                        return .function(addr)
-                    default:
-                        throw Trap._raw("Unexpected global value type for element initializer expression")
-                    }
-                default:
-                    throw Trap._raw("Unexpected element initializer expression: \(expression)")
-                }
-            }
-            let address = allocate(elementType: element.type, references: references)
-            moduleInstance.elementAddresses.append(address)
-        }
-
-        // Step 13.
-        for datum in module.data {
-            let address: DataAddress
-            switch datum {
-            case let .passive(bytes):
-                address = allocate(bytes: bytes)
-            case let .active(datum):
-                address = allocate(bytes: Array(datum.initializer))
-            }
-            moduleInstance.dataAddresses.append(address)
-        }
-
-        // Step 19.
-        for export in module.exports {
-            let exportInstance = ExportInstance(export, moduleInstance: moduleInstance)
-            moduleInstance.exportInstances.append(exportInstance)
-        }
-
-        if let nameSection = module.customSections.first(where: { $0.name == "name" }) {
-            // FIXME?: Just ignore parsing error of name section for now.
-            // Should emit warning instead of just discarding it?
-            try? nameRegistry.register(instance: moduleInstance, nameSection: nameSection)
-        }
-
-        self.modules.append(moduleInstance)
-        // Steps 20-21.
-        return moduleInstance
-    }
-
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-func>
-    func allocate(function: GuestFunction, module: ModuleInstance) -> FunctionAddress {
-        let address = functions.count
-        let instance = FunctionInstance(function, module: module)
-        functions.append(instance)
-        return address
-    }
-
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-table>
-    func allocate(tableType: TableType) -> TableAddress {
-        let address = tables.count
-        let instance = TableInstance(tableType)
-        tables.append(instance)
-        return address
-    }
-
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-mem>
-    public func allocate(memoryType: MemoryType) -> MemoryAddress {
-        let address = memories.count
-        let instance = MemoryInstance(memoryType)
-        memories.append(instance)
-        return address
-    }
-
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-global>
-    func allocate(globalType: GlobalType, initialValue: Value) -> GlobalAddress {
-        let address = globals.count
-        let instance = GlobalInstance(globalType: globalType, initialValue: initialValue)
-        globals.append(instance)
-        return address
-    }
-
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/exec/modules.html#element-segments>
-    func allocate(elementType: ReferenceType, references: [Reference]) -> ElementAddress {
-        let address = elements.count
-        let instance = ElementInstance(type: elementType, references: references)
-        elements.append(instance)
-        return address
-    }
-
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/exec/modules.html#data-segments>
-    func allocate(bytes: [UInt8]) -> DataAddress {
-        let address = datas.count
-        let instance = DataInstance(data: bytes)
-        datas.append(instance)
-        return address
     }
 }

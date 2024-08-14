@@ -21,7 +21,7 @@ struct HostWorldGenerator: ASTVisitor {
             line: """
 
                 struct \(ConvertCase.pascalCase(world.name)) {
-                    let moduleInstance: ModuleInstance
+                    let instance: WasmKit.Instance
 
                     static func link(_ hostModules: inout [String: HostModule]) {
                     }

@@ -1,3 +1,5 @@
+import func Foundation.exit
+
 var arguments = CommandLine.arguments
 
 struct Subcommand {

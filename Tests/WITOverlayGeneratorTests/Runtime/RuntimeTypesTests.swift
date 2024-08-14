@@ -8,7 +8,7 @@ class RuntimeTypesTests: XCTestCase {
     func testNumber() throws {
         var harness = try RuntimeTestHarness(fixture: "Number")
         try harness.build(link: NumberTestWorld.link(_:)) { (runtime, instance) in
-            let component = NumberTestWorld(moduleInstance: instance)
+            let component = NumberTestWorld(instance: instance)
 
             XCTAssertEqual(try component.roundtripBool(runtime: runtime, v: true), true)
             XCTAssertEqual(try component.roundtripBool(runtime: runtime, v: false), false)
@@ -75,7 +75,7 @@ class RuntimeTypesTests: XCTestCase {
     func testChar() throws {
         var harness = try RuntimeTestHarness(fixture: "Char")
         try harness.build(link: CharTestWorld.link(_:)) { (runtime, instance) in
-            let component = CharTestWorld(moduleInstance: instance)
+            let component = CharTestWorld(instance: instance)
 
             for char in "abcd🍏👨‍👩‍👦‍👦".unicodeScalars {
                 XCTAssertEqual(try component.roundtrip(runtime: runtime, v: char), char)
@@ -86,7 +86,7 @@ class RuntimeTypesTests: XCTestCase {
     func testOption() throws {
         var harness = try RuntimeTestHarness(fixture: "Option")
         try harness.build(link: OptionTestWorld.link(_:)) { (runtime, instance) in
-            let component = OptionTestWorld(moduleInstance: instance)
+            let component = OptionTestWorld(instance: instance)
             let value1 = try component.returnNone(runtime: runtime)
             XCTAssertEqual(value1, nil)
 
@@ -112,7 +112,7 @@ class RuntimeTypesTests: XCTestCase {
     func testRecord() throws {
         var harness = try RuntimeTestHarness(fixture: "Record")
         try harness.build(link: RecordTestWorld.link(_:)) { (runtime, instance) in
-            let component = RecordTestWorld(moduleInstance: instance)
+            let component = RecordTestWorld(instance: instance)
             _ = try component.returnEmpty(runtime: runtime)
 
             _ = try component.roundtripEmpty(runtime: runtime, v: RecordTestWorld.RecordEmpty())
@@ -130,7 +130,7 @@ class RuntimeTypesTests: XCTestCase {
     func testString() throws {
         var harness = try RuntimeTestHarness(fixture: "String")
         try harness.build(link: StringTestWorld.link(_:)) { (runtime, instance) in
-            let component = StringTestWorld(moduleInstance: instance)
+            let component = StringTestWorld(instance: instance)
             XCTAssertEqual(try component.returnEmpty(runtime: runtime), "")
             XCTAssertEqual(try component.roundtrip(runtime: runtime, v: "ok"), "ok")
             XCTAssertEqual(try component.roundtrip(runtime: runtime, v: "🍏"), "🍏")
@@ -143,7 +143,7 @@ class RuntimeTypesTests: XCTestCase {
     func testList() throws {
         var harness = try RuntimeTestHarness(fixture: "List")
         try harness.build(link: ListTestWorld.link(_:)) { (runtime, instance) in
-            let component = ListTestWorld(moduleInstance: instance)
+            let component = ListTestWorld(instance: instance)
             XCTAssertEqual(try component.returnEmpty(runtime: runtime), [])
             for value in [[], [1, 2, 3]] as [[UInt8]] {
                 XCTAssertEqual(try component.roundtrip(runtime: runtime, v: value), value)
@@ -158,7 +158,7 @@ class RuntimeTypesTests: XCTestCase {
     func testVariant() throws {
         var harness = try RuntimeTestHarness(fixture: "Variant")
         try harness.build(link: VariantTestWorld.link(_:)) { (runtime, instance) in
-            let component = VariantTestWorld(moduleInstance: instance)
+            let component = VariantTestWorld(instance: instance)
             XCTAssertEqual(try component.returnSingle(runtime: runtime), .a(33_550_336))
 
             let value1 = try component.returnLarge(runtime: runtime)
@@ -186,7 +186,7 @@ class RuntimeTypesTests: XCTestCase {
     func testResult() throws {
         var harness = try RuntimeTestHarness(fixture: "Result")
         try harness.build(link: ResultTestWorld.link(_:)) { (runtime, instance) in
-            let component = ResultTestWorld(moduleInstance: instance)
+            let component = ResultTestWorld(instance: instance)
 
             let value4 = try component.roundtripResult(runtime: runtime, v: .success(()))
             guard case .success = value4 else {
@@ -218,7 +218,7 @@ class RuntimeTypesTests: XCTestCase {
     func testEnum() throws {
         var harness = try RuntimeTestHarness(fixture: "Enum")
         try harness.build(link: EnumTestWorld.link(_:)) { (runtime, instance) in
-            let component = EnumTestWorld(moduleInstance: instance)
+            let component = EnumTestWorld(instance: instance)
 
             let value1 = try component.roundtripSingle(runtime: runtime, v: .a)
             XCTAssertEqual(value1, .a)
@@ -237,7 +237,7 @@ class RuntimeTypesTests: XCTestCase {
     func testFlags() throws {
         var harness = try RuntimeTestHarness(fixture: "Flags")
         try harness.build(link: FlagsTestWorld.link(_:)) { (runtime, instance) in
-            let component = FlagsTestWorld(moduleInstance: instance)
+            let component = FlagsTestWorld(instance: instance)
 
             XCTAssertEqual(try component.roundtripSingle(runtime: runtime, v: []), [])
 
@@ -261,7 +261,7 @@ class RuntimeTypesTests: XCTestCase {
     func testTuple() throws {
         var harness = try RuntimeTestHarness(fixture: "Tuple")
         try harness.build(link: TupleTestWorld.link(_:)) { (runtime, instance) in
-            let component = TupleTestWorld(moduleInstance: instance)
+            let component = TupleTestWorld(instance: instance)
             let value1 = try component.roundtrip(runtime: runtime, v: (true, 42))
             XCTAssertEqual(value1.0, true)
             XCTAssertEqual(value1.1, 42)
@@ -271,11 +271,11 @@ class RuntimeTypesTests: XCTestCase {
     func testInterface() throws {
         var harness = try RuntimeTestHarness(fixture: "Interface")
         try harness.build(link: InterfaceTestWorld.link(_:)) { (runtime, instance) in
-            let component = InterfaceTestWorld(moduleInstance: instance)
+            let component = InterfaceTestWorld(instance: instance)
             let value1 = try component.roundtripT1(runtime: runtime, v: 42)
             XCTAssertEqual(value1, 42)
 
-            let iface = InterfaceTestWorld.IfaceFuncs(moduleInstance: instance)
+            let iface = InterfaceTestWorld.IfaceFuncs(instance: instance)
             let value2 = try iface.roundtripU8(runtime: runtime, v: 43)
             XCTAssertEqual(value2, 43)
         }

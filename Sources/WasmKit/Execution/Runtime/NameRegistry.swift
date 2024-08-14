@@ -3,12 +3,12 @@ import struct WasmParser.NameSectionParser
 import class WasmParser.StaticByteStream
 
 struct NameRegistry {
-    private var functionNames: [FunctionAddress: String] = [:]
+    private var functionNames: [InternalFunction: String] = [:]
     private var materializers: [(inout NameRegistry) throws -> Void] = []
 
     init() {}
 
-    mutating func register(instance: ModuleInstance, nameSection: CustomSection) throws {
+    mutating func register(instance: InternalInstance, nameSection: CustomSection) throws {
         materializers.append { registry in
             let stream = StaticByteStream(bytes: Array(nameSection.bytes))
             let parser = NameSectionParser(stream: stream)
@@ -21,9 +21,9 @@ struct NameRegistry {
         }
     }
 
-    private mutating func register(instance: ModuleInstance, nameMap: NameSectionParser.NameMap) {
+    private mutating func register(instance: InternalInstance, nameMap: NameSectionParser.NameMap) {
         for (index, name) in nameMap {
-            let addr = instance.functionAddresses[Int(index)]
+            let addr = instance.functions[Int(index)]
             self.functionNames[addr] = name
         }
     }
@@ -36,7 +36,7 @@ struct NameRegistry {
         materializers = []
     }
 
-    mutating func lookup(_ addr: FunctionAddress) throws -> String? {
+    mutating func lookup(_ addr: InternalFunction) throws -> String? {
         try materializeIfNeeded()
         return functionNames[addr]
     }

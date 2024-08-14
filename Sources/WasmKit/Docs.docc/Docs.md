@@ -78,7 +78,7 @@ See [examples](https://github.com/swiftwasm/WasmKit/tree/main/Examples) for exec
 ### Basic Concepts
 
 - ``Module``
-- ``ModuleInstance``
+- ``Instance``
 - ``Runtime``
 - ``Store``
 

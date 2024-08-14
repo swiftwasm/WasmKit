@@ -13,17 +13,17 @@ public struct CanonicalCallContext {
     /// The options used for lifting or lowering operations.
     public let options: CanonicalOptions
     /// The module instance that defines the lift/lower operation.
-    public let moduleInstance: ModuleInstance
+    public let instance: Instance
     /// The executing `Runtime` instance
     public let runtime: Runtime
     /// A reference to the guest memory.
-    public var guestMemory: WasmKitGuestMemory {
-        WasmKitGuestMemory(store: runtime.store, address: options.memory)
+    public var guestMemory: Memory {
+        options.memory
     }
 
-    public init(options: CanonicalOptions, moduleInstance: ModuleInstance, runtime: Runtime) {
+    public init(options: CanonicalOptions, instance: Instance, runtime: Runtime) {
         self.options = options
-        self.moduleInstance = moduleInstance
+        self.instance = instance
         self.runtime = runtime
     }
 
@@ -50,22 +50,25 @@ public struct CanonicalCallContext {
     }
 }
 
-public struct WasmKitGuestMemory: GuestMemory {
-    private let store: Store
-    private let address: MemoryAddress
-
-    /// Creates a new memory instance from the given store and address
-    public init(store: Store, address: MemoryAddress) {
-        self.store = store
-        self.address = address
+extension CanonicalCallContext {
+    @available(*, deprecated, renamed: "instance")
+    public var moduleInstance: Instance {
+        return instance
     }
 
-    /// Executes the given closure with a mutable buffer pointer to the host memory region mapped as guest memory.
-    public func withUnsafeMutableBufferPointer<T>(offset: UInt, count: Int, _ body: (UnsafeMutableRawBufferPointer) throws -> T) rethrows -> T {
-        try store.withMemory(at: address) { memory in
-            try memory.data.withUnsafeMutableBufferPointer { buffer in
-                try body(UnsafeMutableRawBufferPointer(start: buffer.baseAddress! + Int(offset), count: count))
-            }
-        }
+    @available(*, deprecated, renamed: "init(options:instance:runtime:)")
+    public init(options: CanonicalOptions, moduleInstance: Instance, runtime: Runtime) {
+        self.init(options: options, instance: moduleInstance, runtime: runtime)
+    }
+}
+
+@available(*, deprecated, renamed: "Memory", message: "WasmKitGuestMemory has been removed; use Memory instead")
+public typealias WasmKitGuestMemory = Memory
+
+extension Memory {
+    /// Creates a new memory instance from the given store and address
+    @available(*, unavailable, message: "WasmKitGuestMemory has been removed; use Memory instead")
+    public init(store: Store, memory: Memory) {
+        fatalError()
     }
 }

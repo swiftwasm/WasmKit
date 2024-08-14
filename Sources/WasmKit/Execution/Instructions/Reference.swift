@@ -1,30 +1,29 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#reference-instructions>
 extension ExecutionState {
-    mutating func refNull(runtime: Runtime, stack: inout Stack, referenceType: ReferenceType) {
-        switch referenceType {
+    mutating func refNull(context: inout StackContext, sp: Sp, refNullOperand: Instruction.RefNullOperand) {
+        let value: Value
+        switch refNullOperand.type {
         case .externRef:
-            stack.push(value: .ref(.extern(nil)))
+            value = .ref(.extern(nil))
         case .funcRef:
-            stack.push(value: .ref(.function(nil)))
+            value = .ref(.function(nil))
         }
+        sp[refNullOperand.result] = UntypedValue(value)
     }
-    mutating func refIsNull(runtime: Runtime, stack: inout Stack) {
-        let value = stack.popValue()
+    mutating func refIsNull(context: inout StackContext, sp: Sp, refIsNullOperand: Instruction.RefIsNullOperand) {
+        let value = sp[refIsNullOperand.value]
 
-        switch value {
-        case .ref(.extern(nil)), .ref(.function(nil)):
-            stack.push(value: .i32(1))
-        case .ref(.extern(_)), .ref(.function(_)):
-            stack.push(value: .i32(0))
-        default:
-            fatalError("Invalid type \(value.type) for `\(#function)` implementation")
+        let result: Value
+        if value.isNullRef {
+            result = .i32(1)
+        } else {
+            result = .i32(0)
         }
+        sp[refIsNullOperand.result] = UntypedValue(result)
     }
-    mutating func refFunc(runtime: Runtime, stack: inout Stack, functionIndex: FunctionIndex) {
-        let module = runtime.store.module(address: stack.currentFrame.module)
-        let functionAddress = module.functionAddresses[Int(functionIndex)]
-
-        stack.push(value: .ref(.function(functionAddress)))
+    mutating func refFunc(context: inout StackContext, sp: Sp, refFuncOperand: Instruction.RefFuncOperand) {
+        let function = context.currentInstance.functions[Int(refFuncOperand.index)]
+        sp[refFuncOperand.result] = UntypedValue(.ref(.function(from: function)))
     }
 }
