@@ -10,6 +10,7 @@ enum Instruction: Equatable {
     case nop
     case ifThen(Instruction.IfOperand)
     case br(offset: Int32)
+    case brIf(Instruction.BrIfOperand)
     case brIfNot(Instruction.BrIfOperand)
     case brTable(Instruction.BrTableOperand)
     case `return`(Instruction.ReturnOperand)

@@ -240,6 +240,11 @@ enum GenerateInternalInstruction {
                     Immediate(name: "offset", type: "Int32"),
                 ]),
             Instruction(
+                name: "brIf", isControl: true, mayThrow: true, mayUpdateFrame: false,
+                immediates: [
+                    Immediate(name: nil, type: "Instruction.BrIfOperand")
+                ]),
+            Instruction(
                 name: "brIfNot", isControl: true, mayThrow: true, mayUpdateFrame: false,
                 immediates: [
                     Immediate(name: nil, type: "Instruction.BrIfOperand")

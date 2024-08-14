@@ -23,6 +23,13 @@ extension ExecutionState {
     mutating func br(context: inout StackContext, sp: Sp, offset: Int32) throws {
         try branch(offset: offset)
     }
+    mutating func brIf(context: inout StackContext, sp: Sp, brIfOperand: Instruction.BrIfOperand) throws {
+        guard sp[brIfOperand.condition].i32 != 0 else {
+            programCounter += 1
+            return
+        }
+        try branch(offset: brIfOperand.offset)
+    }
     mutating func brIfNot(context: inout StackContext, sp: Sp, brIfOperand: Instruction.BrIfOperand) throws {
         guard sp[brIfOperand.condition].i32 == 0 else {
             programCounter += 1
