@@ -623,4 +623,31 @@ extension ExecutionState {
     mutating func i64Load32U(context: inout StackContext, sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
         try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt32.self, castToValue: { .i64(UInt64($0)) })
     }
+    mutating func i32Store(context: inout StackContext, sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
+        try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { $0.i32 })
+    }
+    mutating func i64Store(context: inout StackContext, sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
+        try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { $0.i64 })
+    }
+    mutating func f32Store(context: inout StackContext, sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
+        try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { $0.rawF32 })
+    }
+    mutating func f64Store(context: inout StackContext, sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
+        try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { $0.rawF64 })
+    }
+    mutating func i32Store8(context: inout StackContext, sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
+        try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) })
+    }
+    mutating func i32Store16(context: inout StackContext, sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
+        try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) })
+    }
+    mutating func i64Store8(context: inout StackContext, sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
+        try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) })
+    }
+    mutating func i64Store16(context: inout StackContext, sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
+        try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) })
+    }
+    mutating func i64Store32(context: inout StackContext, sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
+        try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) })
+    }
 }

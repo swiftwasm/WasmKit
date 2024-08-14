@@ -145,20 +145,26 @@ enum GenerateInternalInstruction {
         let base = Instruction(name: name, mayThrow: true, useCurrentMemory: .read, immediates: [Immediate(name: nil, type: "Instruction.LoadOperand")])
         return LoadInstruction(loadAs: loadAs, castToValue: castToValue, base: base)
     }
-    static let memoryStoreInsts: [Instruction] = [
-        "i32Store",
-        "i64Store",
-        "f32Store",
-        "f64Store",
-        "i32Store8",
-        "i32Store16",
-        "i64Store8",
-        "i64Store16",
-        "i64Store32",
-    ].map {
-        Instruction(name: $0, mayThrow: true, useCurrentMemory: .read, immediates: [Immediate(name: nil, type: "Instruction.StoreOperand")])
+
+    struct StoreInstruction {
+        let castFromValue: String
+        let base: Instruction
     }
-    static let memoryLoadStoreInsts: [Instruction] = memoryLoadInsts.map(\.base) + memoryStoreInsts
+    static let memoryStoreInsts: [StoreInstruction] = [
+        ("i32Store", "$0.i32"),
+        ("i64Store", "$0.i64"),
+        ("f32Store", "$0.rawF32"),
+        ("f64Store", "$0.rawF64"),
+        ("i32Store8", "UInt8(truncatingIfNeeded: $0.i32)"),
+        ("i32Store16", "UInt16(truncatingIfNeeded: $0.i32)"),
+        ("i64Store8", "UInt8(truncatingIfNeeded: $0.i64)"),
+        ("i64Store16", "UInt16(truncatingIfNeeded: $0.i64)"),
+        ("i64Store32", "UInt32(truncatingIfNeeded: $0.i64)"),
+    ].map { (name, castFromValue) in
+        let base = Instruction(name: name, mayThrow: true, useCurrentMemory: .read, immediates: [Immediate(name: nil, type: "Instruction.StoreOperand")])
+        return StoreInstruction(castFromValue: castFromValue, base: base)
+    }
+    static let memoryLoadStoreInsts: [Instruction] = memoryLoadInsts.map(\.base) + memoryStoreInsts.map(\.base)
     static let memoryOpInsts: [Instruction] = [
         Instruction(name: "memorySize", immediates: [Immediate(name: nil, type: "Instruction.MemorySizeOperand")]),
         Instruction(name: "memoryGrow", mayThrow: true, useCurrentMemory: .write, immediates: [
@@ -349,6 +355,14 @@ enum GenerateInternalInstruction {
 
                 mutating \(instMethodDecl(inst.base)) {
                     try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: \(inst.loadAs).self, castToValue: { \(inst.castToValue) })
+                }
+            """
+        }
+        for inst in memoryStoreInsts {
+            output += """
+
+                mutating \(instMethodDecl(inst.base)) {
+                    try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { \(inst.castFromValue) })
                 }
             """
         }

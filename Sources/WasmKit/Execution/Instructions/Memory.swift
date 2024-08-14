@@ -20,37 +20,9 @@ extension ExecutionState {
 
     }
 
-    mutating func i32Store(context: inout StackContext, sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
-        try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { $0.i32 })
-    }
-    mutating func i64Store(context: inout StackContext, sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
-        try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { $0.i64 })
-    }
-    mutating func f32Store(context: inout StackContext, sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
-        try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { $0.rawF32 })
-    }
-    mutating func f64Store(context: inout StackContext, sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
-        try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { $0.rawF64 })
-    }
-    mutating func i32Store8(context: inout StackContext, sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
-        try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) })
-    }
-    mutating func i32Store16(context: inout StackContext, sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
-        try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) })
-    }
-    mutating func i64Store8(context: inout StackContext, sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
-        try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) })
-    }
-    mutating func i64Store16(context: inout StackContext, sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
-        try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) })
-    }
-    mutating func i64Store32(context: inout StackContext, sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
-        try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) })
-    }
-
     /// `[type].store[bitWidth]`
     @_transparent
-    private mutating func memoryStore<T: FixedWidthInteger>(sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand, castFromValue: (UntypedValue) -> T) throws {
+    mutating func memoryStore<T: FixedWidthInteger>(sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand, castFromValue: (UntypedValue) -> T) throws {
         let memarg = storeOperand.memarg
 
         let value = sp[storeOperand.value]
