@@ -1,5 +1,9 @@
 import WasmParser
 
+/// Internal representation of a reference to a WebAssembly entity.
+///
+/// This type is designed to eliminate ARC retain/release for entities
+/// known to be alive during a VM execution.
 @dynamicMemberLookup
 struct EntityHandle<T>: Equatable, Hashable {
     private let pointer: UnsafeMutablePointer<T>
@@ -22,28 +26,14 @@ struct EntityHandle<T>: Equatable, Hashable {
     }
 }
 
-struct ImmutableBumpPtrVector<T> {
-    private let buffer: UnsafeMutableBufferPointer<T>
-    init(buffer: UnsafeMutableBufferPointer<T>) {
-        self.buffer = buffer
-    }
-
-    subscript(index: Int) -> T {
-        buffer[index]
-    }
-
-    var first: T? { buffer.first }
-    var count: Int { buffer.count }
-}
-
 struct InstanceEntity /* : ~Copyable */ {
     var types: [FunctionType]
-    var functions: ImmutableBumpPtrVector<InternalFunction>
-    var tables: ImmutableBumpPtrVector<InternalTable>
-    var memories: ImmutableBumpPtrVector<InternalMemory>
-    var globals: ImmutableBumpPtrVector<InternalGlobal>
-    var elementSegments: ImmutableBumpPtrVector<InternalElementSegment>
-    var dataSegments: ImmutableBumpPtrVector<InternalDataSegment>
+    var functions: ImmutableArray<InternalFunction>
+    var tables: ImmutableArray<InternalTable>
+    var memories: ImmutableArray<InternalMemory>
+    var globals: ImmutableArray<InternalGlobal>
+    var elementSegments: ImmutableArray<InternalElementSegment>
+    var dataSegments: ImmutableArray<InternalDataSegment>
     var exports: [Export]
     var features: WasmFeatureSet
     var hasDataCount: Bool
@@ -52,7 +42,7 @@ struct InstanceEntity /* : ~Copyable */ {
 typealias InternalInstance = EntityHandle<InstanceEntity>
 
 /// A stateful instance of a WebAssembly module.
-/// Usually instantiated by ``Runtime/instantiate(module:name:)``.
+/// Usually instantiated by ``Runtime/instantiate(module:)``.
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#module-instances>
 public struct Instance {
@@ -102,6 +92,7 @@ extension Instance {
     public var exportInstances: [Never] { [] }
 }
 
+/// Deprecated typealias for `Instance`.
 @available(*, deprecated, renamed: "Instance")
 public typealias ModuleInstance = Instance
 
@@ -164,13 +155,14 @@ struct TableEntity /* : ~Copyable */ {
 
 typealias InternalTable = EntityHandle<TableEntity>
 
+/// A WebAssembly `table` instance.
+/// > Note:
+/// <https://webassembly.github.io/spec/core/exec/runtime.html#table-instances>
 public struct Table: Equatable {
     let handle: InternalTable
     let allocator: StoreAllocator
 }
 
-/// > Note:
-/// <https://webassembly.github.io/spec/core/exec/runtime.html#memory-instances>
 struct MemoryEntity /* : ~Copyable */ {
     static let pageSize = 64 * 1024
 
@@ -233,6 +225,9 @@ struct MemoryEntity /* : ~Copyable */ {
 
 typealias InternalMemory = EntityHandle<MemoryEntity>
 
+/// A WebAssembly `memory` instance.
+/// > Note:
+/// <https://webassembly.github.io/spec/core/exec/runtime.html#memory-instances>
 public struct Memory: Equatable {
     let handle: InternalMemory
     let allocator: StoreAllocator
@@ -253,12 +248,10 @@ extension Memory: GuestMemory {
     }
 }
 
-/// Instance of a global
-/// > Note:
-/// <https://webassembly.github.io/spec/core/exec/runtime.html#global-instances>
-struct GlobalEntity {
-    public internal(set) var value: Value
-    public let globalType: GlobalType
+/// An entity representing a WebAssembly `global` instance storage.
+struct GlobalEntity /* : ~Copyable */ {
+    var value: Value
+    let globalType: GlobalType
 
     init(globalType: GlobalType, initialValue: Value) {
         value = initialValue
@@ -272,12 +265,29 @@ struct GlobalEntity {
 
 typealias InternalGlobal = EntityHandle<GlobalEntity>
 
+/// A WebAssembly `global` instance.
+/// > Note:
+/// <https://webassembly.github.io/spec/core/exec/runtime.html#global-instances>
 public struct Global: Equatable {
     let handle: InternalGlobal
     let allocator: StoreAllocator
 
-    var value: Value {
-        return handle.value
+    /// The value of the global instance.
+    public var value: Value {
+        handle.value
+    }
+
+    /// Assigns a new value to the global instance.
+    ///
+    /// - Parameter value: The new value to assign.
+    /// - Throws: `Trap` if the global is immutable.
+    public func assign(_ value: Value) throws {
+        try handle.withValue { global in
+            guard global.globalType.mutability == .variable else {
+                throw Trap._raw("Cannot assign to an immutable global")
+            }
+            global.value = value
+        }
     }
 
     init(handle: InternalGlobal, allocator: StoreAllocator) {
@@ -285,6 +295,9 @@ public struct Global: Equatable {
         self.allocator = allocator
     }
 
+    /// Initializes a new global instance with the given type and initial value.
+    /// The returned global instance may be used to instantiate a new
+    /// WebAssembly module.
     public init(globalType: GlobalType, initialValue: Value, store: Store) {
         let handle = store.allocator.allocate(globalType: globalType, initialValue: initialValue)
         self.init(handle: handle, allocator: store.allocator)
@@ -344,17 +357,5 @@ public enum ExternalValue: Equatable {
                 Global(handle: instance.globals[Int(index)], allocator: allocator)
             )
         }
-    }
-}
-
-/// > Note:
-/// <https://webassembly.github.io/spec/core/exec/runtime.html#export-instances>
-public struct ExportInstance: Equatable {
-    public let name: String
-    public let value: ExternalValue
-
-    init(_ export: WasmParser.Export, instance: InternalInstance, allocator: StoreAllocator) {
-        name = export.name
-        value = .init(export, instance: instance, allocator: allocator)
     }
 }

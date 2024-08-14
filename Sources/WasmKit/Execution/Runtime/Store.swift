@@ -209,15 +209,4 @@ extension Store {
 
         return result
     }
-
-    func allocate(
-        module: Module,
-        runtime: Runtime,
-        externalValues: [ExternalValue]
-    ) throws -> InternalInstance {
-        try allocator.allocate(
-            module: module, runtime: runtime,
-            externalValues: externalValues
-        )
-    }
 }

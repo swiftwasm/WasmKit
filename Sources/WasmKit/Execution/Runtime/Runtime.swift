@@ -71,7 +71,7 @@ extension Runtime {
         // Process `elem.init` evaluation during allocation
 
         // Step 11.
-        let instance = try store.allocate(
+        let instance = try store.allocator.allocate(
             module: module, runtime: self,
             externalValues: externalValues
         )
@@ -184,7 +184,7 @@ extension InternalInstance: ConstEvaluationContextProtocol {
 }
 
 struct ConstEvaluationContext: ConstEvaluationContextProtocol {
-    let functions: ImmutableBumpPtrVector<InternalFunction>
+    let functions: ImmutableArray<InternalFunction>
     var globals: [Value]
     func functionRef(_ index: FunctionIndex) -> Reference {
         return .function(from: self.functions[Int(index)])

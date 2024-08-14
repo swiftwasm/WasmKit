@@ -1,11 +1,13 @@
 import WasmParser
 
+/// A simple bump allocator for a single type.
 class BumpAllocator<T> {
     private var pages: [UnsafeMutablePointer<T>] = []
     private var currentPage: UnsafeMutablePointer<T>
     private var currentOffset: Int = 0
     private let currentPageSize: Int
 
+    /// Creates a new bump allocator with the given initial capacity.
     init(initialCapacity: Int) {
         currentPageSize = initialCapacity
         currentPage = .allocate(capacity: currentPageSize)
@@ -18,6 +20,7 @@ class BumpAllocator<T> {
         currentPage.deallocate()
     }
 
+    /// Starts a new fresh page.
     private func startNewPage() {
         pages.append(currentPage)
         // TODO: Should we grow the page size?
@@ -26,12 +29,19 @@ class BumpAllocator<T> {
         currentOffset = 0
     }
 
+    /// Allocates a new value with the given `value` and returns a pointer to it.
+    ///
+    /// - Parameter value: The value to initialize the allocated memory with.
+    /// - Returns: A pointer to the allocated memory.
     func allocate(initializing value: T) -> UnsafeMutablePointer<T> {
         let pointer = allocate()
         pointer.initialize(to: value)
         return pointer
     }
 
+    /// Allocates a new value and returns a pointer to it.
+    ///
+    /// - Returns: An uninitialized pointer of type `T`.
     func allocate() -> UnsafeMutablePointer<T> {
         if currentOffset == currentPageSize - 1 {
             startNewPage()
@@ -42,46 +52,54 @@ class BumpAllocator<T> {
     }
 }
 
-extension BumpAllocator where T == UnsafeMutableRawPointer {
-    func allocate<E>(
-        _: E.Type,
-        count: Int,
-        initialize: (UnsafeMutableBufferPointer<E>) throws -> Void
-    ) rethrows -> ImmutableBumpPtrVector<E> {
-        assert(MemoryLayout<E>.size == MemoryLayout<T>.size)
-        let pointer: UnsafeMutablePointer<T>
-        if currentOffset + count >= currentPageSize {
-            pointer = UnsafeMutablePointer<T>.allocate(capacity: count)
-            pages.append(pointer)
-        } else {
-            pointer = currentPage.advanced(by: currentOffset)
-            currentOffset += count
+
+/// A simple bump allocator for immutable arrays with various element types.
+fileprivate class ImmutableArrayAllocator {
+    private var arrayBuffers: [UnsafeMutableRawPointer] = []
+
+    /// Allocates a buffer for an immutable array of `T` with the given `count`.
+    func allocate<T>(count: Int) -> UnsafeMutableBufferPointer<T> {
+        let buffer = UnsafeMutableBufferPointer<T>.allocate(capacity: count)
+        // If count is zero, don't manage such empty buffer.
+        if let baseAddress = buffer.baseAddress {
+            arrayBuffers.append(baseAddress)
         }
-        return try pointer.withMemoryRebound(to: E.self, capacity: count) { baseAddress in
-            let buffer = UnsafeMutableBufferPointer(
-                start: baseAddress,
-                count: count
-            )
-            try initialize(buffer)
-            return ImmutableBumpPtrVector<E>(buffer: buffer)
+        return buffer
+    }
+
+    deinit {
+        for buffer in arrayBuffers {
+            buffer.deallocate()
         }
     }
 }
 
-struct RuntimeRef {
-    private let _value: Unmanaged<Runtime>
+/// An immutable array allocated by a bump allocator.
+struct ImmutableArray<T> {
+    private let buffer: UnsafeBufferPointer<T>
 
-    var value: Runtime {
-        _value.takeUnretainedValue()
+    /// Initializes an immutable array with the given `count` and `initialize` closure.
+    ///
+    /// - Parameters:
+    ///   - allocator: An allocator to allocate the buffer. The returned array should not outlive the allocator.
+    ///   - count: The number of elements in the array.
+    ///   - initialize: A closure to initialize the buffer.
+    fileprivate init(allocator: ImmutableArrayAllocator, count: Int, initialize: (UnsafeMutableBufferPointer<T>) throws -> Void) rethrows {
+        let mutable: UnsafeMutableBufferPointer<T> = allocator.allocate(count: count)
+        try initialize(mutable)
+        buffer = UnsafeBufferPointer(mutable)
     }
 
-    var store: Store {
-        value.store
+    /// Accesses the element at the specified position.
+    subscript(index: Int) -> T {
+        buffer[index]
     }
 
-    init(_ value: __shared Runtime) {
-        self._value = .passUnretained(value)
-    }
+    /// The first element of the array.
+    var first: T? { buffer.first }
+
+    /// The number of elements in the array.
+    var count: Int { buffer.count }
 }
 
 protocol Internable {
@@ -123,17 +141,19 @@ extension FunctionType: Internable {
 
 typealias InternedFuncType = Interned<FunctionType>
 
+/// A bump allocator associated with a ``Store``.
+/// An allocator should live as long as the store it is associated with.
 class StoreAllocator {
-    var instances: BumpAllocator<InstanceEntity>
-    var functions: BumpAllocator<WasmFunctionEntity>
-    var hostFunctions: BumpAllocator<HostFunctionEntity>
-    var tables: BumpAllocator<TableEntity>
-    var memories: BumpAllocator<MemoryEntity>
-    var globals: BumpAllocator<GlobalEntity>
-    var elements: BumpAllocator<ElementSegmentEntity>
-    var datas: BumpAllocator<DataSegmentEntity>
-    var codes: BumpAllocator<Code>
-    var pointerVectors: BumpAllocator<UnsafeMutableRawPointer>
+    private var instances: BumpAllocator<InstanceEntity>
+    private var functions: BumpAllocator<WasmFunctionEntity>
+    private var hostFunctions: BumpAllocator<HostFunctionEntity>
+    private var tables: BumpAllocator<TableEntity>
+    private var memories: BumpAllocator<MemoryEntity>
+    private var globals: BumpAllocator<GlobalEntity>
+    private var elements: BumpAllocator<ElementSegmentEntity>
+    private var datas: BumpAllocator<DataSegmentEntity>
+    private var codes: BumpAllocator<Code>
+    private let arrayAllocator: ImmutableArrayAllocator
     let iseqAllocator: ISeqAllocator
 
     /// Function type interner shared across stores associated with the same `Runtime`.
@@ -149,7 +169,7 @@ class StoreAllocator {
         globals = BumpAllocator(initialCapacity: 256)
         elements = BumpAllocator(initialCapacity: 2)
         datas = BumpAllocator(initialCapacity: 64)
-        pointerVectors = BumpAllocator(initialCapacity: 1024)
+        arrayAllocator = ImmutableArrayAllocator()
         iseqAllocator = ISeqAllocator()
         self.funcTypeInterner = funcTypeInterner
     }
@@ -157,7 +177,8 @@ class StoreAllocator {
 
 extension StoreAllocator: Equatable {
     static func == (lhs: StoreAllocator, rhs: StoreAllocator) -> Bool {
-        lhs === rhs
+        /// Use reference identity for equality comparison.
+        return lhs === rhs
     }
 }
 
@@ -203,11 +224,8 @@ extension StoreAllocator {
         func allocateEntities<EntityHandle, Internals: Collection>(
             imports: [EntityHandle],
             internals: Internals, allocateHandle: (Internals.Element, Int) throws -> EntityHandle
-        ) rethrows -> ImmutableBumpPtrVector<EntityHandle> {
-            return try pointerVectors.allocate(
-                EntityHandle.self,
-                count: imports.count + internals.count
-            ) { buffer in
+        ) rethrows -> ImmutableArray<EntityHandle> {
+            return try ImmutableArray<EntityHandle>(allocator: arrayAllocator, count: imports.count + internals.count) { buffer in
                 for (index, importedEntity) in imports.enumerated() {
                     buffer.initializeElement(at: index, to: importedEntity)
                 }
@@ -257,10 +275,7 @@ extension StoreAllocator {
         )
 
         // Step 6.
-        let elements = try pointerVectors.allocate(
-            InternalElementSegment.self,
-            count: module.elements.count
-        ) { buffer in
+        let elements = try ImmutableArray<InternalElementSegment>(allocator: arrayAllocator, count: module.elements.count) { buffer in
             for (index, element) in module.elements.enumerated() {
                 let references: [Reference]
                 switch element.mode {
@@ -276,7 +291,7 @@ extension StoreAllocator {
         }
 
         // Step 13.
-        let dataSegments = pointerVectors.allocate(InternalDataSegment.self, count: module.data.count) { buffer in
+        let dataSegments = ImmutableArray<InternalDataSegment>(allocator: arrayAllocator, count: module.data.count) { buffer in
             for (index, datum) in module.data.enumerated() {
                 let segment: InternalDataSegment
                 switch datum {

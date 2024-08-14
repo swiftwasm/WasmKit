@@ -16,11 +16,43 @@ struct ExecutionState {
     }
 }
 
+/// An unmanaged reference to a runtime.
+/// - Note: This is used to avoid ARC overhead during VM execution.
+struct RuntimeRef {
+    private let _value: Unmanaged<Runtime>
 
+    var value: Runtime {
+        _value.takeUnretainedValue()
+    }
+
+    var store: Store {
+        value.store
+    }
+
+    init(_ value: __shared Runtime) {
+        self._value = .passUnretained(value)
+    }
+}
+
+/// The "m"emory "d"ata storage intended to be bound to a physical register.
+/// Stores the base address of the default memory of the current execution context.
 typealias Md = UnsafeMutableRawPointer?
+/// The "m"emory "s"ize intended to be bound to a physical register.
+/// Stores the size of the default memory of the current execution context.
 typealias Ms = Int
+/// The "s"tack "p"ointer intended to be bound to a physical register.
+/// Stores the base address of the current frame's register storage.
 typealias Sp = ExecutionState.FrameBase
 
+/// Executes a WebAssembly function.
+///
+/// - Parameters:
+///   - runtime: The runtime instance.
+///   - function: The function to be executed.
+///   - type: The function type.
+///   - arguments: The arguments to be passed to the function.
+///   - callerInstance: The instance that called the function.
+/// - Returns: The result values of the function.
 @inline(never)
 func executeWasm(
     runtime: Runtime,
@@ -34,6 +66,7 @@ func executeWasm(
     for (index, argument) in arguments.enumerated() {
         stack.frameBase[Instruction.Register(index)] = UntypedValue(argument)
     }
+    // NOTE: `runtime` variable must not outlive this function
     let runtime = RuntimeRef(runtime)
     try withUnsafeTemporaryAllocation(of: Instruction.self, capacity: 1) { rootISeq in
         rootISeq.baseAddress?.pointee = .endOfExecution
@@ -183,7 +216,7 @@ extension ExecutionState {
             stack: &stack,
             callerInstance: nil,
             callLike: Instruction.CallLikeOperand(
-                spAddend: StackLayout.paramResultSize(type: type)
+                spAddend: StackLayout.frameHeaderSize(type: type)
             ),
             md: &md, ms: &ms
         )

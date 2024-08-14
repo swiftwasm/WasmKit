@@ -11,6 +11,7 @@ public struct Function: Equatable {
 
     /// Invokes a function of the given address with the given parameters.
     public func invoke(_ arguments: [Value] = [], runtime: Runtime) throws -> [Value] {
+        assert(allocator === runtime.store.allocator, "Function is not from the same store as the runtime")
         return try handle.invoke(arguments, runtime: runtime)
     }
 }
@@ -33,9 +34,9 @@ struct InternalFunction: Equatable, Hashable {
 
     var type: InternedFuncType {
         if isWasm {
-            wasm.type
+            return wasm.type
         } else {
-            host.type
+            return host.type
         }
     }
 

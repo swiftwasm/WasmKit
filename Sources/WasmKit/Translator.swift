@@ -194,13 +194,61 @@ fileprivate struct MetaProgramCounter {
     let offsetFromHead: Int
 }
 
+/// The layout of the function stack frame.
+///
+/// A function call frame starts with a "frame header" which contains
+/// the function parameters and the result values. The size of the frame
+/// header is determined by the maximum number of parameters and results
+/// of the function type. While executing the function, the frame header
+/// is used as a storage for parameters. On function return, the frame
+/// header is used as a storage for the result values.
+///
+/// On function entry, the stack frame looks like:
+///
+/// | Offset                             | Description          |
+/// |------------------------------------|----------------------|
+/// | 0                                  | Function parameter 0 |
+/// | 1                                  | Function parameter 1 |
+/// | ...                                | ...                  |
+/// | len(params)-1                      | Function parameter N |
+///
+/// On function return, the stack frame looks like:
+/// | Offset                             | Description          |
+/// |------------------------------------|----------------------|
+/// | 0                                  | Function result 0    |
+/// | 1                                  | Function result 1    |
+/// | ...                                | ...                  |
+/// | len(results)-1                     | Function result N    |
+///
+/// The end of the frame header is usually referred to as "stack pointer"
+/// (SP). "local" variables and the value stack space are allocated after
+/// the frame header. The value stack space is used to store intermediate
+/// values usually corresponding to Wasm's value stack. Unlike the Wasm's
+/// value stack, a value slot in the value stack space might be absent if
+/// the value is backed by a local variable.
+/// The slot index is referred to as "register". The register index is
+/// relative to the stack pointer, so the register indices for parameters
+/// and results are negative.
+///
+/// | Offset                             | Description          |
+/// |------------------------------------|----------------------|
+/// | 0 ~ max(params, results)-1         | Frame header         |
+/// | SP+0                               | Local variable 0     |
+/// | SP+1                               | Local variable 1     |
+/// | ...                                | ...                  |
+/// | SP+len(locals)-1                   | Local variable N     |
+/// | SP+len(locals)                     | Value stack 0        |
+/// | SP+len(locals)+1                   | Value stack 1        |
+/// | ...                                | ...                  |
+/// | SP+len(locals)+heighest(stack)-1   | Value stack N        |
+///
 struct StackLayout {
     let type: FunctionType
     let paramResultBase: Instruction.Register
 
     init(type: FunctionType) {
         self.type = type
-        self.paramResultBase = Self.paramResultSize(type: type)
+        self.paramResultBase = Self.frameHeaderSize(type: type)
     }
 
     func paramReg(_ index: Int) -> Instruction.Register {
@@ -219,10 +267,10 @@ struct StackLayout {
         }
     }
 
-    internal static func paramResultSize(type: FunctionType) -> Instruction.Register {
-        paramResultSize(parameters: type.parameters.count, results: type.results.count)
+    internal static func frameHeaderSize(type: FunctionType) -> Instruction.Register {
+        frameHeaderSize(parameters: type.parameters.count, results: type.results.count)
     }
-    internal static func paramResultSize(parameters: Int, results: Int) -> Instruction.Register {
+    internal static func frameHeaderSize(parameters: Int, results: Int) -> Instruction.Register {
         Instruction.Register(max(parameters, results))
     }
 }
@@ -1028,7 +1076,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
 
         let spAddend = valueStack.stackRegBase + Instruction.Register(valueStack.height)
-            + StackLayout.paramResultSize(type: calleeType)
+            + StackLayout.frameHeaderSize(type: calleeType)
 
         for result in calleeType.results {
             _ = valueStack.push(result)
