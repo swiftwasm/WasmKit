@@ -57,7 +57,7 @@ extension ExecutionState {
             CurrentMemory.assign(md: &md, ms: &ms, memory: &memory)
             sp[memoryGrowOperand.result] = UntypedValue(oldPageCount)
         }
-        mayUpdateCurrentInstance(store: store, stack: context)
+        ExecutionState.CurrentMemory.assign(md: &md, ms: &ms, memory: memory)
     }
     mutating func memoryInit(context: inout StackContext, sp: Sp, memoryInitOperand: Instruction.MemoryInitOperand) throws {
         let instance = context.currentInstance

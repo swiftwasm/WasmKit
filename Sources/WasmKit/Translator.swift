@@ -1080,6 +1080,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
     mutating func visitDrop() throws -> Output {
         _ = try popAnyOperand()
+        iseqBuilder.resetLastEmission()
     }
     mutating func visitSelect() throws -> Output {
         let condition = try popOperand(.i32)
