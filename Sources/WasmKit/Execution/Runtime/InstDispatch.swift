@@ -32,16 +32,16 @@ extension ExecutionState {
             return true
         case .br(let offset):
             try self.br(context: &context, sp: sp, offset: offset)
-            return false
+            return true
         case .brIf(let brIfOperand):
             try self.brIf(context: &context, sp: sp, brIfOperand: brIfOperand)
-            return false
+            return true
         case .brIfNot(let brIfOperand):
             try self.brIfNot(context: &context, sp: sp, brIfOperand: brIfOperand)
-            return false
+            return true
         case .brTable(let brTableOperand):
             try self.brTable(context: &context, sp: sp, brTableOperand: brTableOperand)
-            return false
+            return true
         case .`return`(let returnOperand):
             try self.`return`(context: &context, sp: sp, md: &md, ms: &ms, returnOperand: returnOperand)
             return false

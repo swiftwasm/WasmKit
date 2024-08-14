@@ -209,22 +209,22 @@ enum GenerateInternalInstruction {
                     Immediate(name: nil, type: "Instruction.IfOperand")
                 ]),
             Instruction(
-                name: "br", isControl: true, mayThrow: true, mayUpdateFrame: true,
+                name: "br", isControl: true, mayThrow: true, mayUpdateFrame: false,
                 immediates: [
                     Immediate(name: "offset", type: "Int32"),
                 ]),
             Instruction(
-                name: "brIf", isControl: true, mayThrow: true, mayUpdateFrame: true,
+                name: "brIf", isControl: true, mayThrow: true, mayUpdateFrame: false,
                 immediates: [
                     Immediate(name: nil, type: "Instruction.BrIfOperand")
                 ]),
             Instruction(
-                name: "brIfNot", isControl: true, mayThrow: true, mayUpdateFrame: true,
+                name: "brIfNot", isControl: true, mayThrow: true, mayUpdateFrame: false,
                 immediates: [
                     Immediate(name: nil, type: "Instruction.BrIfOperand")
                 ]),
             Instruction(
-                name: "brTable", isControl: true, mayThrow: true, mayUpdateFrame: true,
+                name: "brTable", isControl: true, mayThrow: true, mayUpdateFrame: false,
                 immediates: [
                     Immediate(name: nil, type: "Instruction.BrTableOperand")
                 ]),
