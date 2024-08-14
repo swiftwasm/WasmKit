@@ -124,9 +124,10 @@ func handle_i32AddImm(pc: UnsafePointer<Inst>, regs: UnsafeMutablePointer<Int32>
 
 @_cdecl("handle_i32Ltu")
 @inline(__always)
-func handle_i32Ltu(pc: UnsafePointer<Inst>, regs: UnsafeMutablePointer<Int32>) -> Int32 {
+func handle_i32Ltu(pc: UnsafePointer<Inst>, regs: UnsafeMutablePointer<Int32>, rax: UnsafeMutablePointer<Int32>) -> UnsafePointer<Inst> {
     let op = pc.op(Inst.I32LtuOp.self).pointee
-    return regs[Int(op.lhs)] < op.rhs ? 1 : 0
+    rax.pointee = regs[Int(op.lhs)] < op.rhs ? 1 : 0
+    return pc
 }
 
 @_cdecl("handle_brIf")

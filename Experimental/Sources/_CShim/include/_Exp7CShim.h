@@ -23,9 +23,9 @@ struct Inst {
 extern void * _Nonnull labelTable[numberOfInstTypes];
 
 const struct Inst * _Nonnull handle_randomGet(const struct Inst * _Nonnull , int * _Nonnull regs);
-const struct Inst * _Nonnull handle_brIf(const struct Inst * _Nonnull , int * _Nonnull regs, int32_t rax);
-const int32_t handle_i32Ltu(const struct Inst * _Nonnull , int * _Nonnull regs);
 const struct Inst * _Nonnull handle_i32AddImm(const struct Inst * _Nonnull , int * _Nonnull regs);
+const struct Inst * _Nonnull handle_i32Ltu(const struct Inst * _Nonnull , int * _Nonnull regs, int32_t * _Nonnull rax);
+const struct Inst * _Nonnull handle_brIf(const struct Inst * _Nonnull , int * _Nonnull regs, int32_t rax);
 
 
 static inline intptr_t Inst_op_offset(void) { return offsetof(struct Inst, op); }
@@ -53,16 +53,16 @@ static inline void enter(const struct Inst * _Nullable iseq,
     pc = handle_randomGet(pc, regs);
     NEXT;
   }
-  do_brIf: {
-    pc = handle_brIf(pc, regs, rax);
-    NEXT;
-  }
   do_i32AddImm: {
     pc = handle_i32AddImm(pc, regs);
     NEXT;
   }
   do_i32Ltu: {
-    rax = handle_i32Ltu(pc, regs);
+    pc = handle_i32Ltu(pc, regs, &rax);
+    NEXT;
+  }
+  do_brIf: {
+    pc = handle_brIf(pc, regs, rax);
     NEXT;
   }
   do_endOfFunction: {
