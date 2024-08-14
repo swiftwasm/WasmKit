@@ -71,24 +71,6 @@ struct ValueStack {
         self.values.deallocate()
     }
 
-    var frameBaseOffset: Int { frameBase - values.baseAddress! }
-
-
-    private func checkPrecondition(_ index: Int) {
-        assert(frameBase.advanced(by: index) < values.baseAddress!.advanced(by: values.count))
-    }
-
-    subscript(_ index: Int) -> UntypedValue {
-        get {
-            checkPrecondition(index)
-            return frameBase[index]
-        }
-        set {
-            checkPrecondition(index)
-            return frameBase[index] = newValue
-        }
-    }
-
     mutating func extend(addend: Instruction.Register, maxStackHeight: Int) throws -> UnsafeMutablePointer<UntypedValue> {
         let newFrameBase = frameBase.advanced(by: Int(addend))
         guard newFrameBase.advanced(by: maxStackHeight) < values.baseAddress!.advanced(by: values.count) else {
@@ -103,9 +85,6 @@ struct FixedSizeStack<Element> {
     private let buffer: UnsafeMutableBufferPointer<Element>
     private var numberOfElements: Int = 0
 
-    var isEmpty: Bool {
-        numberOfElements == 0
-    }
 
     var count: Int { numberOfElements }
 
@@ -125,21 +104,9 @@ struct FixedSizeStack<Element> {
         return element
     }
 
-    mutating func pop(_ n: Int) {
-        self.numberOfElements -= n
-    }
-
-    mutating func popAll() {
-        self.numberOfElements = 0
-    }
-
     func peek() -> Element! {
         guard self.numberOfElements > 0 else { return nil }
         return self.buffer[self.numberOfElements - 1]
-    }
-
-    subscript(_ index: Int) -> Element {
-        self.buffer[index]
     }
 
     func deallocate() {
@@ -206,11 +173,6 @@ extension Float32: BitPatternRepresentable {
 }
 extension Float64: BitPatternRepresentable {
     typealias BitPattern = UInt64
-}
-
-struct TypedValue<T: BitPatternRepresentable> {
-    let bitPattern: T.BitPattern
-    var value: T { T(bitPattern: bitPattern) }
 }
 
 struct UntypedValue: Equatable {
@@ -295,11 +257,6 @@ struct UntypedValue: Equatable {
     var isNullRef: Bool {
         return storage & Self.isNullMaskPattern != 0
     }
-
-    static func asI32(_ v: UntypedValue) -> UInt32 { v.i32 }
-    static func asI64(_ v: UntypedValue) -> UInt64 { v.i64 }
-    static func asF32(_ v: UntypedValue) -> UInt32 { v.rawF32 }
-    static func asF64(_ v: UntypedValue) -> UInt64 { v.rawF64 }
 
     func asReference(_ type: ReferenceType) -> Reference {
         func decodeOptionalInt() -> Int? {

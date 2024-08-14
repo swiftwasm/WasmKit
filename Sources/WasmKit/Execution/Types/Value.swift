@@ -22,32 +22,12 @@ enum NumericType: Equatable {
 }
 
 extension WasmParser.ValueType {
-    var defaultValue: Value {
-        switch self {
-        case .i32: return .i32(0)
-        case .i64: return .i64(0)
-        case .f32: return .f32(0)
-        case .f64: return .f64(0)
-        case .ref(.externRef):
-            return .ref(.extern(nil))
-        case .ref(.funcRef):
-            return .ref(.function(nil))
-        }
-    }
-
     var float: FloatValueType {
         switch self {
         case .f32: return .f32
         case .f64: return .f64
         default:
             fatalError("unexpected value type \(self)")
-        }
-    }
-    var bitWidth: Int? {
-        switch self {
-        case .i32, .f32: return 32
-        case .i64, .f64: return 64
-        case .ref: return nil
         }
     }
 }
@@ -83,10 +63,6 @@ extension Value {
         }
     }
 
-    func asAddressOffset(_ isMemory64: Bool) -> UInt64 {
-        return isMemory64 ? i64 : UInt64(i32)
-    }
-
     func maybeAddressOffset(_ isMemory64: Bool) -> UInt64? {
         switch (isMemory64, self) {
         case (true, .i64(let value)): return value
@@ -106,25 +82,6 @@ extension Value {
             return Float32(bitPattern: lhs) == Float32(bitPattern: rhs)
         case let (.f64(lhs), .f64(rhs)):
             return Float64(bitPattern: lhs) == Float64(bitPattern: rhs)
-        case let (.ref(.extern(lhs)), .ref(.extern(rhs))):
-            return lhs == rhs
-        case let (.ref(.function(lhs)), .ref(.function(rhs))):
-            return lhs == rhs
-        default:
-            return false
-        }
-    }
-
-    static func isBitwiseEqual(_ lhs: Self, _ rhs: Self) -> Bool {
-        switch (lhs, rhs) {
-        case let (.i32(lhs), .i32(rhs)):
-            return lhs == rhs
-        case let (.i64(lhs), .i64(rhs)):
-            return lhs == rhs
-        case let (.f32(lhs), .f32(rhs)):
-            return lhs == rhs
-        case let (.f64(lhs), .f64(rhs)):
-            return lhs == rhs
         case let (.ref(.extern(lhs)), .ref(.extern(rhs))):
             return lhs == rhs
         case let (.ref(.function(lhs)), .ref(.function(rhs))):
@@ -285,33 +242,12 @@ enum FloatValueType {
         }
     }
 
-    var zero: Value {
-        switch self {
-        case .f32:
-            return .f32(.zero)
-        case .f64:
-            return .f64(.zero)
-        }
-    }
-
     func infinity(isNegative: Bool) -> Value {
         switch self {
         case .f32:
             return .fromFloat32(isNegative ? -.infinity : .infinity)
         case .f64:
             return .fromFloat64(isNegative ? -.infinity : .infinity)
-        }
-    }
-}
-
-extension Value {
-    var bytes: [UInt8]? {
-        switch self {
-        case let .i32(rawValue): return rawValue.littleEndianBytes
-        case let .i64(rawValue): return rawValue.littleEndianBytes
-        case let .f32(rawValue): return rawValue.littleEndianBytes
-        case let .f64(rawValue): return rawValue.littleEndianBytes
-        case .ref(.function), .ref(.extern): return nil
         }
     }
 }
@@ -331,19 +267,6 @@ extension RawUnsignedInteger {
     // FIXME: shouldn't use arrays with potential heap allocations for this
     var littleEndianBytes: [UInt8] {
         withUnsafeBytes(of: littleEndian) { Array($0) }
-    }
-}
-
-extension Array where Element == ValueType {
-    static func == (lhs: [ValueType], rhs: [ValueType]) -> Bool {
-        guard lhs.count == rhs.count else { return false }
-        return zip(lhs, rhs).reduce(true) { result, zipped in
-            result && zipped.0 == zipped.1
-        }
-    }
-
-    static func != (lhs: [ValueType], rhs: [ValueType]) -> Bool {
-        return !(lhs == rhs)
     }
 }
 

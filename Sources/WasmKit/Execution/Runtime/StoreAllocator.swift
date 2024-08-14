@@ -18,7 +18,7 @@ class BumpAllocator<T> {
         currentPage.deallocate()
     }
 
-    private func startNewPage(minimumCapacity: Int = 1) {
+    private func startNewPage() {
         pages.append(currentPage)
         // TODO: Should we grow the page size?
         let page = UnsafeMutablePointer<T>.allocate(capacity: currentPageSize)
@@ -168,8 +168,7 @@ extension StoreAllocator {
     func allocate(
         module: Module,
         runtime: Runtime,
-        externalValues: [ExternalValue],
-        nameRegistry: inout NameRegistry
+        externalValues: [ExternalValue]
     ) throws -> InternalInstance {
         // Step 1 of module allocation algorithm, according to Wasm 2.0 spec.
 

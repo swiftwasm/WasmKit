@@ -1,7 +1,6 @@
 import WasmParser
 
 struct ModuleImports {
-    let items: [Import]
     let numberOfFunctions: Int
     let numberOfGlobals: Int
     let numberOfMemories: Int
@@ -35,7 +34,6 @@ struct ModuleImports {
             }
         }
         return ModuleImports(
-            items: imports,
             numberOfFunctions: numberOfFunctions,
             numberOfGlobals: numberOfGlobals,
             numberOfMemories: numberOfMemories,
@@ -134,12 +132,6 @@ public struct Module {
 }
 
 extension Module {
-    var globalTypes: [GlobalType] {
-        return translatorContext.globalTypes
-    }
-    var internalGlobalTypes: ArraySlice<GlobalType> {
-        return translatorContext.globalTypes[translatorContext.imports.numberOfGlobals...]
-    }
     var internalMemories: ArraySlice<MemoryType> {
         return translatorContext.memoryTypes[translatorContext.imports.numberOfMemories...]
     }

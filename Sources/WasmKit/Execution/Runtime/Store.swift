@@ -1,7 +1,5 @@
 import WasmParser
 
-internal typealias ModuleAddress = Int
-
 /// A collection of globals and functions that are exported from a host module.
 public struct HostModule {
     public init(
@@ -219,8 +217,7 @@ extension Store {
     ) throws -> InternalInstance {
         try allocator.allocate(
             module: module, runtime: runtime,
-            externalValues: externalValues,
-            nameRegistry: &nameRegistry
+            externalValues: externalValues
         )
     }
 }
