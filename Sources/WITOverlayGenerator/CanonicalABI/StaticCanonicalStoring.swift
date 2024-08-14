@@ -54,6 +54,14 @@ struct StaticCanonicalStoring: CanonicalStoring {
         storeFloat(at: pointer, value: value, bitWidth: 64)
     }
 
+    func storeEnum(
+        at pointer: Pointer, _ value: Operand,
+        type: WITEnum,
+        storeDiscriminant: (Operand) throws -> Void
+    ) throws {
+        try storeDiscriminant(.accessField(value, name: "witRawValue"))
+    }
+
     func storeFlags(at pointer: Pointer, _ value: Operand, type: WITFlags) throws {
         let rawValueType = CanonicalABI.rawType(ofFlags: type.flags.count)
         let rawValue = Operand.accessField(value, name: "rawValue")
