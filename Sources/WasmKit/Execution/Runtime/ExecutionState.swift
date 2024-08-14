@@ -192,6 +192,14 @@ extension ExecutionState {
     @inline(__always)
     mutating func run(stack: inout StackContext, md: inout Md, ms: inout Ms) throws {
         CurrentMemory.mayUpdateCurrentInstance(stack: stack, md: &md, ms: &ms)
+#if WASMKIT_ENGINE_STATS
+        var stats: [String: Int] = [:]
+        defer {
+            for (name, count) in stats.sorted(by: { $0.value < $1.value }) {
+                print(count, name)
+            }
+        }
+#endif
         while !reachedEndOfExecution {
             // Regular path
             let sp = stack.frameBase
@@ -199,6 +207,9 @@ extension ExecutionState {
             // `doExecute` returns false when current frame *may* be updated
             repeat {
                 inst = programCounter.pointee
+#if WASMKIT_ENGINE_STATS
+                stats[inst.name, default: 0] += 1
+#endif
             } while try doExecute(inst, md: &md, ms: &ms, context: &stack, sp: sp)
         }
     }
