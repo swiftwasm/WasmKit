@@ -33,9 +33,6 @@ extension ExecutionState {
         case .br(let offset):
             try self.br(context: &context, sp: sp, offset: offset)
             return true
-        case .brIf(let brIfOperand):
-            try self.brIf(context: &context, sp: sp, brIfOperand: brIfOperand)
-            return true
         case .brIfNot(let brIfOperand):
             try self.brIfNot(context: &context, sp: sp, brIfOperand: brIfOperand)
             return true
@@ -283,7 +280,6 @@ extension Instruction {
         case .nop: return "nop"
         case .ifThen: return "ifThen"
         case .br: return "br"
-        case .brIf: return "brIf"
         case .brIfNot: return "brIfNot"
         case .brTable: return "brTable"
         case .`return`: return "`return`"
