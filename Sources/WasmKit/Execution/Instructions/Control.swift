@@ -77,6 +77,8 @@ extension ExecutionState {
     }
 
     mutating func internalCall(context: inout StackContext, sp: Sp, internalCallOperand: Instruction.InternalCallOperand) throws {
+        // The callee is known to be a function defined within the same module, so we can
+        // skip updating the current instance.
         let (iseq, locals, instance) = internalCallOperand.callee.assumeCompiled()
         try context.pushFrame(
             iseq: iseq,

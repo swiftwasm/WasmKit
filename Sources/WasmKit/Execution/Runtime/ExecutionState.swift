@@ -1,3 +1,8 @@
+/// The program counter pointing to the current instruction.
+/// - Note: This pointer is mutable to allow patching the instruction during execution.
+///         For example, "compile" VM instruction lazily compiles the callee function and
+///         replaces the instruction with the "internalCall" instruction to bypass
+///         "is compiled" check on the next execution.
 typealias ProgramCounter = UnsafeMutablePointer<Instruction>
 
 /// An execution state of an invocation of exported function.
@@ -223,6 +228,7 @@ extension ExecutionState {
         try execution.run(stack: &stack, md: &md, ms: &ms)
     }
 
+    /// The main execution loop. Be careful when modifying this function as it is performance-critical.
     @inline(__always)
     mutating func run(stack: inout StackContext, md: inout Md, ms: inout Ms) throws {
         CurrentMemory.mayUpdateCurrentInstance(stack: stack, md: &md, ms: &ms)
@@ -235,15 +241,15 @@ extension ExecutionState {
         }
 #endif
         while !reachedEndOfExecution {
-            // Regular path
+            // Update the stack pointer when call frame might be updated
             let sp = stack.frameBase
             var inst: Instruction
-            // `doExecute` returns false when current frame *may* be updated
             repeat {
                 inst = programCounter.pointee
 #if WASMKIT_ENGINE_STATS
                 stats[inst.name, default: 0] += 1
 #endif
+            // `doExecute` returns false when current frame *may* be updated
             } while try doExecute(inst, md: &md, ms: &ms, context: &stack, sp: sp)
         }
     }
@@ -272,9 +278,6 @@ extension InternalFunction {
                 spAddend: callLike.spAddend
             )
             executionState.programCounter = iseq.baseAddress
-            // TODO(optimize):
-            // If the callee is known to be a function defined within the same module,
-            // a special `callInternal` instruction can skip updating the current instance
             ExecutionState.CurrentMemory.mayUpdateCurrentInstance(
                 instance: function.instance,
                 from: callerInstance, md: &md, ms: &ms

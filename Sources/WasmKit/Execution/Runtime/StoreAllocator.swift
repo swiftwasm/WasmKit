@@ -102,14 +102,20 @@ struct ImmutableArray<T> {
     var count: Int { buffer.count }
 }
 
+/// A type that can be interned into a unique identifier.
+/// Used for efficient equality comparison.
 protocol Internable {
+    /// Storage representation of an interned value.
     associatedtype Offset: UnsignedInteger
 }
 
+/// An interned value of type `T`.
+/// Two interned values should be equal if their corresponding `T` values are equal.
 struct Interned<T: Internable>: Equatable, Hashable {
     let id: T.Offset
 }
 
+/// A deduplicating interner for values of type `Item`.
 class Interner<Item: Hashable & Internable> {
     private var itemByIntern: [Item]
     private var internByItem: [Item: Interned<Item>]
@@ -119,6 +125,8 @@ class Interner<Item: Hashable & Internable> {
         internByItem = [:]
     }
 
+    /// Interns the given `item` and returns an interned value.
+    /// If the item is already interned, returns the existing interned value.
     func intern(_ item: Item) -> Interned<Item> {
         if let interned = internByItem[item] {
             return interned
@@ -130,11 +138,14 @@ class Interner<Item: Hashable & Internable> {
         return newInterned
     }
 
+    /// Resolves the given `interned` value to the original value.
     func resolve(_ interned: Interned<Item>) -> Item {
         return itemByIntern[Int(interned.id)]
     }
 }
 
+/// A function type is internable for efficient equality comparison.
+/// Usually used for signature checking at indirect calls.
 extension FunctionType: Internable {
     typealias Offset = UInt32
 }
