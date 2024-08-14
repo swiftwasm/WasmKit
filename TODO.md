@@ -1,4 +1,3 @@
-- Variadic width instructions
 - Constant space on stack
   - Trade space and time on prologue for time by fewer instructions
   - |locals|dynamic stack| -> |locals|dynamic stack|constant|
@@ -6,3 +5,6 @@
 - Instruction fusion
   - Const embedding
   - Conditional embedding (eg. br_if_lt)
+- Missing optimizations compared to wasmi (d1bc10cfce3f5df91540c0cc6b76d88f09ef8343)
+  - Variadic width instructions
+  - Const embedding (e.g. i32.add_imm)

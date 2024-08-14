@@ -968,6 +968,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         let brTableAt = iseqBuilder.insertingPC
         iseqBuilder.emit(.brTable(operand))
 
+        // TODO(optimize): Eliminate landing pads when copyCount of a destination is 0
+        //
         // (block $l1 (result i32)
         //   (i32.const 63)
         //   (block $l2 (result i32)
