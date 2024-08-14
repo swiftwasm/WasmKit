@@ -1,7 +1,0 @@
-module _Exp3CShim {
-  header "_Exp3CShim.h"
-}
-
-module _Exp7CShim {
-  header "_Exp7CShim.h"
-}

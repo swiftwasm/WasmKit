@@ -95,20 +95,19 @@ TBD
 
 ### Stack frame layout
 
-```
-| Const Pool | Local Variables | Dynamic |
-
-### VM instruction representation
-
 TBD
 
-## Implementation Plan
 
-TBD
+### TODO
 
-## Alternative considerations
-
-TBD
+- Variadic width instructions
+- Constant pool space on stack
+  - Trade space and time on prologue for time by fewer instructions
+  - |locals|dynamic stack| -> |locals|dynamic stack|constant|
+- Stack caching
+- Instruction fusion
+  - Const embedding
+  - Conditional embedding (eg. br_if_lt)
 
 ## References
 
