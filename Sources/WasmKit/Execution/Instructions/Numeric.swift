@@ -1,26 +1,26 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#numeric-instructions>
 extension ExecutionState {
-    mutating func numericConst(context: inout StackContext, sp: Sp, constOperand: Instruction.ConstOperand) {
+    mutating func numericConst(sp: Sp, constOperand: Instruction.ConstOperand) {
         sp[constOperand.result] = constOperand.value
     }
 
-    mutating func numericFloatUnary(context: inout StackContext, sp: Sp, floatUnary: NumericInstruction.FloatUnary, unaryOperand: Instruction.UnaryOperand) {
+    mutating func numericFloatUnary(sp: Sp, floatUnary: NumericInstruction.FloatUnary, unaryOperand: Instruction.UnaryOperand) {
         let value = sp[unaryOperand.input]
         sp[unaryOperand.result] = UntypedValue(floatUnary(value.cast(to: floatUnary.type)))
     }
 
-    mutating func numericIntBinary(context: inout StackContext, sp: Sp, intBinary: NumericInstruction.IntBinary, binaryOperand: Instruction.BinaryOperand) throws {
+    mutating func numericIntBinary(sp: Sp, intBinary: NumericInstruction.IntBinary, binaryOperand: Instruction.BinaryOperand) throws {
         let value2 = sp[binaryOperand.rhs].cast(to: intBinary.type)
         let value1 = sp[binaryOperand.lhs].cast(to: intBinary.type)
         sp[binaryOperand.result] = UntypedValue(try intBinary(value1, value2))
     }
-    mutating func numericFloatBinary(context: inout StackContext, sp: Sp, floatBinary: NumericInstruction.FloatBinary, binaryOperand: Instruction.BinaryOperand) {
+    mutating func numericFloatBinary(sp: Sp, floatBinary: NumericInstruction.FloatBinary, binaryOperand: Instruction.BinaryOperand) {
         let value2 = sp[binaryOperand.rhs].cast(to: floatBinary.type)
         let value1 = sp[binaryOperand.lhs].cast(to: floatBinary.type)
         sp[binaryOperand.result] = UntypedValue(floatBinary(value1, value2))
     }
-    mutating func numericConversion(context: inout StackContext, sp: Sp, conversion: NumericInstruction.Conversion, unaryOperand: Instruction.UnaryOperand) throws {
+    mutating func numericConversion(sp: Sp, conversion: NumericInstruction.Conversion, unaryOperand: Instruction.UnaryOperand) throws {
         let value = sp[unaryOperand.input]
         sp[unaryOperand.result] = UntypedValue(try conversion(value))
     }

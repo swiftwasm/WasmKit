@@ -2,10 +2,12 @@
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#stack>
 struct StackContext {
 
+    var reachedEndOfExecution: Bool = false
     private var limit: UInt16 { UInt16.max }
     private var valueStack: ValueStack
     private var frames: FixedSizeStack<Frame>
     var currentFrame: Frame!
+    let runtime: RuntimeRef
 
     var frameBase: ExecutionState.FrameBase {
         return ExecutionState.FrameBase(pointer: self.valueStack.frameBase)
@@ -14,17 +16,18 @@ struct StackContext {
         currentFrame.instance
     }
 
-    init() {
+    init(runtime: RuntimeRef) {
         let limit = UInt16.max
         self.valueStack = ValueStack(capacity: Int(limit))
         self.frames = FixedSizeStack(capacity: Int(limit))
+        self.runtime = runtime
     }
 
     mutating func pushFrame(
         iseq: InstructionSequence,
         instance: InternalInstance,
         numberOfNonParameterLocals: Int,
-        returnPC: ProgramCounter,
+        returnPC: Pc,
         spAddend: Instruction.Register
     ) throws {
         guard frames.count < limit else {
@@ -138,12 +141,12 @@ struct BaseStackAddress {
 struct Frame {
     let instance: InternalInstance
     let savedFrameBase: UnsafeMutablePointer<UntypedValue>
-    let returnPC: ProgramCounter
+    let returnPC: Pc
 
     init(
         instance: InternalInstance,
         savedFrameBase: UnsafeMutablePointer<UntypedValue>,
-        returnPC: ProgramCounter
+        returnPC: Pc
     ) {
         self.instance = instance
         self.savedFrameBase = savedFrameBase

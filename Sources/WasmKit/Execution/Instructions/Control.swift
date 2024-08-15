@@ -1,103 +1,103 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#control-instructions>
 extension ExecutionState {
-    func unreachable(context: inout StackContext, sp: Sp) throws {
+    func unreachable(sp: Sp, pc: inout Pc) throws {
         throw Trap.unreachable
     }
-    mutating func nop(context: inout StackContext, sp: Sp) throws {
-        programCounter += 1
+    mutating func nop(sp: Sp, pc: inout Pc) throws {
+        pc += 1
     }
 
-    mutating func ifThen(context: inout StackContext, sp: Sp, ifOperand: Instruction.IfOperand) {
+    mutating func ifThen(sp: Sp, pc: inout Pc, ifOperand: Instruction.IfOperand) {
         let isTrue = sp[ifOperand.condition].i32 != 0
         if isTrue {
-            programCounter += 1
+            pc += 1
         } else {
-            programCounter += ifOperand.elseOrEndRef.relativeOffset
+            pc += ifOperand.elseOrEndRef.relativeOffset
         }
     }
 
-    private mutating func branch(offset: Int32) throws {
-        programCounter += Int(offset)
+    mutating func br(sp: Sp, pc: inout Pc, offset: Int32) throws {
+        pc += Int(offset)
     }
-    mutating func br(context: inout StackContext, sp: Sp, offset: Int32) throws {
-        try branch(offset: offset)
-    }
-    mutating func brIf(context: inout StackContext, sp: Sp, brIfOperand: Instruction.BrIfOperand) throws {
+    mutating func brIf(sp: Sp, pc: inout Pc, brIfOperand: Instruction.BrIfOperand) throws {
         guard sp[brIfOperand.condition].i32 != 0 else {
-            programCounter += 1
+            pc += 1
             return
         }
-        try branch(offset: brIfOperand.offset)
+        pc += Int(brIfOperand.offset)
     }
-    mutating func brIfNot(context: inout StackContext, sp: Sp, brIfOperand: Instruction.BrIfOperand) throws {
+    mutating func brIfNot(sp: Sp, pc: inout Pc, brIfOperand: Instruction.BrIfOperand) throws {
         guard sp[brIfOperand.condition].i32 == 0 else {
-            programCounter += 1
+            pc += 1
             return
         }
-        try branch(offset: brIfOperand.offset)
+        pc += Int(brIfOperand.offset)
     }
-    mutating func brTable(context: inout StackContext, sp: Sp, brTableOperand: Instruction.BrTableOperand) throws {
+    mutating func brTable(sp: Sp, pc: inout Pc, brTableOperand: Instruction.BrTableOperand) throws {
         let brTable = brTableOperand.table
         let index = sp[brTableOperand.index].i32
         let normalizedOffset = min(Int(index), Int(brTable.count - 1))
         let entry = brTable.baseAddress[normalizedOffset]
 
-        try branch(offset: entry.offset)
-    }
-    mutating func `return`(context: inout StackContext, sp: Sp, md: inout Md, ms: inout Ms) throws {
-        try self.endOfFunction(context: &context, sp: sp, md: &md, ms: &ms)
+        pc += Int(entry.offset)
     }
 
-    mutating func endOfFunction(context: inout StackContext, sp: Sp, md: inout Md, ms: inout Ms) throws {
-        try self.endOfFunction(context: &context, currentFrame: context.currentFrame, md: &md, ms: &ms)
+    mutating func `return`(sp: Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
+        try self.endOfFunction(sp: sp, pc: &pc, md: &md, ms: &ms)
     }
 
-    mutating func endOfExecution(context: inout StackContext, sp: Sp) throws {
+    mutating func endOfFunction(sp: Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
+        try self.endOfFunction(currentFrame: self.currentFrame, pc: &pc, md: &md, ms: &ms)
+    }
+
+    mutating func endOfExecution(sp: Sp, pc: inout Pc) throws {
         reachedEndOfExecution = true
     }
 
-    private mutating func endOfFunction(context: inout StackContext, currentFrame: Frame, md: inout Md, ms: inout Ms) throws {
+    private mutating func endOfFunction(currentFrame: Frame, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
         // When reached at "end" of function
-        let lastInstanceAddr = context.popFrame()
-        programCounter = currentFrame.returnPC
+        let lastInstanceAddr = popFrame()
+        pc = currentFrame.returnPC
         CurrentMemory.mayUpdateCurrentInstance(instance: currentFrame.instance, from: lastInstanceAddr, md: &md, ms: &ms)
     }
 
-    mutating func call(context: inout StackContext, sp: Sp, md: inout Md, ms: inout Ms, callOperand: Instruction.CallOperand) throws {
+    mutating func call(sp: Sp, pc: inout Pc, md: inout Md, ms: inout Ms, callOperand: Instruction.CallOperand) throws {
         let function = callOperand.callee
 
-        try invoke(
+        pc = try invoke(
             function: function,
-            stack: &context,
-            callerInstance: context.currentFrame.instance,
+            callerInstance: currentFrame.instance,
             callLike: callOperand.callLike,
-            md: &md, ms: &ms
+            pc: pc, md: &md, ms: &ms
         )
     }
 
-    mutating func internalCall(context: inout StackContext, sp: Sp, internalCallOperand: Instruction.InternalCallOperand) throws {
+    mutating func internalCall(sp: Sp, pc: inout Pc, internalCallOperand: Instruction.InternalCallOperand) throws {
         // The callee is known to be a function defined within the same module, so we can
         // skip updating the current instance.
         let (iseq, locals, instance) = internalCallOperand.callee.assumeCompiled()
-        try context.pushFrame(
+        try pushFrame(
             iseq: iseq,
             instance: instance,
             numberOfNonParameterLocals: locals,
-            returnPC: programCounter.advanced(by: 1),
+            returnPC: pc.advanced(by: 1),
             spAddend: internalCallOperand.callLike.spAddend
         )
-        self.programCounter = iseq.baseAddress
+        pc = iseq.baseAddress
     }
 
-    mutating func compilingCall(context: inout StackContext, sp: Sp, compilingCallOperand: Instruction.CompilingCallOperand) throws {
-        try compilingCallOperand.callee.ensureCompiled(executionState: &self)
-        programCounter.pointee = .internalCall(compilingCallOperand)
-        try internalCall(context: &context, sp: sp, internalCallOperand: compilingCallOperand)
+    mutating func compilingCall(sp: Sp, pc: inout Pc, compilingCallOperand: Instruction.CompilingCallOperand) throws {
+        try compilingCallOperand.callee.ensureCompiled(runtime: runtime)
+        pc.pointee = .internalCall(compilingCallOperand)
+        try internalCall(sp: sp, pc: &pc, internalCallOperand: compilingCallOperand)
     }
 
-    mutating func callIndirect(context: inout StackContext, sp: Sp, md: inout Md, ms: inout Ms, callIndirectOperand: Instruction.CallIndirectOperand) throws {
-        let callerInstance = context.currentFrame.instance
+    @inline(never)
+    private func prepareForIndirectCall(
+        sp: Sp, callIndirectOperand: Instruction.CallIndirectOperand
+    ) throws -> (InternalFunction, InternalInstance) {
+        let callerInstance = currentFrame.instance
         let table = callerInstance.tables[Int(callIndirectOperand.tableIndex)]
         let expectedType = callIndirectOperand.type
         let value = sp[callIndirectOperand.index].asAddressOffset(table.limits.isMemory64)
@@ -116,25 +116,32 @@ extension ExecutionState {
                 expected: runtime.value.resolveType(expectedType)
             )
         }
+        return (function, callerInstance)
+    }
 
-        try invoke(
+    @inline(__always)
+    mutating func callIndirect(sp: Sp, pc: inout Pc, md: inout Md, ms: inout Ms, callIndirectOperand: Instruction.CallIndirectOperand) throws {
+        let (function, callerInstance) = try prepareForIndirectCall(
+            sp: sp,
+            callIndirectOperand: callIndirectOperand
+        )
+        pc = try invoke(
             function: function,
-            stack: &context,
             callerInstance: callerInstance,
             callLike: callIndirectOperand.callLike,
-            md: &md, ms: &ms
+            pc: pc, md: &md, ms: &ms
         )
     }
 
-    mutating func onEnter(context: inout StackContext, sp: Sp, onEnterOperand: Instruction.OnEnterOperand) {
-        let function = context.currentInstance.functions[Int(onEnterOperand)]
+    mutating func onEnter(sp: Sp, onEnterOperand: Instruction.OnEnterOperand) {
+        let function = currentInstance.functions[Int(onEnterOperand)]
         self.runtime.value.interceptor?.onEnterFunction(
             Function(handle: function, allocator: self.runtime.store.allocator),
             store: self.runtime.store
         )
     }
-    mutating func onExit(context: inout StackContext, sp: Sp, onExitOperand: Instruction.OnExitOperand) {
-        let function = context.currentInstance.functions[Int(onExitOperand)]
+    mutating func onExit(sp: Sp, onExitOperand: Instruction.OnExitOperand) {
+        let function = currentInstance.functions[Int(onExitOperand)]
         self.runtime.value.interceptor?.onExitFunction(
             Function(handle: function, allocator: self.runtime.store.allocator),
             store: self.runtime.store

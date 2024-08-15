@@ -115,9 +115,6 @@ extension InternalFunction {
     }
 
     @inline(never)
-    func ensureCompiled(executionState: inout ExecutionState) throws {
-        try ensureCompiled(runtime: executionState.runtime)
-    }
     func ensureCompiled(runtime: RuntimeRef) throws {
         let entity = self.wasm
         switch entity.code {
@@ -159,8 +156,8 @@ struct WasmFunctionEntity {
         self.index = index
     }
 
-    mutating func ensureCompiled(executionState: inout ExecutionState) throws -> InstructionSequence {
-        try ensureCompiled(runtime: executionState.runtime)
+    mutating func ensureCompiled(context: inout StackContext) throws -> InstructionSequence {
+        try ensureCompiled(runtime: context.runtime)
     }
 
     mutating func ensureCompiled(runtime: RuntimeRef) throws -> InstructionSequence {
