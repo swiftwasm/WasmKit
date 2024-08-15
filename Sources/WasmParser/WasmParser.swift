@@ -1123,33 +1123,6 @@ extension Parser {
         return version
     }
 
-    private struct OrderTracking {
-        enum Order: UInt8 {
-            case initial = 0
-            case type
-            case _import
-            case function
-            case table
-            case memory
-            case tag
-            case global
-            case export
-            case start
-            case element
-            case dataCount
-            case code
-            case data
-        }
-
-        private var last: Order = .initial
-        mutating func track(order: Order) throws {
-            guard last.rawValue < order.rawValue else {
-                throw WasmParserError.sectionOutOfOrder
-            }
-            last = order
-        }
-    }
-
     /// Attempts to parse a chunk of the Wasm binary stream.
     ///
     /// - Returns: A `ParsingPayload` if the parsing was successful, otherwise `nil`.
