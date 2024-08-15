@@ -955,6 +955,9 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
     mutating func visitBrIf(relativeDepth: UInt32) throws -> Output {
         guard let condition = try popOperand(.i32)?.intoRegister(layout: stackLayout) else { return }
+
+        // TODO(optimize): We only need to ensure values related to the branch target
+        preserveAllLocalsOnStack()
         let frame = try controlStack.branchTarget(relativeDepth: relativeDepth)
         if frame.copyCount == 0 {
             // Optimization where we don't need copying values when the branch taken
