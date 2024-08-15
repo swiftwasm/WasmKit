@@ -160,12 +160,12 @@ extension Store {
         availableExports[name] = moduleExports
     }
 
-    @available(*, deprecated, message: "Address-based APIs has been removed; use `Memory` instead")
+    @available(*, deprecated, message: "Address-based APIs has been removed; use Memory instead")
     public func memory(at address: Memory) -> Memory {
         address
     }
 
-    @available(*, deprecated, message: "Address-based APIs has been removed; use `Memory` instead")
+    @available(*, deprecated, message: "Address-based APIs has been removed; use Memory instead")
     public func withMemory<T>(at address: Memory, _ body: (Memory) throws -> T) rethrows -> T {
         try body(address)
     }

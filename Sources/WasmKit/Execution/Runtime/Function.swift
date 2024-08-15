@@ -1,22 +1,32 @@
 import WasmParser
 
-/// A WebAssembly guest function or host function
+/// A WebAssembly guest function or host function.
+///
+/// > Note:
+/// <https://webassembly.github.io/spec/core/exec/runtime.html#function-instances>
 public struct Function: Equatable {
     internal let handle: InternalFunction
     let allocator: StoreAllocator
 
+    /// The signature type of the function.
     public var type: FunctionType {
         allocator.funcTypeInterner.resolve(handle.type)
     }
 
     /// Invokes a function of the given address with the given parameters.
+    ///
+    /// - Parameters:
+    ///   - arguments: The arguments to pass to the function.
+    ///   - runtime: The runtime to use for the function invocation.
+    /// - Throws: A trap if the function invocation fails.
+    /// - Returns: The results of the function invocation.
     public func invoke(_ arguments: [Value] = [], runtime: Runtime) throws -> [Value] {
         assert(allocator === runtime.store.allocator, "Function is not from the same store as the runtime")
         return try handle.invoke(arguments, runtime: runtime)
     }
 }
 
-@available(*, deprecated, renamed: "Function")
+@available(*, deprecated, renamed: "Function", message: "Use Function instead")
 public typealias FunctionInstance = Function
 
 struct InternalFunction: Equatable, Hashable {
@@ -125,8 +135,7 @@ extension InternalFunction {
     }
 }
 
-/// > Note:
-/// <https://webassembly.github.io/spec/core/exec/runtime.html#function-instances>
+
 struct WasmFunctionEntity {
     let type: InternedFuncType
     let instance: InternalInstance

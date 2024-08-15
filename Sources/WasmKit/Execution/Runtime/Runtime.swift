@@ -149,6 +149,15 @@ extension Runtime {
         fatalError()
     }
 
+    /// Returns the value of a global variable in a module instance.
+    ///
+    /// Deprecated: Use ``Instance``'s ``Instance/export(_:)`` and ``Global``'s ``Global/value`` instead.
+    ///
+    /// ```swift
+    /// guard case let .global(myGlobal) = instance.export("myGlobal") else { ... }
+    /// let value = myGlobal.value
+    /// ```
+    @available(*, deprecated, message: "Use `Instance.export` and `Global.value` instead")
     public func getGlobal(_ instance: Instance, globalName: String) throws -> Value {
         guard case let .global(global) = instance.export(globalName) else {
             throw Trap._raw("no global export with name \(globalName) in a module instance \(instance)")
@@ -156,6 +165,7 @@ extension Runtime {
         return global.value
     }
 
+    /// Invokes a function in a given module instance.
     public func invoke(_ instance: Instance, function: String, with arguments: [Value] = []) throws -> [Value] {
         guard case let .function(function)? = instance.export(function) else {
             throw Trap.exportedFunctionNotFound(instance, name: function)

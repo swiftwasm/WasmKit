@@ -1,5 +1,35 @@
 import WasmParser
 
+// This file defines the internal representation of WebAssembly entities and
+// their public API.
+//
+// Typically, the internal representation is an unowned handle to an entity
+// storage, and the public API provides a memory-safe way to access and
+// manipulate the entity. The handle is usually owned by a ``StoreAllocator``
+// that manages the lifetime of the entity storage. The public API must ensure
+// that the entity handle does not outlive the ``StoreAllocator``.
+//
+// # Naming Conventions
+// - Internal entity storage: `${Name}Entity`
+// - Entity handle: `Internal${Name}`
+// - Public entity: `${Name}`
+//
+// +--- Public API -----------------------------------------------+
+// |                                                              |
+// |     allocator: StoreAllocator  ---------+                    |
+// |     handle: Internal${Name}             |                    |
+// |        |                                v                    |
+// |        |                    +--- StoreAllocator ---+         |
+// |        v                    |                      |         |
+// |   +---------------+         |  +-----------------+ |         |
+// |   | Entity handle | ---------->| Entity storage  | |         |
+// |   +---------------+         |  +-----------------+ |         |
+// |                             |                      |         |
+// |                             +----------------------+         |
+// |                                                              |
+// +--------------------------------------------------------------+
+
+
 /// Internal representation of a reference to a WebAssembly entity.
 ///
 /// This type is designed to eliminate ARC retain/release for entities
@@ -54,6 +84,10 @@ public struct Instance {
         self.allocator = allocator
     }
 
+    /// Finds an exported entity by name.
+    ///
+    /// - Parameter name: The name of the exported entity.
+    /// - Returns: The exported entity if found, otherwise `nil`.
     public func export(_ name: String) -> ExternalValue? {
         guard let export = handle.exports.first(where: { $0.name == name }) else {
             return nil
@@ -72,6 +106,7 @@ public struct Instance {
 
     public typealias Exports = [String: ExternalValue]
 
+    /// A dictionary of exported entities by name.
     public var exports: Exports {
         handle.exports.reduce(into: [:]) { exports, export in
             exports[export.name] = ExternalValue(export, instance: handle, allocator: allocator)
@@ -93,15 +128,15 @@ extension Instance {
 }
 
 /// Deprecated typealias for `Instance`.
-@available(*, deprecated, renamed: "Instance")
+@available(*, deprecated, renamed: "Instance", message: "ModuleInstance has been renamed to Instance to match the terminology in the WebAssembly ecosystem")
 public typealias ModuleInstance = Instance
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#table-instances>
 struct TableEntity /* : ~Copyable */ {
-    public internal(set) var elements: [Reference]
+    var elements: [Reference]
     let tableType: TableType
-    public var limits: Limits { tableType.limits }
+    var limits: Limits { tableType.limits }
 
     init(_ tableType: TableType) {
         let emptyElement: Reference
@@ -166,7 +201,7 @@ public struct Table: Equatable {
 struct MemoryEntity /* : ~Copyable */ {
     static let pageSize = 64 * 1024
 
-    public var data: [UInt8]
+    var data: [UInt8]
     let maxPageCount: UInt64
     let limit: Limits
 
@@ -200,7 +235,7 @@ struct MemoryEntity /* : ~Copyable */ {
         data[offset..<endOffset] = bytes
     }
 
-    public subscript(i32 address: UInt32) -> UInt32 {
+    subscript(i32 address: UInt32) -> UInt32 {
         get {
             .init(littleEndian: data[Int(address)..<Int(address + 4)])
         }
@@ -209,11 +244,11 @@ struct MemoryEntity /* : ~Copyable */ {
         }
     }
 
-    public subscript(i64 address: UInt32) -> UInt64 {
+    subscript(i64 address: UInt32) -> UInt64 {
         .init(littleEndian: data[Int(address)..<Int(address + 8)])
     }
 
-    public subscript(bytes count: UInt32, at address: UInt32) -> ArraySlice<UInt8> {
+    subscript(bytes count: UInt32, at address: UInt32) -> ArraySlice<UInt8> {
         get {
             data[Int(address)..<Int(address + count)]
         }
@@ -307,8 +342,8 @@ public struct Global: Equatable {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#element-instances>
 struct ElementSegmentEntity {
-    public let type: ReferenceType
-    public var references: [Reference]
+    let type: ReferenceType
+    var references: [Reference]
 
     mutating func drop() {
         self.references = []

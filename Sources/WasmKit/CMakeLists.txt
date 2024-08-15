@@ -1,5 +1,5 @@
 add_wasmkit_library(WasmKit
-  Types/Module.swift
+  Module.swift
   ModuleParser.swift
   Translator.swift
   Component/CanonicalLifting.swift
