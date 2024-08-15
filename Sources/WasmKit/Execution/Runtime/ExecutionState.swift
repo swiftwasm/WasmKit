@@ -57,23 +57,24 @@ func executeWasm(
 ) throws -> [Value] {
     // NOTE: `runtime` variable must not outlive this function
     let runtime = RuntimeRef(runtime)
-    var stack = StackContext(runtime: runtime)
-    defer { stack.deallocate() }
-    for (index, argument) in arguments.enumerated() {
-        stack.frameBase[Instruction.Register(index)] = UntypedValue(argument)
-    }
-    try withUnsafeTemporaryAllocation(of: Instruction.self, capacity: 1) { rootISeq in
-        rootISeq.baseAddress?.pointee = .endOfExecution
-        // NOTE: unwinding a function jump into previous frame's PC + 1, so initial PC is -1ed
-        try ExecutionState.execute(
-            programCounter: rootISeq.baseAddress! - 1,
-            handle: handle,
-            type: type,
-            stack: &stack
-        )
-    }
-    return type.results.enumerated().map { (i, type) in
-        stack.frameBase[Instruction.Register(i)].cast(to: type)
+    return try StackContext.withContext(runtime: runtime) { (stack, sp) in
+        for (index, argument) in arguments.enumerated() {
+            sp[Instruction.Register(index)] = UntypedValue(argument)
+        }
+        try withUnsafeTemporaryAllocation(of: Instruction.self, capacity: 1) { rootISeq in
+            rootISeq.baseAddress?.pointee = .endOfExecution
+            // NOTE: unwinding a function jump into previous frame's PC + 1, so initial PC is -1ed
+            try ExecutionState.execute(
+                sp: sp,
+                pc: rootISeq.baseAddress! - 1,
+                handle: handle,
+                type: type,
+                stack: &stack
+            )
+        }
+        return type.results.enumerated().map { (i, type) in
+            sp[Instruction.Register(i)].cast(to: type)
+        }
     }
 }
 
@@ -84,14 +85,14 @@ extension ExecutionState {
     mutating func invoke(
         function: InternalFunction,
         callerInstance: InternalInstance?,
-        callLike: Instruction.CallLikeOperand = Instruction.CallLikeOperand(spAddend: 0),
-        pc: Pc, md: inout Md, ms: inout Ms
-    ) throws -> Pc {
+        callLike: Instruction.CallLikeOperand,
+        sp: Sp, pc: Pc, md: inout Md, ms: inout Ms
+    ) throws -> (Pc, Sp) {
         return try function.execute(
             executionState: &self,
             callerInstance: callerInstance,
             callLike: callLike,
-            pc: pc, md: &md, ms: &ms
+            sp: sp, pc: pc, md: &md, ms: &ms
         )
     }
 
@@ -157,26 +158,26 @@ extension ExecutionState {
 
     @inline(never)
     static func execute(
-        programCounter: Pc,
+        sp: Sp, pc: Pc,
         handle: InternalFunction,
         type: FunctionType,
         stack: inout StackContext
     ) throws {
-        var md: Md = nil, ms: Ms = 0, pc = programCounter
-        pc = try stack.invoke(
+        var sp: Sp = sp, md: Md = nil, ms: Ms = 0, pc = pc
+        (pc, sp) = try stack.invoke(
             function: handle,
             callerInstance: nil,
             callLike: Instruction.CallLikeOperand(
                 spAddend: StackLayout.frameHeaderSize(type: type)
             ),
-            pc: pc, md: &md, ms: &ms
+            sp: sp, pc: pc, md: &md, ms: &ms
         )
-        try stack.run(pc: &pc, md: &md, ms: &ms)
+        try stack.run(sp: &sp, pc: &pc, md: &md, ms: &ms)
     }
 
     /// The main execution loop. Be careful when modifying this function as it is performance-critical.
     @inline(__always)
-    mutating func run(pc: inout Pc, md: inout Md, ms: inout Ms) throws {
+    mutating func run(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
         CurrentMemory.mayUpdateCurrentInstance(stack: self, md: &md, ms: &ms)
 #if WASMKIT_ENGINE_STATS
         var stats: [String: Int] = [:]
@@ -187,8 +188,6 @@ extension ExecutionState {
         }
 #endif
         while !reachedEndOfExecution {
-            // Update the stack pointer when call frame might be updated
-            let sp = self.frameBase
             var inst: Instruction
             repeat {
                 inst = pc.pointee
@@ -196,7 +195,7 @@ extension ExecutionState {
                 stats[inst.name, default: 0] += 1
 #endif
             // `doExecute` returns false when current frame *may* be updated
-            } while try doExecute(inst, md: &md, ms: &ms, pc: &pc, sp: sp)
+            } while try doExecute(inst, sp: &sp, pc: &pc, md: &md, ms: &ms)
         }
     }
 }
@@ -208,18 +207,19 @@ extension InternalFunction {
         executionState: inout ExecutionState,
         callerInstance: InternalInstance?,
         callLike: Instruction.CallLikeOperand,
-        pc: Pc, md: inout Md, ms: inout Ms
-    ) throws -> Pc {
+        sp: Sp, pc: Pc, md: inout Md, ms: inout Ms
+    ) throws -> (Pc, Sp) {
         if self.isWasm {
             let function = wasm
             let iseq = try function.withValue {
                 try $0.ensureCompiled(context: &executionState)
             }
             
-            try executionState.pushFrame(
+            let newSp = try executionState.pushFrame(
                 iseq: iseq,
                 instance: function.instance,
                 numberOfNonParameterLocals: function.numberOfNonParameterLocals,
+                sp: sp,
                 returnPC: pc.advanced(by: 1),
                 spAddend: callLike.spAddend
             )
@@ -227,14 +227,14 @@ extension InternalFunction {
                 instance: function.instance,
                 from: callerInstance, md: &md, ms: &ms
             )
-            return iseq.baseAddress
+            return (iseq.baseAddress, newSp)
         } else {
             let function = host
             let runtime = executionState.runtime
             let resolvedType = runtime.value.resolveType(function.type)
             let layout = StackLayout(type: resolvedType)
             let parameters = resolvedType.parameters.enumerated().map { (i, type) in
-                executionState.frameBase[callLike.spAddend + layout.paramReg(i)].cast(to: type)
+                sp[callLike.spAddend + layout.paramReg(i)].cast(to: type)
             }
             let instance = executionState.currentFrame.instance
             let caller = Caller(
@@ -243,9 +243,9 @@ extension InternalFunction {
             )
             let results = try function.implementation(caller, Array(parameters))
             for (index, result) in results.enumerated() {
-                executionState.frameBase[callLike.spAddend + layout.returnReg(index)] = UntypedValue(result)
+                sp[callLike.spAddend + layout.returnReg(index)] = UntypedValue(result)
             }
-            return pc.advanced(by: 1)
+            return (pc.advanced(by: 1), sp)
         }
     }
 }

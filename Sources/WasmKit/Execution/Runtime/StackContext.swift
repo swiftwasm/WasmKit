@@ -4,54 +4,61 @@ struct StackContext {
 
     var reachedEndOfExecution: Bool = false
     private var limit: UInt16 { UInt16.max }
-    private var valueStack: ValueStack
+    private var stackEnd: UnsafeMutablePointer<UntypedValue>
     private var frames: FixedSizeStack<Frame>
     var currentFrame: Frame!
     let runtime: RuntimeRef
 
-    var frameBase: ExecutionState.FrameBase {
-        return ExecutionState.FrameBase(pointer: self.valueStack.frameBase)
-    }
     var currentInstance: InternalInstance {
         currentFrame.instance
     }
 
-    init(runtime: RuntimeRef) {
+    static func withContext<T>(
+        runtime: RuntimeRef,
+        body: (inout StackContext, Sp) throws -> T
+    ) rethrows -> T {
         let limit = UInt16.max
-        self.valueStack = ValueStack(capacity: Int(limit))
-        self.frames = FixedSizeStack(capacity: Int(limit))
-        self.runtime = runtime
+        let valueStack = ValueStack(capacity: Int(limit))
+        let frames = FixedSizeStack<Frame>(capacity: Int(limit))
+        defer {
+            valueStack.deallocate()
+            frames.deallocate()
+        }
+        var context = StackContext(stackEnd: valueStack.endAddress, frames: frames, runtime: runtime)
+        return try body(&context, Sp(pointer: valueStack.frameBase))
     }
 
+    @inline(__always)
     mutating func pushFrame(
         iseq: InstructionSequence,
         instance: InternalInstance,
         numberOfNonParameterLocals: Int,
-        returnPC: Pc,
+        sp: Sp, returnPC: Pc,
         spAddend: Instruction.Register
-    ) throws {
+    ) throws -> Sp {
         guard frames.count < limit else {
             throw Trap.callStackExhausted
         }
-        let savedFrameBase = valueStack.frameBase
-        let frameBase = try valueStack.extend(addend: spAddend, maxStackHeight: iseq.maxStackHeight)
+        let newSp = sp.pointer.advanced(by: Int(spAddend))
+        guard newSp.advanced(by: iseq.maxStackHeight) < stackEnd else {
+            throw Trap.callStackExhausted
+        }
         // Initialize the locals with zeros (all types of value have the same representation)
-        frameBase.initialize(repeating: .default, count: numberOfNonParameterLocals)
-        let frame = Frame(instance: instance, savedFrameBase: savedFrameBase, returnPC: returnPC)
+        newSp.initialize(repeating: .default, count: numberOfNonParameterLocals)
+        let frame = Frame(instance: instance, savedSp: sp, returnPc: returnPC)
         frames.push(frame)
         self.currentFrame = frame
+        return FrameBase(pointer: newSp)
     }
 
-    mutating func popFrame() -> InternalInstance {
+    @inline(__always)
+    mutating func popFrame(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) {
         let popped = self.frames.pop()
-        self.currentFrame = self.frames.peek()
-        self.valueStack.frameBase = popped.savedFrameBase
-        return popped.instance
-    }
-
-    func deallocate() {
-        self.valueStack.deallocate()
-        self.frames.deallocate()
+        let newCurrentFrame = self.frames.peek()
+        self.currentFrame = newCurrentFrame
+        sp = popped.savedSp
+        pc = popped.returnPc
+        CurrentMemory.mayUpdateCurrentInstance(instance: popped.instance, from: popped.instance, md: &md, ms: &ms)
     }
 
     func dump(store: Store) throws {
@@ -64,6 +71,9 @@ struct ValueStack {
     var baseAddress: UnsafeMutablePointer<UntypedValue> {
         values.baseAddress!
     }
+    var endAddress: UnsafeMutablePointer<UntypedValue> {
+        baseAddress.advanced(by: self.values.count)
+    }
 
     init(capacity: Int) {
         self.values = .allocate(capacity: capacity)
@@ -73,21 +83,11 @@ struct ValueStack {
     func deallocate() {
         self.values.deallocate()
     }
-
-    mutating func extend(addend: Instruction.Register, maxStackHeight: Int) throws -> UnsafeMutablePointer<UntypedValue> {
-        let newFrameBase = frameBase.advanced(by: Int(addend))
-        guard newFrameBase.advanced(by: maxStackHeight) < values.baseAddress!.advanced(by: values.count) else {
-            throw Trap.callStackExhausted
-        }
-        frameBase = newFrameBase
-        return newFrameBase
-    }
 }
 
 struct FixedSizeStack<Element> {
     private let buffer: UnsafeMutableBufferPointer<Element>
     private var numberOfElements: Int = 0
-
 
     var count: Int { numberOfElements }
 
@@ -131,26 +131,21 @@ extension FixedSizeStack: Sequence {
     }
 }
 
-struct BaseStackAddress {
-    /// Locals are placed between `valueFrameIndex..<valueIndex`
-    let valueFrameIndex: Int
-}
-
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#frames>
 struct Frame {
     let instance: InternalInstance
-    let savedFrameBase: UnsafeMutablePointer<UntypedValue>
-    let returnPC: Pc
+    let savedSp: Sp
+    let returnPc: Pc
 
     init(
         instance: InternalInstance,
-        savedFrameBase: UnsafeMutablePointer<UntypedValue>,
-        returnPC: Pc
+        savedSp: Sp,
+        returnPc: Pc
     ) {
         self.instance = instance
-        self.savedFrameBase = savedFrameBase
-        self.returnPC = returnPC
+        self.savedSp = savedSp
+        self.returnPc = returnPc
     }
 }
 

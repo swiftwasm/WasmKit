@@ -13,11 +13,24 @@ enum GenerateInternalInstruction {
         case write
     }
 
+    struct VirtualRegister: CaseIterable {
+        let label: String
+        let type: String
+
+        static let sp = VirtualRegister(label: "sp", type: "Sp")
+        static let pc = VirtualRegister(label: "pc", type: "Pc")
+        static let md = VirtualRegister(label: "md", type: "Md")
+        static let ms = VirtualRegister(label: "ms", type: "Ms")
+
+        static var allCases = [sp, pc, md, ms]
+    }
+
     struct Instruction {
         let name: String
         let isControl: Bool
         let mayThrow: Bool
         let mayUpdateFrame: Bool
+        let mayUpdateSp: Bool = false
         let useCurrentMemory: RegisterUse
         let immediates: [Immediate]
 
@@ -36,31 +49,30 @@ enum GenerateInternalInstruction {
             assert(isControl || !mayUpdateFrame, "non-control instruction should not update frame")
         }
 
-        static var commonParameters: [(label: String, type: String, isInout: Bool)] {
-            [("sp", "Sp", false)]
-        }
-
         typealias Parameter = (label: String, type: String, isInout: Bool)
         var parameters: [Parameter] {
-            let immediates = immediates.map {
-                let label = $0.name ?? camelCase(pascalCase: String($0.type.split(separator: ".").last!))
-                return (label, $0.type, false)
+            var vregs: [(reg: VirtualRegister, isInout: Bool)] = []
+            if self.mayUpdateFrame {
+                vregs += [(VirtualRegister.sp, true)]
+            } else {
+                vregs += [(VirtualRegister.sp, false)]
             }
-            var extraParameters: [Parameter] = []
             if self.isControl {
-                extraParameters += [("pc", "Pc", true)]
+                vregs += [(VirtualRegister.pc, true)]
             }
             switch useCurrentMemory {
             case .none: break
             case .read:
-                extraParameters += [("md", "Md", false), ("ms", "Ms", false)]
+                vregs += [(VirtualRegister.md, false), (VirtualRegister.ms, false)]
             case .write:
-                extraParameters += [("md", "Md", true), ("ms", "Ms", true)]
+                vregs += [(VirtualRegister.md, true), (VirtualRegister.ms, true)]
             }
-            return
-                (Self.commonParameters
-                + extraParameters
-                + immediates)
+            var parameters: [Parameter] = vregs.map { ($0.reg.label, $0.reg.type, $0.isInout) }
+            parameters += immediates.map {
+                let label = $0.name ?? camelCase(pascalCase: String($0.type.split(separator: ".").last!))
+                return (label, $0.type, false)
+            }
+            return parameters
         }
     }
 
@@ -289,10 +301,9 @@ enum GenerateInternalInstruction {
     }
 
     static func generateDispatcher(instructions: [Instruction]) -> String {
-        let doExecuteParams =
+        let doExecuteParams: [Instruction.Parameter] =
             [("instruction", "Instruction", false)]
-            + [("md", "Md", true), ("ms", "Ms", true), ("pc", "Pc", true)]
-            + Instruction.commonParameters
+            + VirtualRegister.allCases.map { ($0.label, $0.type, true) }
         var output = """
             extension ExecutionState {
                 @inline(__always)
