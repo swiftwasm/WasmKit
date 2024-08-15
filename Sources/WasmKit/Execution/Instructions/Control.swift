@@ -43,54 +43,56 @@ extension ExecutionState {
         pc += Int(entry.offset)
     }
 
-    mutating func `return`(sp: Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
-        try self.endOfFunction(sp: sp, pc: &pc, md: &md, ms: &ms)
+    mutating func `return`(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
+        try self.endOfFunction(sp: &sp, pc: &pc, md: &md, ms: &ms)
     }
 
-    mutating func endOfFunction(sp: Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
-        try self.endOfFunction(currentFrame: self.currentFrame, pc: &pc, md: &md, ms: &ms)
+    mutating func endOfFunction(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
+        // When reached at "end" of function
+        popFrame(sp: &sp, pc: &pc, md: &md, ms: &ms)
     }
 
-    mutating func endOfExecution(sp: Sp, pc: inout Pc) throws {
+    mutating func endOfExecution(sp: inout Sp, pc: inout Pc) throws {
         reachedEndOfExecution = true
     }
 
-    private mutating func endOfFunction(currentFrame: Frame, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
+    private mutating func endOfFunction(currentFrame: Frame, sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
         // When reached at "end" of function
-        let lastInstanceAddr = popFrame()
-        pc = currentFrame.returnPC
-        CurrentMemory.mayUpdateCurrentInstance(instance: currentFrame.instance, from: lastInstanceAddr, md: &md, ms: &ms)
+        popFrame(sp: &sp, pc: &pc, md: &md, ms: &ms)
     }
 
-    mutating func call(sp: Sp, pc: inout Pc, md: inout Md, ms: inout Ms, callOperand: Instruction.CallOperand) throws {
+    @inline(__always)
+    mutating func call(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms, callOperand: Instruction.CallOperand) throws {
         let function = callOperand.callee
 
-        pc = try invoke(
+        (pc, sp) = try invoke(
             function: function,
             callerInstance: currentFrame.instance,
             callLike: callOperand.callLike,
-            pc: pc, md: &md, ms: &ms
+            sp: sp, pc: pc, md: &md, ms: &ms
         )
     }
 
-    mutating func internalCall(sp: Sp, pc: inout Pc, internalCallOperand: Instruction.InternalCallOperand) throws {
+    @inline(__always)
+    mutating func internalCall(sp: inout Sp, pc: inout Pc, internalCallOperand: Instruction.InternalCallOperand) throws {
         // The callee is known to be a function defined within the same module, so we can
         // skip updating the current instance.
         let (iseq, locals, instance) = internalCallOperand.callee.assumeCompiled()
-        try pushFrame(
+        sp = try pushFrame(
             iseq: iseq,
             instance: instance,
             numberOfNonParameterLocals: locals,
-            returnPC: pc.advanced(by: 1),
+            sp: sp, returnPC: pc.advanced(by: 1),
             spAddend: internalCallOperand.callLike.spAddend
         )
         pc = iseq.baseAddress
     }
 
-    mutating func compilingCall(sp: Sp, pc: inout Pc, compilingCallOperand: Instruction.CompilingCallOperand) throws {
+    @inline(__always)
+    mutating func compilingCall(sp: inout Sp, pc: inout Pc, compilingCallOperand: Instruction.CompilingCallOperand) throws {
         try compilingCallOperand.callee.ensureCompiled(runtime: runtime)
         pc.pointee = .internalCall(compilingCallOperand)
-        try internalCall(sp: sp, pc: &pc, internalCallOperand: compilingCallOperand)
+        try internalCall(sp: &sp, pc: &pc, internalCallOperand: compilingCallOperand)
     }
 
     @inline(never)
@@ -120,16 +122,16 @@ extension ExecutionState {
     }
 
     @inline(__always)
-    mutating func callIndirect(sp: Sp, pc: inout Pc, md: inout Md, ms: inout Ms, callIndirectOperand: Instruction.CallIndirectOperand) throws {
+    mutating func callIndirect(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms, callIndirectOperand: Instruction.CallIndirectOperand) throws {
         let (function, callerInstance) = try prepareForIndirectCall(
             sp: sp,
             callIndirectOperand: callIndirectOperand
         )
-        pc = try invoke(
+        (pc, sp) = try invoke(
             function: function,
             callerInstance: callerInstance,
             callLike: callIndirectOperand.callLike,
-            pc: pc, md: &md, ms: &ms
+            sp: sp, pc: pc, md: &md, ms: &ms
         )
     }
 
