@@ -258,13 +258,13 @@ extension WastDirective {
             return handler(self, .passed)
 
         case .assertReturn(let execute, let results):
-            let moduleInstance: Instance?
+            let instance: Instance?
             do {
-                moduleInstance = try deriveModuleInstance(from: execute)
+                instance = try deriveModuleInstance(from: execute)
             } catch {
                 return handler(self, .failed("failed to derive module instance: \(error)"))
             }
-            guard let moduleInstance else {
+            guard let instance else {
                 return handler(self, .failed("no module to execute"))
             }
 
@@ -274,7 +274,7 @@ extension WastDirective {
             case .invoke(let invoke):
                 let result: [WasmKit.Value]
                 do {
-                    result = try runtime.invoke(moduleInstance, function: invoke.name, with: invoke.args)
+                    result = try runtime.invoke(instance, function: invoke.name, with: invoke.args)
                 } catch {
                     return handler(self, .failed("\(error)"))
                 }
@@ -286,7 +286,10 @@ extension WastDirective {
             case .get(_, let globalName):
                 let result: WasmKit.Value
                 do {
-                    result = try runtime.getGlobal(moduleInstance, globalName: globalName)
+                    guard case let .global(global) = instance.export(globalName) else {
+                        throw Trap._raw("no global export with name \(globalName) in a module instance \(instance)")
+                    }
+                    result = global.value
                 } catch {
                     return handler(self, .failed("\(error)"))
                 }
