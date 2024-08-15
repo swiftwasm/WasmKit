@@ -39,15 +39,15 @@ extension ExecutionState {
             .bindMemory(to: T.self, capacity: 1).pointee = toStore.littleEndian
     }
 
-    mutating func memorySize(context: inout StackContext, sp: Sp, memorySizeOperand: Instruction.MemorySizeOperand) {
-        let memory = context.currentInstance.memories[0]
+    mutating func memorySize(sp: Sp, memorySizeOperand: Instruction.MemorySizeOperand) {
+        let memory = currentInstance.memories[0]
 
         let pageCount = memory.data.count / MemoryEntity.pageSize
         let value: Value = memory.limit.isMemory64 ? .i64(UInt64(pageCount)) : .i32(UInt32(pageCount))
         sp[memorySizeOperand.result] = UntypedValue(value)
     }
-    mutating func memoryGrow(context: inout StackContext, sp: Sp, md: inout Md, ms: inout Ms, memoryGrowOperand: Instruction.MemoryGrowOperand) throws {
-        let memory = context.currentInstance.memories[0]
+    mutating func memoryGrow(sp: Sp, md: inout Md, ms: inout Ms, memoryGrowOperand: Instruction.MemoryGrowOperand) throws {
+        let memory = currentInstance.memories[0]
         try memory.withValue { memory in
             let isMemory64 = memory.limit.isMemory64
 
@@ -58,8 +58,8 @@ extension ExecutionState {
             sp[memoryGrowOperand.result] = UntypedValue(oldPageCount)
         }
     }
-    mutating func memoryInit(context: inout StackContext, sp: Sp, memoryInitOperand: Instruction.MemoryInitOperand) throws {
-        let instance = context.currentInstance
+    mutating func memoryInit(sp: Sp, memoryInitOperand: Instruction.MemoryInitOperand) throws {
+        let instance = currentInstance
         let memory = instance.memories[0]
         try memory.withValue { memoryInstance in
             let dataInstance = instance.dataSegments[Int(memoryInitOperand.segmentIndex)]
@@ -86,12 +86,12 @@ extension ExecutionState {
             }
         }
     }
-    mutating func memoryDataDrop(context: inout StackContext, sp: Sp, dataIndex: DataIndex) {
-        let segment = context.currentInstance.dataSegments[Int(dataIndex)]
+    mutating func memoryDataDrop(sp: Sp, dataIndex: DataIndex) {
+        let segment = currentInstance.dataSegments[Int(dataIndex)]
         segment.withValue { $0.drop() }
     }
-    mutating func memoryCopy(context: inout StackContext, sp: Sp, memoryCopyOperand: Instruction.MemoryCopyOperand) throws {
-        let memory = context.currentInstance.memories[0]
+    mutating func memoryCopy(sp: Sp, memoryCopyOperand: Instruction.MemoryCopyOperand) throws {
+        let memory = currentInstance.memories[0]
         try memory.withValue { memory in
             let isMemory64 = memory.limit.isMemory64
             let copyCounter = sp[memoryCopyOperand.size].asAddressOffset(isMemory64)
@@ -120,8 +120,8 @@ extension ExecutionState {
             }
         }
     }
-    mutating func memoryFill(context: inout StackContext, sp: Sp, memoryFillOperand: Instruction.MemoryFillOperand) throws {
-        let memory = context.currentInstance.memories[0]
+    mutating func memoryFill(sp: Sp, memoryFillOperand: Instruction.MemoryFillOperand) throws {
+        let memory = currentInstance.memories[0]
         try memory.withValue { memoryInstance in
             let isMemory64 = memoryInstance.limit.isMemory64
             let copyCounter = Int(sp[memoryFillOperand.size].asAddressOffset(isMemory64))

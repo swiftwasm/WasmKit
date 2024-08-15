@@ -37,7 +37,7 @@ enum GenerateInternalInstruction {
         }
 
         static var commonParameters: [(label: String, type: String, isInout: Bool)] {
-            [("context", "StackContext", true), ("sp", "Sp", false)]
+            [("sp", "Sp", false)]
         }
 
         typealias Parameter = (label: String, type: String, isInout: Bool)
@@ -46,18 +46,20 @@ enum GenerateInternalInstruction {
                 let label = $0.name ?? camelCase(pascalCase: String($0.type.split(separator: ".").last!))
                 return (label, $0.type, false)
             }
-            let memoryParameters: [Parameter]
+            var extraParameters: [Parameter] = []
+            if self.isControl {
+                extraParameters += [("pc", "Pc", true)]
+            }
             switch useCurrentMemory {
-            case .none:
-                memoryParameters = []
+            case .none: break
             case .read:
-                memoryParameters = [("md", "Md", false), ("ms", "Ms", false)]
+                extraParameters += [("md", "Md", false), ("ms", "Ms", false)]
             case .write:
-                memoryParameters = [("md", "Md", true), ("ms", "Ms", true)]
+                extraParameters += [("md", "Md", true), ("ms", "Ms", true)]
             }
             return
                 (Self.commonParameters
-                + memoryParameters
+                + extraParameters
                 + immediates)
         }
     }
@@ -289,7 +291,7 @@ enum GenerateInternalInstruction {
     static func generateDispatcher(instructions: [Instruction]) -> String {
         let doExecuteParams =
             [("instruction", "Instruction", false)]
-            + [("md", "Md", true), ("ms", "Ms", true)]
+            + [("md", "Md", true), ("ms", "Ms", true), ("pc", "Pc", true)]
             + Instruction.commonParameters
         var output = """
             extension ExecutionState {
@@ -331,7 +333,7 @@ enum GenerateInternalInstruction {
         output += """
 
                     }
-                    programCounter += 1
+                    pc += 1
                     return true
                 }
             }
