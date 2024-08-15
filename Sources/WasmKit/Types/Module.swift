@@ -144,19 +144,19 @@ extension Module {
 // <https://webassembly.github.io/spec/core/syntax/modules.html#syntax-typeidx>
 
 /// Index type for function types within a module
-public typealias TypeIndex = UInt32
+typealias TypeIndex = UInt32
 /// Index type for tables within a module
-public typealias FunctionIndex = UInt32
+typealias FunctionIndex = UInt32
 /// Index type for tables within a module
-public typealias TableIndex = UInt32
+typealias TableIndex = UInt32
 /// Index type for memories within a module
-public typealias MemoryIndex = UInt32
+typealias MemoryIndex = UInt32
 /// Index type for globals within a module
-public typealias GlobalIndex = UInt32
+typealias GlobalIndex = UInt32
 /// Index type for elements within a module
-public typealias ElementIndex = UInt32
+typealias ElementIndex = UInt32
 /// Index type for data segments within a module
-public typealias DataIndex = UInt32
+typealias DataIndex = UInt32
 /// Index type for labels within a function
 typealias LocalIndex = UInt32
 /// Index type for labels within a function

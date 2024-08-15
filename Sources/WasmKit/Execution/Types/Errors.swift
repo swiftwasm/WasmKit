@@ -18,13 +18,13 @@ public enum Trap: Error {
     /// Out of bounds table access
     case outOfBoundsTableAccess(Int)
     /// Reading a dropped reference
-    case readingDroppedReference(index: ElementIndex)
+    case readingDroppedReference(index: Int)
 
     // Invocation
     /// Exported function not found
     case exportedFunctionNotFound(Instance, name: String)
     /// The table element is not initialized
-    case tableUninitialized(ElementIndex)
+    case tableUninitialized(Int)
     /// Undefined element in the table
     case undefinedElement
     /// Table size overflow
@@ -34,7 +34,7 @@ public enum Trap: Error {
     /// Out of bounds memory access
     case outOfBoundsMemoryAccess
     /// Invalid function index
-    case invalidFunctionIndex(FunctionIndex)
+    case invalidFunctionIndex(Int)
     /// Integer divided by zero
     case integerDividedByZero
     /// Integer overflowed during arithmetic operation

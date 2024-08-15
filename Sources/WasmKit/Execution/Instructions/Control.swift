@@ -107,7 +107,7 @@ extension ExecutionState {
         }
         guard case let .function(rawBitPattern?) = table.elements[elementIndex]
         else {
-            throw Trap.tableUninitialized(ElementIndex(elementIndex))
+            throw Trap.tableUninitialized(elementIndex)
         }
         let function = InternalFunction(bitPattern: rawBitPattern)
         guard function.type == expectedType else {
