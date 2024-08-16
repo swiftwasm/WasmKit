@@ -15,7 +15,7 @@ class BumpAllocator<T> {
 
     deinit {
         for page in pages {
-            page.deinitialize()
+            page.deinitialize().deallocate()
         }
         for i in 0..<currentOffset {
             currentPage.deinitializeElement(at: i)
