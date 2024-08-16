@@ -236,6 +236,7 @@ extension StoreAllocator {
         runtime: Runtime,
         externalValues: [ExternalValue]
     ) throws -> InternalInstance {
+        let resourceLimiter = runtime.store.resourceLimiter
         // Step 1 of module allocation algorithm, according to Wasm 2.0 spec.
 
         let types = module.types
@@ -291,17 +292,17 @@ extension StoreAllocator {
         )
 
         // Step 3.
-        let tables = allocateEntities(
+        let tables = try allocateEntities(
             imports: importedTables,
             internals: module.internalTables,
-            allocateHandle: { t, _ in allocate(tableType: t) }
+            allocateHandle: { t, _ in try allocate(tableType: t, resourceLimiter: resourceLimiter) }
         )
 
         // Step 4.
-        let memories = allocateEntities(
+        let memories = try allocateEntities(
             imports: importedMemories,
             internals: module.internalMemories,
-            allocateHandle: { m, _ in allocate(memoryType: m) }
+            allocateHandle: { m, _ in try allocate(memoryType: m, resourceLimiter: resourceLimiter) }
         )
 
         // Step 5.
@@ -427,15 +428,15 @@ extension StoreAllocator {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-table>
-    private func allocate(tableType: TableType) -> InternalTable {
-        let pointer = tables.allocate(initializing: TableEntity(tableType))
+    private func allocate(tableType: TableType, resourceLimiter: any ResourceLimiter) throws -> InternalTable {
+        let pointer = try tables.allocate(initializing: TableEntity(tableType, resourceLimiter: resourceLimiter))
         return InternalTable(unsafe: pointer)
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-mem>
-    func allocate(memoryType: MemoryType) -> InternalMemory {
-        let pointer = memories.allocate(initializing: MemoryEntity(memoryType))
+    func allocate(memoryType: MemoryType, resourceLimiter: any ResourceLimiter) throws -> InternalMemory {
+        let pointer = try memories.allocate(initializing: MemoryEntity(memoryType, resourceLimiter: resourceLimiter))
         return InternalMemory(unsafe: pointer)
     }
 

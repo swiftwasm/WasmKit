@@ -8,7 +8,8 @@ final class HostModuleTests: XCTestCase {
     func testImportMemory() throws {
         let runtime = Runtime()
         let memoryType = MemoryType(min: 1, max: nil)
-        let memory = runtime.store.allocator.allocate(memoryType: memoryType)
+        let memory = try runtime.store.allocator.allocate(
+            memoryType: memoryType, resourceLimiter: DefaultResourceLimiter())
         try runtime.store.register(
             HostModule(
                 memories: [

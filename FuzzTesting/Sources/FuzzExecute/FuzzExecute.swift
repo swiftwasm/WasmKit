@@ -1,4 +1,13 @@
-import WasmKit
+@_spi(Fuzzing) import WasmKit
+
+struct FuzzerResourceLimiter: ResourceLimiter {
+    func limitMemoryGrowth(to desired: Int) throws -> Bool {
+        return desired < 1024 * 1024 * 1024
+    }
+    func limitTableGrowth(to desired: Int) throws -> Bool {
+        return desired < 1024 * 1024
+    }
+}
 
 @_cdecl("LLVMFuzzerTestOneInput")
 public func FuzzCheck(_ start: UnsafePointer<UInt8>, _ count: Int) -> CInt {
@@ -6,6 +15,7 @@ public func FuzzCheck(_ start: UnsafePointer<UInt8>, _ count: Int) -> CInt {
     do {
         var module = try WasmKit.parseWasm(bytes: bytes)
         let runtime = WasmKit.Runtime()
+        runtime.store.resourceLimiter = FuzzerResourceLimiter()
         let instance = try runtime.instantiate(module: module)
         for (name, export) in instance.exports {
             guard case let .function(fn) = export else {

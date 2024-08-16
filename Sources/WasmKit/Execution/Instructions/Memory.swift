@@ -48,12 +48,12 @@ extension ExecutionState {
     }
     mutating func memoryGrow(context: inout StackContext, sp: Sp, md: inout Md, ms: inout Ms, memoryGrowOperand: Instruction.MemoryGrowOperand) throws {
         let memory = context.currentInstance.memories[0]
-        memory.withValue { memory in
+        try memory.withValue { memory in
             let isMemory64 = memory.limit.isMemory64
 
             let value = sp[memoryGrowOperand.delta]
             let pageCount: UInt64 = isMemory64 ? value.i64 : UInt64(value.i32)
-            let oldPageCount = memory.grow(by: Int(pageCount))
+            let oldPageCount = try memory.grow(by: Int(pageCount), resourceLimiter: runtime.store.resourceLimiter)
             CurrentMemory.assign(md: &md, ms: &ms, memory: &memory)
             sp[memoryGrowOperand.result] = UntypedValue(oldPageCount)
         }

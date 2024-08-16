@@ -254,7 +254,7 @@ extension ExecutionState {
         case .tableSize(let tableSizeOperand):
             self.tableSize(context: &context, sp: sp, tableSizeOperand: tableSizeOperand)
         case .tableGrow(let tableGrowOperand):
-            self.tableGrow(context: &context, sp: sp, tableGrowOperand: tableGrowOperand)
+            try self.tableGrow(context: &context, sp: sp, tableGrowOperand: tableGrowOperand)
         case .tableFill(let tableFillOperand):
             try self.tableFill(context: &context, sp: sp, tableFillOperand: tableFillOperand)
         case .tableCopy(let tableCopyOperand):

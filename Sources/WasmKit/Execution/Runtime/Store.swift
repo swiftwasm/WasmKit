@@ -29,6 +29,8 @@ public final class Store {
     var hostFunctions: [HostFunction] = []
     private var hostGlobals: [Global] = []
     var nameRegistry = NameRegistry()
+    @_spi(Fuzzing) // Consider making this public
+    public var resourceLimiter: ResourceLimiter = DefaultResourceLimiter()
 
     @available(*, unavailable)
     public var namedModuleInstances: [String: Any] {

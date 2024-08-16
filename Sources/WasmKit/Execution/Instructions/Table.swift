@@ -24,14 +24,14 @@ extension ExecutionState {
         let elementsCount = table.elements.count
         sp[tableSizeOperand.result] = UntypedValue(table.limits.isMemory64 ? .i64(UInt64(elementsCount)) : .i32(UInt32(elementsCount)))
     }
-    mutating func tableGrow(context: inout StackContext, sp: Sp, tableGrowOperand: Instruction.TableGrowOperand) {
+    mutating func tableGrow(context: inout StackContext, sp: Sp, tableGrowOperand: Instruction.TableGrowOperand) throws {
         let table = getTable(tableGrowOperand.tableIndex, stack: &context, store: runtime.store)
 
         let growthSize = sp[tableGrowOperand.delta].asAddressOffset(table.limits.isMemory64)
         let growthValue = sp.getReference(tableGrowOperand.value, type: table.tableType)
 
         let oldSize = table.elements.count
-        guard table.withValue({ $0.grow(by: growthSize, value: growthValue) }) else {
+        guard try table.withValue({ try $0.grow(by: growthSize, value: growthValue, resourceLimiter: runtime.store.resourceLimiter) }) else {
             sp[tableGrowOperand.result] = UntypedValue(.i32(Int32(-1).unsigned))
             return
         }

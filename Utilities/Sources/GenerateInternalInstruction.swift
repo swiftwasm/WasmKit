@@ -193,7 +193,7 @@ enum GenerateInternalInstruction {
         Instruction(name: "tableGet", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.TableGetOperand")]),
         Instruction(name: "tableSet", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.TableSetOperand")]),
         Instruction(name: "tableSize", immediates: [Immediate(name: nil, type: "Instruction.TableSizeOperand")]),
-        Instruction(name: "tableGrow", immediates: [Immediate(name: nil, type: "Instruction.TableGrowOperand")]),
+        Instruction(name: "tableGrow", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.TableGrowOperand")]),
         Instruction(name: "tableFill", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.TableFillOperand")]),
         Instruction(name: "tableCopy", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.TableCopyOperand")]),
         Instruction(name: "tableInit", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.TableInitOperand")]),
