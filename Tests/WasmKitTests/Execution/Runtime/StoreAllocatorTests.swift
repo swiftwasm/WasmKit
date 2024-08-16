@@ -1,6 +1,7 @@
 @testable import WasmKit
 import WasmParser
 import XCTest
+import WAT
 
 final class StoreAllocatorTests: XCTestCase {
     func testBumpAllocatorDeallocates() {
@@ -23,5 +24,20 @@ final class StoreAllocatorTests: XCTestCase {
         }
         // The entity should be deallocated when the allocator is deallocated
         XCTAssertNil(weakEntity)
+    }
+
+    func testStoreAllocatorLeak() throws {
+        weak var weakAllocator: StoreAllocator?
+        do {
+            let module = try parseWasm(bytes: wat2wasm("""
+              (module
+                (memory (;0;) 0)
+                (export "a" (memory 0)))
+            """))
+            let runtime = Runtime()
+            _ = try runtime.instantiate(module: module)
+            weakAllocator = runtime.store.allocator
+        }
+        XCTAssertNil(weakAllocator)
     }
 }

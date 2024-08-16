@@ -68,6 +68,11 @@ struct InternalFunction: Equatable, Hashable {
     }
 }
 
+extension InternalFunction: ValidatableEntity {
+    static func createOutOfBoundsError(index: Int, count: Int) -> any Error {
+        Trap.invalidFunctionIndex(index)
+    }
+}
 
 extension InternalFunction {
     func invoke(_ arguments: [Value], runtime: Runtime) throws -> [Value] {
