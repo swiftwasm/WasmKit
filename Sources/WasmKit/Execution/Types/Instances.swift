@@ -140,7 +140,7 @@ struct TableEntity /* : ~Copyable */ {
     let tableType: TableType
     var limits: Limits { tableType.limits }
 
-    init(_ tableType: TableType) {
+    init(_ tableType: TableType, resourceLimiter: any ResourceLimiter) throws {
         let emptyElement: Reference
         switch tableType.elementType {
         case .funcRef:
@@ -149,13 +149,17 @@ struct TableEntity /* : ~Copyable */ {
             emptyElement = .extern(nil)
         }
 
-        elements = Array(repeating: emptyElement, count: Int(tableType.limits.min))
+        let numberOfElements = Int(tableType.limits.min)
+        guard try resourceLimiter.limitTableGrowth(to: numberOfElements) else {
+            throw Trap._raw("Initial table size exceeds the resource limit: \(numberOfElements) elements")
+        }
+        elements = Array(repeating: emptyElement, count: numberOfElements)
         self.tableType = tableType
     }
 
     /// > Note: https://webassembly.github.io/spec/core/exec/modules.html#grow-table
     /// Returns true if gorwth succeeds, otherwise returns false
-    mutating func grow(by growthSize: UInt64, value: Reference) -> Bool {
+    mutating func grow(by growthSize: UInt64, value: Reference, resourceLimiter: any ResourceLimiter) throws -> Bool {
         let oldSize = UInt64(elements.count)
         guard !UInt64(elements.count).addingReportingOverflow(growthSize).overflow else {
             return false
@@ -165,6 +169,9 @@ struct TableEntity /* : ~Copyable */ {
 
         let newSize = oldSize + growthSize
         if newSize > maxLimit {
+            return false
+        }
+        guard try resourceLimiter.limitTableGrowth(to: Int(newSize)) else {
             return false
         }
         elements.append(contentsOf: Array(repeating: value, count: Int(growthSize)))
@@ -213,8 +220,12 @@ struct MemoryEntity /* : ~Copyable */ {
     let maxPageCount: UInt64
     let limit: Limits
 
-    init(_ memoryType: MemoryType) {
-        data = Array(repeating: 0, count: Int(memoryType.min) * Self.pageSize)
+    init(_ memoryType: MemoryType, resourceLimiter: any ResourceLimiter) throws {
+        let byteSize = Int(memoryType.min) * Self.pageSize
+        guard try resourceLimiter.limitMemoryGrowth(to: byteSize) else {
+            throw Trap._raw("Initial memory size exceeds the resource limit: \(byteSize) bytes")
+        }
+        data = Array(repeating: 0, count: byteSize)
         let defaultMaxPageCount = (memoryType.isMemory64 ? UInt64.max : UInt64(UInt32.max)) / UInt64(Self.pageSize)
         maxPageCount = memoryType.max ?? defaultMaxPageCount
         limit = memoryType
@@ -222,10 +233,13 @@ struct MemoryEntity /* : ~Copyable */ {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#grow-mem>
-    mutating func grow(by pageCount: Int) -> Value {
+    mutating func grow(by pageCount: Int, resourceLimiter: any ResourceLimiter) throws -> Value {
         let newPageCount = data.count / Self.pageSize + pageCount
 
         guard newPageCount <= maxPageCount else {
+            return limit.isMemory64 ? .i64((-1 as Int64).unsigned) : .i32((-1 as Int32).unsigned)
+        }
+        guard try resourceLimiter.limitMemoryGrowth(to: newPageCount * Self.pageSize) else {
             return limit.isMemory64 ? .i64((-1 as Int64).unsigned) : .i32((-1 as Int32).unsigned)
         }
 
