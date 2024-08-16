@@ -56,6 +56,12 @@ struct EntityHandle<T>: Equatable, Hashable {
     }
 }
 
+extension EntityHandle: ValidatableEntity where T: ValidatableEntity {
+    static func createOutOfBoundsError(index: Int, count: Int) -> Error {
+        T.createOutOfBoundsError(index: index, count: count)
+    }
+}
+
 struct InstanceEntity /* : ~Copyable */ {
     var types: [FunctionType]
     var functions: ImmutableArray<InternalFunction>
@@ -64,7 +70,7 @@ struct InstanceEntity /* : ~Copyable */ {
     var globals: ImmutableArray<InternalGlobal>
     var elementSegments: ImmutableArray<InternalElementSegment>
     var dataSegments: ImmutableArray<InternalDataSegment>
-    var exports: [Export]
+    var exports: [String: InternalExternalValue]
     var features: WasmFeatureSet
     var hasDataCount: Bool
 }
@@ -89,10 +95,8 @@ public struct Instance {
     /// - Parameter name: The name of the exported entity.
     /// - Returns: The exported entity if found, otherwise `nil`.
     public func export(_ name: String) -> ExternalValue? {
-        guard let export = handle.exports.first(where: { $0.name == name }) else {
-            return nil
-        }
-        return ExternalValue(export, instance: handle, allocator: allocator)
+        guard let entity = handle.exports[name] else { return nil }
+        return ExternalValue(handle: entity, allocator: allocator)
     }
 
     /// Finds an exported function by name.
@@ -108,9 +112,7 @@ public struct Instance {
 
     /// A dictionary of exported entities by name.
     public var exports: Exports {
-        handle.exports.reduce(into: [:]) { exports, export in
-            exports[export.name] = ExternalValue(export, instance: handle, allocator: allocator)
-        }
+        handle.exports.mapValues { ExternalValue(handle: $0, allocator: allocator) }
     }
 }
 
@@ -188,6 +190,12 @@ struct TableEntity /* : ~Copyable */ {
     }
 }
 
+extension TableEntity: ValidatableEntity {
+    static func createOutOfBoundsError(index: Int, count: Int) -> Error {
+        Trap._raw("Table index out of bounds: \(index) (max: \(count))")
+    }
+}
+
 typealias InternalTable = EntityHandle<TableEntity>
 
 /// A WebAssembly `table` instance.
@@ -258,6 +266,12 @@ struct MemoryEntity /* : ~Copyable */ {
     }
 }
 
+extension MemoryEntity: ValidatableEntity {
+    static func createOutOfBoundsError(index: Int, count: Int) -> Error {
+        Trap._raw("Memory index out of bounds: \(index) (max: \(count))")
+    }
+}
+
 typealias InternalMemory = EntityHandle<MemoryEntity>
 
 /// A WebAssembly `memory` instance.
@@ -295,6 +309,12 @@ struct GlobalEntity /* : ~Copyable */ {
 
     mutating func assign(_ value: UntypedValue) {
         self.value = value.cast(to: globalType.valueType)
+    }
+}
+
+extension GlobalEntity: ValidatableEntity {
+    static func createOutOfBoundsError(index: Int, count: Int) -> Error {
+        Trap._raw("Global index out of bounds: \(index) (max: \(count))")
     }
 }
 
@@ -373,24 +393,23 @@ public enum ExternalValue: Equatable {
     case memory(Memory)
     case global(Global)
 
-    init(_ export: WasmParser.Export, instance: InternalInstance, allocator: StoreAllocator) {
-        switch export.descriptor {
-        case let .function(index):
-            self = .function(
-                Function(handle: instance.functions[Int(index)], allocator: allocator)
-            )
-        case let .table(index):
-            self = .table(
-                Table(handle: instance.tables[Int(index)], allocator: allocator)
-            )
-        case let .memory(index):
-            self = .memory(
-                Memory(handle: instance.memories[Int(index)], allocator: allocator)
-            )
-        case let .global(index):
-            self = .global(
-                Global(handle: instance.globals[Int(index)], allocator: allocator)
-            )
+    init(handle: InternalExternalValue, allocator: StoreAllocator) {
+        switch handle {
+        case .function(let function):
+            self = .function(Function(handle: function, allocator: allocator))
+        case .table(let table):
+            self = .table(Table(handle: table, allocator: allocator))
+        case .memory(let memory):
+            self = .memory(Memory(handle: memory, allocator: allocator))
+        case .global(let global):
+            self = .global(Global(handle: global, allocator: allocator))
         }
     }
+}
+
+enum InternalExternalValue {
+    case function(InternalFunction)
+    case table(InternalTable)
+    case memory(InternalMemory)
+    case global(InternalGlobal)
 }

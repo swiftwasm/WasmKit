@@ -89,7 +89,7 @@ extension Runtime {
             for element in module.elements {
                 guard case let .active(tableIndex, offset) = element.mode else { continue }
                 let offsetValue = try offset.evaluate(context: instance)
-                let table = instance.tables[Int(tableIndex)]
+                let table = try instance.tables[validating: Int(tableIndex)]
                 try table.withValue { table in
                     guard let offset = offsetValue.maybeAddressOffset(table.limits.isMemory64) else {
                         throw InstantiationError.unsupported(
@@ -112,7 +112,7 @@ extension Runtime {
         do {
             for case let .active(data) in module.data {
                 let offsetValue = try data.offset.evaluate(context: instance)
-                let memory = instance.memories[Int(data.index)]
+                let memory = try instance.memories[validating: Int(data.index)]
                 try memory.withValue { memory in
                     guard let offset = offsetValue.maybeAddressOffset(memory.limit.isMemory64) else {
                         throw InstantiationError.unsupported(
@@ -180,26 +180,29 @@ extension Runtime {
 }
 
 protocol ConstEvaluationContextProtocol {
-    func functionRef(_ index: FunctionIndex) -> Reference
-    func globalValue(_ index: GlobalIndex) -> Value
+    func functionRef(_ index: FunctionIndex) throws -> Reference
+    func globalValue(_ index: GlobalIndex) throws -> Value
 }
 
 extension InternalInstance: ConstEvaluationContextProtocol {
-    func functionRef(_ index: FunctionIndex) -> Reference {
-        return .function(from: self.functions[Int(index)])
+    func functionRef(_ index: FunctionIndex) throws -> Reference {
+        return try .function(from: self.functions[validating: Int(index)])
     }
-    func globalValue(_ index: GlobalIndex) -> Value {
-        return self.globals[Int(index)].value
+    func globalValue(_ index: GlobalIndex) throws -> Value {
+        return try self.globals[validating: Int(index)].value
     }
 }
 
 struct ConstEvaluationContext: ConstEvaluationContextProtocol {
     let functions: ImmutableArray<InternalFunction>
     var globals: [Value]
-    func functionRef(_ index: FunctionIndex) -> Reference {
-        return .function(from: self.functions[Int(index)])
+    func functionRef(_ index: FunctionIndex) throws -> Reference {
+        return try .function(from: self.functions[validating: Int(index)])
     }
-    func globalValue(_ index: GlobalIndex) -> Value {
+    func globalValue(_ index: GlobalIndex) throws -> Value {
+        guard index < globals.count else {
+            throw GlobalEntity.createOutOfBoundsError(index: Int(index), count: globals.count)
+        }
         return self.globals[Int(index)]
     }
 }
@@ -216,14 +219,14 @@ extension ConstExpression {
         case .f32Const(let value): return .f32(value.bitPattern)
         case .f64Const(let value): return .f64(value.bitPattern)
         case .globalGet(let globalIndex):
-            return context.globalValue(globalIndex)
+            return try context.globalValue(globalIndex)
         case .refNull(let type):
             switch type {
             case .externRef: return .ref(.extern(nil))
             case .funcRef: return .ref(.function(nil))
             }
         case .refFunc(let functionIndex):
-            return .ref(context.functionRef(functionIndex))
+            return try .ref(context.functionRef(functionIndex))
         default:
             throw InstantiationError.unsupported("illegal const expression instruction: \(constInst)")
         }
@@ -235,13 +238,13 @@ extension WasmParser.ElementSegment {
         try self.initializer.map { expression -> Reference in
             switch expression[0] {
             case let .refFunc(index):
-                return context.functionRef(index)
+                return try context.functionRef(index)
             case .refNull(.funcRef):
                 return .function(nil)
             case .refNull(.externRef):
                 return .extern(nil)
             case .globalGet(let index):
-                let value = context.globalValue(index)
+                let value = try context.globalValue(index)
                 switch value {
                 case .ref(.function(let addr)):
                     return .function(addr)

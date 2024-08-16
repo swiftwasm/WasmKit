@@ -58,6 +58,11 @@ class BumpAllocator<T> {
     }
 }
 
+protocol ValidatableEntity {
+    /// Create an error for an out-of-bounds access to the entity.
+    static func createOutOfBoundsError(index: Int, count: Int) -> any Error
+}
+
 
 /// A simple bump allocator for immutable arrays with various element types.
 fileprivate class ImmutableArrayAllocator {
@@ -104,6 +109,24 @@ struct ImmutableArray<T> {
     /// Accesses the element at the specified position.
     subscript(index: Int) -> T {
         buffer[index]
+    }
+
+    /// Accesses the element at the specified position, with bounds checking.
+    subscript(validating index: Int) -> T where T: ValidatableEntity {
+        get throws {
+            return try self[validating: index, T.createOutOfBoundsError]
+        }
+    }
+
+    /// Accesses the element at the specified position, with bounds checking
+    /// and a custom error creation function.
+    subscript(validating index: Int, createError: (_ index: Int, _ count: Int) -> any Error) -> T {
+        get throws {
+            guard index >= 0 && index < buffer.count else {
+                throw createError(index, buffer.count)
+            }
+            return buffer[index]
+        }
     }
 
     /// The first element of the array.
@@ -329,6 +352,33 @@ extension StoreAllocator {
             }
         }
 
+
+        func createExportValue(_ export: WasmParser.Export) throws -> InternalExternalValue {
+            func createErrorFactory(_ kind: String) -> (_ index: Int, _ count: Int) -> any Error {
+                return { index, count in
+                    InstantiationError.exportIndexOutOfBounds(kind: kind, index: index, count: count)
+                }
+            }
+            switch export.descriptor {
+            case let .function(index):
+                let handle = try functions[validating: Int(index), createErrorFactory("function")]
+                return .function(handle)
+            case let .table(index):
+                let handle = try tables[validating: Int(index), createErrorFactory("table")]
+                return .table(handle)
+            case let .memory(index):
+                let handle = try memories[validating: Int(index), createErrorFactory("memory")]
+                return .memory(handle)
+            case let .global(index):
+                let handle = try globals[validating: Int(index), createErrorFactory("global")]
+                return .global(handle)
+            }
+        }
+
+        let exports: [String: InternalExternalValue] = try module.exports.reduce(into: [:]) { result, export in
+            result[export.name] = try createExportValue(export)
+        }
+
         // Steps 20-21.
         let instanceEntity = InstanceEntity(
             types: types,
@@ -338,7 +388,7 @@ extension StoreAllocator {
             globals: globals,
             elementSegments: elements,
             dataSegments: dataSegments,
-            exports: module.exports,
+            exports: exports,
             features: module.features,
             hasDataCount: module.hasDataCount
         )

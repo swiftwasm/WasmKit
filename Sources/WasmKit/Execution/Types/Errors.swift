@@ -75,6 +75,7 @@ public enum InstantiationError: Error {
     case outOfBoundsTableAccess
     case outOfBoundsMemoryAccess
     case unsupported(String)
+    case exportIndexOutOfBounds(kind: String, index: Int, count: Int)
 
     /// Human-readable text representation of the trap that `.wast` text format expects in assertions
     public var assertionText: String {
