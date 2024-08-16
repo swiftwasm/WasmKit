@@ -2,8 +2,8 @@ import WasmParser
 
 /// A simple bump allocator for a single type.
 class BumpAllocator<T> {
-    private var pages: [UnsafeMutablePointer<T>] = []
-    private var currentPage: UnsafeMutablePointer<T>
+    private var pages: [UnsafeMutableBufferPointer<T>] = []
+    private var currentPage: UnsafeMutableBufferPointer<T>
     private var currentOffset: Int = 0
     private let currentPageSize: Int
 
@@ -15,7 +15,10 @@ class BumpAllocator<T> {
 
     deinit {
         for page in pages {
-            page.deallocate()
+            page.deinitialize()
+        }
+        for i in 0..<currentOffset {
+            currentPage.deinitializeElement(at: i)
         }
         currentPage.deallocate()
     }
@@ -24,7 +27,7 @@ class BumpAllocator<T> {
     private func startNewPage() {
         pages.append(currentPage)
         // TODO: Should we grow the page size?
-        let page = UnsafeMutablePointer<T>.allocate(capacity: currentPageSize)
+        let page = UnsafeMutableBufferPointer<T>.allocate(capacity: currentPageSize)
         currentPage = page
         currentOffset = 0
     }
@@ -41,12 +44,15 @@ class BumpAllocator<T> {
 
     /// Allocates a new value and returns a pointer to it.
     ///
+    /// - Note: The allocated memory must be initialized before
+    ///   the allocator is deallocated.
+    ///
     /// - Returns: An uninitialized pointer of type `T`.
     func allocate() -> UnsafeMutablePointer<T> {
-        if currentOffset == currentPageSize - 1 {
+        if currentOffset == currentPageSize {
             startNewPage()
         }
-        let pointer = currentPage.advanced(by: currentOffset)
+        let pointer = currentPage.baseAddress!.advanced(by: currentOffset)
         currentOffset += 1
         return pointer
     }
@@ -58,7 +64,12 @@ fileprivate class ImmutableArrayAllocator {
     private var arrayBuffers: [UnsafeMutableRawPointer] = []
 
     /// Allocates a buffer for an immutable array of `T` with the given `count`.
+    ///
+    /// - Note: The element type `T` must be a trivial type.
     func allocate<T>(count: Int) -> UnsafeMutableBufferPointer<T> {
+        // We only support trivial types for now. Otherwise, we have to track the element type
+        // until the deallocation of this allocator.
+        assert(_isPOD(T.self), "ImmutableArrayAllocator only supports trivial element types.")
         let buffer = UnsafeMutableBufferPointer<T>.allocate(capacity: count)
         // If count is zero, don't manage such empty buffer.
         if let baseAddress = buffer.baseAddress {
