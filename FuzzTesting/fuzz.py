@@ -109,6 +109,7 @@ def run(args, runner: CommandRunner):
     os.makedirs(artifact_dir, exist_ok=True)
     fuzzer_args = [
         executable_path(args.target_name), './.build/fuzz-corpus',
+        '-timeout=5',
         f'-artifact_prefix={artifact_dir}'
     ] + args.args
     runner.run(fuzzer_args, env={'SWIFT_BACKTRACE': 'enable=off'})
