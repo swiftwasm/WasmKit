@@ -2,6 +2,7 @@ add_wasmkit_library(WasmKit
   Module.swift
   ModuleParser.swift
   Translator.swift
+  ResourceLimiter.swift
   Component/CanonicalLifting.swift
   Component/CanonicalLowering.swift
   Component/CanonicalCall.swift
