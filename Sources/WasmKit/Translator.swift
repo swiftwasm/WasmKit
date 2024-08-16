@@ -498,18 +498,21 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
 
         private var labels: [LabelEntry] = []
+        private var unpinnedLabels: Set<LabelRef> = []
         private var instructions: [WasmKit.Instruction] = []
         private var lastEmission: LastEmission?
         fileprivate var insertingPC: MetaProgramCounter {
             MetaProgramCounter(offsetFromHead: instructions.count)
         }
 
-        func assertDanglingLabels() {
-            for (ref, label) in labels.enumerated() {
+        func assertDanglingLabels() throws {
+            for ref in unpinnedLabels {
+                let label = labels[ref]
                 switch label {
                 case .unpinned(let users):
-                    assert(users.isEmpty, "Label (#\(ref)) is used but not pinned at finalization-time: \(users)")
-                case .pinned: break
+                    guard !users.isEmpty else { continue }
+                    throw TranslationError("Internal consistency error: Label (#\(ref)) is used but not pinned at finalization-time: \(users)")
+                case .pinned: break // unreachable in theory
                 }
             }
         }
@@ -551,6 +554,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         mutating func allocLabel() -> LabelRef {
             let ref = labels.count
             self.labels.append(.unpinned(users: []))
+            self.unpinnedLabels.insert(ref)
             return ref
         }
 
@@ -568,6 +572,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
                 fatalError("Internal consistency error: Label \(ref) is already pinned at \(oldPC), but tried to pin at \(pc) again")
             case .unpinned(let users):
                 self.labels[ref] = .pinned(pc)
+                self.unpinnedLabels.remove(ref)
                 for user in users {
                     switch user.action {
                     case let .emitInstruction(insertAt, make):
@@ -779,10 +784,9 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         if controlStack.numberOfFrames > 1 {
             throw TranslationError("Expect \(controlStack.numberOfFrames - 1) more `end` instructions")
         }
-        #if DEBUG
-            // Check dangling labels
-            iseqBuilder.assertDanglingLabels()
-        #endif
+        // Check dangling labels
+        try iseqBuilder.assertDanglingLabels()
+
         let instructions = iseqBuilder.finalize()
         // TODO: Figure out a way to avoid the copy here while keeping the execution performance.
         let buffer = allocator.allocateInstructions(capacity: instructions.count + 1)
