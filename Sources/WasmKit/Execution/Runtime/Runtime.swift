@@ -130,7 +130,7 @@ extension Runtime {
 
         // Step 17.
         if let startIndex = module.start {
-            let startFunction = instance.functions[Int(startIndex)]
+            let startFunction = try instance.functions[validating: Int(startIndex)]
             _ = try startFunction.invoke([], runtime: self)
         }
 
