@@ -110,6 +110,9 @@ def run(args, runner: CommandRunner):
     fuzzer_args = [
         executable_path(args.target_name), './.build/fuzz-corpus',
         '-timeout=5',
+        # Relax the RSS limit to 5GB (default is 4GB) to allow
+        # allocating maximum memory for 32-bit space.
+        '-rss_limit_mb=5368709120',
         f'-artifact_prefix={artifact_dir}'
     ] + args.args
     runner.run(fuzzer_args, env={'SWIFT_BACKTRACE': 'enable=off'})
