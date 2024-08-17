@@ -1199,10 +1199,10 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         try valueStack.pushLocal(localIndex, locals: &locals)
     }
     mutating func visitLocalSetOrTee(localIndex: UInt32, isTee: Bool) throws {
-        guard try controlStack.currentFrame().reachable else { return }
         preserveLocalsOnStack(localIndex)
         let type = try locals.type(of: localIndex)
         guard let value = try popOperand(type)?.intoRegister(layout: stackLayout) else { return }
+        guard try controlStack.currentFrame().reachable else { return }
         let result = localReg(localIndex)
         if !isTee, iseqBuilder.relinkLastInstructionResult(result) {
             // Good news, copyStack is optimized out :)
