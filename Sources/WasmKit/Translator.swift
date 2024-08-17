@@ -820,14 +820,20 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     mutating func visitBlock(blockType: WasmParser.BlockType) throws -> Output {
         let blockType = try module.resolveBlockType(blockType)
         let endLabel = iseqBuilder.allocLabel()
+        var parameters: [ValueSource?] = []
         for param in blockType.parameters.reversed() {
-            _ = try popOperand(param)
+            parameters.append(try popOperand(param))
         }
         let stackHeight = self.valueStack.height
-        for param in blockType.parameters {
-            _ = valueStack.push(param)
+        for (param, value) in zip(blockType.parameters, parameters.reversed()) {
+            switch value {
+            case .local(let localIndex):
+                // Re-push local variables to the stack
+                _ = try valueStack.pushLocal(localIndex, locals: &locals)
+            case .register, nil:
+                _ = valueStack.push(param)
+            }
         }
-        preserveAllLocalsOnStack()
         controlStack.pushFrame(ControlStack.ControlFrame(blockType: blockType, stackHeight: stackHeight, continuation: endLabel, kind: .block))
     }
 
