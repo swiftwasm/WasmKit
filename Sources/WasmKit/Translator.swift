@@ -820,7 +820,13 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     mutating func visitBlock(blockType: WasmParser.BlockType) throws -> Output {
         let blockType = try module.resolveBlockType(blockType)
         let endLabel = iseqBuilder.allocLabel()
-        let stackHeight = self.valueStack.height - Int(blockType.parameters.count)
+        for param in blockType.parameters.reversed() {
+            _ = try popOperand(param)
+        }
+        let stackHeight = self.valueStack.height
+        for param in blockType.parameters {
+            _ = valueStack.push(param)
+        }
         preserveAllLocalsOnStack()
         controlStack.pushFrame(ControlStack.ControlFrame(blockType: blockType, stackHeight: stackHeight, continuation: endLabel, kind: .block))
     }
@@ -829,8 +835,14 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         let blockType = try module.resolveBlockType(blockType)
         preserveAllLocalsOnStack()
         iseqBuilder.resetLastEmission()
+        for param in blockType.parameters.reversed() {
+            _ = try popOperand(param)
+        }
         let headLabel = iseqBuilder.putLabel()
-        let stackHeight = self.valueStack.height - Int(blockType.parameters.count)
+        let stackHeight = self.valueStack.height
+        for param in blockType.parameters {
+            _ = valueStack.push(param)
+        }
         controlStack.pushFrame(ControlStack.ControlFrame(blockType: blockType, stackHeight: stackHeight, continuation: headLabel, kind: .loop))
     }
 
@@ -840,8 +852,14 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         let blockType = try module.resolveBlockType(blockType)
         let endLabel = iseqBuilder.allocLabel()
         let elseLabel = iseqBuilder.allocLabel()
-        let stackHeight = self.valueStack.height - Int(blockType.parameters.count)
+        for param in blockType.parameters.reversed() {
+            _ = try popOperand(param)
+        }
+        let stackHeight = self.valueStack.height
         preserveAllLocalsOnStack()
+        for param in blockType.parameters {
+            _ = valueStack.push(param)
+        }
         controlStack.pushFrame(
             ControlStack.ControlFrame(
                 blockType: blockType, stackHeight: stackHeight, continuation: endLabel,
