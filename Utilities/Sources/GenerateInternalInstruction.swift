@@ -69,7 +69,8 @@ enum GenerateInternalInstruction {
     }
 
     static let intValueTypes = ["i32", "i64"]
-    static let valueTypes = intValueTypes + ["f32", "f64"]
+    static let floatValueTypes = ["f32", "f64"]
+    static let valueTypes = intValueTypes + floatValueTypes
     static let numericBinaryInsts: [OpInstruction] = [
         "Add", "Sub", "Mul", "Eq", "Ne",
     ].flatMap { op -> [OpInstruction] in
@@ -94,6 +95,16 @@ enum GenerateInternalInstruction {
     static let numericIntUnaryInsts: [OpInstruction] = ["Clz", "Ctz", "Popcnt", "Eqz"].flatMap { op -> [OpInstruction] in
         intValueTypes.map { type in
             let base = Instruction(name: "\(type)\(op)", immediates: [Immediate(name: nil, type: "Instruction.UnaryOperand")])
+            return OpInstruction(op: op, type: type, base: base)
+        }
+    }
+    static let numericFloatBinaryInsts: [OpInstruction] = [
+        "Div"
+    ].flatMap { op -> [OpInstruction] in
+        floatValueTypes.map { type in
+            let base = Instruction(
+                name: "\(type)\(op)", immediates: [Immediate(name: nil, type: "Instruction.BinaryOperand")]
+            )
             return OpInstruction(op: op, type: type, base: base)
         }
     }
@@ -268,6 +279,7 @@ enum GenerateInternalInstruction {
         + numericBinaryInsts.map(\.base)
         + numericIntBinaryInsts.map(\.base)
         + numericIntUnaryInsts.map(\.base)
+        + numericFloatBinaryInsts.map(\.base)
         + miscInsts
 
     static func camelCase(pascalCase: String) -> String {
@@ -333,7 +345,7 @@ enum GenerateInternalInstruction {
             extension ExecutionState {
             """
 
-        for inst in numericBinaryInsts + numericIntBinaryInsts {
+        for inst in numericBinaryInsts + numericIntBinaryInsts + numericFloatBinaryInsts {
             output += """
 
                 mutating \(instMethodDecl(inst.base)) {

@@ -119,7 +119,6 @@ extension NumericInstruction {
 
     public enum FloatBinary: Equatable {
         // fbinop
-        case div(FloatValueType)
         case min(FloatValueType)
         case max(FloatValueType)
         case copysign(FloatValueType)
@@ -132,7 +131,7 @@ extension NumericInstruction {
 
         var type: NumericType {
             switch self {
-            case let .div(type),
+            case
                 let .min(type),
                 let .max(type),
                 let .copysign(type),
@@ -146,24 +145,6 @@ extension NumericInstruction {
 
         func callAsFunction(_ value1: Value, _ value2: Value) -> Value {
             switch self {
-            case .div:
-                guard !value1.isNan && !value2.isNan else {
-                    return value1.type.float.nan
-                }
-
-                switch (value1.isZero, value2.isZero) {
-                case (true, true):
-                    return value1.type.float.nan
-                case (false, true):
-                    switch (value1.isNegative, value2.isNegative) {
-                    case (true, true), (false, false):
-                        return value1.type.float.infinity(isNegative: false)
-                    default:
-                        return value1.type.float.infinity(isNegative: true)
-                    }
-                default:
-                    return value1 / value2
-                }
             case .min:
                 guard !value1.isNan && !value2.isNan else {
                     return value1.type.float.nan

@@ -410,14 +410,6 @@ extension Value {
         }
     }
 
-    static func / (lhs: Self, rhs: Self) -> Self {
-        switch (lhs, rhs) {
-        case let (.f32(lhs), .f32(rhs)): return .f32((Float32(bitPattern: lhs) / Float32(bitPattern: rhs)).bitPattern)
-        case let (.f64(lhs), .f64(rhs)): return .f64((Float64(bitPattern: lhs) / Float64(bitPattern: rhs)).bitPattern)
-        default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value.\(#function)` implementation")
-        }
-    }
-
     static func divisionSigned(_ lhs: Self, _ rhs: Self) throws -> Self {
         switch (lhs, rhs) {
         case let (.i32(lhs), .i32(rhs)):
@@ -534,6 +526,7 @@ extension FloatingPoint {
     func add(_ other: Self) -> Self { self + other }
     func sub(_ other: Self) -> Self { self - other }
     func mul(_ other: Self) -> Self { self * other }
+    func div(_ other: Self) -> Self { self / other }
     func eq(_ other: Self) -> UInt32 { self == other ? 1 : 0 }
     func ne(_ other: Self) -> UInt32 { self == other ? 0 : 1 }
 }
