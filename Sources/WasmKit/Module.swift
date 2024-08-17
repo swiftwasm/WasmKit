@@ -174,6 +174,6 @@ struct GuestFunction {
     let code: Code
 
     func compile(module: Module, funcTypeInterner: Interner<FunctionType>, allocator: ISeqAllocator) throws -> InstructionSequence {
-        fatalError("Compile without instantiation is no longer supported")
+        throw TranslationError("Compile without instantiation is no longer supported")
     }
 }

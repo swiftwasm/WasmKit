@@ -575,10 +575,10 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             }
         }
 
-        fileprivate mutating func pinLabel(_ ref: LabelRef, pc: MetaProgramCounter) {
+        fileprivate mutating func pinLabel(_ ref: LabelRef, pc: MetaProgramCounter) throws {
             switch self.labels[ref] {
             case .pinned(let oldPC):
-                fatalError("Internal consistency error: Label \(ref) is already pinned at \(oldPC), but tried to pin at \(pc) again")
+                throw TranslationError("Internal consistency error: Label \(ref) is already pinned at \(oldPC), but tried to pin at \(pc) again")
             case .unpinned(let users):
                 self.labels[ref] = .pinned(pc)
                 self.unpinnedLabels.remove(ref)
@@ -593,8 +593,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             }
         }
 
-        mutating func pinLabelHere(_ ref: LabelRef) {
-            pinLabel(ref, pc: insertingPC)
+        mutating func pinLabelHere(_ ref: LabelRef) throws {
+            try pinLabel(ref, pc: insertingPC)
         }
 
         /// Emit an instruction at the current insertion point with resolved label position
@@ -881,7 +881,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         for parameter in frame.blockType.parameters {
             _ = valueStack.push(parameter)
         }
-        iseqBuilder.pinLabelHere(elseLabel)
+        try iseqBuilder.pinLabelHere(elseLabel)
     }
 
     mutating func visitEnd() throws -> Output {
@@ -893,16 +893,16 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             if poppedFrame.reachable {
                 try translateReturn()
             }
-            iseqBuilder.pinLabelHere(poppedFrame.continuation)
+            try iseqBuilder.pinLabelHere(poppedFrame.continuation)
             return
         }
 
         switch poppedFrame.kind {
         case .block:
-            iseqBuilder.pinLabelHere(poppedFrame.continuation)
+            try iseqBuilder.pinLabelHere(poppedFrame.continuation)
         case .loop: break
         case .if:
-            iseqBuilder.pinLabelHere(poppedFrame.continuation)
+            try iseqBuilder.pinLabelHere(poppedFrame.continuation)
         }
         preserveAllLocalsOnStack()
         try valueStack.truncate(height: poppedFrame.stackHeight)
@@ -1014,7 +1014,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         try emitBranch(relativeDepth: relativeDepth) { offset, copyCount, popCount in
             return .br(offset: offset)
         }
-        iseqBuilder.pinLabelHere(onBranchNotTaken)
+        try iseqBuilder.pinLabelHere(onBranchNotTaken)
     }
 
     mutating func visitBrTable(targets: WasmParser.BrTable) throws -> Output {
