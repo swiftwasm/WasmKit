@@ -239,6 +239,10 @@ extension ExecutionState {
             self.i32Eqz(context: &context, sp: sp, unaryOperand: unaryOperand)
         case .i64Eqz(let unaryOperand):
             self.i64Eqz(context: &context, sp: sp, unaryOperand: unaryOperand)
+        case .f32Div(let binaryOperand):
+            self.f32Div(context: &context, sp: sp, binaryOperand: binaryOperand)
+        case .f64Div(let binaryOperand):
+            self.f64Div(context: &context, sp: sp, binaryOperand: binaryOperand)
         case .select(let selectOperand):
             try self.select(context: &context, sp: sp, selectOperand: selectOperand)
         case .refNull(let refNullOperand):
@@ -383,6 +387,8 @@ extension Instruction {
         case .i64Popcnt: return "i64Popcnt"
         case .i32Eqz: return "i32Eqz"
         case .i64Eqz: return "i64Eqz"
+        case .f32Div: return "f32Div"
+        case .f64Div: return "f64Div"
         case .select: return "select"
         case .refNull: return "refNull"
         case .refIsNull: return "refIsNull"
@@ -556,6 +562,12 @@ extension ExecutionState {
     }
     mutating func i64Rotr(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.rotr(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func f32Div(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.div(sp[binaryOperand.rhs].f32).untyped
+    }
+    mutating func f64Div(context: inout StackContext, sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.div(sp[binaryOperand.rhs].f64).untyped
     }
     mutating func i32Clz(context: inout StackContext, sp: Sp, unaryOperand: Instruction.UnaryOperand) {
         sp[unaryOperand.result] = sp[unaryOperand.input].i32.clz.untyped
