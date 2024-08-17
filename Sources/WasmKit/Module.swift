@@ -174,19 +174,6 @@ struct GuestFunction {
     let code: Code
 
     func compile(module: Module, funcTypeInterner: Interner<FunctionType>, allocator: ISeqAllocator) throws -> InstructionSequence {
-        var translator = InstructionTranslator(
-            allocator: allocator,
-            funcTypeInterner: funcTypeInterner,
-            module: module.translatorContext,
-            type: type,
-            locals: code.locals
-        )
-
-        try WasmParser.parseExpression(
-            bytes: Array(code.expression),
-            features: module.features, hasDataCount: module.hasDataCount,
-            visitor: &translator
-        )
-        return try translator.finalize()
+        fatalError("Compile without instantiation is no longer supported")
     }
 }
