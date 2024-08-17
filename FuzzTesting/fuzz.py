@@ -4,6 +4,7 @@ import argparse
 import os
 import subprocess
 
+
 class CommandRunner:
     def __init__(self, verbose: bool = False, dry_run: bool = False):
         self.verbose = verbose
@@ -15,6 +16,17 @@ class CommandRunner:
         if self.dry_run:
             return
         return subprocess.run(args, **kwargs)
+
+
+def available_libfuzzer_targets():
+    import json
+    # The list of available library products
+    args = ['swift', 'package', 'dump-package']
+    result = subprocess.run(args, stdout=subprocess.PIPE, check=True)
+    package = result.stdout.decode('utf-8')
+    package = json.loads(package)
+    return [product['name'] for product in package['products']
+            if 'library' in product['type']]
 
 
 def main():
@@ -29,7 +41,7 @@ def main():
     # Subcommands
     subparsers = parser.add_subparsers(required=True)
 
-    available_targets = list(os.listdir('Sources'))
+    available_targets = available_libfuzzer_targets()
 
     build_parser = subparsers.add_parser('build', help='Build the fuzzer')
     build_parser.add_argument(
