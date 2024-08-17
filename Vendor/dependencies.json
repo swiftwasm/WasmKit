@@ -7,6 +7,10 @@
     "repository": "https://github.com/WebAssembly/wasi-testsuite.git",
     "revision": "c9c751586fd86b321d595bbef13f2c7403cfdbc5"
   },
+  "wasm-c-api": {
+    "repository": "https://github.com/WebAssembly/wasm-c-api.git",
+    "revision": "2ce1367c9d1271c83fb63bef26d896a2f290cd23"
+  },
   "swift-format": {
     "repository": "https://github.com/swiftlang/swift-format.git",
     "revision": "b268009b0d1182f9a573311c1a69eee9a7fd3d3f"

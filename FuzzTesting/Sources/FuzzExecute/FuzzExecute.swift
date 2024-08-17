@@ -13,11 +13,11 @@ struct FuzzerResourceLimiter: ResourceLimiter {
 public func FuzzCheck(_ start: UnsafePointer<UInt8>, _ count: Int) -> CInt {
     let bytes = Array(UnsafeBufferPointer(start: start, count: count))
     do {
-        var module = try WasmKit.parseWasm(bytes: bytes)
+        let module = try WasmKit.parseWasm(bytes: bytes)
         let runtime = WasmKit.Runtime()
         runtime.store.resourceLimiter = FuzzerResourceLimiter()
         let instance = try runtime.instantiate(module: module)
-        for (name, export) in instance.exports {
+        for export in instance.exports.values {
             guard case let .function(fn) = export else {
                 continue
             }

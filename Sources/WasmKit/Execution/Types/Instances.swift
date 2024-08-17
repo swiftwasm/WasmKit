@@ -294,6 +294,11 @@ typealias InternalMemory = EntityHandle<MemoryEntity>
 public struct Memory: Equatable {
     let handle: InternalMemory
     let allocator: StoreAllocator
+
+    /// Returns a copy of the memory data.
+    public var data: [UInt8] {
+        handle.data
+    }
 }
 
 extension Memory: GuestMemory {
