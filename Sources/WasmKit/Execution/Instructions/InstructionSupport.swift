@@ -295,9 +295,10 @@ extension Instruction {
 }
 
 extension Instruction {
-    func print<Target>(to target: inout Target) where Target : TextOutputStream {
+    func print<Target>(to target: inout Target, function: Function) where Target : TextOutputStream {
         func reg(_ reg: Register) -> String {
-            let regColor = reg < 15 ? "\u{001B}[3\(reg + 1)m" : ""
+            let adjusted = Register(StackLayout.frameHeaderSize(type: function.type)) + reg
+            let regColor = adjusted < 15 ? "\u{001B}[3\(adjusted + 1)m" : ""
             return "\(regColor)reg:\(reg)\u{001B}[0m"
         }
         func memarg(_ memarg: MemArg) -> String {

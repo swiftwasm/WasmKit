@@ -136,6 +136,16 @@ struct ImmutableArray<T> {
     var count: Int { buffer.count }
 }
 
+extension ImmutableArray: Sequence {
+    typealias Element = T
+    typealias Iterator = UnsafeBufferPointer<T>.Iterator
+
+    func makeIterator() -> Iterator {
+        buffer.makeIterator()
+    }
+}
+
+
 /// A type that can be interned into a unique identifier.
 /// Used for efficient equality comparison.
 protocol Internable {
