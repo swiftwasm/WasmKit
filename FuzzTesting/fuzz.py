@@ -109,7 +109,8 @@ def run(args, runner: CommandRunner):
     os.makedirs(artifact_dir, exist_ok=True)
     fuzzer_args = [
         executable_path(args.target_name), './.build/fuzz-corpus',
-        '-timeout=5',
+        '-fork=2',
+        '-timeout=5', '-ignore_timeouts=1',
         # Relax the RSS limit to 5GB (default is 4GB) to allow
         # allocating maximum memory for 32-bit space.
         '-rss_limit_mb=5368709120',
