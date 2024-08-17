@@ -1266,10 +1266,12 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
     private mutating func pushEmit(
         _ type: ValueType,
-        _ instruction: (Instruction.Register) -> Instruction
+        _ instruction: @escaping (Instruction.Register) -> Instruction
     ) {
         let register = valueStack.push(type)
-        emit(instruction(register))
+        emit(instruction(register), resultRelink: { newResult in
+            instruction(newResult)
+        })
     }
     private mutating func popPushEmit(
         _ pop: ValueType,
