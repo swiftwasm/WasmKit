@@ -38,6 +38,7 @@ protocol TranslatorContext {
     func resolveGlobal(_ index: GlobalIndex) -> InternalGlobal?
     func validateDataSegment(_ index: DataIndex) throws
     func validateElementSegment(_ index: ElementIndex) throws
+    func validateFunctionIndex(_ index: FunctionIndex) throws
 }
 
 extension TranslatorContext {
@@ -105,10 +106,13 @@ extension InternalInstance: TranslatorContext {
     func validateElementSegment(_ index: ElementIndex) throws {
         _ = try self.elementSegments[validating: Int(index)]
     }
+    func validateFunctionIndex(_ index: FunctionIndex) throws {
+        _ = try self.functions[validating: Int(index)]
+    }
 }
 
 
-struct TranslatorModuleContext: TranslatorContext {
+struct TranslatorModuleContext {
     internal let imports: ModuleImports
     internal let typeSection: [FunctionType]
     internal let functionTypeIndices: [TypeIndex]
@@ -192,15 +196,6 @@ struct TranslatorModuleContext: TranslatorContext {
     }
     func resolveGlobal(_ index: GlobalIndex) -> InternalGlobal? {
         return nil
-    }
-    func isSameInstance(_ instance: InternalInstance) -> Bool {
-        fatalError()
-    }
-    func validateDataSegment(_ index: DataIndex) throws {
-        fatalError()
-    }
-    func validateElementSegment(_ index: ElementIndex) throws {
-        fatalError()
     }
 }
 
@@ -1410,7 +1405,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         let result = valueStack.push(.i32)
         emit(.refIsNull(Instruction.RefIsNullOperand(value: value.intoRegister(layout: stackLayout), result: result)))
     }
-    mutating func visitRefFunc(functionIndex: UInt32) -> Output {
+    mutating func visitRefFunc(functionIndex: UInt32) throws -> Output {
+        try self.module.validateFunctionIndex(functionIndex)
         pushEmit(.ref(.funcRef), { .refFunc(Instruction.RefFuncOperand(index: functionIndex, result: $0)) })
     }
 
