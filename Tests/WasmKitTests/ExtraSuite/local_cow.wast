@@ -17,3 +17,20 @@
 )
 
 (assert_return (invoke "local_source_loop_param" (i32.const 3)) (i32.const 3))
+
+(module
+  (func (export "check") (result i32)
+    (local i32 i32)
+    i32.const 42
+    local.set 0
+    block (result i32)
+      i32.const 0
+      br 0
+      local.get 0
+    end
+    local.set 1
+    local.get 1
+  )
+)
+
+(assert_return (invoke "check") (i32.const 0))

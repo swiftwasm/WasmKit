@@ -921,6 +921,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             return
         }
 
+        preserveAllLocalsOnStack()
         switch poppedFrame.kind {
         case .block:
             try iseqBuilder.pinLabelHere(poppedFrame.continuation)
@@ -928,7 +929,6 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         case .if:
             try iseqBuilder.pinLabelHere(poppedFrame.continuation)
         }
-        preserveAllLocalsOnStack()
         try valueStack.truncate(height: poppedFrame.stackHeight)
         for result in poppedFrame.blockType.results {
             _ = valueStack.push(result)

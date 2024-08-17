@@ -114,6 +114,32 @@ public struct Instance {
     public var exports: Exports {
         handle.exports.mapValues { ExternalValue(handle: $0, allocator: allocator) }
     }
+
+    @_spi(OnlyForCLI)
+    public func dumpFunctions<Target>(to target: inout Target, module: Module, runtime: Runtime) throws where Target: TextOutputStream {
+        var nameMap = [UInt32: String]()
+        if let nameSection = module.customSections.first(where: { $0.name == "name" }) {
+            let nameParser = WasmParser.NameSectionParser(stream: StaticByteStream(bytes: Array(nameSection.bytes)))
+            for name in try nameParser.parseAll() {
+                switch name {
+                case .functions(let names):
+                    nameMap = names
+                }
+            }
+        }
+        for (offset, function) in self.handle.functions.enumerated() {
+            let index = module.translatorContext.imports.numberOfFunctions + offset
+            guard function.isWasm else { continue }
+            target.write("==== Function[\(index)]")
+            if let name = nameMap[UInt32(index)] {
+                target.write(" '\(name)'")
+            }
+            target.write(" ====\n")
+            try function.ensureCompiled(runtime: RuntimeRef(runtime))
+            let (iseq, _, _) = function.assumeCompiled()
+            iseq.write(to: &target, function: Function(handle: function, allocator: allocator))
+        }
+    }
 }
 
 extension Instance {

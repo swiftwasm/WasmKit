@@ -13,13 +13,13 @@ public struct HostModule {
     }
 
     /// Names of globals exported by this module mapped to corresponding global instances.
-    public let globals: [String: Global]
+    public var globals: [String: Global]
 
     /// Names of memories exported by this module mapped to corresponding addresses of memory instances.
-    public let memories: [String: Memory]
+    public var memories: [String: Memory]
 
     /// Names of functions exported by this module mapped to corresponding host functions.
-    public let functions: [String: HostFunction]
+    public var functions: [String: HostFunction]
 }
 
 /// A container to manage WebAssembly object space.

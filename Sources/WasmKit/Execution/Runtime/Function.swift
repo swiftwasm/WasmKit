@@ -116,11 +116,14 @@ extension InternalFunction {
 
     @inline(never)
     func ensureCompiled(executionState: inout ExecutionState) throws {
+        try ensureCompiled(runtime: executionState.runtime)
+    }
+    func ensureCompiled(runtime: RuntimeRef) throws {
         let entity = self.wasm
         switch entity.code {
         case .uncompiled(let code):
             try entity.withValue {
-                let iseq = try $0.compile(runtime: executionState.runtime, code: code)
+                let iseq = try $0.compile(runtime: runtime, code: code)
                 $0.code = .compiled(iseq)
             }
         case .compiled: break

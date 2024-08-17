@@ -100,35 +100,6 @@ public struct Module {
             _ = try function.compile(module: self, funcTypeInterner: funcTypeInterner, allocator: allocator)
         }
     }
-
-    @_spi(OnlyForCLI)
-    public func dumpFunctions<Target>(to target: inout Target) throws where Target: TextOutputStream {
-        var nameMap = [UInt32: String]()
-        if let nameSection = customSections.first(where: { $0.name == "name" }) {
-            let nameParser = WasmParser.NameSectionParser(stream: StaticByteStream(bytes: Array(nameSection.bytes)))
-            for name in try nameParser.parseAll() {
-                switch name {
-                case .functions(let names):
-                    nameMap = names
-                }
-            }
-        }
-        let funcTypeInterner = Interner<FunctionType>()
-        for (offset, function) in functions.enumerated() {
-            let index = translatorContext.imports.numberOfFunctions + offset
-            target.write("==== Function[\(index)]")
-            if let name = nameMap[UInt32(index)] {
-                target.write(" '\(name)'")
-            }
-            target.write(" ====\n")
-            let iseq = try function.compile(
-                module: self,
-                funcTypeInterner: funcTypeInterner,
-                allocator: allocator
-            )
-            iseq.write(to: &target)
-        }
-    }
 }
 
 extension Module {

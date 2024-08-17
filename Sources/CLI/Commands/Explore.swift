@@ -14,7 +14,23 @@ struct Explore: ParsableCommand {
 
     func run() throws {
         let module = try parseWasm(filePath: FilePath(path))
+        var hostModuleStubs: [String: HostModule] = [:]
+        for importEntry in module.imports {
+            var hostModule = hostModuleStubs[importEntry.module] ?? HostModule()
+            switch importEntry.descriptor {
+            case .function(let typeIndex):
+                let type = module.types[Int(typeIndex)]
+                hostModule.functions[importEntry.name] = HostFunction(type: type) { _, _ in
+                    fatalError("unreachable")
+                }
+            default:
+                fatalError("Import \(importEntry) not supported in explore mode yet")
+            }
+            hostModuleStubs[importEntry.module] = hostModule
+        }
+        let runtime = Runtime(hostModules: hostModuleStubs)
+        let instance = try runtime.instantiate(module: module)
         var stdout = Stdout()
-        try module.dumpFunctions(to: &stdout)
+        try instance.dumpFunctions(to: &stdout, module: module, runtime: runtime)
     }
 }
