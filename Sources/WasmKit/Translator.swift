@@ -36,6 +36,8 @@ protocol TranslatorContext {
     func resolveCallee(_ index: FunctionIndex) -> InternalFunction?
     func isSameInstance(_ instance: InternalInstance) -> Bool
     func resolveGlobal(_ index: GlobalIndex) -> InternalGlobal?
+    func validateDataSegment(_ index: DataIndex) throws
+    func validateElementSegment(_ index: ElementIndex) throws
 }
 
 extension TranslatorContext {
@@ -96,6 +98,12 @@ extension InternalInstance: TranslatorContext {
     }
     func isSameInstance(_ instance: InternalInstance) -> Bool {
         return instance == self
+    }
+    func validateDataSegment(_ index: DataIndex) throws {
+        _ = try self.dataSegments[validating: Int(index)]
+    }
+    func validateElementSegment(_ index: ElementIndex) throws {
+        _ = try self.elementSegments[validating: Int(index)]
     }
 }
 
@@ -186,6 +194,12 @@ struct TranslatorModuleContext: TranslatorContext {
         return nil
     }
     func isSameInstance(_ instance: InternalInstance) -> Bool {
+        fatalError()
+    }
+    func validateDataSegment(_ index: DataIndex) throws {
+        fatalError()
+    }
+    func validateElementSegment(_ index: ElementIndex) throws {
         fatalError()
     }
 }
@@ -1567,6 +1581,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     mutating func visitI64Extend16S() throws -> Output { try visitUnary(.i64, Instruction.i64Extend16S) }
     mutating func visitI64Extend32S() throws -> Output { try visitUnary(.i64, Instruction.i64Extend32S) }
     mutating func visitMemoryInit(dataIndex: UInt32) throws -> Output {
+        try self.module.validateDataSegment(dataIndex)
         let addressType = try module.addressType(memoryIndex: 0)
         try popEmit((.i32, .i32, addressType)) { [stackLayout] values, stack in
             let (size, sourceOffset, destOffset) = values
@@ -1580,7 +1595,10 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             )
         }
     }
-    mutating func visitDataDrop(dataIndex: UInt32) -> Output { emit(.memoryDataDrop(dataIndex)) }
+    mutating func visitDataDrop(dataIndex: UInt32) throws -> Output {
+        try self.module.validateDataSegment(dataIndex)
+        emit(.memoryDataDrop(dataIndex))
+    }
     mutating func visitMemoryCopy(dstMem: UInt32, srcMem: UInt32) throws -> Output {
         //     C.mems[0] = it limits
         // -----------------------------
@@ -1616,6 +1634,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
     }
     mutating func visitTableInit(elemIndex: UInt32, table: UInt32) throws -> Output {
+        try self.module.validateElementSegment(elemIndex)
         try popEmit((.i32, .i32, module.addressType(tableIndex: table))) { [stackLayout] values, stack in
             let (size, sourceOffset, destOffset) = values
             return .tableInit(
@@ -1629,7 +1648,10 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             )
         }
     }
-    mutating func visitElemDrop(elemIndex: UInt32) -> Output { emit(.tableElementDrop(elemIndex)) }
+    mutating func visitElemDrop(elemIndex: UInt32) throws -> Output {
+        try self.module.validateElementSegment(elemIndex)
+        emit(.tableElementDrop(elemIndex))
+    }
     mutating func visitTableCopy(dstTable: UInt32, srcTable: UInt32) throws -> Output {
         //   C.tables[d] = iN limits t   C.tables[s] = iM limits t    K = min {N, M}
         // -----------------------------------------------------------------------------

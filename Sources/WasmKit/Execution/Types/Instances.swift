@@ -384,6 +384,12 @@ struct ElementSegmentEntity {
     }
 }
 
+extension ElementSegmentEntity: ValidatableEntity {
+    static func createOutOfBoundsError(index: Int, count: Int) -> Error {
+        Trap._raw("Element index out of bounds: \(index) (max: \(count))")
+    }
+}
+
 typealias InternalElementSegment = EntityHandle<ElementSegmentEntity>
 
 /// > Note:
@@ -394,6 +400,12 @@ struct DataSegmentEntity {
 
     mutating func drop() {
         self = DataSegmentEntity(data: [])
+    }
+}
+
+extension DataSegmentEntity: ValidatableEntity {
+    static func createOutOfBoundsError(index: Int, count: Int) -> Error {
+        Trap._raw("Data index out of bounds: \(index) (max: \(count))")
     }
 }
 
