@@ -1,0 +1,3 @@
+module WasmCAPI {
+  header "wasm.h"
+}
