@@ -15,15 +15,15 @@ struct StaticCanonicalDeallocation: CanonicalDeallocation {
         pointer: Operand, length: Operand, element: WITType,
         deallocateElement: (Pointer) throws -> Void
     ) throws {
-        let deallocElemenetVar = builder.variable("deallocElement")
-        printer.write(line: "let \(deallocElemenetVar): (UnsafeMutableRawPointer) -> Void = {")
+        let deallocElementVar = builder.variable("deallocElement")
+        printer.write(line: "let \(deallocElementVar): (UnsafeMutableRawPointer) -> Void = {")
         try printer.indent {
             printer.write(line: "_ = $0")
             try deallocateElement(.init(basePointerVar: "$0", offset: 0))
         }
         printer.write(line: "}")
         printer.write(
-            line: "Prelude.deallocateList(pointer: \(pointer), length: \(length), elementSize: \(CanonicalABI.size(type: element)), deallocateElement: \(deallocElemenetVar))"
+            line: "Prelude.deallocateList(pointer: \(pointer), length: \(length), elementSize: \(CanonicalABI.size(type: element)), deallocateElement: \(deallocElementVar))"
         )
     }
 

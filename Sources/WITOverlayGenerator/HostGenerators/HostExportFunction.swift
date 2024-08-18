@@ -259,7 +259,7 @@ struct HostExportFunction {
             let optionsVar = builder.variable("options")
             printer.write(line: "let \(optionsVar) = CanonicalOptions._derive(from: instance, exportName: \"\(name.abiName)\")")
             printer.write(line: "let \(context.contextVar) = CanonicalCallContext(options: \(optionsVar), instance: instance, runtime: runtime)")
-            // Supress unused variable warning for "context"
+            // Suppress unused variable warning for "context"
             printer.write(line: "_ = \(context.contextVar)")
 
             let arguments = try printLowerArguments(

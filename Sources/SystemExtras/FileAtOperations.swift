@@ -271,7 +271,7 @@ extension FileDescriptor {
   /// Create a symbolic link relative to a directory file descriptor
   ///
   /// - Parameters:
-  ///   - original: The path to be refered by the created symbolic link.
+  ///   - original: The path to be referred by the created symbolic link.
   ///   - link: The relative location of the symbolic link to create
   ///
   /// The corresponding C function is `symlinkat`.
@@ -287,7 +287,7 @@ extension FileDescriptor {
   /// Create a symbolic link relative to a directory file descriptor
   ///
   /// - Parameters:
-  ///   - original: The path to be refered by the created symbolic link.
+  ///   - original: The path to be referred by the created symbolic link.
   ///   - link: The relative location of the symbolic link to create
   ///
   /// The corresponding C function is `symlinkat`.

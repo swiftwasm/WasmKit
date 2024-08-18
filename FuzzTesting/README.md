@@ -7,7 +7,7 @@ This subdirectory contains some [libFuzzer](https://www.llvm.org/docs/LibFuzzer.
 
 ## Requirements
 
-- [Open Source Swift Toolchain](https://swift.org/install) - Xcode toolchain does not contain fuzzing supoort, so you need to install the open source toolchain.
+- [Open Source Swift Toolchain](https://swift.org/install) - Xcode toolchain does not contain fuzzing support, so you need to install the open source toolchain.
 - [wasm-tools](https://github.com/bytecodealliance/wasm-tools) - Required to generate random seed corpora
 
 ## libFuzzer-based Fuzzing Targets

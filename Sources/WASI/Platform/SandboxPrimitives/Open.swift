@@ -40,16 +40,16 @@ struct PathResolution {
         let options: FileDescriptor.OpenOptions
         let mode: FileDescriptor.AccessMode
         if !self.components.isEmpty {
-            var intermediateOtions: FileDescriptor.OpenOptions = []
+            var intermediateOptions: FileDescriptor.OpenOptions = []
 
             #if !os(Windows)
                 // When trying to open an intermediate directory,
                 // we can assume it's directory.
-                intermediateOtions.insert(.directory)
+                intermediateOptions.insert(.directory)
                 // FIXME: Resolve symlink in safe way
-                intermediateOtions.insert(.noFollow)
+                intermediateOptions.insert(.noFollow)
             #endif
-            options = intermediateOtions
+            options = intermediateOptions
             mode = .readOnly
         } else {
             options = self.options
