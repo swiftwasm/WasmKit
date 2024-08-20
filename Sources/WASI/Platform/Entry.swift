@@ -78,7 +78,7 @@ extension FdWASIEntry {
         try WASIAbi.FileType(platformFileType: self.fd.attributes().fileType)
     }
 
-    /// Returns the current file desciptor status
+    /// Returns the current file descriptor status
     func status() throws -> WASIAbi.Fdflags {
         return try WASIAbi.Errno.translatingPlatformErrno {
             WASIAbi.Fdflags(platformOpenOptions: try self.fd.status())

@@ -112,7 +112,7 @@ class ValidationTests: XCTestCase {
                 type a = u8
                 type b = a
               }
-              // a shoud not be visible here
+              // a should not be visible here
               type c = a
             }
             """,
@@ -130,7 +130,7 @@ class ValidationTests: XCTestCase {
                 type a = u8
                 type b = a
               }
-              // a shoud not be visible here
+              // a should not be visible here
               type c = a
             }
             """,

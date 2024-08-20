@@ -80,7 +80,7 @@ internal func system_platform_strlen(_ s: UnsafePointer<CInterop.PlatformChar>) 
   #endif
 }
 
-// Interop between String and platfrom string
+// Interop between String and platform string
 extension String {
   internal func _withPlatformString<Result>(
     _ body: (UnsafePointer<CInterop.PlatformChar>) throws -> Result

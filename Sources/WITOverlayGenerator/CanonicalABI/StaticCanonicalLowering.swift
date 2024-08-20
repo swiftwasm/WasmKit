@@ -188,7 +188,7 @@ extension StaticCanonicalLowering {
             return .accessField(value, name: "bitPattern")
 
         case (.i64, .i32), (.i64, .f32), (.f64, .i32), (.f64, .f32):
-            fatalError("Should not trucate while casting")
+            fatalError("Should not truncate while casting")
         }
     }
 }
