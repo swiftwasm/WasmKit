@@ -649,13 +649,19 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     let type: FunctionType
     let endOfFunctionLabel: LabelRef
     let stackLayout: StackLayout
+    /// The index of the function in the module
+    let functionIndex: FunctionIndex
+    /// Whether a call to this function should be intercepted
+    let intercepting: Bool
 
     init(
         allocator: ISeqAllocator,
         funcTypeInterner: Interner<FunctionType>,
         module: Context,
         type: FunctionType,
-        locals: [WasmParser.ValueType]
+        locals: [WasmParser.ValueType],
+        functionIndex: FunctionIndex,
+        intercepting: Bool
     ) {
         self.allocator = allocator
         self.funcTypeInterner = funcTypeInterner
@@ -666,6 +672,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         self.valueStack = ValueStack(stackRegBase: Instruction.Register(locals.count))
         self.locals = Locals(types: type.parameters + locals)
         self.stackLayout = StackLayout(type: type)
+        self.functionIndex = functionIndex
+        self.intercepting = intercepting
 
         do {
             let endLabel = self.iseqBuilder.allocLabel()
@@ -781,6 +789,10 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
     }
     private mutating func translateReturn() throws {
+        if intercepting {
+            // Emit `onExit` instruction before every `return` instruction
+            emit(.onExit(functionIndex))
+        }
         try iseqBuilder.emit(.return(visitReturnLike()))
     }
     private mutating func markUnreachable() throws {
@@ -789,7 +801,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         try valueStack.truncate(height: currentFrame.stackHeight)
     }
 
-    mutating func finalize() throws -> InstructionSequence {
+    private mutating func finalize() throws -> InstructionSequence {
         if controlStack.numberOfFrames > 1 {
             throw TranslationError("Expect \(controlStack.numberOfFrames - 1) more `end` instructions")
         }
@@ -807,6 +819,25 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             instructions: buffer,
             maxStackHeight: Int(valueStack.stackRegBase) + valueStack.maxHeight
         )
+    }
+
+    // MARK: Main entry point
+
+    /// Translate a Wasm expression into a sequence of instructions.
+    mutating func translate(
+        expression: ArraySlice<UInt8>,
+        instance: InternalInstance
+    ) throws -> InstructionSequence {
+        if intercepting {
+            // Emit `onEnter` instruction at the beginning of the function
+            emit(.onEnter(functionIndex))
+        }
+        try WasmParser.parseExpression(
+            bytes: Array(expression),
+            features: instance.features, hasDataCount: instance.hasDataCount,
+            visitor: &self
+        )
+        return try finalize()
     }
 
     // MARK: - Visitor

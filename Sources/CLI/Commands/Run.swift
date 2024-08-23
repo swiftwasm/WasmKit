@@ -7,6 +7,15 @@ struct Run: ParsableCommand {
     @Flag
     var verbose = false
 
+    @Option(
+        name: .customLong("profile"),
+        help: ArgumentHelp(
+            "Output a profile of the execution to the given file in Google's Trace Event Format",
+            valueName: "path"
+        )
+    )
+    var profileOutput: String?
+
     struct EnvOption: ExpressibleByArgument {
         let key: String
         let value: String
@@ -49,11 +58,14 @@ struct Run: ParsableCommand {
             module = try parseWasm(filePath: FilePath(path))
         }
 
+        let interceptor = try deriveInterceptor()
+        defer { interceptor?.finalize() }
+
         let invoke: () throws -> Void
         if module.exports.contains(where: { $0.name == "_start" }) {
-            invoke = try instantiateWASI(module: module)
+            invoke = try instantiateWASI(module: module, interceptor: interceptor?.interceptor)
         } else {
-            guard let entry = try instantiateNonWASI(module: module) else {
+            guard let entry = try instantiateNonWASI(module: module, interceptor: interceptor?.interceptor) else {
                 return
             }
             invoke = entry
@@ -67,7 +79,28 @@ struct Run: ParsableCommand {
         }
     }
 
-    func instantiateWASI(module: Module) throws -> () throws -> Void {
+    func deriveInterceptor() throws -> (interceptor: GuestTimeProfiler, finalize: () -> Void)? {
+        guard let outputPath = self.profileOutput else { return nil }
+        let fileHandle = try FileDescriptor.open(
+            FilePath(outputPath), .writeOnly, options: .create,
+            permissions: [.ownerReadWrite, .groupRead, .otherRead]
+        )
+        let profiler = GuestTimeProfiler { data in
+            var data = data
+            _ = data.withUTF8 { try! fileHandle.writeAll($0) }
+        }
+        return (
+            profiler,
+            {
+                profiler.finalize()
+                try! fileHandle.close()
+
+                print("\nProfile Completed: \(outputPath) can be viewed using https://ui.perfetto.dev/")
+            }
+        )
+    }
+
+    func instantiateWASI(module: Module, interceptor: RuntimeInterceptor?) throws -> () throws -> Void {
         // Flatten environment variables into a dictionary (Respect the last value if a key is duplicated)
         let environment = environment.reduce(into: [String: String]()) {
             $0[$1.key] = $1.value
@@ -76,7 +109,7 @@ struct Run: ParsableCommand {
             $0[$1] = $1
         }
         let wasi = try WASIBridgeToHost(args: [path] + arguments, environment: environment, preopens: preopens)
-        let runtime = Runtime(hostModules: wasi.hostModules)
+        let runtime = Runtime(hostModules: wasi.hostModules, interceptor: interceptor)
         let moduleInstance = try runtime.instantiate(module: module)
         return {
             let exitCode = try wasi.start(moduleInstance, runtime: runtime)
@@ -84,7 +117,7 @@ struct Run: ParsableCommand {
         }
     }
 
-    func instantiateNonWASI(module: Module) throws -> (() throws -> Void)? {
+    func instantiateNonWASI(module: Module, interceptor: RuntimeInterceptor?) throws -> (() throws -> Void)? {
         let functionName = arguments.first
         let arguments = arguments.dropFirst()
 
@@ -107,7 +140,7 @@ struct Run: ParsableCommand {
             return nil
         }
 
-        let runtime = Runtime()
+        let runtime = Runtime(interceptor: interceptor)
         let moduleInstance = try runtime.instantiate(module: module)
         return {
             log("Started invoking function \"\(functionName)\" with parameters: \(parameters)", verbose: true)

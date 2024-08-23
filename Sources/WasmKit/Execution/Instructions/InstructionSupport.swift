@@ -205,7 +205,10 @@ extension Instruction {
 
     struct ReturnOperand: Equatable {
     }
-    
+
+    typealias OnEnterOperand = FunctionIndex
+    typealias OnExitOperand = FunctionIndex
+
     static func f32Lt(_ op: BinaryOperand) -> Instruction { .numericFloatBinary(.lt(.f32), op) }
     static func f32Gt(_ op: BinaryOperand) -> Instruction { .numericFloatBinary(.gt(.f32), op) }
     static func f32Le(_ op: BinaryOperand) -> Instruction { .numericFloatBinary(.le(.f32), op) }

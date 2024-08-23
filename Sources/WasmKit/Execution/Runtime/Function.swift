@@ -147,14 +147,16 @@ extension InternalFunction {
 struct WasmFunctionEntity {
     let type: InternedFuncType
     let instance: InternalInstance
+    let index: FunctionIndex
     let numberOfNonParameterLocals: Int
     var code: CodeBody
 
-    init(type: InternedFuncType, code: InternalUncompiledCode, instance: InternalInstance) {
+    init(index: FunctionIndex, type: InternedFuncType, code: InternalUncompiledCode, instance: InternalInstance) {
         self.type = type
         self.instance = instance
         self.code = .uncompiled(code)
         self.numberOfNonParameterLocals = code.locals.count
+        self.index = index
     }
 
     mutating func ensureCompiled(executionState: inout ExecutionState) throws -> InstructionSequence {
@@ -178,15 +180,14 @@ struct WasmFunctionEntity {
             funcTypeInterner: runtime.value.funcTypeInterner,
             module: instance,
             type: runtime.value.resolveType(type),
-            locals: code.locals
+            locals: code.locals,
+            functionIndex: index,
+            intercepting: runtime.value.interceptor != nil
         )
-
-        try WasmParser.parseExpression(
-            bytes: Array(code.expression),
-            features: instance.features, hasDataCount: instance.hasDataCount,
-            visitor: &translator
+        let iseq = try translator.translate(
+            expression: code.expression,
+            instance: instance
         )
-        let iseq = try translator.finalize()
         self.code = .compiled(iseq)
         return iseq
     }

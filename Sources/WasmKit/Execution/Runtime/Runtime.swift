@@ -3,13 +3,15 @@ import WasmParser
 /// A container to manage execution state of one or more module instances.
 public final class Runtime {
     public let store: Store
+    let interceptor: RuntimeInterceptor?
     let funcTypeInterner: Interner<FunctionType>
 
     /// Initializes a new instant of a WebAssembly interpreter runtime.
     /// - Parameter hostModules: Host module names mapped to their corresponding ``HostModule`` definitions.
-    public init(hostModules: [String: HostModule] = [:]) {
+    public init(hostModules: [String: HostModule] = [:], interceptor: RuntimeInterceptor? = nil) {
         self.funcTypeInterner = Interner<FunctionType>()
         store = Store(funcTypeInterner: funcTypeInterner)
+        self.interceptor = interceptor
 
         for (moduleName, hostModule) in hostModules {
             store.registerUniqueHostModule(hostModule, as: moduleName, runtime: self)
@@ -25,7 +27,6 @@ public final class Runtime {
 }
 
 @_documentation(visibility: internal)
-@available(*, unavailable, message: "Interceptors are not supported anymore for performance reasons")
 public protocol RuntimeInterceptor {
     func onEnterFunction(_ function: Function, store: Store)
     func onExitFunction(_ function: Function, store: Store)

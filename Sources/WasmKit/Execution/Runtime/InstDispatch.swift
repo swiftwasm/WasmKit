@@ -267,6 +267,10 @@ extension ExecutionState {
             try self.tableInit(context: &context, sp: sp, tableInitOperand: tableInitOperand)
         case .tableElementDrop(let elementIndex):
             self.tableElementDrop(context: &context, sp: sp, elementIndex: elementIndex)
+        case .onEnter(let onEnterOperand):
+            self.onEnter(context: &context, sp: sp, onEnterOperand: onEnterOperand)
+        case .onExit(let onExitOperand):
+            self.onExit(context: &context, sp: sp, onExitOperand: onExitOperand)
         }
         programCounter += 1
         return true
@@ -401,6 +405,8 @@ extension Instruction {
         case .tableCopy: return "tableCopy"
         case .tableInit: return "tableInit"
         case .tableElementDrop: return "tableElementDrop"
+        case .onEnter: return "onEnter"
+        case .onExit: return "onExit"
         }
     }
 }
