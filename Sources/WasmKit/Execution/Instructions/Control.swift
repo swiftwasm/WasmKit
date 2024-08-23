@@ -125,4 +125,19 @@ extension ExecutionState {
             md: &md, ms: &ms
         )
     }
+
+    mutating func onEnter(context: inout StackContext, sp: Sp, onEnterOperand: Instruction.OnEnterOperand) {
+        let function = context.currentInstance.functions[Int(onEnterOperand)]
+        self.runtime.value.interceptor?.onEnterFunction(
+            Function(handle: function, allocator: self.runtime.store.allocator),
+            store: self.runtime.store
+        )
+    }
+    mutating func onExit(context: inout StackContext, sp: Sp, onExitOperand: Instruction.OnExitOperand) {
+        let function = context.currentInstance.functions[Int(onExitOperand)]
+        self.runtime.value.interceptor?.onExitFunction(
+            Function(handle: function, allocator: self.runtime.store.allocator),
+            store: self.runtime.store
+        )
+    }
 }

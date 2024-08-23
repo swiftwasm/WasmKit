@@ -296,8 +296,8 @@ extension StoreAllocator {
         let functions = allocateEntities(
             imports: importedFunctions,
             internals: module.functions,
-            allocateHandle: { f, _ in
-                allocate(function: f, instance: instanceHandle, runtime: runtime)
+            allocateHandle: { f, index in
+                allocate(function: f, index: FunctionIndex(index), instance: instanceHandle, runtime: runtime)
             }
         )
 
@@ -412,13 +412,14 @@ extension StoreAllocator {
     /// TODO: Mark as private
     func allocate(
         function: GuestFunction,
+        index: FunctionIndex,
         instance: InternalInstance,
         runtime: Runtime
     ) -> InternalFunction {
         let code = InternalUncompiledCode(unsafe: codes.allocate(initializing: function.code))
         let pointer = functions.allocate(
             initializing: WasmFunctionEntity(
-                type: runtime.internType(function.type),
+                index: index, type: runtime.internType(function.type),
                 code: code,
                 instance: instance
             )

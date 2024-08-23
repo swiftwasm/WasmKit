@@ -209,6 +209,9 @@ enum GenerateInternalInstruction {
         Instruction(name: "tableCopy", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.TableCopyOperand")]),
         Instruction(name: "tableInit", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.TableInitOperand")]),
         Instruction(name: "tableElementDrop", immediates: [Immediate(name: nil, type: "ElementIndex")]),
+        // Profiling
+        Instruction(name: "onEnter", immediates: [Immediate(name: nil, type: "Instruction.OnEnterOperand")]),
+        Instruction(name: "onExit", immediates: [Immediate(name: nil, type: "Instruction.OnExitOperand")]),
     ]
 
     static let instructions: [Instruction] =

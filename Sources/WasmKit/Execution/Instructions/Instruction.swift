@@ -124,4 +124,6 @@ enum Instruction: Equatable {
     case tableCopy(Instruction.TableCopyOperand)
     case tableInit(Instruction.TableInitOperand)
     case tableElementDrop(ElementIndex)
+    case onEnter(Instruction.OnEnterOperand)
+    case onExit(Instruction.OnExitOperand)
 }

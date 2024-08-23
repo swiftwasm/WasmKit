@@ -40,4 +40,16 @@ struct NameRegistry {
         try materializeIfNeeded()
         return functionNames[addr]
     }
+
+    mutating func symbolicate(_ function: InternalFunction) -> String {
+        if let name = try? lookup(function) {
+            return name
+        }
+        // Fallback
+        if function.isWasm {
+            return "unknown function[\(function.wasm.index)]"
+        } else {
+            return "unknown host function"
+        }
+    }
 }
