@@ -25,7 +25,7 @@ struct StackContext {
             frames.deallocate()
         }
         var context = StackContext(stackEnd: valueStack.endAddress, frames: frames, runtime: runtime)
-        return try body(&context, Sp(pointer: valueStack.frameBase))
+        return try body(&context, valueStack.frameBase)
     }
 
     @inline(__always)
@@ -39,7 +39,7 @@ struct StackContext {
         guard frames.count < limit else {
             throw Trap.callStackExhausted
         }
-        let newSp = sp.pointer.advanced(by: Int(spAddend))
+        let newSp = sp.advanced(by: Int(spAddend))
         guard newSp.advanced(by: iseq.maxStackHeight) < stackEnd else {
             throw Trap.callStackExhausted
         }
@@ -48,7 +48,7 @@ struct StackContext {
         let frame = Frame(instance: instance, savedSp: sp, returnPc: returnPC)
         frames.push(frame)
         self.currentFrame = frame
-        return FrameBase(pointer: newSp)
+        return newSp
     }
 
     @inline(__always)

@@ -149,7 +149,7 @@ extension ExecutionState {
     }
 }
 
-extension ExecutionState.FrameBase {
+extension Sp {
     fileprivate func getReference(_ register: Instruction.Register, type: TableType) -> Reference {
         return self[register].asReference(type.elementType)
     }
