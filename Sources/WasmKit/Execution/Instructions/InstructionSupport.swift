@@ -203,9 +203,6 @@ extension Instruction {
         let callLike: CallLikeOperand
     }
 
-    struct ReturnOperand: Equatable {
-    }
-
     typealias OnEnterOperand = FunctionIndex
     typealias OnExitOperand = FunctionIndex
 

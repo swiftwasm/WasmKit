@@ -42,11 +42,11 @@ extension ExecutionState {
         case .brTable(let brTableOperand):
             try self.brTable(context: &context, sp: sp, brTableOperand: brTableOperand)
             return true
-        case .`return`(let returnOperand):
-            try self.`return`(context: &context, sp: sp, md: &md, ms: &ms, returnOperand: returnOperand)
+        case .`return`:
+            try self.`return`(context: &context, sp: sp, md: &md, ms: &ms)
             return false
-        case .endOfFunction(let returnOperand):
-            try self.endOfFunction(context: &context, sp: sp, md: &md, ms: &ms, returnOperand: returnOperand)
+        case .endOfFunction:
+            try self.endOfFunction(context: &context, sp: sp, md: &md, ms: &ms)
             return false
         case .endOfExecution:
             try self.endOfExecution(context: &context, sp: sp)
