@@ -894,7 +894,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
     mutating func visitLoop(blockType: WasmParser.BlockType) throws -> Output {
         let blockType = try module.resolveBlockType(blockType)
-        preserveAllLocalsOnStack()
+        preserveLocalsOnStack(depth: blockType.parameters.count)
         iseqBuilder.resetLastEmission()
         for param in blockType.parameters.reversed() {
             _ = try popOperand(param)
