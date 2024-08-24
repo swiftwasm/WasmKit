@@ -22,7 +22,7 @@ struct InstructionSequence: Equatable {
 }
 
 extension Collection where Element == Instruction {
-    func write<Target>(to target: inout Target, context: InstructionPrintingContext) where Target : TextOutputStream {
+    func write<Target>(to target: inout Target, context: inout InstructionPrintingContext) where Target : TextOutputStream {
         var hexOffsetWidth = String(self.count - 1, radix: 16).count
         hexOffsetWidth = (hexOffsetWidth + 1) & ~1
         for (index, instruction) in self.enumerated() {
@@ -31,7 +31,7 @@ extension Collection where Element == Instruction {
                 hexOffset = "0" + hexOffset
             }
             target.write("0x\(hexOffset): ")
-            instruction.print(to: &target, context: context)
+            context.print(instruction: instruction, to: &target)
             target.write("\n")
         }
     }
