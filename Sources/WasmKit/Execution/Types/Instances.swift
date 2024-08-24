@@ -117,31 +117,22 @@ public struct Instance {
 
     @_spi(OnlyForCLI)
     public func dumpFunctions<Target>(to target: inout Target, module: Module, runtime: Runtime) throws where Target: TextOutputStream {
-        var nameMap = [UInt32: String]()
-        if let nameSection = module.customSections.first(where: { $0.name == "name" }) {
-            let nameParser = WasmParser.NameSectionParser(stream: StaticByteStream(bytes: Array(nameSection.bytes)))
-            for name in try nameParser.parseAll() {
-                switch name {
-                case .functions(let names):
-                    nameMap = names
-                }
-            }
-        }
         for (offset, function) in self.handle.functions.enumerated() {
-            let index = module.translatorContext.imports.numberOfFunctions + offset
+            let index = offset
             guard function.isWasm else { continue }
             target.write("==== Function[\(index)]")
-            if let name = nameMap[UInt32(index)] {
+            if let name = try? runtime.store.nameRegistry.lookup(function) {
                 target.write(" '\(name)'")
             }
             target.write(" ====\n")
             try function.ensureCompiled(runtime: RuntimeRef(runtime))
             let (iseq, _, _) = function.assumeCompiled()
-            let context = InstructionPrintingContext(
+            var context = InstructionPrintingContext(
                 shouldColor: true,
-                function: Function(handle: function, allocator: allocator)
+                function: Function(handle: function, allocator: allocator),
+                nameRegistry: runtime.store.nameRegistry
             )
-            iseq.instructions.write(to: &target, context: context)
+            iseq.instructions.write(to: &target, context: &context)
         }
     }
 }

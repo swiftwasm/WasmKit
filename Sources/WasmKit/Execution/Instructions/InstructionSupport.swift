@@ -297,6 +297,7 @@ extension Instruction {
 struct InstructionPrintingContext {
     let shouldColor: Bool
     let function: Function
+    var nameRegistry: NameRegistry
 
     func reg(_ reg: Instruction.Register) -> String {
         let adjusted = Instruction.Register(StackLayout.frameHeaderSize(type: function.type)) + reg
@@ -307,29 +308,49 @@ struct InstructionPrintingContext {
             return "reg:\(reg)"
         }
     }
-}
 
-extension Instruction {
-    func print<Target>(to target: inout Target, context: InstructionPrintingContext) where Target : TextOutputStream {
-        func reg(_ reg: Instruction.Register) -> String { context.reg(reg) }
-        func memarg(_ memarg: MemArg) -> String {
-            "offset: \(memarg.offset)"
-        }
-        switch self {
+    func memarg(_ memarg: Instruction.MemArg) -> String {
+        "offset: \(memarg.offset)"
+    }
+
+    mutating func callee(_ callee: InternalFunction) -> String {
+        return "'" + nameRegistry.symbolicate(callee) + "'"
+    }
+
+    func hex<T: BinaryInteger>(_ value: T) -> String {
+        let hex = String(value, radix: 16)
+        return "0x\(String(repeating: "0", count: 16 - hex.count) + hex)"
+    }
+
+    func global(_ global: InternalGlobal) -> String {
+        "global:\(hex(global.bitPattern))"
+    }
+
+    func value(_ value: UntypedValue) -> String {
+        "untyped:\(hex(value.storage))"
+    }
+
+    mutating func print<Target>(
+        instruction: Instruction,
+        to target: inout Target
+    ) where Target : TextOutputStream {
+        switch instruction {
         case .unreachable:
             target.write("unreachable")
         case .nop:
             target.write("nop")
         case .globalGet(let op):
-            target.write("\(reg(op.result)) = global.get \(op.global)")
+            target.write("\(reg(op.result)) = global.get \(global(op.global))")
         case .globalSet(let op):
-            target.write("global.set \(op.global), \(reg(op.value))")
+            target.write("global.set \(global(op.global)), \(reg(op.value))")
         case .numericConst(let op):
-            target.write("\(reg(op.result)) = \(op.value)")
+            target.write("\(reg(op.result)) = \(value(op.value))")
         case .call(let op):
-            target.write("call \(op.callee), sp: +\(op.callLike.spAddend)")
+            target.write("call \(callee(op.callee)), sp: +\(op.callLike.spAddend)")
         case .callIndirect(let op):
-            target.write("call_indirect \(reg(op.index)), \(op.tableIndex), \(op.type), sp: +\(op.callLike.spAddend)")
+            target.write("call_indirect \(reg(op.index)), \(op.tableIndex), (func_ty id:\(op.type.id)), sp: +\(op.callLike.spAddend)")
+        case .compilingCall(let op):
+            target.write("compiling_call \(callee(op.callee)), sp: +\(op.callLike.spAddend)")
         case .i32Load(let op):
             target.write("\(reg(op.result)) = i32.load \(reg(op.pointer)), \(memarg(op.memarg))")
         case .i64Load(let op):
@@ -348,12 +369,16 @@ extension Instruction {
             target.write("\(reg(op.result)) = i32.lt_u \(reg(op.lhs)), \(reg(op.rhs))")
         case .i32Eq(let op):
             target.write("\(reg(op.result)) = i32.eq \(reg(op.lhs)), \(reg(op.rhs))")
+        case .i32Eqz(let op):
+            target.write("\(reg(op.result)) = i32.eqz \(reg(op.input))")
         case .i32Store(let op):
             target.write("i32.store \(reg(op.pointer)), \(reg(op.value)), \(memarg(op.memarg))")
         case .numericIntBinary(let op, let operands):
             target.write("\(reg(operands.result)) = \(op) \(reg(operands.lhs)), \(reg(operands.rhs))")
         case .brIfNot(let op):
             target.write("br_if_not \(reg(op.condition)), +\(op.offset)")
+        case .brIf(let op):
+            target.write("br_if \(reg(op.condition)), +\(op.offset)")
         case .br(let offset):
             target.write("br \(offset > 0 ? "+" : "")\(offset)")
         case .return:
@@ -361,7 +386,7 @@ extension Instruction {
         case .endOfFunction:
             target.write("end")
         default:
-            target.write(String(describing: self))
+            target.write(String(describing: instruction))
         }
     }
 }

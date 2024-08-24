@@ -18,11 +18,11 @@ final class TranslatorTests: XCTestCase {
 
             var out = "Actual:\n"
             let function = Function(handle: function, allocator: runtime.store.allocator)
-            let context = InstructionPrintingContext(shouldColor: false, function: function)
-            iseq.instructions.write(to: &out, context: context)
+            var context = InstructionPrintingContext(shouldColor: false, function: function, nameRegistry: NameRegistry())
+            iseq.instructions.write(to: &out, context: &context)
             out += "\n\n"
             out += "Expected:\n"
-            expected.write(to: &out, context: context)
+            expected.write(to: &out, context: &context)
             XCTFail(out, line: line)
         }
     }
