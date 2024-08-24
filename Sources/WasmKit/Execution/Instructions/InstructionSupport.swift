@@ -166,8 +166,8 @@ extension Instruction {
     }
 
     struct IfOperand: Equatable {
-        // elseRef for if-then-else-end sequence, endRef for if-then-end sequence
-        let elseOrEndRef: ExpressionRef
+        // `else` for if-then-else-end sequence, `end` for if-then-end sequence
+        let elseOrEndOffset: UInt32
         let condition: Register
     }
     
