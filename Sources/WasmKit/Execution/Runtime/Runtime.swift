@@ -26,12 +26,6 @@ public final class Runtime {
     }
 }
 
-@_documentation(visibility: internal)
-public protocol RuntimeInterceptor {
-    func onEnterFunction(_ function: Function, store: Store)
-    func onExitFunction(_ function: Function, store: Store)
-}
-
 extension Runtime {
     public func instantiate(module: Module) throws -> Instance {
         let instance = try instantiate(

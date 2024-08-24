@@ -2,6 +2,9 @@ import ArgumentParser
 import SystemPackage
 import WasmKit
 import WasmKitWASI
+#if canImport(os.signpost)
+import os.signpost
+#endif
 
 struct Run: ParsableCommand {
     @Flag
@@ -15,6 +18,12 @@ struct Run: ParsableCommand {
         )
     )
     var profileOutput: String?
+
+    @Flag(
+        inversion: .prefixedEnableDisable,
+        help: "Enable or disable Signpost logging (macOS only)"
+    )
+    var signpost: Bool = false
 
     struct EnvOption: ExpressibleByArgument {
         let key: String
@@ -58,14 +67,14 @@ struct Run: ParsableCommand {
             module = try parseWasm(filePath: FilePath(path))
         }
 
-        let interceptor = try deriveInterceptor()
-        defer { interceptor?.finalize() }
+        let (interceptor, finalize) = try deriveInterceptor()
+        defer { finalize() }
 
         let invoke: () throws -> Void
         if module.exports.contains(where: { $0.name == "_start" }) {
-            invoke = try instantiateWASI(module: module, interceptor: interceptor?.interceptor)
+            invoke = try instantiateWASI(module: module, interceptor: interceptor)
         } else {
-            guard let entry = try instantiateNonWASI(module: module, interceptor: interceptor?.interceptor) else {
+            guard let entry = try instantiateNonWASI(module: module, interceptor: interceptor) else {
                 return
             }
             invoke = entry
@@ -79,25 +88,50 @@ struct Run: ParsableCommand {
         }
     }
 
-    func deriveInterceptor() throws -> (interceptor: GuestTimeProfiler, finalize: () -> Void)? {
-        guard let outputPath = self.profileOutput else { return nil }
-        let fileHandle = try FileDescriptor.open(
-            FilePath(outputPath), .writeOnly, options: .create,
-            permissions: [.ownerReadWrite, .groupRead, .otherRead]
-        )
-        let profiler = GuestTimeProfiler { data in
-            var data = data
-            _ = data.withUTF8 { try! fileHandle.writeAll($0) }
+    /// Derives the runtime interceptor based on the command line arguments
+    func deriveInterceptor() throws -> (interceptor: RuntimeInterceptor?, finalize: () -> Void) {
+        var interceptors: [RuntimeInterceptor] = []
+        var finalizers: [() -> Void] = []
+
+        if self.signpost {
+            if let signpostTracer = deriveSignpostTracer() {
+                interceptors.append(signpostTracer)
+            }
         }
-        return (
-            profiler,
-            {
+        if let outputPath = self.profileOutput {
+            let fileHandle = try FileDescriptor.open(
+                FilePath(outputPath), .writeOnly, options: .create,
+                permissions: [.ownerReadWrite, .groupRead, .otherRead]
+            )
+            let profiler = GuestTimeProfiler { data in
+                var data = data
+                _ = data.withUTF8 { try! fileHandle.writeAll($0) }
+            }
+            interceptors.append(profiler)
+            finalizers.append {
                 profiler.finalize()
                 try! fileHandle.close()
-
                 print("\nProfile Completed: \(outputPath) can be viewed using https://ui.perfetto.dev/")
             }
-        )
+        }
+        // If no interceptors are present, return nil explicitly
+        // Empty multiplexing interceptor enables runtime tracing but does not
+        // do anything other than adding runtime overhead
+        if interceptors.isEmpty {
+            return (nil, {})
+        }
+        return (MultiplexingInterceptor(interceptors), { finalizers.forEach { $0() } })
+    }
+
+    private func deriveSignpostTracer() -> RuntimeInterceptor? {
+        #if canImport(os.signpost)
+        if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
+            let signposter = SignpostTracer(signposter: OSSignposter())
+            return signposter
+        }
+        #endif
+        log("warning: Signpost logging is not supported on this platform. Ignoring --enable-signpost")
+        return nil
     }
 
     func instantiateWASI(module: Module, interceptor: RuntimeInterceptor?) throws -> () throws -> Void {
