@@ -45,9 +45,6 @@ extension ExecutionState {
         case .`return`:
             try self.`return`(sp: &sp, pc: &pc, md: &md, ms: &ms)
             return false
-        case .endOfFunction:
-            try self.endOfFunction(sp: &sp, pc: &pc, md: &md, ms: &ms)
-            return false
         case .endOfExecution:
             try self.endOfExecution(sp: &sp, pc: &pc)
             return false
@@ -295,7 +292,6 @@ extension Instruction {
         case .brIfNot: return "brIfNot"
         case .brTable: return "brTable"
         case .`return`: return "`return`"
-        case .endOfFunction: return "endOfFunction"
         case .endOfExecution: return "endOfExecution"
         case .i32Load: return "i32Load"
         case .i64Load: return "i64Load"

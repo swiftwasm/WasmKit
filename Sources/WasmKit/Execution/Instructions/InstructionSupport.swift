@@ -383,8 +383,6 @@ struct InstructionPrintingContext {
             target.write("br \(offset > 0 ? "+" : "")\(offset)")
         case .return:
             target.write("return")
-        case .endOfFunction:
-            target.write("end")
         default:
             target.write(String(describing: instruction))
         }

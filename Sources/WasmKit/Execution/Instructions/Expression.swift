@@ -8,7 +8,7 @@ struct InstructionSequence: Equatable {
 
     init(instructions: UnsafeMutableBufferPointer<Instruction>, maxStackHeight: Int) {
         self.instructions = instructions
-        assert(self.instructions.last?.isEndOfFunction ?? false)
+        assert(self.instructions.last?.isReturn ?? false)
         self.maxStackHeight = maxStackHeight
     }
 
@@ -38,8 +38,8 @@ extension Collection where Element == Instruction {
 }
 
 extension Instruction {
-    fileprivate var isEndOfFunction: Bool {
-        if case .endOfFunction = self {
+    fileprivate var isReturn: Bool {
+        if case .return = self {
             return true
         }
         return false

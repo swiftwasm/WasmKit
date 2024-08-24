@@ -36,7 +36,7 @@ final class TranslatorTests: XCTestCase {
             .copyStack(Instruction.CopyStackOperand(source: -1, dest: 0)),
             .copyStack(Instruction.CopyStackOperand(source: 0, dest: -1)),
             .return,
-            .endOfFunction
+            .return,
         ]])
     }
 }
