@@ -796,7 +796,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
 
     private mutating func copyOnBranch(targetFrame frame: ControlStack.ControlFrame) throws {
-        preserveAllLocalsOnStack()
+        preserveLocalsOnStack(depth: Int(valueStack.height - frame.stackHeight))
         let copyCount = Instruction.Register(frame.copyCount)
         let sourceBase = valueStack.stackRegBase + Instruction.Register(valueStack.height)
         let destBase = valueStack.stackRegBase + Instruction.Register(frame.stackHeight)
@@ -976,7 +976,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             return
         }
 
-        preserveAllLocalsOnStack()
+        preserveLocalsOnStack(depth: Int(valueStack.height - poppedFrame.stackHeight))
         switch poppedFrame.kind {
         case .block:
             try iseqBuilder.pinLabelHere(poppedFrame.continuation)
