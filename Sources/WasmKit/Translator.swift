@@ -947,7 +947,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         guard case let .if(elseLabel, endLabel) = frame.kind else {
             throw TranslationError("Expected `if` control frame on top of the stack for `else` but got \(frame)")
         }
-        preserveAllLocalsOnStack()
+        preserveLocalsOnStack(depth: valueStack.height - frame.stackHeight)
         try controlStack.resetReachability()
         iseqBuilder.resetLastEmission()
         let selfPC = iseqBuilder.insertingPC
@@ -1048,8 +1048,6 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     mutating func visitBrIf(relativeDepth: UInt32) throws -> Output {
         guard let condition = try popOperand(.i32)?.intoRegister(layout: stackLayout) else { return }
 
-        // TODO(optimize): We only need to ensure values related to the branch target
-        preserveAllLocalsOnStack()
         let frame = try controlStack.branchTarget(relativeDepth: relativeDepth)
         if frame.copyCount == 0 {
             // Optimization where we don't need copying values when the branch taken
@@ -1062,6 +1060,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             }
             return
         }
+        preserveLocalsOnStack(depth: valueStack.height - frame.stackHeight)
 
         // If branch taken, fallthrough to landing pad, copy stack values
         // then branch to the actual place
