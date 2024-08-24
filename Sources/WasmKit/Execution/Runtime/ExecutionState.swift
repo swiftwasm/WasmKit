@@ -164,35 +164,6 @@ extension ExecutionState {
         }
     }
 
-    struct CurrentGlobalCache {
-        private let _0: InternalGlobal?
-        init(instance: InternalInstance) {
-            self._0 = instance.globals.first
-        }
-        init() {
-            self._0 = nil
-        }
-
-        func get(index: GlobalIndex, context: inout StackContext) -> Value {
-            if index == 0 {
-                return _0!.value
-            }
-            let instance = context.currentFrame.instance
-            let global = instance.globals[Int(index)]
-            return global.value
-        }
-
-        func set(index: GlobalIndex, value: UntypedValue, context: inout StackContext) {
-            if index == 0 {
-                _0!.withValue { $0.assign(value) }
-                return
-            }
-            let instance = context.currentFrame.instance
-            let global = instance.globals[Int(index)]
-            global.withValue { $0.assign(value) }
-        }
-    }
-
     struct FrameBase {
         let pointer: UnsafeMutablePointer<UntypedValue>
 
