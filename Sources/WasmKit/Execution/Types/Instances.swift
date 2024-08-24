@@ -339,16 +339,16 @@ extension Memory: GuestMemory {
 
 /// An entity representing a WebAssembly `global` instance storage.
 struct GlobalEntity /* : ~Copyable */ {
-    var value: Value
+    var rawValue: UntypedValue
+    var value: Value {
+        get { rawValue.cast(to: globalType.valueType) }
+        set { rawValue = UntypedValue(newValue) }
+    }
     let globalType: GlobalType
 
     init(globalType: GlobalType, initialValue: Value) {
-        value = initialValue
+        rawValue = UntypedValue(initialValue)
         self.globalType = globalType
-    }
-
-    mutating func assign(_ value: UntypedValue) {
-        self.value = value.cast(to: globalType.valueType)
     }
 }
 
