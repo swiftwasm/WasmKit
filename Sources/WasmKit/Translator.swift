@@ -1340,23 +1340,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
     }
 
-    private mutating func popPushEmit(
-        _ pops: (ValueType, ValueType, ValueType),
-        _ push: ValueType,
-        _ instruction: (
-            _ popped: (ValueSource, ValueSource, ValueSource),
-            _ result: Instruction.Register,
-            inout ValueStack
-        ) -> Instruction
-    ) throws {
-        let pop1 = try valueStack.pop(pops.0)
-        let pop2 = try valueStack.pop(pops.1)
-        let pop3 = try valueStack.pop(pops.2)
-        let result = valueStack.push(push)
-        emit(instruction((pop1, pop2, pop3), result, &valueStack))
-    }
-
-    private mutating func popEmit(
+    private mutating func pop3Emit(
         _ pops: (ValueType, ValueType, ValueType),
         _ instruction: (
             _ popped: (ValueSource, ValueSource, ValueSource),
@@ -1369,7 +1353,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         emit(instruction((pop1, pop2, pop3), &valueStack))
     }
 
-    private mutating func popPushEmit(
+    private mutating func pop2Emit(
         _ pops: (ValueType, ValueType),
         _ instruction: (
             _ popped: (ValueSource, ValueSource),
@@ -1658,7 +1642,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     mutating func visitMemoryInit(dataIndex: UInt32) throws -> Output {
         try self.module.validateDataSegment(dataIndex)
         let addressType = try module.addressType(memoryIndex: 0)
-        try popEmit((.i32, .i32, addressType)) { [stackLayout] values, stack in
+        try pop3Emit((.i32, .i32, addressType)) { [stackLayout] values, stack in
             let (size, sourceOffset, destOffset) = values
             return .memoryInit(
                 Instruction.MemoryInitOperand(
@@ -1680,7 +1664,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         // C ⊦ memory.fill : [it i32 it] → []
         // https://github.com/WebAssembly/memory64/blob/main/proposals/memory64/Overview.md
         let addressType = try module.addressType(memoryIndex: 0)
-        try popEmit((addressType, addressType, addressType)) { [stackLayout] values, stack in
+        try pop3Emit((addressType, addressType, addressType)) { [stackLayout] values, stack in
             let (size, sourceOffset, destOffset) = values
             return .memoryCopy(
                 Instruction.MemoryCopyOperand(
@@ -1697,7 +1681,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         // C ⊦ memory.fill : [it i32 it] → []
         // https://github.com/WebAssembly/memory64/blob/main/proposals/memory64/Overview.md
         let addressType = try module.addressType(memoryIndex: 0)
-        try popEmit((addressType, .i32, addressType)) { [stackLayout] values, stack in
+        try pop3Emit((addressType, .i32, addressType)) { [stackLayout] values, stack in
             let (size, value, destOffset) = values
             return .memoryFill(
                 Instruction.MemoryFillOperand(
@@ -1710,7 +1694,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
     mutating func visitTableInit(elemIndex: UInt32, table: UInt32) throws -> Output {
         try self.module.validateElementSegment(elemIndex)
-        try popEmit((.i32, .i32, module.addressType(tableIndex: table))) { [stackLayout] values, stack in
+        try pop3Emit((.i32, .i32, module.addressType(tableIndex: table))) { [stackLayout] values, stack in
             let (size, sourceOffset, destOffset) = values
             return .tableInit(
                 Instruction.TableInitOperand(
@@ -1735,7 +1719,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         let destIsMemory64 = try module.isMemory64(tableIndex: dstTable)
         let sourceIsMemory64 = try module.isMemory64(tableIndex: srcTable)
         let lengthIsMemory64 = destIsMemory64 || sourceIsMemory64
-        try popEmit(
+        try pop3Emit(
             (
                 .address(isMemory64: lengthIsMemory64),
                 .address(isMemory64: sourceIsMemory64),
@@ -1756,7 +1740,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
     mutating func visitTableFill(table: UInt32) throws -> Output {
         let address = try module.addressType(tableIndex: table)
-        try popEmit((address, .ref(module.elementType(table)), address)) { [stackLayout] values, stack in
+        try pop3Emit((address, .ref(module.elementType(table)), address)) { [stackLayout] values, stack in
             let (size, value, destOffset) = values
             return .tableFill(
                 Instruction.TableFillOperand(
@@ -1783,7 +1767,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
     }
     mutating func visitTableSet(table: UInt32) throws -> Output {
-        try popPushEmit((.ref(module.elementType(table)), module.addressType(tableIndex: table))) { [stackLayout] values, stack in
+        try pop2Emit((.ref(module.elementType(table)), module.addressType(tableIndex: table))) { [stackLayout] values, stack in
             let (value, index) = values
             return .tableSet(
                 Instruction.TableSetOperand(
@@ -1796,7 +1780,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
     mutating func visitTableGrow(table: UInt32) throws -> Output {
         let address = try module.addressType(tableIndex: table)
-        try popPushEmit((address, .ref(module.elementType(table))), address) { [stackLayout] values, result, stack in
+        try popPushEmit((address, .ref(module.elementType(table))), address) { [stackLayout] values, result in
             let (delta, value) = values
             return .tableGrow(
                 Instruction.TableGrowOperand(
