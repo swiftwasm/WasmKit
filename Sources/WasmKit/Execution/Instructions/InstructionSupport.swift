@@ -297,13 +297,24 @@ extension Instruction {
     static func i64TruncSatF64U(_ op: UnaryOperand) -> Instruction { .numericConversion(.truncSaturatingUnsigned(.i64, .f64), op) }
 }
 
-extension Instruction {
-    func print<Target>(to target: inout Target, function: Function) where Target : TextOutputStream {
-        func reg(_ reg: Register) -> String {
-            let adjusted = Register(StackLayout.frameHeaderSize(type: function.type)) + reg
+struct InstructionPrintingContext {
+    let shouldColor: Bool
+    let function: Function
+
+    func reg(_ reg: Instruction.Register) -> String {
+        let adjusted = Instruction.Register(StackLayout.frameHeaderSize(type: function.type)) + reg
+        if shouldColor {
             let regColor = adjusted < 15 ? "\u{001B}[3\(adjusted + 1)m" : ""
             return "\(regColor)reg:\(reg)\u{001B}[0m"
+        } else {
+            return "reg:\(reg)"
         }
+    }
+}
+
+extension Instruction {
+    func print<Target>(to target: inout Target, context: InstructionPrintingContext) where Target : TextOutputStream {
+        func reg(_ reg: Instruction.Register) -> String { context.reg(reg) }
         func memarg(_ memarg: MemArg) -> String {
             "offset: \(memarg.offset)"
         }

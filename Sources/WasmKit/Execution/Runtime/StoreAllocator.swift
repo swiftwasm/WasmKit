@@ -111,6 +111,10 @@ struct ImmutableArray<T> {
         buffer[index]
     }
 
+    subscript<R>(range: R) -> Slice<UnsafeBufferPointer<Element>> where R: RangeExpression, R.Bound == Int {
+        buffer[range]
+    }
+
     /// Accesses the element at the specified position, with bounds checking.
     subscript(validating index: Int) -> T where T: ValidatableEntity {
         get throws {
