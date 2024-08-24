@@ -268,8 +268,12 @@ struct StackLayout {
         return Instruction.Register(index) - paramResultBase
     }
 
+    func isParamerterLocal(_ index: LocalIndex) -> Bool {
+        return index < type.parameters.count
+    }
+
     func localReg(_ index: LocalIndex) -> Instruction.Register {
-        if index < type.parameters.count {
+        if isParamerterLocal(index) {
             return paramReg(Int(index))
         } else {
             return Instruction.Register(index) - Instruction.Register(type.parameters.count)
@@ -762,11 +766,43 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
 
     private mutating func visitReturnLike() throws -> Instruction.ReturnOperand {
-        preserveAllLocalsOnStack()
+        var copies: [(source: Instruction.Register, dest: Instruction.Register)] = []
         for (index, resultType) in self.type.results.enumerated().reversed() {
-            let result = try valueStack.pop(resultType)
-            let source = result.intoRegister(layout: stackLayout)
             let dest = returnReg(index)
+            switch try valueStack.pop(resultType) {
+            case .local(let localIndex):
+                let source = localReg(localIndex)
+                if stackLayout.isParamerterLocal(localIndex) {
+                    if source == dest {
+                        // If the local is a parameter and the return value is placed in
+                        // the same position, no need to copy.
+                        // e.g. `(func (param i32) (result i32) (local.get 0))` is
+                        // translated to no-op
+                        continue
+                    }
+                    // For local variables originated from params, we need
+                    // two copies to avoid the value being overwritten
+                    // because parameters and results share the same stack
+                    // space.
+
+                    // 1.Copy the local variable to a temporary register
+                    // first to save the value
+                    let tmpReg = valueStack.stackRegBase + Instruction.Register(valueStack.height)
+                    emitCopyStack(from: source, to: tmpReg)
+                    // 2. Then schedule the copy from the temporary register
+                    // to the return register
+                    copies.append((tmpReg, dest))
+                } else {
+                    // For local variables not originated from params, we
+                    // can directly copy the value to the return register
+                    copies.append((source, dest))
+                }
+            case .register(let register):
+                copies.append((register, dest))
+            }
+        }
+        // Emit copy operations targeting the return registers
+        for (source, dest) in copies {
             emitCopyStack(from: source, to: dest)
         }
         return Instruction.ReturnOperand()
