@@ -45,19 +45,19 @@ extension ExecutionState {
 
         try branch(offset: entry.offset)
     }
-    mutating func `return`(context: inout StackContext, sp: Sp, md: inout Md, ms: inout Ms, returnOperand: Instruction.ReturnOperand) throws {
-        try self.endOfFunction(context: &context, sp: sp, md: &md, ms: &ms, returnOperand: returnOperand)
+    mutating func `return`(context: inout StackContext, sp: Sp, md: inout Md, ms: inout Ms) throws {
+        try self.endOfFunction(context: &context, sp: sp, md: &md, ms: &ms)
     }
 
-    mutating func endOfFunction(context: inout StackContext, sp: Sp, md: inout Md, ms: inout Ms, returnOperand: Instruction.ReturnOperand) throws {
-        try self.endOfFunction(context: &context, currentFrame: context.currentFrame, returnOperand: returnOperand, md: &md, ms: &ms)
+    mutating func endOfFunction(context: inout StackContext, sp: Sp, md: inout Md, ms: inout Ms) throws {
+        try self.endOfFunction(context: &context, currentFrame: context.currentFrame, md: &md, ms: &ms)
     }
 
     mutating func endOfExecution(context: inout StackContext, sp: Sp) throws {
         reachedEndOfExecution = true
     }
 
-    private mutating func endOfFunction(context: inout StackContext, currentFrame: Frame, returnOperand: Instruction.ReturnOperand, md: inout Md, ms: inout Ms) throws {
+    private mutating func endOfFunction(context: inout StackContext, currentFrame: Frame, md: inout Md, ms: inout Ms) throws {
         // When reached at "end" of function
         let lastInstanceAddr = context.popFrame()
         programCounter = currentFrame.returnPC

@@ -41,7 +41,6 @@ final class EngineTests: XCTestCase {
         checkSize(Instruction.CallOperand.self)
         checkSize(Instruction.InternalCallOperand.self)
         checkSize(Instruction.CallIndirectOperand.self)
-        checkSize(Instruction.ReturnOperand.self)
         checkSize(Instruction.BrTable.self)
 
     }

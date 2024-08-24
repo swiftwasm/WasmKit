@@ -765,7 +765,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         return try valueStack.pop()
     }
 
-    private mutating func visitReturnLike() throws -> Instruction.ReturnOperand {
+    private mutating func visitReturnLike() throws {
         var copies: [(source: Instruction.Register, dest: Instruction.Register)] = []
         for (index, resultType) in self.type.results.enumerated().reversed() {
             let dest = returnReg(index)
@@ -805,7 +805,6 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         for (source, dest) in copies {
             emitCopyStack(from: source, to: dest)
         }
-        return Instruction.ReturnOperand()
     }
 
     private mutating func copyOnBranch(targetFrame frame: ControlStack.ControlFrame) throws {
@@ -829,7 +828,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             // Emit `onExit` instruction before every `return` instruction
             emit(.onExit(functionIndex))
         }
-        try iseqBuilder.emit(.return(visitReturnLike()))
+        try visitReturnLike()
+        iseqBuilder.emit(.return)
     }
     private mutating func markUnreachable() throws {
         try controlStack.markUnreachable()
@@ -850,7 +850,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         for (idx, instruction) in instructions.enumerated() {
             buffer[idx] = instruction
         }
-        buffer[instructions.count] = .endOfFunction(Instruction.ReturnOperand())
+        buffer[instructions.count] = .endOfFunction
         return InstructionSequence(
             instructions: buffer,
             maxStackHeight: Int(valueStack.stackRegBase) + valueStack.maxHeight
