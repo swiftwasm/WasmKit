@@ -137,7 +137,11 @@ public struct Instance {
             target.write(" ====\n")
             try function.ensureCompiled(runtime: RuntimeRef(runtime))
             let (iseq, _, _) = function.assumeCompiled()
-            iseq.write(to: &target, function: Function(handle: function, allocator: allocator))
+            let context = InstructionPrintingContext(
+                shouldColor: true,
+                function: Function(handle: function, allocator: allocator)
+            )
+            iseq.instructions.write(to: &target, context: context)
         }
     }
 }

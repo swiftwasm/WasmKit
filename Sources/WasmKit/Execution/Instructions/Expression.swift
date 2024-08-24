@@ -21,17 +21,17 @@ struct InstructionSequence: Equatable {
     }
 }
 
-extension InstructionSequence {
-    func write<Target>(to target: inout Target, function: Function) where Target : TextOutputStream {
-        var hexOffsetWidth = String(self.instructions.count - 1, radix: 16).count
+extension Collection where Element == Instruction {
+    func write<Target>(to target: inout Target, context: InstructionPrintingContext) where Target : TextOutputStream {
+        var hexOffsetWidth = String(self.count - 1, radix: 16).count
         hexOffsetWidth = (hexOffsetWidth + 1) & ~1
-        for (index, instruction) in instructions.enumerated() {
+        for (index, instruction) in self.enumerated() {
             var hexOffset = String(index, radix: 16)
             while hexOffset.count < hexOffsetWidth {
                 hexOffset = "0" + hexOffset
             }
             target.write("0x\(hexOffset): ")
-            instruction.print(to: &target, function: function)
+            instruction.print(to: &target, context: context)
             target.write("\n")
         }
     }
