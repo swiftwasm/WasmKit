@@ -30,7 +30,7 @@ typealias Md = UnsafeMutableRawPointer?
 typealias Ms = Int
 /// The "s"tack "p"ointer intended to be bound to a physical register.
 /// Stores the base address of the current frame's register storage.
-typealias Sp = ExecutionState.FrameBase
+typealias Sp = UnsafeMutablePointer<UntypedValue>
 /// The program counter pointing to the current instruction.
 /// - Note: This pointer is mutable to allow patching the instruction during execution.
 ///         For example, "compile" VM instruction lazily compiles the callee function and
@@ -143,19 +143,6 @@ extension ExecutionState {
         }
     }
 
-    struct FrameBase {
-        let pointer: UnsafeMutablePointer<UntypedValue>
-
-        subscript(_ index: Instruction.Register) -> UntypedValue {
-            get {
-                return pointer[Int(index)]
-            }
-            nonmutating set {
-                return pointer[Int(index)] = newValue
-            }
-        }
-    }
-
     @inline(never)
     static func execute(
         sp: Sp, pc: Pc,
@@ -246,6 +233,17 @@ extension InternalFunction {
                 sp[callLike.spAddend + layout.returnReg(index)] = UntypedValue(result)
             }
             return (pc.advanced(by: 1), sp)
+        }
+    }
+}
+
+extension Sp {
+    subscript(_ index: Instruction.Register) -> UntypedValue {
+        get {
+            return self[Int(index)]
+        }
+        nonmutating set {
+            return self[Int(index)] = newValue
         }
     }
 }
