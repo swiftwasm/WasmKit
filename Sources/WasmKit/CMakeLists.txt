@@ -24,11 +24,13 @@ add_wasmkit_library(WasmKit
   Execution/Runtime/InstDispatch.swift
   Execution/Runtime/StackContext.swift
   Execution/Runtime/Runtime.swift
+  Execution/Runtime/RuntimeInterceptor.swift
   Execution/Runtime/ExecutionState.swift
   Execution/Runtime/Profiler.swift
   Execution/Runtime/NameRegistry.swift
   Execution/Runtime/Store.swift
   Execution/Runtime/StoreAllocator.swift
+  Execution/Runtime/SignpostTracer.swift
   Execution/Runtime/Function.swift
 )
 
