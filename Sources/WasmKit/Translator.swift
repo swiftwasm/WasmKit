@@ -917,7 +917,6 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             _ = try popOperand(param)
         }
         let stackHeight = self.valueStack.height
-        preserveAllLocalsOnStack()
         for param in blockType.parameters {
             _ = valueStack.push(param)
         }
