@@ -1368,16 +1368,17 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     private mutating func popPushEmit(
         _ pops: (ValueType, ValueType),
         _ push: ValueType,
-        _ instruction: (
+        _ instruction: @escaping (
             _ popped: (ValueSource, ValueSource),
-            _ result: Instruction.Register,
-            inout ValueStack
+            _ result: Instruction.Register
         ) -> Instruction
     ) throws {
         let pop1 = try valueStack.pop(pops.0)
         let pop2 = try valueStack.pop(pops.1)
         let result = valueStack.push(push)
-        emit(instruction((pop1, pop2), result, &valueStack))
+        emit(instruction((pop1, pop2), result), resultRelink: { result in
+            instruction((pop1, pop2), result)
+        })
     }
 
     private mutating func visitLoad(
