@@ -14,7 +14,6 @@ enum Instruction: Equatable {
     case brIfNot(Instruction.BrIfOperand)
     case brTable(Instruction.BrTableOperand)
     case `return`
-    case endOfFunction
     case endOfExecution
     case i32Load(Instruction.LoadOperand)
     case i64Load(Instruction.LoadOperand)

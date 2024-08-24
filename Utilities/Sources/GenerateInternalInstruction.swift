@@ -283,7 +283,6 @@ enum GenerateInternalInstruction {
                     Immediate(name: nil, type: "Instruction.BrTableOperand")
                 ]),
             Instruction(name: "`return`", isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write, immediates: []),
-            Instruction(name: "endOfFunction", isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write, immediates: []),
             Instruction(name: "endOfExecution", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: []),
         ]
         + memoryLoadStoreInsts

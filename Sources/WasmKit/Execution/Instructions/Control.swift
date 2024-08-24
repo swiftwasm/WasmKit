@@ -44,11 +44,6 @@ extension ExecutionState {
     }
 
     mutating func `return`(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
-        try self.endOfFunction(sp: &sp, pc: &pc, md: &md, ms: &ms)
-    }
-
-    mutating func endOfFunction(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
-        // When reached at "end" of function
         popFrame(sp: &sp, pc: &pc, md: &md, ms: &ms)
     }
 

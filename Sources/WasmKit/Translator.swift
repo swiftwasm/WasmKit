@@ -647,7 +647,6 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     var valueStack: ValueStack
     var locals: Locals
     let type: FunctionType
-    let endOfFunctionLabel: LabelRef
     let stackLayout: StackLayout
     /// The index of the function in the module
     let functionIndex: FunctionIndex
@@ -683,7 +682,6 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
                 continuation: endLabel,
                 kind: .block(root: true)
             )
-            self.endOfFunctionLabel = endLabel
             self.controlStack.pushFrame(rootFrame)
         }
     }
@@ -814,7 +812,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         for (idx, instruction) in instructions.enumerated() {
             buffer[idx] = instruction
         }
-        buffer[instructions.count] = .endOfFunction
+        buffer[instructions.count] = .return
         return InstructionSequence(
             instructions: buffer,
             maxStackHeight: Int(valueStack.stackRegBase) + valueStack.maxHeight
