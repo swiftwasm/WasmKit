@@ -22,6 +22,8 @@ struct RuntimeRef {
     }
 }
 
+struct EndOfExecution: Error {}
+
 /// The "m"emory "d"ata storage intended to be bound to a physical register.
 /// Stores the base address of the default memory of the current execution context.
 typealias Md = UnsafeMutableRawPointer?
@@ -64,13 +66,16 @@ func executeWasm(
         try withUnsafeTemporaryAllocation(of: Instruction.self, capacity: 1) { rootISeq in
             rootISeq.baseAddress?.pointee = .endOfExecution
             // NOTE: unwinding a function jump into previous frame's PC + 1, so initial PC is -1ed
-            try ExecutionState.execute(
-                sp: sp,
-                pc: rootISeq.baseAddress! - 1,
-                handle: handle,
-                type: type,
-                stack: &stack
-            )
+            do {
+                try ExecutionState.execute(
+                    sp: sp,
+                    pc: rootISeq.baseAddress! - 1,
+                    handle: handle,
+                    type: type,
+                    stack: &stack
+                )
+            } catch _ as EndOfExecution {
+            }
         }
         return type.results.enumerated().map { (i, type) in
             sp[Instruction.Register(i)].cast(to: type)
@@ -187,15 +192,14 @@ extension ExecutionState {
             }
         }
 #endif
-        while !reachedEndOfExecution {
-            var inst: Instruction
-            repeat {
-                inst = pc.pointee
+        var inst: Instruction
+        while true {
+            inst = pc.pointee
 #if WASMKIT_ENGINE_STATS
-                stats[inst.name, default: 0] += 1
+            stats[inst.name, default: 0] += 1
 #endif
             // `doExecute` returns false when current frame *may* be updated
-            } while try doExecute(inst, sp: &sp, pc: &pc, md: &md, ms: &ms)
+            _ = try doExecute(inst, sp: &sp, pc: &pc, md: &md, ms: &ms)
         }
     }
 }
