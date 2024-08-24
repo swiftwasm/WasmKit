@@ -428,10 +428,23 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             return copyTo
         }
 
-        mutating func pop() throws -> (MetaValue, ValueSource) {
-            guard let value = self.values.popLast() else {
-                throw TranslationError("Expected a value on stack but it's empty")
+        mutating func preserveLocalsOnStack(depth: Int) -> [(source: LocalIndex, to: Instruction.Register)] {
+            var copies: [(source: LocalIndex, to: Instruction.Register)] = []
+            for offset in 0..<depth {
+                let valueIndex = self.values.count - 1 - offset
+                let value = self.values[valueIndex]
+                guard case .local(let type, let localIndex) = value else { continue }
+                self.values[valueIndex] = .stack(.some(type))
+                copies.append((localIndex, self.stackRegBase + Instruction.Register(valueIndex)))
             }
+            return copies
+        }
+
+        func peek(depth: Int) -> ValueSource {
+            return makeValueSource(self.values[height - 1 - depth])
+        }
+
+        private func makeValueSource(_ value: MetaValueOnStack) -> ValueSource {
             let source: ValueSource
             switch value {
             case .local(_, let localIndex):
@@ -439,6 +452,14 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             case .stack:
                 source = .register(stackRegBase + Instruction.Register(height))
             }
+            return source
+        }
+
+        mutating func pop() throws -> (MetaValue, ValueSource) {
+            guard let value = self.values.popLast() else {
+                throw TranslationError("Expected a value on stack but it's empty")
+            }
+            let source = makeValueSource(value)
             return (value.type, source)
         }
         mutating func pop(_ expected: ValueType) throws -> ValueSource {
@@ -707,6 +728,11 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             emitCopyStack(from: localReg(localIndex), to: copyTo)
         }
     }
+    private mutating func preserveLocalsOnStack(depth: Int) {
+        for (sourceLocal, destReg) in valueStack.preserveLocalsOnStack(depth: depth) {
+            emitCopyStack(from: localReg(sourceLocal), to: destReg)
+        }
+    }
 
     private mutating func preserveAllLocalsOnStack() {
         for localIndex in 0..<locals.count {
@@ -760,7 +786,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
 
     private mutating func visitReturnLike() throws {
-        preserveAllLocalsOnStack()
+        preserveLocalsOnStack(depth: self.type.results.count)
         for (index, resultType) in self.type.results.enumerated().reversed() {
             let result = try valueStack.pop(resultType)
             let source = result.intoRegister(layout: stackLayout)
