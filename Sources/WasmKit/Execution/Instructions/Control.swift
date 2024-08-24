@@ -13,7 +13,7 @@ extension ExecutionState {
         if isTrue {
             pc += 1
         } else {
-            pc += ifOperand.elseOrEndRef.relativeOffset
+            pc += Int(ifOperand.elseOrEndOffset)
         }
     }
 

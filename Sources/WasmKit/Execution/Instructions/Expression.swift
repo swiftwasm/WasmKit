@@ -45,14 +45,3 @@ extension Instruction {
         return false
     }
 }
-
-struct ExpressionRef: Equatable {
-    let _relativeOffset: UInt32
-    var relativeOffset: Int {
-        Int(_relativeOffset)
-    }
-
-    init(_ relativeOffset: Int) {
-        self._relativeOffset = UInt32(relativeOffset)
-    }
-}

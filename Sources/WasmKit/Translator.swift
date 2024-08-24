@@ -929,14 +929,15 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         guard let condition = condition else { return }
         let selfPC = iseqBuilder.insertingPC
         iseqBuilder.emitWithLabel(endLabel) { [stackLayout] iseqBuilder, endPC in
-            let elseOrEndRef: ExpressionRef
+            let targetPC: MetaProgramCounter
             if let elsePC = iseqBuilder.resolveLabel(elseLabel) {
-                elseOrEndRef = ExpressionRef(from: selfPC, to: elsePC)
+                targetPC = elsePC
             } else {
-                elseOrEndRef = ExpressionRef(from: selfPC, to: endPC)
+                targetPC = endPC
             }
+            let elseOrEnd = UInt32(targetPC.offsetFromHead - selfPC.offsetFromHead)
             return .ifThen(Instruction.IfOperand(
-                elseOrEndRef: elseOrEndRef, condition: condition.intoRegister(layout: stackLayout)
+                elseOrEndOffset: elseOrEnd, condition: condition.intoRegister(layout: stackLayout)
             ))
         }
     }
@@ -1813,12 +1814,6 @@ struct TranslationError: Error, CustomStringConvertible {
 
     init(_ description: String) {
         self.description = description
-    }
-}
-
-extension ExpressionRef {
-    fileprivate init(from source: MetaProgramCounter, to destination: MetaProgramCounter) {
-        self.init(destination.offsetFromHead - source.offsetFromHead)
     }
 }
 
