@@ -1,5 +1,7 @@
 import WasmParser
 
+typealias VReg = Int16
+
 extension Instruction {
     struct MemArg: Equatable {
         let offset: UInt64
@@ -16,8 +18,6 @@ extension Instruction {
             lhs.baseAddress == rhs.baseAddress
         }
     }
-
-    typealias VReg = Int16
 
     /// size = 6, alignment = 2
     struct BinaryOperand: Equatable {
@@ -182,7 +182,7 @@ extension Instruction {
     }
 
     struct CallLikeOperand: Equatable {
-        let spAddend: Instruction.VReg
+        let spAddend: VReg
     }
     struct CallOperand: Equatable {
         let callee: InternalFunction
@@ -299,8 +299,8 @@ struct InstructionPrintingContext {
     let function: Function
     var nameRegistry: NameRegistry
 
-    func reg(_ reg: Instruction.VReg) -> String {
-        let adjusted = Instruction.VReg(StackLayout.frameHeaderSize(type: function.type)) + reg
+    func reg(_ reg: VReg) -> String {
+        let adjusted = VReg(StackLayout.frameHeaderSize(type: function.type)) + reg
         if shouldColor {
             let regColor = adjusted < 15 ? "\u{001B}[3\(adjusted + 1)m" : ""
             return "\(regColor)reg:\(reg)\u{001B}[0m"

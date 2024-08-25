@@ -59,7 +59,7 @@ func executeWasm(
     let runtime = RuntimeRef(runtime)
     return try StackContext.withContext(runtime: runtime) { (stack, sp) in
         for (index, argument) in arguments.enumerated() {
-            sp[Instruction.VReg(index)] = UntypedValue(argument)
+            sp[VReg(index)] = UntypedValue(argument)
         }
         try withUnsafeTemporaryAllocation(of: Instruction.self, capacity: 1) { rootISeq in
             rootISeq.baseAddress?.pointee = .endOfExecution
@@ -73,7 +73,7 @@ func executeWasm(
             )
         }
         return type.results.enumerated().map { (i, type) in
-            sp[Instruction.VReg(i)].cast(to: type)
+            sp[VReg(i)].cast(to: type)
         }
     }
 }
@@ -238,7 +238,7 @@ extension InternalFunction {
 }
 
 extension Sp {
-    subscript(_ index: Instruction.VReg) -> UntypedValue {
+    subscript(_ index: VReg) -> UntypedValue {
         get {
             return self[Int(index)]
         }
