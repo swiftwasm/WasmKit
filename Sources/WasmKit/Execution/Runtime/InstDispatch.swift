@@ -410,190 +410,190 @@ extension Instruction {
 
 extension ExecutionState {
     mutating func i32Add(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.add(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].add(sp[i32: binaryOperand.rhs])
     }
     mutating func i64Add(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.add(sp[binaryOperand.rhs].i64).untyped
+        sp[i64: binaryOperand.result] = sp[i64: binaryOperand.lhs].add(sp[i64: binaryOperand.rhs])
     }
     mutating func i32Sub(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.sub(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].sub(sp[i32: binaryOperand.rhs])
     }
     mutating func i64Sub(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.sub(sp[binaryOperand.rhs].i64).untyped
+        sp[i64: binaryOperand.result] = sp[i64: binaryOperand.lhs].sub(sp[i64: binaryOperand.rhs])
     }
     mutating func i32Mul(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.mul(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].mul(sp[i32: binaryOperand.rhs])
     }
     mutating func i64Mul(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.mul(sp[binaryOperand.rhs].i64).untyped
+        sp[i64: binaryOperand.result] = sp[i64: binaryOperand.lhs].mul(sp[i64: binaryOperand.rhs])
     }
     mutating func i32And(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.and(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].and(sp[i32: binaryOperand.rhs])
     }
     mutating func i64And(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.and(sp[binaryOperand.rhs].i64).untyped
+        sp[i64: binaryOperand.result] = sp[i64: binaryOperand.lhs].and(sp[i64: binaryOperand.rhs])
     }
     mutating func i32Or(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.or(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].or(sp[i32: binaryOperand.rhs])
     }
     mutating func i64Or(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.or(sp[binaryOperand.rhs].i64).untyped
+        sp[i64: binaryOperand.result] = sp[i64: binaryOperand.lhs].or(sp[i64: binaryOperand.rhs])
     }
     mutating func i32Xor(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.xor(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].xor(sp[i32: binaryOperand.rhs])
     }
     mutating func i64Xor(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.xor(sp[binaryOperand.rhs].i64).untyped
+        sp[i64: binaryOperand.result] = sp[i64: binaryOperand.lhs].xor(sp[i64: binaryOperand.rhs])
     }
     mutating func i32Shl(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.shl(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].shl(sp[i32: binaryOperand.rhs])
     }
     mutating func i64Shl(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.shl(sp[binaryOperand.rhs].i64).untyped
+        sp[i64: binaryOperand.result] = sp[i64: binaryOperand.lhs].shl(sp[i64: binaryOperand.rhs])
     }
     mutating func i32ShrS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.shrs(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].shrs(sp[i32: binaryOperand.rhs])
     }
     mutating func i64ShrS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.shrs(sp[binaryOperand.rhs].i64).untyped
+        sp[i64: binaryOperand.result] = sp[i64: binaryOperand.lhs].shrs(sp[i64: binaryOperand.rhs])
     }
     mutating func i32ShrU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.shru(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].shru(sp[i32: binaryOperand.rhs])
     }
     mutating func i64ShrU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.shru(sp[binaryOperand.rhs].i64).untyped
+        sp[i64: binaryOperand.result] = sp[i64: binaryOperand.lhs].shru(sp[i64: binaryOperand.rhs])
     }
     mutating func i32Rotl(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.rotl(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].rotl(sp[i32: binaryOperand.rhs])
     }
     mutating func i64Rotl(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.rotl(sp[binaryOperand.rhs].i64).untyped
+        sp[i64: binaryOperand.result] = sp[i64: binaryOperand.lhs].rotl(sp[i64: binaryOperand.rhs])
     }
     mutating func i32Rotr(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.rotr(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].rotr(sp[i32: binaryOperand.rhs])
     }
     mutating func i64Rotr(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.rotr(sp[binaryOperand.rhs].i64).untyped
+        sp[i64: binaryOperand.result] = sp[i64: binaryOperand.lhs].rotr(sp[i64: binaryOperand.rhs])
     }
     mutating func i32Eq(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.eq(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].eq(sp[i32: binaryOperand.rhs])
     }
     mutating func i64Eq(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.eq(sp[binaryOperand.rhs].i64).untyped
+        sp[i32: binaryOperand.result] = sp[i64: binaryOperand.lhs].eq(sp[i64: binaryOperand.rhs])
     }
     mutating func i32Ne(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.ne(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].ne(sp[i32: binaryOperand.rhs])
     }
     mutating func i64Ne(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.ne(sp[binaryOperand.rhs].i64).untyped
+        sp[i32: binaryOperand.result] = sp[i64: binaryOperand.lhs].ne(sp[i64: binaryOperand.rhs])
     }
     mutating func i32LtS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.lts(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].lts(sp[i32: binaryOperand.rhs])
     }
     mutating func i64LtS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.lts(sp[binaryOperand.rhs].i64).untyped
+        sp[i32: binaryOperand.result] = sp[i64: binaryOperand.lhs].lts(sp[i64: binaryOperand.rhs])
     }
     mutating func i32LtU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.ltu(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].ltu(sp[i32: binaryOperand.rhs])
     }
     mutating func i64LtU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.ltu(sp[binaryOperand.rhs].i64).untyped
+        sp[i32: binaryOperand.result] = sp[i64: binaryOperand.lhs].ltu(sp[i64: binaryOperand.rhs])
     }
     mutating func i32GtS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.gts(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].gts(sp[i32: binaryOperand.rhs])
     }
     mutating func i64GtS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.gts(sp[binaryOperand.rhs].i64).untyped
+        sp[i32: binaryOperand.result] = sp[i64: binaryOperand.lhs].gts(sp[i64: binaryOperand.rhs])
     }
     mutating func i32GtU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.gtu(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].gtu(sp[i32: binaryOperand.rhs])
     }
     mutating func i64GtU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.gtu(sp[binaryOperand.rhs].i64).untyped
+        sp[i32: binaryOperand.result] = sp[i64: binaryOperand.lhs].gtu(sp[i64: binaryOperand.rhs])
     }
     mutating func i32LeS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.les(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].les(sp[i32: binaryOperand.rhs])
     }
     mutating func i64LeS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.les(sp[binaryOperand.rhs].i64).untyped
+        sp[i32: binaryOperand.result] = sp[i64: binaryOperand.lhs].les(sp[i64: binaryOperand.rhs])
     }
     mutating func i32LeU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.leu(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].leu(sp[i32: binaryOperand.rhs])
     }
     mutating func i64LeU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.leu(sp[binaryOperand.rhs].i64).untyped
+        sp[i32: binaryOperand.result] = sp[i64: binaryOperand.lhs].leu(sp[i64: binaryOperand.rhs])
     }
     mutating func i32GeS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.ges(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].ges(sp[i32: binaryOperand.rhs])
     }
     mutating func i64GeS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.ges(sp[binaryOperand.rhs].i64).untyped
+        sp[i32: binaryOperand.result] = sp[i64: binaryOperand.lhs].ges(sp[i64: binaryOperand.rhs])
     }
     mutating func i32GeU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.geu(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].geu(sp[i32: binaryOperand.rhs])
     }
     mutating func i64GeU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.geu(sp[binaryOperand.rhs].i64).untyped
+        sp[i32: binaryOperand.result] = sp[i64: binaryOperand.lhs].geu(sp[i64: binaryOperand.rhs])
     }
     mutating func f32Add(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.add(sp[binaryOperand.rhs].f32).untyped
+        sp[f32: binaryOperand.result] = sp[f32: binaryOperand.lhs].add(sp[f32: binaryOperand.rhs])
     }
     mutating func f64Add(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.add(sp[binaryOperand.rhs].f64).untyped
+        sp[f64: binaryOperand.result] = sp[f64: binaryOperand.lhs].add(sp[f64: binaryOperand.rhs])
     }
     mutating func f32Sub(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.sub(sp[binaryOperand.rhs].f32).untyped
+        sp[f32: binaryOperand.result] = sp[f32: binaryOperand.lhs].sub(sp[f32: binaryOperand.rhs])
     }
     mutating func f64Sub(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.sub(sp[binaryOperand.rhs].f64).untyped
+        sp[f64: binaryOperand.result] = sp[f64: binaryOperand.lhs].sub(sp[f64: binaryOperand.rhs])
     }
     mutating func f32Mul(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.mul(sp[binaryOperand.rhs].f32).untyped
+        sp[f32: binaryOperand.result] = sp[f32: binaryOperand.lhs].mul(sp[f32: binaryOperand.rhs])
     }
     mutating func f64Mul(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.mul(sp[binaryOperand.rhs].f64).untyped
+        sp[f64: binaryOperand.result] = sp[f64: binaryOperand.lhs].mul(sp[f64: binaryOperand.rhs])
     }
     mutating func f32Div(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.div(sp[binaryOperand.rhs].f32).untyped
+        sp[f32: binaryOperand.result] = sp[f32: binaryOperand.lhs].div(sp[f32: binaryOperand.rhs])
     }
     mutating func f64Div(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.div(sp[binaryOperand.rhs].f64).untyped
+        sp[f64: binaryOperand.result] = sp[f64: binaryOperand.lhs].div(sp[f64: binaryOperand.rhs])
     }
     mutating func f32Eq(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.eq(sp[binaryOperand.rhs].f32).untyped
+        sp[i32: binaryOperand.result] = sp[f32: binaryOperand.lhs].eq(sp[f32: binaryOperand.rhs])
     }
     mutating func f64Eq(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.eq(sp[binaryOperand.rhs].f64).untyped
+        sp[i32: binaryOperand.result] = sp[f64: binaryOperand.lhs].eq(sp[f64: binaryOperand.rhs])
     }
     mutating func f32Ne(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.ne(sp[binaryOperand.rhs].f32).untyped
+        sp[i32: binaryOperand.result] = sp[f32: binaryOperand.lhs].ne(sp[f32: binaryOperand.rhs])
     }
     mutating func f64Ne(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.ne(sp[binaryOperand.rhs].f64).untyped
+        sp[i32: binaryOperand.result] = sp[f64: binaryOperand.lhs].ne(sp[f64: binaryOperand.rhs])
     }
     mutating func i32Clz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i32.clz.untyped
+        sp[i32: unaryOperand.result] = sp[i32: unaryOperand.input].clz
     }
     mutating func i64Clz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i64.clz.untyped
+        sp[i64: unaryOperand.result] = sp[i64: unaryOperand.input].clz
     }
     mutating func i32Ctz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i32.ctz.untyped
+        sp[i32: unaryOperand.result] = sp[i32: unaryOperand.input].ctz
     }
     mutating func i64Ctz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i64.ctz.untyped
+        sp[i64: unaryOperand.result] = sp[i64: unaryOperand.input].ctz
     }
     mutating func i32Popcnt(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i32.popcnt.untyped
+        sp[i32: unaryOperand.result] = sp[i32: unaryOperand.input].popcnt
     }
     mutating func i64Popcnt(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i64.popcnt.untyped
+        sp[i64: unaryOperand.result] = sp[i64: unaryOperand.input].popcnt
     }
     mutating func i32Eqz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i32.eqz.untyped
+        sp[i32: unaryOperand.result] = sp[i32: unaryOperand.input].eqz
     }
     mutating func i64Eqz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i64.eqz.untyped
+        sp[i32: unaryOperand.result] = sp[i64: unaryOperand.input].eqz
     }
     mutating func i32Load(sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
         try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt32.self, castToValue: { .i32($0) })

@@ -246,4 +246,28 @@ extension Sp {
             return self[Int(index)] = newValue
         }
     }
+    private func read<T: FixedWidthInteger>(_ index: Instruction.Register) -> T {
+        return self.advanced(by: Int(index)).withMemoryRebound(to: T.self, capacity: 1) {
+            $0.pointee
+        }
+    }
+    private func write(_ index: Instruction.Register, _ value: UntypedValue) {
+        self[index] = value
+    }
+    subscript(i32 index: Instruction.Register) -> UInt32 {
+        get { return read(index) }
+        nonmutating set { write(index, .i32(newValue)) }
+    }
+    subscript(i64 index: Instruction.Register) -> UInt64 {
+        get { return read(index) }
+        nonmutating set { write(index, .i64(newValue)) }
+    }
+    subscript(f32 index: Instruction.Register) -> Float32 {
+        get { return Float32(bitPattern: read(index)) }
+        nonmutating set { write(index, .f32(newValue)) }
+    }
+    subscript(f64 index: Instruction.Register) -> Float64 {
+        get { return Float64(bitPattern: read(index)) }
+        nonmutating set { write(index, .f64(newValue)) }
+    }
 }

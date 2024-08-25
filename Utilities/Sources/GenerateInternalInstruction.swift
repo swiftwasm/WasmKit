@@ -88,9 +88,15 @@ enum GenerateInternalInstruction {
             )
             return OpInstruction(op: op, inputType: type, resultType: type, base: base)
         }
-        static func unop(op: String, type: String) -> OpInstruction {
+        static func binop(op: String, inputType: String, resultType: String) -> OpInstruction {
+            let base = Instruction(
+                name: "\(inputType)\(op)", immediates: [Immediate(name: nil, type: "Instruction.BinaryOperand")]
+            )
+            return OpInstruction(op: op, inputType: inputType, resultType: resultType, base: base)
+        }
+        static func unop(op: String, type: String, resultType: String) -> OpInstruction {
             let base = Instruction(name: "\(type)\(op)", immediates: [Immediate(name: nil, type: "Instruction.UnaryOperand")])
-            return OpInstruction(op: op, inputType: type, resultType: type, base: base)
+            return OpInstruction(op: op, inputType: type, resultType: resultType, base: base)
         }
     }
 
@@ -100,18 +106,26 @@ enum GenerateInternalInstruction {
     static let intBinaryInsts: [OpInstruction] = [
         "Add", "Sub", "Mul",
         "And", "Or", "Xor", "Shl", "ShrS", "ShrU", "Rotl", "Rotr",
-        "Eq", "Ne", "LtS", "LtU", "GtS", "GtU", "LeS", "LeU", "GeS", "GeU",
     ].flatMap { op -> [OpInstruction] in
         intValueTypes.map { OpInstruction.binop(op: op, type: $0) }
+    } + [
+        "Eq", "Ne", "LtS", "LtU", "GtS", "GtU", "LeS", "LeU", "GeS", "GeU",
+    ].flatMap { op -> [OpInstruction] in
+        intValueTypes.map { OpInstruction.binop(op: op, inputType: $0, resultType: "i32") }
     }
-    static let intUnaryInsts: [OpInstruction] = ["Clz", "Ctz", "Popcnt", "Eqz"].flatMap { op -> [OpInstruction] in
-        intValueTypes.map { OpInstruction.unop(op: op, type: $0) }
+    static let intUnaryInsts: [OpInstruction] = ["Clz", "Ctz", "Popcnt"].flatMap { op -> [OpInstruction] in
+        intValueTypes.map { OpInstruction.unop(op: op, type: $0, resultType: $0) }
+    } + ["Eqz"].flatMap { op -> [OpInstruction] in
+        intValueTypes.map { OpInstruction.unop(op: op, type: $0, resultType: "i32") }
     }
     static let floatBinaryInsts: [OpInstruction] = [
         "Add", "Sub", "Mul", "Div",
-        "Eq", "Ne",
     ].flatMap { op -> [OpInstruction] in
         floatValueTypes.map { OpInstruction.binop(op: op, type: $0) }
+    } + [
+        "Eq", "Ne",
+    ].flatMap { op -> [OpInstruction] in
+        floatValueTypes.map { OpInstruction.binop(op: op, inputType: $0, resultType: "i32") }
     }
     static let numericOtherInsts: [Instruction] = [
         // Numeric
@@ -350,7 +364,7 @@ enum GenerateInternalInstruction {
             output += """
 
                 mutating \(instMethodDecl(inst.base)) {
-                    sp[binaryOperand.result] = sp[binaryOperand.lhs].\(inst.inputType).\(inst.op.lowercased())(sp[binaryOperand.rhs].\(inst.inputType)).untyped
+                    sp[\(inst.resultType): binaryOperand.result] = sp[\(inst.inputType): binaryOperand.lhs].\(inst.op.lowercased())(sp[\(inst.inputType): binaryOperand.rhs])
                 }
             """
         }
@@ -358,7 +372,7 @@ enum GenerateInternalInstruction {
             output += """
 
                 mutating \(instMethodDecl(inst.base)) {
-                    sp[unaryOperand.result] = sp[unaryOperand.input].\(inst.inputType).\(inst.op.lowercased()).untyped
+                    sp[\(inst.resultType): unaryOperand.result] = sp[\(inst.inputType): unaryOperand.input].\(inst.op.lowercased())
                 }
             """
         }
