@@ -120,74 +120,14 @@ extension ExecutionState {
             self.i32Add(sp: sp, binaryOperand: binaryOperand)
         case .i64Add(let binaryOperand):
             self.i64Add(sp: sp, binaryOperand: binaryOperand)
-        case .f32Add(let binaryOperand):
-            self.f32Add(sp: sp, binaryOperand: binaryOperand)
-        case .f64Add(let binaryOperand):
-            self.f64Add(sp: sp, binaryOperand: binaryOperand)
         case .i32Sub(let binaryOperand):
             self.i32Sub(sp: sp, binaryOperand: binaryOperand)
         case .i64Sub(let binaryOperand):
             self.i64Sub(sp: sp, binaryOperand: binaryOperand)
-        case .f32Sub(let binaryOperand):
-            self.f32Sub(sp: sp, binaryOperand: binaryOperand)
-        case .f64Sub(let binaryOperand):
-            self.f64Sub(sp: sp, binaryOperand: binaryOperand)
         case .i32Mul(let binaryOperand):
             self.i32Mul(sp: sp, binaryOperand: binaryOperand)
         case .i64Mul(let binaryOperand):
             self.i64Mul(sp: sp, binaryOperand: binaryOperand)
-        case .f32Mul(let binaryOperand):
-            self.f32Mul(sp: sp, binaryOperand: binaryOperand)
-        case .f64Mul(let binaryOperand):
-            self.f64Mul(sp: sp, binaryOperand: binaryOperand)
-        case .i32Eq(let binaryOperand):
-            self.i32Eq(sp: sp, binaryOperand: binaryOperand)
-        case .i64Eq(let binaryOperand):
-            self.i64Eq(sp: sp, binaryOperand: binaryOperand)
-        case .f32Eq(let binaryOperand):
-            self.f32Eq(sp: sp, binaryOperand: binaryOperand)
-        case .f64Eq(let binaryOperand):
-            self.f64Eq(sp: sp, binaryOperand: binaryOperand)
-        case .i32Ne(let binaryOperand):
-            self.i32Ne(sp: sp, binaryOperand: binaryOperand)
-        case .i64Ne(let binaryOperand):
-            self.i64Ne(sp: sp, binaryOperand: binaryOperand)
-        case .f32Ne(let binaryOperand):
-            self.f32Ne(sp: sp, binaryOperand: binaryOperand)
-        case .f64Ne(let binaryOperand):
-            self.f64Ne(sp: sp, binaryOperand: binaryOperand)
-        case .i32LtS(let binaryOperand):
-            self.i32LtS(sp: sp, binaryOperand: binaryOperand)
-        case .i64LtS(let binaryOperand):
-            self.i64LtS(sp: sp, binaryOperand: binaryOperand)
-        case .i32LtU(let binaryOperand):
-            self.i32LtU(sp: sp, binaryOperand: binaryOperand)
-        case .i64LtU(let binaryOperand):
-            self.i64LtU(sp: sp, binaryOperand: binaryOperand)
-        case .i32GtS(let binaryOperand):
-            self.i32GtS(sp: sp, binaryOperand: binaryOperand)
-        case .i64GtS(let binaryOperand):
-            self.i64GtS(sp: sp, binaryOperand: binaryOperand)
-        case .i32GtU(let binaryOperand):
-            self.i32GtU(sp: sp, binaryOperand: binaryOperand)
-        case .i64GtU(let binaryOperand):
-            self.i64GtU(sp: sp, binaryOperand: binaryOperand)
-        case .i32LeS(let binaryOperand):
-            self.i32LeS(sp: sp, binaryOperand: binaryOperand)
-        case .i64LeS(let binaryOperand):
-            self.i64LeS(sp: sp, binaryOperand: binaryOperand)
-        case .i32LeU(let binaryOperand):
-            self.i32LeU(sp: sp, binaryOperand: binaryOperand)
-        case .i64LeU(let binaryOperand):
-            self.i64LeU(sp: sp, binaryOperand: binaryOperand)
-        case .i32GeS(let binaryOperand):
-            self.i32GeS(sp: sp, binaryOperand: binaryOperand)
-        case .i64GeS(let binaryOperand):
-            self.i64GeS(sp: sp, binaryOperand: binaryOperand)
-        case .i32GeU(let binaryOperand):
-            self.i32GeU(sp: sp, binaryOperand: binaryOperand)
-        case .i64GeU(let binaryOperand):
-            self.i64GeU(sp: sp, binaryOperand: binaryOperand)
         case .i32And(let binaryOperand):
             self.i32And(sp: sp, binaryOperand: binaryOperand)
         case .i64And(let binaryOperand):
@@ -220,6 +160,46 @@ extension ExecutionState {
             self.i32Rotr(sp: sp, binaryOperand: binaryOperand)
         case .i64Rotr(let binaryOperand):
             self.i64Rotr(sp: sp, binaryOperand: binaryOperand)
+        case .i32Eq(let binaryOperand):
+            self.i32Eq(sp: sp, binaryOperand: binaryOperand)
+        case .i64Eq(let binaryOperand):
+            self.i64Eq(sp: sp, binaryOperand: binaryOperand)
+        case .i32Ne(let binaryOperand):
+            self.i32Ne(sp: sp, binaryOperand: binaryOperand)
+        case .i64Ne(let binaryOperand):
+            self.i64Ne(sp: sp, binaryOperand: binaryOperand)
+        case .i32LtS(let binaryOperand):
+            self.i32LtS(sp: sp, binaryOperand: binaryOperand)
+        case .i64LtS(let binaryOperand):
+            self.i64LtS(sp: sp, binaryOperand: binaryOperand)
+        case .i32LtU(let binaryOperand):
+            self.i32LtU(sp: sp, binaryOperand: binaryOperand)
+        case .i64LtU(let binaryOperand):
+            self.i64LtU(sp: sp, binaryOperand: binaryOperand)
+        case .i32GtS(let binaryOperand):
+            self.i32GtS(sp: sp, binaryOperand: binaryOperand)
+        case .i64GtS(let binaryOperand):
+            self.i64GtS(sp: sp, binaryOperand: binaryOperand)
+        case .i32GtU(let binaryOperand):
+            self.i32GtU(sp: sp, binaryOperand: binaryOperand)
+        case .i64GtU(let binaryOperand):
+            self.i64GtU(sp: sp, binaryOperand: binaryOperand)
+        case .i32LeS(let binaryOperand):
+            self.i32LeS(sp: sp, binaryOperand: binaryOperand)
+        case .i64LeS(let binaryOperand):
+            self.i64LeS(sp: sp, binaryOperand: binaryOperand)
+        case .i32LeU(let binaryOperand):
+            self.i32LeU(sp: sp, binaryOperand: binaryOperand)
+        case .i64LeU(let binaryOperand):
+            self.i64LeU(sp: sp, binaryOperand: binaryOperand)
+        case .i32GeS(let binaryOperand):
+            self.i32GeS(sp: sp, binaryOperand: binaryOperand)
+        case .i64GeS(let binaryOperand):
+            self.i64GeS(sp: sp, binaryOperand: binaryOperand)
+        case .i32GeU(let binaryOperand):
+            self.i32GeU(sp: sp, binaryOperand: binaryOperand)
+        case .i64GeU(let binaryOperand):
+            self.i64GeU(sp: sp, binaryOperand: binaryOperand)
         case .i32Clz(let unaryOperand):
             self.i32Clz(sp: sp, unaryOperand: unaryOperand)
         case .i64Clz(let unaryOperand):
@@ -236,10 +216,30 @@ extension ExecutionState {
             self.i32Eqz(sp: sp, unaryOperand: unaryOperand)
         case .i64Eqz(let unaryOperand):
             self.i64Eqz(sp: sp, unaryOperand: unaryOperand)
+        case .f32Add(let binaryOperand):
+            self.f32Add(sp: sp, binaryOperand: binaryOperand)
+        case .f64Add(let binaryOperand):
+            self.f64Add(sp: sp, binaryOperand: binaryOperand)
+        case .f32Sub(let binaryOperand):
+            self.f32Sub(sp: sp, binaryOperand: binaryOperand)
+        case .f64Sub(let binaryOperand):
+            self.f64Sub(sp: sp, binaryOperand: binaryOperand)
+        case .f32Mul(let binaryOperand):
+            self.f32Mul(sp: sp, binaryOperand: binaryOperand)
+        case .f64Mul(let binaryOperand):
+            self.f64Mul(sp: sp, binaryOperand: binaryOperand)
         case .f32Div(let binaryOperand):
             self.f32Div(sp: sp, binaryOperand: binaryOperand)
         case .f64Div(let binaryOperand):
             self.f64Div(sp: sp, binaryOperand: binaryOperand)
+        case .f32Eq(let binaryOperand):
+            self.f32Eq(sp: sp, binaryOperand: binaryOperand)
+        case .f64Eq(let binaryOperand):
+            self.f64Eq(sp: sp, binaryOperand: binaryOperand)
+        case .f32Ne(let binaryOperand):
+            self.f32Ne(sp: sp, binaryOperand: binaryOperand)
+        case .f64Ne(let binaryOperand):
+            self.f64Ne(sp: sp, binaryOperand: binaryOperand)
         case .select(let selectOperand):
             try self.select(sp: sp, selectOperand: selectOperand)
         case .refNull(let refNullOperand):
@@ -329,40 +329,10 @@ extension Instruction {
         case .numericConversion: return "numericConversion"
         case .i32Add: return "i32Add"
         case .i64Add: return "i64Add"
-        case .f32Add: return "f32Add"
-        case .f64Add: return "f64Add"
         case .i32Sub: return "i32Sub"
         case .i64Sub: return "i64Sub"
-        case .f32Sub: return "f32Sub"
-        case .f64Sub: return "f64Sub"
         case .i32Mul: return "i32Mul"
         case .i64Mul: return "i64Mul"
-        case .f32Mul: return "f32Mul"
-        case .f64Mul: return "f64Mul"
-        case .i32Eq: return "i32Eq"
-        case .i64Eq: return "i64Eq"
-        case .f32Eq: return "f32Eq"
-        case .f64Eq: return "f64Eq"
-        case .i32Ne: return "i32Ne"
-        case .i64Ne: return "i64Ne"
-        case .f32Ne: return "f32Ne"
-        case .f64Ne: return "f64Ne"
-        case .i32LtS: return "i32LtS"
-        case .i64LtS: return "i64LtS"
-        case .i32LtU: return "i32LtU"
-        case .i64LtU: return "i64LtU"
-        case .i32GtS: return "i32GtS"
-        case .i64GtS: return "i64GtS"
-        case .i32GtU: return "i32GtU"
-        case .i64GtU: return "i64GtU"
-        case .i32LeS: return "i32LeS"
-        case .i64LeS: return "i64LeS"
-        case .i32LeU: return "i32LeU"
-        case .i64LeU: return "i64LeU"
-        case .i32GeS: return "i32GeS"
-        case .i64GeS: return "i64GeS"
-        case .i32GeU: return "i32GeU"
-        case .i64GeU: return "i64GeU"
         case .i32And: return "i32And"
         case .i64And: return "i64And"
         case .i32Or: return "i32Or"
@@ -379,6 +349,26 @@ extension Instruction {
         case .i64Rotl: return "i64Rotl"
         case .i32Rotr: return "i32Rotr"
         case .i64Rotr: return "i64Rotr"
+        case .i32Eq: return "i32Eq"
+        case .i64Eq: return "i64Eq"
+        case .i32Ne: return "i32Ne"
+        case .i64Ne: return "i64Ne"
+        case .i32LtS: return "i32LtS"
+        case .i64LtS: return "i64LtS"
+        case .i32LtU: return "i32LtU"
+        case .i64LtU: return "i64LtU"
+        case .i32GtS: return "i32GtS"
+        case .i64GtS: return "i64GtS"
+        case .i32GtU: return "i32GtU"
+        case .i64GtU: return "i64GtU"
+        case .i32LeS: return "i32LeS"
+        case .i64LeS: return "i64LeS"
+        case .i32LeU: return "i32LeU"
+        case .i64LeU: return "i64LeU"
+        case .i32GeS: return "i32GeS"
+        case .i64GeS: return "i64GeS"
+        case .i32GeU: return "i32GeU"
+        case .i64GeU: return "i64GeU"
         case .i32Clz: return "i32Clz"
         case .i64Clz: return "i64Clz"
         case .i32Ctz: return "i32Ctz"
@@ -387,8 +377,18 @@ extension Instruction {
         case .i64Popcnt: return "i64Popcnt"
         case .i32Eqz: return "i32Eqz"
         case .i64Eqz: return "i64Eqz"
+        case .f32Add: return "f32Add"
+        case .f64Add: return "f64Add"
+        case .f32Sub: return "f32Sub"
+        case .f64Sub: return "f64Sub"
+        case .f32Mul: return "f32Mul"
+        case .f64Mul: return "f64Mul"
         case .f32Div: return "f32Div"
         case .f64Div: return "f64Div"
+        case .f32Eq: return "f32Eq"
+        case .f64Eq: return "f64Eq"
+        case .f32Ne: return "f32Ne"
+        case .f64Ne: return "f64Ne"
         case .select: return "select"
         case .refNull: return "refNull"
         case .refIsNull: return "refIsNull"
@@ -415,107 +415,17 @@ extension ExecutionState {
     mutating func i64Add(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.add(sp[binaryOperand.rhs].i64).untyped
     }
-    mutating func f32Add(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.add(sp[binaryOperand.rhs].f32).untyped
-    }
-    mutating func f64Add(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.add(sp[binaryOperand.rhs].f64).untyped
-    }
     mutating func i32Sub(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.sub(sp[binaryOperand.rhs].i32).untyped
     }
     mutating func i64Sub(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.sub(sp[binaryOperand.rhs].i64).untyped
     }
-    mutating func f32Sub(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.sub(sp[binaryOperand.rhs].f32).untyped
-    }
-    mutating func f64Sub(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.sub(sp[binaryOperand.rhs].f64).untyped
-    }
     mutating func i32Mul(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.mul(sp[binaryOperand.rhs].i32).untyped
     }
     mutating func i64Mul(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.mul(sp[binaryOperand.rhs].i64).untyped
-    }
-    mutating func f32Mul(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.mul(sp[binaryOperand.rhs].f32).untyped
-    }
-    mutating func f64Mul(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.mul(sp[binaryOperand.rhs].f64).untyped
-    }
-    mutating func i32Eq(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.eq(sp[binaryOperand.rhs].i32).untyped
-    }
-    mutating func i64Eq(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.eq(sp[binaryOperand.rhs].i64).untyped
-    }
-    mutating func f32Eq(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.eq(sp[binaryOperand.rhs].f32).untyped
-    }
-    mutating func f64Eq(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.eq(sp[binaryOperand.rhs].f64).untyped
-    }
-    mutating func i32Ne(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.ne(sp[binaryOperand.rhs].i32).untyped
-    }
-    mutating func i64Ne(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.ne(sp[binaryOperand.rhs].i64).untyped
-    }
-    mutating func f32Ne(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.ne(sp[binaryOperand.rhs].f32).untyped
-    }
-    mutating func f64Ne(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.ne(sp[binaryOperand.rhs].f64).untyped
-    }
-    mutating func i32LtS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.lts(sp[binaryOperand.rhs].i32).untyped
-    }
-    mutating func i64LtS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.lts(sp[binaryOperand.rhs].i64).untyped
-    }
-    mutating func i32LtU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.ltu(sp[binaryOperand.rhs].i32).untyped
-    }
-    mutating func i64LtU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.ltu(sp[binaryOperand.rhs].i64).untyped
-    }
-    mutating func i32GtS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.gts(sp[binaryOperand.rhs].i32).untyped
-    }
-    mutating func i64GtS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.gts(sp[binaryOperand.rhs].i64).untyped
-    }
-    mutating func i32GtU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.gtu(sp[binaryOperand.rhs].i32).untyped
-    }
-    mutating func i64GtU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.gtu(sp[binaryOperand.rhs].i64).untyped
-    }
-    mutating func i32LeS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.les(sp[binaryOperand.rhs].i32).untyped
-    }
-    mutating func i64LeS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.les(sp[binaryOperand.rhs].i64).untyped
-    }
-    mutating func i32LeU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.leu(sp[binaryOperand.rhs].i32).untyped
-    }
-    mutating func i64LeU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.leu(sp[binaryOperand.rhs].i64).untyped
-    }
-    mutating func i32GeS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.ges(sp[binaryOperand.rhs].i32).untyped
-    }
-    mutating func i64GeS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.ges(sp[binaryOperand.rhs].i64).untyped
-    }
-    mutating func i32GeU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.geu(sp[binaryOperand.rhs].i32).untyped
-    }
-    mutating func i64GeU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.geu(sp[binaryOperand.rhs].i64).untyped
     }
     mutating func i32And(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.and(sp[binaryOperand.rhs].i32).untyped
@@ -565,11 +475,101 @@ extension ExecutionState {
     mutating func i64Rotr(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.rotr(sp[binaryOperand.rhs].i64).untyped
     }
+    mutating func i32Eq(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.eq(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64Eq(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.eq(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func i32Ne(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.ne(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64Ne(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.ne(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func i32LtS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.lts(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64LtS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.lts(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func i32LtU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.ltu(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64LtU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.ltu(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func i32GtS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.gts(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64GtS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.gts(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func i32GtU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.gtu(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64GtU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.gtu(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func i32LeS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.les(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64LeS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.les(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func i32LeU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.leu(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64LeU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.leu(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func i32GeS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.ges(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64GeS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.ges(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func i32GeU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.geu(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64GeU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.geu(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func f32Add(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.add(sp[binaryOperand.rhs].f32).untyped
+    }
+    mutating func f64Add(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.add(sp[binaryOperand.rhs].f64).untyped
+    }
+    mutating func f32Sub(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.sub(sp[binaryOperand.rhs].f32).untyped
+    }
+    mutating func f64Sub(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.sub(sp[binaryOperand.rhs].f64).untyped
+    }
+    mutating func f32Mul(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.mul(sp[binaryOperand.rhs].f32).untyped
+    }
+    mutating func f64Mul(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.mul(sp[binaryOperand.rhs].f64).untyped
+    }
     mutating func f32Div(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.div(sp[binaryOperand.rhs].f32).untyped
     }
     mutating func f64Div(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.div(sp[binaryOperand.rhs].f64).untyped
+    }
+    mutating func f32Eq(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.eq(sp[binaryOperand.rhs].f32).untyped
+    }
+    mutating func f64Eq(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.eq(sp[binaryOperand.rhs].f64).untyped
+    }
+    mutating func f32Ne(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.ne(sp[binaryOperand.rhs].f32).untyped
+    }
+    mutating func f64Ne(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.ne(sp[binaryOperand.rhs].f64).untyped
     }
     mutating func i32Clz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
         sp[unaryOperand.result] = sp[unaryOperand.input].i32.clz.untyped

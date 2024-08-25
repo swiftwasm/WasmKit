@@ -78,49 +78,40 @@ enum GenerateInternalInstruction {
 
     struct OpInstruction {
         let op: String
-        let type: String
+        let inputType: String
+        let resultType: String
         let base: Instruction
+
+        static func binop(op: String, type: String) -> OpInstruction {
+            let base = Instruction(
+                name: "\(type)\(op)", immediates: [Immediate(name: nil, type: "Instruction.BinaryOperand")]
+            )
+            return OpInstruction(op: op, inputType: type, resultType: type, base: base)
+        }
+        static func unop(op: String, type: String) -> OpInstruction {
+            let base = Instruction(name: "\(type)\(op)", immediates: [Immediate(name: nil, type: "Instruction.UnaryOperand")])
+            return OpInstruction(op: op, inputType: type, resultType: type, base: base)
+        }
     }
 
     static let intValueTypes = ["i32", "i64"]
     static let floatValueTypes = ["f32", "f64"]
     static let valueTypes = intValueTypes + floatValueTypes
-    static let numericBinaryInsts: [OpInstruction] = [
-        "Add", "Sub", "Mul", "Eq", "Ne",
-    ].flatMap { op -> [OpInstruction] in
-        valueTypes.map { type in
-            let base = Instruction(
-                name: "\(type)\(op)", immediates: [Immediate(name: nil, type: "Instruction.BinaryOperand")]
-            )
-            return OpInstruction(op: op, type: type, base: base)
-        }
-    }
-    static let numericIntBinaryInsts: [OpInstruction] = [
-        "LtS", "LtU", "GtS", "GtU", "LeS", "LeU", "GeS", "GeU",
+    static let intBinaryInsts: [OpInstruction] = [
+        "Add", "Sub", "Mul",
         "And", "Or", "Xor", "Shl", "ShrS", "ShrU", "Rotl", "Rotr",
+        "Eq", "Ne", "LtS", "LtU", "GtS", "GtU", "LeS", "LeU", "GeS", "GeU",
     ].flatMap { op -> [OpInstruction] in
-        intValueTypes.map { type in
-            let base = Instruction(
-                name: "\(type)\(op)", immediates: [Immediate(name: nil, type: "Instruction.BinaryOperand")]
-            )
-            return OpInstruction(op: op, type: type, base: base)
-        }
+        intValueTypes.map { OpInstruction.binop(op: op, type: $0) }
     }
-    static let numericIntUnaryInsts: [OpInstruction] = ["Clz", "Ctz", "Popcnt", "Eqz"].flatMap { op -> [OpInstruction] in
-        intValueTypes.map { type in
-            let base = Instruction(name: "\(type)\(op)", immediates: [Immediate(name: nil, type: "Instruction.UnaryOperand")])
-            return OpInstruction(op: op, type: type, base: base)
-        }
+    static let intUnaryInsts: [OpInstruction] = ["Clz", "Ctz", "Popcnt", "Eqz"].flatMap { op -> [OpInstruction] in
+        intValueTypes.map { OpInstruction.unop(op: op, type: $0) }
     }
-    static let numericFloatBinaryInsts: [OpInstruction] = [
-        "Div"
+    static let floatBinaryInsts: [OpInstruction] = [
+        "Add", "Sub", "Mul", "Div",
+        "Eq", "Ne",
     ].flatMap { op -> [OpInstruction] in
-        floatValueTypes.map { type in
-            let base = Instruction(
-                name: "\(type)\(op)", immediates: [Immediate(name: nil, type: "Instruction.BinaryOperand")]
-            )
-            return OpInstruction(op: op, type: type, base: base)
-        }
+        floatValueTypes.map { OpInstruction.binop(op: op, type: $0) }
     }
     static let numericOtherInsts: [Instruction] = [
         // Numeric
@@ -288,10 +279,9 @@ enum GenerateInternalInstruction {
         + memoryLoadStoreInsts
         + memoryOpInsts
         + numericOtherInsts
-        + numericBinaryInsts.map(\.base)
-        + numericIntBinaryInsts.map(\.base)
-        + numericIntUnaryInsts.map(\.base)
-        + numericFloatBinaryInsts.map(\.base)
+        + intBinaryInsts.map(\.base)
+        + intUnaryInsts.map(\.base)
+        + floatBinaryInsts.map(\.base)
         + miscInsts
 
     static func camelCase(pascalCase: String) -> String {
@@ -356,19 +346,19 @@ enum GenerateInternalInstruction {
             extension ExecutionState {
             """
 
-        for inst in numericBinaryInsts + numericIntBinaryInsts + numericFloatBinaryInsts {
+        for inst in intBinaryInsts + floatBinaryInsts {
             output += """
 
                 mutating \(instMethodDecl(inst.base)) {
-                    sp[binaryOperand.result] = sp[binaryOperand.lhs].\(inst.type).\(inst.op.lowercased())(sp[binaryOperand.rhs].\(inst.type)).untyped
+                    sp[binaryOperand.result] = sp[binaryOperand.lhs].\(inst.inputType).\(inst.op.lowercased())(sp[binaryOperand.rhs].\(inst.inputType)).untyped
                 }
             """
         }
-        for inst in numericIntUnaryInsts {
+        for inst in intUnaryInsts {
             output += """
 
                 mutating \(instMethodDecl(inst.base)) {
-                    sp[unaryOperand.result] = sp[unaryOperand.input].\(inst.type).\(inst.op.lowercased()).untyped
+                    sp[unaryOperand.result] = sp[unaryOperand.input].\(inst.inputType).\(inst.op.lowercased()).untyped
                 }
             """
         }
