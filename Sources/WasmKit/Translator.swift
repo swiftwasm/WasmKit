@@ -253,34 +253,34 @@ fileprivate struct MetaProgramCounter {
 ///
 struct StackLayout {
     let type: FunctionType
-    let paramResultBase: Instruction.Register
+    let paramResultBase: Instruction.VReg
 
     init(type: FunctionType) {
         self.type = type
         self.paramResultBase = Self.frameHeaderSize(type: type)
     }
 
-    func paramReg(_ index: Int) -> Instruction.Register {
-        Instruction.Register(index) - paramResultBase
+    func paramReg(_ index: Int) -> Instruction.VReg {
+        Instruction.VReg(index) - paramResultBase
     }
 
-    func returnReg(_ index: Int) -> Instruction.Register {
-        return Instruction.Register(index) - paramResultBase
+    func returnReg(_ index: Int) -> Instruction.VReg {
+        return Instruction.VReg(index) - paramResultBase
     }
 
-    func localReg(_ index: LocalIndex) -> Instruction.Register {
+    func localReg(_ index: LocalIndex) -> Instruction.VReg {
         if index < type.parameters.count {
             return paramReg(Int(index))
         } else {
-            return Instruction.Register(index) - Instruction.Register(type.parameters.count)
+            return Instruction.VReg(index) - Instruction.VReg(type.parameters.count)
         }
     }
 
-    internal static func frameHeaderSize(type: FunctionType) -> Instruction.Register {
+    internal static func frameHeaderSize(type: FunctionType) -> Instruction.VReg {
         frameHeaderSize(parameters: type.parameters.count, results: type.results.count)
     }
-    internal static func frameHeaderSize(parameters: Int, results: Int) -> Instruction.Register {
-        Instruction.Register(max(parameters, results))
+    internal static func frameHeaderSize(parameters: Int, results: Int) -> Instruction.VReg {
+        Instruction.VReg(max(parameters, results))
     }
 }
 
@@ -379,10 +379,10 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
 
     enum ValueSource {
-        case register(Instruction.Register)
+        case register(Instruction.VReg)
         case local(LocalIndex)
 
-        func intoRegister(layout: StackLayout) -> Instruction.Register {
+        func intoRegister(layout: StackLayout) -> Instruction.VReg {
             switch self {
             case .register(let register):
                 return register
@@ -397,45 +397,45 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         /// The maximum height of the stack within the function
         private(set) var maxHeight: Int = 0
         var height: Int { values.count }
-        let stackRegBase: Instruction.Register
+        let stackRegBase: Instruction.VReg
 
-        init(stackRegBase: Instruction.Register) {
+        init(stackRegBase: Instruction.VReg) {
             self.stackRegBase = stackRegBase
         }
 
-        mutating func push(_ value: ValueType) -> Instruction.Register {
+        mutating func push(_ value: ValueType) -> Instruction.VReg {
             push(.some(value))
         }
-        mutating func push(_ value: MetaValue) -> Instruction.Register {
+        mutating func push(_ value: MetaValue) -> Instruction.VReg {
             // Record the maximum height of the stack we have seen
             maxHeight = max(maxHeight, height)
             let usedRegister = self.values.count
             self.values.append(.stack(value))
             assert(height < UInt16.max)
-            return stackRegBase + Instruction.Register(usedRegister)
+            return stackRegBase + Instruction.VReg(usedRegister)
         }
         mutating func pushLocal(_ localIndex: LocalIndex, locals: inout Locals) throws {
             let type = try locals.type(of: localIndex)
             self.values.append(.local(type, localIndex))
         }
-        mutating func preserveLocalsOnStack(_ localIndex: LocalIndex) -> [Instruction.Register] {
-            var copyTo: [Instruction.Register] = []
+        mutating func preserveLocalsOnStack(_ localIndex: LocalIndex) -> [Instruction.VReg] {
+            var copyTo: [Instruction.VReg] = []
             for i in 0..<values.count {
                 guard case .local(let type, localIndex) = self.values[i] else { continue }
                 self.values[i] = .stack(.some(type))
-                copyTo.append(stackRegBase + Instruction.Register(i))
+                copyTo.append(stackRegBase + Instruction.VReg(i))
             }
             return copyTo
         }
 
-        mutating func preserveLocalsOnStack(depth: Int) -> [(source: LocalIndex, to: Instruction.Register)] {
-            var copies: [(source: LocalIndex, to: Instruction.Register)] = []
+        mutating func preserveLocalsOnStack(depth: Int) -> [(source: LocalIndex, to: Instruction.VReg)] {
+            var copies: [(source: LocalIndex, to: Instruction.VReg)] = []
             for offset in 0..<depth {
                 let valueIndex = self.values.count - 1 - offset
                 let value = self.values[valueIndex]
                 guard case .local(let type, let localIndex) = value else { continue }
                 self.values[valueIndex] = .stack(.some(type))
-                copies.append((localIndex, self.stackRegBase + Instruction.Register(valueIndex)))
+                copies.append((localIndex, self.stackRegBase + Instruction.VReg(valueIndex)))
             }
             return copies
         }
@@ -450,7 +450,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             case .local(_, let localIndex):
                 source = .local(localIndex)
             case .stack:
-                source = .register(stackRegBase + Instruction.Register(height))
+                source = .register(stackRegBase + Instruction.VReg(height))
             }
             return source
         }
@@ -521,7 +521,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             case pinned(MetaProgramCounter)
         }
 
-        typealias ResultRelink = (_ result: Instruction.Register) -> Instruction
+        typealias ResultRelink = (_ result: Instruction.VReg) -> Instruction
         fileprivate struct LastEmission {
             let position: MetaProgramCounter
             let resultRelink: ResultRelink?
@@ -551,7 +551,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             lastEmission = nil
         }
 
-        mutating func relinkLastInstructionResult(_ newResult: Instruction.Register) -> Bool {
+        mutating func relinkLastInstructionResult(_ newResult: Instruction.VReg) -> Bool {
             guard let lastEmission = self.lastEmission,
                   let resultRelink = lastEmission.resultRelink else { return false }
             let newInstruction = resultRelink(newResult)
@@ -689,7 +689,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         self.module = module
         self.iseqBuilder = ISeqBuilder()
         self.controlStack = ControlStack()
-        self.valueStack = ValueStack(stackRegBase: Instruction.Register(locals.count))
+        self.valueStack = ValueStack(stackRegBase: Instruction.VReg(locals.count))
         self.locals = Locals(types: type.parameters + locals)
         self.stackLayout = StackLayout(type: type)
         self.functionIndex = functionIndex
@@ -707,10 +707,10 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
     }
 
-    private func returnReg(_ index: Int) -> Instruction.Register {
+    private func returnReg(_ index: Int) -> Instruction.VReg {
         return stackLayout.returnReg(index)
     }
-    private func localReg(_ index: LocalIndex) -> Instruction.Register {
+    private func localReg(_ index: LocalIndex) -> Instruction.VReg {
         return stackLayout.localReg(index)
     }
 
@@ -718,7 +718,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         iseqBuilder.emit(instruction, resultRelink: resultRelink)
     }
 
-    private mutating func emitCopyStack(from source: Instruction.Register, to dest: Instruction.Register) {
+    private mutating func emitCopyStack(from source: Instruction.VReg, to dest: Instruction.VReg) {
         guard source != dest else { return }
         emit(.copyStack(Instruction.CopyStackOperand(source: source, dest: dest)))
     }
@@ -771,7 +771,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     private mutating func popOnStackOperand(_ type: ValueType) throws -> Bool {
         let stackHeight = valueStack.height
         guard let op = try popOperand(type) else { return false }
-        let copyTo = valueStack.stackRegBase + Instruction.Register(stackHeight) - 1
+        let copyTo = valueStack.stackRegBase + Instruction.VReg(stackHeight) - 1
         if case .local(let localIndex) = op {
             emitCopyStack(from: localReg(localIndex), to: copyTo)
         }
@@ -797,16 +797,16 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
     private mutating func copyOnBranch(targetFrame frame: ControlStack.ControlFrame) throws {
         preserveLocalsOnStack(depth: Int(valueStack.height - frame.stackHeight))
-        let copyCount = Instruction.Register(frame.copyCount)
-        let sourceBase = valueStack.stackRegBase + Instruction.Register(valueStack.height)
-        let destBase = valueStack.stackRegBase + Instruction.Register(frame.stackHeight)
+        let copyCount = Instruction.VReg(frame.copyCount)
+        let sourceBase = valueStack.stackRegBase + Instruction.VReg(valueStack.height)
+        let destBase = valueStack.stackRegBase + Instruction.VReg(frame.stackHeight)
         for i in (0..<copyCount).reversed() {
-            let source = sourceBase - 1 - Instruction.Register(i)
-            let dest: Instruction.Register
+            let source = sourceBase - 1 - Instruction.VReg(i)
+            let dest: Instruction.VReg
             if case .block(root: true) = frame.kind {
                 dest = returnReg(Int(copyCount - 1 - i))
             } else {
-                dest = destBase + copyCount - 1 - Instruction.Register(i)
+                dest = destBase + copyCount - 1 - Instruction.VReg(i)
             }
             emitCopyStack(from: source, to: dest)
         }
@@ -1164,18 +1164,18 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         try markUnreachable()
     }
 
-    private mutating func visitCallLike(calleeType: FunctionType) throws -> Instruction.Register? {
+    private mutating func visitCallLike(calleeType: FunctionType) throws -> Instruction.VReg? {
         for parameter in calleeType.parameters.reversed() {
             guard try popOnStackOperand(parameter) else { return nil }
         }
 
-        let spAddend = valueStack.stackRegBase + Instruction.Register(valueStack.height)
+        let spAddend = valueStack.stackRegBase + Instruction.VReg(valueStack.height)
             + StackLayout.frameHeaderSize(type: calleeType)
 
         for result in calleeType.results {
             _ = valueStack.push(result)
         }
-        return Instruction.Register(spAddend)
+        return Instruction.VReg(spAddend)
     }
     mutating func visitCall(functionIndex: UInt32) throws -> Output {
         let calleeType = try self.module.functionType(functionIndex, interner: funcTypeInterner)
@@ -1320,7 +1320,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
     private mutating func pushEmit(
         _ type: ValueType,
-        _ instruction: @escaping (Instruction.Register) -> Instruction
+        _ instruction: @escaping (Instruction.VReg) -> Instruction
     ) {
         let register = valueStack.push(type)
         emit(instruction(register), resultRelink: { newResult in
@@ -1330,7 +1330,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     private mutating func popPushEmit(
         _ pop: ValueType,
         _ push: ValueType,
-        _ instruction: @escaping (_ popped: ValueSource, _ result: Instruction.Register, ValueStack) -> Instruction
+        _ instruction: @escaping (_ popped: ValueSource, _ result: Instruction.VReg, ValueStack) -> Instruction
     ) throws {
         let value = try popOperand(pop)
         let result = valueStack.push(push)
@@ -1371,7 +1371,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         _ push: ValueType,
         _ instruction: @escaping (
             _ popped: (ValueSource, ValueSource),
-            _ result: Instruction.Register
+            _ result: Instruction.VReg
         ) -> Instruction
     ) throws {
         let pop1 = try valueStack.pop(pops.0)

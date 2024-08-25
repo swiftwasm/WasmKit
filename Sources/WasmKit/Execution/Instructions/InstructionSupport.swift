@@ -17,172 +17,172 @@ extension Instruction {
         }
     }
 
-    typealias Register = Int16
+    typealias VReg = Int16
 
     /// size = 6, alignment = 2
     struct BinaryOperand: Equatable {
-        let result: Register
-        let lhs: Register
-        let rhs: Register
+        let result: VReg
+        let lhs: VReg
+        let rhs: VReg
     }
     
     /// size = 4, alignment = 2
     struct UnaryOperand: Equatable {
-        let result: Register
-        let input: Register
+        let result: VReg
+        let input: VReg
     }
     
     /// size = 10, alignment = 8
     struct ConstOperand: Equatable {
         let value: UntypedValue
-        let result: Register
+        let result: VReg
     }
 
     /// size = 12, alignment = 8
     struct LoadOperand: Equatable {
         let memarg: MemArg
-        let pointer: Register
-        let result: Register
+        let pointer: VReg
+        let result: VReg
     }
     
     struct StoreOperand: Equatable {
         let memarg: MemArg
-        let pointer: Register
-        let value: Register
+        let pointer: VReg
+        let value: VReg
     }
     
     struct MemorySizeOperand: Equatable {
         let memoryIndex: MemoryIndex
-        let result: Register
+        let result: VReg
     }
     
     struct MemoryGrowOperand: Equatable {
-        let result: Register
-        let delta: Register
+        let result: VReg
+        let delta: VReg
         let memoryIndex: MemoryIndex
     }
     
     struct MemoryInitOperand: Equatable {
         let segmentIndex: DataIndex
-        let destOffset: Register
-        let sourceOffset: Register
-        let size: Register
+        let destOffset: VReg
+        let sourceOffset: VReg
+        let size: VReg
     }
     
     struct MemoryCopyOperand: Equatable {
-        let destOffset: Register
-        let sourceOffset: Register
-        let size: Register
+        let destOffset: VReg
+        let sourceOffset: VReg
+        let size: VReg
     }
     
     struct MemoryFillOperand: Equatable {
-        let destOffset: Register
-        let value: Register
-        let size: Register
+        let destOffset: VReg
+        let value: VReg
+        let size: VReg
     }
     
     struct SelectOperand: Equatable {
-        let result: Register
-        let condition: Register
-        let onTrue: Register
-        let onFalse: Register
+        let result: VReg
+        let condition: VReg
+        let onTrue: VReg
+        let onFalse: VReg
     }
     
     struct RefNullOperand: Equatable {
         let type: ReferenceType
-        let result: Register
+        let result: VReg
     }
     
     struct RefIsNullOperand: Equatable {
-        let value: Register
-        let result: Register
+        let value: VReg
+        let result: VReg
     }
     
     struct RefFuncOperand: Equatable {
         let index: FunctionIndex
-        let result: Register
+        let result: VReg
     }
     
     struct TableGetOperand: Equatable {
-        let index: Register
-        let result: Register
+        let index: VReg
+        let result: VReg
         let tableIndex: TableIndex
     }
     
     struct TableSetOperand: Equatable {
-        let index: Register
-        let value: Register
+        let index: VReg
+        let value: VReg
         let tableIndex: TableIndex
     }
     
     struct TableSizeOperand: Equatable {
         let tableIndex: TableIndex
-        let result: Register
+        let result: VReg
     }
     
     struct TableGrowOperand: Equatable {
         let tableIndex: TableIndex
-        let result: Register
-        let delta: Register
-        let value: Register
+        let result: VReg
+        let delta: VReg
+        let value: VReg
     }
     
     struct TableFillOperand: Equatable {
         let tableIndex: TableIndex
-        let destOffset: Register
-        let value: Register
-        let size: Register
+        let destOffset: VReg
+        let value: VReg
+        let size: VReg
     }
     
     struct TableCopyOperand: Equatable {
         let sourceIndex: TableIndex
         let destIndex: TableIndex
-        let sourceOffset: Register
-        let destOffset: Register
-        let size: Register
+        let sourceOffset: VReg
+        let destOffset: VReg
+        let size: VReg
     }
     
     struct TableInitOperand: Equatable {
         let tableIndex: TableIndex
         let segmentIndex: ElementIndex
-        let destOffset: Register
-        let sourceOffset: Register
-        let size: Register
+        let destOffset: VReg
+        let sourceOffset: VReg
+        let size: VReg
     }
 
     struct GlobalGetOperand: Equatable {
         let global: InternalGlobal
-        let result: Register
+        let result: VReg
     }
     
     struct GlobalSetOperand: Equatable {
         let global: InternalGlobal
-        let value: Register
+        let value: VReg
     }
 
     struct CopyStackOperand: Equatable {
-        let source: Register
-        let dest: Register
+        let source: VReg
+        let dest: VReg
     }
 
     struct IfOperand: Equatable {
         // `else` for if-then-else-end sequence, `end` for if-then-end sequence
         let elseOrEndOffset: UInt32
-        let condition: Register
+        let condition: VReg
     }
     
     struct BrIfOperand: Equatable {
         let offset: Int32
-        let condition: Register
+        let condition: VReg
     }
     
     struct BrTableOperand: Equatable {
         let table: Instruction.BrTable
-        let index: Register
+        let index: VReg
     }
 
     struct CallLikeOperand: Equatable {
-        let spAddend: Instruction.Register
+        let spAddend: Instruction.VReg
     }
     struct CallOperand: Equatable {
         let callee: InternalFunction
@@ -199,7 +199,7 @@ extension Instruction {
     struct CallIndirectOperand: Equatable {
         let tableIndex: TableIndex
         let type: InternedFuncType
-        let index: Register
+        let index: VReg
         let callLike: CallLikeOperand
     }
 
@@ -299,8 +299,8 @@ struct InstructionPrintingContext {
     let function: Function
     var nameRegistry: NameRegistry
 
-    func reg(_ reg: Instruction.Register) -> String {
-        let adjusted = Instruction.Register(StackLayout.frameHeaderSize(type: function.type)) + reg
+    func reg(_ reg: Instruction.VReg) -> String {
+        let adjusted = Instruction.VReg(StackLayout.frameHeaderSize(type: function.type)) + reg
         if shouldColor {
             let regColor = adjusted < 15 ? "\u{001B}[3\(adjusted + 1)m" : ""
             return "\(regColor)reg:\(reg)\u{001B}[0m"

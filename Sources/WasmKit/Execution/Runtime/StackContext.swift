@@ -34,7 +34,7 @@ struct StackContext {
         instance: InternalInstance,
         numberOfNonParameterLocals: Int,
         sp: Sp, returnPC: Pc,
-        spAddend: Instruction.Register
+        spAddend: Instruction.VReg
     ) throws -> Sp {
         guard frames.count < limit else {
             throw Trap.callStackExhausted
