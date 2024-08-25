@@ -137,7 +137,7 @@ extension ExecutionState {
 
     fileprivate mutating func getElementIndex(
         sp: Sp,
-        _ register: Instruction.Register, _ table: InternalTable
+        _ register: Instruction.VReg, _ table: InternalTable
     ) throws -> ElementIndex {
         let elementIndex = sp[register].asAddressOffset(table.limits.isMemory64)
 
@@ -150,7 +150,7 @@ extension ExecutionState {
 }
 
 extension Sp {
-    fileprivate func getReference(_ register: Instruction.Register, type: TableType) -> Reference {
+    fileprivate func getReference(_ register: Instruction.VReg, type: TableType) -> Reference {
         return self[register].asReference(type.elementType)
     }
 }
