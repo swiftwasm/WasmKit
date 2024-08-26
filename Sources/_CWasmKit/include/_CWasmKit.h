@@ -10,7 +10,7 @@
 // See ExecutionContext.swift for more information about each execution
 // parameter.
 typedef uint64_t *_Nonnull Sp;
-typedef int64_t R0;
+typedef uint64_t R0;
 typedef void *_Nullable Pc;
 typedef void *_Nullable Md;
 typedef size_t Ms;

@@ -56,7 +56,18 @@ extension Pc {
     }
 }
 
-typealias R0 = Int64
+typealias R0 = UInt64
+
+func writePReg<T: FixedWidthInteger>(_ result: inout R0, _ value: T) {
+    result = R0(value)
+}
+
+func readPRegI32(_ source: R0) -> UInt32 {
+    return UInt32(source)
+}
+func readPRegI64(_ source: R0) -> UInt64 {
+    return UInt64(source)
+}
 
 /// Executes a WebAssembly function.
 ///

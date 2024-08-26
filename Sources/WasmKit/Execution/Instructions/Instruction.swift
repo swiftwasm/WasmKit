@@ -1,6 +1,9 @@
 enum Instruction: Equatable {
     case copyStack(Instruction.CopyStackOperand)
-    case copyR0ToStack(dest: VReg)
+    case copyR0ToStackI32(dest: VReg)
+    case copyR0ToStackI64(dest: VReg)
+    case copyR0ToStackF32(dest: VReg)
+    case copyR0ToStackF64(dest: VReg)
     case globalGet(Instruction.GlobalGetOperand)
     case globalSet(Instruction.GlobalSetOperand)
     case call(Instruction.CallOperand)
@@ -46,8 +49,10 @@ enum Instruction: Equatable {
     case memoryFill(Instruction.MemoryFillOperand)
     case const32(Instruction.Const32Operand)
     case const64(Instruction.Const64Operand)
-    case i32Add(Instruction.BinaryOperand)
-    case i64Add(Instruction.BinaryOperand)
+    case i32AddSS(Instruction.BinaryOperandSS)
+    case i32AddSR(Instruction.BinaryOperandSR)
+    case i64AddSS(Instruction.BinaryOperandSS)
+    case i64AddSR(Instruction.BinaryOperandSR)
     case i32Sub(Instruction.BinaryOperand)
     case i64Sub(Instruction.BinaryOperand)
     case i32Mul(Instruction.BinaryOperand)
@@ -202,7 +207,10 @@ extension Instruction {
     var rawImmediate: (any InstructionImmediate)? {
         switch self {
         case .copyStack(let copyStackOperand): return copyStackOperand
-        case .copyR0ToStack(let dest): return dest
+        case .copyR0ToStackI32(let dest): return dest
+        case .copyR0ToStackI64(let dest): return dest
+        case .copyR0ToStackF32(let dest): return dest
+        case .copyR0ToStackF64(let dest): return dest
         case .globalGet(let globalGetOperand): return globalGetOperand
         case .globalSet(let globalSetOperand): return globalSetOperand
         case .call(let callOperand): return callOperand
@@ -244,8 +252,10 @@ extension Instruction {
         case .memoryFill(let memoryFillOperand): return memoryFillOperand
         case .const32(let const32Operand): return const32Operand
         case .const64(let const64Operand): return const64Operand
-        case .i32Add(let binaryOperand): return binaryOperand
-        case .i64Add(let binaryOperand): return binaryOperand
+        case .i32AddSS(let binaryOperandSS): return binaryOperandSS
+        case .i32AddSR(let binaryOperandSR): return binaryOperandSR
+        case .i64AddSS(let binaryOperandSS): return binaryOperandSS
+        case .i64AddSR(let binaryOperandSR): return binaryOperandSR
         case .i32Sub(let binaryOperand): return binaryOperand
         case .i64Sub(let binaryOperand): return binaryOperand
         case .i32Mul(let binaryOperand): return binaryOperand

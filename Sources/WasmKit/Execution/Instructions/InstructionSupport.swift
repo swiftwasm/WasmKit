@@ -80,7 +80,7 @@ extension Int32: InstructionImmediate {
     }
 }
 
-enum PReg: Int {
+enum PReg: Int, CaseIterable {
     case r0 = 0
 }
 
@@ -489,6 +489,32 @@ extension Instruction {
 
     typealias OnEnterOperand = FunctionIndex
     typealias OnExitOperand = FunctionIndex
+    
+    struct BinaryOperandSS: Equatable, InstructionImmediate {
+        let lhs: LVReg
+        let rhs: LVReg
+    }
+    struct BinaryOperandSR: Equatable, InstructionImmediate {
+        let lhs: LLVReg
+        init(_ lhs: VReg) {
+            self.lhs = LLVReg(lhs)
+        }
+    }
+
+    struct Commutative {
+        let ss: (BinaryOperandSS) -> Instruction
+        let sr: (BinaryOperandSR) -> Instruction
+    }
+
+    static var i32Add = Commutative(
+        ss: i32AddSS,
+        sr: i32AddSR
+    )
+
+    static var i64Add = Commutative(
+        ss: i64AddSS,
+        sr: i64AddSR
+    )
 }
 
 struct InstructionPrintingContext {
@@ -558,8 +584,8 @@ struct InstructionPrintingContext {
 //            target.write("\(reg(op.result)) = f64.load \(reg(op.pointer)), \(memarg(op.memarg))")
 //        case .copyStack(let op):
 //            target.write("\(reg(op.dest)) = copy \(reg(op.source))")
-        case .i32Add(let op):
-            target.write("\(reg(op.result)) = i32.add \(reg(op.lhs)), \(reg(op.rhs))")
+//        case .i32Add(let op):
+//            target.write("\(reg(op.result)) = i32.add \(reg(op.lhs)), \(reg(op.rhs))")
         case .i32Sub(let op):
             target.write("\(reg(op.result)) = i32.sub \(reg(op.lhs)), \(reg(op.rhs))")
         case .i32LtU(let op):
