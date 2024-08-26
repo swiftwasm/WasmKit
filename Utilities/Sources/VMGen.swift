@@ -24,11 +24,12 @@ enum VMGen {
         let type: String
 
         static let sp = ExecParam(label: "sp", type: "Sp")
+        static let r0 = ExecParam(label: "r0", type: "R0")
         static let pc = ExecParam(label: "pc", type: "Pc")
         static let md = ExecParam(label: "md", type: "Md")
         static let ms = ExecParam(label: "ms", type: "Ms")
 
-        static var allCases = [sp, pc, md, ms]
+        static var allCases = [sp, r0, pc, md, ms]
     }
 
     struct Instruction {
@@ -38,6 +39,7 @@ enum VMGen {
         var mayUpdateFrame: Bool
         var mayUpdateSp: Bool = false
         var useCurrentMemory: RegisterUse
+        var useR0: RegisterUse
         var immediate: Immediate?
 
         var mayUpdatePc: Bool {
@@ -48,6 +50,7 @@ enum VMGen {
             name: String, isControl: Bool = false,
             mayThrow: Bool = false, mayUpdateFrame: Bool = false,
             useCurrentMemory: RegisterUse = .none,
+            useR0: RegisterUse = .none,
             immediate: Immediate? = nil
         ) {
             self.name = name
@@ -56,6 +59,7 @@ enum VMGen {
             self.mayUpdateFrame = mayUpdateFrame
             self.useCurrentMemory = useCurrentMemory
             self.immediate = immediate
+            self.useR0 = useR0
             assert(isControl || !mayUpdateFrame, "non-control instruction should not update frame")
         }
 
@@ -66,6 +70,13 @@ enum VMGen {
                 vregs += [(ExecParam.sp, true)]
             } else {
                 vregs += [(ExecParam.sp, false)]
+            }
+            switch useR0 {
+            case .none: break
+            case .read:
+                vregs += [(ExecParam.r0, false)]
+            case .write:
+                vregs += [(ExecParam.r0, true)]
             }
             if self.mayUpdatePc {
                 vregs += [(ExecParam.pc, false)]
@@ -360,6 +371,7 @@ enum VMGen {
         var instructions: [Instruction] = [
             // Variable
             Instruction(name: "copyStack", immediate: Immediate(name: nil, type: "Instruction.CopyStackOperand")),
+            Instruction(name: "copyR0ToStack", useR0: .read, immediate: Immediate(name: "dest", type: "VReg")),
             Instruction(name: "globalGet", immediate: Immediate(name: nil, type: "Instruction.GlobalGetOperand")),
             Instruction(name: "globalSet", immediate: Immediate(name: nil, type: "Instruction.GlobalSetOperand")),
             // Controls
@@ -373,7 +385,7 @@ enum VMGen {
                 ),
             Instruction(
                 name: "internalCall", isControl: true, mayThrow: true, mayUpdateFrame: true,
-                immediate: 
+                immediate:
                     Immediate(name: nil, type: "Instruction.InternalCallOperand")
                 ),
             Instruction(
@@ -385,7 +397,7 @@ enum VMGen {
             Instruction(name: "nop"),
             Instruction(
                 name: "br", isControl: true, mayUpdateFrame: false,
-                immediate: 
+                immediate:
                     Immediate(name: "offset", type: "Int32")
                 ),
             Instruction(
@@ -395,7 +407,7 @@ enum VMGen {
                 ),
             Instruction(
                 name: "brIfNot", isControl: true, mayUpdateFrame: false,
-                immediate: 
+                immediate:
                     Immediate(name: nil, type: "Instruction.BrIfOperand")
                 ),
             Instruction(
@@ -702,7 +714,7 @@ enum VMGen {
                 output += "    if (error) return wasmkit_execution_state_set_error(error, state);\n"
             }
             output += """
-                return ((wasmkit_tc_exec)(*(void **)pc))(sp, pc, md, ms, state);
+                return ((wasmkit_tc_exec)(*(void **)pc))(\(params.map { $0.label }.joined(separator: ", ")), state);
             }
 
             """

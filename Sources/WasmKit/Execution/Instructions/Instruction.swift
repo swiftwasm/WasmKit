@@ -1,5 +1,6 @@
 enum Instruction: Equatable {
     case copyStack(Instruction.CopyStackOperand)
+    case copyR0ToStack(dest: VReg)
     case globalGet(Instruction.GlobalGetOperand)
     case globalSet(Instruction.GlobalSetOperand)
     case call(Instruction.CallOperand)
@@ -201,6 +202,7 @@ extension Instruction {
     var rawImmediate: (any InstructionImmediate)? {
         switch self {
         case .copyStack(let copyStackOperand): return copyStackOperand
+        case .copyR0ToStack(let dest): return dest
         case .globalGet(let globalGetOperand): return globalGetOperand
         case .globalSet(let globalSetOperand): return globalSetOperand
         case .call(let callOperand): return callOperand

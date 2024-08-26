@@ -56,6 +56,8 @@ extension Pc {
     }
 }
 
+typealias R0 = Int64
+
 /// Executes a WebAssembly function.
 ///
 /// - Parameters:
@@ -163,7 +165,7 @@ extension ExecutionState {
         handle: InternalFunction,
         type: FunctionType
     ) throws {
-        var sp: Sp = sp, md: Md = nil, ms: Ms = 0, pc = pc
+        var sp: Sp = sp, r0: R0 = 0, md: Md = nil, ms: Ms = 0, pc = pc
         (pc, sp) = try invoke(
             function: handle,
             callerInstance: nil,
@@ -175,9 +177,9 @@ extension ExecutionState {
         do {
             switch self.runtime.value.configuration.threadingModel {
             case .direct:
-                try runDirectThreaded(sp: sp, pc: pc, md: md, ms: ms)
+                try runDirectThreaded(sp: sp, r0: r0, pc: pc, md: md, ms: ms)
             case .token:
-                try runTokenThreaded(sp: &sp, pc: &pc, md: &md, ms: &ms)
+                try runTokenThreaded(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
             }
         } catch is EndOfExecution {
             return
@@ -186,12 +188,12 @@ extension ExecutionState {
 
     @inline(never)
     mutating func runDirectThreaded(
-        sp: Sp, pc: Pc, md: Md, ms: Ms
+        sp: Sp, r0: R0, pc: Pc, md: Md, ms: Ms
     ) throws {
         let handler = pc.assumingMemoryBound(to: wasmkit_tc_exec.self).pointee
         handler(
             UnsafeMutableRawPointer(sp).assumingMemoryBound(to: UInt64.self),
-            pc, md, ms, &self
+            r0, pc, md, ms, &self
         )
         if let error = self.trap {
             throw unsafeBitCast(error, to: Error.self)
@@ -200,7 +202,7 @@ extension ExecutionState {
 
     /// The main execution loop. Be careful when modifying this function as it is performance-critical.
     @inline(__always)
-    mutating func runTokenThreaded(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
+    mutating func runTokenThreaded(sp: inout Sp, r0: inout R0, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
 #if WASMKIT_ENGINE_STATS
         var stats: [String: Int] = [:]
         defer {
@@ -215,7 +217,7 @@ extension ExecutionState {
 #if WASMKIT_ENGINE_STATS
             stats[inst.name, default: 0] += 1
 #endif
-            try doExecute(inst, sp: &sp, pc: &pc, md: &md, ms: &ms)
+            try doExecute(inst, sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
         }
     }
 
@@ -245,7 +247,7 @@ extension InternalFunction {
             let iseq = try function.withValue {
                 try $0.ensureCompiled(context: &executionState)
             }
-            
+
             let newSp = try executionState.pushFrame(
                 iseq: iseq,
                 instance: function.instance,
