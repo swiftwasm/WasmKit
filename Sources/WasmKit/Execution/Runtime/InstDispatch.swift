@@ -4,202 +4,207 @@ extension ExecutionState {
     mutating func doExecute(_ instruction: UInt64, sp: inout Sp, r0: inout R0, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
         switch instruction {
         case 0: self.execute_copyStack(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 1: self.execute_copyR0ToStack(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 2: self.execute_globalGet(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 3: self.execute_globalSet(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 4: try self.execute_call(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 5: try self.execute_compilingCall(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 6: try self.execute_internalCall(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 7: try self.execute_callIndirect(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 8: try self.execute_unreachable(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 9: self.execute_nop(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 10: self.execute_br(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 11: self.execute_brIf(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 12: self.execute_brIfNot(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 13: self.execute_brTable(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 14: self.execute__return(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 15: try self.execute_endOfExecution(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 16: try self.execute_i32Load(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 17: try self.execute_i64Load(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 18: try self.execute_f32Load(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 19: try self.execute_f64Load(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 20: try self.execute_i32Load8S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 21: try self.execute_i32Load8U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 22: try self.execute_i32Load16S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 23: try self.execute_i32Load16U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 24: try self.execute_i64Load8S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 25: try self.execute_i64Load8U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 26: try self.execute_i64Load16S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 27: try self.execute_i64Load16U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 28: try self.execute_i64Load32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 29: try self.execute_i64Load32U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 30: try self.execute_i32Store(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 31: try self.execute_i64Store(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 32: try self.execute_f32Store(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 33: try self.execute_f64Store(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 34: try self.execute_i32Store8(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 35: try self.execute_i32Store16(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 36: try self.execute_i64Store8(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 37: try self.execute_i64Store16(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 38: try self.execute_i64Store32(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 39: self.execute_memorySize(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 40: try self.execute_memoryGrow(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 41: try self.execute_memoryInit(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 42: self.execute_memoryDataDrop(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 43: try self.execute_memoryCopy(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 44: try self.execute_memoryFill(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 45: self.execute_const32(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 46: self.execute_const64(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 47: self.execute_i32Add(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 48: self.execute_i64Add(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 49: self.execute_i32Sub(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 50: self.execute_i64Sub(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 51: self.execute_i32Mul(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 52: self.execute_i64Mul(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 53: self.execute_i32And(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 54: self.execute_i64And(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 55: self.execute_i32Or(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 56: self.execute_i64Or(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 57: self.execute_i32Xor(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 58: self.execute_i64Xor(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 59: self.execute_i32Shl(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 60: self.execute_i64Shl(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 61: self.execute_i32ShrS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 62: self.execute_i64ShrS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 63: self.execute_i32ShrU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 64: self.execute_i64ShrU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 65: self.execute_i32Rotl(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 66: self.execute_i64Rotl(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 67: self.execute_i32Rotr(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 68: self.execute_i64Rotr(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 69: try self.execute_i32DivS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 70: try self.execute_i64DivS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 71: try self.execute_i32DivU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 72: try self.execute_i64DivU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 73: try self.execute_i32RemS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 74: try self.execute_i64RemS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 75: try self.execute_i32RemU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 76: try self.execute_i64RemU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 77: self.execute_i32Eq(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 78: self.execute_i64Eq(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 79: self.execute_i32Ne(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 80: self.execute_i64Ne(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 81: self.execute_i32LtS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 82: self.execute_i64LtS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 83: self.execute_i32LtU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 84: self.execute_i64LtU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 85: self.execute_i32GtS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 86: self.execute_i64GtS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 87: self.execute_i32GtU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 88: self.execute_i64GtU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 89: self.execute_i32LeS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 90: self.execute_i64LeS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 91: self.execute_i32LeU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 92: self.execute_i64LeU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 93: self.execute_i32GeS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 94: self.execute_i64GeS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 95: self.execute_i32GeU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 96: self.execute_i64GeU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 97: self.execute_i32Clz(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 98: self.execute_i64Clz(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 99: self.execute_i32Ctz(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 100: self.execute_i64Ctz(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 101: self.execute_i32Popcnt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 102: self.execute_i64Popcnt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 103: self.execute_i32Eqz(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 104: self.execute_i64Eqz(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 105: self.execute_i32WrapI64(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 106: self.execute_i64ExtendI32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 107: self.execute_i64ExtendI32U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 108: self.execute_i32Extend8S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 109: self.execute_i64Extend8S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 110: self.execute_i32Extend16S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 111: self.execute_i64Extend16S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 112: self.execute_i64Extend32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 113: try self.execute_i32TruncF32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 114: try self.execute_i32TruncF32U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 115: try self.execute_i32TruncSatF32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 116: try self.execute_i32TruncSatF32U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 117: try self.execute_i32TruncF64S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 118: try self.execute_i32TruncF64U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 119: try self.execute_i32TruncSatF64S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 120: try self.execute_i32TruncSatF64U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 121: try self.execute_i64TruncF32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 122: try self.execute_i64TruncF32U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 123: try self.execute_i64TruncSatF32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 124: try self.execute_i64TruncSatF32U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 125: try self.execute_i64TruncF64S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 126: try self.execute_i64TruncF64U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 127: try self.execute_i64TruncSatF64S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 128: try self.execute_i64TruncSatF64U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 129: self.execute_f32ConvertI32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 130: self.execute_f32ConvertI32U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 131: self.execute_f32ConvertI64S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 132: self.execute_f32ConvertI64U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 133: self.execute_f64ConvertI32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 134: self.execute_f64ConvertI32U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 135: self.execute_f64ConvertI64S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 136: self.execute_f64ConvertI64U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 137: self.execute_f32ReinterpretI32(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 138: self.execute_f64ReinterpretI64(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 139: self.execute_i32ReinterpretF32(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 140: self.execute_i64ReinterpretF64(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 141: self.execute_f32Add(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 142: self.execute_f64Add(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 143: self.execute_f32Sub(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 144: self.execute_f64Sub(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 145: self.execute_f32Mul(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 146: self.execute_f64Mul(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 147: self.execute_f32Div(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 148: self.execute_f64Div(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 149: self.execute_f32Min(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 150: self.execute_f64Min(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 151: self.execute_f32Max(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 152: self.execute_f64Max(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 153: self.execute_f32CopySign(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 154: self.execute_f64CopySign(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 155: self.execute_f32Eq(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 156: self.execute_f64Eq(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 157: self.execute_f32Ne(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 158: self.execute_f64Ne(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 159: self.execute_f32Lt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 160: self.execute_f64Lt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 161: self.execute_f32Gt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 162: self.execute_f64Gt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 163: self.execute_f32Le(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 164: self.execute_f64Le(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 165: self.execute_f32Ge(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 166: self.execute_f64Ge(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 167: self.execute_f32Abs(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 168: self.execute_f64Abs(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 169: self.execute_f32Neg(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 170: self.execute_f64Neg(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 171: self.execute_f32Ceil(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 172: self.execute_f64Ceil(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 173: self.execute_f32Floor(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 174: self.execute_f64Floor(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 175: self.execute_f32Trunc(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 176: self.execute_f64Trunc(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 177: self.execute_f32Nearest(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 178: self.execute_f64Nearest(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 179: self.execute_f32Sqrt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 180: self.execute_f64Sqrt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 181: self.execute_f64PromoteF32(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 182: self.execute_f32DemoteF64(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 183: self.execute_select(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 184: self.execute_refNull(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 185: self.execute_refIsNull(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 186: self.execute_refFunc(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 187: try self.execute_tableGet(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 188: try self.execute_tableSet(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 189: self.execute_tableSize(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 190: try self.execute_tableGrow(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 191: try self.execute_tableFill(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 192: try self.execute_tableCopy(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 193: try self.execute_tableInit(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 194: self.execute_tableElementDrop(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 195: self.execute_onEnter(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 196: self.execute_onExit(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 1: self.execute_copyR0ToStackI32(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 2: self.execute_copyR0ToStackI64(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 3: self.execute_copyR0ToStackF32(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 4: self.execute_copyR0ToStackF64(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 5: self.execute_globalGet(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 6: self.execute_globalSet(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 7: try self.execute_call(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 8: try self.execute_compilingCall(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 9: try self.execute_internalCall(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 10: try self.execute_callIndirect(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 11: try self.execute_unreachable(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 12: self.execute_nop(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 13: self.execute_br(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 14: self.execute_brIf(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 15: self.execute_brIfNot(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 16: self.execute_brTable(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 17: self.execute__return(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 18: try self.execute_endOfExecution(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 19: try self.execute_i32Load(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 20: try self.execute_i64Load(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 21: try self.execute_f32Load(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 22: try self.execute_f64Load(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 23: try self.execute_i32Load8S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 24: try self.execute_i32Load8U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 25: try self.execute_i32Load16S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 26: try self.execute_i32Load16U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 27: try self.execute_i64Load8S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 28: try self.execute_i64Load8U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 29: try self.execute_i64Load16S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 30: try self.execute_i64Load16U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 31: try self.execute_i64Load32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 32: try self.execute_i64Load32U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 33: try self.execute_i32Store(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 34: try self.execute_i64Store(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 35: try self.execute_f32Store(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 36: try self.execute_f64Store(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 37: try self.execute_i32Store8(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 38: try self.execute_i32Store16(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 39: try self.execute_i64Store8(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 40: try self.execute_i64Store16(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 41: try self.execute_i64Store32(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 42: self.execute_memorySize(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 43: try self.execute_memoryGrow(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 44: try self.execute_memoryInit(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 45: self.execute_memoryDataDrop(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 46: try self.execute_memoryCopy(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 47: try self.execute_memoryFill(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 48: self.execute_const32(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 49: self.execute_const64(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 50: self.execute_i32AddSS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 51: self.execute_i32AddSR(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 52: self.execute_i64AddSS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 53: self.execute_i64AddSR(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 54: self.execute_i32Sub(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 55: self.execute_i64Sub(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 56: self.execute_i32Mul(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 57: self.execute_i64Mul(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 58: self.execute_i32And(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 59: self.execute_i64And(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 60: self.execute_i32Or(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 61: self.execute_i64Or(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 62: self.execute_i32Xor(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 63: self.execute_i64Xor(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 64: self.execute_i32Shl(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 65: self.execute_i64Shl(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 66: self.execute_i32ShrS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 67: self.execute_i64ShrS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 68: self.execute_i32ShrU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 69: self.execute_i64ShrU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 70: self.execute_i32Rotl(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 71: self.execute_i64Rotl(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 72: self.execute_i32Rotr(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 73: self.execute_i64Rotr(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 74: try self.execute_i32DivS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 75: try self.execute_i64DivS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 76: try self.execute_i32DivU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 77: try self.execute_i64DivU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 78: try self.execute_i32RemS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 79: try self.execute_i64RemS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 80: try self.execute_i32RemU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 81: try self.execute_i64RemU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 82: self.execute_i32Eq(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 83: self.execute_i64Eq(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 84: self.execute_i32Ne(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 85: self.execute_i64Ne(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 86: self.execute_i32LtS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 87: self.execute_i64LtS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 88: self.execute_i32LtU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 89: self.execute_i64LtU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 90: self.execute_i32GtS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 91: self.execute_i64GtS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 92: self.execute_i32GtU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 93: self.execute_i64GtU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 94: self.execute_i32LeS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 95: self.execute_i64LeS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 96: self.execute_i32LeU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 97: self.execute_i64LeU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 98: self.execute_i32GeS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 99: self.execute_i64GeS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 100: self.execute_i32GeU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 101: self.execute_i64GeU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 102: self.execute_i32Clz(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 103: self.execute_i64Clz(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 104: self.execute_i32Ctz(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 105: self.execute_i64Ctz(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 106: self.execute_i32Popcnt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 107: self.execute_i64Popcnt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 108: self.execute_i32Eqz(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 109: self.execute_i64Eqz(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 110: self.execute_i32WrapI64(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 111: self.execute_i64ExtendI32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 112: self.execute_i64ExtendI32U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 113: self.execute_i32Extend8S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 114: self.execute_i64Extend8S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 115: self.execute_i32Extend16S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 116: self.execute_i64Extend16S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 117: self.execute_i64Extend32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 118: try self.execute_i32TruncF32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 119: try self.execute_i32TruncF32U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 120: try self.execute_i32TruncSatF32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 121: try self.execute_i32TruncSatF32U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 122: try self.execute_i32TruncF64S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 123: try self.execute_i32TruncF64U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 124: try self.execute_i32TruncSatF64S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 125: try self.execute_i32TruncSatF64U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 126: try self.execute_i64TruncF32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 127: try self.execute_i64TruncF32U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 128: try self.execute_i64TruncSatF32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 129: try self.execute_i64TruncSatF32U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 130: try self.execute_i64TruncF64S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 131: try self.execute_i64TruncF64U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 132: try self.execute_i64TruncSatF64S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 133: try self.execute_i64TruncSatF64U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 134: self.execute_f32ConvertI32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 135: self.execute_f32ConvertI32U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 136: self.execute_f32ConvertI64S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 137: self.execute_f32ConvertI64U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 138: self.execute_f64ConvertI32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 139: self.execute_f64ConvertI32U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 140: self.execute_f64ConvertI64S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 141: self.execute_f64ConvertI64U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 142: self.execute_f32ReinterpretI32(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 143: self.execute_f64ReinterpretI64(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 144: self.execute_i32ReinterpretF32(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 145: self.execute_i64ReinterpretF64(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 146: self.execute_f32Add(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 147: self.execute_f64Add(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 148: self.execute_f32Sub(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 149: self.execute_f64Sub(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 150: self.execute_f32Mul(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 151: self.execute_f64Mul(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 152: self.execute_f32Div(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 153: self.execute_f64Div(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 154: self.execute_f32Min(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 155: self.execute_f64Min(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 156: self.execute_f32Max(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 157: self.execute_f64Max(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 158: self.execute_f32CopySign(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 159: self.execute_f64CopySign(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 160: self.execute_f32Eq(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 161: self.execute_f64Eq(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 162: self.execute_f32Ne(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 163: self.execute_f64Ne(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 164: self.execute_f32Lt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 165: self.execute_f64Lt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 166: self.execute_f32Gt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 167: self.execute_f64Gt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 168: self.execute_f32Le(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 169: self.execute_f64Le(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 170: self.execute_f32Ge(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 171: self.execute_f64Ge(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 172: self.execute_f32Abs(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 173: self.execute_f64Abs(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 174: self.execute_f32Neg(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 175: self.execute_f64Neg(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 176: self.execute_f32Ceil(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 177: self.execute_f64Ceil(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 178: self.execute_f32Floor(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 179: self.execute_f64Floor(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 180: self.execute_f32Trunc(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 181: self.execute_f64Trunc(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 182: self.execute_f32Nearest(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 183: self.execute_f64Nearest(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 184: self.execute_f32Sqrt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 185: self.execute_f64Sqrt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 186: self.execute_f64PromoteF32(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 187: self.execute_f32DemoteF64(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 188: self.execute_select(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 189: self.execute_refNull(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 190: self.execute_refIsNull(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 191: self.execute_refFunc(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 192: try self.execute_tableGet(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 193: try self.execute_tableSet(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 194: self.execute_tableSize(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 195: try self.execute_tableGrow(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 196: try self.execute_tableFill(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 197: try self.execute_tableCopy(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 198: try self.execute_tableInit(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 199: self.execute_tableElementDrop(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 200: self.execute_onEnter(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 201: self.execute_onExit(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
         default: preconditionFailure("Unknown instruction!?")
 
         }
@@ -210,7 +215,10 @@ extension Instruction {
     var name: String {
         switch self {
         case .copyStack: return "copyStack"
-        case .copyR0ToStack: return "copyR0ToStack"
+        case .copyR0ToStackI32: return "copyR0ToStackI32"
+        case .copyR0ToStackI64: return "copyR0ToStackI64"
+        case .copyR0ToStackF32: return "copyR0ToStackF32"
+        case .copyR0ToStackF64: return "copyR0ToStackF64"
         case .globalGet: return "globalGet"
         case .globalSet: return "globalSet"
         case .call: return "call"
@@ -256,8 +264,10 @@ extension Instruction {
         case .memoryFill: return "memoryFill"
         case .const32: return "const32"
         case .const64: return "const64"
-        case .i32Add: return "i32Add"
-        case .i64Add: return "i64Add"
+        case .i32AddSS: return "i32AddSS"
+        case .i32AddSR: return "i32AddSR"
+        case .i64AddSS: return "i64AddSS"
+        case .i64AddSR: return "i64AddSR"
         case .i32Sub: return "i32Sub"
         case .i64Sub: return "i64Sub"
         case .i32Mul: return "i32Mul"
@@ -412,12 +422,10 @@ extension Instruction {
 
 
 extension ExecutionState {
-    @inline(__always) mutating func i32Add(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].add(sp[i32: binaryOperand.rhs])
-    }
-    @inline(__always) mutating func i64Add(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[i64: binaryOperand.result] = sp[i64: binaryOperand.lhs].add(sp[i64: binaryOperand.rhs])
-    }
+    mutating func i32AddSS(sp: Sp, r0: inout R0, binaryOperandSS: Instruction.BinaryOperandSS) { writePReg(&r0, sp[binaryOperandSS.lhs].i32.add(sp[binaryOperandSS.rhs].i32)) }
+    mutating func i32AddSR(sp: Sp, r0: inout R0, binaryOperandSR: Instruction.BinaryOperandSR) { writePReg(&r0, sp[binaryOperandSR.lhs].i32.add(readPRegI32(r0))) }
+    mutating func i64AddSS(sp: Sp, r0: inout R0, binaryOperandSS: Instruction.BinaryOperandSS) { writePReg(&r0, sp[binaryOperandSS.lhs].i64.add(sp[binaryOperandSS.rhs].i64)) }
+    mutating func i64AddSR(sp: Sp, r0: inout R0, binaryOperandSR: Instruction.BinaryOperandSR) { writePReg(&r0, sp[binaryOperandSR.lhs].i64.add(readPRegI64(r0))) }
     @inline(__always) mutating func i32Sub(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].sub(sp[i32: binaryOperand.rhs])
     }
@@ -898,10 +906,25 @@ extension ExecutionState {
         let copyStackOperand = Instruction.CopyStackOperand.load(from: &pc.pointee)
         self.copyStack(sp: sp.pointee, copyStackOperand: copyStackOperand)
     }
-    @_silgen_name("wasmkit_execute_copyR0ToStack") @inline(__always)
-    mutating func execute_copyR0ToStack(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+    @_silgen_name("wasmkit_execute_copyR0ToStackI32") @inline(__always)
+    mutating func execute_copyR0ToStackI32(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
         let dest = VReg.load(from: &pc.pointee)
-        self.copyR0ToStack(sp: sp.pointee, r0: r0.pointee, dest: dest)
+        self.copyR0ToStackI32(sp: sp.pointee, r0: r0.pointee, dest: dest)
+    }
+    @_silgen_name("wasmkit_execute_copyR0ToStackI64") @inline(__always)
+    mutating func execute_copyR0ToStackI64(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let dest = VReg.load(from: &pc.pointee)
+        self.copyR0ToStackI64(sp: sp.pointee, r0: r0.pointee, dest: dest)
+    }
+    @_silgen_name("wasmkit_execute_copyR0ToStackF32") @inline(__always)
+    mutating func execute_copyR0ToStackF32(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let dest = VReg.load(from: &pc.pointee)
+        self.copyR0ToStackF32(sp: sp.pointee, r0: r0.pointee, dest: dest)
+    }
+    @_silgen_name("wasmkit_execute_copyR0ToStackF64") @inline(__always)
+    mutating func execute_copyR0ToStackF64(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let dest = VReg.load(from: &pc.pointee)
+        self.copyR0ToStackF64(sp: sp.pointee, r0: r0.pointee, dest: dest)
     }
     @_silgen_name("wasmkit_execute_globalGet") @inline(__always)
     mutating func execute_globalGet(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
@@ -1124,15 +1147,25 @@ extension ExecutionState {
         let const64Operand = Instruction.Const64Operand.load(from: &pc.pointee)
         self.const64(sp: sp.pointee, const64Operand: const64Operand)
     }
-    @_silgen_name("wasmkit_execute_i32Add") @inline(__always)
-    mutating func execute_i32Add(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        let binaryOperand = Instruction.BinaryOperand.load(from: &pc.pointee)
-        self.i32Add(sp: sp.pointee, binaryOperand: binaryOperand)
+    @_silgen_name("wasmkit_execute_i32AddSS") @inline(__always)
+    mutating func execute_i32AddSS(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandSS = Instruction.BinaryOperandSS.load(from: &pc.pointee)
+        self.i32AddSS(sp: sp.pointee, r0: &r0.pointee, binaryOperandSS: binaryOperandSS)
     }
-    @_silgen_name("wasmkit_execute_i64Add") @inline(__always)
-    mutating func execute_i64Add(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        let binaryOperand = Instruction.BinaryOperand.load(from: &pc.pointee)
-        self.i64Add(sp: sp.pointee, binaryOperand: binaryOperand)
+    @_silgen_name("wasmkit_execute_i32AddSR") @inline(__always)
+    mutating func execute_i32AddSR(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandSR = Instruction.BinaryOperandSR.load(from: &pc.pointee)
+        self.i32AddSR(sp: sp.pointee, r0: &r0.pointee, binaryOperandSR: binaryOperandSR)
+    }
+    @_silgen_name("wasmkit_execute_i64AddSS") @inline(__always)
+    mutating func execute_i64AddSS(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandSS = Instruction.BinaryOperandSS.load(from: &pc.pointee)
+        self.i64AddSS(sp: sp.pointee, r0: &r0.pointee, binaryOperandSS: binaryOperandSS)
+    }
+    @_silgen_name("wasmkit_execute_i64AddSR") @inline(__always)
+    mutating func execute_i64AddSR(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandSR = Instruction.BinaryOperandSR.load(from: &pc.pointee)
+        self.i64AddSR(sp: sp.pointee, r0: &r0.pointee, binaryOperandSR: binaryOperandSR)
     }
     @_silgen_name("wasmkit_execute_i32Sub") @inline(__always)
     mutating func execute_i32Sub(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
@@ -1880,202 +1913,207 @@ extension Instruction {
     var rawIndex: Int {
         switch self {
         case .copyStack: return 0
-        case .copyR0ToStack: return 1
-        case .globalGet: return 2
-        case .globalSet: return 3
-        case .call: return 4
-        case .compilingCall: return 5
-        case .internalCall: return 6
-        case .callIndirect: return 7
-        case .unreachable: return 8
-        case .nop: return 9
-        case .br: return 10
-        case .brIf: return 11
-        case .brIfNot: return 12
-        case .brTable: return 13
-        case ._return: return 14
-        case .endOfExecution: return 15
-        case .i32Load: return 16
-        case .i64Load: return 17
-        case .f32Load: return 18
-        case .f64Load: return 19
-        case .i32Load8S: return 20
-        case .i32Load8U: return 21
-        case .i32Load16S: return 22
-        case .i32Load16U: return 23
-        case .i64Load8S: return 24
-        case .i64Load8U: return 25
-        case .i64Load16S: return 26
-        case .i64Load16U: return 27
-        case .i64Load32S: return 28
-        case .i64Load32U: return 29
-        case .i32Store: return 30
-        case .i64Store: return 31
-        case .f32Store: return 32
-        case .f64Store: return 33
-        case .i32Store8: return 34
-        case .i32Store16: return 35
-        case .i64Store8: return 36
-        case .i64Store16: return 37
-        case .i64Store32: return 38
-        case .memorySize: return 39
-        case .memoryGrow: return 40
-        case .memoryInit: return 41
-        case .memoryDataDrop: return 42
-        case .memoryCopy: return 43
-        case .memoryFill: return 44
-        case .const32: return 45
-        case .const64: return 46
-        case .i32Add: return 47
-        case .i64Add: return 48
-        case .i32Sub: return 49
-        case .i64Sub: return 50
-        case .i32Mul: return 51
-        case .i64Mul: return 52
-        case .i32And: return 53
-        case .i64And: return 54
-        case .i32Or: return 55
-        case .i64Or: return 56
-        case .i32Xor: return 57
-        case .i64Xor: return 58
-        case .i32Shl: return 59
-        case .i64Shl: return 60
-        case .i32ShrS: return 61
-        case .i64ShrS: return 62
-        case .i32ShrU: return 63
-        case .i64ShrU: return 64
-        case .i32Rotl: return 65
-        case .i64Rotl: return 66
-        case .i32Rotr: return 67
-        case .i64Rotr: return 68
-        case .i32DivS: return 69
-        case .i64DivS: return 70
-        case .i32DivU: return 71
-        case .i64DivU: return 72
-        case .i32RemS: return 73
-        case .i64RemS: return 74
-        case .i32RemU: return 75
-        case .i64RemU: return 76
-        case .i32Eq: return 77
-        case .i64Eq: return 78
-        case .i32Ne: return 79
-        case .i64Ne: return 80
-        case .i32LtS: return 81
-        case .i64LtS: return 82
-        case .i32LtU: return 83
-        case .i64LtU: return 84
-        case .i32GtS: return 85
-        case .i64GtS: return 86
-        case .i32GtU: return 87
-        case .i64GtU: return 88
-        case .i32LeS: return 89
-        case .i64LeS: return 90
-        case .i32LeU: return 91
-        case .i64LeU: return 92
-        case .i32GeS: return 93
-        case .i64GeS: return 94
-        case .i32GeU: return 95
-        case .i64GeU: return 96
-        case .i32Clz: return 97
-        case .i64Clz: return 98
-        case .i32Ctz: return 99
-        case .i64Ctz: return 100
-        case .i32Popcnt: return 101
-        case .i64Popcnt: return 102
-        case .i32Eqz: return 103
-        case .i64Eqz: return 104
-        case .i32WrapI64: return 105
-        case .i64ExtendI32S: return 106
-        case .i64ExtendI32U: return 107
-        case .i32Extend8S: return 108
-        case .i64Extend8S: return 109
-        case .i32Extend16S: return 110
-        case .i64Extend16S: return 111
-        case .i64Extend32S: return 112
-        case .i32TruncF32S: return 113
-        case .i32TruncF32U: return 114
-        case .i32TruncSatF32S: return 115
-        case .i32TruncSatF32U: return 116
-        case .i32TruncF64S: return 117
-        case .i32TruncF64U: return 118
-        case .i32TruncSatF64S: return 119
-        case .i32TruncSatF64U: return 120
-        case .i64TruncF32S: return 121
-        case .i64TruncF32U: return 122
-        case .i64TruncSatF32S: return 123
-        case .i64TruncSatF32U: return 124
-        case .i64TruncF64S: return 125
-        case .i64TruncF64U: return 126
-        case .i64TruncSatF64S: return 127
-        case .i64TruncSatF64U: return 128
-        case .f32ConvertI32S: return 129
-        case .f32ConvertI32U: return 130
-        case .f32ConvertI64S: return 131
-        case .f32ConvertI64U: return 132
-        case .f64ConvertI32S: return 133
-        case .f64ConvertI32U: return 134
-        case .f64ConvertI64S: return 135
-        case .f64ConvertI64U: return 136
-        case .f32ReinterpretI32: return 137
-        case .f64ReinterpretI64: return 138
-        case .i32ReinterpretF32: return 139
-        case .i64ReinterpretF64: return 140
-        case .f32Add: return 141
-        case .f64Add: return 142
-        case .f32Sub: return 143
-        case .f64Sub: return 144
-        case .f32Mul: return 145
-        case .f64Mul: return 146
-        case .f32Div: return 147
-        case .f64Div: return 148
-        case .f32Min: return 149
-        case .f64Min: return 150
-        case .f32Max: return 151
-        case .f64Max: return 152
-        case .f32CopySign: return 153
-        case .f64CopySign: return 154
-        case .f32Eq: return 155
-        case .f64Eq: return 156
-        case .f32Ne: return 157
-        case .f64Ne: return 158
-        case .f32Lt: return 159
-        case .f64Lt: return 160
-        case .f32Gt: return 161
-        case .f64Gt: return 162
-        case .f32Le: return 163
-        case .f64Le: return 164
-        case .f32Ge: return 165
-        case .f64Ge: return 166
-        case .f32Abs: return 167
-        case .f64Abs: return 168
-        case .f32Neg: return 169
-        case .f64Neg: return 170
-        case .f32Ceil: return 171
-        case .f64Ceil: return 172
-        case .f32Floor: return 173
-        case .f64Floor: return 174
-        case .f32Trunc: return 175
-        case .f64Trunc: return 176
-        case .f32Nearest: return 177
-        case .f64Nearest: return 178
-        case .f32Sqrt: return 179
-        case .f64Sqrt: return 180
-        case .f64PromoteF32: return 181
-        case .f32DemoteF64: return 182
-        case .select: return 183
-        case .refNull: return 184
-        case .refIsNull: return 185
-        case .refFunc: return 186
-        case .tableGet: return 187
-        case .tableSet: return 188
-        case .tableSize: return 189
-        case .tableGrow: return 190
-        case .tableFill: return 191
-        case .tableCopy: return 192
-        case .tableInit: return 193
-        case .tableElementDrop: return 194
-        case .onEnter: return 195
-        case .onExit: return 196
+        case .copyR0ToStackI32: return 1
+        case .copyR0ToStackI64: return 2
+        case .copyR0ToStackF32: return 3
+        case .copyR0ToStackF64: return 4
+        case .globalGet: return 5
+        case .globalSet: return 6
+        case .call: return 7
+        case .compilingCall: return 8
+        case .internalCall: return 9
+        case .callIndirect: return 10
+        case .unreachable: return 11
+        case .nop: return 12
+        case .br: return 13
+        case .brIf: return 14
+        case .brIfNot: return 15
+        case .brTable: return 16
+        case ._return: return 17
+        case .endOfExecution: return 18
+        case .i32Load: return 19
+        case .i64Load: return 20
+        case .f32Load: return 21
+        case .f64Load: return 22
+        case .i32Load8S: return 23
+        case .i32Load8U: return 24
+        case .i32Load16S: return 25
+        case .i32Load16U: return 26
+        case .i64Load8S: return 27
+        case .i64Load8U: return 28
+        case .i64Load16S: return 29
+        case .i64Load16U: return 30
+        case .i64Load32S: return 31
+        case .i64Load32U: return 32
+        case .i32Store: return 33
+        case .i64Store: return 34
+        case .f32Store: return 35
+        case .f64Store: return 36
+        case .i32Store8: return 37
+        case .i32Store16: return 38
+        case .i64Store8: return 39
+        case .i64Store16: return 40
+        case .i64Store32: return 41
+        case .memorySize: return 42
+        case .memoryGrow: return 43
+        case .memoryInit: return 44
+        case .memoryDataDrop: return 45
+        case .memoryCopy: return 46
+        case .memoryFill: return 47
+        case .const32: return 48
+        case .const64: return 49
+        case .i32AddSS: return 50
+        case .i32AddSR: return 51
+        case .i64AddSS: return 52
+        case .i64AddSR: return 53
+        case .i32Sub: return 54
+        case .i64Sub: return 55
+        case .i32Mul: return 56
+        case .i64Mul: return 57
+        case .i32And: return 58
+        case .i64And: return 59
+        case .i32Or: return 60
+        case .i64Or: return 61
+        case .i32Xor: return 62
+        case .i64Xor: return 63
+        case .i32Shl: return 64
+        case .i64Shl: return 65
+        case .i32ShrS: return 66
+        case .i64ShrS: return 67
+        case .i32ShrU: return 68
+        case .i64ShrU: return 69
+        case .i32Rotl: return 70
+        case .i64Rotl: return 71
+        case .i32Rotr: return 72
+        case .i64Rotr: return 73
+        case .i32DivS: return 74
+        case .i64DivS: return 75
+        case .i32DivU: return 76
+        case .i64DivU: return 77
+        case .i32RemS: return 78
+        case .i64RemS: return 79
+        case .i32RemU: return 80
+        case .i64RemU: return 81
+        case .i32Eq: return 82
+        case .i64Eq: return 83
+        case .i32Ne: return 84
+        case .i64Ne: return 85
+        case .i32LtS: return 86
+        case .i64LtS: return 87
+        case .i32LtU: return 88
+        case .i64LtU: return 89
+        case .i32GtS: return 90
+        case .i64GtS: return 91
+        case .i32GtU: return 92
+        case .i64GtU: return 93
+        case .i32LeS: return 94
+        case .i64LeS: return 95
+        case .i32LeU: return 96
+        case .i64LeU: return 97
+        case .i32GeS: return 98
+        case .i64GeS: return 99
+        case .i32GeU: return 100
+        case .i64GeU: return 101
+        case .i32Clz: return 102
+        case .i64Clz: return 103
+        case .i32Ctz: return 104
+        case .i64Ctz: return 105
+        case .i32Popcnt: return 106
+        case .i64Popcnt: return 107
+        case .i32Eqz: return 108
+        case .i64Eqz: return 109
+        case .i32WrapI64: return 110
+        case .i64ExtendI32S: return 111
+        case .i64ExtendI32U: return 112
+        case .i32Extend8S: return 113
+        case .i64Extend8S: return 114
+        case .i32Extend16S: return 115
+        case .i64Extend16S: return 116
+        case .i64Extend32S: return 117
+        case .i32TruncF32S: return 118
+        case .i32TruncF32U: return 119
+        case .i32TruncSatF32S: return 120
+        case .i32TruncSatF32U: return 121
+        case .i32TruncF64S: return 122
+        case .i32TruncF64U: return 123
+        case .i32TruncSatF64S: return 124
+        case .i32TruncSatF64U: return 125
+        case .i64TruncF32S: return 126
+        case .i64TruncF32U: return 127
+        case .i64TruncSatF32S: return 128
+        case .i64TruncSatF32U: return 129
+        case .i64TruncF64S: return 130
+        case .i64TruncF64U: return 131
+        case .i64TruncSatF64S: return 132
+        case .i64TruncSatF64U: return 133
+        case .f32ConvertI32S: return 134
+        case .f32ConvertI32U: return 135
+        case .f32ConvertI64S: return 136
+        case .f32ConvertI64U: return 137
+        case .f64ConvertI32S: return 138
+        case .f64ConvertI32U: return 139
+        case .f64ConvertI64S: return 140
+        case .f64ConvertI64U: return 141
+        case .f32ReinterpretI32: return 142
+        case .f64ReinterpretI64: return 143
+        case .i32ReinterpretF32: return 144
+        case .i64ReinterpretF64: return 145
+        case .f32Add: return 146
+        case .f64Add: return 147
+        case .f32Sub: return 148
+        case .f64Sub: return 149
+        case .f32Mul: return 150
+        case .f64Mul: return 151
+        case .f32Div: return 152
+        case .f64Div: return 153
+        case .f32Min: return 154
+        case .f64Min: return 155
+        case .f32Max: return 156
+        case .f64Max: return 157
+        case .f32CopySign: return 158
+        case .f64CopySign: return 159
+        case .f32Eq: return 160
+        case .f64Eq: return 161
+        case .f32Ne: return 162
+        case .f64Ne: return 163
+        case .f32Lt: return 164
+        case .f64Lt: return 165
+        case .f32Gt: return 166
+        case .f64Gt: return 167
+        case .f32Le: return 168
+        case .f64Le: return 169
+        case .f32Ge: return 170
+        case .f64Ge: return 171
+        case .f32Abs: return 172
+        case .f64Abs: return 173
+        case .f32Neg: return 174
+        case .f64Neg: return 175
+        case .f32Ceil: return 176
+        case .f64Ceil: return 177
+        case .f32Floor: return 178
+        case .f64Floor: return 179
+        case .f32Trunc: return 180
+        case .f64Trunc: return 181
+        case .f32Nearest: return 182
+        case .f64Nearest: return 183
+        case .f32Sqrt: return 184
+        case .f64Sqrt: return 185
+        case .f64PromoteF32: return 186
+        case .f32DemoteF64: return 187
+        case .select: return 188
+        case .refNull: return 189
+        case .refIsNull: return 190
+        case .refFunc: return 191
+        case .tableGet: return 192
+        case .tableSet: return 193
+        case .tableSize: return 194
+        case .tableGrow: return 195
+        case .tableFill: return 196
+        case .tableCopy: return 197
+        case .tableInit: return 198
+        case .tableElementDrop: return 199
+        case .onEnter: return 200
+        case .onExit: return 201
         }
     }
 }

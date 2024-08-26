@@ -96,52 +96,101 @@ enum VMGen {
         }
     }
 
-    struct OpInstruction {
-        let op: String
-        let inputType: String
-        let resultType: String
-        let base: Instruction
+    enum ValueType {
+        case i32
+        case i64
+        case f32
+        case f64
 
-        static func binop(op: String, type: String) -> OpInstruction {
-            let base = Instruction(
-                name: "\(type)\(op)", immediate: Immediate(name: nil, type: "Instruction.BinaryOperand")
-            )
-            return OpInstruction(op: op, inputType: type, resultType: type, base: base)
+        func selectExecParam() -> ExecParam {
+            switch self {
+            case .i32, .i64: return .r0
+            case .f32, .f64: fatalError()
+            }
         }
-        static func binop(op: String, inputType: String, resultType: String) -> OpInstruction {
-            let base = Instruction(
-                name: "\(inputType)\(op)", immediate: Immediate(name: nil, type: "Instruction.BinaryOperand")
-            )
-            return OpInstruction(op: op, inputType: inputType, resultType: resultType, base: base)
-        }
-        static func unop(op: String, type: String, resultType: String) -> OpInstruction {
-            let base = Instruction(name: "\(type)\(op)", immediate: Immediate(name: nil, type: "Instruction.UnaryOperand"))
-            return OpInstruction(op: op, inputType: type, resultType: resultType, base: base)
+
+        func uppercased() -> String {
+            switch self {
+            case .i32: return "I32"
+            case .i64: return "I64"
+            case .f32: return "F32"
+            case .f64: return "F64"
+            }
         }
     }
 
-    struct BinOpInfo {
-        let op: String
-        let name: String
-        let lhsType: String
-        let rhsType: String
-        let resultType: String
-        var mayThrow: Bool = false
+    enum OperandSource {
+        case stack
+        case register
 
-        var instruction: Instruction {
-            Instruction(
-                name: name,
-                mayThrow: mayThrow,
-                immediate: Immediate(name: nil, type: "Instruction.BinaryOperand")
+        var marker: String {
+            switch self {
+            case .stack: return "S"
+            case .register: return "R"
+            }
+        }
+    }
+
+    struct OperandInfo {
+        var type: ValueType
+        var source: OperandSource
+    }
+
+
+    struct BinOpInfo {
+        var op: String
+        var name: String
+        var lhsType: ValueType
+        var rhsType: ValueType
+        var resultType: ValueType
+        var mayThrow: Bool = false
+        var isCommutative: Bool = false
+        var useFastPath: Bool = false
+
+        var operandSources: [(lhs: OperandInfo, rhs: OperandInfo)] {
+            assert(useFastPath)
+            var sources: [(lhs: OperandInfo, rhs: OperandInfo)] = []
+            sources += [
+                (OperandInfo(type: lhsType, source: .stack), OperandInfo(type: rhsType, source: .stack)),
+                (OperandInfo(type: lhsType, source: .stack), OperandInfo(type: rhsType, source: .register)),
+            ]
+            if !isCommutative {
+                sources += [
+                    (OperandInfo(type: lhsType, source: .register), OperandInfo(type: rhsType, source: .stack)),
+                ]
+            }
+            return sources
+        }
+
+        func instruction(lhs: OperandInfo, rhs: OperandInfo) -> Instruction {
+            assert(useFastPath)
+            return Instruction(
+                name: name + lhs.source.marker + rhs.source.marker,
+                useR0: .write,
+                immediate: Immediate(name: nil, type: "Instruction.BinaryOperand\(lhs.source.marker)\(rhs.source.marker)")
             )
+        }
+
+        var instruction: [Instruction] {
+            guard useFastPath else {
+                return [Instruction(
+                    name: name, mayThrow: mayThrow,
+                    immediate: Immediate(name: nil, type: "Instruction.BinaryOperand")
+                )]
+            }
+            var instructions: [Instruction] = []
+            for (lhs, rhs) in operandSources {
+                instructions.append(instruction(lhs: lhs, rhs: rhs))
+            }
+            return instructions
         }
     }
 
     struct UnOpInfo {
         var op: String
         var name: String
-        var inputType: String
-        var resultType: String
+        var inputType: ValueType
+        var resultType: ValueType
         var mayThrow: Bool = false
 
         var instruction: Instruction {
@@ -149,8 +198,8 @@ enum VMGen {
         }
     }
 
-    static let intValueTypes = ["i32", "i64"]
-    static let floatValueTypes = ["f32", "f64"]
+    static let intValueTypes: [ValueType] = [.i32, .i64]
+    static let floatValueTypes: [ValueType] = [.f32, .f64]
     static let valueTypes = intValueTypes + floatValueTypes
 
     // MARK: - Int instructions
@@ -158,8 +207,15 @@ enum VMGen {
     static func buildIntBinOps() -> [BinOpInfo] {
         var results: [BinOpInfo] = []
         // (T, T) -> T for all T in int types
+        // Commutative
         results += [
-            "Add", "Sub", "Mul",
+            "Add"
+        ].flatMap { op -> [BinOpInfo] in
+            intValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: $0, isCommutative: true, useFastPath: true) }
+        }
+        // Others
+        results += [
+            "Sub", "Mul",
             "And", "Or", "Xor", "Shl", "ShrS", "ShrU", "Rotl", "Rotr",
         ].flatMap { op -> [BinOpInfo] in
             intValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: $0) }
@@ -169,11 +225,12 @@ enum VMGen {
         ].flatMap { op -> [BinOpInfo] in
             intValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: $0, mayThrow: true) }
         }
+
         // (T, T) -> i32 for all T in int types
         results += [
             "Eq", "Ne", "LtS", "LtU", "GtS", "GtU", "LeS", "LeU", "GeS", "GeU",
         ].flatMap { op -> [BinOpInfo] in
-            intValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: "i32") }
+            intValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: .i32) }
         }
         return results
     }
@@ -187,13 +244,13 @@ enum VMGen {
         }
         // (T) -> i32 for all T in int types
         results += ["Eqz"].flatMap { op -> [UnOpInfo] in
-            intValueTypes.map { UnOpInfo(op: op, name: "\($0)\(op)", inputType: $0, resultType: "i32") }
+            intValueTypes.map { UnOpInfo(op: op, name: "\($0)\(op)", inputType: $0, resultType: .i32) }
         }
         // (i64) -> i32
-        results += [UnOpInfo(op: "Wrap", name: "i32WrapI64", inputType: "i64", resultType: "i32")]
+        results += [UnOpInfo(op: "Wrap", name: "i32WrapI64", inputType: .i64, resultType: .i32)]
         // (i32) -> i64
         results += ["ExtendI32S", "ExtendI32U"].map { op -> UnOpInfo in
-            UnOpInfo(op: op, name: "i64\(op)", inputType: "i32", resultType: "i64")
+            UnOpInfo(op: op, name: "i64\(op)", inputType: .i32, resultType: .i64)
         }
         // (T) -> T for all T in int types
         results += ["Extend8S", "Extend16S"].flatMap { op -> [UnOpInfo] in
@@ -201,11 +258,11 @@ enum VMGen {
         }
         // (i64) -> i64
         results += ["Extend32S"].map { op -> UnOpInfo in
-            UnOpInfo(op: op, name: "i64\(op)", inputType: "i64", resultType: "i64")
+            UnOpInfo(op: op, name: "i64\(op)", inputType: .i64, resultType: .i64)
         }
         // Truncation
-        let truncInOut: [(source: String, result: String)] = [
-            ("f32", "i32"), ("f64", "i32"), ("f32", "i64"), ("f64", "i64")
+        let truncInOut: [(source: ValueType, result: ValueType)] = [
+            (.f32, .i32), (.f64, .i32), (.f32, .i64), (.f64, .i64)
         ]
         results += truncInOut.flatMap { source, result in
             [
@@ -216,8 +273,8 @@ enum VMGen {
             ]
         }
         // Conversion
-        let convInOut: [(source: String, result: String)] = [
-            ("i32", "f32"), ("i64", "f32"), ("i32", "f64"), ("i64", "f64")
+        let convInOut: [(source: ValueType, result: ValueType)] = [
+            (.i32, .f32), (.i64, .f32), (.i32, .f64), (.i64, .f64)
         ]
         results += convInOut.flatMap { source, result in
             [
@@ -226,8 +283,8 @@ enum VMGen {
             ]
         }
         // Reinterpret
-        let reinterpretInOut: [(source: String, result: String)] = [
-            ("i32", "f32"), ("i64", "f64"), ("f32", "i32"), ("f64", "i64")
+        let reinterpretInOut: [(source: ValueType, result: ValueType)] = [
+            (.i32, .f32), (.i64, .f64), (.f32, .i32), (.f64, .i64)
         ]
         results += reinterpretInOut.flatMap { source, result in
             [
@@ -254,7 +311,7 @@ enum VMGen {
         results += [
             "Eq", "Ne", "Lt", "Gt", "Le", "Ge"
         ].flatMap { op -> [BinOpInfo] in
-            floatValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: "i32") }
+            floatValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: .i32) }
         }
         return results
     }
@@ -268,11 +325,11 @@ enum VMGen {
         }
         // (f32) -> f64
         results += ["PromoteF32"].map { op -> UnOpInfo in
-            UnOpInfo(op: op, name: "f64\(op)", inputType: "f32", resultType: "f64")
+            UnOpInfo(op: op, name: "f64\(op)", inputType: .f32, resultType: .f64)
         }
         // (f64) -> f32
         results += ["DemoteF64"].map { op -> UnOpInfo in
-            UnOpInfo(op: op, name: "f32\(op)", inputType: "f64", resultType: "f32")
+            UnOpInfo(op: op, name: "f32\(op)", inputType: .f64, resultType: .f32)
         }
         return results
     }
@@ -371,7 +428,10 @@ enum VMGen {
         var instructions: [Instruction] = [
             // Variable
             Instruction(name: "copyStack", immediate: Immediate(name: nil, type: "Instruction.CopyStackOperand")),
-            Instruction(name: "copyR0ToStack", useR0: .read, immediate: Immediate(name: "dest", type: "VReg")),
+            Instruction(name: "copyR0ToStackI32", useR0: .read, immediate: Immediate(name: "dest", type: "VReg")),
+            Instruction(name: "copyR0ToStackI64", useR0: .read, immediate: Immediate(name: "dest", type: "VReg")),
+            Instruction(name: "copyR0ToStackF32", useR0: .read, immediate: Immediate(name: "dest", type: "VReg")),
+            Instruction(name: "copyR0ToStackF64", useR0: .read, immediate: Immediate(name: "dest", type: "VReg")),
             Instruction(name: "globalGet", immediate: Immediate(name: nil, type: "Instruction.GlobalGetOperand")),
             Instruction(name: "globalSet", immediate: Immediate(name: nil, type: "Instruction.GlobalSetOperand")),
             // Controls
@@ -421,9 +481,9 @@ enum VMGen {
         instructions += memoryLoadStoreInsts
         instructions += memoryOpInsts
         instructions += numericOtherInsts
-        instructions += intBinOps.map(\.instruction)
+        instructions += intBinOps.flatMap(\.instruction)
         instructions += intUnaryInsts.map(\.instruction)
-        instructions += floatBinOps.map(\.instruction)
+        instructions += floatBinOps.flatMap(\.instruction)
         instructions += floatUnaryOps.map(\.instruction)
         instructions += miscInsts
         return instructions
@@ -472,12 +532,35 @@ enum VMGen {
             """
 
         for op in intBinOps + floatBinOps {
-            output += """
-
-                @inline(__always) mutating \(instMethodDecl(op.instruction)) {
-                    sp[\(op.resultType): binaryOperand.result] = \(op.mayThrow ? "try " : "")sp[\(op.lhsType): binaryOperand.lhs].\(camelCase(pascalCase: op.op))(sp[\(op.rhsType): binaryOperand.rhs])
+            if op.useFastPath {
+                func operand(_ name: String, _ source: OperandSource, _ type: ValueType) -> String {
+                    switch source {
+                    case .stack: return "sp[\(name)].\(op.resultType)"
+                    case .register: return "readPReg\(String(describing: type).uppercased())(" + type.selectExecParam().label + ")"
+                    }
                 }
-            """
+                for (lhs, rhs) in op.operandSources {
+                    let inst = op.instruction(lhs: lhs, rhs: rhs)
+                    output += """
+
+                        mutating \(instMethodDecl(inst)) {
+                    """
+                    output += " "
+                    let result = op.resultType.selectExecParam().label
+                    let immediate = inst.immediate!.label
+                    output += """
+                    writePReg(&\(result), \(operand("\(immediate).lhs", lhs.source, op.lhsType)).\(op.op.lowercased())(\(operand("\(immediate).rhs", rhs.source, op.rhsType))))
+                    """
+                    output += " }"
+                }
+            } else {
+                output += """
+
+                    @inline(__always) mutating \(instMethodDecl(op.instruction[0])) {
+                        sp[\(op.resultType): binaryOperand.result] = \(op.mayThrow ? "try " : "")sp[\(op.lhsType): binaryOperand.lhs].\(camelCase(pascalCase: op.op))(sp[\(op.rhsType): binaryOperand.rhs])
+                    }
+                """
+            }
         }
         for op in intUnaryInsts + floatUnaryOps {
             output += """
