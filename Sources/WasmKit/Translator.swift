@@ -768,14 +768,22 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         return try valueStack.pop(type)
     }
 
-    private mutating func popOnStackOperand(_ type: ValueType) throws -> Bool {
+    private mutating func popOnStackOperand(_ type: ValueType) throws -> VReg? {
         let stackHeight = valueStack.height
-        guard let op = try popOperand(type) else { return false }
+        guard let op = try popOperand(type) else { return nil }
         let copyTo = valueStack.stackRegBase + VReg(stackHeight) - 1
-        if case .local(let localIndex) = op {
+        switch op {
+        case .register(let vReg):
+            return vReg
+        case .local(let localIndex):
             emitCopyStack(from: localReg(localIndex), to: copyTo)
+            return copyTo
         }
-        return true
+    }
+
+    private mutating func popVRegOperand(_ type: ValueType) throws -> VReg? {
+        guard let op = try popOperand(type) else { return nil }
+        return op.intoRegister(layout: stackLayout)
     }
 
     private mutating func popAnyOperand() throws -> (MetaValue, ValueSource?) {
@@ -1166,7 +1174,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
     private mutating func visitCallLike(calleeType: FunctionType) throws -> VReg? {
         for parameter in calleeType.parameters.reversed() {
-            guard try popOnStackOperand(parameter) else { return nil }
+            guard let _ = try popOnStackOperand(parameter) else { return nil }
         }
 
         let spAddend = valueStack.stackRegBase + VReg(valueStack.height)
@@ -1330,9 +1338,9 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     private mutating func popPushEmit(
         _ pop: ValueType,
         _ push: ValueType,
-        _ instruction: @escaping (_ popped: ValueSource, _ result: VReg, ValueStack) -> Instruction
+        _ instruction: @escaping (_ popped: VReg, _ result: VReg, ValueStack) -> Instruction
     ) throws {
-        let value = try popOperand(pop)
+        let value = try popVRegOperand(pop)
         let result = valueStack.push(push)
         if let value = value {
             emit(instruction(value, result, valueStack), resultRelink: { [valueStack] newResult in
@@ -1344,38 +1352,38 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     private mutating func pop3Emit(
         _ pops: (ValueType, ValueType, ValueType),
         _ instruction: (
-            _ popped: (ValueSource, ValueSource, ValueSource),
+            _ popped: (VReg, VReg, VReg),
             inout ValueStack
         ) -> Instruction
     ) throws {
-        let pop1 = try valueStack.pop(pops.0)
-        let pop2 = try valueStack.pop(pops.1)
-        let pop3 = try valueStack.pop(pops.2)
+        guard let pop1 = try popVRegOperand(pops.0),
+              let pop2 = try popVRegOperand(pops.1),
+              let pop3 = try popVRegOperand(pops.2) else { return }
         emit(instruction((pop1, pop2, pop3), &valueStack))
     }
 
     private mutating func pop2Emit(
         _ pops: (ValueType, ValueType),
         _ instruction: (
-            _ popped: (ValueSource, ValueSource),
+            _ popped: (VReg, VReg),
             inout ValueStack
         ) -> Instruction
     ) throws {
-        let pop1 = try valueStack.pop(pops.0)
-        let pop2 = try valueStack.pop(pops.1)
+        guard let pop1 = try popVRegOperand(pops.0),
+              let pop2 = try popVRegOperand(pops.1) else { return }
         emit(instruction((pop1, pop2), &valueStack))
     }
 
-    private mutating func popPushEmit(
+    private mutating func pop2PushEmit(
         _ pops: (ValueType, ValueType),
         _ push: ValueType,
         _ instruction: @escaping (
-            _ popped: (ValueSource, ValueSource),
+            _ popped: (VReg, VReg),
             _ result: VReg
         ) -> Instruction
     ) throws {
-        let pop1 = try valueStack.pop(pops.0)
-        let pop2 = try valueStack.pop(pops.1)
+        guard let pop1 = try popVRegOperand(pops.0),
+              let pop2 = try popVRegOperand(pops.1) else { return }
         let result = valueStack.push(push)
         emit(instruction((pop1, pop2), result), resultRelink: { result in
             instruction((pop1, pop2), result)
@@ -1392,10 +1400,10 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         if memarg.align >= alignLog2Limit {
             throw TranslationError("Alignment 2**\(memarg.align) is out of limit \(alignLog2Limit)")
         }
-        try popPushEmit(.address(isMemory64: isMemory64), type) { [stackLayout] value, result, stack in
+        try popPushEmit(.address(isMemory64: isMemory64), type) { value, result, stack in
             let loadOperand = Instruction.LoadOperand(
                 memarg: Instruction.MemArg(offset: memarg.offset),
-                pointer: value.intoRegister(layout: stackLayout),
+                pointer: value,
                 result: result
             )
             return instruction(loadOperand)
@@ -1450,8 +1458,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         let isMemory64 = try module.isMemory64(memoryIndex: memory)
         let sizeType = ValueType.address(isMemory64: isMemory64)
         // Just pop/push the same type (i64 or i32) value
-        try popPushEmit(sizeType, sizeType) { [stackLayout] value, result, stack in
-            .memoryGrow(Instruction.MemoryGrowOperand(result: result, delta: value.intoRegister(layout: stackLayout), memoryIndex: memory))
+        try popPushEmit(sizeType, sizeType) { value, result, stack in
+            .memoryGrow(Instruction.MemoryGrowOperand(result: result, delta: value, memoryIndex: memory))
         }
     }
 
@@ -1476,8 +1484,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
 
     private mutating func visitUnary(_ operand: ValueType, _ instruction: @escaping (Instruction.UnaryOperand) -> Instruction) throws {
-        try popPushEmit(operand, operand) { [stackLayout] value, result, stack in
-            return instruction(Instruction.UnaryOperand(result: result, input: value.intoRegister(layout: stackLayout)))
+        try popPushEmit(operand, operand) { value, result, stack in
+            return instruction(Instruction.UnaryOperand(result: result, input: value))
         }
     }
     private mutating func visitBinary(
@@ -1501,13 +1509,13 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         try visitBinary(operand, .i32, instruction)
     }
     private mutating func visitConversion(_ from: ValueType, _ to: ValueType, _ instruction: @escaping (Instruction.UnaryOperand) -> Instruction) throws {
-        try popPushEmit(from, to) { [stackLayout] value, result, stack in
-            return instruction(Instruction.UnaryOperand(result: result, input: value.intoRegister(layout: stackLayout)))
+        try popPushEmit(from, to) { value, result, stack in
+            return instruction(Instruction.UnaryOperand(result: result, input: value))
         }
     }
     mutating func visitI32Eqz() throws -> Output {
-        try popPushEmit(.i32, .i32) { [stackLayout] value, result, stack in
-            .i32Eqz(Instruction.UnaryOperand(result: result, input: value.intoRegister(layout: stackLayout)))
+        try popPushEmit(.i32, .i32) { value, result, stack in
+            .i32Eqz(Instruction.UnaryOperand(result: result, input: value))
         }
     }
     mutating func visitI32Eq() throws -> Output { try visitCmp(.i32, Instruction.i32Eq) }
@@ -1521,8 +1529,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     mutating func visitI32GeS() throws -> Output { try visitCmp(.i32, Instruction.i32GeS) }
     mutating func visitI32GeU() throws -> Output { try visitCmp(.i32, Instruction.i32GeU) }
     mutating func visitI64Eqz() throws -> Output {
-        try popPushEmit(.i64, .i32) { [stackLayout] value, result, stack in
-            .i64Eqz(Instruction.UnaryOperand(result: result, input: value.intoRegister(layout: stackLayout)))
+        try popPushEmit(.i64, .i32) { value, result, stack in
+            .i64Eqz(Instruction.UnaryOperand(result: result, input: value))
         }
     }
     mutating func visitI64Eq() throws -> Output { try visitCmp(.i64, Instruction.i64Eq) }
@@ -1644,14 +1652,14 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     mutating func visitMemoryInit(dataIndex: UInt32) throws -> Output {
         try self.module.validateDataSegment(dataIndex)
         let addressType = try module.addressType(memoryIndex: 0)
-        try pop3Emit((.i32, .i32, addressType)) { [stackLayout] values, stack in
+        try pop3Emit((.i32, .i32, addressType)) { values, stack in
             let (size, sourceOffset, destOffset) = values
             return .memoryInit(
                 Instruction.MemoryInitOperand(
                     segmentIndex: dataIndex,
-                    destOffset: destOffset.intoRegister(layout: stackLayout),
-                    sourceOffset: sourceOffset.intoRegister(layout: stackLayout),
-                    size: size.intoRegister(layout: stackLayout)
+                    destOffset: destOffset,
+                    sourceOffset: sourceOffset,
+                    size: size
                 )
             )
         }
@@ -1666,13 +1674,13 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         // C ⊦ memory.fill : [it i32 it] → []
         // https://github.com/WebAssembly/memory64/blob/main/proposals/memory64/Overview.md
         let addressType = try module.addressType(memoryIndex: 0)
-        try pop3Emit((addressType, addressType, addressType)) { [stackLayout] values, stack in
+        try pop3Emit((addressType, addressType, addressType)) { values, stack in
             let (size, sourceOffset, destOffset) = values
             return .memoryCopy(
                 Instruction.MemoryCopyOperand(
-                    destOffset: destOffset.intoRegister(layout: stackLayout),
-                    sourceOffset: sourceOffset.intoRegister(layout: stackLayout),
-                    size: size.intoRegister(layout: stackLayout)
+                    destOffset: destOffset,
+                    sourceOffset: sourceOffset,
+                    size: size
                 )
             )
         }
@@ -1683,28 +1691,28 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         // C ⊦ memory.fill : [it i32 it] → []
         // https://github.com/WebAssembly/memory64/blob/main/proposals/memory64/Overview.md
         let addressType = try module.addressType(memoryIndex: 0)
-        try pop3Emit((addressType, .i32, addressType)) { [stackLayout] values, stack in
+        try pop3Emit((addressType, .i32, addressType)) { values, stack in
             let (size, value, destOffset) = values
             return .memoryFill(
                 Instruction.MemoryFillOperand(
-                    destOffset: destOffset.intoRegister(layout: stackLayout),
-                    value: value.intoRegister(layout: stackLayout),
-                    size: size.intoRegister(layout: stackLayout)
+                    destOffset: destOffset,
+                    value: value,
+                    size: size
                 )
             )
         }
     }
     mutating func visitTableInit(elemIndex: UInt32, table: UInt32) throws -> Output {
         try self.module.validateElementSegment(elemIndex)
-        try pop3Emit((.i32, .i32, module.addressType(tableIndex: table))) { [stackLayout] values, stack in
+        try pop3Emit((.i32, .i32, module.addressType(tableIndex: table))) { values, stack in
             let (size, sourceOffset, destOffset) = values
             return .tableInit(
                 Instruction.TableInitOperand(
                     tableIndex: table,
                     segmentIndex: elemIndex,
-                    destOffset: destOffset.intoRegister(layout: stackLayout),
-                    sourceOffset: sourceOffset.intoRegister(layout: stackLayout),
-                    size: size.intoRegister(layout: stackLayout)
+                    destOffset: destOffset,
+                    sourceOffset: sourceOffset,
+                    size: size
                 )
             )
         }
@@ -1727,29 +1735,29 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
                 .address(isMemory64: sourceIsMemory64),
                 .address(isMemory64: destIsMemory64)
             )
-        ) { [stackLayout] values, stack in
+        ) { values, stack in
             let (size, sourceOffset, destOffset) = values
             return .tableCopy(
                 Instruction.TableCopyOperand(
                     sourceIndex: srcTable,
                     destIndex: dstTable,
-                    sourceOffset: sourceOffset.intoRegister(layout: stackLayout),
-                    destOffset: destOffset.intoRegister(layout: stackLayout),
-                    size: size.intoRegister(layout: stackLayout)
+                    sourceOffset: sourceOffset,
+                    destOffset: destOffset,
+                    size: size
                 )
             )
         }
     }
     mutating func visitTableFill(table: UInt32) throws -> Output {
         let address = try module.addressType(tableIndex: table)
-        try pop3Emit((address, .ref(module.elementType(table)), address)) { [stackLayout] values, stack in
+        try pop3Emit((address, .ref(module.elementType(table)), address)) { values, stack in
             let (size, value, destOffset) = values
             return .tableFill(
                 Instruction.TableFillOperand(
                     tableIndex: table,
-                    destOffset: destOffset.intoRegister(layout: stackLayout),
-                    value: value.intoRegister(layout: stackLayout),
-                    size: size.intoRegister(layout: stackLayout)
+                    destOffset: destOffset,
+                    value: value,
+                    size: size
                 )
             )
         }
@@ -1758,10 +1766,10 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         try popPushEmit(
             module.addressType(tableIndex: table),
             .ref(module.elementType(table))
-        ) { [stackLayout] index, result, stack in
+        ) { index, result, stack in
             return .tableGet(
                 Instruction.TableGetOperand(
-                    index: index.intoRegister(layout: stackLayout),
+                    index: index,
                     result: result,
                     tableIndex: table
                 )
@@ -1769,12 +1777,12 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
     }
     mutating func visitTableSet(table: UInt32) throws -> Output {
-        try pop2Emit((.ref(module.elementType(table)), module.addressType(tableIndex: table))) { [stackLayout] values, stack in
+        try pop2Emit((.ref(module.elementType(table)), module.addressType(tableIndex: table))) { values, stack in
             let (value, index) = values
             return .tableSet(
                 Instruction.TableSetOperand(
-                    index: index.intoRegister(layout: stackLayout),
-                    value: value.intoRegister(layout: stackLayout),
+                    index: index,
+                    value: value,
                     tableIndex: table
                 )
             )
@@ -1782,14 +1790,14 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
     mutating func visitTableGrow(table: UInt32) throws -> Output {
         let address = try module.addressType(tableIndex: table)
-        try popPushEmit((address, .ref(module.elementType(table))), address) { [stackLayout] values, result in
+        try pop2PushEmit((address, .ref(module.elementType(table))), address) { values, result in
             let (delta, value) = values
             return .tableGrow(
                 Instruction.TableGrowOperand(
                     tableIndex: table,
                     result: result,
-                    delta: delta.intoRegister(layout: stackLayout),
-                    value: value.intoRegister(layout: stackLayout)
+                    delta: delta,
+                    value: value
                 )
             )
         }
