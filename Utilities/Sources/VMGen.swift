@@ -1,7 +1,7 @@
 import Foundation
 
 /// A utility to generate internal VM instruction related code.
-enum GenerateInternalInstruction {
+enum VMGen {
 
     struct Immediate {
         let name: String?
@@ -13,14 +13,16 @@ enum GenerateInternalInstruction {
         case write
     }
 
-    struct VirtualRegister: CaseIterable {
+    /// A parameter passed to the `doExecute` method. Expected to be bound to a
+    /// physical register.
+    struct ExecParam: CaseIterable {
         let label: String
         let type: String
 
-        static let sp = VirtualRegister(label: "sp", type: "Sp")
-        static let pc = VirtualRegister(label: "pc", type: "Pc")
-        static let md = VirtualRegister(label: "md", type: "Md")
-        static let ms = VirtualRegister(label: "ms", type: "Ms")
+        static let sp = ExecParam(label: "sp", type: "Sp")
+        static let pc = ExecParam(label: "pc", type: "Pc")
+        static let md = ExecParam(label: "md", type: "Md")
+        static let ms = ExecParam(label: "ms", type: "Ms")
 
         static var allCases = [sp, pc, md, ms]
     }
@@ -51,21 +53,21 @@ enum GenerateInternalInstruction {
 
         typealias Parameter = (label: String, type: String, isInout: Bool)
         var parameters: [Parameter] {
-            var vregs: [(reg: VirtualRegister, isInout: Bool)] = []
+            var vregs: [(reg: ExecParam, isInout: Bool)] = []
             if self.mayUpdateFrame {
-                vregs += [(VirtualRegister.sp, true)]
+                vregs += [(ExecParam.sp, true)]
             } else {
-                vregs += [(VirtualRegister.sp, false)]
+                vregs += [(ExecParam.sp, false)]
             }
             if self.isControl {
-                vregs += [(VirtualRegister.pc, true)]
+                vregs += [(ExecParam.pc, true)]
             }
             switch useCurrentMemory {
             case .none: break
             case .read:
-                vregs += [(VirtualRegister.md, false), (VirtualRegister.ms, false)]
+                vregs += [(ExecParam.md, false), (ExecParam.ms, false)]
             case .write:
-                vregs += [(VirtualRegister.md, true), (VirtualRegister.ms, true)]
+                vregs += [(ExecParam.md, true), (ExecParam.ms, true)]
             }
             var parameters: [Parameter] = vregs.map { ($0.reg.label, $0.reg.type, $0.isInout) }
             parameters += immediates.map {
@@ -94,25 +96,94 @@ enum GenerateInternalInstruction {
         }
     }
 
+    struct BinOpInfo {
+        let op: String
+        let name: String
+        let lhsType: String
+        let rhsType: String
+        let resultType: String
+
+        var instruction: Instruction {
+            Instruction(
+                name: name,
+                immediates: [Immediate(name: nil, type: "Instruction.BinaryOperand")]
+            )
+        }
+    }
+
+    struct UnOpInfo {
+        let op: String
+        let name: String
+        let inputType: String
+        let resultType: String
+
+        var instruction: Instruction {
+            Instruction(name: name, immediates: [Immediate(name: nil, type: "Instruction.UnaryOperand")])
+        }
+    }
+
     static let intValueTypes = ["i32", "i64"]
     static let floatValueTypes = ["f32", "f64"]
     static let valueTypes = intValueTypes + floatValueTypes
-    static let intBinaryInsts: [OpInstruction] = [
-        "Add", "Sub", "Mul",
-        "And", "Or", "Xor", "Shl", "ShrS", "ShrU", "Rotl", "Rotr",
-        "Eq", "Ne", "LtS", "LtU", "GtS", "GtU", "LeS", "LeU", "GeS", "GeU",
-    ].flatMap { op -> [OpInstruction] in
-        intValueTypes.map { OpInstruction.binop(op: op, type: $0) }
+
+    // MARK: - Int instructions
+
+    static func buildIntBinOps() -> [BinOpInfo] {
+        var results: [BinOpInfo] = []
+        // (T, T) -> T for all T in int types
+        results += [
+            "Add", "Sub", "Mul",
+            "And", "Or", "Xor", "Shl", "ShrS", "ShrU", "Rotl", "Rotr",
+        ].flatMap { op -> [BinOpInfo] in
+            intValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: $0) }
+        }
+        // (T, T) -> i32 for all T in int types
+        results += [
+            "Eq", "Ne", "LtS", "LtU", "GtS", "GtU", "LeS", "LeU", "GeS", "GeU",
+        ].flatMap { op -> [BinOpInfo] in
+            intValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: "i32") }
+        }
+        return results
     }
-    static let intUnaryInsts: [OpInstruction] = ["Clz", "Ctz", "Popcnt", "Eqz"].flatMap { op -> [OpInstruction] in
-        intValueTypes.map { OpInstruction.unop(op: op, type: $0) }
+    static let intBinOps: [BinOpInfo] = buildIntBinOps()
+
+    static func buildIntUnaryInsts() -> [UnOpInfo] {
+        var results: [UnOpInfo] = []
+        // (T) -> T for all T in int types
+        results += ["Clz", "Ctz", "Popcnt"].flatMap { op -> [UnOpInfo] in
+            intValueTypes.map { UnOpInfo(op: op, name: "\($0)\(op)", inputType: $0, resultType: $0) }
+        }
+        // (T) -> i32 for all T in int types
+        results += ["Eqz"].flatMap { op -> [UnOpInfo] in
+            intValueTypes.map { UnOpInfo(op: op, name: "\($0)\(op)", inputType: $0, resultType: "i32") }
+        }
+        return results
     }
-    static let floatBinaryInsts: [OpInstruction] = [
-        "Add", "Sub", "Mul", "Div",
-        "Eq", "Ne",
-    ].flatMap { op -> [OpInstruction] in
-        floatValueTypes.map { OpInstruction.binop(op: op, type: $0) }
+    static let intUnaryInsts: [UnOpInfo] = buildIntUnaryInsts()
+
+
+    // MARK: - Float instructions
+
+    static func buildFloatBinOps() -> [BinOpInfo] {
+        var results: [BinOpInfo] = []
+        // (T, T) -> T for all T in float types
+        results += [
+            "Add", "Sub", "Mul", "Div",
+        ].flatMap { op -> [BinOpInfo] in
+            floatValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: $0) }
+        }
+        // (T, T) -> i32 for all T in float types
+        results += [
+            "Eq", "Ne",
+        ].flatMap { op -> [BinOpInfo] in
+            floatValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: "i32") }
+        }
+        return results
     }
+    static let floatBinOps: [BinOpInfo] = buildFloatBinOps()
+
+    // MARK: - Minor numeric instructions
+
     static let numericOtherInsts: [Instruction] = [
         // Numeric
         Instruction(name: "numericConst", immediates: [
@@ -135,6 +206,8 @@ enum GenerateInternalInstruction {
             Immediate(name: nil, type: "Instruction.UnaryOperand"),
         ]),
     ]
+
+    // MARK: - Memory instructions
 
     struct LoadInstruction {
         let loadAs: String
@@ -198,6 +271,8 @@ enum GenerateInternalInstruction {
         ]),
     ]
 
+    // MARK: - Misc instructions
+
     static let miscInsts: [Instruction] = [
         // Parametric
         Instruction(name: "select", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.SelectOperand")]),
@@ -219,8 +294,10 @@ enum GenerateInternalInstruction {
         Instruction(name: "onExit", immediates: [Immediate(name: nil, type: "Instruction.OnExitOperand")]),
     ]
 
-    static let instructions: [Instruction] =
-        [
+    // MARK: - Instruction generation
+
+    static func buildInstructions() -> [Instruction] {
+        var instructions: [Instruction] = [
             // Variable
             Instruction(name: "copyStack", immediates: [Immediate(name: nil, type: "Instruction.CopyStackOperand")]),
             Instruction(name: "globalGet", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.GlobalGetOperand")]),
@@ -276,13 +353,17 @@ enum GenerateInternalInstruction {
             Instruction(name: "`return`", isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write, immediates: []),
             Instruction(name: "endOfExecution", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: []),
         ]
-        + memoryLoadStoreInsts
-        + memoryOpInsts
-        + numericOtherInsts
-        + intBinaryInsts.map(\.base)
-        + intUnaryInsts.map(\.base)
-        + floatBinaryInsts.map(\.base)
-        + miscInsts
+        instructions += memoryLoadStoreInsts
+        instructions += memoryOpInsts
+        instructions += numericOtherInsts
+        instructions += intBinOps.map(\.instruction)
+        instructions += intUnaryInsts.map(\.instruction)
+        instructions += floatBinOps.map(\.instruction)
+        instructions += miscInsts
+        return instructions
+    }
+
+    static let instructions: [Instruction] = buildInstructions()
 
     static func camelCase(pascalCase: String) -> String {
         let first = pascalCase.first!.lowercased()
@@ -292,7 +373,7 @@ enum GenerateInternalInstruction {
     static func generateDispatcher(instructions: [Instruction]) -> String {
         let doExecuteParams: [Instruction.Parameter] =
             [("instruction", "Instruction", false)]
-            + VirtualRegister.allCases.map { ($0.label, $0.type, true) }
+            + ExecParam.allCases.map { ($0.label, $0.type, true) }
         var output = """
             extension ExecutionState {
                 @inline(__always)
@@ -346,19 +427,19 @@ enum GenerateInternalInstruction {
             extension ExecutionState {
             """
 
-        for inst in intBinaryInsts + floatBinaryInsts {
+        for op in intBinOps + floatBinOps {
             output += """
 
-                mutating \(instMethodDecl(inst.base)) {
-                    sp[binaryOperand.result] = sp[binaryOperand.lhs].\(inst.inputType).\(inst.op.lowercased())(sp[binaryOperand.rhs].\(inst.inputType)).untyped
+                mutating \(instMethodDecl(op.instruction)) {
+                    sp[binaryOperand.result] = sp[binaryOperand.lhs].\(op.lhsType).\(op.op.lowercased())(sp[binaryOperand.rhs].\(op.rhsType)).untyped
                 }
             """
         }
-        for inst in intUnaryInsts {
+        for op in intUnaryInsts {
             output += """
 
-                mutating \(instMethodDecl(inst.base)) {
-                    sp[unaryOperand.result] = sp[unaryOperand.input].\(inst.inputType).\(inst.op.lowercased()).untyped
+                mutating \(instMethodDecl(op.instruction)) {
+                    sp[unaryOperand.result] = sp[unaryOperand.input].\(op.inputType).\(op.op.lowercased()).untyped
                 }
             """
         }

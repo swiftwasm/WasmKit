@@ -11,8 +11,8 @@ struct Subcommand {
 func main() throws {
 
     let subcommands: [Subcommand] = [
-        Subcommand(name: "generate-internal-instruction", description: "Generate internal instruction code", handler: GenerateInternalInstruction.main),
-        Subcommand(name: "generate-wasm-instruction", description: "Generate wasm instruction code", handler: GenerateWasmInstruction.main),
+        Subcommand(name: "vmgen", description: "Generate internal instruction code", handler: VMGen.main),
+        Subcommand(name: "wasmgen", description: "Generate wasm instruction code", handler: WasmGen.main),
     ]
 
     func printAvailableSubcommands() {
