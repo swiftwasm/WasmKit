@@ -10,6 +10,7 @@
 // See ExecutionContext.swift for more information about each execution
 // parameter.
 typedef uint64_t *_Nonnull Sp;
+typedef int64_t R0;
 typedef void *_Nullable Pc;
 typedef void *_Nullable Md;
 typedef size_t Ms;
@@ -21,6 +22,6 @@ typedef size_t Ms;
 /// See https://clang.llvm.org/docs/AttributeReference.html#swiftasynccall for
 /// more information about `swiftasynccall`.
 typedef SWIFT_CC(swiftasync) void (*wasmkit_tc_exec)(
-    uint64_t *_Nonnull sp, Pc, Md, Ms, SWIFT_CONTEXT void *_Nullable state);
+    uint64_t *_Nonnull sp, R0, Pc, Md, Ms, SWIFT_CONTEXT void *_Nullable state);
 
 #endif // WASMKIT__CWASMKIT_H

@@ -80,6 +80,10 @@ extension Int32: InstructionImmediate {
     }
 }
 
+enum PReg: Int {
+    case r0 = 0
+}
+
 extension Instruction {
     /// size = 6, alignment = 2
     struct BinaryOperand: Equatable, InstructionImmediate {
