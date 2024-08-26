@@ -1,7 +1,7 @@
 import Foundation
 
 /// A utility for generating Core Wasm instruction related code based on the `Instructions.json` file.
-enum GenerateWasmInstruction {
+enum WasmGen {
 
     struct Instruction: Decodable {
         let feature: String
