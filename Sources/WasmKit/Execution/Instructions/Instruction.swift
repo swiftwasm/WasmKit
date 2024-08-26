@@ -1,5 +1,6 @@
 enum Instruction: Equatable {
     case copyStack(Instruction.CopyStackOperand)
+    case copyR0ToStack(dest: VReg)
     case globalGet(Instruction.GlobalGetOperand)
     case globalSet(Instruction.GlobalSetOperand)
     case call(Instruction.CallOperand)

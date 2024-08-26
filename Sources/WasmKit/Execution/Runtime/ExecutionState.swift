@@ -38,6 +38,8 @@ typealias Sp = UnsafeMutablePointer<UntypedValue>
 ///         "is compiled" check on the next execution.
 typealias Pc = UnsafeMutablePointer<Instruction>
 
+typealias R0 = Int64
+
 /// Executes a WebAssembly function.
 ///
 /// - Parameters:
@@ -150,7 +152,7 @@ extension ExecutionState {
         type: FunctionType,
         stack: inout StackContext
     ) throws {
-        var sp: Sp = sp, md: Md = nil, ms: Ms = 0, pc = pc
+        var sp: Sp = sp, r0: R0 = 0, md: Md = nil, ms: Ms = 0, pc = pc
         (pc, sp) = try stack.invoke(
             function: handle,
             callerInstance: nil,
@@ -159,12 +161,12 @@ extension ExecutionState {
             ),
             sp: sp, pc: pc, md: &md, ms: &ms
         )
-        try stack.run(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        try stack.run(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
     }
 
     /// The main execution loop. Be careful when modifying this function as it is performance-critical.
     @inline(__always)
-    mutating func run(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
+    mutating func run(sp: inout Sp, r0: inout R0, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
         CurrentMemory.mayUpdateCurrentInstance(stack: self, md: &md, ms: &ms)
 #if WASMKIT_ENGINE_STATS
         var stats: [String: Int] = [:]
@@ -182,7 +184,7 @@ extension ExecutionState {
                 stats[inst.name, default: 0] += 1
 #endif
             // `doExecute` returns false when current frame *may* be updated
-            } while try doExecute(inst, sp: &sp, pc: &pc, md: &md, ms: &ms)
+            } while try doExecute(inst, sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
         }
     }
 }

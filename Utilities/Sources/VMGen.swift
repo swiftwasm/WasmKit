@@ -20,11 +20,12 @@ enum VMGen {
         let type: String
 
         static let sp = ExecParam(label: "sp", type: "Sp")
+        static let r0 = ExecParam(label: "r0", type: "R0")
         static let pc = ExecParam(label: "pc", type: "Pc")
         static let md = ExecParam(label: "md", type: "Md")
         static let ms = ExecParam(label: "ms", type: "Ms")
 
-        static var allCases = [sp, pc, md, ms]
+        static var allCases = [sp, r0, pc, md, ms]
     }
 
     struct Instruction {
@@ -34,12 +35,14 @@ enum VMGen {
         let mayUpdateFrame: Bool
         let mayUpdateSp: Bool = false
         let useCurrentMemory: RegisterUse
+        let useR0: RegisterUse
         let immediates: [Immediate]
 
         init(
             name: String, isControl: Bool = false,
             mayThrow: Bool = false, mayUpdateFrame: Bool = false,
             useCurrentMemory: RegisterUse = .none,
+            useR0: RegisterUse = .none,
             immediates: [Immediate]
         ) {
             self.name = name
@@ -47,6 +50,7 @@ enum VMGen {
             self.mayThrow = mayThrow
             self.mayUpdateFrame = mayUpdateFrame
             self.useCurrentMemory = useCurrentMemory
+            self.useR0 = useR0
             self.immediates = immediates
             assert(isControl || !mayUpdateFrame, "non-control instruction should not update frame")
         }
@@ -58,6 +62,13 @@ enum VMGen {
                 vregs += [(ExecParam.sp, true)]
             } else {
                 vregs += [(ExecParam.sp, false)]
+            }
+            switch useR0 {
+            case .none: break
+            case .read:
+                vregs += [(ExecParam.r0, false)]
+            case .write:
+                vregs += [(ExecParam.r0, true)]
             }
             if self.isControl {
                 vregs += [(ExecParam.pc, true)]
@@ -300,6 +311,7 @@ enum VMGen {
         var instructions: [Instruction] = [
             // Variable
             Instruction(name: "copyStack", immediates: [Immediate(name: nil, type: "Instruction.CopyStackOperand")]),
+            Instruction(name: "copyR0ToStack", useR0: .read, immediates: [Immediate(name: "dest", type: "VReg")]),
             Instruction(name: "globalGet", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.GlobalGetOperand")]),
             Instruction(name: "globalSet", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.GlobalSetOperand")]),
             // Controls

@@ -2,6 +2,10 @@ import WasmParser
 
 typealias VReg = Int16
 
+enum PReg: Int {
+    case r0 = 0
+}
+
 extension Instruction {
     struct MemArg: Equatable {
         let offset: UInt64
