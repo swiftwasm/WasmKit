@@ -385,12 +385,12 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
 
     enum ValueSource {
-        case register(VReg)
+        case vreg(VReg)
         case local(LocalIndex)
 
-        func intoRegister(layout: StackLayout) -> VReg {
+        func intoVReg(layout: StackLayout) -> VReg {
             switch self {
-            case .register(let register):
+            case .vreg(let register):
                 return register
             case .local(let index):
                 return layout.localReg(index)
@@ -456,7 +456,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             case .local(_, let localIndex):
                 source = .local(localIndex)
             case .stack:
-                source = .register(stackRegBase + VReg(height))
+                source = .vreg(stackRegBase + VReg(height))
             }
             return source
         }
@@ -779,7 +779,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         guard let op = try popOperand(type) else { return nil }
         let copyTo = valueStack.stackRegBase + VReg(stackHeight) - 1
         switch op {
-        case .register(let vReg):
+        case .vreg(let vReg):
             return vReg
         case .local(let localIndex):
             emitCopyStack(from: localReg(localIndex), to: copyTo)
@@ -789,7 +789,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
     private mutating func popVRegOperand(_ type: ValueType) throws -> VReg? {
         guard let op = try popOperand(type) else { return nil }
-        return op.intoRegister(layout: stackLayout)
+        return op.intoVReg(layout: stackLayout)
     }
 
     private mutating func popAnyOperand() throws -> (MetaValue, ValueSource?) {
@@ -803,7 +803,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         preserveLocalsOnStack(depth: self.type.results.count)
         for (index, resultType) in self.type.results.enumerated().reversed() {
             let result = try valueStack.pop(resultType)
-            let source = result.intoRegister(layout: stackLayout)
+            let source = result.intoVReg(layout: stackLayout)
             let dest = returnReg(index)
             emitCopyStack(from: source, to: dest)
         }
@@ -899,7 +899,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             case .local(let localIndex):
                 // Re-push local variables to the stack
                 _ = try valueStack.pushLocal(localIndex, locals: &locals)
-            case .register, nil:
+            case .vreg, nil:
                 _ = valueStack.push(param)
             }
         }
@@ -951,7 +951,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             }
             let elseOrEnd = UInt32(targetPC.offsetFromHead - selfPC.offsetFromHead)
             return .ifThen(Instruction.IfOperand(
-                elseOrEndOffset: elseOrEnd, condition: condition.intoRegister(layout: stackLayout)
+                elseOrEndOffset: elseOrEnd, condition: condition.intoVReg(layout: stackLayout)
             ))
         }
     }
@@ -1060,7 +1060,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
 
     mutating func visitBrIf(relativeDepth: UInt32) throws -> Output {
-        guard let condition = try popOperand(.i32)?.intoRegister(layout: stackLayout) else { return }
+        guard let condition = try popOperand(.i32)?.intoVReg(layout: stackLayout) else { return }
 
         let frame = try controlStack.branchTarget(relativeDepth: relativeDepth)
         if frame.copyCount == 0 {
@@ -1110,7 +1110,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
 
     mutating func visitBrTable(targets: WasmParser.BrTable) throws -> Output {
-        guard let index = try popOperand(.i32)?.intoRegister(layout: stackLayout) else { return }
+        guard let index = try popOperand(.i32)?.intoVReg(layout: stackLayout) else { return }
         guard try controlStack.currentFrame().reachable else { return }
 
         preserveAllLocalsOnStack()
@@ -1223,7 +1223,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         let address = try popOperand(addressType)  // function address
         let calleeType = try self.module.resolveType(typeIndex)
         guard let spAddend = try visitCallLike(calleeType: calleeType) else { return }
-        guard let addressRegister = address?.intoRegister(layout: stackLayout) else { return }
+        guard let addressRegister = address?.intoVReg(layout: stackLayout) else { return }
         let internType = funcTypeInterner.intern(calleeType)
         let operand = Instruction.CallIndirectOperand(
             tableIndex: tableIndex,
@@ -1251,9 +1251,9 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             break
         }
         let result = valueStack.push(value1Type)
-        if let condition = condition?.intoRegister(layout: stackLayout),
-           let value1 = value1?.intoRegister(layout: stackLayout),
-           let value2 = value2?.intoRegister(layout: stackLayout) {
+        if let condition = condition?.intoVReg(layout: stackLayout),
+           let value1 = value1?.intoVReg(layout: stackLayout),
+           let value2 = value2?.intoVReg(layout: stackLayout) {
             let operand = Instruction.SelectOperand(
                 result: result,
                 condition: condition,
@@ -1275,9 +1275,9 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         //     throw TranslationError("Type mismatch on `select`. Expected \(value2) and \(type) to be same")
         // }
         let result = valueStack.push(value1Type)
-        if let condition = condition?.intoRegister(layout: stackLayout),
-           let value1 = value1?.intoRegister(layout: stackLayout),
-           let value2 = value2?.intoRegister(layout: stackLayout) {
+        if let condition = condition?.intoVReg(layout: stackLayout),
+           let value1 = value1?.intoVReg(layout: stackLayout),
+           let value2 = value2?.intoVReg(layout: stackLayout) {
             let operand = Instruction.SelectOperand(
                 result: result,
                 condition: condition,
@@ -1293,7 +1293,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     mutating func visitLocalSetOrTee(localIndex: UInt32, isTee: Bool) throws {
         preserveLocalsOnStack(localIndex)
         let type = try locals.type(of: localIndex)
-        guard let value = try popOperand(type)?.intoRegister(layout: stackLayout) else { return }
+        guard let value = try popOperand(type)?.intoVReg(layout: stackLayout) else { return }
         guard try controlStack.currentFrame().reachable else { return }
         let result = localReg(localIndex)
         if !isTee, iseqBuilder.relinkLastInstructionResult(result) {
@@ -1327,7 +1327,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             return
         }
         let operand = Instruction.GlobalSetOperand(
-            global: global, value: value.intoRegister(layout: stackLayout)
+            global: global, value: value.intoVReg(layout: stackLayout)
         )
         emit(.globalSet(operand))
     }
@@ -1423,8 +1423,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         let isMemory64 = try module.isMemory64(memoryIndex: 0)
         let value = try popOperand(type)
         let pointer = try popOperand(.address(isMemory64: isMemory64))
-        if let value = value?.intoRegister(layout: stackLayout),
-           let pointer = pointer?.intoRegister(layout: stackLayout) {
+        if let value = value?.intoVReg(layout: stackLayout),
+           let pointer = pointer?.intoVReg(layout: stackLayout) {
             let storeOperand = Instruction.StoreOperand(
                 memarg: Instruction.MemArg(offset: memarg.offset),
                 pointer: pointer,
@@ -1482,7 +1482,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     mutating func visitRefIsNull() throws -> Output {
         let value = try valueStack.popRef()
         let result = valueStack.push(.i32)
-        emit(.refIsNull(Instruction.RefIsNullOperand(value: value.intoRegister(layout: stackLayout), result: result)))
+        emit(.refIsNull(Instruction.RefIsNullOperand(value: value.intoVReg(layout: stackLayout), result: result)))
     }
     mutating func visitRefFunc(functionIndex: UInt32) throws -> Output {
         try self.module.validateFunctionIndex(functionIndex)
@@ -1502,7 +1502,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         let rhs = try popOperand(operand)
         let lhs = try popOperand(operand)
         let result = valueStack.push(result)
-        if let lhs = lhs?.intoRegister(layout: stackLayout), let rhs = rhs?.intoRegister(layout: stackLayout) {
+        if let lhs = lhs?.intoVReg(layout: stackLayout), let rhs = rhs?.intoVReg(layout: stackLayout) {
             emit(
                 instruction(Instruction.BinaryOperand(result: result, lhs: lhs, rhs: rhs)),
                 resultRelink: { result in
