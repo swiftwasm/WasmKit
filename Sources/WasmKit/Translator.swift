@@ -214,20 +214,24 @@ fileprivate struct MetaProgramCounter {
 ///
 /// On function entry, the stack frame looks like:
 ///
+/// ```
 /// | Offset                             | Description          |
 /// |------------------------------------|----------------------|
 /// | 0                                  | Function parameter 0 |
 /// | 1                                  | Function parameter 1 |
 /// | ...                                | ...                  |
 /// | len(params)-1                      | Function parameter N |
+/// ```
 ///
 /// On function return, the stack frame looks like:
+/// ```
 /// | Offset                             | Description          |
 /// |------------------------------------|----------------------|
 /// | 0                                  | Function result 0    |
 /// | 1                                  | Function result 1    |
 /// | ...                                | ...                  |
 /// | len(results)-1                     | Function result N    |
+/// ```
 ///
 /// The end of the frame header is usually referred to as "stack pointer"
 /// (SP). "local" variables and the value stack space are allocated after
@@ -239,6 +243,7 @@ fileprivate struct MetaProgramCounter {
 /// relative to the stack pointer, so the register indices for parameters
 /// and results are negative.
 ///
+/// ```
 /// | Offset                             | Description          |
 /// |------------------------------------|----------------------|
 /// | 0 ~ max(params, results)-1         | Frame header         |
@@ -250,6 +255,7 @@ fileprivate struct MetaProgramCounter {
 /// | SP+len(locals)+1                   | Value stack 1        |
 /// | ...                                | ...                  |
 /// | SP+len(locals)+heighest(stack)-1   | Value stack N        |
+/// ```
 ///
 struct StackLayout {
     let type: FunctionType
