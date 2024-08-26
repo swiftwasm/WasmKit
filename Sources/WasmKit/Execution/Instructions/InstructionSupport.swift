@@ -2,7 +2,7 @@ import WasmParser
 
 typealias VReg = Int16
 
-enum PReg: Int {
+enum PReg: Int, CaseIterable {
     case r0 = 0
 }
 
@@ -210,6 +210,21 @@ extension Instruction {
     typealias OnEnterOperand = FunctionIndex
     typealias OnExitOperand = FunctionIndex
 
+    struct Commutative {
+        let ss: (VReg, VReg) -> Instruction
+        let sr: (VReg) -> Instruction
+    }
+
+    static var i32Add = Commutative(
+        ss: i32AddSS,
+        sr: i32AddSR
+    )
+
+    static var i64Add = Commutative(
+        ss: i64AddSS,
+        sr: i64AddSR
+    )
+
     static func f32Lt(_ op: BinaryOperand) -> Instruction { .numericFloatBinary(.lt(.f32), op) }
     static func f32Gt(_ op: BinaryOperand) -> Instruction { .numericFloatBinary(.gt(.f32), op) }
     static func f32Le(_ op: BinaryOperand) -> Instruction { .numericFloatBinary(.le(.f32), op) }
@@ -365,8 +380,8 @@ struct InstructionPrintingContext {
             target.write("\(reg(op.result)) = f64.load \(reg(op.pointer)), \(memarg(op.memarg))")
         case .copyStack(let op):
             target.write("\(reg(op.dest)) = copy \(reg(op.source))")
-        case .i32Add(let op):
-            target.write("\(reg(op.result)) = i32.add \(reg(op.lhs)), \(reg(op.rhs))")
+        case .i32AddSS(let lhs, let rhs):
+            target.write("r0 = i32.add_ss \(reg(lhs)), \(reg(rhs))")
         case .i32Sub(let op):
             target.write("\(reg(op.result)) = i32.sub \(reg(op.lhs)), \(reg(op.rhs))")
         case .i32LtU(let op):

@@ -5,8 +5,14 @@ extension ExecutionState {
         switch instruction {
         case .copyStack(let copyStackOperand):
             self.copyStack(sp: sp, copyStackOperand: copyStackOperand)
-        case .copyR0ToStack(let dest):
-            self.copyR0ToStack(sp: sp, r0: r0, dest: dest)
+        case .copyR0ToStackI32(let dest):
+            self.copyR0ToStackI32(sp: sp, r0: r0, dest: dest)
+        case .copyR0ToStackI64(let dest):
+            self.copyR0ToStackI64(sp: sp, r0: r0, dest: dest)
+        case .copyR0ToStackF32(let dest):
+            self.copyR0ToStackF32(sp: sp, r0: r0, dest: dest)
+        case .copyR0ToStackF64(let dest):
+            self.copyR0ToStackF64(sp: sp, r0: r0, dest: dest)
         case .globalGet(let globalGetOperand):
             try self.globalGet(sp: sp, globalGetOperand: globalGetOperand)
         case .globalSet(let globalSetOperand):
@@ -118,10 +124,14 @@ extension ExecutionState {
             self.numericFloatBinary(sp: sp, floatBinary: floatBinary, binaryOperand: binaryOperand)
         case .numericConversion(let conversion, let unaryOperand):
             try self.numericConversion(sp: sp, conversion: conversion, unaryOperand: unaryOperand)
-        case .i32Add(let binaryOperand):
-            self.i32Add(sp: sp, binaryOperand: binaryOperand)
-        case .i64Add(let binaryOperand):
-            self.i64Add(sp: sp, binaryOperand: binaryOperand)
+        case .i32AddSS(let lhs, let rhs):
+            self.i32AddSS(sp: sp, r0: &r0, lhs: lhs, rhs: rhs)
+        case .i32AddSR(let lhs):
+            self.i32AddSR(sp: sp, r0: &r0, lhs: lhs)
+        case .i64AddSS(let lhs, let rhs):
+            self.i64AddSS(sp: sp, r0: &r0, lhs: lhs, rhs: rhs)
+        case .i64AddSR(let lhs):
+            self.i64AddSR(sp: sp, r0: &r0, lhs: lhs)
         case .i32Sub(let binaryOperand):
             self.i32Sub(sp: sp, binaryOperand: binaryOperand)
         case .i64Sub(let binaryOperand):
@@ -280,7 +290,10 @@ extension Instruction {
     var name: String {
         switch self {
         case .copyStack: return "copyStack"
-        case .copyR0ToStack: return "copyR0ToStack"
+        case .copyR0ToStackI32: return "copyR0ToStackI32"
+        case .copyR0ToStackI64: return "copyR0ToStackI64"
+        case .copyR0ToStackF32: return "copyR0ToStackF32"
+        case .copyR0ToStackF64: return "copyR0ToStackF64"
         case .globalGet: return "globalGet"
         case .globalSet: return "globalSet"
         case .call: return "call"
@@ -330,8 +343,10 @@ extension Instruction {
         case .numericIntBinary: return "numericIntBinary"
         case .numericFloatBinary: return "numericFloatBinary"
         case .numericConversion: return "numericConversion"
-        case .i32Add: return "i32Add"
-        case .i64Add: return "i64Add"
+        case .i32AddSS: return "i32AddSS"
+        case .i32AddSR: return "i32AddSR"
+        case .i64AddSS: return "i64AddSS"
+        case .i64AddSR: return "i64AddSR"
         case .i32Sub: return "i32Sub"
         case .i64Sub: return "i64Sub"
         case .i32Mul: return "i32Mul"
@@ -412,12 +427,10 @@ extension Instruction {
 
 
 extension ExecutionState {
-    mutating func i32Add(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.add(sp[binaryOperand.rhs].i32).untyped
-    }
-    mutating func i64Add(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.add(sp[binaryOperand.rhs].i64).untyped
-    }
+    mutating func i32AddSS(sp: Sp, r0: inout R0, lhs: VReg, rhs: VReg) { writePReg(&r0, sp[lhs].i32.add(sp[rhs].i32)) }
+    mutating func i32AddSR(sp: Sp, r0: inout R0, lhs: VReg) { writePReg(&r0, sp[lhs].i32.add(readPRegI32(r0))) }
+    mutating func i64AddSS(sp: Sp, r0: inout R0, lhs: VReg, rhs: VReg) { writePReg(&r0, sp[lhs].i64.add(sp[rhs].i64)) }
+    mutating func i64AddSR(sp: Sp, r0: inout R0, lhs: VReg) { writePReg(&r0, sp[lhs].i64.add(readPRegI64(r0))) }
     mutating func i32Sub(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.sub(sp[binaryOperand.rhs].i32).untyped
     }
