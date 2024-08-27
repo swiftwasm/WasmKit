@@ -409,6 +409,118 @@ SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64AddSR(Sp sp, R0 r0, Pc pc,
     INLINE_CALL wasmkit_execute_i64AddSR(&sp, &r0, &pc, &md, &ms, state, &error);
     return ((wasmkit_tc_exec)(*(void **)pc))(sp, r0, pc, md, ms, state);
 }
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32MulSS(Sp sp, R0 r0, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) void wasmkit_execute_i32MulSS(Sp *sp, R0 *r0, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    pc += sizeof(uint64_t);
+    void * _Nullable error = NULL;
+    INLINE_CALL wasmkit_execute_i32MulSS(&sp, &r0, &pc, &md, &ms, state, &error);
+    return ((wasmkit_tc_exec)(*(void **)pc))(sp, r0, pc, md, ms, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32MulSR(Sp sp, R0 r0, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) void wasmkit_execute_i32MulSR(Sp *sp, R0 *r0, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    pc += sizeof(uint64_t);
+    void * _Nullable error = NULL;
+    INLINE_CALL wasmkit_execute_i32MulSR(&sp, &r0, &pc, &md, &ms, state, &error);
+    return ((wasmkit_tc_exec)(*(void **)pc))(sp, r0, pc, md, ms, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64MulSS(Sp sp, R0 r0, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) void wasmkit_execute_i64MulSS(Sp *sp, R0 *r0, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    pc += sizeof(uint64_t);
+    void * _Nullable error = NULL;
+    INLINE_CALL wasmkit_execute_i64MulSS(&sp, &r0, &pc, &md, &ms, state, &error);
+    return ((wasmkit_tc_exec)(*(void **)pc))(sp, r0, pc, md, ms, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64MulSR(Sp sp, R0 r0, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) void wasmkit_execute_i64MulSR(Sp *sp, R0 *r0, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    pc += sizeof(uint64_t);
+    void * _Nullable error = NULL;
+    INLINE_CALL wasmkit_execute_i64MulSR(&sp, &r0, &pc, &md, &ms, state, &error);
+    return ((wasmkit_tc_exec)(*(void **)pc))(sp, r0, pc, md, ms, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32AndSS(Sp sp, R0 r0, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) void wasmkit_execute_i32AndSS(Sp *sp, R0 *r0, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    pc += sizeof(uint64_t);
+    void * _Nullable error = NULL;
+    INLINE_CALL wasmkit_execute_i32AndSS(&sp, &r0, &pc, &md, &ms, state, &error);
+    return ((wasmkit_tc_exec)(*(void **)pc))(sp, r0, pc, md, ms, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32AndSR(Sp sp, R0 r0, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) void wasmkit_execute_i32AndSR(Sp *sp, R0 *r0, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    pc += sizeof(uint64_t);
+    void * _Nullable error = NULL;
+    INLINE_CALL wasmkit_execute_i32AndSR(&sp, &r0, &pc, &md, &ms, state, &error);
+    return ((wasmkit_tc_exec)(*(void **)pc))(sp, r0, pc, md, ms, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64AndSS(Sp sp, R0 r0, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) void wasmkit_execute_i64AndSS(Sp *sp, R0 *r0, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    pc += sizeof(uint64_t);
+    void * _Nullable error = NULL;
+    INLINE_CALL wasmkit_execute_i64AndSS(&sp, &r0, &pc, &md, &ms, state, &error);
+    return ((wasmkit_tc_exec)(*(void **)pc))(sp, r0, pc, md, ms, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64AndSR(Sp sp, R0 r0, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) void wasmkit_execute_i64AndSR(Sp *sp, R0 *r0, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    pc += sizeof(uint64_t);
+    void * _Nullable error = NULL;
+    INLINE_CALL wasmkit_execute_i64AndSR(&sp, &r0, &pc, &md, &ms, state, &error);
+    return ((wasmkit_tc_exec)(*(void **)pc))(sp, r0, pc, md, ms, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32OrSS(Sp sp, R0 r0, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) void wasmkit_execute_i32OrSS(Sp *sp, R0 *r0, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    pc += sizeof(uint64_t);
+    void * _Nullable error = NULL;
+    INLINE_CALL wasmkit_execute_i32OrSS(&sp, &r0, &pc, &md, &ms, state, &error);
+    return ((wasmkit_tc_exec)(*(void **)pc))(sp, r0, pc, md, ms, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32OrSR(Sp sp, R0 r0, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) void wasmkit_execute_i32OrSR(Sp *sp, R0 *r0, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    pc += sizeof(uint64_t);
+    void * _Nullable error = NULL;
+    INLINE_CALL wasmkit_execute_i32OrSR(&sp, &r0, &pc, &md, &ms, state, &error);
+    return ((wasmkit_tc_exec)(*(void **)pc))(sp, r0, pc, md, ms, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64OrSS(Sp sp, R0 r0, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) void wasmkit_execute_i64OrSS(Sp *sp, R0 *r0, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    pc += sizeof(uint64_t);
+    void * _Nullable error = NULL;
+    INLINE_CALL wasmkit_execute_i64OrSS(&sp, &r0, &pc, &md, &ms, state, &error);
+    return ((wasmkit_tc_exec)(*(void **)pc))(sp, r0, pc, md, ms, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64OrSR(Sp sp, R0 r0, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) void wasmkit_execute_i64OrSR(Sp *sp, R0 *r0, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    pc += sizeof(uint64_t);
+    void * _Nullable error = NULL;
+    INLINE_CALL wasmkit_execute_i64OrSR(&sp, &r0, &pc, &md, &ms, state, &error);
+    return ((wasmkit_tc_exec)(*(void **)pc))(sp, r0, pc, md, ms, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32XorSS(Sp sp, R0 r0, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) void wasmkit_execute_i32XorSS(Sp *sp, R0 *r0, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    pc += sizeof(uint64_t);
+    void * _Nullable error = NULL;
+    INLINE_CALL wasmkit_execute_i32XorSS(&sp, &r0, &pc, &md, &ms, state, &error);
+    return ((wasmkit_tc_exec)(*(void **)pc))(sp, r0, pc, md, ms, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32XorSR(Sp sp, R0 r0, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) void wasmkit_execute_i32XorSR(Sp *sp, R0 *r0, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    pc += sizeof(uint64_t);
+    void * _Nullable error = NULL;
+    INLINE_CALL wasmkit_execute_i32XorSR(&sp, &r0, &pc, &md, &ms, state, &error);
+    return ((wasmkit_tc_exec)(*(void **)pc))(sp, r0, pc, md, ms, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64XorSS(Sp sp, R0 r0, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) void wasmkit_execute_i64XorSS(Sp *sp, R0 *r0, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    pc += sizeof(uint64_t);
+    void * _Nullable error = NULL;
+    INLINE_CALL wasmkit_execute_i64XorSS(&sp, &r0, &pc, &md, &ms, state, &error);
+    return ((wasmkit_tc_exec)(*(void **)pc))(sp, r0, pc, md, ms, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64XorSR(Sp sp, R0 r0, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) void wasmkit_execute_i64XorSR(Sp *sp, R0 *r0, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    pc += sizeof(uint64_t);
+    void * _Nullable error = NULL;
+    INLINE_CALL wasmkit_execute_i64XorSR(&sp, &r0, &pc, &md, &ms, state, &error);
+    return ((wasmkit_tc_exec)(*(void **)pc))(sp, r0, pc, md, ms, state);
+}
 SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32Sub(Sp sp, R0 r0, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
     SWIFT_CC(swift) void wasmkit_execute_i32Sub(Sp *sp, R0 *r0, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
     pc += sizeof(uint64_t);
@@ -421,62 +533,6 @@ SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64Sub(Sp sp, R0 r0, Pc pc, M
     pc += sizeof(uint64_t);
     void * _Nullable error = NULL;
     INLINE_CALL wasmkit_execute_i64Sub(&sp, &r0, &pc, &md, &ms, state, &error);
-    return ((wasmkit_tc_exec)(*(void **)pc))(sp, r0, pc, md, ms, state);
-}
-SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32Mul(Sp sp, R0 r0, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
-    SWIFT_CC(swift) void wasmkit_execute_i32Mul(Sp *sp, R0 *r0, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
-    pc += sizeof(uint64_t);
-    void * _Nullable error = NULL;
-    INLINE_CALL wasmkit_execute_i32Mul(&sp, &r0, &pc, &md, &ms, state, &error);
-    return ((wasmkit_tc_exec)(*(void **)pc))(sp, r0, pc, md, ms, state);
-}
-SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64Mul(Sp sp, R0 r0, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
-    SWIFT_CC(swift) void wasmkit_execute_i64Mul(Sp *sp, R0 *r0, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
-    pc += sizeof(uint64_t);
-    void * _Nullable error = NULL;
-    INLINE_CALL wasmkit_execute_i64Mul(&sp, &r0, &pc, &md, &ms, state, &error);
-    return ((wasmkit_tc_exec)(*(void **)pc))(sp, r0, pc, md, ms, state);
-}
-SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32And(Sp sp, R0 r0, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
-    SWIFT_CC(swift) void wasmkit_execute_i32And(Sp *sp, R0 *r0, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
-    pc += sizeof(uint64_t);
-    void * _Nullable error = NULL;
-    INLINE_CALL wasmkit_execute_i32And(&sp, &r0, &pc, &md, &ms, state, &error);
-    return ((wasmkit_tc_exec)(*(void **)pc))(sp, r0, pc, md, ms, state);
-}
-SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64And(Sp sp, R0 r0, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
-    SWIFT_CC(swift) void wasmkit_execute_i64And(Sp *sp, R0 *r0, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
-    pc += sizeof(uint64_t);
-    void * _Nullable error = NULL;
-    INLINE_CALL wasmkit_execute_i64And(&sp, &r0, &pc, &md, &ms, state, &error);
-    return ((wasmkit_tc_exec)(*(void **)pc))(sp, r0, pc, md, ms, state);
-}
-SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32Or(Sp sp, R0 r0, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
-    SWIFT_CC(swift) void wasmkit_execute_i32Or(Sp *sp, R0 *r0, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
-    pc += sizeof(uint64_t);
-    void * _Nullable error = NULL;
-    INLINE_CALL wasmkit_execute_i32Or(&sp, &r0, &pc, &md, &ms, state, &error);
-    return ((wasmkit_tc_exec)(*(void **)pc))(sp, r0, pc, md, ms, state);
-}
-SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64Or(Sp sp, R0 r0, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
-    SWIFT_CC(swift) void wasmkit_execute_i64Or(Sp *sp, R0 *r0, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
-    pc += sizeof(uint64_t);
-    void * _Nullable error = NULL;
-    INLINE_CALL wasmkit_execute_i64Or(&sp, &r0, &pc, &md, &ms, state, &error);
-    return ((wasmkit_tc_exec)(*(void **)pc))(sp, r0, pc, md, ms, state);
-}
-SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32Xor(Sp sp, R0 r0, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
-    SWIFT_CC(swift) void wasmkit_execute_i32Xor(Sp *sp, R0 *r0, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
-    pc += sizeof(uint64_t);
-    void * _Nullable error = NULL;
-    INLINE_CALL wasmkit_execute_i32Xor(&sp, &r0, &pc, &md, &ms, state, &error);
-    return ((wasmkit_tc_exec)(*(void **)pc))(sp, r0, pc, md, ms, state);
-}
-SWIFT_CC(swiftasync) static inline void wasmkit_tc_i64Xor(Sp sp, R0 r0, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
-    SWIFT_CC(swift) void wasmkit_execute_i64Xor(Sp *sp, R0 *r0, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
-    pc += sizeof(uint64_t);
-    void * _Nullable error = NULL;
-    INLINE_CALL wasmkit_execute_i64Xor(&sp, &r0, &pc, &md, &ms, state, &error);
     return ((wasmkit_tc_exec)(*(void **)pc))(sp, r0, pc, md, ms, state);
 }
 SWIFT_CC(swiftasync) static inline void wasmkit_tc_i32Shl(Sp sp, R0 r0, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
@@ -1530,16 +1586,24 @@ static const uint64_t wasmkit_tc_exec_handlers[] = {
     (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i32AddSR),
     (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i64AddSS),
     (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i64AddSR),
+    (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i32MulSS),
+    (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i32MulSR),
+    (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i64MulSS),
+    (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i64MulSR),
+    (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i32AndSS),
+    (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i32AndSR),
+    (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i64AndSS),
+    (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i64AndSR),
+    (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i32OrSS),
+    (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i32OrSR),
+    (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i64OrSS),
+    (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i64OrSR),
+    (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i32XorSS),
+    (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i32XorSR),
+    (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i64XorSS),
+    (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i64XorSR),
     (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i32Sub),
     (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i64Sub),
-    (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i32Mul),
-    (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i64Mul),
-    (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i32And),
-    (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i64And),
-    (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i32Or),
-    (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i64Or),
-    (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i32Xor),
-    (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i64Xor),
     (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i32Shl),
     (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i64Shl),
     (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_i32ShrS),
