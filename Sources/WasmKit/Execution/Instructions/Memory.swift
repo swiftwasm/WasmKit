@@ -1,7 +1,6 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#memory-instructions>
 extension ExecutionState {
-    @_transparent
     mutating func memoryLoad<T: FixedWidthInteger>(
         sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand, loadAs _: T.Type = T.self, castToValue: (T) -> UntypedValue
     ) throws {
@@ -21,7 +20,6 @@ extension ExecutionState {
     }
 
     /// `[type].store[bitWidth]`
-    @_transparent
     mutating func memoryStore<T: FixedWidthInteger>(sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand, castFromValue: (UntypedValue) -> T) throws {
         let memarg = storeOperand.memarg
 
