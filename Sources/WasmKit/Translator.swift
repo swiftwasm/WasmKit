@@ -1427,14 +1427,21 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     mutating func visitLocalSetOrTee(localIndex: UInt32, isTee: Bool) throws {
         preserveLocalsOnStack(localIndex)
         let type = try locals.type(of: localIndex)
-        guard let value = try popVRegOperand(type) else { return }
+        guard let value = try popOperand(type) else { return }
         guard try controlStack.currentFrame().reachable else { return }
         let result = localReg(localIndex)
         if !isTee, iseqBuilder.relinkLastInstructionResult(result) {
             // Good news, copyStack is optimized out :)
             return
         }
-        emitCopyStack(from: value, to: result)
+        switch value {
+        case .vreg(let vReg):
+            emitCopyStack(from: vReg, to: result)
+        case .preg(let pReg, let valueType):
+            emitCopyPRegToStack(from: pReg, to: result, type: valueType)
+        case .local(let localIndex):
+            emitCopyStack(from: stackLayout.localReg(localIndex), to: result)
+        }
     }
     mutating func visitLocalSet(localIndex: UInt32) throws -> Output {
         try visitLocalSetOrTee(localIndex: localIndex, isTee: false)
