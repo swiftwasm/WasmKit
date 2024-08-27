@@ -164,30 +164,78 @@ extension ExecutionState {
             self.i64XorSS(sp: sp, r0: &r0, lhs: lhs, rhs: rhs)
         case .i64XorSR(let lhs):
             self.i64XorSR(sp: sp, r0: &r0, lhs: lhs)
-        case .i32Sub(let binaryOperand):
-            self.i32Sub(sp: sp, binaryOperand: binaryOperand)
-        case .i64Sub(let binaryOperand):
-            self.i64Sub(sp: sp, binaryOperand: binaryOperand)
-        case .i32Shl(let binaryOperand):
-            self.i32Shl(sp: sp, binaryOperand: binaryOperand)
-        case .i64Shl(let binaryOperand):
-            self.i64Shl(sp: sp, binaryOperand: binaryOperand)
-        case .i32ShrS(let binaryOperand):
-            self.i32ShrS(sp: sp, binaryOperand: binaryOperand)
-        case .i64ShrS(let binaryOperand):
-            self.i64ShrS(sp: sp, binaryOperand: binaryOperand)
-        case .i32ShrU(let binaryOperand):
-            self.i32ShrU(sp: sp, binaryOperand: binaryOperand)
-        case .i64ShrU(let binaryOperand):
-            self.i64ShrU(sp: sp, binaryOperand: binaryOperand)
-        case .i32Rotl(let binaryOperand):
-            self.i32Rotl(sp: sp, binaryOperand: binaryOperand)
-        case .i64Rotl(let binaryOperand):
-            self.i64Rotl(sp: sp, binaryOperand: binaryOperand)
-        case .i32Rotr(let binaryOperand):
-            self.i32Rotr(sp: sp, binaryOperand: binaryOperand)
-        case .i64Rotr(let binaryOperand):
-            self.i64Rotr(sp: sp, binaryOperand: binaryOperand)
+        case .i32SubSS(let lhs, let rhs):
+            self.i32SubSS(sp: sp, r0: &r0, lhs: lhs, rhs: rhs)
+        case .i32SubSR(let lhs):
+            self.i32SubSR(sp: sp, r0: &r0, lhs: lhs)
+        case .i32SubRS(let rhs):
+            self.i32SubRS(sp: sp, r0: &r0, rhs: rhs)
+        case .i64SubSS(let lhs, let rhs):
+            self.i64SubSS(sp: sp, r0: &r0, lhs: lhs, rhs: rhs)
+        case .i64SubSR(let lhs):
+            self.i64SubSR(sp: sp, r0: &r0, lhs: lhs)
+        case .i64SubRS(let rhs):
+            self.i64SubRS(sp: sp, r0: &r0, rhs: rhs)
+        case .i32ShlSS(let lhs, let rhs):
+            self.i32ShlSS(sp: sp, r0: &r0, lhs: lhs, rhs: rhs)
+        case .i32ShlSR(let lhs):
+            self.i32ShlSR(sp: sp, r0: &r0, lhs: lhs)
+        case .i32ShlRS(let rhs):
+            self.i32ShlRS(sp: sp, r0: &r0, rhs: rhs)
+        case .i64ShlSS(let lhs, let rhs):
+            self.i64ShlSS(sp: sp, r0: &r0, lhs: lhs, rhs: rhs)
+        case .i64ShlSR(let lhs):
+            self.i64ShlSR(sp: sp, r0: &r0, lhs: lhs)
+        case .i64ShlRS(let rhs):
+            self.i64ShlRS(sp: sp, r0: &r0, rhs: rhs)
+        case .i32ShrSSS(let lhs, let rhs):
+            self.i32ShrSSS(sp: sp, r0: &r0, lhs: lhs, rhs: rhs)
+        case .i32ShrSSR(let lhs):
+            self.i32ShrSSR(sp: sp, r0: &r0, lhs: lhs)
+        case .i32ShrSRS(let rhs):
+            self.i32ShrSRS(sp: sp, r0: &r0, rhs: rhs)
+        case .i64ShrSSS(let lhs, let rhs):
+            self.i64ShrSSS(sp: sp, r0: &r0, lhs: lhs, rhs: rhs)
+        case .i64ShrSSR(let lhs):
+            self.i64ShrSSR(sp: sp, r0: &r0, lhs: lhs)
+        case .i64ShrSRS(let rhs):
+            self.i64ShrSRS(sp: sp, r0: &r0, rhs: rhs)
+        case .i32ShrUSS(let lhs, let rhs):
+            self.i32ShrUSS(sp: sp, r0: &r0, lhs: lhs, rhs: rhs)
+        case .i32ShrUSR(let lhs):
+            self.i32ShrUSR(sp: sp, r0: &r0, lhs: lhs)
+        case .i32ShrURS(let rhs):
+            self.i32ShrURS(sp: sp, r0: &r0, rhs: rhs)
+        case .i64ShrUSS(let lhs, let rhs):
+            self.i64ShrUSS(sp: sp, r0: &r0, lhs: lhs, rhs: rhs)
+        case .i64ShrUSR(let lhs):
+            self.i64ShrUSR(sp: sp, r0: &r0, lhs: lhs)
+        case .i64ShrURS(let rhs):
+            self.i64ShrURS(sp: sp, r0: &r0, rhs: rhs)
+        case .i32RotlSS(let lhs, let rhs):
+            self.i32RotlSS(sp: sp, r0: &r0, lhs: lhs, rhs: rhs)
+        case .i32RotlSR(let lhs):
+            self.i32RotlSR(sp: sp, r0: &r0, lhs: lhs)
+        case .i32RotlRS(let rhs):
+            self.i32RotlRS(sp: sp, r0: &r0, rhs: rhs)
+        case .i64RotlSS(let lhs, let rhs):
+            self.i64RotlSS(sp: sp, r0: &r0, lhs: lhs, rhs: rhs)
+        case .i64RotlSR(let lhs):
+            self.i64RotlSR(sp: sp, r0: &r0, lhs: lhs)
+        case .i64RotlRS(let rhs):
+            self.i64RotlRS(sp: sp, r0: &r0, rhs: rhs)
+        case .i32RotrSS(let lhs, let rhs):
+            self.i32RotrSS(sp: sp, r0: &r0, lhs: lhs, rhs: rhs)
+        case .i32RotrSR(let lhs):
+            self.i32RotrSR(sp: sp, r0: &r0, lhs: lhs)
+        case .i32RotrRS(let rhs):
+            self.i32RotrRS(sp: sp, r0: &r0, rhs: rhs)
+        case .i64RotrSS(let lhs, let rhs):
+            self.i64RotrSS(sp: sp, r0: &r0, lhs: lhs, rhs: rhs)
+        case .i64RotrSR(let lhs):
+            self.i64RotrSR(sp: sp, r0: &r0, lhs: lhs)
+        case .i64RotrRS(let rhs):
+            self.i64RotrRS(sp: sp, r0: &r0, rhs: rhs)
         case .i32Eq(let binaryOperand):
             self.i32Eq(sp: sp, binaryOperand: binaryOperand)
         case .i64Eq(let binaryOperand):
@@ -379,18 +427,42 @@ extension Instruction {
         case .i32XorSR: return "i32XorSR"
         case .i64XorSS: return "i64XorSS"
         case .i64XorSR: return "i64XorSR"
-        case .i32Sub: return "i32Sub"
-        case .i64Sub: return "i64Sub"
-        case .i32Shl: return "i32Shl"
-        case .i64Shl: return "i64Shl"
-        case .i32ShrS: return "i32ShrS"
-        case .i64ShrS: return "i64ShrS"
-        case .i32ShrU: return "i32ShrU"
-        case .i64ShrU: return "i64ShrU"
-        case .i32Rotl: return "i32Rotl"
-        case .i64Rotl: return "i64Rotl"
-        case .i32Rotr: return "i32Rotr"
-        case .i64Rotr: return "i64Rotr"
+        case .i32SubSS: return "i32SubSS"
+        case .i32SubSR: return "i32SubSR"
+        case .i32SubRS: return "i32SubRS"
+        case .i64SubSS: return "i64SubSS"
+        case .i64SubSR: return "i64SubSR"
+        case .i64SubRS: return "i64SubRS"
+        case .i32ShlSS: return "i32ShlSS"
+        case .i32ShlSR: return "i32ShlSR"
+        case .i32ShlRS: return "i32ShlRS"
+        case .i64ShlSS: return "i64ShlSS"
+        case .i64ShlSR: return "i64ShlSR"
+        case .i64ShlRS: return "i64ShlRS"
+        case .i32ShrSSS: return "i32ShrSSS"
+        case .i32ShrSSR: return "i32ShrSSR"
+        case .i32ShrSRS: return "i32ShrSRS"
+        case .i64ShrSSS: return "i64ShrSSS"
+        case .i64ShrSSR: return "i64ShrSSR"
+        case .i64ShrSRS: return "i64ShrSRS"
+        case .i32ShrUSS: return "i32ShrUSS"
+        case .i32ShrUSR: return "i32ShrUSR"
+        case .i32ShrURS: return "i32ShrURS"
+        case .i64ShrUSS: return "i64ShrUSS"
+        case .i64ShrUSR: return "i64ShrUSR"
+        case .i64ShrURS: return "i64ShrURS"
+        case .i32RotlSS: return "i32RotlSS"
+        case .i32RotlSR: return "i32RotlSR"
+        case .i32RotlRS: return "i32RotlRS"
+        case .i64RotlSS: return "i64RotlSS"
+        case .i64RotlSR: return "i64RotlSR"
+        case .i64RotlRS: return "i64RotlRS"
+        case .i32RotrSS: return "i32RotrSS"
+        case .i32RotrSR: return "i32RotrSR"
+        case .i32RotrRS: return "i32RotrRS"
+        case .i64RotrSS: return "i64RotrSS"
+        case .i64RotrSR: return "i64RotrSR"
+        case .i64RotrRS: return "i64RotrRS"
         case .i32Eq: return "i32Eq"
         case .i64Eq: return "i64Eq"
         case .i32Ne: return "i32Ne"
@@ -471,42 +543,42 @@ extension ExecutionState {
     mutating func i32XorSR(sp: Sp, r0: inout R0, lhs: VReg) { writePReg(&r0, sp[lhs].i32.xor(readPRegI32(r0))) }
     mutating func i64XorSS(sp: Sp, r0: inout R0, lhs: VReg, rhs: VReg) { writePReg(&r0, sp[lhs].i64.xor(sp[rhs].i64)) }
     mutating func i64XorSR(sp: Sp, r0: inout R0, lhs: VReg) { writePReg(&r0, sp[lhs].i64.xor(readPRegI64(r0))) }
-    mutating func i32Sub(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.sub(sp[binaryOperand.rhs].i32).untyped
-    }
-    mutating func i64Sub(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.sub(sp[binaryOperand.rhs].i64).untyped
-    }
-    mutating func i32Shl(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.shl(sp[binaryOperand.rhs].i32).untyped
-    }
-    mutating func i64Shl(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.shl(sp[binaryOperand.rhs].i64).untyped
-    }
-    mutating func i32ShrS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.shrs(sp[binaryOperand.rhs].i32).untyped
-    }
-    mutating func i64ShrS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.shrs(sp[binaryOperand.rhs].i64).untyped
-    }
-    mutating func i32ShrU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.shru(sp[binaryOperand.rhs].i32).untyped
-    }
-    mutating func i64ShrU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.shru(sp[binaryOperand.rhs].i64).untyped
-    }
-    mutating func i32Rotl(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.rotl(sp[binaryOperand.rhs].i32).untyped
-    }
-    mutating func i64Rotl(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.rotl(sp[binaryOperand.rhs].i64).untyped
-    }
-    mutating func i32Rotr(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.rotr(sp[binaryOperand.rhs].i32).untyped
-    }
-    mutating func i64Rotr(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.rotr(sp[binaryOperand.rhs].i64).untyped
-    }
+    mutating func i32SubSS(sp: Sp, r0: inout R0, lhs: VReg, rhs: VReg) { writePReg(&r0, sp[lhs].i32.sub(sp[rhs].i32)) }
+    mutating func i32SubSR(sp: Sp, r0: inout R0, lhs: VReg) { writePReg(&r0, sp[lhs].i32.sub(readPRegI32(r0))) }
+    mutating func i32SubRS(sp: Sp, r0: inout R0, rhs: VReg) { writePReg(&r0, readPRegI32(r0).sub(sp[rhs].i32)) }
+    mutating func i64SubSS(sp: Sp, r0: inout R0, lhs: VReg, rhs: VReg) { writePReg(&r0, sp[lhs].i64.sub(sp[rhs].i64)) }
+    mutating func i64SubSR(sp: Sp, r0: inout R0, lhs: VReg) { writePReg(&r0, sp[lhs].i64.sub(readPRegI64(r0))) }
+    mutating func i64SubRS(sp: Sp, r0: inout R0, rhs: VReg) { writePReg(&r0, readPRegI64(r0).sub(sp[rhs].i64)) }
+    mutating func i32ShlSS(sp: Sp, r0: inout R0, lhs: VReg, rhs: VReg) { writePReg(&r0, sp[lhs].i32.shl(sp[rhs].i32)) }
+    mutating func i32ShlSR(sp: Sp, r0: inout R0, lhs: VReg) { writePReg(&r0, sp[lhs].i32.shl(readPRegI32(r0))) }
+    mutating func i32ShlRS(sp: Sp, r0: inout R0, rhs: VReg) { writePReg(&r0, readPRegI32(r0).shl(sp[rhs].i32)) }
+    mutating func i64ShlSS(sp: Sp, r0: inout R0, lhs: VReg, rhs: VReg) { writePReg(&r0, sp[lhs].i64.shl(sp[rhs].i64)) }
+    mutating func i64ShlSR(sp: Sp, r0: inout R0, lhs: VReg) { writePReg(&r0, sp[lhs].i64.shl(readPRegI64(r0))) }
+    mutating func i64ShlRS(sp: Sp, r0: inout R0, rhs: VReg) { writePReg(&r0, readPRegI64(r0).shl(sp[rhs].i64)) }
+    mutating func i32ShrSSS(sp: Sp, r0: inout R0, lhs: VReg, rhs: VReg) { writePReg(&r0, sp[lhs].i32.shrs(sp[rhs].i32)) }
+    mutating func i32ShrSSR(sp: Sp, r0: inout R0, lhs: VReg) { writePReg(&r0, sp[lhs].i32.shrs(readPRegI32(r0))) }
+    mutating func i32ShrSRS(sp: Sp, r0: inout R0, rhs: VReg) { writePReg(&r0, readPRegI32(r0).shrs(sp[rhs].i32)) }
+    mutating func i64ShrSSS(sp: Sp, r0: inout R0, lhs: VReg, rhs: VReg) { writePReg(&r0, sp[lhs].i64.shrs(sp[rhs].i64)) }
+    mutating func i64ShrSSR(sp: Sp, r0: inout R0, lhs: VReg) { writePReg(&r0, sp[lhs].i64.shrs(readPRegI64(r0))) }
+    mutating func i64ShrSRS(sp: Sp, r0: inout R0, rhs: VReg) { writePReg(&r0, readPRegI64(r0).shrs(sp[rhs].i64)) }
+    mutating func i32ShrUSS(sp: Sp, r0: inout R0, lhs: VReg, rhs: VReg) { writePReg(&r0, sp[lhs].i32.shru(sp[rhs].i32)) }
+    mutating func i32ShrUSR(sp: Sp, r0: inout R0, lhs: VReg) { writePReg(&r0, sp[lhs].i32.shru(readPRegI32(r0))) }
+    mutating func i32ShrURS(sp: Sp, r0: inout R0, rhs: VReg) { writePReg(&r0, readPRegI32(r0).shru(sp[rhs].i32)) }
+    mutating func i64ShrUSS(sp: Sp, r0: inout R0, lhs: VReg, rhs: VReg) { writePReg(&r0, sp[lhs].i64.shru(sp[rhs].i64)) }
+    mutating func i64ShrUSR(sp: Sp, r0: inout R0, lhs: VReg) { writePReg(&r0, sp[lhs].i64.shru(readPRegI64(r0))) }
+    mutating func i64ShrURS(sp: Sp, r0: inout R0, rhs: VReg) { writePReg(&r0, readPRegI64(r0).shru(sp[rhs].i64)) }
+    mutating func i32RotlSS(sp: Sp, r0: inout R0, lhs: VReg, rhs: VReg) { writePReg(&r0, sp[lhs].i32.rotl(sp[rhs].i32)) }
+    mutating func i32RotlSR(sp: Sp, r0: inout R0, lhs: VReg) { writePReg(&r0, sp[lhs].i32.rotl(readPRegI32(r0))) }
+    mutating func i32RotlRS(sp: Sp, r0: inout R0, rhs: VReg) { writePReg(&r0, readPRegI32(r0).rotl(sp[rhs].i32)) }
+    mutating func i64RotlSS(sp: Sp, r0: inout R0, lhs: VReg, rhs: VReg) { writePReg(&r0, sp[lhs].i64.rotl(sp[rhs].i64)) }
+    mutating func i64RotlSR(sp: Sp, r0: inout R0, lhs: VReg) { writePReg(&r0, sp[lhs].i64.rotl(readPRegI64(r0))) }
+    mutating func i64RotlRS(sp: Sp, r0: inout R0, rhs: VReg) { writePReg(&r0, readPRegI64(r0).rotl(sp[rhs].i64)) }
+    mutating func i32RotrSS(sp: Sp, r0: inout R0, lhs: VReg, rhs: VReg) { writePReg(&r0, sp[lhs].i32.rotr(sp[rhs].i32)) }
+    mutating func i32RotrSR(sp: Sp, r0: inout R0, lhs: VReg) { writePReg(&r0, sp[lhs].i32.rotr(readPRegI32(r0))) }
+    mutating func i32RotrRS(sp: Sp, r0: inout R0, rhs: VReg) { writePReg(&r0, readPRegI32(r0).rotr(sp[rhs].i32)) }
+    mutating func i64RotrSS(sp: Sp, r0: inout R0, lhs: VReg, rhs: VReg) { writePReg(&r0, sp[lhs].i64.rotr(sp[rhs].i64)) }
+    mutating func i64RotrSR(sp: Sp, r0: inout R0, lhs: VReg) { writePReg(&r0, sp[lhs].i64.rotr(readPRegI64(r0))) }
+    mutating func i64RotrRS(sp: Sp, r0: inout R0, rhs: VReg) { writePReg(&r0, readPRegI64(r0).rotr(sp[rhs].i64)) }
     mutating func i32Eq(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.eq(sp[binaryOperand.rhs].i32).untyped
     }

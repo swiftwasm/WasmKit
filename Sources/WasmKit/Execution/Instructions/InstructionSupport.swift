@@ -214,6 +214,11 @@ extension Instruction {
         let ss: (VReg, VReg) -> Instruction
         let sr: (VReg) -> Instruction
     }
+    struct NonCommutative {
+        let ss: (VReg, VReg) -> Instruction
+        let sr: (VReg) -> Instruction
+        let rs: (VReg) -> Instruction
+    }
 
     static func f32Lt(_ op: BinaryOperand) -> Instruction { .numericFloatBinary(.lt(.f32), op) }
     static func f32Gt(_ op: BinaryOperand) -> Instruction { .numericFloatBinary(.gt(.f32), op) }
@@ -372,8 +377,8 @@ struct InstructionPrintingContext {
             target.write("\(reg(op.dest)) = copy \(reg(op.source))")
         case .i32AddSS(let lhs, let rhs):
             target.write("r0 = i32.add_ss \(reg(lhs)), \(reg(rhs))")
-        case .i32Sub(let op):
-            target.write("\(reg(op.result)) = i32.sub \(reg(op.lhs)), \(reg(op.rhs))")
+        case .i32SubSS(let lhs, let rhs):
+            target.write("r0 = i32.sub \(reg(lhs)), \(reg(rhs))")
         case .i32LtU(let op):
             target.write("\(reg(op.result)) = i32.lt_u \(reg(op.lhs)), \(reg(op.rhs))")
         case .i32Eq(let op):

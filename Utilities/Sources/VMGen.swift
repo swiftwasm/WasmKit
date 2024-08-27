@@ -206,12 +206,11 @@ enum VMGen {
         ].flatMap { op -> [BinOpInfo] in
             intValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: $0, isCommutative: true, useFastPath: true) }
         }
-        // Others
+        // Non-commutative
         results += [
-            "Sub",
-            "Shl", "ShrS", "ShrU", "Rotl", "Rotr",
+            "Sub", "Shl", "ShrS", "ShrU", "Rotl", "Rotr",
         ].flatMap { op -> [BinOpInfo] in
-            intValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: $0) }
+            intValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: $0, isCommutative: false, useFastPath: true) }
         }
 
         // (T, T) -> i32 for all T in int types
@@ -680,6 +679,12 @@ enum VMGen {
                 output += "    static let \(binOp.name) = Commutative("
                 output += "ss: \(binOp.instruction(lhs: .stack, rhs: .stack).name), "
                 output += "sr: \(binOp.instruction(lhs: .stack, rhs: .register).name)"
+                output += ")\n"
+            } else {
+                output += "    static let \(binOp.name) = NonCommutative("
+                output += "ss: \(binOp.instruction(lhs: .stack, rhs: .stack).name), "
+                output += "sr: \(binOp.instruction(lhs: .stack, rhs: .register).name), "
+                output += "rs: \(binOp.instruction(lhs: .register, rhs: .stack).name)"
                 output += ")\n"
             }
         }
