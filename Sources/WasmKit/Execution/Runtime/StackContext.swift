@@ -2,7 +2,6 @@
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#stack>
 struct StackContext {
 
-    var reachedEndOfExecution: Bool = false
     private var limit: UInt16 { UInt16.max }
     private var stackEnd: UnsafeMutablePointer<UntypedValue>
     private var frames: FixedSizeStack<Frame>

@@ -142,6 +142,8 @@ extension ExecutionState {
         }
     }
 
+    struct EndOfExecution: Error {}
+
     @inline(never)
     mutating func execute(
         sp: Sp, pc: Pc,
@@ -157,7 +159,11 @@ extension ExecutionState {
             ),
             sp: sp, pc: pc, md: &md, ms: &ms
         )
-        try run(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        do {
+            try run(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        } catch is EndOfExecution {
+            return
+        }
     }
 
     /// The main execution loop. Be careful when modifying this function as it is performance-critical.
@@ -172,15 +178,14 @@ extension ExecutionState {
             }
         }
 #endif
-        while !reachedEndOfExecution {
-            var inst: Instruction
-            repeat {
-                inst = pc.pointee
+        var inst: Instruction
+        while true {
+            inst = pc.pointee
 #if WASMKIT_ENGINE_STATS
-                stats[inst.name, default: 0] += 1
+            stats[inst.name, default: 0] += 1
 #endif
             // `doExecute` returns false when current frame *may* be updated
-            } while try doExecute(inst, sp: &sp, pc: &pc, md: &md, ms: &ms)
+            _ = try doExecute(inst, sp: &sp, pc: &pc, md: &md, ms: &ms)
         }
     }
 }
