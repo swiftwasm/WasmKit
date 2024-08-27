@@ -1669,6 +1669,30 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
         valueStack.pushPReg(.r0, type: result)
     }
+    private mutating func visitBinary(
+        _ operand: ValueType,
+        _ result: ValueType,
+        _ nonCommutative: Instruction.NonCommutative
+    ) throws {
+        let rhs = try popOperand(operand)?.intoOperandSource(stackLayout)
+        let lhs = try popOperand(operand)?.intoOperandSource(stackLayout)
+        if let lhs = lhs, let rhs = rhs {
+            let instruction: Instruction
+            switch (lhs, rhs) {
+            case (.vreg(let lhs), .vreg(let rhs)):
+                preservePReg(.r0)
+                instruction = nonCommutative.ss(Instruction.BinaryOperandSS(lhs: LVReg(lhs), rhs: LVReg(rhs)))
+            case (.vreg(let vreg), .preg):
+                instruction = nonCommutative.sr(Instruction.BinaryOperandSR(vreg))
+            case (.preg, .vreg(let vreg)):
+                instruction = nonCommutative.rs(Instruction.BinaryOperandRS(vreg))
+            case (.preg, .preg):
+                fatalError()
+            }
+            emit(instruction)
+        }
+        valueStack.pushPReg(.r0, type: result)
+    }
     private mutating func visitCmp(_ operand: ValueType, _ instruction: @escaping (Instruction.BinaryOperand) -> Instruction) throws {
         try visitBinary(operand, .i32, instruction)
     }

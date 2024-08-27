@@ -63,7 +63,7 @@ func writePReg<T: FixedWidthInteger>(_ result: inout R0, _ value: T) {
 }
 
 func readPRegI32(_ source: R0) -> UInt32 {
-    return UInt32(source)
+    return UInt32(source & 0xffffffff)
 }
 func readPRegI64(_ source: R0) -> UInt64 {
     return UInt64(source)

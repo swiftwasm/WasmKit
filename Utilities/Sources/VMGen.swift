@@ -213,12 +213,11 @@ enum VMGen {
         ].flatMap { op -> [BinOpInfo] in
             intValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: $0, isCommutative: true, useFastPath: true) }
         }
-        // Others
+        // Non-commutative
         results += [
-            "Sub",
-            "Shl", "ShrS", "ShrU", "Rotl", "Rotr",
+            "Sub", "Shl", "ShrS", "ShrU", "Rotl", "Rotr",
         ].flatMap { op -> [BinOpInfo] in
-            intValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: $0) }
+            intValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: $0, isCommutative: false, useFastPath: true) }
         }
         results += [
             "DivS", "DivU", "RemS", "RemU",
@@ -549,7 +548,7 @@ enum VMGen {
                     let result = op.resultType.selectExecParam().label
                     let immediate = inst.immediate!.label
                     output += """
-                    writePReg(&\(result), \(operand("\(immediate).lhs", lhs, op.lhsType)).\(op.op.lowercased())(\(operand("\(immediate).rhs", rhs, op.rhsType))))
+                    writePReg(&\(result), \(operand("\(immediate).lhs", lhs, op.lhsType)).\(camelCase(pascalCase: op.op))(\(operand("\(immediate).rhs", rhs, op.rhsType))))
                     """
                     output += " }"
                 }
@@ -782,6 +781,12 @@ enum VMGen {
                 output += "    static let \(binOp.name) = Commutative("
                 output += "ss: \(binOp.instruction(lhs: .stack, rhs: .stack).name), "
                 output += "sr: \(binOp.instruction(lhs: .stack, rhs: .register).name)"
+                output += ")\n"
+            } else {
+                output += "    static let \(binOp.name) = NonCommutative("
+                output += "ss: \(binOp.instruction(lhs: .stack, rhs: .stack).name), "
+                output += "sr: \(binOp.instruction(lhs: .stack, rhs: .register).name), "
+                output += "rs: \(binOp.instruction(lhs: .register, rhs: .stack).name)"
                 output += ")\n"
             }
         }
