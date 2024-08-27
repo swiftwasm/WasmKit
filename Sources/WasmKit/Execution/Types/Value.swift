@@ -491,24 +491,24 @@ extension FixedWidthInteger {
 }
 
 extension RawUnsignedInteger {
-    func ltS(_ other: Self) -> UInt32 { self.signed < other.signed ? 1 : 0 }
-    func ltU(_ other: Self) -> UInt32 { self < other ? 1 : 0 }
-    func gtS(_ other: Self) -> UInt32 { self.signed > other.signed ? 1 : 0 }
-    func gtU(_ other: Self) -> UInt32 { self > other ? 1 : 0 }
-    func leS(_ other: Self) -> UInt32 { self.signed <= other.signed ? 1 : 0 }
-    func leU(_ other: Self) -> UInt32 { self <= other ? 1 : 0 }
-    func geS(_ other: Self) -> UInt32 { self.signed >= other.signed ? 1 : 0 }
-    func geU(_ other: Self) -> UInt32 { self >= other ? 1 : 0 }
+    func lts(_ other: Self) -> UInt32 { self.signed < other.signed ? 1 : 0 }
+    func ltu(_ other: Self) -> UInt32 { self < other ? 1 : 0 }
+    func gts(_ other: Self) -> UInt32 { self.signed > other.signed ? 1 : 0 }
+    func gtu(_ other: Self) -> UInt32 { self > other ? 1 : 0 }
+    func les(_ other: Self) -> UInt32 { self.signed <= other.signed ? 1 : 0 }
+    func leu(_ other: Self) -> UInt32 { self <= other ? 1 : 0 }
+    func ges(_ other: Self) -> UInt32 { self.signed >= other.signed ? 1 : 0 }
+    func geu(_ other: Self) -> UInt32 { self >= other ? 1 : 0 }
 
     func shl(_ other: Self) -> Self {
         let shift = other % Self(Self.bitWidth)
         return self << shift
     }
-    func shrS(_ other: Self) -> Self {
+    func shrs(_ other: Self) -> Self {
         let shift = other.signed % Self.Signed(Self.bitWidth)
         return (self.signed >> shift.unsigned).unsigned
     }
-    func shrU(_ other: Self) -> Self {
+    func shru(_ other: Self) -> Self {
         let shift = other % Self(Self.bitWidth)
         return self >> shift
     }
@@ -522,36 +522,6 @@ extension RawUnsignedInteger {
     }
 }
 
-extension UInt32 {
-    var extendI32S: UInt64 {
-        return UInt64(bitPattern: Int64(signed))
-    }
-    var extendI32U: UInt64 {
-        return UInt64(self)
-    }
-}
-
-extension RawUnsignedInteger {
-    var extend8S: Self {
-        return Self(bitPattern: Self.Signed(Int8(truncatingIfNeeded: self)))
-    }
-    var extend16S: Self {
-        return Self(bitPattern: Self.Signed(Int16(truncatingIfNeeded: self)))
-    }
-}
-
-extension UInt64 {
-    var extend32S: UInt64 {
-        return UInt64(bitPattern: Int64(Int32(truncatingIfNeeded: self)))
-    }
-}
-
-extension UInt64 {
-    var wrap: UInt32 {
-        return UInt32(truncatingIfNeeded: self)
-    }
-}
-
 extension FloatingPoint {
     func add(_ other: Self) -> Self { self + other }
     func sub(_ other: Self) -> Self { self - other }
@@ -559,65 +529,6 @@ extension FloatingPoint {
     func div(_ other: Self) -> Self { self / other }
     func eq(_ other: Self) -> UInt32 { self == other ? 1 : 0 }
     func ne(_ other: Self) -> UInt32 { self == other ? 0 : 1 }
-}
-
-extension FloatingPoint {
-    @inline(__always)
-    fileprivate func truncTo<T: FixedWidthInteger>(
-        rounding: (Self) -> T,
-        max: Self, min: Self
-    ) throws -> T {
-        guard !self.isNaN else { throw Trap.invalidConversionToInteger }
-        if self <= min || self >= max {
-            throw Trap.integerOverflowed
-        }
-        return rounding(self)
-    }
-}
-
-extension Float32 {
-    var truncToI32S: UInt32 {
-        get throws {
-            return try truncTo(rounding: { Int32($0).unsigned }, max: 2147483648.0, min: -2147483904.0)
-        }
-    }
-    var truncToI64S: UInt64 {
-        get throws {
-            return try truncTo(rounding: { Int64($0).unsigned }, max: 9223372036854775808.0, min: -9223373136366403584.0)
-        }
-    }
-    var truncToI32U: UInt32 {
-        get throws {
-            return try truncTo(rounding: { UInt32($0) }, max: 4294967296.0, min: -1.0)
-        }
-    }
-    var truncToI64U: UInt64 {
-        get throws {
-            return try truncTo(rounding: { UInt64($0) }, max: 18446744073709551616.0, min: -1.0)
-        }
-    }
-}
-extension Float64 {
-    var truncToI32S: UInt32 {
-        get throws {
-            return try truncTo(rounding: { Int32($0).unsigned }, max: 2147483648.0, min: -2147483649.0)
-        }
-    }
-    var truncToI64S: UInt64 {
-        get throws {
-            return try truncTo(rounding: { Int64($0).unsigned }, max: 9223372036854775808.0, min: -9223372036854777856.0)
-        }
-    }
-    var truncToI32U: UInt32 {
-        get throws {
-            return try truncTo(rounding: { UInt32($0) }, max: 4294967296.0, min: -1.0)
-        }
-    }
-    var truncToI64U: UInt64 {
-        get throws {
-            return try truncTo(rounding: { UInt64($0) }, max: 18446744073709551616.0, min: -1.0)
-        }
-    }
 }
 
 extension UInt32 {

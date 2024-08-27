@@ -216,38 +216,6 @@ extension ExecutionState {
             self.i32Eqz(sp: sp, unaryOperand: unaryOperand)
         case .i64Eqz(let unaryOperand):
             self.i64Eqz(sp: sp, unaryOperand: unaryOperand)
-        case .i32WrapI64(let unaryOperand):
-            self.i32WrapI64(sp: sp, unaryOperand: unaryOperand)
-        case .i64ExtendI32S(let unaryOperand):
-            self.i64ExtendI32S(sp: sp, unaryOperand: unaryOperand)
-        case .i64ExtendI32U(let unaryOperand):
-            self.i64ExtendI32U(sp: sp, unaryOperand: unaryOperand)
-        case .i32Extend8S(let unaryOperand):
-            self.i32Extend8S(sp: sp, unaryOperand: unaryOperand)
-        case .i64Extend8S(let unaryOperand):
-            self.i64Extend8S(sp: sp, unaryOperand: unaryOperand)
-        case .i32Extend16S(let unaryOperand):
-            self.i32Extend16S(sp: sp, unaryOperand: unaryOperand)
-        case .i64Extend16S(let unaryOperand):
-            self.i64Extend16S(sp: sp, unaryOperand: unaryOperand)
-        case .i64Extend32S(let unaryOperand):
-            self.i64Extend32S(sp: sp, unaryOperand: unaryOperand)
-        case .i32TruncF32S(let unaryOperand):
-            try self.i32TruncF32S(sp: sp, unaryOperand: unaryOperand)
-        case .i32TruncF32U(let unaryOperand):
-            try self.i32TruncF32U(sp: sp, unaryOperand: unaryOperand)
-        case .i32TruncF64S(let unaryOperand):
-            try self.i32TruncF64S(sp: sp, unaryOperand: unaryOperand)
-        case .i32TruncF64U(let unaryOperand):
-            try self.i32TruncF64U(sp: sp, unaryOperand: unaryOperand)
-        case .i64TruncF32S(let unaryOperand):
-            try self.i64TruncF32S(sp: sp, unaryOperand: unaryOperand)
-        case .i64TruncF32U(let unaryOperand):
-            try self.i64TruncF32U(sp: sp, unaryOperand: unaryOperand)
-        case .i64TruncF64S(let unaryOperand):
-            try self.i64TruncF64S(sp: sp, unaryOperand: unaryOperand)
-        case .i64TruncF64U(let unaryOperand):
-            try self.i64TruncF64U(sp: sp, unaryOperand: unaryOperand)
         case .f32Add(let binaryOperand):
             self.f32Add(sp: sp, binaryOperand: binaryOperand)
         case .f64Add(let binaryOperand):
@@ -409,22 +377,6 @@ extension Instruction {
         case .i64Popcnt: return "i64Popcnt"
         case .i32Eqz: return "i32Eqz"
         case .i64Eqz: return "i64Eqz"
-        case .i32WrapI64: return "i32WrapI64"
-        case .i64ExtendI32S: return "i64ExtendI32S"
-        case .i64ExtendI32U: return "i64ExtendI32U"
-        case .i32Extend8S: return "i32Extend8S"
-        case .i64Extend8S: return "i64Extend8S"
-        case .i32Extend16S: return "i32Extend16S"
-        case .i64Extend16S: return "i64Extend16S"
-        case .i64Extend32S: return "i64Extend32S"
-        case .i32TruncF32S: return "i32TruncF32S"
-        case .i32TruncF32U: return "i32TruncF32U"
-        case .i32TruncF64S: return "i32TruncF64S"
-        case .i32TruncF64U: return "i32TruncF64U"
-        case .i64TruncF32S: return "i64TruncF32S"
-        case .i64TruncF32U: return "i64TruncF32U"
-        case .i64TruncF64S: return "i64TruncF64S"
-        case .i64TruncF64U: return "i64TruncF64U"
         case .f32Add: return "f32Add"
         case .f64Add: return "f64Add"
         case .f32Sub: return "f32Sub"
@@ -500,16 +452,16 @@ extension ExecutionState {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.shl(sp[binaryOperand.rhs].i64).untyped
     }
     mutating func i32ShrS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.shrS(sp[binaryOperand.rhs].i32).untyped
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.shrs(sp[binaryOperand.rhs].i32).untyped
     }
     mutating func i64ShrS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.shrS(sp[binaryOperand.rhs].i64).untyped
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.shrs(sp[binaryOperand.rhs].i64).untyped
     }
     mutating func i32ShrU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.shrU(sp[binaryOperand.rhs].i32).untyped
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.shru(sp[binaryOperand.rhs].i32).untyped
     }
     mutating func i64ShrU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.shrU(sp[binaryOperand.rhs].i64).untyped
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.shru(sp[binaryOperand.rhs].i64).untyped
     }
     mutating func i32Rotl(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.rotl(sp[binaryOperand.rhs].i32).untyped
@@ -536,52 +488,52 @@ extension ExecutionState {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.ne(sp[binaryOperand.rhs].i64).untyped
     }
     mutating func i32LtS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.ltS(sp[binaryOperand.rhs].i32).untyped
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.lts(sp[binaryOperand.rhs].i32).untyped
     }
     mutating func i64LtS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.ltS(sp[binaryOperand.rhs].i64).untyped
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.lts(sp[binaryOperand.rhs].i64).untyped
     }
     mutating func i32LtU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.ltU(sp[binaryOperand.rhs].i32).untyped
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.ltu(sp[binaryOperand.rhs].i32).untyped
     }
     mutating func i64LtU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.ltU(sp[binaryOperand.rhs].i64).untyped
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.ltu(sp[binaryOperand.rhs].i64).untyped
     }
     mutating func i32GtS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.gtS(sp[binaryOperand.rhs].i32).untyped
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.gts(sp[binaryOperand.rhs].i32).untyped
     }
     mutating func i64GtS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.gtS(sp[binaryOperand.rhs].i64).untyped
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.gts(sp[binaryOperand.rhs].i64).untyped
     }
     mutating func i32GtU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.gtU(sp[binaryOperand.rhs].i32).untyped
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.gtu(sp[binaryOperand.rhs].i32).untyped
     }
     mutating func i64GtU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.gtU(sp[binaryOperand.rhs].i64).untyped
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.gtu(sp[binaryOperand.rhs].i64).untyped
     }
     mutating func i32LeS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.leS(sp[binaryOperand.rhs].i32).untyped
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.les(sp[binaryOperand.rhs].i32).untyped
     }
     mutating func i64LeS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.leS(sp[binaryOperand.rhs].i64).untyped
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.les(sp[binaryOperand.rhs].i64).untyped
     }
     mutating func i32LeU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.leU(sp[binaryOperand.rhs].i32).untyped
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.leu(sp[binaryOperand.rhs].i32).untyped
     }
     mutating func i64LeU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.leU(sp[binaryOperand.rhs].i64).untyped
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.leu(sp[binaryOperand.rhs].i64).untyped
     }
     mutating func i32GeS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.geS(sp[binaryOperand.rhs].i32).untyped
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.ges(sp[binaryOperand.rhs].i32).untyped
     }
     mutating func i64GeS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.geS(sp[binaryOperand.rhs].i64).untyped
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.ges(sp[binaryOperand.rhs].i64).untyped
     }
     mutating func i32GeU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.geU(sp[binaryOperand.rhs].i32).untyped
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.geu(sp[binaryOperand.rhs].i32).untyped
     }
     mutating func i64GeU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.geU(sp[binaryOperand.rhs].i64).untyped
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.geu(sp[binaryOperand.rhs].i64).untyped
     }
     mutating func f32Add(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.add(sp[binaryOperand.rhs].f32).untyped
@@ -642,54 +594,6 @@ extension ExecutionState {
     }
     mutating func i64Eqz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
         sp[unaryOperand.result] = sp[unaryOperand.input].i64.eqz.untyped
-    }
-    mutating func i32WrapI64(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i64.wrap.untyped
-    }
-    mutating func i64ExtendI32S(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i32.extendI32S.untyped
-    }
-    mutating func i64ExtendI32U(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i32.extendI32U.untyped
-    }
-    mutating func i32Extend8S(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i32.extend8S.untyped
-    }
-    mutating func i64Extend8S(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i64.extend8S.untyped
-    }
-    mutating func i32Extend16S(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i32.extend16S.untyped
-    }
-    mutating func i64Extend16S(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i64.extend16S.untyped
-    }
-    mutating func i64Extend32S(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i64.extend32S.untyped
-    }
-    mutating func i32TruncF32S(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
-        sp[unaryOperand.result] = try sp[unaryOperand.input].f32.truncToI32S.untyped
-    }
-    mutating func i32TruncF32U(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
-        sp[unaryOperand.result] = try sp[unaryOperand.input].f32.truncToI32U.untyped
-    }
-    mutating func i32TruncF64S(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
-        sp[unaryOperand.result] = try sp[unaryOperand.input].f64.truncToI32S.untyped
-    }
-    mutating func i32TruncF64U(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
-        sp[unaryOperand.result] = try sp[unaryOperand.input].f64.truncToI32U.untyped
-    }
-    mutating func i64TruncF32S(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
-        sp[unaryOperand.result] = try sp[unaryOperand.input].f32.truncToI64S.untyped
-    }
-    mutating func i64TruncF32U(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
-        sp[unaryOperand.result] = try sp[unaryOperand.input].f32.truncToI64U.untyped
-    }
-    mutating func i64TruncF64S(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
-        sp[unaryOperand.result] = try sp[unaryOperand.input].f64.truncToI64S.untyped
-    }
-    mutating func i64TruncF64U(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
-        sp[unaryOperand.result] = try sp[unaryOperand.input].f64.truncToI64U.untyped
     }
     mutating func i32Load(sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
         try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt32.self, castToValue: { .i32($0) })
