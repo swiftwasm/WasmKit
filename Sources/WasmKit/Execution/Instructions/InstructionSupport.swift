@@ -500,6 +500,17 @@ extension Instruction {
             self.lhs = LLVReg(lhs)
         }
     }
+    struct BinaryOperandRS: Equatable, InstructionImmediate {
+        let rhs: LLVReg
+        init(_ rhs: VReg) {
+            self.rhs = LLVReg(rhs)
+        }
+    }
+    struct NonCommutative {
+        let ss: (BinaryOperandSS) -> Instruction
+        let sr: (BinaryOperandSR) -> Instruction
+        let rs: (BinaryOperandRS) -> Instruction
+    }
 
     struct Commutative {
         let ss: (BinaryOperandSS) -> Instruction
@@ -576,8 +587,8 @@ struct InstructionPrintingContext {
 //            target.write("\(reg(op.dest)) = copy \(reg(op.source))")
 //        case .i32Add(let op):
 //            target.write("\(reg(op.result)) = i32.add \(reg(op.lhs)), \(reg(op.rhs))")
-        case .i32Sub(let op):
-            target.write("\(reg(op.result)) = i32.sub \(reg(op.lhs)), \(reg(op.rhs))")
+//        case .i32Sub(let op):
+//            target.write("\(reg(op.result)) = i32.sub \(reg(op.lhs)), \(reg(op.rhs))")
         case .i32LtU(let op):
             target.write("\(reg(op.result)) = i32.lt_u \(reg(op.lhs)), \(reg(op.rhs))")
         case .i32Eq(let op):

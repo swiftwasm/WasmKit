@@ -69,18 +69,42 @@ enum Instruction: Equatable {
     case i32XorSR(Instruction.BinaryOperandSR)
     case i64XorSS(Instruction.BinaryOperandSS)
     case i64XorSR(Instruction.BinaryOperandSR)
-    case i32Sub(Instruction.BinaryOperand)
-    case i64Sub(Instruction.BinaryOperand)
-    case i32Shl(Instruction.BinaryOperand)
-    case i64Shl(Instruction.BinaryOperand)
-    case i32ShrS(Instruction.BinaryOperand)
-    case i64ShrS(Instruction.BinaryOperand)
-    case i32ShrU(Instruction.BinaryOperand)
-    case i64ShrU(Instruction.BinaryOperand)
-    case i32Rotl(Instruction.BinaryOperand)
-    case i64Rotl(Instruction.BinaryOperand)
-    case i32Rotr(Instruction.BinaryOperand)
-    case i64Rotr(Instruction.BinaryOperand)
+    case i32SubSS(Instruction.BinaryOperandSS)
+    case i32SubSR(Instruction.BinaryOperandSR)
+    case i32SubRS(Instruction.BinaryOperandRS)
+    case i64SubSS(Instruction.BinaryOperandSS)
+    case i64SubSR(Instruction.BinaryOperandSR)
+    case i64SubRS(Instruction.BinaryOperandRS)
+    case i32ShlSS(Instruction.BinaryOperandSS)
+    case i32ShlSR(Instruction.BinaryOperandSR)
+    case i32ShlRS(Instruction.BinaryOperandRS)
+    case i64ShlSS(Instruction.BinaryOperandSS)
+    case i64ShlSR(Instruction.BinaryOperandSR)
+    case i64ShlRS(Instruction.BinaryOperandRS)
+    case i32ShrSSS(Instruction.BinaryOperandSS)
+    case i32ShrSSR(Instruction.BinaryOperandSR)
+    case i32ShrSRS(Instruction.BinaryOperandRS)
+    case i64ShrSSS(Instruction.BinaryOperandSS)
+    case i64ShrSSR(Instruction.BinaryOperandSR)
+    case i64ShrSRS(Instruction.BinaryOperandRS)
+    case i32ShrUSS(Instruction.BinaryOperandSS)
+    case i32ShrUSR(Instruction.BinaryOperandSR)
+    case i32ShrURS(Instruction.BinaryOperandRS)
+    case i64ShrUSS(Instruction.BinaryOperandSS)
+    case i64ShrUSR(Instruction.BinaryOperandSR)
+    case i64ShrURS(Instruction.BinaryOperandRS)
+    case i32RotlSS(Instruction.BinaryOperandSS)
+    case i32RotlSR(Instruction.BinaryOperandSR)
+    case i32RotlRS(Instruction.BinaryOperandRS)
+    case i64RotlSS(Instruction.BinaryOperandSS)
+    case i64RotlSR(Instruction.BinaryOperandSR)
+    case i64RotlRS(Instruction.BinaryOperandRS)
+    case i32RotrSS(Instruction.BinaryOperandSS)
+    case i32RotrSR(Instruction.BinaryOperandSR)
+    case i32RotrRS(Instruction.BinaryOperandRS)
+    case i64RotrSS(Instruction.BinaryOperandSS)
+    case i64RotrSR(Instruction.BinaryOperandSR)
+    case i64RotrRS(Instruction.BinaryOperandRS)
     case i32DivS(Instruction.BinaryOperand)
     case i64DivS(Instruction.BinaryOperand)
     case i32DivU(Instruction.BinaryOperand)
@@ -280,18 +304,42 @@ extension Instruction {
         case .i32XorSR(let binaryOperandSR): return binaryOperandSR
         case .i64XorSS(let binaryOperandSS): return binaryOperandSS
         case .i64XorSR(let binaryOperandSR): return binaryOperandSR
-        case .i32Sub(let binaryOperand): return binaryOperand
-        case .i64Sub(let binaryOperand): return binaryOperand
-        case .i32Shl(let binaryOperand): return binaryOperand
-        case .i64Shl(let binaryOperand): return binaryOperand
-        case .i32ShrS(let binaryOperand): return binaryOperand
-        case .i64ShrS(let binaryOperand): return binaryOperand
-        case .i32ShrU(let binaryOperand): return binaryOperand
-        case .i64ShrU(let binaryOperand): return binaryOperand
-        case .i32Rotl(let binaryOperand): return binaryOperand
-        case .i64Rotl(let binaryOperand): return binaryOperand
-        case .i32Rotr(let binaryOperand): return binaryOperand
-        case .i64Rotr(let binaryOperand): return binaryOperand
+        case .i32SubSS(let binaryOperandSS): return binaryOperandSS
+        case .i32SubSR(let binaryOperandSR): return binaryOperandSR
+        case .i32SubRS(let binaryOperandRS): return binaryOperandRS
+        case .i64SubSS(let binaryOperandSS): return binaryOperandSS
+        case .i64SubSR(let binaryOperandSR): return binaryOperandSR
+        case .i64SubRS(let binaryOperandRS): return binaryOperandRS
+        case .i32ShlSS(let binaryOperandSS): return binaryOperandSS
+        case .i32ShlSR(let binaryOperandSR): return binaryOperandSR
+        case .i32ShlRS(let binaryOperandRS): return binaryOperandRS
+        case .i64ShlSS(let binaryOperandSS): return binaryOperandSS
+        case .i64ShlSR(let binaryOperandSR): return binaryOperandSR
+        case .i64ShlRS(let binaryOperandRS): return binaryOperandRS
+        case .i32ShrSSS(let binaryOperandSS): return binaryOperandSS
+        case .i32ShrSSR(let binaryOperandSR): return binaryOperandSR
+        case .i32ShrSRS(let binaryOperandRS): return binaryOperandRS
+        case .i64ShrSSS(let binaryOperandSS): return binaryOperandSS
+        case .i64ShrSSR(let binaryOperandSR): return binaryOperandSR
+        case .i64ShrSRS(let binaryOperandRS): return binaryOperandRS
+        case .i32ShrUSS(let binaryOperandSS): return binaryOperandSS
+        case .i32ShrUSR(let binaryOperandSR): return binaryOperandSR
+        case .i32ShrURS(let binaryOperandRS): return binaryOperandRS
+        case .i64ShrUSS(let binaryOperandSS): return binaryOperandSS
+        case .i64ShrUSR(let binaryOperandSR): return binaryOperandSR
+        case .i64ShrURS(let binaryOperandRS): return binaryOperandRS
+        case .i32RotlSS(let binaryOperandSS): return binaryOperandSS
+        case .i32RotlSR(let binaryOperandSR): return binaryOperandSR
+        case .i32RotlRS(let binaryOperandRS): return binaryOperandRS
+        case .i64RotlSS(let binaryOperandSS): return binaryOperandSS
+        case .i64RotlSR(let binaryOperandSR): return binaryOperandSR
+        case .i64RotlRS(let binaryOperandRS): return binaryOperandRS
+        case .i32RotrSS(let binaryOperandSS): return binaryOperandSS
+        case .i32RotrSR(let binaryOperandSR): return binaryOperandSR
+        case .i32RotrRS(let binaryOperandRS): return binaryOperandRS
+        case .i64RotrSS(let binaryOperandSS): return binaryOperandSS
+        case .i64RotrSR(let binaryOperandSR): return binaryOperandSR
+        case .i64RotrRS(let binaryOperandRS): return binaryOperandRS
         case .i32DivS(let binaryOperand): return binaryOperand
         case .i64DivS(let binaryOperand): return binaryOperand
         case .i32DivU(let binaryOperand): return binaryOperand

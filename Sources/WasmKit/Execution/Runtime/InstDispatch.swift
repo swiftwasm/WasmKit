@@ -73,146 +73,170 @@ extension ExecutionState {
         case 67: self.execute_i32XorSR(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
         case 68: self.execute_i64XorSS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
         case 69: self.execute_i64XorSR(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 70: self.execute_i32Sub(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 71: self.execute_i64Sub(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 72: self.execute_i32Shl(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 73: self.execute_i64Shl(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 74: self.execute_i32ShrS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 75: self.execute_i64ShrS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 76: self.execute_i32ShrU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 77: self.execute_i64ShrU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 78: self.execute_i32Rotl(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 79: self.execute_i64Rotl(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 80: self.execute_i32Rotr(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 81: self.execute_i64Rotr(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 82: try self.execute_i32DivS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 83: try self.execute_i64DivS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 84: try self.execute_i32DivU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 85: try self.execute_i64DivU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 86: try self.execute_i32RemS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 87: try self.execute_i64RemS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 88: try self.execute_i32RemU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 89: try self.execute_i64RemU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 90: self.execute_i32Eq(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 91: self.execute_i64Eq(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 92: self.execute_i32Ne(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 93: self.execute_i64Ne(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 94: self.execute_i32LtS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 95: self.execute_i64LtS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 96: self.execute_i32LtU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 97: self.execute_i64LtU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 98: self.execute_i32GtS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 99: self.execute_i64GtS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 100: self.execute_i32GtU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 101: self.execute_i64GtU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 102: self.execute_i32LeS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 103: self.execute_i64LeS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 104: self.execute_i32LeU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 105: self.execute_i64LeU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 106: self.execute_i32GeS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 107: self.execute_i64GeS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 108: self.execute_i32GeU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 109: self.execute_i64GeU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 110: self.execute_i32Clz(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 111: self.execute_i64Clz(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 112: self.execute_i32Ctz(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 113: self.execute_i64Ctz(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 114: self.execute_i32Popcnt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 115: self.execute_i64Popcnt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 116: self.execute_i32Eqz(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 117: self.execute_i64Eqz(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 118: self.execute_i32WrapI64(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 119: self.execute_i64ExtendI32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 120: self.execute_i64ExtendI32U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 121: self.execute_i32Extend8S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 122: self.execute_i64Extend8S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 123: self.execute_i32Extend16S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 124: self.execute_i64Extend16S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 125: self.execute_i64Extend32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 126: try self.execute_i32TruncF32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 127: try self.execute_i32TruncF32U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 128: try self.execute_i32TruncSatF32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 129: try self.execute_i32TruncSatF32U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 130: try self.execute_i32TruncF64S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 131: try self.execute_i32TruncF64U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 132: try self.execute_i32TruncSatF64S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 133: try self.execute_i32TruncSatF64U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 134: try self.execute_i64TruncF32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 135: try self.execute_i64TruncF32U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 136: try self.execute_i64TruncSatF32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 137: try self.execute_i64TruncSatF32U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 138: try self.execute_i64TruncF64S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 139: try self.execute_i64TruncF64U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 140: try self.execute_i64TruncSatF64S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 141: try self.execute_i64TruncSatF64U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 142: self.execute_f32ConvertI32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 143: self.execute_f32ConvertI32U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 144: self.execute_f32ConvertI64S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 145: self.execute_f32ConvertI64U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 146: self.execute_f64ConvertI32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 147: self.execute_f64ConvertI32U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 148: self.execute_f64ConvertI64S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 149: self.execute_f64ConvertI64U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 150: self.execute_f32ReinterpretI32(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 151: self.execute_f64ReinterpretI64(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 152: self.execute_i32ReinterpretF32(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 153: self.execute_i64ReinterpretF64(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 154: self.execute_f32Add(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 155: self.execute_f64Add(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 156: self.execute_f32Sub(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 157: self.execute_f64Sub(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 158: self.execute_f32Mul(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 159: self.execute_f64Mul(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 160: self.execute_f32Div(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 161: self.execute_f64Div(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 162: self.execute_f32Min(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 163: self.execute_f64Min(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 164: self.execute_f32Max(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 165: self.execute_f64Max(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 166: self.execute_f32CopySign(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 167: self.execute_f64CopySign(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 168: self.execute_f32Eq(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 169: self.execute_f64Eq(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 170: self.execute_f32Ne(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 171: self.execute_f64Ne(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 172: self.execute_f32Lt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 173: self.execute_f64Lt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 174: self.execute_f32Gt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 175: self.execute_f64Gt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 176: self.execute_f32Le(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 177: self.execute_f64Le(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 178: self.execute_f32Ge(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 179: self.execute_f64Ge(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 180: self.execute_f32Abs(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 181: self.execute_f64Abs(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 182: self.execute_f32Neg(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 183: self.execute_f64Neg(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 184: self.execute_f32Ceil(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 185: self.execute_f64Ceil(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 186: self.execute_f32Floor(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 187: self.execute_f64Floor(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 188: self.execute_f32Trunc(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 189: self.execute_f64Trunc(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 190: self.execute_f32Nearest(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 191: self.execute_f64Nearest(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 192: self.execute_f32Sqrt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 193: self.execute_f64Sqrt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 194: self.execute_f64PromoteF32(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 195: self.execute_f32DemoteF64(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 196: self.execute_select(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 197: self.execute_refNull(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 198: self.execute_refIsNull(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 199: self.execute_refFunc(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 200: try self.execute_tableGet(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 201: try self.execute_tableSet(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 202: self.execute_tableSize(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 203: try self.execute_tableGrow(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 204: try self.execute_tableFill(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 205: try self.execute_tableCopy(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 206: try self.execute_tableInit(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 207: self.execute_tableElementDrop(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 208: self.execute_onEnter(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
-        case 209: self.execute_onExit(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 70: self.execute_i32SubSS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 71: self.execute_i32SubSR(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 72: self.execute_i32SubRS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 73: self.execute_i64SubSS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 74: self.execute_i64SubSR(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 75: self.execute_i64SubRS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 76: self.execute_i32ShlSS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 77: self.execute_i32ShlSR(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 78: self.execute_i32ShlRS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 79: self.execute_i64ShlSS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 80: self.execute_i64ShlSR(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 81: self.execute_i64ShlRS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 82: self.execute_i32ShrSSS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 83: self.execute_i32ShrSSR(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 84: self.execute_i32ShrSRS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 85: self.execute_i64ShrSSS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 86: self.execute_i64ShrSSR(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 87: self.execute_i64ShrSRS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 88: self.execute_i32ShrUSS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 89: self.execute_i32ShrUSR(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 90: self.execute_i32ShrURS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 91: self.execute_i64ShrUSS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 92: self.execute_i64ShrUSR(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 93: self.execute_i64ShrURS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 94: self.execute_i32RotlSS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 95: self.execute_i32RotlSR(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 96: self.execute_i32RotlRS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 97: self.execute_i64RotlSS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 98: self.execute_i64RotlSR(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 99: self.execute_i64RotlRS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 100: self.execute_i32RotrSS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 101: self.execute_i32RotrSR(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 102: self.execute_i32RotrRS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 103: self.execute_i64RotrSS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 104: self.execute_i64RotrSR(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 105: self.execute_i64RotrRS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 106: try self.execute_i32DivS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 107: try self.execute_i64DivS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 108: try self.execute_i32DivU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 109: try self.execute_i64DivU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 110: try self.execute_i32RemS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 111: try self.execute_i64RemS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 112: try self.execute_i32RemU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 113: try self.execute_i64RemU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 114: self.execute_i32Eq(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 115: self.execute_i64Eq(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 116: self.execute_i32Ne(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 117: self.execute_i64Ne(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 118: self.execute_i32LtS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 119: self.execute_i64LtS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 120: self.execute_i32LtU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 121: self.execute_i64LtU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 122: self.execute_i32GtS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 123: self.execute_i64GtS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 124: self.execute_i32GtU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 125: self.execute_i64GtU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 126: self.execute_i32LeS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 127: self.execute_i64LeS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 128: self.execute_i32LeU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 129: self.execute_i64LeU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 130: self.execute_i32GeS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 131: self.execute_i64GeS(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 132: self.execute_i32GeU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 133: self.execute_i64GeU(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 134: self.execute_i32Clz(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 135: self.execute_i64Clz(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 136: self.execute_i32Ctz(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 137: self.execute_i64Ctz(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 138: self.execute_i32Popcnt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 139: self.execute_i64Popcnt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 140: self.execute_i32Eqz(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 141: self.execute_i64Eqz(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 142: self.execute_i32WrapI64(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 143: self.execute_i64ExtendI32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 144: self.execute_i64ExtendI32U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 145: self.execute_i32Extend8S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 146: self.execute_i64Extend8S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 147: self.execute_i32Extend16S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 148: self.execute_i64Extend16S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 149: self.execute_i64Extend32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 150: try self.execute_i32TruncF32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 151: try self.execute_i32TruncF32U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 152: try self.execute_i32TruncSatF32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 153: try self.execute_i32TruncSatF32U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 154: try self.execute_i32TruncF64S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 155: try self.execute_i32TruncF64U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 156: try self.execute_i32TruncSatF64S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 157: try self.execute_i32TruncSatF64U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 158: try self.execute_i64TruncF32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 159: try self.execute_i64TruncF32U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 160: try self.execute_i64TruncSatF32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 161: try self.execute_i64TruncSatF32U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 162: try self.execute_i64TruncF64S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 163: try self.execute_i64TruncF64U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 164: try self.execute_i64TruncSatF64S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 165: try self.execute_i64TruncSatF64U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 166: self.execute_f32ConvertI32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 167: self.execute_f32ConvertI32U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 168: self.execute_f32ConvertI64S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 169: self.execute_f32ConvertI64U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 170: self.execute_f64ConvertI32S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 171: self.execute_f64ConvertI32U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 172: self.execute_f64ConvertI64S(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 173: self.execute_f64ConvertI64U(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 174: self.execute_f32ReinterpretI32(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 175: self.execute_f64ReinterpretI64(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 176: self.execute_i32ReinterpretF32(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 177: self.execute_i64ReinterpretF64(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 178: self.execute_f32Add(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 179: self.execute_f64Add(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 180: self.execute_f32Sub(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 181: self.execute_f64Sub(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 182: self.execute_f32Mul(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 183: self.execute_f64Mul(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 184: self.execute_f32Div(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 185: self.execute_f64Div(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 186: self.execute_f32Min(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 187: self.execute_f64Min(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 188: self.execute_f32Max(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 189: self.execute_f64Max(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 190: self.execute_f32CopySign(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 191: self.execute_f64CopySign(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 192: self.execute_f32Eq(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 193: self.execute_f64Eq(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 194: self.execute_f32Ne(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 195: self.execute_f64Ne(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 196: self.execute_f32Lt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 197: self.execute_f64Lt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 198: self.execute_f32Gt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 199: self.execute_f64Gt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 200: self.execute_f32Le(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 201: self.execute_f64Le(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 202: self.execute_f32Ge(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 203: self.execute_f64Ge(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 204: self.execute_f32Abs(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 205: self.execute_f64Abs(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 206: self.execute_f32Neg(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 207: self.execute_f64Neg(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 208: self.execute_f32Ceil(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 209: self.execute_f64Ceil(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 210: self.execute_f32Floor(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 211: self.execute_f64Floor(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 212: self.execute_f32Trunc(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 213: self.execute_f64Trunc(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 214: self.execute_f32Nearest(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 215: self.execute_f64Nearest(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 216: self.execute_f32Sqrt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 217: self.execute_f64Sqrt(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 218: self.execute_f64PromoteF32(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 219: self.execute_f32DemoteF64(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 220: self.execute_select(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 221: self.execute_refNull(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 222: self.execute_refIsNull(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 223: self.execute_refFunc(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 224: try self.execute_tableGet(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 225: try self.execute_tableSet(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 226: self.execute_tableSize(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 227: try self.execute_tableGrow(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 228: try self.execute_tableFill(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 229: try self.execute_tableCopy(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 230: try self.execute_tableInit(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 231: self.execute_tableElementDrop(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 232: self.execute_onEnter(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
+        case 233: self.execute_onExit(sp: &sp, r0: &r0, pc: &pc, md: &md, ms: &ms)
         default: preconditionFailure("Unknown instruction!?")
 
         }
@@ -292,18 +316,42 @@ extension Instruction {
         case .i32XorSR: return "i32XorSR"
         case .i64XorSS: return "i64XorSS"
         case .i64XorSR: return "i64XorSR"
-        case .i32Sub: return "i32Sub"
-        case .i64Sub: return "i64Sub"
-        case .i32Shl: return "i32Shl"
-        case .i64Shl: return "i64Shl"
-        case .i32ShrS: return "i32ShrS"
-        case .i64ShrS: return "i64ShrS"
-        case .i32ShrU: return "i32ShrU"
-        case .i64ShrU: return "i64ShrU"
-        case .i32Rotl: return "i32Rotl"
-        case .i64Rotl: return "i64Rotl"
-        case .i32Rotr: return "i32Rotr"
-        case .i64Rotr: return "i64Rotr"
+        case .i32SubSS: return "i32SubSS"
+        case .i32SubSR: return "i32SubSR"
+        case .i32SubRS: return "i32SubRS"
+        case .i64SubSS: return "i64SubSS"
+        case .i64SubSR: return "i64SubSR"
+        case .i64SubRS: return "i64SubRS"
+        case .i32ShlSS: return "i32ShlSS"
+        case .i32ShlSR: return "i32ShlSR"
+        case .i32ShlRS: return "i32ShlRS"
+        case .i64ShlSS: return "i64ShlSS"
+        case .i64ShlSR: return "i64ShlSR"
+        case .i64ShlRS: return "i64ShlRS"
+        case .i32ShrSSS: return "i32ShrSSS"
+        case .i32ShrSSR: return "i32ShrSSR"
+        case .i32ShrSRS: return "i32ShrSRS"
+        case .i64ShrSSS: return "i64ShrSSS"
+        case .i64ShrSSR: return "i64ShrSSR"
+        case .i64ShrSRS: return "i64ShrSRS"
+        case .i32ShrUSS: return "i32ShrUSS"
+        case .i32ShrUSR: return "i32ShrUSR"
+        case .i32ShrURS: return "i32ShrURS"
+        case .i64ShrUSS: return "i64ShrUSS"
+        case .i64ShrUSR: return "i64ShrUSR"
+        case .i64ShrURS: return "i64ShrURS"
+        case .i32RotlSS: return "i32RotlSS"
+        case .i32RotlSR: return "i32RotlSR"
+        case .i32RotlRS: return "i32RotlRS"
+        case .i64RotlSS: return "i64RotlSS"
+        case .i64RotlSR: return "i64RotlSR"
+        case .i64RotlRS: return "i64RotlRS"
+        case .i32RotrSS: return "i32RotrSS"
+        case .i32RotrSR: return "i32RotrSR"
+        case .i32RotrRS: return "i32RotrRS"
+        case .i64RotrSS: return "i64RotrSS"
+        case .i64RotrSR: return "i64RotrSR"
+        case .i64RotrRS: return "i64RotrRS"
         case .i32DivS: return "i32DivS"
         case .i64DivS: return "i64DivS"
         case .i32DivU: return "i32DivU"
@@ -458,42 +506,42 @@ extension ExecutionState {
     mutating func i32XorSR(sp: Sp, r0: inout R0, binaryOperandSR: Instruction.BinaryOperandSR) { writePReg(&r0, sp[binaryOperandSR.lhs].i32.xor(readPRegI32(r0))) }
     mutating func i64XorSS(sp: Sp, r0: inout R0, binaryOperandSS: Instruction.BinaryOperandSS) { writePReg(&r0, sp[binaryOperandSS.lhs].i64.xor(sp[binaryOperandSS.rhs].i64)) }
     mutating func i64XorSR(sp: Sp, r0: inout R0, binaryOperandSR: Instruction.BinaryOperandSR) { writePReg(&r0, sp[binaryOperandSR.lhs].i64.xor(readPRegI64(r0))) }
-    @inline(__always) mutating func i32Sub(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].sub(sp[i32: binaryOperand.rhs])
-    }
-    @inline(__always) mutating func i64Sub(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[i64: binaryOperand.result] = sp[i64: binaryOperand.lhs].sub(sp[i64: binaryOperand.rhs])
-    }
-    @inline(__always) mutating func i32Shl(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].shl(sp[i32: binaryOperand.rhs])
-    }
-    @inline(__always) mutating func i64Shl(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[i64: binaryOperand.result] = sp[i64: binaryOperand.lhs].shl(sp[i64: binaryOperand.rhs])
-    }
-    @inline(__always) mutating func i32ShrS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].shrS(sp[i32: binaryOperand.rhs])
-    }
-    @inline(__always) mutating func i64ShrS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[i64: binaryOperand.result] = sp[i64: binaryOperand.lhs].shrS(sp[i64: binaryOperand.rhs])
-    }
-    @inline(__always) mutating func i32ShrU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].shrU(sp[i32: binaryOperand.rhs])
-    }
-    @inline(__always) mutating func i64ShrU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[i64: binaryOperand.result] = sp[i64: binaryOperand.lhs].shrU(sp[i64: binaryOperand.rhs])
-    }
-    @inline(__always) mutating func i32Rotl(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].rotl(sp[i32: binaryOperand.rhs])
-    }
-    @inline(__always) mutating func i64Rotl(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[i64: binaryOperand.result] = sp[i64: binaryOperand.lhs].rotl(sp[i64: binaryOperand.rhs])
-    }
-    @inline(__always) mutating func i32Rotr(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].rotr(sp[i32: binaryOperand.rhs])
-    }
-    @inline(__always) mutating func i64Rotr(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[i64: binaryOperand.result] = sp[i64: binaryOperand.lhs].rotr(sp[i64: binaryOperand.rhs])
-    }
+    mutating func i32SubSS(sp: Sp, r0: inout R0, binaryOperandSS: Instruction.BinaryOperandSS) { writePReg(&r0, sp[binaryOperandSS.lhs].i32.sub(sp[binaryOperandSS.rhs].i32)) }
+    mutating func i32SubSR(sp: Sp, r0: inout R0, binaryOperandSR: Instruction.BinaryOperandSR) { writePReg(&r0, sp[binaryOperandSR.lhs].i32.sub(readPRegI32(r0))) }
+    mutating func i32SubRS(sp: Sp, r0: inout R0, binaryOperandRS: Instruction.BinaryOperandRS) { writePReg(&r0, readPRegI32(r0).sub(sp[binaryOperandRS.rhs].i32)) }
+    mutating func i64SubSS(sp: Sp, r0: inout R0, binaryOperandSS: Instruction.BinaryOperandSS) { writePReg(&r0, sp[binaryOperandSS.lhs].i64.sub(sp[binaryOperandSS.rhs].i64)) }
+    mutating func i64SubSR(sp: Sp, r0: inout R0, binaryOperandSR: Instruction.BinaryOperandSR) { writePReg(&r0, sp[binaryOperandSR.lhs].i64.sub(readPRegI64(r0))) }
+    mutating func i64SubRS(sp: Sp, r0: inout R0, binaryOperandRS: Instruction.BinaryOperandRS) { writePReg(&r0, readPRegI64(r0).sub(sp[binaryOperandRS.rhs].i64)) }
+    mutating func i32ShlSS(sp: Sp, r0: inout R0, binaryOperandSS: Instruction.BinaryOperandSS) { writePReg(&r0, sp[binaryOperandSS.lhs].i32.shl(sp[binaryOperandSS.rhs].i32)) }
+    mutating func i32ShlSR(sp: Sp, r0: inout R0, binaryOperandSR: Instruction.BinaryOperandSR) { writePReg(&r0, sp[binaryOperandSR.lhs].i32.shl(readPRegI32(r0))) }
+    mutating func i32ShlRS(sp: Sp, r0: inout R0, binaryOperandRS: Instruction.BinaryOperandRS) { writePReg(&r0, readPRegI32(r0).shl(sp[binaryOperandRS.rhs].i32)) }
+    mutating func i64ShlSS(sp: Sp, r0: inout R0, binaryOperandSS: Instruction.BinaryOperandSS) { writePReg(&r0, sp[binaryOperandSS.lhs].i64.shl(sp[binaryOperandSS.rhs].i64)) }
+    mutating func i64ShlSR(sp: Sp, r0: inout R0, binaryOperandSR: Instruction.BinaryOperandSR) { writePReg(&r0, sp[binaryOperandSR.lhs].i64.shl(readPRegI64(r0))) }
+    mutating func i64ShlRS(sp: Sp, r0: inout R0, binaryOperandRS: Instruction.BinaryOperandRS) { writePReg(&r0, readPRegI64(r0).shl(sp[binaryOperandRS.rhs].i64)) }
+    mutating func i32ShrSSS(sp: Sp, r0: inout R0, binaryOperandSS: Instruction.BinaryOperandSS) { writePReg(&r0, sp[binaryOperandSS.lhs].i32.shrS(sp[binaryOperandSS.rhs].i32)) }
+    mutating func i32ShrSSR(sp: Sp, r0: inout R0, binaryOperandSR: Instruction.BinaryOperandSR) { writePReg(&r0, sp[binaryOperandSR.lhs].i32.shrS(readPRegI32(r0))) }
+    mutating func i32ShrSRS(sp: Sp, r0: inout R0, binaryOperandRS: Instruction.BinaryOperandRS) { writePReg(&r0, readPRegI32(r0).shrS(sp[binaryOperandRS.rhs].i32)) }
+    mutating func i64ShrSSS(sp: Sp, r0: inout R0, binaryOperandSS: Instruction.BinaryOperandSS) { writePReg(&r0, sp[binaryOperandSS.lhs].i64.shrS(sp[binaryOperandSS.rhs].i64)) }
+    mutating func i64ShrSSR(sp: Sp, r0: inout R0, binaryOperandSR: Instruction.BinaryOperandSR) { writePReg(&r0, sp[binaryOperandSR.lhs].i64.shrS(readPRegI64(r0))) }
+    mutating func i64ShrSRS(sp: Sp, r0: inout R0, binaryOperandRS: Instruction.BinaryOperandRS) { writePReg(&r0, readPRegI64(r0).shrS(sp[binaryOperandRS.rhs].i64)) }
+    mutating func i32ShrUSS(sp: Sp, r0: inout R0, binaryOperandSS: Instruction.BinaryOperandSS) { writePReg(&r0, sp[binaryOperandSS.lhs].i32.shrU(sp[binaryOperandSS.rhs].i32)) }
+    mutating func i32ShrUSR(sp: Sp, r0: inout R0, binaryOperandSR: Instruction.BinaryOperandSR) { writePReg(&r0, sp[binaryOperandSR.lhs].i32.shrU(readPRegI32(r0))) }
+    mutating func i32ShrURS(sp: Sp, r0: inout R0, binaryOperandRS: Instruction.BinaryOperandRS) { writePReg(&r0, readPRegI32(r0).shrU(sp[binaryOperandRS.rhs].i32)) }
+    mutating func i64ShrUSS(sp: Sp, r0: inout R0, binaryOperandSS: Instruction.BinaryOperandSS) { writePReg(&r0, sp[binaryOperandSS.lhs].i64.shrU(sp[binaryOperandSS.rhs].i64)) }
+    mutating func i64ShrUSR(sp: Sp, r0: inout R0, binaryOperandSR: Instruction.BinaryOperandSR) { writePReg(&r0, sp[binaryOperandSR.lhs].i64.shrU(readPRegI64(r0))) }
+    mutating func i64ShrURS(sp: Sp, r0: inout R0, binaryOperandRS: Instruction.BinaryOperandRS) { writePReg(&r0, readPRegI64(r0).shrU(sp[binaryOperandRS.rhs].i64)) }
+    mutating func i32RotlSS(sp: Sp, r0: inout R0, binaryOperandSS: Instruction.BinaryOperandSS) { writePReg(&r0, sp[binaryOperandSS.lhs].i32.rotl(sp[binaryOperandSS.rhs].i32)) }
+    mutating func i32RotlSR(sp: Sp, r0: inout R0, binaryOperandSR: Instruction.BinaryOperandSR) { writePReg(&r0, sp[binaryOperandSR.lhs].i32.rotl(readPRegI32(r0))) }
+    mutating func i32RotlRS(sp: Sp, r0: inout R0, binaryOperandRS: Instruction.BinaryOperandRS) { writePReg(&r0, readPRegI32(r0).rotl(sp[binaryOperandRS.rhs].i32)) }
+    mutating func i64RotlSS(sp: Sp, r0: inout R0, binaryOperandSS: Instruction.BinaryOperandSS) { writePReg(&r0, sp[binaryOperandSS.lhs].i64.rotl(sp[binaryOperandSS.rhs].i64)) }
+    mutating func i64RotlSR(sp: Sp, r0: inout R0, binaryOperandSR: Instruction.BinaryOperandSR) { writePReg(&r0, sp[binaryOperandSR.lhs].i64.rotl(readPRegI64(r0))) }
+    mutating func i64RotlRS(sp: Sp, r0: inout R0, binaryOperandRS: Instruction.BinaryOperandRS) { writePReg(&r0, readPRegI64(r0).rotl(sp[binaryOperandRS.rhs].i64)) }
+    mutating func i32RotrSS(sp: Sp, r0: inout R0, binaryOperandSS: Instruction.BinaryOperandSS) { writePReg(&r0, sp[binaryOperandSS.lhs].i32.rotr(sp[binaryOperandSS.rhs].i32)) }
+    mutating func i32RotrSR(sp: Sp, r0: inout R0, binaryOperandSR: Instruction.BinaryOperandSR) { writePReg(&r0, sp[binaryOperandSR.lhs].i32.rotr(readPRegI32(r0))) }
+    mutating func i32RotrRS(sp: Sp, r0: inout R0, binaryOperandRS: Instruction.BinaryOperandRS) { writePReg(&r0, readPRegI32(r0).rotr(sp[binaryOperandRS.rhs].i32)) }
+    mutating func i64RotrSS(sp: Sp, r0: inout R0, binaryOperandSS: Instruction.BinaryOperandSS) { writePReg(&r0, sp[binaryOperandSS.lhs].i64.rotr(sp[binaryOperandSS.rhs].i64)) }
+    mutating func i64RotrSR(sp: Sp, r0: inout R0, binaryOperandSR: Instruction.BinaryOperandSR) { writePReg(&r0, sp[binaryOperandSR.lhs].i64.rotr(readPRegI64(r0))) }
+    mutating func i64RotrRS(sp: Sp, r0: inout R0, binaryOperandRS: Instruction.BinaryOperandRS) { writePReg(&r0, readPRegI64(r0).rotr(sp[binaryOperandRS.rhs].i64)) }
     @inline(__always) mutating func i32DivS(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
         sp[i32: binaryOperand.result] = try sp[i32: binaryOperand.lhs].divS(sp[i32: binaryOperand.rhs])
     }
@@ -1255,65 +1303,185 @@ extension ExecutionState {
         let binaryOperandSR = Instruction.BinaryOperandSR.load(from: &pc.pointee)
         self.i64XorSR(sp: sp.pointee, r0: &r0.pointee, binaryOperandSR: binaryOperandSR)
     }
-    @_silgen_name("wasmkit_execute_i32Sub") @inline(__always)
-    mutating func execute_i32Sub(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        let binaryOperand = Instruction.BinaryOperand.load(from: &pc.pointee)
-        self.i32Sub(sp: sp.pointee, binaryOperand: binaryOperand)
+    @_silgen_name("wasmkit_execute_i32SubSS") @inline(__always)
+    mutating func execute_i32SubSS(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandSS = Instruction.BinaryOperandSS.load(from: &pc.pointee)
+        self.i32SubSS(sp: sp.pointee, r0: &r0.pointee, binaryOperandSS: binaryOperandSS)
     }
-    @_silgen_name("wasmkit_execute_i64Sub") @inline(__always)
-    mutating func execute_i64Sub(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        let binaryOperand = Instruction.BinaryOperand.load(from: &pc.pointee)
-        self.i64Sub(sp: sp.pointee, binaryOperand: binaryOperand)
+    @_silgen_name("wasmkit_execute_i32SubSR") @inline(__always)
+    mutating func execute_i32SubSR(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandSR = Instruction.BinaryOperandSR.load(from: &pc.pointee)
+        self.i32SubSR(sp: sp.pointee, r0: &r0.pointee, binaryOperandSR: binaryOperandSR)
     }
-    @_silgen_name("wasmkit_execute_i32Shl") @inline(__always)
-    mutating func execute_i32Shl(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        let binaryOperand = Instruction.BinaryOperand.load(from: &pc.pointee)
-        self.i32Shl(sp: sp.pointee, binaryOperand: binaryOperand)
+    @_silgen_name("wasmkit_execute_i32SubRS") @inline(__always)
+    mutating func execute_i32SubRS(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandRS = Instruction.BinaryOperandRS.load(from: &pc.pointee)
+        self.i32SubRS(sp: sp.pointee, r0: &r0.pointee, binaryOperandRS: binaryOperandRS)
     }
-    @_silgen_name("wasmkit_execute_i64Shl") @inline(__always)
-    mutating func execute_i64Shl(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        let binaryOperand = Instruction.BinaryOperand.load(from: &pc.pointee)
-        self.i64Shl(sp: sp.pointee, binaryOperand: binaryOperand)
+    @_silgen_name("wasmkit_execute_i64SubSS") @inline(__always)
+    mutating func execute_i64SubSS(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandSS = Instruction.BinaryOperandSS.load(from: &pc.pointee)
+        self.i64SubSS(sp: sp.pointee, r0: &r0.pointee, binaryOperandSS: binaryOperandSS)
     }
-    @_silgen_name("wasmkit_execute_i32ShrS") @inline(__always)
-    mutating func execute_i32ShrS(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        let binaryOperand = Instruction.BinaryOperand.load(from: &pc.pointee)
-        self.i32ShrS(sp: sp.pointee, binaryOperand: binaryOperand)
+    @_silgen_name("wasmkit_execute_i64SubSR") @inline(__always)
+    mutating func execute_i64SubSR(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandSR = Instruction.BinaryOperandSR.load(from: &pc.pointee)
+        self.i64SubSR(sp: sp.pointee, r0: &r0.pointee, binaryOperandSR: binaryOperandSR)
     }
-    @_silgen_name("wasmkit_execute_i64ShrS") @inline(__always)
-    mutating func execute_i64ShrS(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        let binaryOperand = Instruction.BinaryOperand.load(from: &pc.pointee)
-        self.i64ShrS(sp: sp.pointee, binaryOperand: binaryOperand)
+    @_silgen_name("wasmkit_execute_i64SubRS") @inline(__always)
+    mutating func execute_i64SubRS(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandRS = Instruction.BinaryOperandRS.load(from: &pc.pointee)
+        self.i64SubRS(sp: sp.pointee, r0: &r0.pointee, binaryOperandRS: binaryOperandRS)
     }
-    @_silgen_name("wasmkit_execute_i32ShrU") @inline(__always)
-    mutating func execute_i32ShrU(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        let binaryOperand = Instruction.BinaryOperand.load(from: &pc.pointee)
-        self.i32ShrU(sp: sp.pointee, binaryOperand: binaryOperand)
+    @_silgen_name("wasmkit_execute_i32ShlSS") @inline(__always)
+    mutating func execute_i32ShlSS(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandSS = Instruction.BinaryOperandSS.load(from: &pc.pointee)
+        self.i32ShlSS(sp: sp.pointee, r0: &r0.pointee, binaryOperandSS: binaryOperandSS)
     }
-    @_silgen_name("wasmkit_execute_i64ShrU") @inline(__always)
-    mutating func execute_i64ShrU(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        let binaryOperand = Instruction.BinaryOperand.load(from: &pc.pointee)
-        self.i64ShrU(sp: sp.pointee, binaryOperand: binaryOperand)
+    @_silgen_name("wasmkit_execute_i32ShlSR") @inline(__always)
+    mutating func execute_i32ShlSR(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandSR = Instruction.BinaryOperandSR.load(from: &pc.pointee)
+        self.i32ShlSR(sp: sp.pointee, r0: &r0.pointee, binaryOperandSR: binaryOperandSR)
     }
-    @_silgen_name("wasmkit_execute_i32Rotl") @inline(__always)
-    mutating func execute_i32Rotl(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        let binaryOperand = Instruction.BinaryOperand.load(from: &pc.pointee)
-        self.i32Rotl(sp: sp.pointee, binaryOperand: binaryOperand)
+    @_silgen_name("wasmkit_execute_i32ShlRS") @inline(__always)
+    mutating func execute_i32ShlRS(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandRS = Instruction.BinaryOperandRS.load(from: &pc.pointee)
+        self.i32ShlRS(sp: sp.pointee, r0: &r0.pointee, binaryOperandRS: binaryOperandRS)
     }
-    @_silgen_name("wasmkit_execute_i64Rotl") @inline(__always)
-    mutating func execute_i64Rotl(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        let binaryOperand = Instruction.BinaryOperand.load(from: &pc.pointee)
-        self.i64Rotl(sp: sp.pointee, binaryOperand: binaryOperand)
+    @_silgen_name("wasmkit_execute_i64ShlSS") @inline(__always)
+    mutating func execute_i64ShlSS(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandSS = Instruction.BinaryOperandSS.load(from: &pc.pointee)
+        self.i64ShlSS(sp: sp.pointee, r0: &r0.pointee, binaryOperandSS: binaryOperandSS)
     }
-    @_silgen_name("wasmkit_execute_i32Rotr") @inline(__always)
-    mutating func execute_i32Rotr(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        let binaryOperand = Instruction.BinaryOperand.load(from: &pc.pointee)
-        self.i32Rotr(sp: sp.pointee, binaryOperand: binaryOperand)
+    @_silgen_name("wasmkit_execute_i64ShlSR") @inline(__always)
+    mutating func execute_i64ShlSR(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandSR = Instruction.BinaryOperandSR.load(from: &pc.pointee)
+        self.i64ShlSR(sp: sp.pointee, r0: &r0.pointee, binaryOperandSR: binaryOperandSR)
     }
-    @_silgen_name("wasmkit_execute_i64Rotr") @inline(__always)
-    mutating func execute_i64Rotr(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        let binaryOperand = Instruction.BinaryOperand.load(from: &pc.pointee)
-        self.i64Rotr(sp: sp.pointee, binaryOperand: binaryOperand)
+    @_silgen_name("wasmkit_execute_i64ShlRS") @inline(__always)
+    mutating func execute_i64ShlRS(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandRS = Instruction.BinaryOperandRS.load(from: &pc.pointee)
+        self.i64ShlRS(sp: sp.pointee, r0: &r0.pointee, binaryOperandRS: binaryOperandRS)
+    }
+    @_silgen_name("wasmkit_execute_i32ShrSSS") @inline(__always)
+    mutating func execute_i32ShrSSS(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandSS = Instruction.BinaryOperandSS.load(from: &pc.pointee)
+        self.i32ShrSSS(sp: sp.pointee, r0: &r0.pointee, binaryOperandSS: binaryOperandSS)
+    }
+    @_silgen_name("wasmkit_execute_i32ShrSSR") @inline(__always)
+    mutating func execute_i32ShrSSR(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandSR = Instruction.BinaryOperandSR.load(from: &pc.pointee)
+        self.i32ShrSSR(sp: sp.pointee, r0: &r0.pointee, binaryOperandSR: binaryOperandSR)
+    }
+    @_silgen_name("wasmkit_execute_i32ShrSRS") @inline(__always)
+    mutating func execute_i32ShrSRS(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandRS = Instruction.BinaryOperandRS.load(from: &pc.pointee)
+        self.i32ShrSRS(sp: sp.pointee, r0: &r0.pointee, binaryOperandRS: binaryOperandRS)
+    }
+    @_silgen_name("wasmkit_execute_i64ShrSSS") @inline(__always)
+    mutating func execute_i64ShrSSS(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandSS = Instruction.BinaryOperandSS.load(from: &pc.pointee)
+        self.i64ShrSSS(sp: sp.pointee, r0: &r0.pointee, binaryOperandSS: binaryOperandSS)
+    }
+    @_silgen_name("wasmkit_execute_i64ShrSSR") @inline(__always)
+    mutating func execute_i64ShrSSR(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandSR = Instruction.BinaryOperandSR.load(from: &pc.pointee)
+        self.i64ShrSSR(sp: sp.pointee, r0: &r0.pointee, binaryOperandSR: binaryOperandSR)
+    }
+    @_silgen_name("wasmkit_execute_i64ShrSRS") @inline(__always)
+    mutating func execute_i64ShrSRS(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandRS = Instruction.BinaryOperandRS.load(from: &pc.pointee)
+        self.i64ShrSRS(sp: sp.pointee, r0: &r0.pointee, binaryOperandRS: binaryOperandRS)
+    }
+    @_silgen_name("wasmkit_execute_i32ShrUSS") @inline(__always)
+    mutating func execute_i32ShrUSS(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandSS = Instruction.BinaryOperandSS.load(from: &pc.pointee)
+        self.i32ShrUSS(sp: sp.pointee, r0: &r0.pointee, binaryOperandSS: binaryOperandSS)
+    }
+    @_silgen_name("wasmkit_execute_i32ShrUSR") @inline(__always)
+    mutating func execute_i32ShrUSR(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandSR = Instruction.BinaryOperandSR.load(from: &pc.pointee)
+        self.i32ShrUSR(sp: sp.pointee, r0: &r0.pointee, binaryOperandSR: binaryOperandSR)
+    }
+    @_silgen_name("wasmkit_execute_i32ShrURS") @inline(__always)
+    mutating func execute_i32ShrURS(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandRS = Instruction.BinaryOperandRS.load(from: &pc.pointee)
+        self.i32ShrURS(sp: sp.pointee, r0: &r0.pointee, binaryOperandRS: binaryOperandRS)
+    }
+    @_silgen_name("wasmkit_execute_i64ShrUSS") @inline(__always)
+    mutating func execute_i64ShrUSS(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandSS = Instruction.BinaryOperandSS.load(from: &pc.pointee)
+        self.i64ShrUSS(sp: sp.pointee, r0: &r0.pointee, binaryOperandSS: binaryOperandSS)
+    }
+    @_silgen_name("wasmkit_execute_i64ShrUSR") @inline(__always)
+    mutating func execute_i64ShrUSR(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandSR = Instruction.BinaryOperandSR.load(from: &pc.pointee)
+        self.i64ShrUSR(sp: sp.pointee, r0: &r0.pointee, binaryOperandSR: binaryOperandSR)
+    }
+    @_silgen_name("wasmkit_execute_i64ShrURS") @inline(__always)
+    mutating func execute_i64ShrURS(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandRS = Instruction.BinaryOperandRS.load(from: &pc.pointee)
+        self.i64ShrURS(sp: sp.pointee, r0: &r0.pointee, binaryOperandRS: binaryOperandRS)
+    }
+    @_silgen_name("wasmkit_execute_i32RotlSS") @inline(__always)
+    mutating func execute_i32RotlSS(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandSS = Instruction.BinaryOperandSS.load(from: &pc.pointee)
+        self.i32RotlSS(sp: sp.pointee, r0: &r0.pointee, binaryOperandSS: binaryOperandSS)
+    }
+    @_silgen_name("wasmkit_execute_i32RotlSR") @inline(__always)
+    mutating func execute_i32RotlSR(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandSR = Instruction.BinaryOperandSR.load(from: &pc.pointee)
+        self.i32RotlSR(sp: sp.pointee, r0: &r0.pointee, binaryOperandSR: binaryOperandSR)
+    }
+    @_silgen_name("wasmkit_execute_i32RotlRS") @inline(__always)
+    mutating func execute_i32RotlRS(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandRS = Instruction.BinaryOperandRS.load(from: &pc.pointee)
+        self.i32RotlRS(sp: sp.pointee, r0: &r0.pointee, binaryOperandRS: binaryOperandRS)
+    }
+    @_silgen_name("wasmkit_execute_i64RotlSS") @inline(__always)
+    mutating func execute_i64RotlSS(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandSS = Instruction.BinaryOperandSS.load(from: &pc.pointee)
+        self.i64RotlSS(sp: sp.pointee, r0: &r0.pointee, binaryOperandSS: binaryOperandSS)
+    }
+    @_silgen_name("wasmkit_execute_i64RotlSR") @inline(__always)
+    mutating func execute_i64RotlSR(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandSR = Instruction.BinaryOperandSR.load(from: &pc.pointee)
+        self.i64RotlSR(sp: sp.pointee, r0: &r0.pointee, binaryOperandSR: binaryOperandSR)
+    }
+    @_silgen_name("wasmkit_execute_i64RotlRS") @inline(__always)
+    mutating func execute_i64RotlRS(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandRS = Instruction.BinaryOperandRS.load(from: &pc.pointee)
+        self.i64RotlRS(sp: sp.pointee, r0: &r0.pointee, binaryOperandRS: binaryOperandRS)
+    }
+    @_silgen_name("wasmkit_execute_i32RotrSS") @inline(__always)
+    mutating func execute_i32RotrSS(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandSS = Instruction.BinaryOperandSS.load(from: &pc.pointee)
+        self.i32RotrSS(sp: sp.pointee, r0: &r0.pointee, binaryOperandSS: binaryOperandSS)
+    }
+    @_silgen_name("wasmkit_execute_i32RotrSR") @inline(__always)
+    mutating func execute_i32RotrSR(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandSR = Instruction.BinaryOperandSR.load(from: &pc.pointee)
+        self.i32RotrSR(sp: sp.pointee, r0: &r0.pointee, binaryOperandSR: binaryOperandSR)
+    }
+    @_silgen_name("wasmkit_execute_i32RotrRS") @inline(__always)
+    mutating func execute_i32RotrRS(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandRS = Instruction.BinaryOperandRS.load(from: &pc.pointee)
+        self.i32RotrRS(sp: sp.pointee, r0: &r0.pointee, binaryOperandRS: binaryOperandRS)
+    }
+    @_silgen_name("wasmkit_execute_i64RotrSS") @inline(__always)
+    mutating func execute_i64RotrSS(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandSS = Instruction.BinaryOperandSS.load(from: &pc.pointee)
+        self.i64RotrSS(sp: sp.pointee, r0: &r0.pointee, binaryOperandSS: binaryOperandSS)
+    }
+    @_silgen_name("wasmkit_execute_i64RotrSR") @inline(__always)
+    mutating func execute_i64RotrSR(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandSR = Instruction.BinaryOperandSR.load(from: &pc.pointee)
+        self.i64RotrSR(sp: sp.pointee, r0: &r0.pointee, binaryOperandSR: binaryOperandSR)
+    }
+    @_silgen_name("wasmkit_execute_i64RotrRS") @inline(__always)
+    mutating func execute_i64RotrRS(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let binaryOperandRS = Instruction.BinaryOperandRS.load(from: &pc.pointee)
+        self.i64RotrRS(sp: sp.pointee, r0: &r0.pointee, binaryOperandRS: binaryOperandRS)
     }
     @_silgen_name("wasmkit_execute_i32DivS") @inline(__always)
     mutating func execute_i32DivS(sp: UnsafeMutablePointer<Sp>, r0: UnsafeMutablePointer<R0>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
@@ -2030,146 +2198,170 @@ extension Instruction {
         case .i32XorSR: return 67
         case .i64XorSS: return 68
         case .i64XorSR: return 69
-        case .i32Sub: return 70
-        case .i64Sub: return 71
-        case .i32Shl: return 72
-        case .i64Shl: return 73
-        case .i32ShrS: return 74
-        case .i64ShrS: return 75
-        case .i32ShrU: return 76
-        case .i64ShrU: return 77
-        case .i32Rotl: return 78
-        case .i64Rotl: return 79
-        case .i32Rotr: return 80
-        case .i64Rotr: return 81
-        case .i32DivS: return 82
-        case .i64DivS: return 83
-        case .i32DivU: return 84
-        case .i64DivU: return 85
-        case .i32RemS: return 86
-        case .i64RemS: return 87
-        case .i32RemU: return 88
-        case .i64RemU: return 89
-        case .i32Eq: return 90
-        case .i64Eq: return 91
-        case .i32Ne: return 92
-        case .i64Ne: return 93
-        case .i32LtS: return 94
-        case .i64LtS: return 95
-        case .i32LtU: return 96
-        case .i64LtU: return 97
-        case .i32GtS: return 98
-        case .i64GtS: return 99
-        case .i32GtU: return 100
-        case .i64GtU: return 101
-        case .i32LeS: return 102
-        case .i64LeS: return 103
-        case .i32LeU: return 104
-        case .i64LeU: return 105
-        case .i32GeS: return 106
-        case .i64GeS: return 107
-        case .i32GeU: return 108
-        case .i64GeU: return 109
-        case .i32Clz: return 110
-        case .i64Clz: return 111
-        case .i32Ctz: return 112
-        case .i64Ctz: return 113
-        case .i32Popcnt: return 114
-        case .i64Popcnt: return 115
-        case .i32Eqz: return 116
-        case .i64Eqz: return 117
-        case .i32WrapI64: return 118
-        case .i64ExtendI32S: return 119
-        case .i64ExtendI32U: return 120
-        case .i32Extend8S: return 121
-        case .i64Extend8S: return 122
-        case .i32Extend16S: return 123
-        case .i64Extend16S: return 124
-        case .i64Extend32S: return 125
-        case .i32TruncF32S: return 126
-        case .i32TruncF32U: return 127
-        case .i32TruncSatF32S: return 128
-        case .i32TruncSatF32U: return 129
-        case .i32TruncF64S: return 130
-        case .i32TruncF64U: return 131
-        case .i32TruncSatF64S: return 132
-        case .i32TruncSatF64U: return 133
-        case .i64TruncF32S: return 134
-        case .i64TruncF32U: return 135
-        case .i64TruncSatF32S: return 136
-        case .i64TruncSatF32U: return 137
-        case .i64TruncF64S: return 138
-        case .i64TruncF64U: return 139
-        case .i64TruncSatF64S: return 140
-        case .i64TruncSatF64U: return 141
-        case .f32ConvertI32S: return 142
-        case .f32ConvertI32U: return 143
-        case .f32ConvertI64S: return 144
-        case .f32ConvertI64U: return 145
-        case .f64ConvertI32S: return 146
-        case .f64ConvertI32U: return 147
-        case .f64ConvertI64S: return 148
-        case .f64ConvertI64U: return 149
-        case .f32ReinterpretI32: return 150
-        case .f64ReinterpretI64: return 151
-        case .i32ReinterpretF32: return 152
-        case .i64ReinterpretF64: return 153
-        case .f32Add: return 154
-        case .f64Add: return 155
-        case .f32Sub: return 156
-        case .f64Sub: return 157
-        case .f32Mul: return 158
-        case .f64Mul: return 159
-        case .f32Div: return 160
-        case .f64Div: return 161
-        case .f32Min: return 162
-        case .f64Min: return 163
-        case .f32Max: return 164
-        case .f64Max: return 165
-        case .f32CopySign: return 166
-        case .f64CopySign: return 167
-        case .f32Eq: return 168
-        case .f64Eq: return 169
-        case .f32Ne: return 170
-        case .f64Ne: return 171
-        case .f32Lt: return 172
-        case .f64Lt: return 173
-        case .f32Gt: return 174
-        case .f64Gt: return 175
-        case .f32Le: return 176
-        case .f64Le: return 177
-        case .f32Ge: return 178
-        case .f64Ge: return 179
-        case .f32Abs: return 180
-        case .f64Abs: return 181
-        case .f32Neg: return 182
-        case .f64Neg: return 183
-        case .f32Ceil: return 184
-        case .f64Ceil: return 185
-        case .f32Floor: return 186
-        case .f64Floor: return 187
-        case .f32Trunc: return 188
-        case .f64Trunc: return 189
-        case .f32Nearest: return 190
-        case .f64Nearest: return 191
-        case .f32Sqrt: return 192
-        case .f64Sqrt: return 193
-        case .f64PromoteF32: return 194
-        case .f32DemoteF64: return 195
-        case .select: return 196
-        case .refNull: return 197
-        case .refIsNull: return 198
-        case .refFunc: return 199
-        case .tableGet: return 200
-        case .tableSet: return 201
-        case .tableSize: return 202
-        case .tableGrow: return 203
-        case .tableFill: return 204
-        case .tableCopy: return 205
-        case .tableInit: return 206
-        case .tableElementDrop: return 207
-        case .onEnter: return 208
-        case .onExit: return 209
+        case .i32SubSS: return 70
+        case .i32SubSR: return 71
+        case .i32SubRS: return 72
+        case .i64SubSS: return 73
+        case .i64SubSR: return 74
+        case .i64SubRS: return 75
+        case .i32ShlSS: return 76
+        case .i32ShlSR: return 77
+        case .i32ShlRS: return 78
+        case .i64ShlSS: return 79
+        case .i64ShlSR: return 80
+        case .i64ShlRS: return 81
+        case .i32ShrSSS: return 82
+        case .i32ShrSSR: return 83
+        case .i32ShrSRS: return 84
+        case .i64ShrSSS: return 85
+        case .i64ShrSSR: return 86
+        case .i64ShrSRS: return 87
+        case .i32ShrUSS: return 88
+        case .i32ShrUSR: return 89
+        case .i32ShrURS: return 90
+        case .i64ShrUSS: return 91
+        case .i64ShrUSR: return 92
+        case .i64ShrURS: return 93
+        case .i32RotlSS: return 94
+        case .i32RotlSR: return 95
+        case .i32RotlRS: return 96
+        case .i64RotlSS: return 97
+        case .i64RotlSR: return 98
+        case .i64RotlRS: return 99
+        case .i32RotrSS: return 100
+        case .i32RotrSR: return 101
+        case .i32RotrRS: return 102
+        case .i64RotrSS: return 103
+        case .i64RotrSR: return 104
+        case .i64RotrRS: return 105
+        case .i32DivS: return 106
+        case .i64DivS: return 107
+        case .i32DivU: return 108
+        case .i64DivU: return 109
+        case .i32RemS: return 110
+        case .i64RemS: return 111
+        case .i32RemU: return 112
+        case .i64RemU: return 113
+        case .i32Eq: return 114
+        case .i64Eq: return 115
+        case .i32Ne: return 116
+        case .i64Ne: return 117
+        case .i32LtS: return 118
+        case .i64LtS: return 119
+        case .i32LtU: return 120
+        case .i64LtU: return 121
+        case .i32GtS: return 122
+        case .i64GtS: return 123
+        case .i32GtU: return 124
+        case .i64GtU: return 125
+        case .i32LeS: return 126
+        case .i64LeS: return 127
+        case .i32LeU: return 128
+        case .i64LeU: return 129
+        case .i32GeS: return 130
+        case .i64GeS: return 131
+        case .i32GeU: return 132
+        case .i64GeU: return 133
+        case .i32Clz: return 134
+        case .i64Clz: return 135
+        case .i32Ctz: return 136
+        case .i64Ctz: return 137
+        case .i32Popcnt: return 138
+        case .i64Popcnt: return 139
+        case .i32Eqz: return 140
+        case .i64Eqz: return 141
+        case .i32WrapI64: return 142
+        case .i64ExtendI32S: return 143
+        case .i64ExtendI32U: return 144
+        case .i32Extend8S: return 145
+        case .i64Extend8S: return 146
+        case .i32Extend16S: return 147
+        case .i64Extend16S: return 148
+        case .i64Extend32S: return 149
+        case .i32TruncF32S: return 150
+        case .i32TruncF32U: return 151
+        case .i32TruncSatF32S: return 152
+        case .i32TruncSatF32U: return 153
+        case .i32TruncF64S: return 154
+        case .i32TruncF64U: return 155
+        case .i32TruncSatF64S: return 156
+        case .i32TruncSatF64U: return 157
+        case .i64TruncF32S: return 158
+        case .i64TruncF32U: return 159
+        case .i64TruncSatF32S: return 160
+        case .i64TruncSatF32U: return 161
+        case .i64TruncF64S: return 162
+        case .i64TruncF64U: return 163
+        case .i64TruncSatF64S: return 164
+        case .i64TruncSatF64U: return 165
+        case .f32ConvertI32S: return 166
+        case .f32ConvertI32U: return 167
+        case .f32ConvertI64S: return 168
+        case .f32ConvertI64U: return 169
+        case .f64ConvertI32S: return 170
+        case .f64ConvertI32U: return 171
+        case .f64ConvertI64S: return 172
+        case .f64ConvertI64U: return 173
+        case .f32ReinterpretI32: return 174
+        case .f64ReinterpretI64: return 175
+        case .i32ReinterpretF32: return 176
+        case .i64ReinterpretF64: return 177
+        case .f32Add: return 178
+        case .f64Add: return 179
+        case .f32Sub: return 180
+        case .f64Sub: return 181
+        case .f32Mul: return 182
+        case .f64Mul: return 183
+        case .f32Div: return 184
+        case .f64Div: return 185
+        case .f32Min: return 186
+        case .f64Min: return 187
+        case .f32Max: return 188
+        case .f64Max: return 189
+        case .f32CopySign: return 190
+        case .f64CopySign: return 191
+        case .f32Eq: return 192
+        case .f64Eq: return 193
+        case .f32Ne: return 194
+        case .f64Ne: return 195
+        case .f32Lt: return 196
+        case .f64Lt: return 197
+        case .f32Gt: return 198
+        case .f64Gt: return 199
+        case .f32Le: return 200
+        case .f64Le: return 201
+        case .f32Ge: return 202
+        case .f64Ge: return 203
+        case .f32Abs: return 204
+        case .f64Abs: return 205
+        case .f32Neg: return 206
+        case .f64Neg: return 207
+        case .f32Ceil: return 208
+        case .f64Ceil: return 209
+        case .f32Floor: return 210
+        case .f64Floor: return 211
+        case .f32Trunc: return 212
+        case .f64Trunc: return 213
+        case .f32Nearest: return 214
+        case .f64Nearest: return 215
+        case .f32Sqrt: return 216
+        case .f64Sqrt: return 217
+        case .f64PromoteF32: return 218
+        case .f32DemoteF64: return 219
+        case .select: return 220
+        case .refNull: return 221
+        case .refIsNull: return 222
+        case .refFunc: return 223
+        case .tableGet: return 224
+        case .tableSet: return 225
+        case .tableSize: return 226
+        case .tableGrow: return 227
+        case .tableFill: return 228
+        case .tableCopy: return 229
+        case .tableInit: return 230
+        case .tableElementDrop: return 231
+        case .onEnter: return 232
+        case .onExit: return 233
         }
     }
 }
@@ -2186,6 +2378,18 @@ extension Instruction {
     static let i64Or = Commutative(ss: i64OrSS, sr: i64OrSR)
     static let i32Xor = Commutative(ss: i32XorSS, sr: i32XorSR)
     static let i64Xor = Commutative(ss: i64XorSS, sr: i64XorSR)
+    static let i32Sub = NonCommutative(ss: i32SubSS, sr: i32SubSR, rs: i32SubRS)
+    static let i64Sub = NonCommutative(ss: i64SubSS, sr: i64SubSR, rs: i64SubRS)
+    static let i32Shl = NonCommutative(ss: i32ShlSS, sr: i32ShlSR, rs: i32ShlRS)
+    static let i64Shl = NonCommutative(ss: i64ShlSS, sr: i64ShlSR, rs: i64ShlRS)
+    static let i32ShrS = NonCommutative(ss: i32ShrSSS, sr: i32ShrSSR, rs: i32ShrSRS)
+    static let i64ShrS = NonCommutative(ss: i64ShrSSS, sr: i64ShrSSR, rs: i64ShrSRS)
+    static let i32ShrU = NonCommutative(ss: i32ShrUSS, sr: i32ShrUSR, rs: i32ShrURS)
+    static let i64ShrU = NonCommutative(ss: i64ShrUSS, sr: i64ShrUSR, rs: i64ShrURS)
+    static let i32Rotl = NonCommutative(ss: i32RotlSS, sr: i32RotlSR, rs: i32RotlRS)
+    static let i64Rotl = NonCommutative(ss: i64RotlSS, sr: i64RotlSR, rs: i64RotlRS)
+    static let i32Rotr = NonCommutative(ss: i32RotrSS, sr: i32RotrSR, rs: i32RotrRS)
+    static let i64Rotr = NonCommutative(ss: i64RotrSS, sr: i64RotrSR, rs: i64RotrRS)
 }
 
 
