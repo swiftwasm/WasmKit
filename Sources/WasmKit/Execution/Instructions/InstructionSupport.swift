@@ -505,16 +505,6 @@ extension Instruction {
         let ss: (BinaryOperandSS) -> Instruction
         let sr: (BinaryOperandSR) -> Instruction
     }
-
-    static var i32Add = Commutative(
-        ss: i32AddSS,
-        sr: i32AddSR
-    )
-
-    static var i64Add = Commutative(
-        ss: i64AddSS,
-        sr: i64AddSR
-    )
 }
 
 struct InstructionPrintingContext {
