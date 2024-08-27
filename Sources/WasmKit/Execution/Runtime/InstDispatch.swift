@@ -24,6 +24,12 @@ extension ExecutionState {
         case .unreachable:
             try self.unreachable(sp: sp, pc: &pc)
             return true
+        case .nop:
+            try self.nop(sp: sp, pc: &pc)
+            return true
+        case .ifThen(let ifOperand):
+            self.ifThen(sp: sp, pc: &pc, ifOperand: ifOperand)
+            return true
         case .br(let offset):
             try self.br(sp: sp, pc: &pc, offset: offset)
             return true
@@ -279,6 +285,8 @@ extension Instruction {
         case .internalCall: return "internalCall"
         case .callIndirect: return "callIndirect"
         case .unreachable: return "unreachable"
+        case .nop: return "nop"
+        case .ifThen: return "ifThen"
         case .br: return "br"
         case .brIf: return "brIf"
         case .brIfNot: return "brIfNot"
