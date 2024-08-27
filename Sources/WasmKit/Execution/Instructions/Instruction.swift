@@ -7,6 +7,8 @@ enum Instruction: Equatable {
     case internalCall(Instruction.InternalCallOperand)
     case callIndirect(Instruction.CallIndirectOperand)
     case unreachable
+    case nop
+    case ifThen(Instruction.IfOperand)
     case br(offset: Int32)
     case brIf(Instruction.BrIfOperand)
     case brIfNot(Instruction.BrIfOperand)
@@ -123,8 +125,4 @@ enum Instruction: Equatable {
     case tableElementDrop(ElementIndex)
     case onEnter(Instruction.OnEnterOperand)
     case onExit(Instruction.OnExitOperand)
-}
-extension Instruction {
-    static let nop = Instruction.unreachable
-    static func ifThen(_: Instruction.IfOperand) -> Instruction { .unreachable }
 }

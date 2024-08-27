@@ -362,17 +362,8 @@ enum VMGen {
         instructions += miscInsts
         return instructions
     }
-    static let allInstructions: [Instruction] = buildInstructions()
-    static let instructions: [Instruction] = {
-        var unusedInsts = ["nop", "ifThen", "brIfNot", "f32Load", "i64Load8S", "i64Load8U", "i64Load16S", "i64Load16U", "f32Store", "i64Store8", "i64Store16", "memorySize", "memoryGrow", "memoryInit", "memoryDataDrop", "memoryFill", "i64Add", "i64Xor", "i64Shl", "i64ShrS", "i32Rotl", "i64Rotl", "i32Rotr", "i64Rotr", "i64Eq", "i64LtS", "i64LtU", "i64LeS", "i64LeU", "i64GeS", "i32Clz", "i64Clz", "i32Ctz", "i64Ctz", "i32Popcnt", "i64Popcnt", "f32Add", "f32Sub", "f32Mul", "f32Div", "f32Eq", "f32Ne", "refNull", "refIsNull", "refFunc", "tableGet", "tableSet", "tableSize", "tableGrow", "tableFill", "tableCopy", "tableInit", "tableElementDrop", "onEnter", "onExit"]
-        var numberOfRemovedInsts = 3
-        if let number = Int(ProcessInfo.processInfo.environment["REMOVE_INST_COUNT"] ?? "") {
-            numberOfRemovedInsts = number
-        }
-        unusedInsts = Array(unusedInsts.prefix(numberOfRemovedInsts))
-        print("Remove \(numberOfRemovedInsts) instructions")
-        return allInstructions.filter { !unusedInsts.contains($0.name) }
-    }()
+
+    static let instructions: [Instruction] = buildInstructions()
 
     static func camelCase(pascalCase: String) -> String {
         let first = pascalCase.first!.lowercased()
@@ -578,32 +569,6 @@ enum VMGen {
             output += "\n"
         }
         output += "}\n"
-
-        // Alias removed instructions to `unreachable`
-        output += """
-            extension Instruction {
-
-            """
-        for inst in allInstructions where !instructions.contains(where: { $0.name == inst.name }) {
-            if inst.immediates.isEmpty {
-                output += "    static let \(inst.name) = Instruction.unreachable\n"
-            } else {
-                output += "    static func \(inst.name)("
-                output += inst.immediates.map { immediate in
-                    if let name = immediate.name {
-                        return name + ": " + immediate.type
-                    } else {
-                        return "_: " + immediate.type
-                    }
-                }.joined(separator: ", ")
-                output += ") -> Instruction { .unreachable }\n"
-            }
-        }
-        output += """
-            }
-
-            """
-
         return output
     }
 
