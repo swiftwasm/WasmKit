@@ -64,12 +64,11 @@ func executeWasm(
         try withUnsafeTemporaryAllocation(of: Instruction.self, capacity: 1) { rootISeq in
             rootISeq.baseAddress?.pointee = .endOfExecution
             // NOTE: unwinding a function jump into previous frame's PC + 1, so initial PC is -1ed
-            try ExecutionState.execute(
+            try stack.execute(
                 sp: sp,
                 pc: rootISeq.baseAddress! - 1,
                 handle: handle,
-                type: type,
-                stack: &stack
+                type: type
             )
         }
         return type.results.enumerated().map { (i, type) in
@@ -144,14 +143,13 @@ extension ExecutionState {
     }
 
     @inline(never)
-    static func execute(
+    mutating func execute(
         sp: Sp, pc: Pc,
         handle: InternalFunction,
-        type: FunctionType,
-        stack: inout StackContext
+        type: FunctionType
     ) throws {
         var sp: Sp = sp, md: Md = nil, ms: Ms = 0, pc = pc
-        (pc, sp) = try stack.invoke(
+        (pc, sp) = try invoke(
             function: handle,
             callerInstance: nil,
             callLike: Instruction.CallLikeOperand(
@@ -159,7 +157,7 @@ extension ExecutionState {
             ),
             sp: sp, pc: pc, md: &md, ms: &ms
         )
-        try stack.run(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        try run(sp: &sp, pc: &pc, md: &md, ms: &ms)
     }
 
     /// The main execution loop. Be careful when modifying this function as it is performance-critical.
