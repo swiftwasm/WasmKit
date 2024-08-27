@@ -112,14 +112,13 @@ enum VMGen {
     }
 
     struct UnOpInfo {
-        var op: String
-        var name: String
-        var inputType: String
-        var resultType: String
-        var mayThrow: Bool = false
+        let op: String
+        let name: String
+        let inputType: String
+        let resultType: String
 
         var instruction: Instruction {
-            Instruction(name: name, mayThrow: mayThrow, immediates: [Immediate(name: nil, type: "Instruction.UnaryOperand")])
+            Instruction(name: name, immediates: [Immediate(name: nil, type: "Instruction.UnaryOperand")])
         }
     }
 
@@ -157,30 +156,6 @@ enum VMGen {
         // (T) -> i32 for all T in int types
         results += ["Eqz"].flatMap { op -> [UnOpInfo] in
             intValueTypes.map { UnOpInfo(op: op, name: "\($0)\(op)", inputType: $0, resultType: "i32") }
-        }
-        // (i64) -> i32
-        results += [UnOpInfo(op: "Wrap", name: "i32WrapI64", inputType: "i64", resultType: "i32")]
-        // (i32) -> i64
-        results += ["ExtendI32S", "ExtendI32U"].map { op -> UnOpInfo in
-            UnOpInfo(op: op, name: "i64\(op)", inputType: "i32", resultType: "i64")
-        }
-        // (T) -> T for all T in int types
-        results += ["Extend8S", "Extend16S"].flatMap { op -> [UnOpInfo] in
-            intValueTypes.map { UnOpInfo(op: op, name: "\($0)\(op)", inputType: $0, resultType: $0) }
-        }
-        // (i64) -> i64
-        results += ["Extend32S"].map { op -> UnOpInfo in
-            UnOpInfo(op: op, name: "i64\(op)", inputType: "i64", resultType: "i64")
-        }
-        // Truncation
-        let truncInOut: [(source: String, result: String)] = [
-            ("f32", "i32"), ("f64", "i32"), ("f32", "i64"), ("f64", "i64")
-        ]
-        results += truncInOut.flatMap { source, result in
-            [
-                UnOpInfo(op: "TruncTo\(result.uppercased())S", name: "\(result)Trunc\(source.uppercased())S", inputType: source, resultType: result, mayThrow: true),
-                UnOpInfo(op: "TruncTo\(result.uppercased())U", name: "\(result)Trunc\(source.uppercased())U", inputType: source, resultType: result, mayThrow: true)
-            ]
         }
         return results
     }
@@ -456,7 +431,7 @@ enum VMGen {
             output += """
 
                 mutating \(instMethodDecl(op.instruction)) {
-                    sp[binaryOperand.result] = sp[binaryOperand.lhs].\(op.lhsType).\(camelCase(pascalCase: op.op))(sp[binaryOperand.rhs].\(op.rhsType)).untyped
+                    sp[binaryOperand.result] = sp[binaryOperand.lhs].\(op.lhsType).\(op.op.lowercased())(sp[binaryOperand.rhs].\(op.rhsType)).untyped
                 }
             """
         }
@@ -464,7 +439,7 @@ enum VMGen {
             output += """
 
                 mutating \(instMethodDecl(op.instruction)) {
-                    sp[unaryOperand.result] = \(op.mayThrow ? "try " : "")sp[unaryOperand.input].\(op.inputType).\(camelCase(pascalCase: op.op)).untyped
+                    sp[unaryOperand.result] = sp[unaryOperand.input].\(op.inputType).\(op.op.lowercased()).untyped
                 }
             """
         }
