@@ -344,6 +344,10 @@ struct InstructionPrintingContext {
         "untyped:\(hex(value.storage))"
     }
 
+    func offset(_ offset: Int32) -> String {
+        return offset < 0 ? "-\(offset)" : "+\(offset)"
+    }
+
     mutating func print<Target>(
         instruction: Instruction,
         to target: inout Target
@@ -357,6 +361,14 @@ struct InstructionPrintingContext {
             target.write("\(reg(op.result)) = global.get \(global(op.global))")
         case .globalSet(let op):
             target.write("global.set \(global(op.global)), \(reg(op.value))")
+        case .copyR0ToStackI32(let dest):
+            target.write("\(reg(dest)) = r0 as i32")
+        case .copyR0ToStackI64(let dest):
+            target.write("\(reg(dest)) = r0 as i64")
+        case .copyR0ToStackF32(let dest):
+            target.write("\(reg(dest)) = r0 as f32")
+        case .copyR0ToStackF64(let dest):
+            target.write("\(reg(dest)) = r0 as f64")
         case .numericConst(let op):
             target.write("\(reg(op.result)) = \(value(op.value))")
         case .call(let op):
@@ -390,11 +402,11 @@ struct InstructionPrintingContext {
         case .numericIntBinary(let op, let operands):
             target.write("\(reg(operands.result)) = \(op) \(reg(operands.lhs)), \(reg(operands.rhs))")
         case .brIfNot(let op):
-            target.write("br_if_not \(reg(op.condition)), +\(op.offset)")
+            target.write("br_if_not \(reg(op.condition)), \(offset(op.offset))")
         case .brIf(let op):
-            target.write("br_if \(reg(op.condition)), +\(op.offset)")
+            target.write("br_if \(reg(op.condition)), \(offset(op.offset))")
         case .br(let offset):
-            target.write("br \(offset > 0 ? "+" : "")\(offset)")
+            target.write("br \(self.offset(offset))")
         case .return:
             target.write("return")
         default:
