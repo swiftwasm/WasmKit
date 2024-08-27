@@ -215,16 +215,6 @@ extension Instruction {
         let sr: (VReg) -> Instruction
     }
 
-    static var i32Add = Commutative(
-        ss: i32AddSS,
-        sr: i32AddSR
-    )
-
-    static var i64Add = Commutative(
-        ss: i64AddSS,
-        sr: i64AddSR
-    )
-
     static func f32Lt(_ op: BinaryOperand) -> Instruction { .numericFloatBinary(.lt(.f32), op) }
     static func f32Gt(_ op: BinaryOperand) -> Instruction { .numericFloatBinary(.gt(.f32), op) }
     static func f32Le(_ op: BinaryOperand) -> Instruction { .numericFloatBinary(.le(.f32), op) }

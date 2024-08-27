@@ -132,26 +132,42 @@ extension ExecutionState {
             self.i64AddSS(sp: sp, r0: &r0, lhs: lhs, rhs: rhs)
         case .i64AddSR(let lhs):
             self.i64AddSR(sp: sp, r0: &r0, lhs: lhs)
+        case .i32MulSS(let lhs, let rhs):
+            self.i32MulSS(sp: sp, r0: &r0, lhs: lhs, rhs: rhs)
+        case .i32MulSR(let lhs):
+            self.i32MulSR(sp: sp, r0: &r0, lhs: lhs)
+        case .i64MulSS(let lhs, let rhs):
+            self.i64MulSS(sp: sp, r0: &r0, lhs: lhs, rhs: rhs)
+        case .i64MulSR(let lhs):
+            self.i64MulSR(sp: sp, r0: &r0, lhs: lhs)
+        case .i32AndSS(let lhs, let rhs):
+            self.i32AndSS(sp: sp, r0: &r0, lhs: lhs, rhs: rhs)
+        case .i32AndSR(let lhs):
+            self.i32AndSR(sp: sp, r0: &r0, lhs: lhs)
+        case .i64AndSS(let lhs, let rhs):
+            self.i64AndSS(sp: sp, r0: &r0, lhs: lhs, rhs: rhs)
+        case .i64AndSR(let lhs):
+            self.i64AndSR(sp: sp, r0: &r0, lhs: lhs)
+        case .i32OrSS(let lhs, let rhs):
+            self.i32OrSS(sp: sp, r0: &r0, lhs: lhs, rhs: rhs)
+        case .i32OrSR(let lhs):
+            self.i32OrSR(sp: sp, r0: &r0, lhs: lhs)
+        case .i64OrSS(let lhs, let rhs):
+            self.i64OrSS(sp: sp, r0: &r0, lhs: lhs, rhs: rhs)
+        case .i64OrSR(let lhs):
+            self.i64OrSR(sp: sp, r0: &r0, lhs: lhs)
+        case .i32XorSS(let lhs, let rhs):
+            self.i32XorSS(sp: sp, r0: &r0, lhs: lhs, rhs: rhs)
+        case .i32XorSR(let lhs):
+            self.i32XorSR(sp: sp, r0: &r0, lhs: lhs)
+        case .i64XorSS(let lhs, let rhs):
+            self.i64XorSS(sp: sp, r0: &r0, lhs: lhs, rhs: rhs)
+        case .i64XorSR(let lhs):
+            self.i64XorSR(sp: sp, r0: &r0, lhs: lhs)
         case .i32Sub(let binaryOperand):
             self.i32Sub(sp: sp, binaryOperand: binaryOperand)
         case .i64Sub(let binaryOperand):
             self.i64Sub(sp: sp, binaryOperand: binaryOperand)
-        case .i32Mul(let binaryOperand):
-            self.i32Mul(sp: sp, binaryOperand: binaryOperand)
-        case .i64Mul(let binaryOperand):
-            self.i64Mul(sp: sp, binaryOperand: binaryOperand)
-        case .i32And(let binaryOperand):
-            self.i32And(sp: sp, binaryOperand: binaryOperand)
-        case .i64And(let binaryOperand):
-            self.i64And(sp: sp, binaryOperand: binaryOperand)
-        case .i32Or(let binaryOperand):
-            self.i32Or(sp: sp, binaryOperand: binaryOperand)
-        case .i64Or(let binaryOperand):
-            self.i64Or(sp: sp, binaryOperand: binaryOperand)
-        case .i32Xor(let binaryOperand):
-            self.i32Xor(sp: sp, binaryOperand: binaryOperand)
-        case .i64Xor(let binaryOperand):
-            self.i64Xor(sp: sp, binaryOperand: binaryOperand)
         case .i32Shl(let binaryOperand):
             self.i32Shl(sp: sp, binaryOperand: binaryOperand)
         case .i64Shl(let binaryOperand):
@@ -347,16 +363,24 @@ extension Instruction {
         case .i32AddSR: return "i32AddSR"
         case .i64AddSS: return "i64AddSS"
         case .i64AddSR: return "i64AddSR"
+        case .i32MulSS: return "i32MulSS"
+        case .i32MulSR: return "i32MulSR"
+        case .i64MulSS: return "i64MulSS"
+        case .i64MulSR: return "i64MulSR"
+        case .i32AndSS: return "i32AndSS"
+        case .i32AndSR: return "i32AndSR"
+        case .i64AndSS: return "i64AndSS"
+        case .i64AndSR: return "i64AndSR"
+        case .i32OrSS: return "i32OrSS"
+        case .i32OrSR: return "i32OrSR"
+        case .i64OrSS: return "i64OrSS"
+        case .i64OrSR: return "i64OrSR"
+        case .i32XorSS: return "i32XorSS"
+        case .i32XorSR: return "i32XorSR"
+        case .i64XorSS: return "i64XorSS"
+        case .i64XorSR: return "i64XorSR"
         case .i32Sub: return "i32Sub"
         case .i64Sub: return "i64Sub"
-        case .i32Mul: return "i32Mul"
-        case .i64Mul: return "i64Mul"
-        case .i32And: return "i32And"
-        case .i64And: return "i64And"
-        case .i32Or: return "i32Or"
-        case .i64Or: return "i64Or"
-        case .i32Xor: return "i32Xor"
-        case .i64Xor: return "i64Xor"
         case .i32Shl: return "i32Shl"
         case .i64Shl: return "i64Shl"
         case .i32ShrS: return "i32ShrS"
@@ -431,35 +455,27 @@ extension ExecutionState {
     mutating func i32AddSR(sp: Sp, r0: inout R0, lhs: VReg) { writePReg(&r0, sp[lhs].i32.add(readPRegI32(r0))) }
     mutating func i64AddSS(sp: Sp, r0: inout R0, lhs: VReg, rhs: VReg) { writePReg(&r0, sp[lhs].i64.add(sp[rhs].i64)) }
     mutating func i64AddSR(sp: Sp, r0: inout R0, lhs: VReg) { writePReg(&r0, sp[lhs].i64.add(readPRegI64(r0))) }
+    mutating func i32MulSS(sp: Sp, r0: inout R0, lhs: VReg, rhs: VReg) { writePReg(&r0, sp[lhs].i32.mul(sp[rhs].i32)) }
+    mutating func i32MulSR(sp: Sp, r0: inout R0, lhs: VReg) { writePReg(&r0, sp[lhs].i32.mul(readPRegI32(r0))) }
+    mutating func i64MulSS(sp: Sp, r0: inout R0, lhs: VReg, rhs: VReg) { writePReg(&r0, sp[lhs].i64.mul(sp[rhs].i64)) }
+    mutating func i64MulSR(sp: Sp, r0: inout R0, lhs: VReg) { writePReg(&r0, sp[lhs].i64.mul(readPRegI64(r0))) }
+    mutating func i32AndSS(sp: Sp, r0: inout R0, lhs: VReg, rhs: VReg) { writePReg(&r0, sp[lhs].i32.and(sp[rhs].i32)) }
+    mutating func i32AndSR(sp: Sp, r0: inout R0, lhs: VReg) { writePReg(&r0, sp[lhs].i32.and(readPRegI32(r0))) }
+    mutating func i64AndSS(sp: Sp, r0: inout R0, lhs: VReg, rhs: VReg) { writePReg(&r0, sp[lhs].i64.and(sp[rhs].i64)) }
+    mutating func i64AndSR(sp: Sp, r0: inout R0, lhs: VReg) { writePReg(&r0, sp[lhs].i64.and(readPRegI64(r0))) }
+    mutating func i32OrSS(sp: Sp, r0: inout R0, lhs: VReg, rhs: VReg) { writePReg(&r0, sp[lhs].i32.or(sp[rhs].i32)) }
+    mutating func i32OrSR(sp: Sp, r0: inout R0, lhs: VReg) { writePReg(&r0, sp[lhs].i32.or(readPRegI32(r0))) }
+    mutating func i64OrSS(sp: Sp, r0: inout R0, lhs: VReg, rhs: VReg) { writePReg(&r0, sp[lhs].i64.or(sp[rhs].i64)) }
+    mutating func i64OrSR(sp: Sp, r0: inout R0, lhs: VReg) { writePReg(&r0, sp[lhs].i64.or(readPRegI64(r0))) }
+    mutating func i32XorSS(sp: Sp, r0: inout R0, lhs: VReg, rhs: VReg) { writePReg(&r0, sp[lhs].i32.xor(sp[rhs].i32)) }
+    mutating func i32XorSR(sp: Sp, r0: inout R0, lhs: VReg) { writePReg(&r0, sp[lhs].i32.xor(readPRegI32(r0))) }
+    mutating func i64XorSS(sp: Sp, r0: inout R0, lhs: VReg, rhs: VReg) { writePReg(&r0, sp[lhs].i64.xor(sp[rhs].i64)) }
+    mutating func i64XorSR(sp: Sp, r0: inout R0, lhs: VReg) { writePReg(&r0, sp[lhs].i64.xor(readPRegI64(r0))) }
     mutating func i32Sub(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.sub(sp[binaryOperand.rhs].i32).untyped
     }
     mutating func i64Sub(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.sub(sp[binaryOperand.rhs].i64).untyped
-    }
-    mutating func i32Mul(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.mul(sp[binaryOperand.rhs].i32).untyped
-    }
-    mutating func i64Mul(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.mul(sp[binaryOperand.rhs].i64).untyped
-    }
-    mutating func i32And(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.and(sp[binaryOperand.rhs].i32).untyped
-    }
-    mutating func i64And(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.and(sp[binaryOperand.rhs].i64).untyped
-    }
-    mutating func i32Or(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.or(sp[binaryOperand.rhs].i32).untyped
-    }
-    mutating func i64Or(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.or(sp[binaryOperand.rhs].i64).untyped
-    }
-    mutating func i32Xor(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.xor(sp[binaryOperand.rhs].i32).untyped
-    }
-    mutating func i64Xor(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.xor(sp[binaryOperand.rhs].i64).untyped
     }
     mutating func i32Shl(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.shl(sp[binaryOperand.rhs].i32).untyped

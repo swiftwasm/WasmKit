@@ -128,36 +128,36 @@ enum VMGen {
         var isCommutative: Bool = false
         var useFastPath: Bool = false
 
-        var operandSources: [(lhs: OperandInfo, rhs: OperandInfo)] {
+        var operandSources: [(lhs: OperandSource, rhs: OperandSource)] {
             assert(useFastPath)
-            var sources: [(lhs: OperandInfo, rhs: OperandInfo)] = []
+            var sources: [(lhs: OperandSource, rhs: OperandSource)] = []
             sources += [
-                (OperandInfo(type: lhsType, source: .stack), OperandInfo(type: rhsType, source: .stack)),
-                (OperandInfo(type: lhsType, source: .stack), OperandInfo(type: rhsType, source: .register)),
+                (.stack, .stack),
+                (.stack, .register),
             ]
             if !isCommutative {
                 sources += [
-                    (OperandInfo(type: lhsType, source: .register), OperandInfo(type: rhsType, source: .stack)),
+                    (.register, .stack),
                 ]
             }
             return sources
         }
 
-        func instruction(lhs: OperandInfo, rhs: OperandInfo) -> Instruction {
+        func instruction(lhs: OperandSource, rhs: OperandSource) -> Instruction {
             assert(useFastPath)
             var immediates: [Immediate] = []
-            switch lhs.source {
+            switch lhs {
             case .stack:
                 immediates.append(Immediate(name: "lhs", type: "VReg"))
             case .register: break
             }
-            switch rhs.source {
+            switch rhs {
             case .stack:
                 immediates.append(Immediate(name: "rhs", type: "VReg"))
             case .register: break
             }
             return Instruction(
-                name: name + lhs.source.marker + rhs.source.marker,
+                name: name + lhs.marker + rhs.marker,
                 useR0: .write,
                 immediates: immediates
             )
@@ -202,14 +202,14 @@ enum VMGen {
         // (T, T) -> T for all T in int types
         // Commutative
         results += [
-            "Add"
+            "Add", "Mul", "And", "Or", "Xor",
         ].flatMap { op -> [BinOpInfo] in
             intValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: $0, isCommutative: true, useFastPath: true) }
         }
         // Others
         results += [
-            "Sub", "Mul",
-            "And", "Or", "Xor", "Shl", "ShrS", "ShrU", "Rotl", "Rotr",
+            "Sub",
+            "Shl", "ShrS", "ShrU", "Rotl", "Rotr",
         ].flatMap { op -> [BinOpInfo] in
             intValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: $0) }
         }
@@ -525,7 +525,7 @@ enum VMGen {
                     output += " "
                     let result = op.resultType.selectExecParam().label
                     output += """
-                    writePReg(&\(result), \(operand("lhs", lhs.source, op.lhsType)).\(op.op.lowercased())(\(operand("rhs", rhs.source, op.rhsType))))
+                    writePReg(&\(result), \(operand("lhs", lhs, op.lhsType)).\(op.op.lowercased())(\(operand("rhs", rhs, op.rhsType))))
                     """
                     output += " }"
                 }
@@ -670,6 +670,18 @@ enum VMGen {
                 output += ")"
             }
             output += "\n"
+        }
+        output += "}\n"
+        output += "\n\n"
+        output += "extension Instruction {\n"
+        for binOp in intBinOps {
+            guard binOp.useFastPath else { continue }
+            if binOp.isCommutative {
+                output += "    static let \(binOp.name) = Commutative("
+                output += "ss: \(binOp.instruction(lhs: .stack, rhs: .stack).name), "
+                output += "sr: \(binOp.instruction(lhs: .stack, rhs: .register).name)"
+                output += ")\n"
+            }
         }
         output += "}\n"
         return output
