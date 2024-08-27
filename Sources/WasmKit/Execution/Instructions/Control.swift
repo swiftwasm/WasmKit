@@ -48,7 +48,7 @@ extension ExecutionState {
     }
 
     mutating func endOfExecution(sp: inout Sp, pc: inout Pc) throws {
-        reachedEndOfExecution = true
+        throw EndOfExecution()
     }
 
     private mutating func endOfFunction(currentFrame: Frame, sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
