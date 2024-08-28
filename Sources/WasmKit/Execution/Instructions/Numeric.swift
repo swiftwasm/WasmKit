@@ -184,13 +184,13 @@ extension NumericInstruction {
             case .copysign:
                 return .copySign(value1, value2)
             case .lt:
-                return value1 < value2 ? true : false
+                return .i32(value1 < value2 ? 1 : 0)
             case .gt:
-                return value1 > value2 ? true : false
+                return .i32(value1 > value2 ? 1 : 0)
             case .le:
-                return value1 <= value2 ? true : false
+                return .i32(value1 <= value2 ? 1 : 0)
             case .ge:
-                return value1 >= value2 ? true : false
+                return .i32(value1 >= value2 ? 1 : 0)
             }
         }
     }

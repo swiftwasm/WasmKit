@@ -92,7 +92,13 @@ extension Value {
     }
 }
 
-extension Value: Comparable {
+// TODO: Remove Comparable conformance after refactoring float binops
+#if hasAttribute(retroactive)
+extension Value: @retroactive Comparable {}
+#else
+extension Value: Comparable {}
+#endif
+extension Value {
     /// Returns if the left value is less than the right value.
     /// - Precondition: The values are of the same type.
     public static func < (lhs: Self, rhs: Self) -> Bool {
@@ -138,31 +144,6 @@ extension Value: Comparable {
         case let (.f32(lhs), .f32(rhs)): return Float32(bitPattern: lhs) <= Float32(bitPattern: rhs)
         case let (.f64(lhs), .f64(rhs)): return Float64(bitPattern: lhs) <= Float64(bitPattern: rhs)
         default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value: Comparable` implementation")
-        }
-    }
-}
-
-extension Value: ExpressibleByBooleanLiteral {
-    /// Create a new value from a boolean literal.
-    public init(booleanLiteral value: BooleanLiteralType) {
-        if value {
-            self = .i32(1)
-        } else {
-            self = .i32(0)
-        }
-    }
-}
-
-extension Value: CustomStringConvertible {
-    /// A textual representation of the value.
-    public var description: String {
-        switch self {
-        case let .i32(rawValue): return "I32(\(rawValue.signed))"
-        case let .i64(rawValue): return "I64(\(rawValue.signed))"
-        case let .f32(rawValue): return "F32(\(Float32(bitPattern: rawValue)))"
-        case let .f64(rawValue): return "F64(\(Float64(bitPattern: rawValue)))"
-        case let .ref(.extern(tableIndex)): return "externref(\(tableIndex?.description ?? "null"))"
-        case let .ref(.function(functionAddress)): return "funcref(\(functionAddress?.description ?? "null"))"
         }
     }
 }
