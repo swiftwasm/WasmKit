@@ -10,11 +10,6 @@ extension ExecutionState {
         sp[unaryOperand.result] = UntypedValue(floatUnary(value.cast(to: floatUnary.type)))
     }
 
-    mutating func numericIntBinary(sp: Sp, intBinary: NumericInstruction.IntBinary, binaryOperand: Instruction.BinaryOperand) throws {
-        let value2 = sp[binaryOperand.rhs].cast(to: intBinary.type)
-        let value1 = sp[binaryOperand.lhs].cast(to: intBinary.type)
-        sp[binaryOperand.result] = UntypedValue(try intBinary(value1, value2))
-    }
     mutating func numericFloatBinary(sp: Sp, floatBinary: NumericInstruction.FloatBinary, binaryOperand: Instruction.BinaryOperand) {
         let value2 = sp[binaryOperand.rhs].cast(to: floatBinary.type)
         let value1 = sp[binaryOperand.lhs].cast(to: floatBinary.type)
@@ -75,44 +70,6 @@ extension NumericInstruction {
                 return value.nearest
             case .sqrt:
                 return value.squareRoot
-            }
-        }
-    }
-
-    public enum IntBinary: Equatable {
-        // ibinop
-        case divS(IntValueType)
-        case divU(IntValueType)
-        case remS(IntValueType)
-        case remU(IntValueType)
-
-        var type: NumericType {
-            switch self {
-            case let .divS(type),
-                let .divU(type),
-                let .remS(type),
-                let .remU(type):
-                return .int(type)
-            }
-        }
-
-        func callAsFunction(
-            _ value1: Value,
-            _ value2: Value
-        ) throws -> Value {
-            switch self {
-            case .divS:
-                guard !value2.isZero else { throw Trap.integerDividedByZero }
-                return try Value.divisionSigned(value1, value2)
-            case .divU:
-                guard !value2.isZero else { throw Trap.integerDividedByZero }
-                return try Value.divisionUnsigned(value1, value2)
-            case .remS:
-                guard !value2.isZero else { throw Trap.integerDividedByZero }
-                return try Value.remainderSigned(value1, value2)
-            case .remU:
-                guard !value2.isZero else { throw Trap.integerDividedByZero }
-                return try Value.remainderUnsigned(value1, value2)
             }
         }
     }

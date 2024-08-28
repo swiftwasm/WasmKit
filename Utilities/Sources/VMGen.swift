@@ -102,10 +102,12 @@ enum VMGen {
         let lhsType: String
         let rhsType: String
         let resultType: String
+        var mayThrow: Bool = false
 
         var instruction: Instruction {
             Instruction(
                 name: name,
+                mayThrow: mayThrow,
                 immediates: [Immediate(name: nil, type: "Instruction.BinaryOperand")]
             )
         }
@@ -137,6 +139,11 @@ enum VMGen {
             "And", "Or", "Xor", "Shl", "ShrS", "ShrU", "Rotl", "Rotr",
         ].flatMap { op -> [BinOpInfo] in
             intValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: $0) }
+        }
+        results += [
+            "DivS", "DivU", "RemS", "RemU",
+        ].flatMap { op -> [BinOpInfo] in
+            intValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: $0, mayThrow: true) }
         }
         // (T, T) -> i32 for all T in int types
         results += [
@@ -217,10 +224,6 @@ enum VMGen {
         Instruction(name: "numericFloatUnary", immediates: [
             Immediate(name: nil, type: "NumericInstruction.FloatUnary"),
             Immediate(name: nil, type: "Instruction.UnaryOperand"),
-        ]),
-        Instruction(name: "numericIntBinary", mayThrow: true, immediates: [
-            Immediate(name: nil, type: "NumericInstruction.IntBinary"),
-            Immediate(name: nil, type: "Instruction.BinaryOperand"),
         ]),
         Instruction(name: "numericFloatBinary", immediates: [
             Immediate(name: nil, type: "NumericInstruction.FloatBinary"),
@@ -456,7 +459,7 @@ enum VMGen {
             output += """
 
                 mutating \(instMethodDecl(op.instruction)) {
-                    sp[binaryOperand.result] = sp[binaryOperand.lhs].\(op.lhsType).\(camelCase(pascalCase: op.op))(sp[binaryOperand.rhs].\(op.rhsType)).untyped
+                    sp[binaryOperand.result] = \(op.mayThrow ? "try " : "")sp[binaryOperand.lhs].\(op.lhsType).\(camelCase(pascalCase: op.op))(sp[binaryOperand.rhs].\(op.rhsType)).untyped
                 }
             """
         }

@@ -501,6 +501,31 @@ extension RawUnsignedInteger {
         let shift = other % Self(Self.bitWidth)
         return self >> shift | self << (Self(Self.bitWidth) - shift)
     }
+
+    func divS(_ other: Self) throws -> Self {
+        if _slowPath(other == 0) { throw Trap.integerDividedByZero }
+        let (signed, overflow) = signed.dividedReportingOverflow(by: other.signed)
+        guard !overflow else { throw Trap.integerOverflowed }
+        return signed.unsigned
+    }
+    func divU(_ other: Self) throws -> Self {
+        if _slowPath(other == 0) { throw Trap.integerDividedByZero }
+        let (unsigned, overflow) = dividedReportingOverflow(by: other)
+        guard !overflow else { throw Trap.integerOverflowed }
+        return unsigned
+    }
+    func remS(_ other: Self) throws -> Self {
+        if _slowPath(other == 0) { throw Trap.integerDividedByZero }
+        let (signed, overflow) = signed.remainderReportingOverflow(dividingBy: other.signed)
+        guard !overflow else { return 0 }
+        return signed.unsigned
+    }
+    func remU(_ other: Self) throws -> Self {
+        if _slowPath(other == 0) { throw Trap.integerDividedByZero }
+        let (unsigned, overflow) = remainderReportingOverflow(dividingBy: other)
+        guard !overflow else { throw Trap.integerOverflowed }
+        return unsigned
+    }
 }
 
 extension UInt32 {
