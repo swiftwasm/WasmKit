@@ -5,34 +5,34 @@ extension ExecutionState {
         throw Trap.unreachable
     }
     mutating func nop(sp: Sp, pc: inout Pc) throws {
-        pc += 1
+        nextInstruction(&pc)
     }
 
     mutating func ifThen(sp: Sp, pc: inout Pc, ifOperand: Instruction.IfOperand) {
         let isTrue = sp[ifOperand.condition].i32 != 0
         if isTrue {
-            pc += 1
+            nextInstruction(&pc)
         } else {
-            pc += Int(ifOperand.elseOrEndOffset)
+            nextInstruction(&pc, count: Int(ifOperand.elseOrEndOffset))
         }
     }
 
     mutating func br(sp: Sp, pc: inout Pc, offset: Int32) throws {
-        pc += Int(offset)
+        nextInstruction(&pc, count: Int(offset))
     }
     mutating func brIf(sp: Sp, pc: inout Pc, brIfOperand: Instruction.BrIfOperand) throws {
         guard sp[brIfOperand.condition].i32 != 0 else {
-            pc += 1
+            nextInstruction(&pc)
             return
         }
-        pc += Int(brIfOperand.offset)
+        nextInstruction(&pc, count: Int(brIfOperand.offset))
     }
     mutating func brIfNot(sp: Sp, pc: inout Pc, brIfOperand: Instruction.BrIfOperand) throws {
         guard sp[brIfOperand.condition].i32 == 0 else {
-            pc += 1
+            nextInstruction(&pc)
             return
         }
-        pc += Int(brIfOperand.offset)
+        nextInstruction(&pc, count: Int(brIfOperand.offset))
     }
     mutating func brTable(sp: Sp, pc: inout Pc, brTableOperand: Instruction.BrTableOperand) throws {
         let brTable = brTableOperand.table
@@ -40,7 +40,7 @@ extension ExecutionState {
         let normalizedOffset = min(Int(index), Int(brTable.count - 1))
         let entry = brTable.baseAddress[normalizedOffset]
 
-        pc += Int(entry.offset)
+        nextInstruction(&pc, count: Int(entry.offset))
     }
 
     mutating func `return`(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
@@ -77,7 +77,7 @@ extension ExecutionState {
             iseq: iseq,
             instance: instance,
             numberOfNonParameterLocals: locals,
-            sp: sp, returnPC: pc.advanced(by: 1),
+            sp: sp, returnPC: pc.advancedPc(by: 1),
             spAddend: internalCallOperand.callLike.spAddend
         )
         pc = iseq.baseAddress
@@ -86,7 +86,7 @@ extension ExecutionState {
     @inline(__always)
     mutating func compilingCall(sp: inout Sp, pc: inout Pc, compilingCallOperand: Instruction.CompilingCallOperand) throws {
         try compilingCallOperand.callee.ensureCompiled(runtime: runtime)
-        pc.pointee = .internalCall(compilingCallOperand)
+        pc.assumingMemoryBound(to: Instruction.self).pointee = .internalCall(compilingCallOperand)
         try internalCall(sp: &sp, pc: &pc, internalCallOperand: compilingCallOperand)
     }
 

@@ -856,7 +856,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
         buffer[instructions.count] = .return
         return InstructionSequence(
-            instructions: buffer,
+            instructions: UnsafeMutableRawBufferPointer(buffer),
             maxStackHeight: Int(valueStack.stackRegBase) + valueStack.maxHeight
         )
     }
