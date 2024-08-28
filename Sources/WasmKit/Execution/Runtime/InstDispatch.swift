@@ -6,100 +6,100 @@ extension ExecutionState {
         case .copyStack(let copyStackOperand):
             self.copyStack(sp: sp, copyStackOperand: copyStackOperand)
         case .globalGet(let globalGetOperand):
-            try self.globalGet(sp: sp, globalGetOperand: globalGetOperand)
+            pc = try self.globalGet(sp: sp, pc: pc, globalGetOperand: globalGetOperand)
         case .globalSet(let globalSetOperand):
-            try self.globalSet(sp: sp, globalSetOperand: globalSetOperand)
+            pc = try self.globalSet(sp: sp, pc: pc, globalSetOperand: globalSetOperand)
         case .call(let callOperand):
-            try self.call(sp: &sp, pc: &pc, md: &md, ms: &ms, callOperand: callOperand)
+            pc = try self.call(sp: &sp, pc: pc, md: &md, ms: &ms, callOperand: callOperand)
             return false
         case .compilingCall(let compilingCallOperand):
-            try self.compilingCall(sp: &sp, pc: &pc, compilingCallOperand: compilingCallOperand)
+            pc = try self.compilingCall(sp: &sp, pc: pc, compilingCallOperand: compilingCallOperand)
             return false
         case .internalCall(let internalCallOperand):
-            try self.internalCall(sp: &sp, pc: &pc, internalCallOperand: internalCallOperand)
+            pc = try self.internalCall(sp: &sp, pc: pc, internalCallOperand: internalCallOperand)
             return false
         case .callIndirect(let callIndirectOperand):
-            try self.callIndirect(sp: &sp, pc: &pc, md: &md, ms: &ms, callIndirectOperand: callIndirectOperand)
+            pc = try self.callIndirect(sp: &sp, pc: pc, md: &md, ms: &ms, callIndirectOperand: callIndirectOperand)
             return false
         case .unreachable:
-            try self.unreachable(sp: sp, pc: &pc)
+            pc = try self.unreachable(sp: sp, pc: pc)
             return true
         case .nop:
-            try self.nop(sp: sp, pc: &pc)
+            pc = try self.nop(sp: sp, pc: pc)
             return true
         case .ifThen(let ifOperand):
-            self.ifThen(sp: sp, pc: &pc, ifOperand: ifOperand)
+            pc = self.ifThen(sp: sp, pc: pc, ifOperand: ifOperand)
             return true
         case .br(let offset):
-            try self.br(sp: sp, pc: &pc, offset: offset)
+            pc = try self.br(sp: sp, pc: pc, offset: offset)
             return true
         case .brIf(let brIfOperand):
-            try self.brIf(sp: sp, pc: &pc, brIfOperand: brIfOperand)
+            pc = try self.brIf(sp: sp, pc: pc, brIfOperand: brIfOperand)
             return true
         case .brIfNot(let brIfOperand):
-            try self.brIfNot(sp: sp, pc: &pc, brIfOperand: brIfOperand)
+            pc = try self.brIfNot(sp: sp, pc: pc, brIfOperand: brIfOperand)
             return true
         case .brTable(let brTableOperand):
-            try self.brTable(sp: sp, pc: &pc, brTableOperand: brTableOperand)
+            pc = try self.brTable(sp: sp, pc: pc, brTableOperand: brTableOperand)
             return true
         case .`return`:
-            try self.`return`(sp: &sp, pc: &pc, md: &md, ms: &ms)
+            pc = try self.`return`(sp: &sp, pc: pc, md: &md, ms: &ms)
             return false
         case .endOfExecution:
-            try self.endOfExecution(sp: &sp, pc: &pc)
+            pc = try self.endOfExecution(sp: &sp, pc: pc)
             return false
         case .i32Load(let loadOperand):
-            try self.i32Load(sp: sp, md: md, ms: ms, loadOperand: loadOperand)
+            pc = try self.i32Load(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand)
         case .i64Load(let loadOperand):
-            try self.i64Load(sp: sp, md: md, ms: ms, loadOperand: loadOperand)
+            pc = try self.i64Load(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand)
         case .f32Load(let loadOperand):
-            try self.f32Load(sp: sp, md: md, ms: ms, loadOperand: loadOperand)
+            pc = try self.f32Load(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand)
         case .f64Load(let loadOperand):
-            try self.f64Load(sp: sp, md: md, ms: ms, loadOperand: loadOperand)
+            pc = try self.f64Load(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand)
         case .i32Load8S(let loadOperand):
-            try self.i32Load8S(sp: sp, md: md, ms: ms, loadOperand: loadOperand)
+            pc = try self.i32Load8S(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand)
         case .i32Load8U(let loadOperand):
-            try self.i32Load8U(sp: sp, md: md, ms: ms, loadOperand: loadOperand)
+            pc = try self.i32Load8U(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand)
         case .i32Load16S(let loadOperand):
-            try self.i32Load16S(sp: sp, md: md, ms: ms, loadOperand: loadOperand)
+            pc = try self.i32Load16S(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand)
         case .i32Load16U(let loadOperand):
-            try self.i32Load16U(sp: sp, md: md, ms: ms, loadOperand: loadOperand)
+            pc = try self.i32Load16U(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand)
         case .i64Load8S(let loadOperand):
-            try self.i64Load8S(sp: sp, md: md, ms: ms, loadOperand: loadOperand)
+            pc = try self.i64Load8S(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand)
         case .i64Load8U(let loadOperand):
-            try self.i64Load8U(sp: sp, md: md, ms: ms, loadOperand: loadOperand)
+            pc = try self.i64Load8U(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand)
         case .i64Load16S(let loadOperand):
-            try self.i64Load16S(sp: sp, md: md, ms: ms, loadOperand: loadOperand)
+            pc = try self.i64Load16S(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand)
         case .i64Load16U(let loadOperand):
-            try self.i64Load16U(sp: sp, md: md, ms: ms, loadOperand: loadOperand)
+            pc = try self.i64Load16U(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand)
         case .i64Load32S(let loadOperand):
-            try self.i64Load32S(sp: sp, md: md, ms: ms, loadOperand: loadOperand)
+            pc = try self.i64Load32S(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand)
         case .i64Load32U(let loadOperand):
-            try self.i64Load32U(sp: sp, md: md, ms: ms, loadOperand: loadOperand)
+            pc = try self.i64Load32U(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand)
         case .i32Store(let storeOperand):
-            try self.i32Store(sp: sp, md: md, ms: ms, storeOperand: storeOperand)
+            pc = try self.i32Store(sp: sp, pc: pc, md: md, ms: ms, storeOperand: storeOperand)
         case .i64Store(let storeOperand):
-            try self.i64Store(sp: sp, md: md, ms: ms, storeOperand: storeOperand)
+            pc = try self.i64Store(sp: sp, pc: pc, md: md, ms: ms, storeOperand: storeOperand)
         case .f32Store(let storeOperand):
-            try self.f32Store(sp: sp, md: md, ms: ms, storeOperand: storeOperand)
+            pc = try self.f32Store(sp: sp, pc: pc, md: md, ms: ms, storeOperand: storeOperand)
         case .f64Store(let storeOperand):
-            try self.f64Store(sp: sp, md: md, ms: ms, storeOperand: storeOperand)
+            pc = try self.f64Store(sp: sp, pc: pc, md: md, ms: ms, storeOperand: storeOperand)
         case .i32Store8(let storeOperand):
-            try self.i32Store8(sp: sp, md: md, ms: ms, storeOperand: storeOperand)
+            pc = try self.i32Store8(sp: sp, pc: pc, md: md, ms: ms, storeOperand: storeOperand)
         case .i32Store16(let storeOperand):
-            try self.i32Store16(sp: sp, md: md, ms: ms, storeOperand: storeOperand)
+            pc = try self.i32Store16(sp: sp, pc: pc, md: md, ms: ms, storeOperand: storeOperand)
         case .i64Store8(let storeOperand):
-            try self.i64Store8(sp: sp, md: md, ms: ms, storeOperand: storeOperand)
+            pc = try self.i64Store8(sp: sp, pc: pc, md: md, ms: ms, storeOperand: storeOperand)
         case .i64Store16(let storeOperand):
-            try self.i64Store16(sp: sp, md: md, ms: ms, storeOperand: storeOperand)
+            pc = try self.i64Store16(sp: sp, pc: pc, md: md, ms: ms, storeOperand: storeOperand)
         case .i64Store32(let storeOperand):
-            try self.i64Store32(sp: sp, md: md, ms: ms, storeOperand: storeOperand)
+            pc = try self.i64Store32(sp: sp, pc: pc, md: md, ms: ms, storeOperand: storeOperand)
         case .memorySize(let memorySizeOperand):
             self.memorySize(sp: sp, memorySizeOperand: memorySizeOperand)
         case .memoryGrow(let memoryGrowOperand):
             try self.memoryGrow(sp: sp, md: &md, ms: &ms, memoryGrowOperand: memoryGrowOperand)
         case .memoryInit(let memoryInitOperand):
-            try self.memoryInit(sp: sp, memoryInitOperand: memoryInitOperand)
+            pc = try self.memoryInit(sp: sp, pc: pc, memoryInitOperand: memoryInitOperand)
         case .memoryDataDrop(let dataIndex):
             self.memoryDataDrop(sp: sp, dataIndex: dataIndex)
         case .memoryCopy(let memoryCopyOperand):
@@ -107,7 +107,7 @@ extension ExecutionState {
         case .memoryFill(let memoryFillOperand):
             try self.memoryFill(sp: sp, memoryFillOperand: memoryFillOperand)
         case .numericConst(let constOperand):
-            self.numericConst(sp: sp, constOperand: constOperand)
+            pc = self.numericConst(sp: sp, pc: pc, constOperand: constOperand)
         case .numericFloatUnary(let floatUnary, let unaryOperand):
             self.numericFloatUnary(sp: sp, floatUnary: floatUnary, unaryOperand: unaryOperand)
         case .numericConversion(let conversion, let unaryOperand):
@@ -312,8 +312,8 @@ extension ExecutionState {
             self.f32Ge(sp: sp, binaryOperand: binaryOperand)
         case .f64Ge(let binaryOperand):
             self.f64Ge(sp: sp, binaryOperand: binaryOperand)
-        case .select(let selectOperand):
-            try self.select(sp: sp, selectOperand: selectOperand)
+        case .select:
+            pc = try self.select(sp: sp, pc: pc)
         case .refNull(let refNullOperand):
             self.refNull(sp: sp, refNullOperand: refNullOperand)
         case .refIsNull(let refIsNullOperand):
@@ -321,19 +321,19 @@ extension ExecutionState {
         case .refFunc(let refFuncOperand):
             self.refFunc(sp: sp, refFuncOperand: refFuncOperand)
         case .tableGet(let tableGetOperand):
-            try self.tableGet(sp: sp, tableGetOperand: tableGetOperand)
+            pc = try self.tableGet(sp: sp, pc: pc, tableGetOperand: tableGetOperand)
         case .tableSet(let tableSetOperand):
-            try self.tableSet(sp: sp, tableSetOperand: tableSetOperand)
+            pc = try self.tableSet(sp: sp, pc: pc, tableSetOperand: tableSetOperand)
         case .tableSize(let tableSizeOperand):
             self.tableSize(sp: sp, tableSizeOperand: tableSizeOperand)
         case .tableGrow(let tableGrowOperand):
-            try self.tableGrow(sp: sp, tableGrowOperand: tableGrowOperand)
+            pc = try self.tableGrow(sp: sp, pc: pc, tableGrowOperand: tableGrowOperand)
         case .tableFill(let tableFillOperand):
-            try self.tableFill(sp: sp, tableFillOperand: tableFillOperand)
+            pc = try self.tableFill(sp: sp, pc: pc, tableFillOperand: tableFillOperand)
         case .tableCopy(let tableCopyOperand):
-            try self.tableCopy(sp: sp, tableCopyOperand: tableCopyOperand)
+            pc = try self.tableCopy(sp: sp, pc: pc, tableCopyOperand: tableCopyOperand)
         case .tableInit(let tableInitOperand):
-            try self.tableInit(sp: sp, tableInitOperand: tableInitOperand)
+            pc = try self.tableInit(sp: sp, pc: pc, tableInitOperand: tableInitOperand)
         case .tableElementDrop(let elementIndex):
             self.tableElementDrop(sp: sp, elementIndex: elementIndex)
         case .onEnter(let onEnterOperand):
@@ -341,7 +341,6 @@ extension ExecutionState {
         case .onExit(let onExitOperand):
             self.onExit(sp: sp, onExitOperand: onExitOperand)
         }
-        nextInstruction(&pc)
         return true
     }
 }
@@ -517,373 +516,373 @@ extension Instruction {
 
 
 extension ExecutionState {
-    mutating func i32Add(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i32Add(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.add(sp[binaryOperand.rhs].i32).untyped
     }
-    mutating func i64Add(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i64Add(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.add(sp[binaryOperand.rhs].i64).untyped
     }
-    mutating func i32Sub(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i32Sub(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.sub(sp[binaryOperand.rhs].i32).untyped
     }
-    mutating func i64Sub(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i64Sub(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.sub(sp[binaryOperand.rhs].i64).untyped
     }
-    mutating func i32Mul(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i32Mul(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.mul(sp[binaryOperand.rhs].i32).untyped
     }
-    mutating func i64Mul(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i64Mul(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.mul(sp[binaryOperand.rhs].i64).untyped
     }
-    mutating func i32And(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i32And(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.and(sp[binaryOperand.rhs].i32).untyped
     }
-    mutating func i64And(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i64And(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.and(sp[binaryOperand.rhs].i64).untyped
     }
-    mutating func i32Or(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i32Or(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.or(sp[binaryOperand.rhs].i32).untyped
     }
-    mutating func i64Or(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i64Or(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.or(sp[binaryOperand.rhs].i64).untyped
     }
-    mutating func i32Xor(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i32Xor(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.xor(sp[binaryOperand.rhs].i32).untyped
     }
-    mutating func i64Xor(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i64Xor(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.xor(sp[binaryOperand.rhs].i64).untyped
     }
-    mutating func i32Shl(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i32Shl(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.shl(sp[binaryOperand.rhs].i32).untyped
     }
-    mutating func i64Shl(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i64Shl(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.shl(sp[binaryOperand.rhs].i64).untyped
     }
-    mutating func i32ShrS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i32ShrS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.shrS(sp[binaryOperand.rhs].i32).untyped
     }
-    mutating func i64ShrS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i64ShrS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.shrS(sp[binaryOperand.rhs].i64).untyped
     }
-    mutating func i32ShrU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i32ShrU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.shrU(sp[binaryOperand.rhs].i32).untyped
     }
-    mutating func i64ShrU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i64ShrU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.shrU(sp[binaryOperand.rhs].i64).untyped
     }
-    mutating func i32Rotl(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i32Rotl(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.rotl(sp[binaryOperand.rhs].i32).untyped
     }
-    mutating func i64Rotl(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i64Rotl(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.rotl(sp[binaryOperand.rhs].i64).untyped
     }
-    mutating func i32Rotr(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i32Rotr(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.rotr(sp[binaryOperand.rhs].i32).untyped
     }
-    mutating func i64Rotr(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i64Rotr(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.rotr(sp[binaryOperand.rhs].i64).untyped
     }
-    mutating func i32DivS(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
+    @inline(__always) mutating func i32DivS(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
         sp[binaryOperand.result] = try sp[binaryOperand.lhs].i32.divS(sp[binaryOperand.rhs].i32).untyped
     }
-    mutating func i64DivS(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
+    @inline(__always) mutating func i64DivS(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
         sp[binaryOperand.result] = try sp[binaryOperand.lhs].i64.divS(sp[binaryOperand.rhs].i64).untyped
     }
-    mutating func i32DivU(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
+    @inline(__always) mutating func i32DivU(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
         sp[binaryOperand.result] = try sp[binaryOperand.lhs].i32.divU(sp[binaryOperand.rhs].i32).untyped
     }
-    mutating func i64DivU(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
+    @inline(__always) mutating func i64DivU(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
         sp[binaryOperand.result] = try sp[binaryOperand.lhs].i64.divU(sp[binaryOperand.rhs].i64).untyped
     }
-    mutating func i32RemS(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
+    @inline(__always) mutating func i32RemS(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
         sp[binaryOperand.result] = try sp[binaryOperand.lhs].i32.remS(sp[binaryOperand.rhs].i32).untyped
     }
-    mutating func i64RemS(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
+    @inline(__always) mutating func i64RemS(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
         sp[binaryOperand.result] = try sp[binaryOperand.lhs].i64.remS(sp[binaryOperand.rhs].i64).untyped
     }
-    mutating func i32RemU(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
+    @inline(__always) mutating func i32RemU(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
         sp[binaryOperand.result] = try sp[binaryOperand.lhs].i32.remU(sp[binaryOperand.rhs].i32).untyped
     }
-    mutating func i64RemU(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
+    @inline(__always) mutating func i64RemU(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
         sp[binaryOperand.result] = try sp[binaryOperand.lhs].i64.remU(sp[binaryOperand.rhs].i64).untyped
     }
-    mutating func i32Eq(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i32Eq(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.eq(sp[binaryOperand.rhs].i32).untyped
     }
-    mutating func i64Eq(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i64Eq(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.eq(sp[binaryOperand.rhs].i64).untyped
     }
-    mutating func i32Ne(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i32Ne(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.ne(sp[binaryOperand.rhs].i32).untyped
     }
-    mutating func i64Ne(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i64Ne(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.ne(sp[binaryOperand.rhs].i64).untyped
     }
-    mutating func i32LtS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i32LtS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.ltS(sp[binaryOperand.rhs].i32).untyped
     }
-    mutating func i64LtS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i64LtS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.ltS(sp[binaryOperand.rhs].i64).untyped
     }
-    mutating func i32LtU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i32LtU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.ltU(sp[binaryOperand.rhs].i32).untyped
     }
-    mutating func i64LtU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i64LtU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.ltU(sp[binaryOperand.rhs].i64).untyped
     }
-    mutating func i32GtS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i32GtS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.gtS(sp[binaryOperand.rhs].i32).untyped
     }
-    mutating func i64GtS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i64GtS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.gtS(sp[binaryOperand.rhs].i64).untyped
     }
-    mutating func i32GtU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i32GtU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.gtU(sp[binaryOperand.rhs].i32).untyped
     }
-    mutating func i64GtU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i64GtU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.gtU(sp[binaryOperand.rhs].i64).untyped
     }
-    mutating func i32LeS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i32LeS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.leS(sp[binaryOperand.rhs].i32).untyped
     }
-    mutating func i64LeS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i64LeS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.leS(sp[binaryOperand.rhs].i64).untyped
     }
-    mutating func i32LeU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i32LeU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.leU(sp[binaryOperand.rhs].i32).untyped
     }
-    mutating func i64LeU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i64LeU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.leU(sp[binaryOperand.rhs].i64).untyped
     }
-    mutating func i32GeS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i32GeS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.geS(sp[binaryOperand.rhs].i32).untyped
     }
-    mutating func i64GeS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i64GeS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.geS(sp[binaryOperand.rhs].i64).untyped
     }
-    mutating func i32GeU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i32GeU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.geU(sp[binaryOperand.rhs].i32).untyped
     }
-    mutating func i64GeU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func i64GeU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.geU(sp[binaryOperand.rhs].i64).untyped
     }
-    mutating func f32Add(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func f32Add(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.add(sp[binaryOperand.rhs].f32).untyped
     }
-    mutating func f64Add(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func f64Add(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.add(sp[binaryOperand.rhs].f64).untyped
     }
-    mutating func f32Sub(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func f32Sub(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.sub(sp[binaryOperand.rhs].f32).untyped
     }
-    mutating func f64Sub(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func f64Sub(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.sub(sp[binaryOperand.rhs].f64).untyped
     }
-    mutating func f32Mul(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func f32Mul(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.mul(sp[binaryOperand.rhs].f32).untyped
     }
-    mutating func f64Mul(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func f64Mul(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.mul(sp[binaryOperand.rhs].f64).untyped
     }
-    mutating func f32Div(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func f32Div(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.div(sp[binaryOperand.rhs].f32).untyped
     }
-    mutating func f64Div(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func f64Div(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.div(sp[binaryOperand.rhs].f64).untyped
     }
-    mutating func f32Min(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func f32Min(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.min(sp[binaryOperand.rhs].f32).untyped
     }
-    mutating func f64Min(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func f64Min(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.min(sp[binaryOperand.rhs].f64).untyped
     }
-    mutating func f32Max(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func f32Max(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.max(sp[binaryOperand.rhs].f32).untyped
     }
-    mutating func f64Max(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func f64Max(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.max(sp[binaryOperand.rhs].f64).untyped
     }
-    mutating func f32CopySign(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func f32CopySign(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.copySign(sp[binaryOperand.rhs].f32).untyped
     }
-    mutating func f64CopySign(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func f64CopySign(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.copySign(sp[binaryOperand.rhs].f64).untyped
     }
-    mutating func f32Eq(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func f32Eq(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.eq(sp[binaryOperand.rhs].f32).untyped
     }
-    mutating func f64Eq(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func f64Eq(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.eq(sp[binaryOperand.rhs].f64).untyped
     }
-    mutating func f32Ne(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func f32Ne(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.ne(sp[binaryOperand.rhs].f32).untyped
     }
-    mutating func f64Ne(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func f64Ne(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.ne(sp[binaryOperand.rhs].f64).untyped
     }
-    mutating func f32Lt(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func f32Lt(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.lt(sp[binaryOperand.rhs].f32).untyped
     }
-    mutating func f64Lt(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func f64Lt(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.lt(sp[binaryOperand.rhs].f64).untyped
     }
-    mutating func f32Gt(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func f32Gt(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.gt(sp[binaryOperand.rhs].f32).untyped
     }
-    mutating func f64Gt(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func f64Gt(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.gt(sp[binaryOperand.rhs].f64).untyped
     }
-    mutating func f32Le(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func f32Le(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.le(sp[binaryOperand.rhs].f32).untyped
     }
-    mutating func f64Le(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func f64Le(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.le(sp[binaryOperand.rhs].f64).untyped
     }
-    mutating func f32Ge(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func f32Ge(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.ge(sp[binaryOperand.rhs].f32).untyped
     }
-    mutating func f64Ge(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+    @inline(__always) mutating func f64Ge(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.ge(sp[binaryOperand.rhs].f64).untyped
     }
-    mutating func i32Clz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+    @inline(__always) mutating func i32Clz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
         sp[unaryOperand.result] = sp[unaryOperand.input].i32.clz.untyped
     }
-    mutating func i64Clz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+    @inline(__always) mutating func i64Clz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
         sp[unaryOperand.result] = sp[unaryOperand.input].i64.clz.untyped
     }
-    mutating func i32Ctz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+    @inline(__always) mutating func i32Ctz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
         sp[unaryOperand.result] = sp[unaryOperand.input].i32.ctz.untyped
     }
-    mutating func i64Ctz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+    @inline(__always) mutating func i64Ctz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
         sp[unaryOperand.result] = sp[unaryOperand.input].i64.ctz.untyped
     }
-    mutating func i32Popcnt(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+    @inline(__always) mutating func i32Popcnt(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
         sp[unaryOperand.result] = sp[unaryOperand.input].i32.popcnt.untyped
     }
-    mutating func i64Popcnt(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+    @inline(__always) mutating func i64Popcnt(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
         sp[unaryOperand.result] = sp[unaryOperand.input].i64.popcnt.untyped
     }
-    mutating func i32Eqz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+    @inline(__always) mutating func i32Eqz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
         sp[unaryOperand.result] = sp[unaryOperand.input].i32.eqz.untyped
     }
-    mutating func i64Eqz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+    @inline(__always) mutating func i64Eqz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
         sp[unaryOperand.result] = sp[unaryOperand.input].i64.eqz.untyped
     }
-    mutating func i32WrapI64(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+    @inline(__always) mutating func i32WrapI64(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
         sp[unaryOperand.result] = sp[unaryOperand.input].i64.wrap.untyped
     }
-    mutating func i64ExtendI32S(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+    @inline(__always) mutating func i64ExtendI32S(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
         sp[unaryOperand.result] = sp[unaryOperand.input].i32.extendI32S.untyped
     }
-    mutating func i64ExtendI32U(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+    @inline(__always) mutating func i64ExtendI32U(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
         sp[unaryOperand.result] = sp[unaryOperand.input].i32.extendI32U.untyped
     }
-    mutating func i32Extend8S(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+    @inline(__always) mutating func i32Extend8S(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
         sp[unaryOperand.result] = sp[unaryOperand.input].i32.extend8S.untyped
     }
-    mutating func i64Extend8S(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+    @inline(__always) mutating func i64Extend8S(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
         sp[unaryOperand.result] = sp[unaryOperand.input].i64.extend8S.untyped
     }
-    mutating func i32Extend16S(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+    @inline(__always) mutating func i32Extend16S(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
         sp[unaryOperand.result] = sp[unaryOperand.input].i32.extend16S.untyped
     }
-    mutating func i64Extend16S(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+    @inline(__always) mutating func i64Extend16S(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
         sp[unaryOperand.result] = sp[unaryOperand.input].i64.extend16S.untyped
     }
-    mutating func i64Extend32S(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+    @inline(__always) mutating func i64Extend32S(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
         sp[unaryOperand.result] = sp[unaryOperand.input].i64.extend32S.untyped
     }
-    mutating func i32TruncF32S(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
+    @inline(__always) mutating func i32TruncF32S(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
         sp[unaryOperand.result] = try sp[unaryOperand.input].f32.truncToI32S.untyped
     }
-    mutating func i32TruncF32U(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
+    @inline(__always) mutating func i32TruncF32U(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
         sp[unaryOperand.result] = try sp[unaryOperand.input].f32.truncToI32U.untyped
     }
-    mutating func i32TruncF64S(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
+    @inline(__always) mutating func i32TruncF64S(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
         sp[unaryOperand.result] = try sp[unaryOperand.input].f64.truncToI32S.untyped
     }
-    mutating func i32TruncF64U(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
+    @inline(__always) mutating func i32TruncF64U(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
         sp[unaryOperand.result] = try sp[unaryOperand.input].f64.truncToI32U.untyped
     }
-    mutating func i64TruncF32S(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
+    @inline(__always) mutating func i64TruncF32S(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
         sp[unaryOperand.result] = try sp[unaryOperand.input].f32.truncToI64S.untyped
     }
-    mutating func i64TruncF32U(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
+    @inline(__always) mutating func i64TruncF32U(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
         sp[unaryOperand.result] = try sp[unaryOperand.input].f32.truncToI64U.untyped
     }
-    mutating func i64TruncF64S(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
+    @inline(__always) mutating func i64TruncF64S(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
         sp[unaryOperand.result] = try sp[unaryOperand.input].f64.truncToI64S.untyped
     }
-    mutating func i64TruncF64U(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
+    @inline(__always) mutating func i64TruncF64U(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
         sp[unaryOperand.result] = try sp[unaryOperand.input].f64.truncToI64U.untyped
     }
-    mutating func i32Load(sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt32.self, castToValue: { .i32($0) })
+    @inline(__always) mutating func i32Load(sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws -> Pc {
+        return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt32.self, castToValue: { .i32($0) })
     }
-    mutating func i64Load(sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt64.self, castToValue: { .i64($0) })
+    @inline(__always) mutating func i64Load(sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws -> Pc {
+        return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt64.self, castToValue: { .i64($0) })
     }
-    mutating func f32Load(sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt32.self, castToValue: { .rawF32($0) })
+    @inline(__always) mutating func f32Load(sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws -> Pc {
+        return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt32.self, castToValue: { .rawF32($0) })
     }
-    mutating func f64Load(sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt64.self, castToValue: { .rawF64($0) })
+    @inline(__always) mutating func f64Load(sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws -> Pc {
+        return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt64.self, castToValue: { .rawF64($0) })
     }
-    mutating func i32Load8S(sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: Int8.self, castToValue: { .init(signed: Int32($0)) })
+    @inline(__always) mutating func i32Load8S(sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws -> Pc {
+        return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: Int8.self, castToValue: { .init(signed: Int32($0)) })
     }
-    mutating func i32Load8U(sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt8.self, castToValue: { .i32(UInt32($0)) })
+    @inline(__always) mutating func i32Load8U(sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws -> Pc {
+        return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt8.self, castToValue: { .i32(UInt32($0)) })
     }
-    mutating func i32Load16S(sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: Int16.self, castToValue: { .init(signed: Int32($0)) })
+    @inline(__always) mutating func i32Load16S(sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws -> Pc {
+        return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: Int16.self, castToValue: { .init(signed: Int32($0)) })
     }
-    mutating func i32Load16U(sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt16.self, castToValue: { .i32(UInt32($0)) })
+    @inline(__always) mutating func i32Load16U(sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws -> Pc {
+        return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt16.self, castToValue: { .i32(UInt32($0)) })
     }
-    mutating func i64Load8S(sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: Int8.self, castToValue: { .init(signed: Int64($0)) })
+    @inline(__always) mutating func i64Load8S(sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws -> Pc {
+        return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: Int8.self, castToValue: { .init(signed: Int64($0)) })
     }
-    mutating func i64Load8U(sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt8.self, castToValue: { .i64(UInt64($0)) })
+    @inline(__always) mutating func i64Load8U(sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws -> Pc {
+        return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt8.self, castToValue: { .i64(UInt64($0)) })
     }
-    mutating func i64Load16S(sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: Int16.self, castToValue: { .init(signed: Int64($0)) })
+    @inline(__always) mutating func i64Load16S(sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws -> Pc {
+        return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: Int16.self, castToValue: { .init(signed: Int64($0)) })
     }
-    mutating func i64Load16U(sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt16.self, castToValue: { .i64(UInt64($0)) })
+    @inline(__always) mutating func i64Load16U(sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws -> Pc {
+        return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt16.self, castToValue: { .i64(UInt64($0)) })
     }
-    mutating func i64Load32S(sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: Int32.self, castToValue: { .init(signed: Int64($0)) })
+    @inline(__always) mutating func i64Load32S(sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws -> Pc {
+        return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: Int32.self, castToValue: { .init(signed: Int64($0)) })
     }
-    mutating func i64Load32U(sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
-        try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt32.self, castToValue: { .i64(UInt64($0)) })
+    @inline(__always) mutating func i64Load32U(sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws -> Pc {
+        return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt32.self, castToValue: { .i64(UInt64($0)) })
     }
-    mutating func i32Store(sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
-        try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { $0.i32 })
+    @inline(__always) mutating func i32Store(sp: Sp, pc: Pc, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws -> Pc {
+        return try memoryStore(sp: sp, pc: pc, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { $0.i32 })
     }
-    mutating func i64Store(sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
-        try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { $0.i64 })
+    @inline(__always) mutating func i64Store(sp: Sp, pc: Pc, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws -> Pc {
+        return try memoryStore(sp: sp, pc: pc, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { $0.i64 })
     }
-    mutating func f32Store(sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
-        try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { $0.rawF32 })
+    @inline(__always) mutating func f32Store(sp: Sp, pc: Pc, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws -> Pc {
+        return try memoryStore(sp: sp, pc: pc, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { $0.rawF32 })
     }
-    mutating func f64Store(sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
-        try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { $0.rawF64 })
+    @inline(__always) mutating func f64Store(sp: Sp, pc: Pc, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws -> Pc {
+        return try memoryStore(sp: sp, pc: pc, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { $0.rawF64 })
     }
-    mutating func i32Store8(sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
-        try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) })
+    @inline(__always) mutating func i32Store8(sp: Sp, pc: Pc, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws -> Pc {
+        return try memoryStore(sp: sp, pc: pc, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) })
     }
-    mutating func i32Store16(sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
-        try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) })
+    @inline(__always) mutating func i32Store16(sp: Sp, pc: Pc, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws -> Pc {
+        return try memoryStore(sp: sp, pc: pc, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) })
     }
-    mutating func i64Store8(sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
-        try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) })
+    @inline(__always) mutating func i64Store8(sp: Sp, pc: Pc, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws -> Pc {
+        return try memoryStore(sp: sp, pc: pc, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) })
     }
-    mutating func i64Store16(sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
-        try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) })
+    @inline(__always) mutating func i64Store16(sp: Sp, pc: Pc, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws -> Pc {
+        return try memoryStore(sp: sp, pc: pc, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) })
     }
-    mutating func i64Store32(sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
-        try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) })
+    @inline(__always) mutating func i64Store32(sp: Sp, pc: Pc, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws -> Pc {
+        return try memoryStore(sp: sp, pc: pc, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) })
     }
 }

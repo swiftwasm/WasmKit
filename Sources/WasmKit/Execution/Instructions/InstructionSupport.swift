@@ -12,7 +12,6 @@ extension Instruction {
             var offset: Int32
         }
         let baseAddress: UnsafePointer<Entry>
-        let count: UInt16
         
         static func == (lhs: Instruction.BrTable, rhs: Instruction.BrTable) -> Bool {
             lhs.baseAddress == rhs.baseAddress
@@ -32,21 +31,18 @@ extension Instruction {
         let input: VReg
     }
     
-    /// size = 10, alignment = 8
+    /// size = 2, alignment = 8
     struct ConstOperand: Equatable {
-        let value: UntypedValue
         let result: VReg
     }
 
-    /// size = 12, alignment = 8
+    /// size = 4, alignment = 8
     struct LoadOperand: Equatable {
-        let memarg: MemArg
         let pointer: VReg
         let result: VReg
     }
-    
+
     struct StoreOperand: Equatable {
-        let memarg: MemArg
         let pointer: VReg
         let value: VReg
     }
@@ -59,11 +55,9 @@ extension Instruction {
     struct MemoryGrowOperand: Equatable {
         let result: VReg
         let delta: VReg
-        let memoryIndex: MemoryIndex
     }
     
     struct MemoryInitOperand: Equatable {
-        let segmentIndex: DataIndex
         let destOffset: VReg
         let sourceOffset: VReg
         let size: VReg
@@ -106,13 +100,11 @@ extension Instruction {
     struct TableGetOperand: Equatable {
         let index: VReg
         let result: VReg
-        let tableIndex: TableIndex
     }
     
     struct TableSetOperand: Equatable {
         let index: VReg
         let value: VReg
-        let tableIndex: TableIndex
     }
     
     struct TableSizeOperand: Equatable {
@@ -121,42 +113,34 @@ extension Instruction {
     }
     
     struct TableGrowOperand: Equatable {
-        let tableIndex: TableIndex
         let result: VReg
         let delta: VReg
         let value: VReg
     }
     
     struct TableFillOperand: Equatable {
-        let tableIndex: TableIndex
         let destOffset: VReg
         let value: VReg
         let size: VReg
     }
     
     struct TableCopyOperand: Equatable {
-        let sourceIndex: TableIndex
-        let destIndex: TableIndex
         let sourceOffset: VReg
         let destOffset: VReg
         let size: VReg
     }
     
     struct TableInitOperand: Equatable {
-        let tableIndex: TableIndex
-        let segmentIndex: ElementIndex
         let destOffset: VReg
         let sourceOffset: VReg
         let size: VReg
     }
 
     struct GlobalGetOperand: Equatable {
-        let global: InternalGlobal
         let result: VReg
     }
     
     struct GlobalSetOperand: Equatable {
-        let global: InternalGlobal
         let value: VReg
     }
 
@@ -177,7 +161,7 @@ extension Instruction {
     }
     
     struct BrTableOperand: Equatable {
-        let table: Instruction.BrTable
+        let count: UInt16
         let index: VReg
     }
 
@@ -185,20 +169,16 @@ extension Instruction {
         let spAddend: VReg
     }
     struct CallOperand: Equatable {
-        let callee: InternalFunction
         let callLike: CallLikeOperand
     }
 
     struct InternalCallOperand: Equatable {
-        let callee: InternalFunction
         let callLike: CallLikeOperand
     }
 
     typealias CompilingCallOperand = InternalCallOperand
     
     struct CallIndirectOperand: Equatable {
-        let tableIndex: TableIndex
-        let type: InternedFuncType
         let index: VReg
         let callLike: CallLikeOperand
     }
@@ -248,6 +228,18 @@ extension Instruction {
     static func i64TruncSatF64U(_ op: UnaryOperand) -> Instruction { .numericConversion(.truncSaturatingUnsigned(.i64, .f64), op) }
 }
 
+extension Instruction {
+    var rawValue: UInt64 {
+        assert(_isPOD(Instruction.self))
+        typealias RawInstruction = (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
+        let raw = unsafeBitCast(self, to: RawInstruction.self)
+        let slotData: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (
+            raw.0, raw.1, raw.2, raw.3, raw.4, raw.5, raw.6, 0
+        )
+        return unsafeBitCast(slotData, to: UInt64.self)
+    }
+}
+
 struct InstructionPrintingContext {
     let shouldColor: Bool
     let function: Function
@@ -293,26 +285,26 @@ struct InstructionPrintingContext {
             target.write("unreachable")
         case .nop:
             target.write("nop")
-        case .globalGet(let op):
-            target.write("\(reg(op.result)) = global.get \(global(op.global))")
-        case .globalSet(let op):
-            target.write("global.set \(global(op.global)), \(reg(op.value))")
-        case .numericConst(let op):
-            target.write("\(reg(op.result)) = \(value(op.value))")
-        case .call(let op):
-            target.write("call \(callee(op.callee)), sp: +\(op.callLike.spAddend)")
-        case .callIndirect(let op):
-            target.write("call_indirect \(reg(op.index)), \(op.tableIndex), (func_ty id:\(op.type.id)), sp: +\(op.callLike.spAddend)")
-        case .compilingCall(let op):
-            target.write("compiling_call \(callee(op.callee)), sp: +\(op.callLike.spAddend)")
-        case .i32Load(let op):
-            target.write("\(reg(op.result)) = i32.load \(reg(op.pointer)), \(memarg(op.memarg))")
-        case .i64Load(let op):
-            target.write("\(reg(op.result)) = i64.load \(reg(op.pointer)), \(memarg(op.memarg))")
-        case .f32Load(let op):
-            target.write("\(reg(op.result)) = f32.load \(reg(op.pointer)), \(memarg(op.memarg))")
-        case .f64Load(let op):
-            target.write("\(reg(op.result)) = f64.load \(reg(op.pointer)), \(memarg(op.memarg))")
+//        case .globalGet(let op):
+//            target.write("\(reg(op.result)) = global.get \(global(op.global))")
+//        case .globalSet(let op):
+//            target.write("global.set \(global(op.global)), \(reg(op.value))")
+//        case .numericConst(let op):
+//            target.write("\(reg(op.result)) = \(value(op.value))")
+//        case .call(let op):
+//            target.write("call \(callee(op.callee)), sp: +\(op.callLike.spAddend)")
+//        case .callIndirect(let op):
+//            target.write("call_indirect \(reg(op.index)), \(op.tableIndex), (func_ty id:\(op.type.id)), sp: +\(op.callLike.spAddend)")
+//        case .compilingCall(let op):
+//            target.write("compiling_call \(callee(op.callee)), sp: +\(op.callLike.spAddend)")
+//        case .i32Load(let op):
+//            target.write("\(reg(op.result)) = i32.load \(reg(op.pointer)), \(memarg(op.memarg))")
+//        case .i64Load(let op):
+//            target.write("\(reg(op.result)) = i64.load \(reg(op.pointer)), \(memarg(op.memarg))")
+//        case .f32Load(let op):
+//            target.write("\(reg(op.result)) = f32.load \(reg(op.pointer)), \(memarg(op.memarg))")
+//        case .f64Load(let op):
+//            target.write("\(reg(op.result)) = f64.load \(reg(op.pointer)), \(memarg(op.memarg))")
         case .copyStack(let op):
             target.write("\(reg(op.dest)) = copy \(reg(op.source))")
         case .i32Add(let op):
@@ -325,8 +317,8 @@ struct InstructionPrintingContext {
             target.write("\(reg(op.result)) = i32.eq \(reg(op.lhs)), \(reg(op.rhs))")
         case .i32Eqz(let op):
             target.write("\(reg(op.result)) = i32.eqz \(reg(op.input))")
-        case .i32Store(let op):
-            target.write("i32.store \(reg(op.pointer)), \(reg(op.value)), \(memarg(op.memarg))")
+//        case .i32Store(let op):
+//            target.write("i32.store \(reg(op.pointer)), \(reg(op.value)), \(memarg(op.memarg))")
         case .brIfNot(let op):
             target.write("br_if_not \(reg(op.condition)), +\(op.offset)")
         case .brIf(let op):

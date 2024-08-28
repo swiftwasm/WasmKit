@@ -147,7 +147,7 @@ enum Instruction: Equatable {
     case f64Le(Instruction.BinaryOperand)
     case f32Ge(Instruction.BinaryOperand)
     case f64Ge(Instruction.BinaryOperand)
-    case select(Instruction.SelectOperand)
+    case select
     case refNull(Instruction.RefNullOperand)
     case refIsNull(Instruction.RefIsNullOperand)
     case refFunc(Instruction.RefFuncOperand)

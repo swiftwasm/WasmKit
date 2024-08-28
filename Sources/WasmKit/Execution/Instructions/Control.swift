@@ -1,53 +1,53 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#control-instructions>
 extension ExecutionState {
-    func unreachable(sp: Sp, pc: inout Pc) throws {
+    func unreachable(sp: Sp, pc: Pc) throws -> Pc {
         throw Trap.unreachable
     }
-    mutating func nop(sp: Sp, pc: inout Pc) throws {
-        nextInstruction(&pc)
+    mutating func nop(sp: Sp, pc: Pc) throws -> Pc {
+        return pc
     }
 
-    mutating func ifThen(sp: Sp, pc: inout Pc, ifOperand: Instruction.IfOperand) {
-        let isTrue = sp[ifOperand.condition].i32 != 0
-        if isTrue {
-            nextInstruction(&pc)
-        } else {
-            nextInstruction(&pc, count: Int(ifOperand.elseOrEndOffset))
+    mutating func ifThen(sp: Sp, pc: Pc, ifOperand: Instruction.IfOperand) -> Pc {
+        guard sp[ifOperand.condition].i32 == 0 else {
+            return pc
         }
+        return pc.advancedPc(by: Int(ifOperand.elseOrEndOffset))
     }
 
-    mutating func br(sp: Sp, pc: inout Pc, offset: Int32) throws {
-        nextInstruction(&pc, count: Int(offset))
+    mutating func br(sp: Sp, pc: Pc, offset: Int32) throws -> Pc {
+        return pc.advancedPc(by: Int(offset))
     }
-    mutating func brIf(sp: Sp, pc: inout Pc, brIfOperand: Instruction.BrIfOperand) throws {
+    mutating func brIf(sp: Sp, pc: Pc, brIfOperand: Instruction.BrIfOperand) throws -> Pc {
         guard sp[brIfOperand.condition].i32 != 0 else {
-            nextInstruction(&pc)
-            return
+            return pc
         }
-        nextInstruction(&pc, count: Int(brIfOperand.offset))
+        return pc.advancedPc(by: Int(brIfOperand.offset))
     }
-    mutating func brIfNot(sp: Sp, pc: inout Pc, brIfOperand: Instruction.BrIfOperand) throws {
+    mutating func brIfNot(sp: Sp, pc: Pc, brIfOperand: Instruction.BrIfOperand) throws -> Pc {
         guard sp[brIfOperand.condition].i32 == 0 else {
-            nextInstruction(&pc)
-            return
+            return pc
         }
-        nextInstruction(&pc, count: Int(brIfOperand.offset))
+        return pc.advancedPc(by: Int(brIfOperand.offset))
     }
-    mutating func brTable(sp: Sp, pc: inout Pc, brTableOperand: Instruction.BrTableOperand) throws {
-        let brTable = brTableOperand.table
+    mutating func brTable(sp: Sp, pc: Pc, brTableOperand: Instruction.BrTableOperand) throws -> Pc {
+        var pc = pc
+        let brTable = pc.read(Instruction.BrTable.self)
         let index = sp[brTableOperand.index].i32
-        let normalizedOffset = min(Int(index), Int(brTable.count - 1))
+        let normalizedOffset = min(Int(index), Int(brTableOperand.count - 1))
         let entry = brTable.baseAddress[normalizedOffset]
 
         nextInstruction(&pc, count: Int(entry.offset))
+        return pc
     }
 
-    mutating func `return`(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
+    mutating func `return`(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms) throws -> Pc {
+        var pc = pc
         popFrame(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        return pc
     }
 
-    mutating func endOfExecution(sp: inout Sp, pc: inout Pc) throws {
+    mutating func endOfExecution(sp: inout Sp, pc: Pc) throws -> Pc {
         throw EndOfExecution()
     }
 
@@ -57,8 +57,9 @@ extension ExecutionState {
     }
 
     @inline(__always)
-    mutating func call(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms, callOperand: Instruction.CallOperand) throws {
-        let function = callOperand.callee
+    mutating func call(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, callOperand: Instruction.CallOperand) throws -> Pc {
+        var pc = pc
+        let function = pc.read(InternalFunction.self)
 
         (pc, sp) = try invoke(
             function: function,
@@ -66,37 +67,55 @@ extension ExecutionState {
             callLike: callOperand.callLike,
             sp: sp, pc: pc, md: &md, ms: &ms
         )
+        return pc
     }
 
     @inline(__always)
-    mutating func internalCall(sp: inout Sp, pc: inout Pc, internalCallOperand: Instruction.InternalCallOperand) throws {
+    private mutating func _internalCall(
+        sp: inout Sp,
+        pc: inout Pc,
+        callee: InternalFunction,
+        internalCallOperand: Instruction.InternalCallOperand
+    ) throws {
         // The callee is known to be a function defined within the same module, so we can
         // skip updating the current instance.
-        let (iseq, locals, instance) = internalCallOperand.callee.assumeCompiled()
+        let (iseq, locals, instance) = callee.assumeCompiled()
         sp = try pushFrame(
             iseq: iseq,
             instance: instance,
             numberOfNonParameterLocals: locals,
-            sp: sp, returnPC: pc.advancedPc(by: 1),
+            sp: sp, returnPC: pc,
             spAddend: internalCallOperand.callLike.spAddend
         )
         pc = iseq.baseAddress
     }
 
     @inline(__always)
-    mutating func compilingCall(sp: inout Sp, pc: inout Pc, compilingCallOperand: Instruction.CompilingCallOperand) throws {
-        try compilingCallOperand.callee.ensureCompiled(runtime: runtime)
-        pc.assumingMemoryBound(to: Instruction.self).pointee = .internalCall(compilingCallOperand)
-        try internalCall(sp: &sp, pc: &pc, internalCallOperand: compilingCallOperand)
+    mutating func internalCall(sp: inout Sp, pc: Pc, internalCallOperand: Instruction.InternalCallOperand) throws -> Pc {
+        var pc = pc
+        let callee = pc.read(InternalFunction.self)
+        try _internalCall(sp: &sp, pc: &pc, callee: callee, internalCallOperand: internalCallOperand)
+        return pc
+    }
+
+    @inline(__always)
+    mutating func compilingCall(sp: inout Sp, pc: Pc, compilingCallOperand: Instruction.CompilingCallOperand) throws -> Pc {
+        var pc = pc
+        let callPc = pc - MemoryLayout<Instruction>.stride
+        let callee = pc.read(InternalFunction.self)
+        try callee.ensureCompiled(runtime: runtime)
+        callPc.assumingMemoryBound(to: Instruction.self).pointee = .internalCall(compilingCallOperand)
+        try _internalCall(sp: &sp, pc: &pc, callee: callee, internalCallOperand: compilingCallOperand)
+        return pc
     }
 
     @inline(never)
     private func prepareForIndirectCall(
-        sp: Sp, callIndirectOperand: Instruction.CallIndirectOperand
+        sp: Sp, tableIndex: TableIndex, expectedType: InternedFuncType,
+        callIndirectOperand: Instruction.CallIndirectOperand
     ) throws -> (InternalFunction, InternalInstance) {
         let callerInstance = currentFrame.instance
-        let table = callerInstance.tables[Int(callIndirectOperand.tableIndex)]
-        let expectedType = callIndirectOperand.type
+        let table = callerInstance.tables[Int(tableIndex)]
         let value = sp[callIndirectOperand.index].asAddressOffset(table.limits.isMemory64)
         let elementIndex = Int(value)
         guard elementIndex < table.elements.count else {
@@ -117,9 +136,12 @@ extension ExecutionState {
     }
 
     @inline(__always)
-    mutating func callIndirect(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms, callIndirectOperand: Instruction.CallIndirectOperand) throws {
+    mutating func callIndirect(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, callIndirectOperand: Instruction.CallIndirectOperand) throws -> Pc {
+        var pc = pc
+        let tableIndex = TableIndex(pc.read(UInt64.self))
+        let expectedType = InternedFuncType(id: UInt32((pc.read(UInt64.self))))
         let (function, callerInstance) = try prepareForIndirectCall(
-            sp: sp,
+            sp: sp, tableIndex: tableIndex, expectedType: expectedType,
             callIndirectOperand: callIndirectOperand
         )
         (pc, sp) = try invoke(
@@ -128,6 +150,7 @@ extension ExecutionState {
             callLike: callIndirectOperand.callLike,
             sp: sp, pc: pc, md: &md, ms: &ms
         )
+        return pc
     }
 
     mutating func onEnter(sp: Sp, onEnterOperand: Instruction.OnEnterOperand) {

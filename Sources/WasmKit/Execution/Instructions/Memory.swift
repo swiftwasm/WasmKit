@@ -2,9 +2,10 @@
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#memory-instructions>
 extension ExecutionState {
     mutating func memoryLoad<T: FixedWidthInteger>(
-        sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand, loadAs _: T.Type = T.self, castToValue: (T) -> UntypedValue
-    ) throws {
-        let memarg = loadOperand.memarg
+        sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand, loadAs _: T.Type = T.self, castToValue: (T) -> UntypedValue
+    ) throws -> Pc {
+        var pc = pc
+        let memarg = pc.read(Instruction.MemArg.self)
 
         let length = UInt64(T.bitWidth) / 8
         let i = sp[loadOperand.pointer].asAddressOffset()
@@ -16,12 +17,13 @@ extension ExecutionState {
         let address = memarg.offset + i
         let loaded = UnsafeMutableRawBufferPointer(start: md, count: ms).loadUnaligned(fromByteOffset: Int(address), as: T.self)
         sp[loadOperand.result] = castToValue(loaded)
-
+        return pc
     }
 
     /// `[type].store[bitWidth]`
-    mutating func memoryStore<T: FixedWidthInteger>(sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand, castFromValue: (UntypedValue) -> T) throws {
-        let memarg = storeOperand.memarg
+    mutating func memoryStore<T: FixedWidthInteger>(sp: Sp, pc: Pc, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand, castFromValue: (UntypedValue) -> T) throws -> Pc {
+        var pc = pc
+        let memarg = pc.read(Instruction.MemArg.self)
 
         let value = sp[storeOperand.value]
         let length = UInt64(T.bitWidth) / 8
@@ -35,6 +37,7 @@ extension ExecutionState {
         let toStore = castFromValue(value)
         md!.advanced(by: Int(address))
             .bindMemory(to: T.self, capacity: 1).pointee = toStore.littleEndian
+        return pc
     }
 
     mutating func memorySize(sp: Sp, memorySizeOperand: Instruction.MemorySizeOperand) {
@@ -44,6 +47,7 @@ extension ExecutionState {
         let value: Value = memory.limit.isMemory64 ? .i64(UInt64(pageCount)) : .i32(UInt32(pageCount))
         sp[memorySizeOperand.result] = UntypedValue(value)
     }
+
     mutating func memoryGrow(sp: Sp, md: inout Md, ms: inout Ms, memoryGrowOperand: Instruction.MemoryGrowOperand) throws {
         let memory = currentInstance.memories[0]
         try memory.withValue { memory in
@@ -56,11 +60,13 @@ extension ExecutionState {
             sp[memoryGrowOperand.result] = UntypedValue(oldPageCount)
         }
     }
-    mutating func memoryInit(sp: Sp, memoryInitOperand: Instruction.MemoryInitOperand) throws {
+    mutating func memoryInit(sp: Sp, pc: Pc, memoryInitOperand: Instruction.MemoryInitOperand) throws -> Pc {
+        var pc = pc
+        let segmentIndex = Int(pc.read(UInt64.self))
         let instance = currentInstance
         let memory = instance.memories[0]
         try memory.withValue { memoryInstance in
-            let dataInstance = instance.dataSegments[Int(memoryInitOperand.segmentIndex)]
+            let dataInstance = instance.dataSegments[segmentIndex]
 
             let copyCounter = sp[memoryInitOperand.size].i32
             let sourceIndex = sp[memoryInitOperand.sourceOffset].i32
@@ -83,6 +89,7 @@ extension ExecutionState {
                     dataInstance.data[dataInstance.data.startIndex + Int(sourceIndex + i)]
             }
         }
+        return pc
     }
     mutating func memoryDataDrop(sp: Sp, dataIndex: DataIndex) {
         let segment = currentInstance.dataSegments[Int(dataIndex)]
