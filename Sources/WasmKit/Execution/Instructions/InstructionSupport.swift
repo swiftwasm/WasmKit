@@ -215,17 +215,6 @@ extension Instruction {
     static func f64Gt(_ op: BinaryOperand) -> Instruction { .numericFloatBinary(.gt(.f64), op) }
     static func f64Le(_ op: BinaryOperand) -> Instruction { .numericFloatBinary(.le(.f64), op) }
     static func f64Ge(_ op: BinaryOperand) -> Instruction { .numericFloatBinary(.ge(.f64), op) }
-    
-    static func i32DivS(_ op: BinaryOperand) -> Instruction { .numericIntBinary(.divS(.i32), op) }
-    static func i32DivU(_ op: BinaryOperand) -> Instruction { .numericIntBinary(.divU(.i32), op) }
-    static func i32RemS(_ op: BinaryOperand) -> Instruction { .numericIntBinary(.remS(.i32), op) }
-    static func i32RemU(_ op: BinaryOperand) -> Instruction { .numericIntBinary(.remU(.i32), op) }
-    
-
-    static func i64DivS(_ op: BinaryOperand) -> Instruction { .numericIntBinary(.divS(.i64), op) }
-    static func i64DivU(_ op: BinaryOperand) -> Instruction { .numericIntBinary(.divU(.i64), op) }
-    static func i64RemS(_ op: BinaryOperand) -> Instruction { .numericIntBinary(.remS(.i64), op) }
-    static func i64RemU(_ op: BinaryOperand) -> Instruction { .numericIntBinary(.remU(.i64), op) }
 
     static func f32Abs(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.abs(.f32), op) }
     static func f32Neg(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.neg(.f32), op) }
@@ -356,8 +345,6 @@ struct InstructionPrintingContext {
             target.write("\(reg(op.result)) = i32.eqz \(reg(op.input))")
         case .i32Store(let op):
             target.write("i32.store \(reg(op.pointer)), \(reg(op.value)), \(memarg(op.memarg))")
-        case .numericIntBinary(let op, let operands):
-            target.write("\(reg(operands.result)) = \(op) \(reg(operands.lhs)), \(reg(operands.rhs))")
         case .brIfNot(let op):
             target.write("br_if_not \(reg(op.condition)), +\(op.offset)")
         case .brIf(let op):

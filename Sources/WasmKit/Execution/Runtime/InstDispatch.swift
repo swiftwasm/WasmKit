@@ -110,8 +110,6 @@ extension ExecutionState {
             self.numericConst(sp: sp, constOperand: constOperand)
         case .numericFloatUnary(let floatUnary, let unaryOperand):
             self.numericFloatUnary(sp: sp, floatUnary: floatUnary, unaryOperand: unaryOperand)
-        case .numericIntBinary(let intBinary, let binaryOperand):
-            try self.numericIntBinary(sp: sp, intBinary: intBinary, binaryOperand: binaryOperand)
         case .numericFloatBinary(let floatBinary, let binaryOperand):
             self.numericFloatBinary(sp: sp, floatBinary: floatBinary, binaryOperand: binaryOperand)
         case .numericConversion(let conversion, let unaryOperand):
@@ -160,6 +158,22 @@ extension ExecutionState {
             self.i32Rotr(sp: sp, binaryOperand: binaryOperand)
         case .i64Rotr(let binaryOperand):
             self.i64Rotr(sp: sp, binaryOperand: binaryOperand)
+        case .i32DivS(let binaryOperand):
+            try self.i32DivS(sp: sp, binaryOperand: binaryOperand)
+        case .i64DivS(let binaryOperand):
+            try self.i64DivS(sp: sp, binaryOperand: binaryOperand)
+        case .i32DivU(let binaryOperand):
+            try self.i32DivU(sp: sp, binaryOperand: binaryOperand)
+        case .i64DivU(let binaryOperand):
+            try self.i64DivU(sp: sp, binaryOperand: binaryOperand)
+        case .i32RemS(let binaryOperand):
+            try self.i32RemS(sp: sp, binaryOperand: binaryOperand)
+        case .i64RemS(let binaryOperand):
+            try self.i64RemS(sp: sp, binaryOperand: binaryOperand)
+        case .i32RemU(let binaryOperand):
+            try self.i32RemU(sp: sp, binaryOperand: binaryOperand)
+        case .i64RemU(let binaryOperand):
+            try self.i64RemU(sp: sp, binaryOperand: binaryOperand)
         case .i32Eq(let binaryOperand):
             self.i32Eq(sp: sp, binaryOperand: binaryOperand)
         case .i64Eq(let binaryOperand):
@@ -356,7 +370,6 @@ extension Instruction {
         case .memoryFill: return "memoryFill"
         case .numericConst: return "numericConst"
         case .numericFloatUnary: return "numericFloatUnary"
-        case .numericIntBinary: return "numericIntBinary"
         case .numericFloatBinary: return "numericFloatBinary"
         case .numericConversion: return "numericConversion"
         case .i32Add: return "i32Add"
@@ -381,6 +394,14 @@ extension Instruction {
         case .i64Rotl: return "i64Rotl"
         case .i32Rotr: return "i32Rotr"
         case .i64Rotr: return "i64Rotr"
+        case .i32DivS: return "i32DivS"
+        case .i64DivS: return "i64DivS"
+        case .i32DivU: return "i32DivU"
+        case .i64DivU: return "i64DivU"
+        case .i32RemS: return "i32RemS"
+        case .i64RemS: return "i64RemS"
+        case .i32RemU: return "i32RemU"
+        case .i64RemU: return "i64RemU"
         case .i32Eq: return "i32Eq"
         case .i64Eq: return "i64Eq"
         case .i32Ne: return "i32Ne"
@@ -522,6 +543,30 @@ extension ExecutionState {
     }
     mutating func i64Rotr(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.rotr(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func i32DivS(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
+        sp[binaryOperand.result] = try sp[binaryOperand.lhs].i32.divS(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64DivS(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
+        sp[binaryOperand.result] = try sp[binaryOperand.lhs].i64.divS(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func i32DivU(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
+        sp[binaryOperand.result] = try sp[binaryOperand.lhs].i32.divU(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64DivU(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
+        sp[binaryOperand.result] = try sp[binaryOperand.lhs].i64.divU(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func i32RemS(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
+        sp[binaryOperand.result] = try sp[binaryOperand.lhs].i32.remS(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64RemS(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
+        sp[binaryOperand.result] = try sp[binaryOperand.lhs].i64.remS(sp[binaryOperand.rhs].i64).untyped
+    }
+    mutating func i32RemU(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
+        sp[binaryOperand.result] = try sp[binaryOperand.lhs].i32.remU(sp[binaryOperand.rhs].i32).untyped
+    }
+    mutating func i64RemU(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
+        sp[binaryOperand.result] = try sp[binaryOperand.lhs].i64.remU(sp[binaryOperand.rhs].i64).untyped
     }
     mutating func i32Eq(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.eq(sp[binaryOperand.rhs].i32).untyped
