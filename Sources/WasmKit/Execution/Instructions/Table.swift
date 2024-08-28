@@ -3,23 +3,28 @@
 
 import WasmParser
 extension ExecutionState {
-    mutating func tableGet(sp: Sp, tableGetOperand: Instruction.TableGetOperand) throws {
+    mutating func tableGet(sp: Sp, pc: Pc, tableGetOperand: Instruction.TableGetOperand) throws -> Pc {
+        var pc = pc
         let runtime = runtime.value
-        let table = getTable(tableGetOperand.tableIndex, store: runtime.store)
+        let tableIndex = TableIndex(pc.read(UInt64.self))
+        let table = getTable(tableIndex, store: runtime.store)
 
         let elementIndex = try getElementIndex(sp: sp, tableGetOperand.index, table)
 
         let reference = table.elements[Int(elementIndex)]
         sp[tableGetOperand.result] = UntypedValue(.ref(reference))
+        return pc
     }
-    mutating func tableSet(sp: Sp, tableSetOperand: Instruction.TableSetOperand) throws {
+    mutating func tableSet(sp: Sp, pc: Pc, tableSetOperand: Instruction.TableSetOperand) throws -> Pc {
+        var pc = pc
         let runtime = runtime.value
-        let table = getTable(tableSetOperand.tableIndex, store: runtime.store)
+        let tableIndex = TableIndex(pc.read(UInt64.self))
+        let table = getTable(tableIndex, store: runtime.store)
 
         let reference = sp.getReference(tableSetOperand.value, type: table.tableType)
         let elementIndex = try getElementIndex(sp: sp, tableSetOperand.index, table)
         setTableElement(table: table, Int(elementIndex), reference)
-
+        return pc
     }
     mutating func tableSize(sp: Sp, tableSizeOperand: Instruction.TableSizeOperand) {
         let runtime = runtime.value
@@ -27,9 +32,11 @@ extension ExecutionState {
         let elementsCount = table.elements.count
         sp[tableSizeOperand.result] = UntypedValue(table.limits.isMemory64 ? .i64(UInt64(elementsCount)) : .i32(UInt32(elementsCount)))
     }
-    mutating func tableGrow(sp: Sp, tableGrowOperand: Instruction.TableGrowOperand) throws {
+    mutating func tableGrow(sp: Sp, pc: Pc, tableGrowOperand: Instruction.TableGrowOperand) throws -> Pc {
+        var pc = pc
         let runtime = runtime.value
-        let table = getTable(tableGrowOperand.tableIndex, store: runtime.store)
+        let tableIndex = TableIndex(pc.read(UInt64.self))
+        let table = getTable(tableIndex, store: runtime.store)
 
         let growthSize = sp[tableGrowOperand.delta].asAddressOffset(table.limits.isMemory64)
         let growthValue = sp.getReference(tableGrowOperand.value, type: table.tableType)
@@ -37,19 +44,22 @@ extension ExecutionState {
         let oldSize = table.elements.count
         guard try table.withValue({ try $0.grow(by: growthSize, value: growthValue, resourceLimiter: runtime.store.resourceLimiter) }) else {
             sp[tableGrowOperand.result] = UntypedValue(.i32(Int32(-1).unsigned))
-            return
+            return pc
         }
         sp[tableGrowOperand.result] = UntypedValue(table.limits.isMemory64 ? .i64(UInt64(oldSize)) : .i32(UInt32(oldSize)))
+        return pc
     }
-    mutating func tableFill(sp: Sp, tableFillOperand: Instruction.TableFillOperand) throws {
+    mutating func tableFill(sp: Sp, pc: Pc, tableFillOperand: Instruction.TableFillOperand) throws -> Pc {
+        var pc = pc
         let runtime = runtime.value
-        let table = getTable(tableFillOperand.tableIndex, store: runtime.store)
+        let tableIndex = TableIndex(pc.read(UInt64.self))
+        let table = getTable(tableIndex, store: runtime.store)
         let fillCounter = sp[tableFillOperand.size].asAddressOffset(table.limits.isMemory64)
         let fillValue = sp.getReference(tableFillOperand.value, type: table.tableType)
         let startIndex = sp[tableFillOperand.destOffset].asAddressOffset(table.limits.isMemory64)
 
         guard fillCounter > 0 else {
-            return
+            return pc
         }
 
         guard Int(startIndex + fillCounter) <= table.elements.count else {
@@ -59,10 +69,12 @@ extension ExecutionState {
         for i in 0..<fillCounter {
             setTableElement(table: table, Int(startIndex + i), fillValue)
         }
+        return pc
     }
-    mutating func tableCopy(sp: Sp, tableCopyOperand: Instruction.TableCopyOperand) throws {
-        let destinationTableIndex = tableCopyOperand.destIndex
-        let sourceTableIndex = tableCopyOperand.sourceIndex
+    mutating func tableCopy(sp: Sp, pc: Pc, tableCopyOperand: Instruction.TableCopyOperand) throws -> Pc {
+        var pc = pc
+        let sourceTableIndex = TableIndex(pc.read(UInt64.self))
+        let destinationTableIndex = TableIndex(pc.read(UInt64.self))
         let runtime = runtime.value
         let sourceTable = getTable(sourceTableIndex, store: runtime.store)
         let destinationTable = getTable(destinationTableIndex, store: runtime.store)
@@ -74,7 +86,7 @@ extension ExecutionState {
         let destinationIndex = sp[tableCopyOperand.destOffset].asAddressOffset(destinationTable.limits.isMemory64)
 
         guard copyCounter > 0 else {
-            return
+            return pc
         }
 
         guard
@@ -97,10 +109,14 @@ extension ExecutionState {
                 value
             )
         }
+        return pc
     }
-    mutating func tableInit(sp: Sp, tableInitOperand: Instruction.TableInitOperand) throws {
-        let destinationTable = getTable(tableInitOperand.tableIndex, store: runtime.store)
-        let sourceElement = currentInstance.elementSegments[Int(tableInitOperand.segmentIndex)]
+    mutating func tableInit(sp: Sp, pc: Pc, tableInitOperand: Instruction.TableInitOperand) throws -> Pc {
+        var pc = pc
+        let tableIndex = TableIndex(pc.read(UInt64.self))
+        let segmentIndex = DataIndex(pc.read(UInt64.self))
+        let destinationTable = getTable(tableIndex, store: runtime.store)
+        let sourceElement = currentInstance.elementSegments[Int(segmentIndex)]
 
         let copyCounter = UInt64(sp[tableInitOperand.size].i32)
         let sourceIndex = UInt64(sp[tableInitOperand.sourceOffset].i32)
@@ -113,6 +129,7 @@ extension ExecutionState {
                 count: Int(copyCounter)
             )
         }
+        return pc
     }
     mutating func tableElementDrop(sp: Sp, elementIndex: ElementIndex) {
         let segment = currentInstance.elementSegments[Int(elementIndex)]

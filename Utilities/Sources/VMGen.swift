@@ -33,12 +33,18 @@ enum VMGen {
         let mayThrow: Bool
         let mayUpdateFrame: Bool
         let mayUpdateSp: Bool = false
+        let hasData: Bool
         let useCurrentMemory: RegisterUse
         let immediates: [Immediate]
+
+        var mayUpdatePc: Bool {
+            self.isControl || self.hasData
+        }
 
         init(
             name: String, isControl: Bool = false,
             mayThrow: Bool = false, mayUpdateFrame: Bool = false,
+            hasData: Bool = false,
             useCurrentMemory: RegisterUse = .none,
             immediates: [Immediate]
         ) {
@@ -46,6 +52,7 @@ enum VMGen {
             self.isControl = isControl
             self.mayThrow = mayThrow
             self.mayUpdateFrame = mayUpdateFrame
+            self.hasData = hasData
             self.useCurrentMemory = useCurrentMemory
             self.immediates = immediates
             assert(isControl || !mayUpdateFrame, "non-control instruction should not update frame")
@@ -59,8 +66,8 @@ enum VMGen {
             } else {
                 vregs += [(ExecParam.sp, false)]
             }
-            if self.isControl {
-                vregs += [(ExecParam.pc, true)]
+            if self.mayUpdatePc {
+                vregs += [(ExecParam.pc, false)]
             }
             switch useCurrentMemory {
             case .none: break
@@ -219,7 +226,7 @@ enum VMGen {
 
     static let numericOtherInsts: [Instruction] = [
         // Numeric
-        Instruction(name: "numericConst", immediates: [
+        Instruction(name: "numericConst", hasData: true, immediates: [
             Immediate(name: nil, type: "Instruction.ConstOperand")
         ]),
         Instruction(name: "numericFloatUnary", immediates: [
@@ -256,7 +263,7 @@ enum VMGen {
         ("i64Load32S", "Int32", ".init(signed: Int64($0))"),
         ("i64Load32U", "UInt32", ".i64(UInt64($0))"),
     ].map { (name, loadAs, castToValue) in
-        let base = Instruction(name: name, mayThrow: true, useCurrentMemory: .read, immediates: [Immediate(name: nil, type: "Instruction.LoadOperand")])
+        let base = Instruction(name: name, mayThrow: true, hasData: true, useCurrentMemory: .read, immediates: [Immediate(name: nil, type: "Instruction.LoadOperand")])
         return LoadInstruction(loadAs: loadAs, castToValue: castToValue, base: base)
     }
 
@@ -275,7 +282,7 @@ enum VMGen {
         ("i64Store16", "UInt16(truncatingIfNeeded: $0.i64)"),
         ("i64Store32", "UInt32(truncatingIfNeeded: $0.i64)"),
     ].map { (name, castFromValue) in
-        let base = Instruction(name: name, mayThrow: true, useCurrentMemory: .read, immediates: [Immediate(name: nil, type: "Instruction.StoreOperand")])
+        let base = Instruction(name: name, mayThrow: true, hasData: true, useCurrentMemory: .read, immediates: [Immediate(name: nil, type: "Instruction.StoreOperand")])
         return StoreInstruction(castFromValue: castFromValue, base: base)
     }
     static let memoryLoadStoreInsts: [Instruction] = memoryLoadInsts.map(\.base) + memoryStoreInsts.map(\.base)
@@ -284,7 +291,7 @@ enum VMGen {
         Instruction(name: "memoryGrow", mayThrow: true, useCurrentMemory: .write, immediates: [
             Immediate(name: nil, type: "Instruction.MemoryGrowOperand"),
         ]),
-        Instruction(name: "memoryInit", mayThrow: true, immediates: [
+        Instruction(name: "memoryInit", mayThrow: true, hasData: true, immediates: [
             Immediate(name: nil, type: "Instruction.MemoryInitOperand"),
         ]),
         Instruction(name: "memoryDataDrop", immediates: [Immediate(name: nil, type: "DataIndex")]),
@@ -300,19 +307,19 @@ enum VMGen {
 
     static let miscInsts: [Instruction] = [
         // Parametric
-        Instruction(name: "select", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.SelectOperand")]),
+        Instruction(name: "select", mayThrow: true, hasData: true, immediates: []),
         // Reference
         Instruction(name: "refNull", immediates: [Immediate(name: nil, type: "Instruction.RefNullOperand")]),
         Instruction(name: "refIsNull", immediates: [Immediate(name: nil, type: "Instruction.RefIsNullOperand")]),
         Instruction(name: "refFunc", immediates: [Immediate(name: nil, type: "Instruction.RefFuncOperand")]),
         // Table
-        Instruction(name: "tableGet", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.TableGetOperand")]),
-        Instruction(name: "tableSet", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.TableSetOperand")]),
+        Instruction(name: "tableGet", mayThrow: true, hasData: true, immediates: [Immediate(name: nil, type: "Instruction.TableGetOperand")]),
+        Instruction(name: "tableSet", mayThrow: true, hasData: true, immediates: [Immediate(name: nil, type: "Instruction.TableSetOperand")]),
         Instruction(name: "tableSize", immediates: [Immediate(name: nil, type: "Instruction.TableSizeOperand")]),
-        Instruction(name: "tableGrow", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.TableGrowOperand")]),
-        Instruction(name: "tableFill", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.TableFillOperand")]),
-        Instruction(name: "tableCopy", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.TableCopyOperand")]),
-        Instruction(name: "tableInit", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.TableInitOperand")]),
+        Instruction(name: "tableGrow", mayThrow: true, hasData: true, immediates: [Immediate(name: nil, type: "Instruction.TableGrowOperand")]),
+        Instruction(name: "tableFill", mayThrow: true, hasData: true, immediates: [Immediate(name: nil, type: "Instruction.TableFillOperand")]),
+        Instruction(name: "tableCopy", mayThrow: true, hasData: true, immediates: [Immediate(name: nil, type: "Instruction.TableCopyOperand")]),
+        Instruction(name: "tableInit", mayThrow: true, hasData: true, immediates: [Immediate(name: nil, type: "Instruction.TableInitOperand")]),
         Instruction(name: "tableElementDrop", immediates: [Immediate(name: nil, type: "ElementIndex")]),
         // Profiling
         Instruction(name: "onEnter", immediates: [Immediate(name: nil, type: "Instruction.OnEnterOperand")]),
@@ -325,8 +332,8 @@ enum VMGen {
         var instructions: [Instruction] = [
             // Variable
             Instruction(name: "copyStack", immediates: [Immediate(name: nil, type: "Instruction.CopyStackOperand")]),
-            Instruction(name: "globalGet", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.GlobalGetOperand")]),
-            Instruction(name: "globalSet", mayThrow: true, immediates: [Immediate(name: nil, type: "Instruction.GlobalSetOperand")]),
+            Instruction(name: "globalGet", mayThrow: true, hasData: true, immediates: [Immediate(name: nil, type: "Instruction.GlobalGetOperand")]),
+            Instruction(name: "globalSet", mayThrow: true, hasData: true, immediates: [Immediate(name: nil, type: "Instruction.GlobalSetOperand")]),
             // Controls
             Instruction(
                 name: "call", isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write,
@@ -425,9 +432,10 @@ enum VMGen {
                             case .\(inst.name)(\(labels.map { "let \($0)" }.joined(separator: ", "))):
                     """
             }
+            let mayAssignPc = inst.mayUpdatePc ? "pc = " : ""
             output += """
 
-                            \(tryPrefix)self.\(inst.name)(\(args.joined(separator: ", ")))
+                            \(mayAssignPc)\(tryPrefix)self.\(inst.name)(\(args.joined(separator: ", ")))
                 """
             if inst.isControl {
                 output += """
@@ -439,7 +447,6 @@ enum VMGen {
         output += """
 
                     }
-                    nextInstruction(&pc)
                     return true
                 }
             }
@@ -455,7 +462,7 @@ enum VMGen {
         for op in intBinOps + floatBinOps {
             output += """
 
-                mutating \(instMethodDecl(op.instruction)) {
+                @inline(__always) mutating \(instMethodDecl(op.instruction)) {
                     sp[binaryOperand.result] = \(op.mayThrow ? "try " : "")sp[binaryOperand.lhs].\(op.lhsType).\(camelCase(pascalCase: op.op))(sp[binaryOperand.rhs].\(op.rhsType)).untyped
                 }
             """
@@ -463,7 +470,7 @@ enum VMGen {
         for op in intUnaryInsts {
             output += """
 
-                mutating \(instMethodDecl(op.instruction)) {
+                @inline(__always) mutating \(instMethodDecl(op.instruction)) {
                     sp[unaryOperand.result] = \(op.mayThrow ? "try " : "")sp[unaryOperand.input].\(op.inputType).\(camelCase(pascalCase: op.op)).untyped
                 }
             """
@@ -472,16 +479,16 @@ enum VMGen {
         for inst in memoryLoadInsts {
             output += """
 
-                mutating \(instMethodDecl(inst.base)) {
-                    try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: \(inst.loadAs).self, castToValue: { \(inst.castToValue) })
+                @inline(__always) mutating \(instMethodDecl(inst.base)) {
+                    return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: \(inst.loadAs).self, castToValue: { \(inst.castToValue) })
                 }
             """
         }
         for inst in memoryStoreInsts {
             output += """
 
-                mutating \(instMethodDecl(inst.base)) {
-                    try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { \(inst.castFromValue) })
+                @inline(__always) mutating \(instMethodDecl(inst.base)) {
+                    return try memoryStore(sp: sp, pc: pc, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { \(inst.castFromValue) })
                 }
             """
         }
@@ -496,8 +503,9 @@ enum VMGen {
 
     static func instMethodDecl(_ inst: Instruction) -> String {
         let throwsKwd = inst.mayThrow ? " throws" : ""
+        let returnClause = inst.mayUpdatePc ? " -> Pc" : ""
         let args = inst.parameters
-        return "func \(inst.name)(\(args.map { "\($0.label): \($0.isInout ? "inout " : "")\($0.type)" }.joined(separator: ", ")))\(throwsKwd)"
+        return "func \(inst.name)(\(args.map { "\($0.label): \($0.isInout ? "inout " : "")\($0.type)" }.joined(separator: ", ")))\(throwsKwd)\(returnClause)"
     }
 
     static func generatePrototype(instructions: [Instruction]) -> String {

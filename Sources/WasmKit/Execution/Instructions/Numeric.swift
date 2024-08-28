@@ -1,14 +1,19 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#numeric-instructions>
 extension ExecutionState {
-    mutating func numericConst(sp: Sp, constOperand: Instruction.ConstOperand) {
-        sp[constOperand.result] = constOperand.value
+    @inline(__always)
+    mutating func numericConst(sp: Sp, pc: Pc, constOperand: Instruction.ConstOperand) -> Pc {
+        var pc = pc
+        let value = pc.readUntypedValue()
+        sp[constOperand.result] = value
+        return pc
     }
 
     mutating func numericFloatUnary(sp: Sp, floatUnary: NumericInstruction.FloatUnary, unaryOperand: Instruction.UnaryOperand) {
         let value = sp[unaryOperand.input]
         sp[unaryOperand.result] = UntypedValue(floatUnary(value.cast(to: floatUnary.type)))
     }
+
     mutating func numericConversion(sp: Sp, conversion: NumericInstruction.Conversion, unaryOperand: Instruction.UnaryOperand) throws {
         let value = sp[unaryOperand.input]
         sp[unaryOperand.result] = UntypedValue(try conversion(value))

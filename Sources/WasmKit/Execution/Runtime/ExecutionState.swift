@@ -38,17 +38,26 @@ typealias Sp = UnsafeMutablePointer<UntypedValue>
 ///         "is compiled" check on the next execution.
 typealias Pc = UnsafeMutableRawPointer
 
-func readInstruction(_ pc: Pc) -> Instruction {
-    return pc.assumingMemoryBound(to: Instruction.self).pointee
-}
-
-func nextInstruction(_ pc: inout Pc, count: Int = 1) {
+func nextInstruction(_ pc: inout Pc, count: Int) {
     pc = pc.advancedPc(by: count)
 }
 
 extension Pc {
     func advancedPc(by count: Int) -> Pc {
+        assert(Int(bitPattern: self) % MemoryLayout<Instruction>.alignment == 0)
         return self + MemoryLayout<Instruction>.stride * count
+    }
+
+    mutating func read<T>(_: T.Type = T.self) -> T {
+        assert(MemoryLayout<T>.stride == 8)
+        let value = self.assumingMemoryBound(to: T.self).pointee
+        self += MemoryLayout<UInt64>.size
+        return value
+    }
+    mutating func readUntypedValue() -> UntypedValue {
+        let value = self.assumingMemoryBound(to: UntypedValue.self).pointee
+        self += MemoryLayout<UntypedValue>.size
+        return value
     }
 }
 
@@ -80,7 +89,7 @@ func executeWasm(
             // NOTE: unwinding a function jump into previous frame's PC + 1, so initial PC is -1ed
             try stack.execute(
                 sp: sp,
-                pc: rootISeq.baseAddress! - 1,
+                pc: rootISeq.baseAddress!,
                 handle: handle,
                 type: type
             )
@@ -194,11 +203,12 @@ extension ExecutionState {
 #endif
         var inst: Instruction
         while true {
-            inst = readInstruction(pc)
+            inst = pc.read(Instruction.self)
 #if WASMKIT_ENGINE_STATS
             stats[inst.name, default: 0] += 1
 #endif
             // `doExecute` returns false when current frame *may* be updated
+            // print("[\(pc)] execute:", inst)
             _ = try doExecute(inst, sp: &sp, pc: &pc, md: &md, ms: &ms)
         }
     }
@@ -224,7 +234,7 @@ extension InternalFunction {
                 instance: function.instance,
                 numberOfNonParameterLocals: function.numberOfNonParameterLocals,
                 sp: sp,
-                returnPC: pc.advancedPc(by: 1),
+                returnPC: pc,
                 spAddend: callLike.spAddend
             )
             ExecutionState.CurrentMemory.mayUpdateCurrentInstance(
@@ -249,7 +259,7 @@ extension InternalFunction {
             for (index, result) in results.enumerated() {
                 sp[callLike.spAddend + layout.returnReg(index)] = UntypedValue(result)
             }
-            return (pc.advancedPc(by: 1), sp)
+            return (pc, sp)
         }
     }
 }

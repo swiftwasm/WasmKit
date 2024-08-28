@@ -11,9 +11,9 @@ class ISeqAllocator {
         return buffer
     }
 
-    func allocateInstructions(capacity: Int) -> UnsafeMutableBufferPointer<Instruction> {
+    func allocateInstructions(capacity: Int) -> UnsafeMutableBufferPointer<UInt64> {
         assert(_isPOD(Instruction.self), "Instruction must be POD")
-        let buffer = UnsafeMutableBufferPointer<Instruction>.allocate(capacity: capacity)
+        let buffer = UnsafeMutableBufferPointer<UInt64>.allocate(capacity: capacity)
         self.buffers.append(UnsafeMutableRawBufferPointer(buffer))
         return buffer
     }
@@ -505,7 +505,11 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         typealias BuildingBrTable = UnsafeMutableBufferPointer<Instruction.BrTable.Entry>
 
         enum OnPinAction {
-            case emitInstruction(insertAt: MetaProgramCounter, InstructionFactoryWithLabel)
+            case emitInstruction(
+                insertAt: MetaProgramCounter,
+                source: MetaProgramCounter,
+                InstructionFactoryWithLabel
+            )
             case fillBrTableEntry(
                 buildingTable: BuildingBrTable,
                 index: Int, make: BrTableEntryFactory
@@ -532,7 +536,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
         private var labels: [LabelEntry] = []
         private var unpinnedLabels: Set<LabelRef> = []
-        private var instructions: [WasmKit.Instruction] = []
+        private var instructions: [UInt64] = []
         private var lastEmission: LastEmission?
         fileprivate var insertingPC: MetaProgramCounter {
             MetaProgramCounter(offsetFromHead: instructions.count)
@@ -550,6 +554,10 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             }
         }
 
+        private mutating func assign(at index: Int, _ instruction: Instruction) {
+            self.instructions[index] = instruction.rawValue
+        }
+
         mutating func resetLastEmission() {
             lastEmission = nil
         }
@@ -558,7 +566,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             guard let lastEmission = self.lastEmission,
                   let resultRelink = lastEmission.resultRelink else { return false }
             let newInstruction = resultRelink(newResult)
-            self.instructions[lastEmission.position.offsetFromHead] = newInstruction
+            assign(at: lastEmission.position.offsetFromHead, newInstruction)
             resetLastEmission()
             return true
         }
@@ -569,13 +577,19 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             }
         }
 
-        func finalize() -> [Instruction] {
+        func finalize() -> [UInt64] {
             return instructions
         }
 
         mutating func emit(_ instruction: Instruction, resultRelink: ResultRelink? = nil) {
             self.lastEmission = LastEmission(position: insertingPC, resultRelink: resultRelink)
-            self.instructions.append(instruction)
+            // print("emitInstruction:", instruction, "0x" + String(instruction.rawValue, radix: 16))
+            self.instructions.append(instruction.rawValue)
+        }
+        
+        mutating func emitData<T>(_ data: T) {
+            // print("emitData:", data, "0x" + String(unsafeBitCast(data, to: UInt64.self), radix: 16))
+            self.instructions.append(unsafeBitCast(data, to: UInt64.self))
         }
 
         mutating func putLabel() -> LabelRef {
@@ -608,8 +622,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
                 self.unpinnedLabels.remove(ref)
                 for user in users {
                     switch user.action {
-                    case let .emitInstruction(insertAt, make):
-                        instructions[insertAt.offsetFromHead] = make(self, insertAt, pc)
+                    case let .emitInstruction(insertAt, source, make):
+                        assign(at: insertAt.offsetFromHead, make(self, source, pc))
                     case let .fillBrTableEntry(brTable, index, make):
                         brTable[index] = make(self, pc)
                     }
@@ -627,6 +641,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         ///   - make: Factory closure to make an inserting instruction
         mutating func emitWithLabel(_ ref: LabelRef, line: UInt = #line, make: @escaping InstructionFactoryWithLabel) {
             let insertAt = insertingPC
+            // TODO: Skip emitting nop if the label is already pinned
             emit(.nop)  // Emit dummy instruction to be replaced later
             emitWithLabel(ref, insertAt: insertAt, line: line, make: make)
         }
@@ -636,15 +651,15 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         ///   - ref: Label reference to be resolved
         ///   - insertAt: Instruction sequence offset to insert at
         ///   - make: Factory closure to make an inserting instruction
-        fileprivate mutating func emitWithLabel(
+        private mutating func emitWithLabel(
             _ ref: LabelRef, insertAt: MetaProgramCounter,
             line: UInt = #line, make: @escaping InstructionFactoryWithLabel
         ) {
             switch self.labels[ref] {
             case .pinned(let pc):
-                self.instructions[insertAt.offsetFromHead] = make(self, insertAt, pc)
+                assign(at: insertAt.offsetFromHead, make(self, insertingPC, pc))
             case .unpinned(var users):
-                users.append(LabelUser(action: .emitInstruction(insertAt: insertAt, make), sourceLine: line))
+                users.append(LabelUser(action: .emitInstruction(insertAt: insertAt, source: insertingPC, make), sourceLine: line))
                 self.labels[ref] = .unpinned(users: users)
             }
         }
@@ -860,7 +875,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         for (idx, instruction) in instructions.enumerated() {
             buffer[idx] = instruction
         }
-        buffer[instructions.count] = .return
+        buffer[instructions.count] = Instruction.return.rawValue
         return InstructionSequence(
             instructions: UnsafeMutableRawBufferPointer(buffer),
             maxStackHeight: Int(valueStack.stackRegBase) + valueStack.maxHeight
@@ -1120,12 +1135,13 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         let allLabelIndices = targets.labelIndices + [targets.defaultIndex]
         let tableBuffer = allocator.allocateBrTable(capacity: allLabelIndices.count)
         let brTable = Instruction.BrTable(
-            baseAddress: tableBuffer.baseAddress!,
-            count: UInt16(tableBuffer.count)
+            baseAddress: tableBuffer.baseAddress!
+//            count: UInt16(tableBuffer.count)
         )
-        let operand = Instruction.BrTableOperand(table: brTable, index: index)
-        let brTableAt = iseqBuilder.insertingPC
+        let operand = Instruction.BrTableOperand(count: UInt16(tableBuffer.count), index: index)
         iseqBuilder.emit(.brTable(operand))
+        iseqBuilder.emitData(brTable)
+        let brTableAt = iseqBuilder.insertingPC
 
         // TODO(optimize): Eliminate landing pads when copyCount of a destination is 0
         //
@@ -1205,19 +1221,21 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             if module.isSameInstance(callee.wasm.instance) {
                 emit(.compilingCall(
                     Instruction.InternalCallOperand(
-                        callee: callee,
+//                        callee: callee,
                         callLike: callLike
                     )
                 ))
+                iseqBuilder.emitData(callee)
                 return
             }
         }
         emit(.call(
             Instruction.CallOperand(
-                callee: callee,
+//                callee: callee,
                 callLike: Instruction.CallLikeOperand(spAddend: spAddend)
             )
         ))
+        iseqBuilder.emitData(callee)
     }
 
     mutating func visitCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws -> Output {
@@ -1228,12 +1246,14 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         guard let address = address else { return }
         let internType = funcTypeInterner.intern(calleeType)
         let operand = Instruction.CallIndirectOperand(
-            tableIndex: tableIndex,
-            type: internType,
+//            tableIndex: tableIndex,
+//            type: internType,
             index: address,
             callLike: Instruction.CallLikeOperand(spAddend: spAddend)
         )
         emit(.callIndirect(operand))
+        iseqBuilder.emitData(UInt64(tableIndex))
+        iseqBuilder.emitData(UInt64(internType.id))
     }
 
     mutating func visitDrop() throws -> Output {
@@ -1260,7 +1280,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
                 onTrue: ensureOnVReg(value2),
                 onFalse: ensureOnVReg(value1)
             )
-            emit(.select(operand))
+            emit(.select)
+            iseqBuilder.emitData(operand)
         }
     }
     mutating func visitTypedSelect(type: WasmParser.ValueType) throws -> Output {
@@ -1282,7 +1303,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
                 onTrue: ensureOnVReg(value2),
                 onFalse: ensureOnVReg(value1)
             )
-            emit(.select(operand))
+            emit(.select)
+            iseqBuilder.emitData(operand)
         }
     }
     mutating func visitLocalGet(localIndex: UInt32) throws -> Output {
@@ -1315,7 +1337,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             // Skip actual code emission if validation-only mode
             return
         }
-        emit(.globalGet(Instruction.GlobalGetOperand(global: global, result: result)))
+        emit(.globalGet(Instruction.GlobalGetOperand(result: result)))
+        iseqBuilder.emitData(global)
     }
     mutating func visitGlobalSet(globalIndex: UInt32) throws -> Output {
         let type = try module.globalType(globalIndex)
@@ -1325,9 +1348,10 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             return
         }
         let operand = Instruction.GlobalSetOperand(
-            global: global, value: value
+            value: value
         )
         emit(.globalSet(operand))
+        iseqBuilder.emitData(global)
     }
 
     private mutating func pushEmit(
@@ -1406,12 +1430,13 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
         try popPushEmit(.address(isMemory64: isMemory64), type) { value, result, stack in
             let loadOperand = Instruction.LoadOperand(
-                memarg: Instruction.MemArg(offset: memarg.offset),
+//                memarg: Instruction.MemArg(offset: memarg.offset),
                 pointer: value,
                 result: result
             )
             return instruction(loadOperand)
         }
+        iseqBuilder.emitData(Instruction.MemArg(offset: memarg.offset))
     }
     private mutating func visitStore(
         _ memarg: MemArg,
@@ -1423,12 +1448,13 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
         if let value = value, let pointer = pointer {
             let storeOperand = Instruction.StoreOperand(
-                memarg: Instruction.MemArg(offset: memarg.offset),
+//                memarg: Instruction.MemArg(offset: memarg.offset),
                 pointer: pointer,
                 value: value
             )
             emit(instruction(storeOperand))
         }
+        iseqBuilder.emitData(Instruction.MemArg(offset: memarg.offset))
     }
     mutating func visitI32Load(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i32, Instruction.i32Load) }
     mutating func visitI64Load(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, Instruction.i64Load) }
@@ -1462,12 +1488,15 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         let sizeType = ValueType.address(isMemory64: isMemory64)
         // Just pop/push the same type (i64 or i32) value
         try popPushEmit(sizeType, sizeType) { value, result, stack in
-            .memoryGrow(Instruction.MemoryGrowOperand(result: result, delta: value, memoryIndex: memory))
+            .memoryGrow(Instruction.MemoryGrowOperand(result: result, delta: value))
         }
+        // TODO: For multi-memory support
+        // iseqBuilder.emitData(UInt64(memory))
     }
 
     private mutating func visitConst(_ type: ValueType, _ value: Value) {
-        pushEmit(type, { .numericConst(Instruction.ConstOperand(value: UntypedValue(value), result: $0)) })
+        pushEmit(type, { .numericConst(Instruction.ConstOperand(result: $0)) })
+        iseqBuilder.emitData(UntypedValue(value))
     }
     mutating func visitI32Const(value: Int32) -> Output { visitConst(.i32, .i32(UInt32(bitPattern: value))) }
     mutating func visitI64Const(value: Int64) -> Output { visitConst(.i64, .i64(UInt64(bitPattern: value))) }
@@ -1658,13 +1687,14 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             let (size, sourceOffset, destOffset) = values
             return .memoryInit(
                 Instruction.MemoryInitOperand(
-                    segmentIndex: dataIndex,
+//                    segmentIndex: dataIndex,
                     destOffset: destOffset,
                     sourceOffset: sourceOffset,
                     size: size
                 )
             )
         }
+        iseqBuilder.emitData(UInt64(dataIndex))
     }
     mutating func visitDataDrop(dataIndex: UInt32) throws -> Output {
         try self.module.validateDataSegment(dataIndex)
@@ -1710,14 +1740,16 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             let (size, sourceOffset, destOffset) = values
             return .tableInit(
                 Instruction.TableInitOperand(
-                    tableIndex: table,
-                    segmentIndex: elemIndex,
+//                    tableIndex: table,
+//                    segmentIndex: elemIndex,
                     destOffset: destOffset,
                     sourceOffset: sourceOffset,
                     size: size
                 )
             )
         }
+        iseqBuilder.emitData(UInt64(table))
+        iseqBuilder.emitData(UInt64(elemIndex))
     }
     mutating func visitElemDrop(elemIndex: UInt32) throws -> Output {
         try self.module.validateElementSegment(elemIndex)
@@ -1741,14 +1773,16 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             let (size, sourceOffset, destOffset) = values
             return .tableCopy(
                 Instruction.TableCopyOperand(
-                    sourceIndex: srcTable,
-                    destIndex: dstTable,
+//                    sourceIndex: srcTable,
+//                    destIndex: dstTable,
                     sourceOffset: sourceOffset,
                     destOffset: destOffset,
                     size: size
                 )
             )
         }
+        iseqBuilder.emitData(UInt64(srcTable))
+        iseqBuilder.emitData(UInt64(dstTable))
     }
     mutating func visitTableFill(table: UInt32) throws -> Output {
         let address = try module.addressType(tableIndex: table)
@@ -1756,13 +1790,14 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             let (size, value, destOffset) = values
             return .tableFill(
                 Instruction.TableFillOperand(
-                    tableIndex: table,
+//                    tableIndex: table,
                     destOffset: destOffset,
                     value: value,
                     size: size
                 )
             )
         }
+        iseqBuilder.emitData(UInt64(table))
     }
     mutating func visitTableGet(table: UInt32) throws -> Output {
         try popPushEmit(
@@ -1772,11 +1807,11 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             return .tableGet(
                 Instruction.TableGetOperand(
                     index: index,
-                    result: result,
-                    tableIndex: table
+                    result: result
                 )
             )
         }
+        iseqBuilder.emitData(UInt64(table))
     }
     mutating func visitTableSet(table: UInt32) throws -> Output {
         try pop2Emit((.ref(module.elementType(table)), module.addressType(tableIndex: table))) { values, stack in
@@ -1784,11 +1819,12 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             return .tableSet(
                 Instruction.TableSetOperand(
                     index: index,
-                    value: value,
-                    tableIndex: table
+                    value: value
+//                    tableIndex: table
                 )
             )
         }
+        iseqBuilder.emitData(UInt64(table))
     }
     mutating func visitTableGrow(table: UInt32) throws -> Output {
         let address = try module.addressType(tableIndex: table)
@@ -1796,13 +1832,14 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             let (delta, value) = values
             return .tableGrow(
                 Instruction.TableGrowOperand(
-                    tableIndex: table,
+//                    tableIndex: table,
                     result: result,
                     delta: delta,
                     value: value
                 )
             )
         }
+        iseqBuilder.emitData(UInt64(table))
     }
     mutating func visitTableSize(table: UInt32) throws -> Output {
         pushEmit(try module.addressType(tableIndex: table)) { result in
