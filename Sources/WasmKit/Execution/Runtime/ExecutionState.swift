@@ -36,7 +36,21 @@ typealias Sp = UnsafeMutablePointer<UntypedValue>
 ///         For example, "compile" VM instruction lazily compiles the callee function and
 ///         replaces the instruction with the "internalCall" instruction to bypass
 ///         "is compiled" check on the next execution.
-typealias Pc = UnsafeMutablePointer<Instruction>
+typealias Pc = UnsafeMutableRawPointer
+
+func readInstruction(_ pc: Pc) -> Instruction {
+    return pc.assumingMemoryBound(to: Instruction.self).pointee
+}
+
+func nextInstruction(_ pc: inout Pc, count: Int = 1) {
+    pc = pc.advancedPc(by: count)
+}
+
+extension Pc {
+    func advancedPc(by count: Int) -> Pc {
+        return self + MemoryLayout<Instruction>.stride * count
+    }
+}
 
 /// Executes a WebAssembly function.
 ///
@@ -180,7 +194,7 @@ extension ExecutionState {
 #endif
         var inst: Instruction
         while true {
-            inst = pc.pointee
+            inst = readInstruction(pc)
 #if WASMKIT_ENGINE_STATS
             stats[inst.name, default: 0] += 1
 #endif
@@ -210,7 +224,7 @@ extension InternalFunction {
                 instance: function.instance,
                 numberOfNonParameterLocals: function.numberOfNonParameterLocals,
                 sp: sp,
-                returnPC: pc.advanced(by: 1),
+                returnPC: pc.advancedPc(by: 1),
                 spAddend: callLike.spAddend
             )
             ExecutionState.CurrentMemory.mayUpdateCurrentInstance(
@@ -235,7 +249,7 @@ extension InternalFunction {
             for (index, result) in results.enumerated() {
                 sp[callLike.spAddend + layout.returnReg(index)] = UntypedValue(result)
             }
-            return (pc.advanced(by: 1), sp)
+            return (pc.advancedPc(by: 1), sp)
         }
     }
 }

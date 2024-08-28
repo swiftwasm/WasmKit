@@ -439,7 +439,7 @@ enum VMGen {
         output += """
 
                     }
-                    pc += 1
+                    nextInstruction(&pc)
                     return true
                 }
             }

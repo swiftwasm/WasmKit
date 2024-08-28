@@ -132,7 +132,7 @@ public struct Instance {
                 function: Function(handle: function, allocator: allocator),
                 nameRegistry: runtime.store.nameRegistry
             )
-            iseq.instructions.write(to: &target, context: &context)
+            iseq.write(to: &target, context: &context)
         }
     }
 }

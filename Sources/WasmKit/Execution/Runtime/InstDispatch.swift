@@ -301,7 +301,7 @@ extension ExecutionState {
         case .onExit(let onExitOperand):
             self.onExit(sp: sp, onExitOperand: onExitOperand)
         }
-        pc += 1
+        nextInstruction(&pc)
         return true
     }
 }
