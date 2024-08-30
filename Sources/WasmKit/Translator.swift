@@ -494,7 +494,13 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
 
     fileprivate struct ISeqBuilder {
-        typealias InstructionFactoryWithLabel = (ISeqBuilder, MetaProgramCounter) -> (WasmKit.Instruction)
+        typealias InstructionFactoryWithLabel = (
+            ISeqBuilder,
+            // The position of the next slot of the creating instruction
+            _ source: MetaProgramCounter,
+            // The position of the resolved label
+            _ target: MetaProgramCounter
+        ) -> (WasmKit.Instruction)
         typealias BrTableEntryFactory = (ISeqBuilder, MetaProgramCounter) -> Instruction.BrTable.Entry
         typealias BuildingBrTable = UnsafeMutableBufferPointer<Instruction.BrTable.Entry>
 
@@ -603,7 +609,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
                 for user in users {
                     switch user.action {
                     case let .emitInstruction(insertAt, make):
-                        instructions[insertAt.offsetFromHead] = make(self, pc)
+                        instructions[insertAt.offsetFromHead] = make(self, insertAt, pc)
                     case let .fillBrTableEntry(brTable, index, make):
                         brTable[index] = make(self, pc)
                     }
@@ -636,7 +642,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         ) {
             switch self.labels[ref] {
             case .pinned(let pc):
-                self.instructions[insertAt.offsetFromHead] = make(self, pc)
+                self.instructions[insertAt.offsetFromHead] = make(self, insertAt, pc)
             case .unpinned(var users):
                 users.append(LabelUser(action: .emitInstruction(insertAt: insertAt, make), sourceLine: line))
                 self.labels[ref] = .unpinned(users: users)
@@ -943,8 +949,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             )
         )
         guard let condition = condition else { return }
-        let selfPC = iseqBuilder.insertingPC
-        iseqBuilder.emitWithLabel(endLabel) { iseqBuilder, endPC in
+        iseqBuilder.emitWithLabel(endLabel) { iseqBuilder, selfPC, endPC in
             let targetPC: MetaProgramCounter
             if let elsePC = iseqBuilder.resolveLabel(elseLabel) {
                 targetPC = elsePC
@@ -966,8 +971,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         preserveLocalsOnStack(depth: valueStack.height - frame.stackHeight)
         try controlStack.resetReachability()
         iseqBuilder.resetLastEmission()
-        let selfPC = iseqBuilder.insertingPC
-        iseqBuilder.emitWithLabel(endLabel) { _, endPC in
+        iseqBuilder.emitWithLabel(endLabel) { _, selfPC, endPC in
             let offset = endPC.offsetFromHead - selfPC.offsetFromHead
             return .br(offset: Int32(offset))
         }
@@ -1032,13 +1036,12 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     ) throws {
         let frame = try controlStack.branchTarget(relativeDepth: relativeDepth)
         let copyCount = frame.copyCount
-        let selfPC = iseqBuilder.insertingPC
         let popCount = try Self.computePopCount(
             destination: frame,
             currentFrame: try controlStack.currentFrame(),
             currentHeight: valueStack.height
         )
-        iseqBuilder.emitWithLabel(frame.continuation) { _, continuation in
+        iseqBuilder.emitWithLabel(frame.continuation) { _, selfPC, continuation in
             let relativeOffset = continuation.offsetFromHead - selfPC.offsetFromHead
             return make(Int32(relativeOffset), UInt32(copyCount), popCount)
         }
@@ -1067,8 +1070,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         let frame = try controlStack.branchTarget(relativeDepth: relativeDepth)
         if frame.copyCount == 0 {
             // Optimization where we don't need copying values when the branch taken
-            let selfPC = iseqBuilder.insertingPC
-            iseqBuilder.emitWithLabel(frame.continuation) { _, continuation in
+            iseqBuilder.emitWithLabel(frame.continuation) { _, selfPC, continuation in
                 let relativeOffset = continuation.offsetFromHead - selfPC.offsetFromHead
                 return .brIf(Instruction.BrIfOperand(
                     offset: Int32(relativeOffset), condition: condition
@@ -1099,8 +1101,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         // [0x06] (local.get 1 reg:2) <----|---------+
         // [0x07] ...              <-------+
         let onBranchNotTaken = iseqBuilder.allocLabel()
-        let conditionCheckAt = iseqBuilder.insertingPC
-        iseqBuilder.emitWithLabel(onBranchNotTaken) { _, continuation in
+        iseqBuilder.emitWithLabel(onBranchNotTaken) { _, conditionCheckAt, continuation in
             let relativeOffset = continuation.offsetFromHead - conditionCheckAt.offsetFromHead
             return .brIfNot(Instruction.BrIfOperand(offset: Int32(relativeOffset), condition: condition))
         }
@@ -1165,8 +1166,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
                 )
             }
             try copyOnBranch(targetFrame: frame)
-            let brAt = iseqBuilder.insertingPC
-            iseqBuilder.emitWithLabel(frame.continuation) { _, continuation in
+            iseqBuilder.emitWithLabel(frame.continuation) { _, brAt, continuation in
                 let relativeOffset = continuation.offsetFromHead - brAt.offsetFromHead
                 return .br(offset: Int32(relativeOffset))
             }
