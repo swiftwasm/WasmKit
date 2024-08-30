@@ -38,10 +38,6 @@ typealias Sp = UnsafeMutablePointer<UntypedValue>
 ///         "is compiled" check on the next execution.
 typealias Pc = UnsafeMutableRawPointer
 
-func nextInstruction(_ pc: inout Pc, count: Int) {
-    pc = pc.advancedPc(by: count)
-}
-
 extension Pc {
     func advancedPc(by count: Int) -> Pc {
         assert(Int(bitPattern: self) % MemoryLayout<Instruction>.alignment == 0)
@@ -52,11 +48,6 @@ extension Pc {
         assert(MemoryLayout<T>.stride == 8)
         let value = self.assumingMemoryBound(to: T.self).pointee
         self += MemoryLayout<UInt64>.size
-        return value
-    }
-    mutating func readUntypedValue() -> UntypedValue {
-        let value = self.assumingMemoryBound(to: UntypedValue.self).pointee
-        self += MemoryLayout<UntypedValue>.size
         return value
     }
 }
