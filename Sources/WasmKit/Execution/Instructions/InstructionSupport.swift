@@ -224,10 +224,6 @@ extension Instruction {
     static func f32Nearest(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.nearest(.f32), op) }
     static func f32Sqrt(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.sqrt(.f32), op) }
 
-    static func f32Min(_ op: BinaryOperand) -> Instruction { .numericFloatBinary(.min(.f32), op) }
-    static func f32Max(_ op: BinaryOperand) -> Instruction { .numericFloatBinary(.max(.f32), op) }
-    static func f32Copysign(_ op: BinaryOperand) -> Instruction { .numericFloatBinary(.copysign(.f32), op) }
-
     static func f64Abs(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.abs(.f64), op) }
     static func f64Neg(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.neg(.f64), op) }
     static func f64Ceil(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.ceil(.f64), op) }
@@ -235,10 +231,6 @@ extension Instruction {
     static func f64Trunc(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.trunc(.f64), op) }
     static func f64Nearest(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.nearest(.f64), op) }
     static func f64Sqrt(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.sqrt(.f64), op) }
-
-    static func f64Min(_ op: BinaryOperand) -> Instruction { .numericFloatBinary(.min(.f64), op) }
-    static func f64Max(_ op: BinaryOperand) -> Instruction { .numericFloatBinary(.max(.f64), op) }
-    static func f64Copysign(_ op: BinaryOperand) -> Instruction { .numericFloatBinary(.copysign(.f64), op) }
 
     static func f32ConvertI32S(_ op: UnaryOperand) -> Instruction { .numericConversion(.convertSigned(.f32, .i32), op) }
     static func f32ConvertI32U(_ op: UnaryOperand) -> Instruction { .numericConversion(.convertUnsigned(.f32, .i32), op) }

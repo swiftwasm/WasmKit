@@ -278,6 +278,18 @@ extension ExecutionState {
             self.f32Div(sp: sp, binaryOperand: binaryOperand)
         case .f64Div(let binaryOperand):
             self.f64Div(sp: sp, binaryOperand: binaryOperand)
+        case .f32Min(let binaryOperand):
+            self.f32Min(sp: sp, binaryOperand: binaryOperand)
+        case .f64Min(let binaryOperand):
+            self.f64Min(sp: sp, binaryOperand: binaryOperand)
+        case .f32Max(let binaryOperand):
+            self.f32Max(sp: sp, binaryOperand: binaryOperand)
+        case .f64Max(let binaryOperand):
+            self.f64Max(sp: sp, binaryOperand: binaryOperand)
+        case .f32CopySign(let binaryOperand):
+            self.f32CopySign(sp: sp, binaryOperand: binaryOperand)
+        case .f64CopySign(let binaryOperand):
+            self.f64CopySign(sp: sp, binaryOperand: binaryOperand)
         case .f32Eq(let binaryOperand):
             self.f32Eq(sp: sp, binaryOperand: binaryOperand)
         case .f64Eq(let binaryOperand):
@@ -454,6 +466,12 @@ extension Instruction {
         case .f64Mul: return "f64Mul"
         case .f32Div: return "f32Div"
         case .f64Div: return "f64Div"
+        case .f32Min: return "f32Min"
+        case .f64Min: return "f64Min"
+        case .f32Max: return "f32Max"
+        case .f64Max: return "f64Max"
+        case .f32CopySign: return "f32CopySign"
+        case .f64CopySign: return "f64CopySign"
         case .f32Eq: return "f32Eq"
         case .f64Eq: return "f64Eq"
         case .f32Ne: return "f32Ne"
@@ -651,6 +669,24 @@ extension ExecutionState {
     }
     mutating func f64Div(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.div(sp[binaryOperand.rhs].f64).untyped
+    }
+    mutating func f32Min(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.min(sp[binaryOperand.rhs].f32).untyped
+    }
+    mutating func f64Min(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.min(sp[binaryOperand.rhs].f64).untyped
+    }
+    mutating func f32Max(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.max(sp[binaryOperand.rhs].f32).untyped
+    }
+    mutating func f64Max(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.max(sp[binaryOperand.rhs].f64).untyped
+    }
+    mutating func f32CopySign(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.copySign(sp[binaryOperand.rhs].f32).untyped
+    }
+    mutating func f64CopySign(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.copySign(sp[binaryOperand.rhs].f64).untyped
     }
     mutating func f32Eq(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.eq(sp[binaryOperand.rhs].f32).untyped

@@ -1606,7 +1606,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     mutating func visitF32Div() throws -> Output { try visitBinary(.f32, .f32, Instruction.f32Div) }
     mutating func visitF32Min() throws -> Output { try visitBinary(.f32, .f32, Instruction.f32Min) }
     mutating func visitF32Max() throws -> Output { try visitBinary(.f32, .f32, Instruction.f32Max) }
-    mutating func visitF32Copysign() throws -> Output { try visitBinary(.f32, .f32, Instruction.f32Copysign) }
+    mutating func visitF32Copysign() throws -> Output { try visitBinary(.f32, .f32, Instruction.f32CopySign) }
     mutating func visitF64Abs() throws -> Output { try visitUnary(.f64, Instruction.f64Abs) }
     mutating func visitF64Neg() throws -> Output { try visitUnary(.f64, Instruction.f64Neg) }
     mutating func visitF64Ceil() throws -> Output { try visitUnary(.f64, Instruction.f64Ceil) }
@@ -1620,7 +1620,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     mutating func visitF64Div() throws -> Output { try visitBinary(.f64, .f64, Instruction.f64Div) }
     mutating func visitF64Min() throws -> Output { try visitBinary(.f64, .f64, Instruction.f64Min) }
     mutating func visitF64Max() throws -> Output { try visitBinary(.f64, .f64, Instruction.f64Max) }
-    mutating func visitF64Copysign() throws -> Output { try visitBinary(.f64, .f64, Instruction.f64Copysign) }
+    mutating func visitF64Copysign() throws -> Output { try visitBinary(.f64, .f64, Instruction.f64CopySign) }
     mutating func visitI32WrapI64() throws -> Output { try visitConversion(.i64, .i32, Instruction.i32WrapI64) }
     mutating func visitI32TruncF32S() throws -> Output { try visitConversion(.f32, .i32, Instruction.i32TruncF32S) }
     mutating func visitI32TruncF32U() throws -> Output { try visitConversion(.f32, .i32, Instruction.i32TruncF32U) }
