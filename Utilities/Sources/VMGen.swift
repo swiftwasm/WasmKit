@@ -226,8 +226,11 @@ enum VMGen {
 
     static let numericOtherInsts: [Instruction] = [
         // Numeric
-        Instruction(name: "numericConst", hasData: true, immediates: [
-            Immediate(name: nil, type: "Instruction.ConstOperand")
+        Instruction(name: "const32", immediates: [
+            Immediate(name: nil, type: "Instruction.Const32Operand")
+        ]),
+        Instruction(name: "const64", hasData: true, immediates: [
+            Immediate(name: nil, type: "Instruction.Const64Operand")
         ]),
         Instruction(name: "numericFloatUnary", immediates: [
             Immediate(name: nil, type: "NumericInstruction.FloatUnary"),
