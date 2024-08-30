@@ -200,7 +200,7 @@ extension ExecutionState {
 #endif
             // `doExecute` returns false when current frame *may* be updated
             // print("[\(pc)] execute:", inst)
-            _ = try doExecute(inst, sp: &sp, pc: &pc, md: &md, ms: &ms)
+            try doExecute(inst, sp: &sp, pc: &pc, md: &md, ms: &ms)
         }
     }
 }
