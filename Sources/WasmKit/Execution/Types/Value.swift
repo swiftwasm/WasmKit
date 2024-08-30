@@ -590,6 +590,10 @@ extension FloatingPoint {
     }
     func eq(_ other: Self) -> UInt32 { self == other ? 1 : 0 }
     func ne(_ other: Self) -> UInt32 { self == other ? 0 : 1 }
+    func lt(_ other: Self) -> UInt32 { self < other ? 1 : 0 }
+    func gt(_ other: Self) -> UInt32 { self > other ? 1 : 0 }
+    func le(_ other: Self) -> UInt32 { self <= other ? 1 : 0 }
+    func ge(_ other: Self) -> UInt32 { self >= other ? 1 : 0 }
 }
 
 extension FloatingPoint {

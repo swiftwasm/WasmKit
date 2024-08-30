@@ -206,16 +206,6 @@ extension Instruction {
     typealias OnEnterOperand = FunctionIndex
     typealias OnExitOperand = FunctionIndex
 
-    static func f32Lt(_ op: BinaryOperand) -> Instruction { .numericFloatBinary(.lt(.f32), op) }
-    static func f32Gt(_ op: BinaryOperand) -> Instruction { .numericFloatBinary(.gt(.f32), op) }
-    static func f32Le(_ op: BinaryOperand) -> Instruction { .numericFloatBinary(.le(.f32), op) }
-    static func f32Ge(_ op: BinaryOperand) -> Instruction { .numericFloatBinary(.ge(.f32), op) }
-    
-    static func f64Lt(_ op: BinaryOperand) -> Instruction { .numericFloatBinary(.lt(.f64), op) }
-    static func f64Gt(_ op: BinaryOperand) -> Instruction { .numericFloatBinary(.gt(.f64), op) }
-    static func f64Le(_ op: BinaryOperand) -> Instruction { .numericFloatBinary(.le(.f64), op) }
-    static func f64Ge(_ op: BinaryOperand) -> Instruction { .numericFloatBinary(.ge(.f64), op) }
-
     static func f32Abs(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.abs(.f32), op) }
     static func f32Neg(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.neg(.f32), op) }
     static func f32Ceil(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.ceil(.f32), op) }

@@ -9,12 +9,6 @@ extension ExecutionState {
         let value = sp[unaryOperand.input]
         sp[unaryOperand.result] = UntypedValue(floatUnary(value.cast(to: floatUnary.type)))
     }
-
-    mutating func numericFloatBinary(sp: Sp, floatBinary: NumericInstruction.FloatBinary, binaryOperand: Instruction.BinaryOperand) {
-        let value2 = sp[binaryOperand.rhs].cast(to: floatBinary.type)
-        let value1 = sp[binaryOperand.lhs].cast(to: floatBinary.type)
-        sp[binaryOperand.result] = UntypedValue(floatBinary(value1, value2))
-    }
     mutating func numericConversion(sp: Sp, conversion: NumericInstruction.Conversion, unaryOperand: Instruction.UnaryOperand) throws {
         let value = sp[unaryOperand.input]
         sp[unaryOperand.result] = UntypedValue(try conversion(value))
@@ -70,38 +64,6 @@ extension NumericInstruction {
                 return value.nearest
             case .sqrt:
                 return value.squareRoot
-            }
-        }
-    }
-
-    public enum FloatBinary: Equatable {
-        // frelop
-        case lt(FloatValueType)
-        case gt(FloatValueType)
-        case le(FloatValueType)
-        case ge(FloatValueType)
-
-        var type: NumericType {
-            switch self {
-            case
-                let .lt(type),
-                let .gt(type),
-                let .le(type),
-                let .ge(type):
-                return .float(type)
-            }
-        }
-
-        func callAsFunction(_ value1: Value, _ value2: Value) -> Value {
-            switch self {
-            case .lt:
-                return .i32(value1 < value2 ? 1 : 0)
-            case .gt:
-                return .i32(value1 > value2 ? 1 : 0)
-            case .le:
-                return .i32(value1 <= value2 ? 1 : 0)
-            case .ge:
-                return .i32(value1 >= value2 ? 1 : 0)
             }
         }
     }
