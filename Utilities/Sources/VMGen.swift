@@ -207,7 +207,7 @@ enum VMGen {
         }
         // (T, T) -> i32 for all T in float types
         results += [
-            "Eq", "Ne",
+            "Eq", "Ne", "Lt", "Gt", "Le", "Ge"
         ].flatMap { op -> [BinOpInfo] in
             floatValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: "i32") }
         }
@@ -225,10 +225,6 @@ enum VMGen {
         Instruction(name: "numericFloatUnary", immediates: [
             Immediate(name: nil, type: "NumericInstruction.FloatUnary"),
             Immediate(name: nil, type: "Instruction.UnaryOperand"),
-        ]),
-        Instruction(name: "numericFloatBinary", immediates: [
-            Immediate(name: nil, type: "NumericInstruction.FloatBinary"),
-            Immediate(name: nil, type: "Instruction.BinaryOperand"),
         ]),
         Instruction(name: "numericConversion", mayThrow: true, immediates: [
             Immediate(name: nil, type: "NumericInstruction.Conversion"),

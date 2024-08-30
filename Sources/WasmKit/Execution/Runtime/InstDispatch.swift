@@ -110,8 +110,6 @@ extension ExecutionState {
             self.numericConst(sp: sp, constOperand: constOperand)
         case .numericFloatUnary(let floatUnary, let unaryOperand):
             self.numericFloatUnary(sp: sp, floatUnary: floatUnary, unaryOperand: unaryOperand)
-        case .numericFloatBinary(let floatBinary, let binaryOperand):
-            self.numericFloatBinary(sp: sp, floatBinary: floatBinary, binaryOperand: binaryOperand)
         case .numericConversion(let conversion, let unaryOperand):
             try self.numericConversion(sp: sp, conversion: conversion, unaryOperand: unaryOperand)
         case .i32Add(let binaryOperand):
@@ -298,6 +296,22 @@ extension ExecutionState {
             self.f32Ne(sp: sp, binaryOperand: binaryOperand)
         case .f64Ne(let binaryOperand):
             self.f64Ne(sp: sp, binaryOperand: binaryOperand)
+        case .f32Lt(let binaryOperand):
+            self.f32Lt(sp: sp, binaryOperand: binaryOperand)
+        case .f64Lt(let binaryOperand):
+            self.f64Lt(sp: sp, binaryOperand: binaryOperand)
+        case .f32Gt(let binaryOperand):
+            self.f32Gt(sp: sp, binaryOperand: binaryOperand)
+        case .f64Gt(let binaryOperand):
+            self.f64Gt(sp: sp, binaryOperand: binaryOperand)
+        case .f32Le(let binaryOperand):
+            self.f32Le(sp: sp, binaryOperand: binaryOperand)
+        case .f64Le(let binaryOperand):
+            self.f64Le(sp: sp, binaryOperand: binaryOperand)
+        case .f32Ge(let binaryOperand):
+            self.f32Ge(sp: sp, binaryOperand: binaryOperand)
+        case .f64Ge(let binaryOperand):
+            self.f64Ge(sp: sp, binaryOperand: binaryOperand)
         case .select(let selectOperand):
             try self.select(sp: sp, selectOperand: selectOperand)
         case .refNull(let refNullOperand):
@@ -382,7 +396,6 @@ extension Instruction {
         case .memoryFill: return "memoryFill"
         case .numericConst: return "numericConst"
         case .numericFloatUnary: return "numericFloatUnary"
-        case .numericFloatBinary: return "numericFloatBinary"
         case .numericConversion: return "numericConversion"
         case .i32Add: return "i32Add"
         case .i64Add: return "i64Add"
@@ -476,6 +489,14 @@ extension Instruction {
         case .f64Eq: return "f64Eq"
         case .f32Ne: return "f32Ne"
         case .f64Ne: return "f64Ne"
+        case .f32Lt: return "f32Lt"
+        case .f64Lt: return "f64Lt"
+        case .f32Gt: return "f32Gt"
+        case .f64Gt: return "f64Gt"
+        case .f32Le: return "f32Le"
+        case .f64Le: return "f64Le"
+        case .f32Ge: return "f32Ge"
+        case .f64Ge: return "f64Ge"
         case .select: return "select"
         case .refNull: return "refNull"
         case .refIsNull: return "refIsNull"
@@ -699,6 +720,30 @@ extension ExecutionState {
     }
     mutating func f64Ne(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
         sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.ne(sp[binaryOperand.rhs].f64).untyped
+    }
+    mutating func f32Lt(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.lt(sp[binaryOperand.rhs].f32).untyped
+    }
+    mutating func f64Lt(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.lt(sp[binaryOperand.rhs].f64).untyped
+    }
+    mutating func f32Gt(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.gt(sp[binaryOperand.rhs].f32).untyped
+    }
+    mutating func f64Gt(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.gt(sp[binaryOperand.rhs].f64).untyped
+    }
+    mutating func f32Le(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.le(sp[binaryOperand.rhs].f32).untyped
+    }
+    mutating func f64Le(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.le(sp[binaryOperand.rhs].f64).untyped
+    }
+    mutating func f32Ge(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.ge(sp[binaryOperand.rhs].f32).untyped
+    }
+    mutating func f64Ge(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
+        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.ge(sp[binaryOperand.rhs].f64).untyped
     }
     mutating func i32Clz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
         sp[unaryOperand.result] = sp[unaryOperand.input].i32.clz.untyped
