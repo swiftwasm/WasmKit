@@ -206,7 +206,11 @@ struct UntypedValue: Equatable {
         return rawF64(value.bitPattern)
     }
 
-    private init(storage: UInt64) {
+    init(storage32: UInt32) {
+        self.storage = UInt64(storage32)
+    }
+
+    init(storage: UInt64) {
         self.storage = storage
     }
 

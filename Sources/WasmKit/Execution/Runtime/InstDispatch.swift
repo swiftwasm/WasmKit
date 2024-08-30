@@ -106,8 +106,10 @@ extension ExecutionState {
             try self.memoryCopy(sp: sp, memoryCopyOperand: memoryCopyOperand)
         case .memoryFill(let memoryFillOperand):
             try self.memoryFill(sp: sp, memoryFillOperand: memoryFillOperand)
-        case .numericConst(let constOperand):
-            pc = self.numericConst(sp: sp, pc: pc, constOperand: constOperand)
+        case .const32(let const32Operand):
+            self.const32(sp: sp, const32Operand: const32Operand)
+        case .const64(let const64Operand):
+            pc = self.const64(sp: sp, pc: pc, const64Operand: const64Operand)
         case .numericFloatUnary(let floatUnary, let unaryOperand):
             self.numericFloatUnary(sp: sp, floatUnary: floatUnary, unaryOperand: unaryOperand)
         case .numericConversion(let conversion, let unaryOperand):
@@ -393,7 +395,8 @@ extension Instruction {
         case .memoryDataDrop: return "memoryDataDrop"
         case .memoryCopy: return "memoryCopy"
         case .memoryFill: return "memoryFill"
-        case .numericConst: return "numericConst"
+        case .const32: return "const32"
+        case .const64: return "const64"
         case .numericFloatUnary: return "numericFloatUnary"
         case .numericConversion: return "numericConversion"
         case .i32Add: return "i32Add"

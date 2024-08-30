@@ -31,8 +31,13 @@ extension Instruction {
         let input: VReg
     }
     
-    /// size = 2, alignment = 8
-    struct ConstOperand: Equatable {
+    /// size = 6, alignment = 4
+    struct Const32Operand: Equatable {
+        let value: UInt32
+        let result: VReg
+    }
+    /// size = 2, alignment = 2
+    struct Const64Operand: Equatable {
         let result: VReg
     }
 

@@ -2,10 +2,13 @@
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#numeric-instructions>
 extension ExecutionState {
     @inline(__always)
-    mutating func numericConst(sp: Sp, pc: Pc, constOperand: Instruction.ConstOperand) -> Pc {
+    mutating func const32(sp: Sp, const32Operand: Instruction.Const32Operand) {
+        sp[const32Operand.result] = UntypedValue(storage32: const32Operand.value)
+    }
+    @inline(__always)
+    mutating func const64(sp: Sp, pc: Pc, const64Operand: Instruction.Const64Operand) -> Pc {
         var pc = pc
-        let value = pc.readUntypedValue()
-        sp[constOperand.result] = value
+        sp[const64Operand.result] = pc.read(UntypedValue.self)
         return pc
     }
 
@@ -24,10 +27,6 @@ enum NumericInstruction {}
 
 /// Numeric Instructions
 extension NumericInstruction {
-    internal enum Constant {
-        case const(Value)
-    }
-
     public enum FloatUnary: Equatable {
         // funop
         case abs(FloatValueType)

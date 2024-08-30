@@ -1495,8 +1495,16 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
 
     private mutating func visitConst(_ type: ValueType, _ value: Value) {
-        pushEmit(type, { .numericConst(Instruction.ConstOperand(result: $0)) })
-        iseqBuilder.emitData(UntypedValue(value))
+        let value = UntypedValue(value)
+        let is32Bit = type == .i32 || type == .f32
+        if is32Bit {
+            pushEmit(type, {
+                .const32(Instruction.Const32Operand(value: UInt32(value.storage), result: $0))
+            })
+        } else {
+            pushEmit(type, { .const64(Instruction.Const64Operand(result: $0)) })
+            iseqBuilder.emitData(value.storage)
+        }
     }
     mutating func visitI32Const(value: Int32) -> Output { visitConst(.i32, .i32(UInt32(bitPattern: value))) }
     mutating func visitI64Const(value: Int64) -> Output { visitConst(.i64, .i64(UInt64(bitPattern: value))) }
