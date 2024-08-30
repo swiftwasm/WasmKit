@@ -412,7 +412,7 @@ enum VMGen {
         var output = """
             extension ExecutionState {
                 @inline(__always)
-                mutating func doExecute(_ \(doExecuteParams.map { "\($0.label): \($0.isInout ? "inout " : "")\($0.type)" }.joined(separator: ", "))) throws -> Bool {
+                mutating func doExecute(_ \(doExecuteParams.map { "\($0.label): \($0.isInout ? "inout " : "")\($0.type)" }.joined(separator: ", "))) throws {
                     switch instruction {
             """
 
@@ -440,17 +440,10 @@ enum VMGen {
 
                             \(mayAssignPc)\(tryPrefix)self.\(inst.name)(\(args.joined(separator: ", ")))
                 """
-            if inst.isControl {
-                output += """
-
-                                return \(!inst.mayUpdateFrame)
-                    """
-            }
         }
         output += """
 
                     }
-                    return true
                 }
             }
             """
