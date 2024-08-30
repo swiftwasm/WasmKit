@@ -465,9 +465,9 @@ extension FixedWidthInteger {
     func or(_ other: Self) -> Self { self | other }
     func xor(_ other: Self) -> Self { self ^ other }
 
-    var clz: UInt32 { UInt32(leadingZeroBitCount) }
-    var ctz: UInt32 { UInt32(trailingZeroBitCount) }
-    var popcnt: UInt32 { UInt32(nonzeroBitCount) }
+    var clz: Self { Self(leadingZeroBitCount) }
+    var ctz: Self { Self(trailingZeroBitCount) }
+    var popcnt: Self { Self(nonzeroBitCount) }
     var eqz: UInt32 { self == 0 ? 1 : 0 }
 }
 

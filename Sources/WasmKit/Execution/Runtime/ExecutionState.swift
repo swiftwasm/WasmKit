@@ -1,3 +1,5 @@
+import _CWasmKit
+
 /// An execution state of an invocation of exported function.
 ///
 /// Each new invocation through exported function has a separate ``ExecutionState``
@@ -75,8 +77,9 @@ func executeWasm(
         for (index, argument) in arguments.enumerated() {
             sp[VReg(index)] = UntypedValue(argument)
         }
-        try withUnsafeTemporaryAllocation(of: Instruction.self, capacity: 1) { rootISeq in
-            rootISeq.baseAddress?.pointee = .endOfExecution
+        try withUnsafeTemporaryAllocation(of: UInt64.self, capacity: 2) { rootISeq in
+            rootISeq[0] = Instruction.endOfExecution.handler
+            rootISeq[1] = Instruction.endOfExecution.rawValue
             // NOTE: unwinding a function jump into previous frame's PC + 1, so initial PC is -1ed
             try stack.execute(
                 sp: sp,
@@ -174,15 +177,36 @@ extension ExecutionState {
             sp: sp, pc: pc, md: &md, ms: &ms
         )
         do {
-            try run(sp: &sp, pc: &pc, md: &md, ms: &ms)
+            switch self.runtime.value.configuration.threadingModel {
+            case .direct:
+                try runDirectThreaded(sp: sp, pc: pc, md: md, ms: ms)
+            case .token:
+                try runTokenThreaded(sp: &sp, pc: &pc, md: &md, ms: &ms)
+            }
         } catch is EndOfExecution {
             return
         }
     }
 
+    @inline(never)
+    mutating func runDirectThreaded(
+        sp: Sp, pc: Pc, md: Md, ms: Ms
+    ) throws {
+        let handler = pc.assumingMemoryBound(to: wasmkit_tc_exec.self).pointee
+        handler(
+            UnsafeMutableRawPointer(sp).assumingMemoryBound(to: UInt64.self),
+            pc.assumingMemoryBound(to: UInt64.self),
+            md, ms,
+            &self
+        )
+        if let error = self.trap {
+            throw unsafeBitCast(error, to: Error.self)
+        }
+    }
+
     /// The main execution loop. Be careful when modifying this function as it is performance-critical.
     @inline(__always)
-    mutating func run(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
+    mutating func runTokenThreaded(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
         CurrentMemory.mayUpdateCurrentInstance(stack: self, md: &md, ms: &ms)
 #if WASMKIT_ENGINE_STATS
         var stats: [String: Int] = [:]
@@ -194,6 +218,7 @@ extension ExecutionState {
 #endif
         var inst: Instruction
         while true {
+            pc = pc.advancedPc(by: 1)
             inst = pc.read(Instruction.self)
 #if WASMKIT_ENGINE_STATS
             stats[inst.name, default: 0] += 1
@@ -202,6 +227,17 @@ extension ExecutionState {
             // print("[\(pc)] execute:", inst)
             try doExecute(inst, sp: &sp, pc: &pc, md: &md, ms: &ms)
         }
+    }
+
+    /// Sets the error trap thrown during execution.
+    ///
+    /// - Note: This function is called by C instruction handlers at most once.
+    /// It's used only when direct threading is enabled.
+    /// - Parameter trap: The error trap thrown during execution.
+    @_silgen_name("wasmkit_execution_state_set_error")
+    mutating func setError(_ trap: UnsafeRawPointer) {
+        precondition(self.trap == nil)
+        self.trap = trap
     }
 }
 
@@ -263,5 +299,29 @@ extension Sp {
         nonmutating set {
             return self[Int(index)] = newValue
         }
+    }
+    private func read<T: FixedWidthInteger>(_ index: VReg) -> T {
+        return self.advanced(by: Int(index)).withMemoryRebound(to: T.self, capacity: 1) {
+            $0.pointee
+        }
+    }
+    private func write(_ index: VReg, _ value: UntypedValue) {
+        self[index] = value
+    }
+    subscript(i32 index: VReg) -> UInt32 {
+        get { return read(index) }
+        nonmutating set { write(index, .i32(newValue)) }
+    }
+    subscript(i64 index: VReg) -> UInt64 {
+        get { return read(index) }
+        nonmutating set { write(index, .i64(newValue)) }
+    }
+    subscript(f32 index: VReg) -> Float32 {
+        get { return Float32(bitPattern: read(index)) }
+        nonmutating set { write(index, .f32(newValue)) }
+    }
+    subscript(f64 index: VReg) -> Float64 {
+        get { return Float64(bitPattern: read(index)) }
+        nonmutating set { write(index, .f64(newValue)) }
     }
 }

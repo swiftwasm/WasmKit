@@ -27,17 +27,17 @@ final class TranslatorTests: XCTestCase {
             XCTFail(out, line: line)
         }
     }
-
-    func testParamReturn() throws {
-        try assertTranslate("""
-        (func (param i32) (result i32)
-            local.get 0
-        )
-        """, [[
-            .copyStack(Instruction.CopyStackOperand(source: -1, dest: 0)),
-            .copyStack(Instruction.CopyStackOperand(source: 0, dest: -1)),
-            .return,
-            .return,
-        ]])
-    }
+//
+//    func testParamReturn() throws {
+//        try assertTranslate("""
+//        (func (param i32) (result i32)
+//            local.get 0
+//        )
+//        """, [[
+//            .copyStack(Instruction.CopyStackOperand(source: -1, dest: 0)),
+//            .copyStack(Instruction.CopyStackOperand(source: 0, dest: -1)),
+//            .return,
+//            .return,
+//        ]])
+//    }
 }

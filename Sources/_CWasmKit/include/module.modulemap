@@ -1,0 +1,12 @@
+module _CWasmKit {
+  header "_CWasmKit.h"
+
+  module Platform {
+    header "Platform.h"
+    export *
+  }
+
+  module InlineCode {
+    header "InlineCode.h"
+  }
+}

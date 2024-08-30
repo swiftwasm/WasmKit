@@ -243,6 +243,16 @@ extension Instruction {
         )
         return unsafeBitCast(slotData, to: UInt64.self)
     }
+    
+    init(rawValue: UInt64) {
+        assert(_isPOD(Instruction.self))
+        typealias RawBytes = (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
+        let raw = unsafeBitCast(rawValue, to: RawBytes.self)
+        let rawInst: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (
+            raw.0, raw.1, raw.2, raw.3, raw.4, raw.5, raw.6
+        )
+        self = unsafeBitCast(rawInst, to: Instruction.self)
+    }
 }
 
 struct InstructionPrintingContext {
@@ -330,7 +340,7 @@ struct InstructionPrintingContext {
             target.write("br_if \(reg(op.condition)), +\(op.offset)")
         case .br(let offset):
             target.write("br \(offset > 0 ? "+" : "")\(offset)")
-        case .return:
+        case ._return:
             target.write("return")
         default:
             target.write(String(describing: instruction))

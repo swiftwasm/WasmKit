@@ -4,7 +4,7 @@ extension ExecutionState {
     func unreachable(sp: Sp, pc: Pc) throws -> Pc {
         throw Trap.unreachable
     }
-    mutating func nop(sp: Sp, pc: Pc) throws -> Pc {
+    mutating func nop(sp: Sp, pc: Pc) -> Pc {
         return pc
     }
 
@@ -15,22 +15,22 @@ extension ExecutionState {
         return pc.advancedPc(by: Int(ifOperand.elseOrEndOffset))
     }
 
-    mutating func br(sp: Sp, pc: Pc, offset: Int32) throws -> Pc {
+    mutating func br(sp: Sp, pc: Pc, offset: Int32) -> Pc {
         return pc.advancedPc(by: Int(offset))
     }
-    mutating func brIf(sp: Sp, pc: Pc, brIfOperand: Instruction.BrIfOperand) throws -> Pc {
+    mutating func brIf(sp: Sp, pc: Pc, brIfOperand: Instruction.BrIfOperand) -> Pc {
         guard sp[brIfOperand.condition].i32 != 0 else {
             return pc
         }
         return pc.advancedPc(by: Int(brIfOperand.offset))
     }
-    mutating func brIfNot(sp: Sp, pc: Pc, brIfOperand: Instruction.BrIfOperand) throws -> Pc {
+    mutating func brIfNot(sp: Sp, pc: Pc, brIfOperand: Instruction.BrIfOperand) -> Pc {
         guard sp[brIfOperand.condition].i32 == 0 else {
             return pc
         }
         return pc.advancedPc(by: Int(brIfOperand.offset))
     }
-    mutating func brTable(sp: Sp, pc: Pc, brTableOperand: Instruction.BrTableOperand) throws -> Pc {
+    mutating func brTable(sp: Sp, pc: Pc, brTableOperand: Instruction.BrTableOperand) -> Pc {
         var pc = pc
         let brTable = pc.read(Instruction.BrTable.self)
         let index = sp[brTableOperand.index].i32
@@ -39,7 +39,7 @@ extension ExecutionState {
         return pc.advancedPc(by: Int(entry.offset))
     }
 
-    mutating func `return`(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms) throws -> Pc {
+    mutating func _return(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms) -> Pc {
         var pc = pc
         popFrame(sp: &sp, pc: &pc, md: &md, ms: &ms)
         return pc
@@ -99,10 +99,12 @@ extension ExecutionState {
     @inline(__always)
     mutating func compilingCall(sp: inout Sp, pc: Pc, compilingCallOperand: Instruction.CompilingCallOperand) throws -> Pc {
         var pc = pc
-        let callPc = pc - MemoryLayout<Instruction>.stride
+        let callPc = pc.assumingMemoryBound(to: UInt64.self)
         let callee = pc.read(InternalFunction.self)
         try callee.ensureCompiled(runtime: runtime)
-        callPc.assumingMemoryBound(to: Instruction.self).pointee = .internalCall(compilingCallOperand)
+        let replaced = Instruction.internalCall(compilingCallOperand)
+        callPc[-2] = replaced.handler
+        callPc[-1] = replaced.rawValue
         try _internalCall(sp: &sp, pc: &pc, callee: callee, internalCallOperand: compilingCallOperand)
         return pc
     }

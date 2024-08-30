@@ -1,7 +1,7 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#parametric-instructions>
 extension ExecutionState {
-    mutating func select(sp: Sp, pc: Pc) throws -> Pc {
+    mutating func select(sp: Sp, pc: Pc) -> Pc {
         var pc = pc
         let selectOperand = pc.read(Instruction.SelectOperand.self)
         let flag = sp[selectOperand.condition].i32

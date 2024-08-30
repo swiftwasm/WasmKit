@@ -7,6 +7,7 @@ struct StackContext {
     private var frames: FixedSizeStack<Frame>
     var currentFrame: Frame!
     let runtime: RuntimeRef
+    var trap: UnsafeRawPointer?
 
     var currentInstance: InternalInstance {
         currentFrame.instance

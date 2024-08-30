@@ -39,6 +39,7 @@ let package = Package(
         .target(
             name: "WasmKit",
             dependencies: [
+                "_CWasmKit",
                 "WasmParser",
                 "WasmTypes",
                 "SystemExtras",
@@ -46,6 +47,7 @@ let package = Package(
             ],
             exclude: ["CMakeLists.txt"]
         ),
+        .target(name: "_CWasmKit"),
         .testTarget(
             name: "WasmKitTests",
             dependencies: ["WasmKit", "WAT"],
