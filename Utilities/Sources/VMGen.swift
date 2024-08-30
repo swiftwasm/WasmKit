@@ -201,6 +201,7 @@ enum VMGen {
         // (T, T) -> T for all T in float types
         results += [
             "Add", "Sub", "Mul", "Div",
+            "Min", "Max", "CopySign",
         ].flatMap { op -> [BinOpInfo] in
             floatValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: $0) }
         }

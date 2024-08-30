@@ -563,6 +563,31 @@ extension FloatingPoint {
     func sub(_ other: Self) -> Self { self - other }
     func mul(_ other: Self) -> Self { self * other }
     func div(_ other: Self) -> Self { self / other }
+    func min(_ other: Self) -> Self {
+        guard !isNaN && !other.isNaN else {
+            return .nan
+        }
+        // min(0.0, -0.0) returns 0.0 in Swift, but wasm expects to return -0.0
+        // spec: https://webassembly.github.io/spec/core/exec/numerics.html#op-fmin
+        if self.isZero, self == other {
+            return self.sign == .minus ? self : other
+        }
+        return Swift.min(self, other)
+    }
+    func max(_ other: Self) -> Self {
+        guard !isNaN && !other.isNaN else {
+            return .nan
+        }
+        //  max(-0.0, 0.0) returns -0.0 in Swift, but wasm expects to return 0.0
+        // spec: https://webassembly.github.io/spec/core/exec/numerics.html#op-fmax
+        if self.isZero, self == other {
+            return self.sign == .plus ? self : other
+        }
+        return Swift.max(self, other)
+    }
+    func copySign(_ other: Self) -> Self {
+        return sign == other.sign ? self : -self
+    }
     func eq(_ other: Self) -> UInt32 { self == other ? 1 : 0 }
     func ne(_ other: Self) -> UInt32 { self == other ? 0 : 1 }
 }

@@ -75,11 +75,6 @@ extension NumericInstruction {
     }
 
     public enum FloatBinary: Equatable {
-        // fbinop
-        case min(FloatValueType)
-        case max(FloatValueType)
-        case copysign(FloatValueType)
-
         // frelop
         case lt(FloatValueType)
         case gt(FloatValueType)
@@ -89,9 +84,6 @@ extension NumericInstruction {
         var type: NumericType {
             switch self {
             case
-                let .min(type),
-                let .max(type),
-                let .copysign(type),
                 let .lt(type),
                 let .gt(type),
                 let .le(type),
@@ -102,44 +94,6 @@ extension NumericInstruction {
 
         func callAsFunction(_ value1: Value, _ value2: Value) -> Value {
             switch self {
-            case .min:
-                guard !value1.isNan && !value2.isNan else {
-                    return value1.type.float.nan
-                }
-                // min(0.0, -0.0) returns 0.0 in Swift, but wasm expects to return -0.0
-                // spec: https://webassembly.github.io/spec/core/exec/numerics.html#op-fmin
-                switch (value1, value2) {
-                case let (.f32(lhs), .f32(rhs)):
-                    if value1 == value2 {
-                        return .f32(lhs | rhs)
-                    }
-                case let (.f64(lhs), .f64(rhs)):
-                    if value1 == value2 {
-                        return .f64(lhs | rhs)
-                    }
-                default: break
-                }
-                return Swift.min(value1, value2)
-            case .max:
-                guard !value1.isNan && !value2.isNan else {
-                    return value1.type.float.nan
-                }
-                // max(-0.0, 0.0) returns -0.0 in Swift, but wasm expects to return -0.0
-                // spec: https://webassembly.github.io/spec/core/exec/numerics.html#op-fmin
-                switch (value1, value2) {
-                case let (.f32(lhs), .f32(rhs)):
-                    if value1 == value2 {
-                        return .f32(lhs & rhs)
-                    }
-                case let (.f64(lhs), .f64(rhs)):
-                    if value1 == value2 {
-                        return .f64(lhs & rhs)
-                    }
-                default: break
-                }
-                return Swift.max(value1, value2)
-            case .copysign:
-                return .copySign(value1, value2)
             case .lt:
                 return .i32(value1 < value2 ? 1 : 0)
             case .gt:
