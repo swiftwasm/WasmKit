@@ -36,9 +36,7 @@ extension ExecutionState {
         let index = sp[brTableOperand.index].i32
         let normalizedOffset = min(Int(index), Int(brTableOperand.count - 1))
         let entry = brTable.baseAddress[normalizedOffset]
-
-        nextInstruction(&pc, count: Int(entry.offset))
-        return pc
+        return pc.advancedPc(by: Int(entry.offset))
     }
 
     mutating func `return`(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms) throws -> Pc {
