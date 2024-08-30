@@ -1,6 +1,9 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#memory-instructions>
 extension ExecutionState {
+    @inline(never) func throwOutOfBoundsMemoryAccess() throws -> Never {
+        throw Trap.outOfBoundsMemoryAccess
+    }
     mutating func memoryLoad<T: FixedWidthInteger>(
         sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand, loadAs _: T.Type = T.self, castToValue: (T) -> UntypedValue
     ) throws -> Pc {
@@ -9,15 +12,15 @@ extension ExecutionState {
 
         let length = UInt64(T.bitWidth) / 8
         let i = sp[loadOperand.pointer].asAddressOffset()
-        let (endAddress, isEndOverflow) = i.addingReportingOverflow(length + memarg.offset)
-        guard !isEndOverflow, endAddress <= ms else {
-            // TODO(optimize): Swift-native exception leads code-bloating
-            throw Trap.outOfBoundsMemoryAccess
+        let (endAddress, isEndOverflow) = i.addingReportingOverflow(length &+ memarg.offset)
+        if _fastPath(!isEndOverflow && endAddress <= ms) {
+            let address = memarg.offset + i
+            let loaded = md.unsafelyUnwrapped.loadUnaligned(fromByteOffset: Int(address), as: T.self)
+            sp[loadOperand.result] = castToValue(loaded)
+            return pc
+        } else {
+            try throwOutOfBoundsMemoryAccess()
         }
-        let address = memarg.offset + i
-        let loaded = UnsafeMutableRawBufferPointer(start: md, count: ms).loadUnaligned(fromByteOffset: Int(address), as: T.self)
-        sp[loadOperand.result] = castToValue(loaded)
-        return pc
     }
 
     /// `[type].store[bitWidth]`
@@ -28,16 +31,16 @@ extension ExecutionState {
         let value = sp[storeOperand.value]
         let length = UInt64(T.bitWidth) / 8
         let i = sp[storeOperand.pointer].asAddressOffset()
-        let (endAddress, isEndOverflow) = i.addingReportingOverflow(length + memarg.offset)
-        guard !isEndOverflow, endAddress <= ms else {
-            // TODO(optimize): Swift-native exception leads code-bloating
-            throw Trap.outOfBoundsMemoryAccess
-        }
         let address = memarg.offset + i
-        let toStore = castFromValue(value)
-        md!.advanced(by: Int(address))
-            .bindMemory(to: T.self, capacity: 1).pointee = toStore.littleEndian
-        return pc
+        let (endAddress, isEndOverflow) = i.addingReportingOverflow(length + memarg.offset)
+        if _fastPath(!isEndOverflow && endAddress <= ms) {
+            let toStore = castFromValue(value)
+            md.unsafelyUnwrapped.advanced(by: Int(address))
+                .bindMemory(to: T.self, capacity: 1).pointee = toStore.littleEndian
+            return pc
+        } else {
+            try throwOutOfBoundsMemoryAccess()
+        }
     }
 
     mutating func memorySize(sp: Sp, memorySizeOperand: Instruction.MemorySizeOperand) {

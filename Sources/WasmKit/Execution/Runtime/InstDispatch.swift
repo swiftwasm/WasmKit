@@ -6,9 +6,9 @@ extension ExecutionState {
         case .copyStack(let copyStackOperand):
             self.copyStack(sp: sp, copyStackOperand: copyStackOperand)
         case .globalGet(let globalGetOperand):
-            pc = try self.globalGet(sp: sp, pc: pc, globalGetOperand: globalGetOperand)
+            pc = self.globalGet(sp: sp, pc: pc, globalGetOperand: globalGetOperand)
         case .globalSet(let globalSetOperand):
-            pc = try self.globalSet(sp: sp, pc: pc, globalSetOperand: globalSetOperand)
+            pc = self.globalSet(sp: sp, pc: pc, globalSetOperand: globalSetOperand)
         case .call(let callOperand):
             pc = try self.call(sp: &sp, pc: pc, md: &md, ms: &ms, callOperand: callOperand)
         case .compilingCall(let compilingCallOperand):
@@ -20,19 +20,19 @@ extension ExecutionState {
         case .unreachable:
             pc = try self.unreachable(sp: sp, pc: pc)
         case .nop:
-            pc = try self.nop(sp: sp, pc: pc)
+            pc = self.nop(sp: sp, pc: pc)
         case .ifThen(let ifOperand):
             pc = self.ifThen(sp: sp, pc: pc, ifOperand: ifOperand)
         case .br(let offset):
-            pc = try self.br(sp: sp, pc: pc, offset: offset)
+            pc = self.br(sp: sp, pc: pc, offset: offset)
         case .brIf(let brIfOperand):
-            pc = try self.brIf(sp: sp, pc: pc, brIfOperand: brIfOperand)
+            pc = self.brIf(sp: sp, pc: pc, brIfOperand: brIfOperand)
         case .brIfNot(let brIfOperand):
-            pc = try self.brIfNot(sp: sp, pc: pc, brIfOperand: brIfOperand)
+            pc = self.brIfNot(sp: sp, pc: pc, brIfOperand: brIfOperand)
         case .brTable(let brTableOperand):
-            pc = try self.brTable(sp: sp, pc: pc, brTableOperand: brTableOperand)
-        case .`return`:
-            pc = try self.`return`(sp: &sp, pc: pc, md: &md, ms: &ms)
+            pc = self.brTable(sp: sp, pc: pc, brTableOperand: brTableOperand)
+        case ._return:
+            pc = self._return(sp: &sp, pc: pc, md: &md, ms: &ms)
         case .endOfExecution:
             pc = try self.endOfExecution(sp: &sp, pc: pc)
         case .i32Load(let loadOperand):
@@ -302,7 +302,7 @@ extension ExecutionState {
         case .f64Ge(let binaryOperand):
             self.f64Ge(sp: sp, binaryOperand: binaryOperand)
         case .select:
-            pc = try self.select(sp: sp, pc: pc)
+            pc = self.select(sp: sp, pc: pc)
         case .refNull(let refNullOperand):
             self.refNull(sp: sp, refNullOperand: refNullOperand)
         case .refIsNull(let refIsNullOperand):
@@ -350,7 +350,7 @@ extension Instruction {
         case .brIf: return "brIf"
         case .brIfNot: return "brIfNot"
         case .brTable: return "brTable"
-        case .`return`: return "`return`"
+        case ._return: return "_return"
         case .endOfExecution: return "endOfExecution"
         case .i32Load: return "i32Load"
         case .i64Load: return "i64Load"
@@ -506,304 +506,304 @@ extension Instruction {
 
 extension ExecutionState {
     @inline(__always) mutating func i32Add(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.add(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].add(sp[i32: binaryOperand.rhs])
     }
     @inline(__always) mutating func i64Add(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.add(sp[binaryOperand.rhs].i64).untyped
+        sp[i64: binaryOperand.result] = sp[i64: binaryOperand.lhs].add(sp[i64: binaryOperand.rhs])
     }
     @inline(__always) mutating func i32Sub(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.sub(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].sub(sp[i32: binaryOperand.rhs])
     }
     @inline(__always) mutating func i64Sub(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.sub(sp[binaryOperand.rhs].i64).untyped
+        sp[i64: binaryOperand.result] = sp[i64: binaryOperand.lhs].sub(sp[i64: binaryOperand.rhs])
     }
     @inline(__always) mutating func i32Mul(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.mul(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].mul(sp[i32: binaryOperand.rhs])
     }
     @inline(__always) mutating func i64Mul(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.mul(sp[binaryOperand.rhs].i64).untyped
+        sp[i64: binaryOperand.result] = sp[i64: binaryOperand.lhs].mul(sp[i64: binaryOperand.rhs])
     }
     @inline(__always) mutating func i32And(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.and(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].and(sp[i32: binaryOperand.rhs])
     }
     @inline(__always) mutating func i64And(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.and(sp[binaryOperand.rhs].i64).untyped
+        sp[i64: binaryOperand.result] = sp[i64: binaryOperand.lhs].and(sp[i64: binaryOperand.rhs])
     }
     @inline(__always) mutating func i32Or(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.or(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].or(sp[i32: binaryOperand.rhs])
     }
     @inline(__always) mutating func i64Or(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.or(sp[binaryOperand.rhs].i64).untyped
+        sp[i64: binaryOperand.result] = sp[i64: binaryOperand.lhs].or(sp[i64: binaryOperand.rhs])
     }
     @inline(__always) mutating func i32Xor(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.xor(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].xor(sp[i32: binaryOperand.rhs])
     }
     @inline(__always) mutating func i64Xor(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.xor(sp[binaryOperand.rhs].i64).untyped
+        sp[i64: binaryOperand.result] = sp[i64: binaryOperand.lhs].xor(sp[i64: binaryOperand.rhs])
     }
     @inline(__always) mutating func i32Shl(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.shl(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].shl(sp[i32: binaryOperand.rhs])
     }
     @inline(__always) mutating func i64Shl(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.shl(sp[binaryOperand.rhs].i64).untyped
+        sp[i64: binaryOperand.result] = sp[i64: binaryOperand.lhs].shl(sp[i64: binaryOperand.rhs])
     }
     @inline(__always) mutating func i32ShrS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.shrS(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].shrS(sp[i32: binaryOperand.rhs])
     }
     @inline(__always) mutating func i64ShrS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.shrS(sp[binaryOperand.rhs].i64).untyped
+        sp[i64: binaryOperand.result] = sp[i64: binaryOperand.lhs].shrS(sp[i64: binaryOperand.rhs])
     }
     @inline(__always) mutating func i32ShrU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.shrU(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].shrU(sp[i32: binaryOperand.rhs])
     }
     @inline(__always) mutating func i64ShrU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.shrU(sp[binaryOperand.rhs].i64).untyped
+        sp[i64: binaryOperand.result] = sp[i64: binaryOperand.lhs].shrU(sp[i64: binaryOperand.rhs])
     }
     @inline(__always) mutating func i32Rotl(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.rotl(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].rotl(sp[i32: binaryOperand.rhs])
     }
     @inline(__always) mutating func i64Rotl(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.rotl(sp[binaryOperand.rhs].i64).untyped
+        sp[i64: binaryOperand.result] = sp[i64: binaryOperand.lhs].rotl(sp[i64: binaryOperand.rhs])
     }
     @inline(__always) mutating func i32Rotr(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.rotr(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].rotr(sp[i32: binaryOperand.rhs])
     }
     @inline(__always) mutating func i64Rotr(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.rotr(sp[binaryOperand.rhs].i64).untyped
+        sp[i64: binaryOperand.result] = sp[i64: binaryOperand.lhs].rotr(sp[i64: binaryOperand.rhs])
     }
     @inline(__always) mutating func i32DivS(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
-        sp[binaryOperand.result] = try sp[binaryOperand.lhs].i32.divS(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = try sp[i32: binaryOperand.lhs].divS(sp[i32: binaryOperand.rhs])
     }
     @inline(__always) mutating func i64DivS(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
-        sp[binaryOperand.result] = try sp[binaryOperand.lhs].i64.divS(sp[binaryOperand.rhs].i64).untyped
+        sp[i64: binaryOperand.result] = try sp[i64: binaryOperand.lhs].divS(sp[i64: binaryOperand.rhs])
     }
     @inline(__always) mutating func i32DivU(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
-        sp[binaryOperand.result] = try sp[binaryOperand.lhs].i32.divU(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = try sp[i32: binaryOperand.lhs].divU(sp[i32: binaryOperand.rhs])
     }
     @inline(__always) mutating func i64DivU(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
-        sp[binaryOperand.result] = try sp[binaryOperand.lhs].i64.divU(sp[binaryOperand.rhs].i64).untyped
+        sp[i64: binaryOperand.result] = try sp[i64: binaryOperand.lhs].divU(sp[i64: binaryOperand.rhs])
     }
     @inline(__always) mutating func i32RemS(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
-        sp[binaryOperand.result] = try sp[binaryOperand.lhs].i32.remS(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = try sp[i32: binaryOperand.lhs].remS(sp[i32: binaryOperand.rhs])
     }
     @inline(__always) mutating func i64RemS(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
-        sp[binaryOperand.result] = try sp[binaryOperand.lhs].i64.remS(sp[binaryOperand.rhs].i64).untyped
+        sp[i64: binaryOperand.result] = try sp[i64: binaryOperand.lhs].remS(sp[i64: binaryOperand.rhs])
     }
     @inline(__always) mutating func i32RemU(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
-        sp[binaryOperand.result] = try sp[binaryOperand.lhs].i32.remU(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = try sp[i32: binaryOperand.lhs].remU(sp[i32: binaryOperand.rhs])
     }
     @inline(__always) mutating func i64RemU(sp: Sp, binaryOperand: Instruction.BinaryOperand) throws {
-        sp[binaryOperand.result] = try sp[binaryOperand.lhs].i64.remU(sp[binaryOperand.rhs].i64).untyped
+        sp[i64: binaryOperand.result] = try sp[i64: binaryOperand.lhs].remU(sp[i64: binaryOperand.rhs])
     }
     @inline(__always) mutating func i32Eq(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.eq(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].eq(sp[i32: binaryOperand.rhs])
     }
     @inline(__always) mutating func i64Eq(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.eq(sp[binaryOperand.rhs].i64).untyped
+        sp[i32: binaryOperand.result] = sp[i64: binaryOperand.lhs].eq(sp[i64: binaryOperand.rhs])
     }
     @inline(__always) mutating func i32Ne(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.ne(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].ne(sp[i32: binaryOperand.rhs])
     }
     @inline(__always) mutating func i64Ne(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.ne(sp[binaryOperand.rhs].i64).untyped
+        sp[i32: binaryOperand.result] = sp[i64: binaryOperand.lhs].ne(sp[i64: binaryOperand.rhs])
     }
     @inline(__always) mutating func i32LtS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.ltS(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].ltS(sp[i32: binaryOperand.rhs])
     }
     @inline(__always) mutating func i64LtS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.ltS(sp[binaryOperand.rhs].i64).untyped
+        sp[i32: binaryOperand.result] = sp[i64: binaryOperand.lhs].ltS(sp[i64: binaryOperand.rhs])
     }
     @inline(__always) mutating func i32LtU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.ltU(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].ltU(sp[i32: binaryOperand.rhs])
     }
     @inline(__always) mutating func i64LtU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.ltU(sp[binaryOperand.rhs].i64).untyped
+        sp[i32: binaryOperand.result] = sp[i64: binaryOperand.lhs].ltU(sp[i64: binaryOperand.rhs])
     }
     @inline(__always) mutating func i32GtS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.gtS(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].gtS(sp[i32: binaryOperand.rhs])
     }
     @inline(__always) mutating func i64GtS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.gtS(sp[binaryOperand.rhs].i64).untyped
+        sp[i32: binaryOperand.result] = sp[i64: binaryOperand.lhs].gtS(sp[i64: binaryOperand.rhs])
     }
     @inline(__always) mutating func i32GtU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.gtU(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].gtU(sp[i32: binaryOperand.rhs])
     }
     @inline(__always) mutating func i64GtU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.gtU(sp[binaryOperand.rhs].i64).untyped
+        sp[i32: binaryOperand.result] = sp[i64: binaryOperand.lhs].gtU(sp[i64: binaryOperand.rhs])
     }
     @inline(__always) mutating func i32LeS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.leS(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].leS(sp[i32: binaryOperand.rhs])
     }
     @inline(__always) mutating func i64LeS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.leS(sp[binaryOperand.rhs].i64).untyped
+        sp[i32: binaryOperand.result] = sp[i64: binaryOperand.lhs].leS(sp[i64: binaryOperand.rhs])
     }
     @inline(__always) mutating func i32LeU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.leU(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].leU(sp[i32: binaryOperand.rhs])
     }
     @inline(__always) mutating func i64LeU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.leU(sp[binaryOperand.rhs].i64).untyped
+        sp[i32: binaryOperand.result] = sp[i64: binaryOperand.lhs].leU(sp[i64: binaryOperand.rhs])
     }
     @inline(__always) mutating func i32GeS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.geS(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].geS(sp[i32: binaryOperand.rhs])
     }
     @inline(__always) mutating func i64GeS(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.geS(sp[binaryOperand.rhs].i64).untyped
+        sp[i32: binaryOperand.result] = sp[i64: binaryOperand.lhs].geS(sp[i64: binaryOperand.rhs])
     }
     @inline(__always) mutating func i32GeU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i32.geU(sp[binaryOperand.rhs].i32).untyped
+        sp[i32: binaryOperand.result] = sp[i32: binaryOperand.lhs].geU(sp[i32: binaryOperand.rhs])
     }
     @inline(__always) mutating func i64GeU(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].i64.geU(sp[binaryOperand.rhs].i64).untyped
+        sp[i32: binaryOperand.result] = sp[i64: binaryOperand.lhs].geU(sp[i64: binaryOperand.rhs])
     }
     @inline(__always) mutating func f32Add(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.add(sp[binaryOperand.rhs].f32).untyped
+        sp[f32: binaryOperand.result] = sp[f32: binaryOperand.lhs].add(sp[f32: binaryOperand.rhs])
     }
     @inline(__always) mutating func f64Add(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.add(sp[binaryOperand.rhs].f64).untyped
+        sp[f64: binaryOperand.result] = sp[f64: binaryOperand.lhs].add(sp[f64: binaryOperand.rhs])
     }
     @inline(__always) mutating func f32Sub(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.sub(sp[binaryOperand.rhs].f32).untyped
+        sp[f32: binaryOperand.result] = sp[f32: binaryOperand.lhs].sub(sp[f32: binaryOperand.rhs])
     }
     @inline(__always) mutating func f64Sub(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.sub(sp[binaryOperand.rhs].f64).untyped
+        sp[f64: binaryOperand.result] = sp[f64: binaryOperand.lhs].sub(sp[f64: binaryOperand.rhs])
     }
     @inline(__always) mutating func f32Mul(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.mul(sp[binaryOperand.rhs].f32).untyped
+        sp[f32: binaryOperand.result] = sp[f32: binaryOperand.lhs].mul(sp[f32: binaryOperand.rhs])
     }
     @inline(__always) mutating func f64Mul(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.mul(sp[binaryOperand.rhs].f64).untyped
+        sp[f64: binaryOperand.result] = sp[f64: binaryOperand.lhs].mul(sp[f64: binaryOperand.rhs])
     }
     @inline(__always) mutating func f32Div(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.div(sp[binaryOperand.rhs].f32).untyped
+        sp[f32: binaryOperand.result] = sp[f32: binaryOperand.lhs].div(sp[f32: binaryOperand.rhs])
     }
     @inline(__always) mutating func f64Div(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.div(sp[binaryOperand.rhs].f64).untyped
+        sp[f64: binaryOperand.result] = sp[f64: binaryOperand.lhs].div(sp[f64: binaryOperand.rhs])
     }
     @inline(__always) mutating func f32Min(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.min(sp[binaryOperand.rhs].f32).untyped
+        sp[f32: binaryOperand.result] = sp[f32: binaryOperand.lhs].min(sp[f32: binaryOperand.rhs])
     }
     @inline(__always) mutating func f64Min(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.min(sp[binaryOperand.rhs].f64).untyped
+        sp[f64: binaryOperand.result] = sp[f64: binaryOperand.lhs].min(sp[f64: binaryOperand.rhs])
     }
     @inline(__always) mutating func f32Max(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.max(sp[binaryOperand.rhs].f32).untyped
+        sp[f32: binaryOperand.result] = sp[f32: binaryOperand.lhs].max(sp[f32: binaryOperand.rhs])
     }
     @inline(__always) mutating func f64Max(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.max(sp[binaryOperand.rhs].f64).untyped
+        sp[f64: binaryOperand.result] = sp[f64: binaryOperand.lhs].max(sp[f64: binaryOperand.rhs])
     }
     @inline(__always) mutating func f32CopySign(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.copySign(sp[binaryOperand.rhs].f32).untyped
+        sp[f32: binaryOperand.result] = sp[f32: binaryOperand.lhs].copySign(sp[f32: binaryOperand.rhs])
     }
     @inline(__always) mutating func f64CopySign(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.copySign(sp[binaryOperand.rhs].f64).untyped
+        sp[f64: binaryOperand.result] = sp[f64: binaryOperand.lhs].copySign(sp[f64: binaryOperand.rhs])
     }
     @inline(__always) mutating func f32Eq(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.eq(sp[binaryOperand.rhs].f32).untyped
+        sp[i32: binaryOperand.result] = sp[f32: binaryOperand.lhs].eq(sp[f32: binaryOperand.rhs])
     }
     @inline(__always) mutating func f64Eq(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.eq(sp[binaryOperand.rhs].f64).untyped
+        sp[i32: binaryOperand.result] = sp[f64: binaryOperand.lhs].eq(sp[f64: binaryOperand.rhs])
     }
     @inline(__always) mutating func f32Ne(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.ne(sp[binaryOperand.rhs].f32).untyped
+        sp[i32: binaryOperand.result] = sp[f32: binaryOperand.lhs].ne(sp[f32: binaryOperand.rhs])
     }
     @inline(__always) mutating func f64Ne(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.ne(sp[binaryOperand.rhs].f64).untyped
+        sp[i32: binaryOperand.result] = sp[f64: binaryOperand.lhs].ne(sp[f64: binaryOperand.rhs])
     }
     @inline(__always) mutating func f32Lt(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.lt(sp[binaryOperand.rhs].f32).untyped
+        sp[i32: binaryOperand.result] = sp[f32: binaryOperand.lhs].lt(sp[f32: binaryOperand.rhs])
     }
     @inline(__always) mutating func f64Lt(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.lt(sp[binaryOperand.rhs].f64).untyped
+        sp[i32: binaryOperand.result] = sp[f64: binaryOperand.lhs].lt(sp[f64: binaryOperand.rhs])
     }
     @inline(__always) mutating func f32Gt(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.gt(sp[binaryOperand.rhs].f32).untyped
+        sp[i32: binaryOperand.result] = sp[f32: binaryOperand.lhs].gt(sp[f32: binaryOperand.rhs])
     }
     @inline(__always) mutating func f64Gt(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.gt(sp[binaryOperand.rhs].f64).untyped
+        sp[i32: binaryOperand.result] = sp[f64: binaryOperand.lhs].gt(sp[f64: binaryOperand.rhs])
     }
     @inline(__always) mutating func f32Le(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.le(sp[binaryOperand.rhs].f32).untyped
+        sp[i32: binaryOperand.result] = sp[f32: binaryOperand.lhs].le(sp[f32: binaryOperand.rhs])
     }
     @inline(__always) mutating func f64Le(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.le(sp[binaryOperand.rhs].f64).untyped
+        sp[i32: binaryOperand.result] = sp[f64: binaryOperand.lhs].le(sp[f64: binaryOperand.rhs])
     }
     @inline(__always) mutating func f32Ge(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f32.ge(sp[binaryOperand.rhs].f32).untyped
+        sp[i32: binaryOperand.result] = sp[f32: binaryOperand.lhs].ge(sp[f32: binaryOperand.rhs])
     }
     @inline(__always) mutating func f64Ge(sp: Sp, binaryOperand: Instruction.BinaryOperand) {
-        sp[binaryOperand.result] = sp[binaryOperand.lhs].f64.ge(sp[binaryOperand.rhs].f64).untyped
+        sp[i32: binaryOperand.result] = sp[f64: binaryOperand.lhs].ge(sp[f64: binaryOperand.rhs])
     }
-    @inline(__always) mutating func i32Clz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i32.clz.untyped
+    mutating func i32Clz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        sp[i32: unaryOperand.result] = sp[i32: unaryOperand.input].clz
     }
-    @inline(__always) mutating func i64Clz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i64.clz.untyped
+    mutating func i64Clz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        sp[i64: unaryOperand.result] = sp[i64: unaryOperand.input].clz
     }
-    @inline(__always) mutating func i32Ctz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i32.ctz.untyped
+    mutating func i32Ctz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        sp[i32: unaryOperand.result] = sp[i32: unaryOperand.input].ctz
     }
-    @inline(__always) mutating func i64Ctz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i64.ctz.untyped
+    mutating func i64Ctz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        sp[i64: unaryOperand.result] = sp[i64: unaryOperand.input].ctz
     }
-    @inline(__always) mutating func i32Popcnt(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i32.popcnt.untyped
+    mutating func i32Popcnt(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        sp[i32: unaryOperand.result] = sp[i32: unaryOperand.input].popcnt
     }
-    @inline(__always) mutating func i64Popcnt(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i64.popcnt.untyped
+    mutating func i64Popcnt(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        sp[i64: unaryOperand.result] = sp[i64: unaryOperand.input].popcnt
     }
-    @inline(__always) mutating func i32Eqz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i32.eqz.untyped
+    mutating func i32Eqz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        sp[i32: unaryOperand.result] = sp[i32: unaryOperand.input].eqz
     }
-    @inline(__always) mutating func i64Eqz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i64.eqz.untyped
+    mutating func i64Eqz(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        sp[i32: unaryOperand.result] = sp[i64: unaryOperand.input].eqz
     }
-    @inline(__always) mutating func i32WrapI64(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i64.wrap.untyped
+    mutating func i32WrapI64(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        sp[i32: unaryOperand.result] = sp[i64: unaryOperand.input].wrap
     }
-    @inline(__always) mutating func i64ExtendI32S(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i32.extendI32S.untyped
+    mutating func i64ExtendI32S(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        sp[i64: unaryOperand.result] = sp[i32: unaryOperand.input].extendI32S
     }
-    @inline(__always) mutating func i64ExtendI32U(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i32.extendI32U.untyped
+    mutating func i64ExtendI32U(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        sp[i64: unaryOperand.result] = sp[i32: unaryOperand.input].extendI32U
     }
-    @inline(__always) mutating func i32Extend8S(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i32.extend8S.untyped
+    mutating func i32Extend8S(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        sp[i32: unaryOperand.result] = sp[i32: unaryOperand.input].extend8S
     }
-    @inline(__always) mutating func i64Extend8S(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i64.extend8S.untyped
+    mutating func i64Extend8S(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        sp[i64: unaryOperand.result] = sp[i64: unaryOperand.input].extend8S
     }
-    @inline(__always) mutating func i32Extend16S(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i32.extend16S.untyped
+    mutating func i32Extend16S(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        sp[i32: unaryOperand.result] = sp[i32: unaryOperand.input].extend16S
     }
-    @inline(__always) mutating func i64Extend16S(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i64.extend16S.untyped
+    mutating func i64Extend16S(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        sp[i64: unaryOperand.result] = sp[i64: unaryOperand.input].extend16S
     }
-    @inline(__always) mutating func i64Extend32S(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
-        sp[unaryOperand.result] = sp[unaryOperand.input].i64.extend32S.untyped
+    mutating func i64Extend32S(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
+        sp[i64: unaryOperand.result] = sp[i64: unaryOperand.input].extend32S
     }
-    @inline(__always) mutating func i32TruncF32S(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
-        sp[unaryOperand.result] = try sp[unaryOperand.input].f32.truncToI32S.untyped
+    mutating func i32TruncF32S(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
+        sp[i32: unaryOperand.result] = try sp[f32: unaryOperand.input].truncToI32S
     }
-    @inline(__always) mutating func i32TruncF32U(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
-        sp[unaryOperand.result] = try sp[unaryOperand.input].f32.truncToI32U.untyped
+    mutating func i32TruncF32U(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
+        sp[i32: unaryOperand.result] = try sp[f32: unaryOperand.input].truncToI32U
     }
-    @inline(__always) mutating func i32TruncF64S(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
-        sp[unaryOperand.result] = try sp[unaryOperand.input].f64.truncToI32S.untyped
+    mutating func i32TruncF64S(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
+        sp[i32: unaryOperand.result] = try sp[f64: unaryOperand.input].truncToI32S
     }
-    @inline(__always) mutating func i32TruncF64U(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
-        sp[unaryOperand.result] = try sp[unaryOperand.input].f64.truncToI32U.untyped
+    mutating func i32TruncF64U(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
+        sp[i32: unaryOperand.result] = try sp[f64: unaryOperand.input].truncToI32U
     }
-    @inline(__always) mutating func i64TruncF32S(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
-        sp[unaryOperand.result] = try sp[unaryOperand.input].f32.truncToI64S.untyped
+    mutating func i64TruncF32S(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
+        sp[i64: unaryOperand.result] = try sp[f32: unaryOperand.input].truncToI64S
     }
-    @inline(__always) mutating func i64TruncF32U(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
-        sp[unaryOperand.result] = try sp[unaryOperand.input].f32.truncToI64U.untyped
+    mutating func i64TruncF32U(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
+        sp[i64: unaryOperand.result] = try sp[f32: unaryOperand.input].truncToI64U
     }
-    @inline(__always) mutating func i64TruncF64S(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
-        sp[unaryOperand.result] = try sp[unaryOperand.input].f64.truncToI64S.untyped
+    mutating func i64TruncF64S(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
+        sp[i64: unaryOperand.result] = try sp[f64: unaryOperand.input].truncToI64S
     }
-    @inline(__always) mutating func i64TruncF64U(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
-        sp[unaryOperand.result] = try sp[unaryOperand.input].f64.truncToI64U.untyped
+    mutating func i64TruncF64U(sp: Sp, unaryOperand: Instruction.UnaryOperand) throws {
+        sp[i64: unaryOperand.result] = try sp[f64: unaryOperand.input].truncToI64U
     }
     @inline(__always) mutating func i32Load(sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws -> Pc {
         return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt32.self, castToValue: { .i32($0) })
@@ -873,5 +873,1480 @@ extension ExecutionState {
     }
     @inline(__always) mutating func i64Store32(sp: Sp, pc: Pc, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws -> Pc {
         return try memoryStore(sp: sp, pc: pc, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) })
+    }
+}
+
+
+extension ExecutionState {
+    @_silgen_name("wasmkit_execute_copyStack")
+    mutating func execute_copyStack(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .copyStack(copyStackOperand) = inst else {
+            preconditionFailure()
+        }
+        copyStack(sp: sp.pointee, copyStackOperand: copyStackOperand)
+    }
+    @_silgen_name("wasmkit_execute_globalGet")
+    mutating func execute_globalGet(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .globalGet(globalGetOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = globalGet(sp: sp.pointee, pc: pc.pointee, globalGetOperand: globalGetOperand)
+    }
+    @_silgen_name("wasmkit_execute_globalSet")
+    mutating func execute_globalSet(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .globalSet(globalSetOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = globalSet(sp: sp.pointee, pc: pc.pointee, globalSetOperand: globalSetOperand)
+    }
+    @_silgen_name("wasmkit_execute_call")
+    mutating func execute_call(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .call(callOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try call(sp: &sp.pointee, pc: pc.pointee, md: &md.pointee, ms: &ms.pointee, callOperand: callOperand)
+    }
+    @_silgen_name("wasmkit_execute_compilingCall")
+    mutating func execute_compilingCall(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .compilingCall(compilingCallOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try compilingCall(sp: &sp.pointee, pc: pc.pointee, compilingCallOperand: compilingCallOperand)
+    }
+    @_silgen_name("wasmkit_execute_internalCall")
+    mutating func execute_internalCall(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .internalCall(internalCallOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try internalCall(sp: &sp.pointee, pc: pc.pointee, internalCallOperand: internalCallOperand)
+    }
+    @_silgen_name("wasmkit_execute_callIndirect")
+    mutating func execute_callIndirect(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .callIndirect(callIndirectOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try callIndirect(sp: &sp.pointee, pc: pc.pointee, md: &md.pointee, ms: &ms.pointee, callIndirectOperand: callIndirectOperand)
+    }
+    @_silgen_name("wasmkit_execute_unreachable")
+    mutating func execute_unreachable(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        pc.pointee = try unreachable(sp: sp.pointee, pc: pc.pointee)
+    }
+    @_silgen_name("wasmkit_execute_nop")
+    mutating func execute_nop(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        pc.pointee = nop(sp: sp.pointee, pc: pc.pointee)
+    }
+    @_silgen_name("wasmkit_execute_ifThen")
+    mutating func execute_ifThen(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .ifThen(ifOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = ifThen(sp: sp.pointee, pc: pc.pointee, ifOperand: ifOperand)
+    }
+    @_silgen_name("wasmkit_execute_br")
+    mutating func execute_br(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .br(offset) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = br(sp: sp.pointee, pc: pc.pointee, offset: offset)
+    }
+    @_silgen_name("wasmkit_execute_brIf")
+    mutating func execute_brIf(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .brIf(brIfOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = brIf(sp: sp.pointee, pc: pc.pointee, brIfOperand: brIfOperand)
+    }
+    @_silgen_name("wasmkit_execute_brIfNot")
+    mutating func execute_brIfNot(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .brIfNot(brIfOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = brIfNot(sp: sp.pointee, pc: pc.pointee, brIfOperand: brIfOperand)
+    }
+    @_silgen_name("wasmkit_execute_brTable")
+    mutating func execute_brTable(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .brTable(brTableOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = brTable(sp: sp.pointee, pc: pc.pointee, brTableOperand: brTableOperand)
+    }
+    @_silgen_name("wasmkit_execute__return")
+    mutating func execute__return(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        pc.pointee = _return(sp: &sp.pointee, pc: pc.pointee, md: &md.pointee, ms: &ms.pointee)
+    }
+    @_silgen_name("wasmkit_execute_endOfExecution")
+    mutating func execute_endOfExecution(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        pc.pointee = try endOfExecution(sp: &sp.pointee, pc: pc.pointee)
+    }
+    @_silgen_name("wasmkit_execute_i32Load")
+    mutating func execute_i32Load(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32Load(loadOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try i32Load(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64Load")
+    mutating func execute_i64Load(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64Load(loadOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try i64Load(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
+    }
+    @_silgen_name("wasmkit_execute_f32Load")
+    mutating func execute_f32Load(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .f32Load(loadOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try f32Load(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
+    }
+    @_silgen_name("wasmkit_execute_f64Load")
+    mutating func execute_f64Load(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .f64Load(loadOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try f64Load(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32Load8S")
+    mutating func execute_i32Load8S(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32Load8S(loadOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try i32Load8S(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32Load8U")
+    mutating func execute_i32Load8U(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32Load8U(loadOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try i32Load8U(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32Load16S")
+    mutating func execute_i32Load16S(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32Load16S(loadOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try i32Load16S(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32Load16U")
+    mutating func execute_i32Load16U(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32Load16U(loadOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try i32Load16U(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64Load8S")
+    mutating func execute_i64Load8S(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64Load8S(loadOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try i64Load8S(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64Load8U")
+    mutating func execute_i64Load8U(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64Load8U(loadOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try i64Load8U(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64Load16S")
+    mutating func execute_i64Load16S(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64Load16S(loadOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try i64Load16S(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64Load16U")
+    mutating func execute_i64Load16U(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64Load16U(loadOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try i64Load16U(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64Load32S")
+    mutating func execute_i64Load32S(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64Load32S(loadOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try i64Load32S(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64Load32U")
+    mutating func execute_i64Load32U(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64Load32U(loadOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try i64Load32U(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32Store")
+    mutating func execute_i32Store(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32Store(storeOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try i32Store(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, storeOperand: storeOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64Store")
+    mutating func execute_i64Store(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64Store(storeOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try i64Store(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, storeOperand: storeOperand)
+    }
+    @_silgen_name("wasmkit_execute_f32Store")
+    mutating func execute_f32Store(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .f32Store(storeOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try f32Store(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, storeOperand: storeOperand)
+    }
+    @_silgen_name("wasmkit_execute_f64Store")
+    mutating func execute_f64Store(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .f64Store(storeOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try f64Store(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, storeOperand: storeOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32Store8")
+    mutating func execute_i32Store8(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32Store8(storeOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try i32Store8(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, storeOperand: storeOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32Store16")
+    mutating func execute_i32Store16(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32Store16(storeOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try i32Store16(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, storeOperand: storeOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64Store8")
+    mutating func execute_i64Store8(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64Store8(storeOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try i64Store8(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, storeOperand: storeOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64Store16")
+    mutating func execute_i64Store16(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64Store16(storeOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try i64Store16(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, storeOperand: storeOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64Store32")
+    mutating func execute_i64Store32(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64Store32(storeOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try i64Store32(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, storeOperand: storeOperand)
+    }
+    @_silgen_name("wasmkit_execute_memorySize")
+    mutating func execute_memorySize(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .memorySize(memorySizeOperand) = inst else {
+            preconditionFailure()
+        }
+        memorySize(sp: sp.pointee, memorySizeOperand: memorySizeOperand)
+    }
+    @_silgen_name("wasmkit_execute_memoryGrow")
+    mutating func execute_memoryGrow(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .memoryGrow(memoryGrowOperand) = inst else {
+            preconditionFailure()
+        }
+        try memoryGrow(sp: sp.pointee, md: &md.pointee, ms: &ms.pointee, memoryGrowOperand: memoryGrowOperand)
+    }
+    @_silgen_name("wasmkit_execute_memoryInit")
+    mutating func execute_memoryInit(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .memoryInit(memoryInitOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try memoryInit(sp: sp.pointee, pc: pc.pointee, memoryInitOperand: memoryInitOperand)
+    }
+    @_silgen_name("wasmkit_execute_memoryDataDrop")
+    mutating func execute_memoryDataDrop(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .memoryDataDrop(dataIndex) = inst else {
+            preconditionFailure()
+        }
+        memoryDataDrop(sp: sp.pointee, dataIndex: dataIndex)
+    }
+    @_silgen_name("wasmkit_execute_memoryCopy")
+    mutating func execute_memoryCopy(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .memoryCopy(memoryCopyOperand) = inst else {
+            preconditionFailure()
+        }
+        try memoryCopy(sp: sp.pointee, memoryCopyOperand: memoryCopyOperand)
+    }
+    @_silgen_name("wasmkit_execute_memoryFill")
+    mutating func execute_memoryFill(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .memoryFill(memoryFillOperand) = inst else {
+            preconditionFailure()
+        }
+        try memoryFill(sp: sp.pointee, memoryFillOperand: memoryFillOperand)
+    }
+    @_silgen_name("wasmkit_execute_const32")
+    mutating func execute_const32(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .const32(const32Operand) = inst else {
+            preconditionFailure()
+        }
+        const32(sp: sp.pointee, const32Operand: const32Operand)
+    }
+    @_silgen_name("wasmkit_execute_const64")
+    mutating func execute_const64(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .const64(const64Operand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = const64(sp: sp.pointee, pc: pc.pointee, const64Operand: const64Operand)
+    }
+    @_silgen_name("wasmkit_execute_numericFloatUnary")
+    mutating func execute_numericFloatUnary(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .numericFloatUnary(floatUnary, unaryOperand) = inst else {
+            preconditionFailure()
+        }
+        numericFloatUnary(sp: sp.pointee, floatUnary: floatUnary, unaryOperand: unaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_numericConversion")
+    mutating func execute_numericConversion(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .numericConversion(conversion, unaryOperand) = inst else {
+            preconditionFailure()
+        }
+        try numericConversion(sp: sp.pointee, conversion: conversion, unaryOperand: unaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32Add")
+    mutating func execute_i32Add(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32Add(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i32Add(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64Add")
+    mutating func execute_i64Add(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64Add(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i64Add(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32Sub")
+    mutating func execute_i32Sub(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32Sub(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i32Sub(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64Sub")
+    mutating func execute_i64Sub(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64Sub(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i64Sub(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32Mul")
+    mutating func execute_i32Mul(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32Mul(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i32Mul(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64Mul")
+    mutating func execute_i64Mul(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64Mul(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i64Mul(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32And")
+    mutating func execute_i32And(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32And(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i32And(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64And")
+    mutating func execute_i64And(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64And(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i64And(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32Or")
+    mutating func execute_i32Or(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32Or(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i32Or(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64Or")
+    mutating func execute_i64Or(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64Or(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i64Or(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32Xor")
+    mutating func execute_i32Xor(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32Xor(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i32Xor(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64Xor")
+    mutating func execute_i64Xor(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64Xor(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i64Xor(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32Shl")
+    mutating func execute_i32Shl(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32Shl(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i32Shl(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64Shl")
+    mutating func execute_i64Shl(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64Shl(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i64Shl(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32ShrS")
+    mutating func execute_i32ShrS(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32ShrS(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i32ShrS(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64ShrS")
+    mutating func execute_i64ShrS(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64ShrS(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i64ShrS(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32ShrU")
+    mutating func execute_i32ShrU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32ShrU(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i32ShrU(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64ShrU")
+    mutating func execute_i64ShrU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64ShrU(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i64ShrU(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32Rotl")
+    mutating func execute_i32Rotl(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32Rotl(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i32Rotl(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64Rotl")
+    mutating func execute_i64Rotl(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64Rotl(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i64Rotl(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32Rotr")
+    mutating func execute_i32Rotr(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32Rotr(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i32Rotr(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64Rotr")
+    mutating func execute_i64Rotr(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64Rotr(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i64Rotr(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32DivS")
+    mutating func execute_i32DivS(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32DivS(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        try i32DivS(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64DivS")
+    mutating func execute_i64DivS(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64DivS(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        try i64DivS(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32DivU")
+    mutating func execute_i32DivU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32DivU(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        try i32DivU(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64DivU")
+    mutating func execute_i64DivU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64DivU(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        try i64DivU(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32RemS")
+    mutating func execute_i32RemS(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32RemS(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        try i32RemS(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64RemS")
+    mutating func execute_i64RemS(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64RemS(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        try i64RemS(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32RemU")
+    mutating func execute_i32RemU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32RemU(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        try i32RemU(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64RemU")
+    mutating func execute_i64RemU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64RemU(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        try i64RemU(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32Eq")
+    mutating func execute_i32Eq(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32Eq(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i32Eq(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64Eq")
+    mutating func execute_i64Eq(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64Eq(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i64Eq(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32Ne")
+    mutating func execute_i32Ne(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32Ne(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i32Ne(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64Ne")
+    mutating func execute_i64Ne(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64Ne(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i64Ne(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32LtS")
+    mutating func execute_i32LtS(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32LtS(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i32LtS(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64LtS")
+    mutating func execute_i64LtS(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64LtS(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i64LtS(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32LtU")
+    mutating func execute_i32LtU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32LtU(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i32LtU(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64LtU")
+    mutating func execute_i64LtU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64LtU(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i64LtU(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32GtS")
+    mutating func execute_i32GtS(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32GtS(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i32GtS(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64GtS")
+    mutating func execute_i64GtS(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64GtS(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i64GtS(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32GtU")
+    mutating func execute_i32GtU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32GtU(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i32GtU(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64GtU")
+    mutating func execute_i64GtU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64GtU(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i64GtU(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32LeS")
+    mutating func execute_i32LeS(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32LeS(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i32LeS(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64LeS")
+    mutating func execute_i64LeS(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64LeS(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i64LeS(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32LeU")
+    mutating func execute_i32LeU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32LeU(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i32LeU(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64LeU")
+    mutating func execute_i64LeU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64LeU(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i64LeU(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32GeS")
+    mutating func execute_i32GeS(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32GeS(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i32GeS(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64GeS")
+    mutating func execute_i64GeS(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64GeS(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i64GeS(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32GeU")
+    mutating func execute_i32GeU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32GeU(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i32GeU(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64GeU")
+    mutating func execute_i64GeU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64GeU(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i64GeU(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32Clz")
+    mutating func execute_i32Clz(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32Clz(unaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i32Clz(sp: sp.pointee, unaryOperand: unaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64Clz")
+    mutating func execute_i64Clz(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64Clz(unaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i64Clz(sp: sp.pointee, unaryOperand: unaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32Ctz")
+    mutating func execute_i32Ctz(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32Ctz(unaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i32Ctz(sp: sp.pointee, unaryOperand: unaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64Ctz")
+    mutating func execute_i64Ctz(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64Ctz(unaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i64Ctz(sp: sp.pointee, unaryOperand: unaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32Popcnt")
+    mutating func execute_i32Popcnt(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32Popcnt(unaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i32Popcnt(sp: sp.pointee, unaryOperand: unaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64Popcnt")
+    mutating func execute_i64Popcnt(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64Popcnt(unaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i64Popcnt(sp: sp.pointee, unaryOperand: unaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32Eqz")
+    mutating func execute_i32Eqz(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32Eqz(unaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i32Eqz(sp: sp.pointee, unaryOperand: unaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64Eqz")
+    mutating func execute_i64Eqz(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64Eqz(unaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i64Eqz(sp: sp.pointee, unaryOperand: unaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32WrapI64")
+    mutating func execute_i32WrapI64(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32WrapI64(unaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i32WrapI64(sp: sp.pointee, unaryOperand: unaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64ExtendI32S")
+    mutating func execute_i64ExtendI32S(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64ExtendI32S(unaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i64ExtendI32S(sp: sp.pointee, unaryOperand: unaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64ExtendI32U")
+    mutating func execute_i64ExtendI32U(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64ExtendI32U(unaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i64ExtendI32U(sp: sp.pointee, unaryOperand: unaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32Extend8S")
+    mutating func execute_i32Extend8S(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32Extend8S(unaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i32Extend8S(sp: sp.pointee, unaryOperand: unaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64Extend8S")
+    mutating func execute_i64Extend8S(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64Extend8S(unaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i64Extend8S(sp: sp.pointee, unaryOperand: unaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32Extend16S")
+    mutating func execute_i32Extend16S(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32Extend16S(unaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i32Extend16S(sp: sp.pointee, unaryOperand: unaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64Extend16S")
+    mutating func execute_i64Extend16S(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64Extend16S(unaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i64Extend16S(sp: sp.pointee, unaryOperand: unaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64Extend32S")
+    mutating func execute_i64Extend32S(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64Extend32S(unaryOperand) = inst else {
+            preconditionFailure()
+        }
+        i64Extend32S(sp: sp.pointee, unaryOperand: unaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32TruncF32S")
+    mutating func execute_i32TruncF32S(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32TruncF32S(unaryOperand) = inst else {
+            preconditionFailure()
+        }
+        try i32TruncF32S(sp: sp.pointee, unaryOperand: unaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32TruncF32U")
+    mutating func execute_i32TruncF32U(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32TruncF32U(unaryOperand) = inst else {
+            preconditionFailure()
+        }
+        try i32TruncF32U(sp: sp.pointee, unaryOperand: unaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32TruncF64S")
+    mutating func execute_i32TruncF64S(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32TruncF64S(unaryOperand) = inst else {
+            preconditionFailure()
+        }
+        try i32TruncF64S(sp: sp.pointee, unaryOperand: unaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i32TruncF64U")
+    mutating func execute_i32TruncF64U(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i32TruncF64U(unaryOperand) = inst else {
+            preconditionFailure()
+        }
+        try i32TruncF64U(sp: sp.pointee, unaryOperand: unaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64TruncF32S")
+    mutating func execute_i64TruncF32S(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64TruncF32S(unaryOperand) = inst else {
+            preconditionFailure()
+        }
+        try i64TruncF32S(sp: sp.pointee, unaryOperand: unaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64TruncF32U")
+    mutating func execute_i64TruncF32U(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64TruncF32U(unaryOperand) = inst else {
+            preconditionFailure()
+        }
+        try i64TruncF32U(sp: sp.pointee, unaryOperand: unaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64TruncF64S")
+    mutating func execute_i64TruncF64S(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64TruncF64S(unaryOperand) = inst else {
+            preconditionFailure()
+        }
+        try i64TruncF64S(sp: sp.pointee, unaryOperand: unaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_i64TruncF64U")
+    mutating func execute_i64TruncF64U(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .i64TruncF64U(unaryOperand) = inst else {
+            preconditionFailure()
+        }
+        try i64TruncF64U(sp: sp.pointee, unaryOperand: unaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_f32Add")
+    mutating func execute_f32Add(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .f32Add(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        f32Add(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_f64Add")
+    mutating func execute_f64Add(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .f64Add(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        f64Add(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_f32Sub")
+    mutating func execute_f32Sub(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .f32Sub(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        f32Sub(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_f64Sub")
+    mutating func execute_f64Sub(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .f64Sub(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        f64Sub(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_f32Mul")
+    mutating func execute_f32Mul(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .f32Mul(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        f32Mul(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_f64Mul")
+    mutating func execute_f64Mul(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .f64Mul(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        f64Mul(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_f32Div")
+    mutating func execute_f32Div(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .f32Div(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        f32Div(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_f64Div")
+    mutating func execute_f64Div(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .f64Div(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        f64Div(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_f32Min")
+    mutating func execute_f32Min(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .f32Min(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        f32Min(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_f64Min")
+    mutating func execute_f64Min(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .f64Min(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        f64Min(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_f32Max")
+    mutating func execute_f32Max(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .f32Max(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        f32Max(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_f64Max")
+    mutating func execute_f64Max(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .f64Max(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        f64Max(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_f32CopySign")
+    mutating func execute_f32CopySign(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .f32CopySign(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        f32CopySign(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_f64CopySign")
+    mutating func execute_f64CopySign(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .f64CopySign(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        f64CopySign(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_f32Eq")
+    mutating func execute_f32Eq(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .f32Eq(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        f32Eq(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_f64Eq")
+    mutating func execute_f64Eq(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .f64Eq(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        f64Eq(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_f32Ne")
+    mutating func execute_f32Ne(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .f32Ne(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        f32Ne(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_f64Ne")
+    mutating func execute_f64Ne(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .f64Ne(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        f64Ne(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_f32Lt")
+    mutating func execute_f32Lt(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .f32Lt(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        f32Lt(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_f64Lt")
+    mutating func execute_f64Lt(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .f64Lt(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        f64Lt(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_f32Gt")
+    mutating func execute_f32Gt(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .f32Gt(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        f32Gt(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_f64Gt")
+    mutating func execute_f64Gt(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .f64Gt(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        f64Gt(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_f32Le")
+    mutating func execute_f32Le(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .f32Le(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        f32Le(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_f64Le")
+    mutating func execute_f64Le(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .f64Le(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        f64Le(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_f32Ge")
+    mutating func execute_f32Ge(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .f32Ge(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        f32Ge(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_f64Ge")
+    mutating func execute_f64Ge(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .f64Ge(binaryOperand) = inst else {
+            preconditionFailure()
+        }
+        f64Ge(sp: sp.pointee, binaryOperand: binaryOperand)
+    }
+    @_silgen_name("wasmkit_execute_select")
+    mutating func execute_select(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        pc.pointee = select(sp: sp.pointee, pc: pc.pointee)
+    }
+    @_silgen_name("wasmkit_execute_refNull")
+    mutating func execute_refNull(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .refNull(refNullOperand) = inst else {
+            preconditionFailure()
+        }
+        refNull(sp: sp.pointee, refNullOperand: refNullOperand)
+    }
+    @_silgen_name("wasmkit_execute_refIsNull")
+    mutating func execute_refIsNull(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .refIsNull(refIsNullOperand) = inst else {
+            preconditionFailure()
+        }
+        refIsNull(sp: sp.pointee, refIsNullOperand: refIsNullOperand)
+    }
+    @_silgen_name("wasmkit_execute_refFunc")
+    mutating func execute_refFunc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .refFunc(refFuncOperand) = inst else {
+            preconditionFailure()
+        }
+        refFunc(sp: sp.pointee, refFuncOperand: refFuncOperand)
+    }
+    @_silgen_name("wasmkit_execute_tableGet")
+    mutating func execute_tableGet(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .tableGet(tableGetOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try tableGet(sp: sp.pointee, pc: pc.pointee, tableGetOperand: tableGetOperand)
+    }
+    @_silgen_name("wasmkit_execute_tableSet")
+    mutating func execute_tableSet(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .tableSet(tableSetOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try tableSet(sp: sp.pointee, pc: pc.pointee, tableSetOperand: tableSetOperand)
+    }
+    @_silgen_name("wasmkit_execute_tableSize")
+    mutating func execute_tableSize(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .tableSize(tableSizeOperand) = inst else {
+            preconditionFailure()
+        }
+        tableSize(sp: sp.pointee, tableSizeOperand: tableSizeOperand)
+    }
+    @_silgen_name("wasmkit_execute_tableGrow")
+    mutating func execute_tableGrow(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .tableGrow(tableGrowOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try tableGrow(sp: sp.pointee, pc: pc.pointee, tableGrowOperand: tableGrowOperand)
+    }
+    @_silgen_name("wasmkit_execute_tableFill")
+    mutating func execute_tableFill(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .tableFill(tableFillOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try tableFill(sp: sp.pointee, pc: pc.pointee, tableFillOperand: tableFillOperand)
+    }
+    @_silgen_name("wasmkit_execute_tableCopy")
+    mutating func execute_tableCopy(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .tableCopy(tableCopyOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try tableCopy(sp: sp.pointee, pc: pc.pointee, tableCopyOperand: tableCopyOperand)
+    }
+    @_silgen_name("wasmkit_execute_tableInit")
+    mutating func execute_tableInit(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .tableInit(tableInitOperand) = inst else {
+            preconditionFailure()
+        }
+        pc.pointee = try tableInit(sp: sp.pointee, pc: pc.pointee, tableInitOperand: tableInitOperand)
+    }
+    @_silgen_name("wasmkit_execute_tableElementDrop")
+    mutating func execute_tableElementDrop(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .tableElementDrop(elementIndex) = inst else {
+            preconditionFailure()
+        }
+        tableElementDrop(sp: sp.pointee, elementIndex: elementIndex)
+    }
+    @_silgen_name("wasmkit_execute_onEnter")
+    mutating func execute_onEnter(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .onEnter(onEnterOperand) = inst else {
+            preconditionFailure()
+        }
+        onEnter(sp: sp.pointee, onEnterOperand: onEnterOperand)
+    }
+    @_silgen_name("wasmkit_execute_onExit")
+    mutating func execute_onExit(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
+        let inst = pc.pointee.read(Instruction.self)
+        guard case let .onExit(onExitOperand) = inst else {
+            preconditionFailure()
+        }
+        onExit(sp: sp.pointee, onExitOperand: onExitOperand)
+    }
+}
+
+extension Instruction {
+    var dtcHandlerIndex: Int {
+        switch self {
+        case .copyStack: return 0
+        case .globalGet: return 1
+        case .globalSet: return 2
+        case .call: return 3
+        case .compilingCall: return 4
+        case .internalCall: return 5
+        case .callIndirect: return 6
+        case .unreachable: return 7
+        case .nop: return 8
+        case .ifThen: return 9
+        case .br: return 10
+        case .brIf: return 11
+        case .brIfNot: return 12
+        case .brTable: return 13
+        case ._return: return 14
+        case .endOfExecution: return 15
+        case .i32Load: return 16
+        case .i64Load: return 17
+        case .f32Load: return 18
+        case .f64Load: return 19
+        case .i32Load8S: return 20
+        case .i32Load8U: return 21
+        case .i32Load16S: return 22
+        case .i32Load16U: return 23
+        case .i64Load8S: return 24
+        case .i64Load8U: return 25
+        case .i64Load16S: return 26
+        case .i64Load16U: return 27
+        case .i64Load32S: return 28
+        case .i64Load32U: return 29
+        case .i32Store: return 30
+        case .i64Store: return 31
+        case .f32Store: return 32
+        case .f64Store: return 33
+        case .i32Store8: return 34
+        case .i32Store16: return 35
+        case .i64Store8: return 36
+        case .i64Store16: return 37
+        case .i64Store32: return 38
+        case .memorySize: return 39
+        case .memoryGrow: return 40
+        case .memoryInit: return 41
+        case .memoryDataDrop: return 42
+        case .memoryCopy: return 43
+        case .memoryFill: return 44
+        case .const32: return 45
+        case .const64: return 46
+        case .numericFloatUnary: return 47
+        case .numericConversion: return 48
+        case .i32Add: return 49
+        case .i64Add: return 50
+        case .i32Sub: return 51
+        case .i64Sub: return 52
+        case .i32Mul: return 53
+        case .i64Mul: return 54
+        case .i32And: return 55
+        case .i64And: return 56
+        case .i32Or: return 57
+        case .i64Or: return 58
+        case .i32Xor: return 59
+        case .i64Xor: return 60
+        case .i32Shl: return 61
+        case .i64Shl: return 62
+        case .i32ShrS: return 63
+        case .i64ShrS: return 64
+        case .i32ShrU: return 65
+        case .i64ShrU: return 66
+        case .i32Rotl: return 67
+        case .i64Rotl: return 68
+        case .i32Rotr: return 69
+        case .i64Rotr: return 70
+        case .i32DivS: return 71
+        case .i64DivS: return 72
+        case .i32DivU: return 73
+        case .i64DivU: return 74
+        case .i32RemS: return 75
+        case .i64RemS: return 76
+        case .i32RemU: return 77
+        case .i64RemU: return 78
+        case .i32Eq: return 79
+        case .i64Eq: return 80
+        case .i32Ne: return 81
+        case .i64Ne: return 82
+        case .i32LtS: return 83
+        case .i64LtS: return 84
+        case .i32LtU: return 85
+        case .i64LtU: return 86
+        case .i32GtS: return 87
+        case .i64GtS: return 88
+        case .i32GtU: return 89
+        case .i64GtU: return 90
+        case .i32LeS: return 91
+        case .i64LeS: return 92
+        case .i32LeU: return 93
+        case .i64LeU: return 94
+        case .i32GeS: return 95
+        case .i64GeS: return 96
+        case .i32GeU: return 97
+        case .i64GeU: return 98
+        case .i32Clz: return 99
+        case .i64Clz: return 100
+        case .i32Ctz: return 101
+        case .i64Ctz: return 102
+        case .i32Popcnt: return 103
+        case .i64Popcnt: return 104
+        case .i32Eqz: return 105
+        case .i64Eqz: return 106
+        case .i32WrapI64: return 107
+        case .i64ExtendI32S: return 108
+        case .i64ExtendI32U: return 109
+        case .i32Extend8S: return 110
+        case .i64Extend8S: return 111
+        case .i32Extend16S: return 112
+        case .i64Extend16S: return 113
+        case .i64Extend32S: return 114
+        case .i32TruncF32S: return 115
+        case .i32TruncF32U: return 116
+        case .i32TruncF64S: return 117
+        case .i32TruncF64U: return 118
+        case .i64TruncF32S: return 119
+        case .i64TruncF32U: return 120
+        case .i64TruncF64S: return 121
+        case .i64TruncF64U: return 122
+        case .f32Add: return 123
+        case .f64Add: return 124
+        case .f32Sub: return 125
+        case .f64Sub: return 126
+        case .f32Mul: return 127
+        case .f64Mul: return 128
+        case .f32Div: return 129
+        case .f64Div: return 130
+        case .f32Min: return 131
+        case .f64Min: return 132
+        case .f32Max: return 133
+        case .f64Max: return 134
+        case .f32CopySign: return 135
+        case .f64CopySign: return 136
+        case .f32Eq: return 137
+        case .f64Eq: return 138
+        case .f32Ne: return 139
+        case .f64Ne: return 140
+        case .f32Lt: return 141
+        case .f64Lt: return 142
+        case .f32Gt: return 143
+        case .f64Gt: return 144
+        case .f32Le: return 145
+        case .f64Le: return 146
+        case .f32Ge: return 147
+        case .f64Ge: return 148
+        case .select: return 149
+        case .refNull: return 150
+        case .refIsNull: return 151
+        case .refFunc: return 152
+        case .tableGet: return 153
+        case .tableSet: return 154
+        case .tableSize: return 155
+        case .tableGrow: return 156
+        case .tableFill: return 157
+        case .tableCopy: return 158
+        case .tableInit: return 159
+        case .tableElementDrop: return 160
+        case .onEnter: return 161
+        case .onExit: return 162
+        }
+    }
+}
+
+
+import _CWasmKit.InlineCode
+
+extension Instruction {
+    private static let handlers: [UInt64] = withUnsafePointer(to: wasmkit_tc_exec_handlers) {
+        let count = MemoryLayout.size(ofValue: wasmkit_tc_exec_handlers) / MemoryLayout<wasmkit_tc_exec>.size
+        return $0.withMemoryRebound(to: UInt64.self, capacity: count) {
+            Array(UnsafeBufferPointer(start: $0, count: count))
+        }
+    }
+
+    @inline(never)
+    var handler: UInt64 {
+        return Self.handlers[dtcHandlerIndex]
     }
 }

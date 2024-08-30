@@ -555,7 +555,10 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
 
         private mutating func assign(at index: Int, _ instruction: Instruction) {
-            self.instructions[index] = instruction.rawValue
+            self.instructions[index] = instruction.handler
+            if instruction.hasImmediate {
+                self.instructions[index + 1] = instruction.rawValue
+            }
         }
 
         mutating func resetLastEmission() {
@@ -584,7 +587,10 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         mutating func emit(_ instruction: Instruction, resultRelink: ResultRelink? = nil) {
             self.lastEmission = LastEmission(position: insertingPC, resultRelink: resultRelink)
             // print("emitInstruction:", instruction, "0x" + String(instruction.rawValue, radix: 16))
-            self.instructions.append(instruction.rawValue)
+            self.instructions.append(instruction.handler)
+            if instruction.hasImmediate {
+                self.instructions.append(instruction.rawValue)
+            }
         }
         
         mutating func emitData<T>(_ data: T) {
@@ -642,7 +648,9 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         mutating func emitWithLabel(_ ref: LabelRef, line: UInt = #line, make: @escaping InstructionFactoryWithLabel) {
             let insertAt = insertingPC
             // TODO: Skip emitting nop if the label is already pinned
-            emit(.nop)  // Emit dummy instruction to be replaced later
+            // FIXME: ****THIS IS ABSOLUTELY WRONG. JUST FOR PERF EVALUATION**
+            // Please change placeholder size based on whether the instruction has any immediate
+            emit(.br(offset: 0))  // Emit dummy instruction to be replaced later
             emitWithLabel(ref, insertAt: insertAt, line: line, make: make)
         }
 
@@ -854,7 +862,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             emit(.onExit(functionIndex))
         }
         try visitReturnLike()
-        iseqBuilder.emit(.return)
+        iseqBuilder.emit(._return)
     }
     private mutating func markUnreachable() throws {
         try controlStack.markUnreachable()
@@ -869,13 +877,13 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         // Check dangling labels
         try iseqBuilder.assertDanglingLabels()
 
+        iseqBuilder.emit(._return)
         let instructions = iseqBuilder.finalize()
         // TODO: Figure out a way to avoid the copy here while keeping the execution performance.
-        let buffer = allocator.allocateInstructions(capacity: instructions.count + 1)
+        let buffer = allocator.allocateInstructions(capacity: instructions.count)
         for (idx, instruction) in instructions.enumerated() {
             buffer[idx] = instruction
         }
-        buffer[instructions.count] = Instruction.return.rawValue
         return InstructionSequence(
             instructions: UnsafeMutableRawBufferPointer(buffer),
             maxStackHeight: Int(valueStack.stackRegBase) + valueStack.maxHeight

@@ -6,6 +6,10 @@ enum VMGen {
     struct Immediate {
         let name: String?
         let type: String
+
+        var label: String {
+            name ?? VMGen.camelCase(pascalCase: String(type.split(separator: ".").last!))
+        }
     }
     enum RegisterUse {
         case none
@@ -78,8 +82,7 @@ enum VMGen {
             }
             var parameters: [Parameter] = vregs.map { ($0.reg.label, $0.reg.type, $0.isInout) }
             parameters += immediates.map {
-                let label = $0.name ?? camelCase(pascalCase: String($0.type.split(separator: ".").last!))
-                return (label, $0.type, false)
+                return ($0.label, $0.type, false)
             }
             return parameters
         }
@@ -97,9 +100,15 @@ enum VMGen {
             )
             return OpInstruction(op: op, inputType: type, resultType: type, base: base)
         }
-        static func unop(op: String, type: String) -> OpInstruction {
+        static func binop(op: String, inputType: String, resultType: String) -> OpInstruction {
+            let base = Instruction(
+                name: "\(inputType)\(op)", immediates: [Immediate(name: nil, type: "Instruction.BinaryOperand")]
+            )
+            return OpInstruction(op: op, inputType: inputType, resultType: resultType, base: base)
+        }
+        static func unop(op: String, type: String, resultType: String) -> OpInstruction {
             let base = Instruction(name: "\(type)\(op)", immediates: [Immediate(name: nil, type: "Instruction.UnaryOperand")])
-            return OpInstruction(op: op, inputType: type, resultType: type, base: base)
+            return OpInstruction(op: op, inputType: type, resultType: resultType, base: base)
         }
     }
 
@@ -310,7 +319,7 @@ enum VMGen {
 
     static let miscInsts: [Instruction] = [
         // Parametric
-        Instruction(name: "select", mayThrow: true, hasData: true, immediates: []),
+        Instruction(name: "select", hasData: true, immediates: []),
         // Reference
         Instruction(name: "refNull", immediates: [Immediate(name: nil, type: "Instruction.RefNullOperand")]),
         Instruction(name: "refIsNull", immediates: [Immediate(name: nil, type: "Instruction.RefIsNullOperand")]),
@@ -335,8 +344,8 @@ enum VMGen {
         var instructions: [Instruction] = [
             // Variable
             Instruction(name: "copyStack", immediates: [Immediate(name: nil, type: "Instruction.CopyStackOperand")]),
-            Instruction(name: "globalGet", mayThrow: true, hasData: true, immediates: [Immediate(name: nil, type: "Instruction.GlobalGetOperand")]),
-            Instruction(name: "globalSet", mayThrow: true, hasData: true, immediates: [Immediate(name: nil, type: "Instruction.GlobalSetOperand")]),
+            Instruction(name: "globalGet", hasData: true, immediates: [Immediate(name: nil, type: "Instruction.GlobalGetOperand")]),
+            Instruction(name: "globalSet", hasData: true, immediates: [Immediate(name: nil, type: "Instruction.GlobalSetOperand")]),
             // Controls
             Instruction(
                 name: "call", isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write,
@@ -359,33 +368,33 @@ enum VMGen {
                     Immediate(name: nil, type: "Instruction.CallIndirectOperand")
                 ]),
             Instruction(name: "unreachable", isControl: true, mayThrow: true, immediates: []),
-            Instruction(name: "nop", isControl: true, mayThrow: true, immediates: []),
+            Instruction(name: "nop", isControl: true, immediates: []),
             Instruction(
                 name: "ifThen", isControl: true,
                 immediates: [
                     Immediate(name: nil, type: "Instruction.IfOperand")
                 ]),
             Instruction(
-                name: "br", isControl: true, mayThrow: true, mayUpdateFrame: false,
+                name: "br", isControl: true, mayUpdateFrame: false,
                 immediates: [
                     Immediate(name: "offset", type: "Int32"),
                 ]),
             Instruction(
-                name: "brIf", isControl: true, mayThrow: true, mayUpdateFrame: false,
+                name: "brIf", isControl: true, mayUpdateFrame: false,
                 immediates: [
                     Immediate(name: nil, type: "Instruction.BrIfOperand")
                 ]),
             Instruction(
-                name: "brIfNot", isControl: true, mayThrow: true, mayUpdateFrame: false,
+                name: "brIfNot", isControl: true, mayUpdateFrame: false,
                 immediates: [
                     Immediate(name: nil, type: "Instruction.BrIfOperand")
                 ]),
             Instruction(
-                name: "brTable", isControl: true, mayThrow: true, mayUpdateFrame: false,
+                name: "brTable", isControl: true, mayUpdateFrame: false,
                 immediates: [
                     Immediate(name: nil, type: "Instruction.BrTableOperand")
                 ]),
-            Instruction(name: "`return`", isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write, immediates: []),
+            Instruction(name: "_return", isControl: true, mayUpdateFrame: true, useCurrentMemory: .write, immediates: []),
             Instruction(name: "endOfExecution", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: []),
         ]
         instructions += memoryLoadStoreInsts
@@ -427,9 +436,7 @@ enum VMGen {
                             case .\(inst.name):
                     """
             } else {
-                let labels = inst.immediates.map {
-                    $0.name ?? camelCase(pascalCase: String($0.type.split(separator: ".").last!))
-                }
+                let labels = inst.immediates.map { $0.label }
                 output += """
 
                             case .\(inst.name)(\(labels.map { "let \($0)" }.joined(separator: ", "))):
@@ -459,15 +466,15 @@ enum VMGen {
             output += """
 
                 @inline(__always) mutating \(instMethodDecl(op.instruction)) {
-                    sp[binaryOperand.result] = \(op.mayThrow ? "try " : "")sp[binaryOperand.lhs].\(op.lhsType).\(camelCase(pascalCase: op.op))(sp[binaryOperand.rhs].\(op.rhsType)).untyped
+                    sp[\(op.resultType): binaryOperand.result] = \(op.mayThrow ? "try " : "")sp[\(op.lhsType): binaryOperand.lhs].\(camelCase(pascalCase: op.op))(sp[\(op.rhsType): binaryOperand.rhs])
                 }
             """
         }
         for op in intUnaryInsts {
             output += """
 
-                @inline(__always) mutating \(instMethodDecl(op.instruction)) {
-                    sp[unaryOperand.result] = \(op.mayThrow ? "try " : "")sp[unaryOperand.input].\(op.inputType).\(camelCase(pascalCase: op.op)).untyped
+                mutating \(instMethodDecl(op.instruction)) {
+                    sp[\(op.resultType): unaryOperand.result] = \(op.mayThrow ? "try " : "")sp[\(op.inputType): unaryOperand.input].\(camelCase(pascalCase: op.op))
                 }
             """
         }
@@ -598,6 +605,117 @@ enum VMGen {
             output += "\n"
         }
         output += "}\n"
+        output += "\n"
+        output += "extension Instruction {\n"
+        output += "    var hasImmediate: Bool {\n"
+        output += "        switch self {\n"
+        for inst in instructions {
+            output += "        case .\(inst.name): return \(inst.immediates.isEmpty ? "false" : "true")\n"
+        }
+        output += "        }\n"
+        output += "    }\n"
+        output += "}\n"
+        return output
+    }
+
+    static func generateDirectThreadedCode(instructions: [Instruction]) -> String {
+        var output = """
+            extension ExecutionState {
+            """
+        for inst in instructions {
+            let args = inst.parameters.map { label, _, isInout in
+                let isExecParam = ExecParam.allCases.contains { $0.label == label }
+                if isExecParam {
+                    return "\(label): \(isInout ? "&" : "")\(label).pointee"
+                } else {
+                    return "\(label): \(isInout ? "&" : "")\(label)"
+                }
+            }.joined(separator: ", ")
+            let throwsKwd = inst.mayThrow ? " throws" : ""
+            let tryKwd = inst.mayThrow ? "try " : ""
+            let mayAssignPc = inst.mayUpdatePc ? "pc.pointee = " : ""
+            output += """
+
+                @_silgen_name("wasmkit_execute_\(inst.name)")
+                mutating func execute_\(inst.name)(\(ExecParam.allCases.map { "\($0.label): UnsafeMutablePointer<\($0.type)>" }.joined(separator: ", ")))\(throwsKwd) {
+
+            """
+            if !inst.immediates.isEmpty {
+                output += """
+                        let inst = pc.pointee.read(Instruction.self)
+                        guard case let .\(inst.name)(\(inst.immediates.map { $0.label }.joined(separator: ", "))) = inst else {
+                            preconditionFailure()
+                        }
+
+                """
+            }
+            output += """
+                    \(mayAssignPc)\(tryKwd)\(inst.name)(\(args))
+                }
+            """
+        }
+        output += """
+
+            }
+            """
+
+        output += "\n\n"
+        output += """
+        extension Instruction {
+            var dtcHandlerIndex: Int {
+                switch self {
+
+        """
+        for (i, inst) in instructions.enumerated() {
+            output += "        case .\(inst.name): return \(i)\n"
+        }
+        output += """
+                }
+            }
+        }
+
+        """
+        return output
+    }
+
+    static func generateDirectThreadedCodeOfCPart(instructions: [Instruction]) -> String {
+        var output = ""
+
+        func handlerName(_ inst: Instruction) -> String {
+            "wasmkit_tc_\(inst.name)"
+        }
+
+        for inst in instructions {
+            let params = ExecParam.allCases
+            output += """
+            SWIFT_CC(swiftasync) static inline void \(handlerName(inst))(\(params.map { "\($0.type) \($0.label)" }.joined(separator: ", ")), SWIFT_CONTEXT void *state) {
+                SWIFT_CC(swift) void wasmkit_execute_\(inst.name)(\(params.map { "\($0.type) *\($0.label)" }.joined(separator: ", ")), SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+                pc++;
+                void * _Nullable error = NULL;
+                INLINE_CALL wasmkit_execute_\(inst.name)(\(params.map { "&\($0.label)" }.joined(separator: ", ")), state, &error);\n
+            """
+            if inst.mayThrow {
+                output += "    if (error) return wasmkit_execution_state_set_error(error, state);\n"
+            }
+            output += """
+                return ((wasmkit_tc_exec)(*pc))(sp, pc, md, ms, state);
+            }
+
+            """
+        }
+
+        output += """
+        static const uint64_t wasmkit_tc_exec_handlers[] = {
+
+        """
+        for inst in instructions {
+            output += "    (uint64_t)((wasmkit_tc_exec)&\(handlerName(inst))),\n"
+        }
+        output += """
+        };
+
+        """
+
         return output
     }
 
@@ -626,8 +744,37 @@ enum VMGen {
             output += generateInstName(instructions: instructions)
             output += "\n\n"
             output += generateBasicInstImplementations()
+            output += "\n\n"
+            output += generateDirectThreadedCode(instructions: instructions)
+
+            output += """
+
+
+            import _CWasmKit.InlineCode
+
+            extension Instruction {
+                private static let handlers: [UInt64] = withUnsafePointer(to: wasmkit_tc_exec_handlers) {
+                    let count = MemoryLayout.size(ofValue: wasmkit_tc_exec_handlers) / MemoryLayout<wasmkit_tc_exec>.size
+                    return $0.withMemoryRebound(to: UInt64.self, capacity: count) {
+                        Array(UnsafeBufferPointer(start: $0, count: count))
+                    }
+                }
+
+                @inline(never)
+                var handler: UInt64 {
+                    return Self.handlers[dtcHandlerIndex]
+                }
+            }
+
+            """
 
             let outputFile = sourceRoot.appending(path: "Sources/WasmKit/Execution/Runtime/InstDispatch.swift")
+            try output.write(to: outputFile, atomically: true, encoding: .utf8)
+        }
+
+        do {
+            let outputFile = sourceRoot.appending(path: "Sources/_CWasmKit/include/DirectThreadedCode.inc")
+            let output = generateDirectThreadedCodeOfCPart(instructions: instructions)
             try output.write(to: outputFile, atomically: true, encoding: .utf8)
         }
 

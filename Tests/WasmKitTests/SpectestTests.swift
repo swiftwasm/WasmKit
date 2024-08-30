@@ -17,7 +17,8 @@ final class SpectestTests: XCTestCase {
                 projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite").path,
             ],
             include: environment["WASMKIT_SPECTEST_INCLUDE"],
-            exclude: environment["WASMKIT_SPECTEST_EXCLUDE"]
+            exclude: environment["WASMKIT_SPECTEST_EXCLUDE"],
+            parallel: true
         )
         XCTAssertTrue(ok)
     }

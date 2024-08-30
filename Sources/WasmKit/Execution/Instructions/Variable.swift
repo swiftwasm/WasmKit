@@ -1,7 +1,7 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/instructions.html#variable-instructions>
 extension ExecutionState {
-    mutating func globalGet(sp: Sp, pc: Pc, globalGetOperand: Instruction.GlobalGetOperand) throws -> Pc {
+    mutating func globalGet(sp: Sp, pc: Pc, globalGetOperand: Instruction.GlobalGetOperand) -> Pc {
         var pc = pc
         let global = pc.read(InternalGlobal.self)
         global.withValue{
@@ -9,7 +9,7 @@ extension ExecutionState {
         }
         return pc
     }
-    mutating func globalSet(sp: Sp, pc: Pc, globalSetOperand: Instruction.GlobalSetOperand) throws -> Pc {
+    mutating func globalSet(sp: Sp, pc: Pc, globalSetOperand: Instruction.GlobalSetOperand) -> Pc {
         var pc = pc
         let global = pc.read(InternalGlobal.self)
         let value = sp[globalSetOperand.value]
