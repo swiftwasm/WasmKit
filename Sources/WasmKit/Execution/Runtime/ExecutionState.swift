@@ -195,9 +195,7 @@ extension ExecutionState {
         let handler = pc.assumingMemoryBound(to: wasmkit_tc_exec.self).pointee
         handler(
             UnsafeMutableRawPointer(sp).assumingMemoryBound(to: UInt64.self),
-            pc.assumingMemoryBound(to: UInt64.self),
-            md, ms,
-            &self
+            pc, md, ms, &self
         )
         if let error = self.trap {
             throw unsafeBitCast(error, to: Error.self)

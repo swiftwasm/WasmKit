@@ -690,7 +690,7 @@ enum VMGen {
             output += """
             SWIFT_CC(swiftasync) static inline void \(handlerName(inst))(\(params.map { "\($0.type) \($0.label)" }.joined(separator: ", ")), SWIFT_CONTEXT void *state) {
                 SWIFT_CC(swift) void wasmkit_execute_\(inst.name)(\(params.map { "\($0.type) *\($0.label)" }.joined(separator: ", ")), SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
-                pc++;
+                pc += sizeof(uint64_t);
                 void * _Nullable error = NULL;
                 INLINE_CALL wasmkit_execute_\(inst.name)(\(params.map { "&\($0.label)" }.joined(separator: ", ")), state, &error);\n
             """
@@ -698,7 +698,7 @@ enum VMGen {
                 output += "    if (error) return wasmkit_execution_state_set_error(error, state);\n"
             }
             output += """
-                return ((wasmkit_tc_exec)(*pc))(sp, pc, md, ms, state);
+                return ((wasmkit_tc_exec)(*(void **)pc))(sp, pc, md, ms, state);
             }
 
             """
