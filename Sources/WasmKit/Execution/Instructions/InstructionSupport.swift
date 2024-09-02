@@ -80,11 +80,6 @@ extension Instruction {
         }
     }
 
-    struct ConversionOperand: Equatable {
-        let operation: NumericInstruction.Conversion
-        let unary: UnaryOperand
-    }
-
     /// size = 4, alignment = 8
     struct LoadOperand: Equatable {
         let pointer: VReg
@@ -236,35 +231,6 @@ extension Instruction {
 
     typealias OnEnterOperand = FunctionIndex
     typealias OnExitOperand = FunctionIndex
-
-    static func numericConversion(_ op: NumericInstruction.Conversion, _ unary: Instruction.UnaryOperand) -> Instruction {
-        .numericConversion(ConversionOperand(operation: op, unary: unary))
-    }
-
-    static func f32ConvertI32S(_ op: UnaryOperand) -> Instruction { .numericConversion(.convertSigned(.f32, .i32), op) }
-    static func f32ConvertI32U(_ op: UnaryOperand) -> Instruction { .numericConversion(.convertUnsigned(.f32, .i32), op) }
-    static func f32ConvertI64S(_ op: UnaryOperand) -> Instruction { .numericConversion(.convertSigned(.f32, .i64), op) }
-    static func f32ConvertI64U(_ op: UnaryOperand) -> Instruction { .numericConversion(.convertUnsigned(.f32, .i64), op) }
-    static func f32DemoteF64(_ op: UnaryOperand) -> Instruction { .numericConversion(.demote, op) }
-    static func f64ConvertI32S(_ op: UnaryOperand) -> Instruction { .numericConversion(.convertSigned(.f64, .i32), op) }
-    static func f64ConvertI32U(_ op: UnaryOperand) -> Instruction { .numericConversion(.convertUnsigned(.f64, .i32), op) }
-    static func f64ConvertI64S(_ op: UnaryOperand) -> Instruction { .numericConversion(.convertSigned(.f64, .i64), op) }
-    static func f64ConvertI64U(_ op: UnaryOperand) -> Instruction { .numericConversion(.convertUnsigned(.f64, .i64), op) }
-    static func f64PromoteF32(_ op: UnaryOperand) -> Instruction { .numericConversion(.promote, op) }
-
-    static func i32ReinterpretF32(_ op: UnaryOperand) -> Instruction { .numericConversion(.reinterpret(.i32, .f32), op) }
-    static func i64ReinterpretF64(_ op: UnaryOperand) -> Instruction { .numericConversion(.reinterpret(.i64, .f64), op) }
-    static func f32ReinterpretI32(_ op: UnaryOperand) -> Instruction { .numericConversion(.reinterpret(.f32, .i32), op) }
-    static func f64ReinterpretI64(_ op: UnaryOperand) -> Instruction { .numericConversion(.reinterpret(.f64, .i64), op) }
-
-    static func i32TruncSatF32S(_ op: UnaryOperand) -> Instruction { .numericConversion(.truncSaturatingSigned(.i32, .f32), op) }
-    static func i32TruncSatF32U(_ op: UnaryOperand) -> Instruction { .numericConversion(.truncSaturatingUnsigned(.i32, .f32), op) }
-    static func i32TruncSatF64S(_ op: UnaryOperand) -> Instruction { .numericConversion(.truncSaturatingSigned(.i32, .f64), op) }
-    static func i32TruncSatF64U(_ op: UnaryOperand) -> Instruction { .numericConversion(.truncSaturatingUnsigned(.i32, .f64), op) }
-    static func i64TruncSatF32S(_ op: UnaryOperand) -> Instruction { .numericConversion(.truncSaturatingSigned(.i64, .f32), op) }
-    static func i64TruncSatF32U(_ op: UnaryOperand) -> Instruction { .numericConversion(.truncSaturatingUnsigned(.i64, .f32), op) }
-    static func i64TruncSatF64S(_ op: UnaryOperand) -> Instruction { .numericConversion(.truncSaturatingSigned(.i64, .f64), op) }
-    static func i64TruncSatF64U(_ op: UnaryOperand) -> Instruction { .numericConversion(.truncSaturatingUnsigned(.i64, .f64), op) }
 }
 
 extension Instruction {

@@ -46,7 +46,6 @@ enum Instruction: Equatable {
     case memoryFill(Instruction.MemoryFillOperand)
     case const32(Instruction.Const32Operand)
     case const64(Instruction.Const64Operand)
-    case numericConversion(Instruction.ConversionOperand)
     case i32Add(Instruction.BinaryOperand)
     case i64Add(Instruction.BinaryOperand)
     case i32Sub(Instruction.BinaryOperand)
@@ -115,12 +114,32 @@ enum Instruction: Equatable {
     case i64Extend32S(Instruction.UnaryOperand)
     case i32TruncF32S(Instruction.UnaryOperand)
     case i32TruncF32U(Instruction.UnaryOperand)
+    case i32TruncSatF32S(Instruction.UnaryOperand)
+    case i32TruncSatF32U(Instruction.UnaryOperand)
     case i32TruncF64S(Instruction.UnaryOperand)
     case i32TruncF64U(Instruction.UnaryOperand)
+    case i32TruncSatF64S(Instruction.UnaryOperand)
+    case i32TruncSatF64U(Instruction.UnaryOperand)
     case i64TruncF32S(Instruction.UnaryOperand)
     case i64TruncF32U(Instruction.UnaryOperand)
+    case i64TruncSatF32S(Instruction.UnaryOperand)
+    case i64TruncSatF32U(Instruction.UnaryOperand)
     case i64TruncF64S(Instruction.UnaryOperand)
     case i64TruncF64U(Instruction.UnaryOperand)
+    case i64TruncSatF64S(Instruction.UnaryOperand)
+    case i64TruncSatF64U(Instruction.UnaryOperand)
+    case f32ConvertI32S(Instruction.UnaryOperand)
+    case f32ConvertI32U(Instruction.UnaryOperand)
+    case f32ConvertI64S(Instruction.UnaryOperand)
+    case f32ConvertI64U(Instruction.UnaryOperand)
+    case f64ConvertI32S(Instruction.UnaryOperand)
+    case f64ConvertI32U(Instruction.UnaryOperand)
+    case f64ConvertI64S(Instruction.UnaryOperand)
+    case f64ConvertI64U(Instruction.UnaryOperand)
+    case f32ReinterpretI32(Instruction.UnaryOperand)
+    case f64ReinterpretI64(Instruction.UnaryOperand)
+    case i32ReinterpretF32(Instruction.UnaryOperand)
+    case i64ReinterpretF64(Instruction.UnaryOperand)
     case f32Add(Instruction.BinaryOperand)
     case f64Add(Instruction.BinaryOperand)
     case f32Sub(Instruction.BinaryOperand)
@@ -161,6 +180,8 @@ enum Instruction: Equatable {
     case f64Nearest(Instruction.UnaryOperand)
     case f32Sqrt(Instruction.UnaryOperand)
     case f64Sqrt(Instruction.UnaryOperand)
+    case f64PromoteF32(Instruction.UnaryOperand)
+    case f32DemoteF64(Instruction.UnaryOperand)
     case select
     case refNull(Instruction.RefNullOperand)
     case refIsNull(Instruction.RefIsNullOperand)
@@ -227,7 +248,6 @@ extension Instruction {
         case .memoryFill: return true
         case .const32: return true
         case .const64: return true
-        case .numericConversion: return true
         case .i32Add: return true
         case .i64Add: return true
         case .i32Sub: return true
@@ -296,12 +316,32 @@ extension Instruction {
         case .i64Extend32S: return true
         case .i32TruncF32S: return true
         case .i32TruncF32U: return true
+        case .i32TruncSatF32S: return true
+        case .i32TruncSatF32U: return true
         case .i32TruncF64S: return true
         case .i32TruncF64U: return true
+        case .i32TruncSatF64S: return true
+        case .i32TruncSatF64U: return true
         case .i64TruncF32S: return true
         case .i64TruncF32U: return true
+        case .i64TruncSatF32S: return true
+        case .i64TruncSatF32U: return true
         case .i64TruncF64S: return true
         case .i64TruncF64U: return true
+        case .i64TruncSatF64S: return true
+        case .i64TruncSatF64U: return true
+        case .f32ConvertI32S: return true
+        case .f32ConvertI32U: return true
+        case .f32ConvertI64S: return true
+        case .f32ConvertI64U: return true
+        case .f64ConvertI32S: return true
+        case .f64ConvertI32U: return true
+        case .f64ConvertI64S: return true
+        case .f64ConvertI64U: return true
+        case .f32ReinterpretI32: return true
+        case .f64ReinterpretI64: return true
+        case .i32ReinterpretF32: return true
+        case .i64ReinterpretF64: return true
         case .f32Add: return true
         case .f64Add: return true
         case .f32Sub: return true
@@ -342,6 +382,8 @@ extension Instruction {
         case .f64Nearest: return true
         case .f32Sqrt: return true
         case .f64Sqrt: return true
+        case .f64PromoteF32: return true
+        case .f32DemoteF64: return true
         case .select: return false
         case .refNull: return true
         case .refIsNull: return true
@@ -424,7 +466,6 @@ extension Instruction {
         case memoryDataDrop(DataIndex)
         case memoryCopy(Instruction.MemoryCopyOperand)
         case memoryFill(Instruction.MemoryFillOperand)
-        case numericConversion(Instruction.ConversionOperand)
         case i32Add(Instruction.BinaryOperand)
         case i64Add(Instruction.BinaryOperand)
         case i32Sub(Instruction.BinaryOperand)
@@ -493,12 +534,32 @@ extension Instruction {
         case i64Extend32S(Instruction.UnaryOperand)
         case i32TruncF32S(Instruction.UnaryOperand)
         case i32TruncF32U(Instruction.UnaryOperand)
+        case i32TruncSatF32S(Instruction.UnaryOperand)
+        case i32TruncSatF32U(Instruction.UnaryOperand)
         case i32TruncF64S(Instruction.UnaryOperand)
         case i32TruncF64U(Instruction.UnaryOperand)
+        case i32TruncSatF64S(Instruction.UnaryOperand)
+        case i32TruncSatF64U(Instruction.UnaryOperand)
         case i64TruncF32S(Instruction.UnaryOperand)
         case i64TruncF32U(Instruction.UnaryOperand)
+        case i64TruncSatF32S(Instruction.UnaryOperand)
+        case i64TruncSatF32U(Instruction.UnaryOperand)
         case i64TruncF64S(Instruction.UnaryOperand)
         case i64TruncF64U(Instruction.UnaryOperand)
+        case i64TruncSatF64S(Instruction.UnaryOperand)
+        case i64TruncSatF64U(Instruction.UnaryOperand)
+        case f32ConvertI32S(Instruction.UnaryOperand)
+        case f32ConvertI32U(Instruction.UnaryOperand)
+        case f32ConvertI64S(Instruction.UnaryOperand)
+        case f32ConvertI64U(Instruction.UnaryOperand)
+        case f64ConvertI32S(Instruction.UnaryOperand)
+        case f64ConvertI32U(Instruction.UnaryOperand)
+        case f64ConvertI64S(Instruction.UnaryOperand)
+        case f64ConvertI64U(Instruction.UnaryOperand)
+        case f32ReinterpretI32(Instruction.UnaryOperand)
+        case f64ReinterpretI64(Instruction.UnaryOperand)
+        case i32ReinterpretF32(Instruction.UnaryOperand)
+        case i64ReinterpretF64(Instruction.UnaryOperand)
         case f32Add(Instruction.BinaryOperand)
         case f64Add(Instruction.BinaryOperand)
         case f32Sub(Instruction.BinaryOperand)
@@ -539,6 +600,8 @@ extension Instruction {
         case f64Nearest(Instruction.UnaryOperand)
         case f32Sqrt(Instruction.UnaryOperand)
         case f64Sqrt(Instruction.UnaryOperand)
+        case f64PromoteF32(Instruction.UnaryOperand)
+        case f32DemoteF64(Instruction.UnaryOperand)
         case refNull(Instruction.RefNullOperand)
         case refIsNull(Instruction.RefIsNullOperand)
         case refFunc(Instruction.RefFuncOperand)
@@ -594,7 +657,6 @@ extension Instruction {
         case let .memoryDataDrop(dataIndex): return .memoryDataDrop(dataIndex)
         case let .memoryCopy(memoryCopyOperand): return .memoryCopy(memoryCopyOperand)
         case let .memoryFill(memoryFillOperand): return .memoryFill(memoryFillOperand)
-        case let .numericConversion(conversionOperand): return .numericConversion(conversionOperand)
         case let .i32Add(binaryOperand): return .i32Add(binaryOperand)
         case let .i64Add(binaryOperand): return .i64Add(binaryOperand)
         case let .i32Sub(binaryOperand): return .i32Sub(binaryOperand)
@@ -663,12 +725,32 @@ extension Instruction {
         case let .i64Extend32S(unaryOperand): return .i64Extend32S(unaryOperand)
         case let .i32TruncF32S(unaryOperand): return .i32TruncF32S(unaryOperand)
         case let .i32TruncF32U(unaryOperand): return .i32TruncF32U(unaryOperand)
+        case let .i32TruncSatF32S(unaryOperand): return .i32TruncSatF32S(unaryOperand)
+        case let .i32TruncSatF32U(unaryOperand): return .i32TruncSatF32U(unaryOperand)
         case let .i32TruncF64S(unaryOperand): return .i32TruncF64S(unaryOperand)
         case let .i32TruncF64U(unaryOperand): return .i32TruncF64U(unaryOperand)
+        case let .i32TruncSatF64S(unaryOperand): return .i32TruncSatF64S(unaryOperand)
+        case let .i32TruncSatF64U(unaryOperand): return .i32TruncSatF64U(unaryOperand)
         case let .i64TruncF32S(unaryOperand): return .i64TruncF32S(unaryOperand)
         case let .i64TruncF32U(unaryOperand): return .i64TruncF32U(unaryOperand)
+        case let .i64TruncSatF32S(unaryOperand): return .i64TruncSatF32S(unaryOperand)
+        case let .i64TruncSatF32U(unaryOperand): return .i64TruncSatF32U(unaryOperand)
         case let .i64TruncF64S(unaryOperand): return .i64TruncF64S(unaryOperand)
         case let .i64TruncF64U(unaryOperand): return .i64TruncF64U(unaryOperand)
+        case let .i64TruncSatF64S(unaryOperand): return .i64TruncSatF64S(unaryOperand)
+        case let .i64TruncSatF64U(unaryOperand): return .i64TruncSatF64U(unaryOperand)
+        case let .f32ConvertI32S(unaryOperand): return .f32ConvertI32S(unaryOperand)
+        case let .f32ConvertI32U(unaryOperand): return .f32ConvertI32U(unaryOperand)
+        case let .f32ConvertI64S(unaryOperand): return .f32ConvertI64S(unaryOperand)
+        case let .f32ConvertI64U(unaryOperand): return .f32ConvertI64U(unaryOperand)
+        case let .f64ConvertI32S(unaryOperand): return .f64ConvertI32S(unaryOperand)
+        case let .f64ConvertI32U(unaryOperand): return .f64ConvertI32U(unaryOperand)
+        case let .f64ConvertI64S(unaryOperand): return .f64ConvertI64S(unaryOperand)
+        case let .f64ConvertI64U(unaryOperand): return .f64ConvertI64U(unaryOperand)
+        case let .f32ReinterpretI32(unaryOperand): return .f32ReinterpretI32(unaryOperand)
+        case let .f64ReinterpretI64(unaryOperand): return .f64ReinterpretI64(unaryOperand)
+        case let .i32ReinterpretF32(unaryOperand): return .i32ReinterpretF32(unaryOperand)
+        case let .i64ReinterpretF64(unaryOperand): return .i64ReinterpretF64(unaryOperand)
         case let .f32Add(binaryOperand): return .f32Add(binaryOperand)
         case let .f64Add(binaryOperand): return .f64Add(binaryOperand)
         case let .f32Sub(binaryOperand): return .f32Sub(binaryOperand)
@@ -709,6 +791,8 @@ extension Instruction {
         case let .f64Nearest(unaryOperand): return .f64Nearest(unaryOperand)
         case let .f32Sqrt(unaryOperand): return .f32Sqrt(unaryOperand)
         case let .f64Sqrt(unaryOperand): return .f64Sqrt(unaryOperand)
+        case let .f64PromoteF32(unaryOperand): return .f64PromoteF32(unaryOperand)
+        case let .f32DemoteF64(unaryOperand): return .f32DemoteF64(unaryOperand)
         case let .refNull(refNullOperand): return .refNull(refNullOperand)
         case let .refIsNull(refIsNullOperand): return .refIsNull(refIsNullOperand)
         case let .refFunc(refFuncOperand): return .refFunc(refFuncOperand)
