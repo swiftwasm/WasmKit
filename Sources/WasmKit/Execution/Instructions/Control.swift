@@ -8,13 +8,6 @@ extension ExecutionState {
         return pc
     }
 
-    mutating func ifThen(sp: Sp, pc: Pc, ifOperand: Instruction.IfOperand) -> Pc {
-        guard sp[ifOperand.condition].i32 == 0 else {
-            return pc
-        }
-        return pc.advancedPc(by: Int(ifOperand.elseOrEndOffset))
-    }
-
     mutating func br(sp: Sp, pc: Pc, offset: Int32) -> Pc {
         return pc.advancedPc(by: Int(offset))
     }

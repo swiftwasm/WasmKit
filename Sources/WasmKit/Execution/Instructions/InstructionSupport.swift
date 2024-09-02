@@ -265,9 +265,15 @@ extension Instruction {
         let condition: VReg
     }
     
-    struct BrIfOperand: Equatable {
+    struct BrIfOperand: Equatable, InstructionImmediate {
         let offset: Int32
-        let condition: VReg
+        let condition: LVReg
+        static func load(from pc: inout Pc) -> Self {
+            pc.read()
+        }
+        static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast($0, to: CodeSlot.self) }
+        }
     }
     
     struct BrTable: Equatable, InstructionImmediate {

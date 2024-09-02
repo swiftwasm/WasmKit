@@ -66,13 +66,6 @@ SWIFT_CC(swiftasync) static inline void wasmkit_tc_nop(Sp sp, Pc pc, Md md, Ms m
     INLINE_CALL wasmkit_execute_nop(&sp, &pc, &md, &ms, state, &error);
     return ((wasmkit_tc_exec)(*(void **)pc))(sp, pc, md, ms, state);
 }
-SWIFT_CC(swiftasync) static inline void wasmkit_tc_ifThen(Sp sp, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
-    SWIFT_CC(swift) void wasmkit_execute_ifThen(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
-    pc += sizeof(uint64_t);
-    void * _Nullable error = NULL;
-    INLINE_CALL wasmkit_execute_ifThen(&sp, &pc, &md, &ms, state, &error);
-    return ((wasmkit_tc_exec)(*(void **)pc))(sp, pc, md, ms, state);
-}
 SWIFT_CC(swiftasync) static inline void wasmkit_tc_br(Sp sp, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
     SWIFT_CC(swift) void wasmkit_execute_br(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
     pc += sizeof(uint64_t);
@@ -1450,7 +1443,6 @@ static const uint64_t wasmkit_tc_exec_handlers[] = {
     (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_callIndirect),
     (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_unreachable),
     (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_nop),
-    (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_ifThen),
     (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_br),
     (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_brIf),
     (uint64_t)((wasmkit_tc_exec)&wasmkit_tc_brIfNot),
