@@ -114,7 +114,7 @@ enum VMGen {
             return OpInstruction(op: op, inputType: inputType, resultType: resultType, base: base)
         }
         static func unop(op: String, type: String, resultType: String) -> OpInstruction {
-            let base = Instruction(name: "\(type)\(op)", immediates: [Immediate(name: nil, type: "Instruction.UnaryOperand")])
+            let base = Instruction(name: "\(type)\(op)", immediates: [Immediate(name: nil, type: "Instruction.UnaryOperand")]).withRawOperand()
             return OpInstruction(op: op, inputType: type, resultType: resultType, base: base)
         }
     }
@@ -132,7 +132,7 @@ enum VMGen {
                 name: name,
                 mayThrow: mayThrow,
                 immediates: [Immediate(name: nil, type: "Instruction.BinaryOperand")]
-            )
+            ).withRawOperand()
         }
     }
 
@@ -144,7 +144,7 @@ enum VMGen {
         var mayThrow: Bool = false
 
         var instruction: Instruction {
-            Instruction(name: name, mayThrow: mayThrow, immediates: [Immediate(name: nil, type: "Instruction.UnaryOperand")])
+            Instruction(name: name, mayThrow: mayThrow, immediates: [Immediate(name: nil, type: "Instruction.UnaryOperand")]).withRawOperand()
         }
     }
 

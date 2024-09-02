@@ -1568,7 +1568,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
     private mutating func visitUnary(_ operand: ValueType, _ instruction: @escaping (Instruction.UnaryOperand) -> Instruction) throws {
         try popPushEmit(operand, operand) { value, result, stack in
-            return instruction(Instruction.UnaryOperand(result: result, input: value))
+            return instruction(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
     }
     private mutating func visitBinary(
@@ -1581,9 +1581,9 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         let result = valueStack.push(result)
         guard let lhs = lhs, let rhs = rhs else { return }
         emit(
-            instruction(Instruction.BinaryOperand(result: result, lhs: lhs, rhs: rhs)),
+            instruction(Instruction.BinaryOperand(result: LVReg(result), lhs: lhs, rhs: rhs)),
             resultRelink: { result in
-                return instruction(Instruction.BinaryOperand(result: result, lhs: lhs, rhs: rhs))
+                return instruction(Instruction.BinaryOperand(result: LVReg(result), lhs: lhs, rhs: rhs))
             }
         )
     }
@@ -1592,12 +1592,12 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
     private mutating func visitConversion(_ from: ValueType, _ to: ValueType, _ instruction: @escaping (Instruction.UnaryOperand) -> Instruction) throws {
         try popPushEmit(from, to) { value, result, stack in
-            return instruction(Instruction.UnaryOperand(result: result, input: value))
+            return instruction(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
     }
     mutating func visitI32Eqz() throws -> Output {
         try popPushEmit(.i32, .i32) { value, result, stack in
-            .i32Eqz(Instruction.UnaryOperand(result: result, input: value))
+                .i32Eqz(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
     }
     mutating func visitI32Eq() throws -> Output { try visitCmp(.i32, Instruction.i32Eq) }
@@ -1612,7 +1612,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     mutating func visitI32GeU() throws -> Output { try visitCmp(.i32, Instruction.i32GeU) }
     mutating func visitI64Eqz() throws -> Output {
         try popPushEmit(.i64, .i32) { value, result, stack in
-            .i64Eqz(Instruction.UnaryOperand(result: result, input: value))
+                .i64Eqz(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
     }
     mutating func visitI64Eq() throws -> Output { try visitCmp(.i64, Instruction.i64Eq) }
