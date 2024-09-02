@@ -412,6 +412,29 @@ extension Instruction {
         case .compilingCall: return true
         case .internalCall: return true
         case .brTable: return true
+        case .i32Load: return true
+        case .i64Load: return true
+        case .f32Load: return true
+        case .f64Load: return true
+        case .i32Load8S: return true
+        case .i32Load8U: return true
+        case .i32Load16S: return true
+        case .i32Load16U: return true
+        case .i64Load8S: return true
+        case .i64Load8U: return true
+        case .i64Load16S: return true
+        case .i64Load16U: return true
+        case .i64Load32S: return true
+        case .i64Load32U: return true
+        case .i32Store: return true
+        case .i64Store: return true
+        case .f32Store: return true
+        case .f64Store: return true
+        case .i32Store8: return true
+        case .i32Store16: return true
+        case .i64Store8: return true
+        case .i64Store16: return true
+        case .i64Store32: return true
         case .memoryInit: return true
         case .const32: return true
         case .const64: return true
@@ -429,6 +452,29 @@ extension Instruction {
         case .compilingCall(let compilingCallOperand): return compilingCallOperand
         case .internalCall(let internalCallOperand): return internalCallOperand
         case .brTable(let brTable): return brTable
+        case .i32Load(let loadOperand): return loadOperand
+        case .i64Load(let loadOperand): return loadOperand
+        case .f32Load(let loadOperand): return loadOperand
+        case .f64Load(let loadOperand): return loadOperand
+        case .i32Load8S(let loadOperand): return loadOperand
+        case .i32Load8U(let loadOperand): return loadOperand
+        case .i32Load16S(let loadOperand): return loadOperand
+        case .i32Load16U(let loadOperand): return loadOperand
+        case .i64Load8S(let loadOperand): return loadOperand
+        case .i64Load8U(let loadOperand): return loadOperand
+        case .i64Load16S(let loadOperand): return loadOperand
+        case .i64Load16U(let loadOperand): return loadOperand
+        case .i64Load32S(let loadOperand): return loadOperand
+        case .i64Load32U(let loadOperand): return loadOperand
+        case .i32Store(let storeOperand): return storeOperand
+        case .i64Store(let storeOperand): return storeOperand
+        case .f32Store(let storeOperand): return storeOperand
+        case .f64Store(let storeOperand): return storeOperand
+        case .i32Store8(let storeOperand): return storeOperand
+        case .i32Store16(let storeOperand): return storeOperand
+        case .i64Store8(let storeOperand): return storeOperand
+        case .i64Store16(let storeOperand): return storeOperand
+        case .i64Store32(let storeOperand): return storeOperand
         case .memoryInit(let memoryInitOperand): return memoryInitOperand
         case .const32(let const32Operand): return const32Operand
         case .const64(let const64Operand): return const64Operand
@@ -443,29 +489,6 @@ extension Instruction {
         case br(Int32)
         case brIf(Instruction.BrIfOperand)
         case brIfNot(Instruction.BrIfOperand)
-        case i32Load(Instruction.LoadOperand)
-        case i64Load(Instruction.LoadOperand)
-        case f32Load(Instruction.LoadOperand)
-        case f64Load(Instruction.LoadOperand)
-        case i32Load8S(Instruction.LoadOperand)
-        case i32Load8U(Instruction.LoadOperand)
-        case i32Load16S(Instruction.LoadOperand)
-        case i32Load16U(Instruction.LoadOperand)
-        case i64Load8S(Instruction.LoadOperand)
-        case i64Load8U(Instruction.LoadOperand)
-        case i64Load16S(Instruction.LoadOperand)
-        case i64Load16U(Instruction.LoadOperand)
-        case i64Load32S(Instruction.LoadOperand)
-        case i64Load32U(Instruction.LoadOperand)
-        case i32Store(Instruction.StoreOperand)
-        case i64Store(Instruction.StoreOperand)
-        case f32Store(Instruction.StoreOperand)
-        case f64Store(Instruction.StoreOperand)
-        case i32Store8(Instruction.StoreOperand)
-        case i32Store16(Instruction.StoreOperand)
-        case i64Store8(Instruction.StoreOperand)
-        case i64Store16(Instruction.StoreOperand)
-        case i64Store32(Instruction.StoreOperand)
         case memorySize(Instruction.MemorySizeOperand)
         case memoryGrow(Instruction.MemoryGrowOperand)
         case memoryDataDrop(DataIndex)
@@ -629,29 +652,6 @@ extension Instruction {
         case let .br(offset): return .br(offset)
         case let .brIf(brIfOperand): return .brIf(brIfOperand)
         case let .brIfNot(brIfOperand): return .brIfNot(brIfOperand)
-        case let .i32Load(loadOperand): return .i32Load(loadOperand)
-        case let .i64Load(loadOperand): return .i64Load(loadOperand)
-        case let .f32Load(loadOperand): return .f32Load(loadOperand)
-        case let .f64Load(loadOperand): return .f64Load(loadOperand)
-        case let .i32Load8S(loadOperand): return .i32Load8S(loadOperand)
-        case let .i32Load8U(loadOperand): return .i32Load8U(loadOperand)
-        case let .i32Load16S(loadOperand): return .i32Load16S(loadOperand)
-        case let .i32Load16U(loadOperand): return .i32Load16U(loadOperand)
-        case let .i64Load8S(loadOperand): return .i64Load8S(loadOperand)
-        case let .i64Load8U(loadOperand): return .i64Load8U(loadOperand)
-        case let .i64Load16S(loadOperand): return .i64Load16S(loadOperand)
-        case let .i64Load16U(loadOperand): return .i64Load16U(loadOperand)
-        case let .i64Load32S(loadOperand): return .i64Load32S(loadOperand)
-        case let .i64Load32U(loadOperand): return .i64Load32U(loadOperand)
-        case let .i32Store(storeOperand): return .i32Store(storeOperand)
-        case let .i64Store(storeOperand): return .i64Store(storeOperand)
-        case let .f32Store(storeOperand): return .f32Store(storeOperand)
-        case let .f64Store(storeOperand): return .f64Store(storeOperand)
-        case let .i32Store8(storeOperand): return .i32Store8(storeOperand)
-        case let .i32Store16(storeOperand): return .i32Store16(storeOperand)
-        case let .i64Store8(storeOperand): return .i64Store8(storeOperand)
-        case let .i64Store16(storeOperand): return .i64Store16(storeOperand)
-        case let .i64Store32(storeOperand): return .i64Store32(storeOperand)
         case let .memorySize(memorySizeOperand): return .memorySize(memorySizeOperand)
         case let .memoryGrow(memoryGrowOperand): return .memoryGrow(memoryGrowOperand)
         case let .memoryDataDrop(dataIndex): return .memoryDataDrop(dataIndex)

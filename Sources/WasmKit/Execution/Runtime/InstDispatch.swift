@@ -820,74 +820,74 @@ extension ExecutionState {
     mutating func f32DemoteF64(sp: Sp, unaryOperand: Instruction.UnaryOperand) {
         sp[f32: unaryOperand.result] = sp[f64: unaryOperand.input].demoteF64
     }
-    @inline(__always) mutating func i32Load(sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws -> Pc {
-        return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt32.self, castToValue: { .i32($0) })
+    @inline(__always) mutating func i32Load(sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
+        return try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt32.self, castToValue: { .i32($0) })
     }
-    @inline(__always) mutating func i64Load(sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws -> Pc {
-        return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt64.self, castToValue: { .i64($0) })
+    @inline(__always) mutating func i64Load(sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
+        return try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt64.self, castToValue: { .i64($0) })
     }
-    @inline(__always) mutating func f32Load(sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws -> Pc {
-        return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt32.self, castToValue: { .rawF32($0) })
+    @inline(__always) mutating func f32Load(sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
+        return try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt32.self, castToValue: { .rawF32($0) })
     }
-    @inline(__always) mutating func f64Load(sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws -> Pc {
-        return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt64.self, castToValue: { .rawF64($0) })
+    @inline(__always) mutating func f64Load(sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
+        return try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt64.self, castToValue: { .rawF64($0) })
     }
-    @inline(__always) mutating func i32Load8S(sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws -> Pc {
-        return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: Int8.self, castToValue: { .init(signed: Int32($0)) })
+    @inline(__always) mutating func i32Load8S(sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
+        return try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: Int8.self, castToValue: { .init(signed: Int32($0)) })
     }
-    @inline(__always) mutating func i32Load8U(sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws -> Pc {
-        return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt8.self, castToValue: { .i32(UInt32($0)) })
+    @inline(__always) mutating func i32Load8U(sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
+        return try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt8.self, castToValue: { .i32(UInt32($0)) })
     }
-    @inline(__always) mutating func i32Load16S(sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws -> Pc {
-        return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: Int16.self, castToValue: { .init(signed: Int32($0)) })
+    @inline(__always) mutating func i32Load16S(sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
+        return try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: Int16.self, castToValue: { .init(signed: Int32($0)) })
     }
-    @inline(__always) mutating func i32Load16U(sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws -> Pc {
-        return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt16.self, castToValue: { .i32(UInt32($0)) })
+    @inline(__always) mutating func i32Load16U(sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
+        return try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt16.self, castToValue: { .i32(UInt32($0)) })
     }
-    @inline(__always) mutating func i64Load8S(sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws -> Pc {
-        return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: Int8.self, castToValue: { .init(signed: Int64($0)) })
+    @inline(__always) mutating func i64Load8S(sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
+        return try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: Int8.self, castToValue: { .init(signed: Int64($0)) })
     }
-    @inline(__always) mutating func i64Load8U(sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws -> Pc {
-        return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt8.self, castToValue: { .i64(UInt64($0)) })
+    @inline(__always) mutating func i64Load8U(sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
+        return try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt8.self, castToValue: { .i64(UInt64($0)) })
     }
-    @inline(__always) mutating func i64Load16S(sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws -> Pc {
-        return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: Int16.self, castToValue: { .init(signed: Int64($0)) })
+    @inline(__always) mutating func i64Load16S(sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
+        return try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: Int16.self, castToValue: { .init(signed: Int64($0)) })
     }
-    @inline(__always) mutating func i64Load16U(sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws -> Pc {
-        return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt16.self, castToValue: { .i64(UInt64($0)) })
+    @inline(__always) mutating func i64Load16U(sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
+        return try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt16.self, castToValue: { .i64(UInt64($0)) })
     }
-    @inline(__always) mutating func i64Load32S(sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws -> Pc {
-        return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: Int32.self, castToValue: { .init(signed: Int64($0)) })
+    @inline(__always) mutating func i64Load32S(sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
+        return try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: Int32.self, castToValue: { .init(signed: Int64($0)) })
     }
-    @inline(__always) mutating func i64Load32U(sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws -> Pc {
-        return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt32.self, castToValue: { .i64(UInt64($0)) })
+    @inline(__always) mutating func i64Load32U(sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand) throws {
+        return try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: UInt32.self, castToValue: { .i64(UInt64($0)) })
     }
-    @inline(__always) mutating func i32Store(sp: Sp, pc: Pc, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws -> Pc {
-        return try memoryStore(sp: sp, pc: pc, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { $0.i32 })
+    @inline(__always) mutating func i32Store(sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
+        return try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { $0.i32 })
     }
-    @inline(__always) mutating func i64Store(sp: Sp, pc: Pc, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws -> Pc {
-        return try memoryStore(sp: sp, pc: pc, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { $0.i64 })
+    @inline(__always) mutating func i64Store(sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
+        return try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { $0.i64 })
     }
-    @inline(__always) mutating func f32Store(sp: Sp, pc: Pc, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws -> Pc {
-        return try memoryStore(sp: sp, pc: pc, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { $0.rawF32 })
+    @inline(__always) mutating func f32Store(sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
+        return try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { $0.rawF32 })
     }
-    @inline(__always) mutating func f64Store(sp: Sp, pc: Pc, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws -> Pc {
-        return try memoryStore(sp: sp, pc: pc, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { $0.rawF64 })
+    @inline(__always) mutating func f64Store(sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
+        return try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { $0.rawF64 })
     }
-    @inline(__always) mutating func i32Store8(sp: Sp, pc: Pc, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws -> Pc {
-        return try memoryStore(sp: sp, pc: pc, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) })
+    @inline(__always) mutating func i32Store8(sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
+        return try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) })
     }
-    @inline(__always) mutating func i32Store16(sp: Sp, pc: Pc, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws -> Pc {
-        return try memoryStore(sp: sp, pc: pc, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) })
+    @inline(__always) mutating func i32Store16(sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
+        return try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) })
     }
-    @inline(__always) mutating func i64Store8(sp: Sp, pc: Pc, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws -> Pc {
-        return try memoryStore(sp: sp, pc: pc, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) })
+    @inline(__always) mutating func i64Store8(sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
+        return try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) })
     }
-    @inline(__always) mutating func i64Store16(sp: Sp, pc: Pc, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws -> Pc {
-        return try memoryStore(sp: sp, pc: pc, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) })
+    @inline(__always) mutating func i64Store16(sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
+        return try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) })
     }
-    @inline(__always) mutating func i64Store32(sp: Sp, pc: Pc, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws -> Pc {
-        return try memoryStore(sp: sp, pc: pc, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) })
+    @inline(__always) mutating func i64Store32(sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand) throws {
+        return try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) })
     }
 }
 
@@ -986,187 +986,118 @@ extension ExecutionState {
     }
     @_silgen_name("wasmkit_execute_i32Load") @inline(__always)
     mutating func execute_i32Load(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .i32Load(loadOperand) = inst else {
-            preconditionFailure()
-        }
-        pc.pointee = try self.i32Load(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
+        let loadOperand = Instruction.LoadOperand.load(from: &pc.pointee)
+        try self.i32Load(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
     }
     @_silgen_name("wasmkit_execute_i64Load") @inline(__always)
     mutating func execute_i64Load(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .i64Load(loadOperand) = inst else {
-            preconditionFailure()
-        }
-        pc.pointee = try self.i64Load(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
+        let loadOperand = Instruction.LoadOperand.load(from: &pc.pointee)
+        try self.i64Load(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
     }
     @_silgen_name("wasmkit_execute_f32Load") @inline(__always)
     mutating func execute_f32Load(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .f32Load(loadOperand) = inst else {
-            preconditionFailure()
-        }
-        pc.pointee = try self.f32Load(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
+        let loadOperand = Instruction.LoadOperand.load(from: &pc.pointee)
+        try self.f32Load(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
     }
     @_silgen_name("wasmkit_execute_f64Load") @inline(__always)
     mutating func execute_f64Load(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .f64Load(loadOperand) = inst else {
-            preconditionFailure()
-        }
-        pc.pointee = try self.f64Load(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
+        let loadOperand = Instruction.LoadOperand.load(from: &pc.pointee)
+        try self.f64Load(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
     }
     @_silgen_name("wasmkit_execute_i32Load8S") @inline(__always)
     mutating func execute_i32Load8S(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .i32Load8S(loadOperand) = inst else {
-            preconditionFailure()
-        }
-        pc.pointee = try self.i32Load8S(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
+        let loadOperand = Instruction.LoadOperand.load(from: &pc.pointee)
+        try self.i32Load8S(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
     }
     @_silgen_name("wasmkit_execute_i32Load8U") @inline(__always)
     mutating func execute_i32Load8U(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .i32Load8U(loadOperand) = inst else {
-            preconditionFailure()
-        }
-        pc.pointee = try self.i32Load8U(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
+        let loadOperand = Instruction.LoadOperand.load(from: &pc.pointee)
+        try self.i32Load8U(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
     }
     @_silgen_name("wasmkit_execute_i32Load16S") @inline(__always)
     mutating func execute_i32Load16S(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .i32Load16S(loadOperand) = inst else {
-            preconditionFailure()
-        }
-        pc.pointee = try self.i32Load16S(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
+        let loadOperand = Instruction.LoadOperand.load(from: &pc.pointee)
+        try self.i32Load16S(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
     }
     @_silgen_name("wasmkit_execute_i32Load16U") @inline(__always)
     mutating func execute_i32Load16U(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .i32Load16U(loadOperand) = inst else {
-            preconditionFailure()
-        }
-        pc.pointee = try self.i32Load16U(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
+        let loadOperand = Instruction.LoadOperand.load(from: &pc.pointee)
+        try self.i32Load16U(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
     }
     @_silgen_name("wasmkit_execute_i64Load8S") @inline(__always)
     mutating func execute_i64Load8S(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .i64Load8S(loadOperand) = inst else {
-            preconditionFailure()
-        }
-        pc.pointee = try self.i64Load8S(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
+        let loadOperand = Instruction.LoadOperand.load(from: &pc.pointee)
+        try self.i64Load8S(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
     }
     @_silgen_name("wasmkit_execute_i64Load8U") @inline(__always)
     mutating func execute_i64Load8U(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .i64Load8U(loadOperand) = inst else {
-            preconditionFailure()
-        }
-        pc.pointee = try self.i64Load8U(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
+        let loadOperand = Instruction.LoadOperand.load(from: &pc.pointee)
+        try self.i64Load8U(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
     }
     @_silgen_name("wasmkit_execute_i64Load16S") @inline(__always)
     mutating func execute_i64Load16S(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .i64Load16S(loadOperand) = inst else {
-            preconditionFailure()
-        }
-        pc.pointee = try self.i64Load16S(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
+        let loadOperand = Instruction.LoadOperand.load(from: &pc.pointee)
+        try self.i64Load16S(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
     }
     @_silgen_name("wasmkit_execute_i64Load16U") @inline(__always)
     mutating func execute_i64Load16U(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .i64Load16U(loadOperand) = inst else {
-            preconditionFailure()
-        }
-        pc.pointee = try self.i64Load16U(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
+        let loadOperand = Instruction.LoadOperand.load(from: &pc.pointee)
+        try self.i64Load16U(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
     }
     @_silgen_name("wasmkit_execute_i64Load32S") @inline(__always)
     mutating func execute_i64Load32S(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .i64Load32S(loadOperand) = inst else {
-            preconditionFailure()
-        }
-        pc.pointee = try self.i64Load32S(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
+        let loadOperand = Instruction.LoadOperand.load(from: &pc.pointee)
+        try self.i64Load32S(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
     }
     @_silgen_name("wasmkit_execute_i64Load32U") @inline(__always)
     mutating func execute_i64Load32U(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .i64Load32U(loadOperand) = inst else {
-            preconditionFailure()
-        }
-        pc.pointee = try self.i64Load32U(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
+        let loadOperand = Instruction.LoadOperand.load(from: &pc.pointee)
+        try self.i64Load32U(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: loadOperand)
     }
     @_silgen_name("wasmkit_execute_i32Store") @inline(__always)
     mutating func execute_i32Store(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .i32Store(storeOperand) = inst else {
-            preconditionFailure()
-        }
-        pc.pointee = try self.i32Store(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, storeOperand: storeOperand)
+        let storeOperand = Instruction.StoreOperand.load(from: &pc.pointee)
+        try self.i32Store(sp: sp.pointee, md: md.pointee, ms: ms.pointee, storeOperand: storeOperand)
     }
     @_silgen_name("wasmkit_execute_i64Store") @inline(__always)
     mutating func execute_i64Store(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .i64Store(storeOperand) = inst else {
-            preconditionFailure()
-        }
-        pc.pointee = try self.i64Store(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, storeOperand: storeOperand)
+        let storeOperand = Instruction.StoreOperand.load(from: &pc.pointee)
+        try self.i64Store(sp: sp.pointee, md: md.pointee, ms: ms.pointee, storeOperand: storeOperand)
     }
     @_silgen_name("wasmkit_execute_f32Store") @inline(__always)
     mutating func execute_f32Store(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .f32Store(storeOperand) = inst else {
-            preconditionFailure()
-        }
-        pc.pointee = try self.f32Store(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, storeOperand: storeOperand)
+        let storeOperand = Instruction.StoreOperand.load(from: &pc.pointee)
+        try self.f32Store(sp: sp.pointee, md: md.pointee, ms: ms.pointee, storeOperand: storeOperand)
     }
     @_silgen_name("wasmkit_execute_f64Store") @inline(__always)
     mutating func execute_f64Store(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .f64Store(storeOperand) = inst else {
-            preconditionFailure()
-        }
-        pc.pointee = try self.f64Store(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, storeOperand: storeOperand)
+        let storeOperand = Instruction.StoreOperand.load(from: &pc.pointee)
+        try self.f64Store(sp: sp.pointee, md: md.pointee, ms: ms.pointee, storeOperand: storeOperand)
     }
     @_silgen_name("wasmkit_execute_i32Store8") @inline(__always)
     mutating func execute_i32Store8(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .i32Store8(storeOperand) = inst else {
-            preconditionFailure()
-        }
-        pc.pointee = try self.i32Store8(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, storeOperand: storeOperand)
+        let storeOperand = Instruction.StoreOperand.load(from: &pc.pointee)
+        try self.i32Store8(sp: sp.pointee, md: md.pointee, ms: ms.pointee, storeOperand: storeOperand)
     }
     @_silgen_name("wasmkit_execute_i32Store16") @inline(__always)
     mutating func execute_i32Store16(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .i32Store16(storeOperand) = inst else {
-            preconditionFailure()
-        }
-        pc.pointee = try self.i32Store16(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, storeOperand: storeOperand)
+        let storeOperand = Instruction.StoreOperand.load(from: &pc.pointee)
+        try self.i32Store16(sp: sp.pointee, md: md.pointee, ms: ms.pointee, storeOperand: storeOperand)
     }
     @_silgen_name("wasmkit_execute_i64Store8") @inline(__always)
     mutating func execute_i64Store8(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .i64Store8(storeOperand) = inst else {
-            preconditionFailure()
-        }
-        pc.pointee = try self.i64Store8(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, storeOperand: storeOperand)
+        let storeOperand = Instruction.StoreOperand.load(from: &pc.pointee)
+        try self.i64Store8(sp: sp.pointee, md: md.pointee, ms: ms.pointee, storeOperand: storeOperand)
     }
     @_silgen_name("wasmkit_execute_i64Store16") @inline(__always)
     mutating func execute_i64Store16(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .i64Store16(storeOperand) = inst else {
-            preconditionFailure()
-        }
-        pc.pointee = try self.i64Store16(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, storeOperand: storeOperand)
+        let storeOperand = Instruction.StoreOperand.load(from: &pc.pointee)
+        try self.i64Store16(sp: sp.pointee, md: md.pointee, ms: ms.pointee, storeOperand: storeOperand)
     }
     @_silgen_name("wasmkit_execute_i64Store32") @inline(__always)
     mutating func execute_i64Store32(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .i64Store32(storeOperand) = inst else {
-            preconditionFailure()
-        }
-        pc.pointee = try self.i64Store32(sp: sp.pointee, pc: pc.pointee, md: md.pointee, ms: ms.pointee, storeOperand: storeOperand)
+        let storeOperand = Instruction.StoreOperand.load(from: &pc.pointee)
+        try self.i64Store32(sp: sp.pointee, md: md.pointee, ms: ms.pointee, storeOperand: storeOperand)
     }
     @_silgen_name("wasmkit_execute_memorySize") @inline(__always)
     mutating func execute_memorySize(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
