@@ -576,11 +576,13 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             }
             if instruction.hasImmediate {
                 if instruction.useRawOperand {
-                    var index = index + 1
+                    var slots: [CodeSlot] = []
                     instruction.rawImmediate.emit(to: {
-                        self.instructions[index] = $0
-                        index += 1
+                        slots.append($0)
                     })
+                    for (i, slot) in slots.enumerated() {
+                        self.instructions[index + 1 + i] = slot
+                    }
                 } else {
                     self.instructions[index + 1] = (instruction.rawValue)
                 }
@@ -625,7 +627,9 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             }
             if instruction.hasImmediate {
                 if instruction.useRawOperand {
-                    instruction.rawImmediate.emit(to: { emitSlot($0) })
+                    var slots: [CodeSlot] = []
+                    instruction.rawImmediate.emit(to: { slots.append($0) })
+                    for slot in slots { emitSlot(slot) }
                 } else {
                     emitSlot(instruction.rawValue)
                 }
@@ -1268,21 +1272,19 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             if module.isSameInstance(callee.wasm.instance) {
                 emit(.compilingCall(
                     Instruction.InternalCallOperand(
-//                        callee: callee,
+                        callee: callee,
                         callLike: callLike
                     )
                 ))
-                iseqBuilder.emitData(callee)
                 return
             }
         }
         emit(.call(
             Instruction.CallOperand(
-//                callee: callee,
+                callee: callee,
                 callLike: Instruction.CallLikeOperand(spAddend: spAddend)
             )
         ))
-        iseqBuilder.emitData(callee)
     }
 
     mutating func visitCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws -> Output {
