@@ -574,17 +574,11 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             case .token:
                 self.instructions[index] = UInt64(instruction.rawIndex)
             }
-            if instruction.hasImmediate {
-                if instruction.useRawOperand {
-                    var slots: [CodeSlot] = []
-                    instruction.rawImmediate.emit(to: {
-                        slots.append($0)
-                    })
-                    for (i, slot) in slots.enumerated() {
-                        self.instructions[index + 1 + i] = slot
-                    }
-                } else {
-                    self.instructions[index + 1] = (instruction.rawValue)
+            if let immediate = instruction.rawImmediate {
+                var slots: [CodeSlot] = []
+                immediate.emit(to: { slots.append($0) })
+                for (i, slot) in slots.enumerated() {
+                    self.instructions[index + 1 + i] = slot
                 }
             }
         }
@@ -625,14 +619,10 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             case .token:
                 emitSlot(UInt64(instruction.rawIndex))
             }
-            if instruction.hasImmediate {
-                if instruction.useRawOperand {
-                    var slots: [CodeSlot] = []
-                    instruction.rawImmediate.emit(to: { slots.append($0) })
-                    for slot in slots { emitSlot(slot) }
-                } else {
-                    emitSlot(instruction.rawValue)
-                }
+            if let immediate = instruction.rawImmediate {
+                var slots: [CodeSlot] = []
+                immediate.emit(to: { slots.append($0) })
+                for slot in slots { emitSlot(slot) }
             }
         }
 
@@ -1521,17 +1511,17 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     mutating func visitI64Store32(memarg: MemArg) throws -> Output { try visitStore(memarg, .i64, Instruction.i64Store32) }
     mutating func visitMemorySize(memory: UInt32) throws -> Output {
         let sizeType: ValueType = try module.isMemory64(memoryIndex: memory) ? .i64 : .i32
-        pushEmit(sizeType, { .memorySize(Instruction.MemorySizeOperand(memoryIndex: memory, result: $0)) })
+        pushEmit(sizeType, { .memorySize(Instruction.MemorySizeOperand(memoryIndex: memory, result: LVReg($0))) })
     }
     mutating func visitMemoryGrow(memory: UInt32) throws -> Output {
         let isMemory64 = try module.isMemory64(memoryIndex: memory)
         let sizeType = ValueType.address(isMemory64: isMemory64)
         // Just pop/push the same type (i64 or i32) value
         try popPushEmit(sizeType, sizeType) { value, result, stack in
-            .memoryGrow(Instruction.MemoryGrowOperand(result: result, delta: value))
+            .memoryGrow(Instruction.MemoryGrowOperand(
+                result: result, delta: value, memory: memory
+            ))
         }
-        // TODO: For multi-memory support
-        // iseqBuilder.emitData(UInt64(memory))
     }
 
     private mutating func visitConst(_ type: ValueType, _ value: Value) {
@@ -1555,11 +1545,11 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     mutating func visitRefIsNull() throws -> Output {
         let value = try valueStack.popRef()
         let result = valueStack.push(.i32)
-        emit(.refIsNull(Instruction.RefIsNullOperand(value: ensureOnVReg(value), result: result)))
+        emit(.refIsNull(Instruction.RefIsNullOperand(value: LVReg(ensureOnVReg(value)), result: LVReg(result))))
     }
     mutating func visitRefFunc(functionIndex: UInt32) throws -> Output {
         try self.module.validateFunctionIndex(functionIndex)
-        pushEmit(.ref(.funcRef), { .refFunc(Instruction.RefFuncOperand(index: functionIndex, result: $0)) })
+        pushEmit(.ref(.funcRef), { .refFunc(Instruction.RefFuncOperand(index: functionIndex, result: LVReg($0))) })
     }
 
     private mutating func visitUnary(_ operand: ValueType, _ instruction: @escaping (Instruction.UnaryOperand) -> Instruction) throws {
@@ -1758,7 +1748,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
                 Instruction.MemoryCopyOperand(
                     destOffset: destOffset,
                     sourceOffset: sourceOffset,
-                    size: size
+                    size: LVReg(size)
                 )
             )
         }
@@ -1775,7 +1765,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
                 Instruction.MemoryFillOperand(
                     destOffset: destOffset,
                     value: value,
-                    size: size
+                    size: LVReg(size)
                 )
             )
         }
@@ -1786,16 +1776,14 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             let (size, sourceOffset, destOffset) = values
             return .tableInit(
                 Instruction.TableInitOperand(
-//                    tableIndex: table,
-//                    segmentIndex: elemIndex,
+                    tableIndex: table,
+                    segmentIndex: elemIndex,
                     destOffset: destOffset,
                     sourceOffset: sourceOffset,
                     size: size
                 )
             )
         }
-        iseqBuilder.emitData(UInt64(table))
-        iseqBuilder.emitData(UInt64(elemIndex))
     }
     mutating func visitElemDrop(elemIndex: UInt32) throws -> Output {
         try self.module.validateElementSegment(elemIndex)
@@ -1819,16 +1807,14 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             let (size, sourceOffset, destOffset) = values
             return .tableCopy(
                 Instruction.TableCopyOperand(
-//                    sourceIndex: srcTable,
-//                    destIndex: dstTable,
-                    sourceOffset: sourceOffset,
+                    sourceIndex: srcTable,
+                    destIndex: dstTable,
                     destOffset: destOffset,
+                    sourceOffset: sourceOffset,
                     size: size
                 )
             )
         }
-        iseqBuilder.emitData(UInt64(srcTable))
-        iseqBuilder.emitData(UInt64(dstTable))
     }
     mutating func visitTableFill(table: UInt32) throws -> Output {
         let address = try module.addressType(tableIndex: table)
@@ -1836,14 +1822,13 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             let (size, value, destOffset) = values
             return .tableFill(
                 Instruction.TableFillOperand(
-//                    tableIndex: table,
+                    tableIndex: table,
                     destOffset: destOffset,
                     value: value,
                     size: size
                 )
             )
         }
-        iseqBuilder.emitData(UInt64(table))
     }
     mutating func visitTableGet(table: UInt32) throws -> Output {
         try popPushEmit(
@@ -1853,11 +1838,11 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             return .tableGet(
                 Instruction.TableGetOperand(
                     index: index,
-                    result: result
+                    result: result,
+                    tableIndex: table
                 )
             )
         }
-        iseqBuilder.emitData(UInt64(table))
     }
     mutating func visitTableSet(table: UInt32) throws -> Output {
         try pop2Emit((.ref(module.elementType(table)), module.addressType(tableIndex: table))) { values, stack in
@@ -1865,12 +1850,11 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             return .tableSet(
                 Instruction.TableSetOperand(
                     index: index,
-                    value: value
-//                    tableIndex: table
+                    value: value,
+                    tableIndex: table
                 )
             )
         }
-        iseqBuilder.emitData(UInt64(table))
     }
     mutating func visitTableGrow(table: UInt32) throws -> Output {
         let address = try module.addressType(tableIndex: table)
@@ -1878,18 +1862,17 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             let (delta, value) = values
             return .tableGrow(
                 Instruction.TableGrowOperand(
-//                    tableIndex: table,
+                    tableIndex: table,
                     result: result,
                     delta: delta,
                     value: value
                 )
             )
         }
-        iseqBuilder.emitData(UInt64(table))
     }
     mutating func visitTableSize(table: UInt32) throws -> Output {
         pushEmit(try module.addressType(tableIndex: table)) { result in
-            return .tableSize(Instruction.TableSizeOperand(tableIndex: table, result: result))
+            return .tableSize(Instruction.TableSizeOperand(tableIndex: table, result: LVReg(result)))
         }
     }
     mutating func visitI32TruncSatF32S() throws -> Output { try visitConversion(.f32, .i32, Instruction.i32TruncSatF32S) }
