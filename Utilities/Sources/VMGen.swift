@@ -631,7 +631,7 @@ enum VMGen {
 
         output += """
         extension Instruction {
-            var rawImmediate: UInt64 {
+            var rawImmediate: any InstructionImmediate {
                 switch self {
 
         """
@@ -639,7 +639,7 @@ enum VMGen {
             guard let immediate = inst.immediates.first, inst.useRawOperand else {
                 continue
             }
-            output += "        case .\(inst.name)(let \(immediate.label)): return unsafeBitCast(\(immediate.label), to: UInt64.self)\n"
+            output += "        case .\(inst.name)(let \(immediate.label)): return \(immediate.label)\n"
         }
         output += """
                 default: preconditionFailure()
@@ -705,7 +705,7 @@ enum VMGen {
                 if inst.useRawOperand {
                     let immediate = inst.immediates[0]
                     output += """
-                            let \(immediate.label) = pc.pointee.read(\(immediate.type).self)
+                            let \(immediate.label) = \(immediate.type).load(from: &pc.pointee)
 
                     """
                 } else {

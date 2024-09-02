@@ -343,9 +343,9 @@ extension Instruction {
     }
 }
 extension Instruction {
-    var rawImmediate: UInt64 {
+    var rawImmediate: any InstructionImmediate {
         switch self {
-        case .copyStack(let copyStackOperand): return unsafeBitCast(copyStackOperand, to: UInt64.self)
+        case .copyStack(let copyStackOperand): return copyStackOperand
         default: preconditionFailure()
         }
     }
