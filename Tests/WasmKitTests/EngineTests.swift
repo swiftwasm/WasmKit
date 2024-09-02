@@ -35,7 +35,6 @@ final class EngineTests: XCTestCase {
         checkSize(Instruction.GlobalGetOperand.self)
         checkSize(Instruction.GlobalSetOperand.self)
         checkSize(Instruction.CopyStackOperand.self)
-        checkSize(Instruction.IfOperand.self)
         checkSize(Instruction.BrIfOperand.self)
         checkSize(Instruction.BrTable.self)
         checkSize(Instruction.CallLikeOperand.self)

@@ -28,6 +28,7 @@ extension ExecutionState {
         return pc.advancedPc(by: Int(entry.offset))
     }
 
+    @inline(__always)
     mutating func _return(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms) -> Pc {
         var pc = pc
         popFrame(sp: &sp, pc: &pc, md: &md, ms: &ms)
@@ -44,7 +45,7 @@ extension ExecutionState {
 
         (pc, sp) = try invoke(
             function: callOperand.callee,
-            callerInstance: currentFrame.instance,
+            callerInstance: currentInstance(sp: sp),
             callLike: callOperand.callLike,
             sp: sp, pc: pc, md: &md, ms: &ms
         )
@@ -102,7 +103,7 @@ extension ExecutionState {
         sp: Sp, tableIndex: TableIndex, expectedType: InternedFuncType,
         callIndirectOperand: Instruction.CallIndirectOperand
     ) throws -> (InternalFunction, InternalInstance) {
-        let callerInstance = currentFrame.instance
+        let callerInstance = currentInstance(sp: sp)
         let table = callerInstance.tables[Int(tableIndex)]
         let value = sp[callIndirectOperand.index].asAddressOffset(table.limits.isMemory64)
         let elementIndex = Int(value)
@@ -140,14 +141,14 @@ extension ExecutionState {
     }
 
     mutating func onEnter(sp: Sp, onEnterOperand: Instruction.OnEnterOperand) {
-        let function = currentInstance.functions[Int(onEnterOperand)]
+        let function = currentInstance(sp: sp).functions[Int(onEnterOperand)]
         self.runtime.value.interceptor?.onEnterFunction(
             Function(handle: function, allocator: self.runtime.store.allocator),
             store: self.runtime.store
         )
     }
     mutating func onExit(sp: Sp, onExitOperand: Instruction.OnExitOperand) {
-        let function = currentInstance.functions[Int(onExitOperand)]
+        let function = currentInstance(sp: sp).functions[Int(onExitOperand)]
         self.runtime.value.interceptor?.onExitFunction(
             Function(handle: function, allocator: self.runtime.store.allocator),
             store: self.runtime.store

@@ -42,6 +42,11 @@ struct EntityHandle<T>: Equatable, Hashable {
         self.pointer = pointer
     }
 
+    init?(bitPattern: UInt) {
+        guard let pointer = UnsafeMutablePointer<T>(bitPattern: bitPattern) else { return nil }
+        self.pointer = pointer
+    }
+
     subscript<R>(dynamicMember keyPath: KeyPath<T, R>) -> R {
         pointer.pointee[keyPath: keyPath]
     }

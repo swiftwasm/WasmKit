@@ -86,7 +86,6 @@ func executeWasm(
             case .token:
                 rootISeq[0] = UInt64(Instruction.endOfExecution.rawIndex)
             }
-            // NOTE: unwinding a function jump into previous frame's PC + 1, so initial PC is -1ed
             try stack.execute(
                 sp: sp,
                 pc: rootISeq.baseAddress!,
@@ -134,15 +133,6 @@ extension ExecutionState {
         static func assignNil(md: inout Md, ms: inout Ms) {
             md = nil
             ms = 0
-        }
-
-        @inline(__always)
-        static func mayUpdateCurrentInstance(stack: StackContext, md: inout Md, ms: inout Ms) {
-            guard let instance = stack.currentFrame?.instance else {
-                assignNil(md: &md, ms: &ms)
-                return
-            }
-            mayUpdateCurrentInstance(instance: instance, md: &md, ms: &ms)
         }
 
         @inline(__always)
@@ -211,7 +201,6 @@ extension ExecutionState {
     /// The main execution loop. Be careful when modifying this function as it is performance-critical.
     @inline(__always)
     mutating func runTokenThreaded(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
-        CurrentMemory.mayUpdateCurrentInstance(stack: self, md: &md, ms: &ms)
 #if WASMKIT_ENGINE_STATS
         var stats: [String: Int] = [:]
         defer {
@@ -278,7 +267,7 @@ extension InternalFunction {
             let parameters = resolvedType.parameters.enumerated().map { (i, type) in
                 sp[callLike.spAddend + layout.paramReg(i)].cast(to: type)
             }
-            let instance = executionState.currentFrame.instance
+            let instance = executionState.currentInstance(sp: sp)
             let caller = Caller(
                 instanceHandle: instance,
                 runtime: runtime.value
