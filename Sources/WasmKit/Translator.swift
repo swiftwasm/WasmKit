@@ -1548,8 +1548,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
                 .const32(Instruction.Const32Operand(value: UInt32(value.storage), result: LVReg($0)))
             })
         } else {
-            pushEmit(type, { .const64(Instruction.Const64Operand(result: $0)) })
-            iseqBuilder.emitData(value.storage)
+            pushEmit(type, { .const64(Instruction.Const64Operand(value: value, result: LLVReg($0))) })
         }
     }
     mutating func visitI32Const(value: Int32) -> Output { visitConst(.i32, .i32(UInt32(bitPattern: value))) }

@@ -67,8 +67,18 @@ extension Instruction {
         }
     }
     /// size = 2, alignment = 2
-    struct Const64Operand: Equatable {
-        let result: VReg
+    struct Const64Operand: Equatable, InstructionImmediate {
+        let value: UntypedValue
+        let result: LLVReg
+        static func load(from pc: inout Pc) -> Self {
+            let value = pc.read(UntypedValue.self)
+            let result = pc.read(LLVReg.self)
+            return Self(value: value, result: result)
+        }
+        static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { $0.value.storage }
+            emitSlot { CodeSlot(bitPattern: $0.result) }
+        }
     }
 
     struct FloatUnaryOperand: Equatable {

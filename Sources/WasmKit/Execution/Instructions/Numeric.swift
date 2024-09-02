@@ -7,8 +7,7 @@ extension ExecutionState {
     }
     @inline(__always)
     mutating func const64(sp: Sp, pc: Pc, const64Operand: Instruction.Const64Operand) -> Pc {
-        var pc = pc
-        sp[const64Operand.result] = pc.read(UntypedValue.self)
+        sp[VReg(const64Operand.result)] = const64Operand.value
         return pc
     }
 

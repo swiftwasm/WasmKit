@@ -1059,10 +1059,7 @@ extension ExecutionState {
     }
     @_silgen_name("wasmkit_execute_const64") @inline(__always)
     mutating func execute_const64(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .const64(const64Operand) = inst else {
-            preconditionFailure()
-        }
+        let const64Operand = Instruction.Const64Operand.load(from: &pc.pointee)
         pc.pointee = const64(sp: sp.pointee, pc: pc.pointee, const64Operand: const64Operand)
     }
     @_silgen_name("wasmkit_execute_numericFloatUnary") @inline(__always)
