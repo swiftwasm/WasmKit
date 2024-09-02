@@ -283,20 +283,6 @@ struct UntypedValue: Equatable {
         return asAddressOffset()
     }
 
-    func cast(to type: NumericType) -> Value {
-        switch type {
-        case .int(let type):
-            switch type {
-            case .i32: return .i32(i32)
-            case .i64: return .i64(i64)
-            }
-        case .float(let type):
-            switch type {
-            case .f32: return .f32(f32.bitPattern)
-            case .f64: return .f64(f64.bitPattern)
-            }
-        }
-    }
     func cast(to type: ValueType) -> Value {
         switch type {
         case .i32: return .i32(i32)
