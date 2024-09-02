@@ -277,28 +277,6 @@ struct MemoryEntity /* : ~Copyable */ {
         }
         data[offset..<endOffset] = bytes
     }
-
-    subscript(i32 address: UInt32) -> UInt32 {
-        get {
-            .init(littleEndian: data[Int(address)..<Int(address + 4)])
-        }
-        set {
-            data[Int(address)..<Int(address + 4)] = ArraySlice(newValue.littleEndianBytes)
-        }
-    }
-
-    subscript(i64 address: UInt32) -> UInt64 {
-        .init(littleEndian: data[Int(address)..<Int(address + 8)])
-    }
-
-    subscript(bytes count: UInt32, at address: UInt32) -> ArraySlice<UInt8> {
-        get {
-            data[Int(address)..<Int(address + count)]
-        }
-        set {
-            data[Int(address)..<Int(address + count)] = newValue
-        }
-    }
 }
 
 extension MemoryEntity: ValidatableEntity {

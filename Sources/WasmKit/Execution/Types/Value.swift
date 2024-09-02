@@ -4,33 +4,6 @@ import enum WasmParser.ValueType
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#value-types>
 
-/// Numeric types
-enum NumericType: Equatable {
-    /// Integer value type.
-    case int(IntValueType)
-    /// Floating-point value type.
-    case float(FloatValueType)
-
-    /// 32-bit signed or unsigned integer.
-    static let i32: Self = .int(.i32)
-    /// 64-bit signed or unsigned integer.
-    static let i64: Self = .int(.i64)
-    /// 32-bit IEEE 754 floating-point number.
-    static let f32: Self = .float(.f32)
-    /// 64-bit IEEE 754 floating-point number.
-    static let f64: Self = .float(.f64)
-}
-
-extension WasmParser.ValueType {
-    var float: FloatValueType {
-        switch self {
-        case .f32: return .f32
-        case .f64: return .f64
-        default:
-            fatalError("unexpected value type \(self)")
-        }
-    }
-}
 
 public typealias ReferenceType = WasmParser.ReferenceType
 
@@ -49,17 +22,6 @@ extension Value {
             return .ref(.funcRef)
         case .ref(.extern):
             return .ref(.externRef)
-        }
-    }
-
-    init<V: RawUnsignedInteger>(_ rawValue: V) {
-        switch rawValue {
-        case let value as UInt32:
-            self = .i32(value)
-        case let value as UInt64:
-            self = .i64(value)
-        default:
-            fatalError("unknown raw integer type \(Swift.type(of: rawValue)) passed to `Value.init` ")
         }
     }
 
@@ -88,62 +50,6 @@ extension Value {
             return lhs == rhs
         default:
             return false
-        }
-    }
-}
-
-// TODO: Remove Comparable conformance after refactoring float binops
-#if hasAttribute(retroactive)
-extension Value: @retroactive Comparable {}
-#else
-extension Value: Comparable {}
-#endif
-extension Value {
-    /// Returns if the left value is less than the right value.
-    /// - Precondition: The values are of the same type.
-    public static func < (lhs: Self, rhs: Self) -> Bool {
-        switch (lhs, rhs) {
-        case let (.i32(lhs), .i32(rhs)): return lhs < rhs
-        case let (.i64(lhs), .i64(rhs)): return lhs < rhs
-        case let (.f32(lhs), .f32(rhs)): return Float32(bitPattern: lhs) < Float32(bitPattern: rhs)
-        case let (.f64(lhs), .f64(rhs)): return Float64(bitPattern: lhs) < Float64(bitPattern: rhs)
-        default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value: Comparable` implementation")
-        }
-    }
-
-    /// Returns if the left value is greater than the right value.
-    /// - Precondition: The values are of the same type.
-    public static func > (lhs: Self, rhs: Self) -> Bool {
-        switch (lhs, rhs) {
-        case let (.i32(lhs), .i32(rhs)): return lhs > rhs
-        case let (.i64(lhs), .i64(rhs)): return lhs > rhs
-        case let (.f32(lhs), .f32(rhs)): return Float32(bitPattern: lhs) > Float32(bitPattern: rhs)
-        case let (.f64(lhs), .f64(rhs)): return Float64(bitPattern: lhs) > Float64(bitPattern: rhs)
-        default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value: Comparable` implementation")
-        }
-    }
-
-    /// Returns if the left value is less than or equal to the right value.
-    /// - Precondition: The values are of the same type.
-    public static func >= (lhs: Self, rhs: Self) -> Bool {
-        switch (lhs, rhs) {
-        case let (.i32(lhs), .i32(rhs)): return lhs >= rhs
-        case let (.i64(lhs), .i64(rhs)): return lhs >= rhs
-        case let (.f32(lhs), .f32(rhs)): return Float32(bitPattern: lhs) >= Float32(bitPattern: rhs)
-        case let (.f64(lhs), .f64(rhs)): return Float64(bitPattern: lhs) >= Float64(bitPattern: rhs)
-        default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value: Comparable` implementation")
-        }
-    }
-
-    /// Returns if the left value is less than or equal to the right value.
-    /// - Precondition: The values are of the same type.
-    public static func <= (lhs: Self, rhs: Self) -> Bool {
-        switch (lhs, rhs) {
-        case let (.i32(lhs), .i32(rhs)): return lhs <= rhs
-        case let (.i64(lhs), .i64(rhs)): return lhs <= rhs
-        case let (.f32(lhs), .f32(rhs)): return Float32(bitPattern: lhs) <= Float32(bitPattern: rhs)
-        case let (.f64(lhs), .f64(rhs)): return Float64(bitPattern: lhs) <= Float64(bitPattern: rhs)
-        default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value: Comparable` implementation")
         }
     }
 }
@@ -213,35 +119,6 @@ enum FloatValueType {
     case f32
     /// 64-bit IEEE 754 floating-point number.
     case f64
-
-    var nan: Value {
-        switch self {
-        case .f32:
-            return .fromFloat32(.nan)
-        case .f64:
-            return .fromFloat64(.nan)
-        }
-    }
-
-    func infinity(isNegative: Bool) -> Value {
-        switch self {
-        case .f32:
-            return .fromFloat32(isNegative ? -.infinity : .infinity)
-        case .f64:
-            return .fromFloat64(isNegative ? -.infinity : .infinity)
-        }
-    }
-}
-
-extension RawUnsignedInteger {
-    init<T: RandomAccessCollection>(littleEndian bytes: T) where T.Element == UInt8, T.Index == Int {
-        self = .zero
-
-        for i in stride(from: bytes.endIndex - 1, to: bytes.startIndex - 1, by: -1) {
-            self <<= 8
-            self |= Self(bytes[i])
-        }
-    }
 }
 
 extension RawUnsignedInteger {
@@ -251,125 +128,13 @@ extension RawUnsignedInteger {
     }
 }
 
-// MARK: Arithmetic
-
-extension Value {
-    var abs: Value {
-        switch self {
-        case let .f32(rawValue): return .f32(Swift.abs(Float32(bitPattern: rawValue)).bitPattern)
-        case let .f64(rawValue): return .f64(Swift.abs(Float64(bitPattern: rawValue)).bitPattern)
-        default: fatalError("Invalid type \(type) for `Value.\(#function)` implementation")
-        }
-    }
-
-    var isZero: Bool {
-        switch self {
-        case let .i32(rawValue): return rawValue == 0
-        case let .i64(rawValue): return rawValue == 0
-        case let .f32(rawValue): return Float32(bitPattern: rawValue).isZero
-        case let .f64(rawValue): return Float64(bitPattern: rawValue).isZero
-        case .ref(.extern), .ref(.function):
-            fatalError("Invalid type \(type) for `Value.\(#function)` implementation")
-        }
-    }
-
-    var isNegative: Bool {
-        switch self {
-        case let .i32(rawValue): return rawValue.signum() < 0
-        case let .i64(rawValue): return rawValue.signum() < 0
-        case let .f32(rawValue): return Float32(bitPattern: rawValue).sign == .minus
-        case let .f64(rawValue): return Float64(bitPattern: rawValue).sign == .minus
-        case .ref(.extern), .ref(.function):
-            fatalError("Invalid type \(type) for `Value.\(#function)` implementation")
-        }
-    }
-
-    var isNan: Bool {
-        switch self {
-        case let .f32(rawValue): return Float32(bitPattern: rawValue).isNaN
-        case let .f64(rawValue): return Float64(bitPattern: rawValue).isNaN
-        default:
-            fatalError("Invalid type \(type) for `Value.\(#function)` implementation")
-        }
-    }
-
-    static func copySign(_ lhs: Self, _ rhs: Self) -> Self {
-        switch (lhs, rhs) {
-        case let (.f32(lhs), .f32(rhs)):
-            let lhs = Float32(bitPattern: lhs)
-            let rhs = Float32(bitPattern: rhs)
-            return .f32(lhs.sign == rhs.sign ? lhs.bitPattern : (-lhs).bitPattern)
-        case let (.f64(lhs), .f64(rhs)):
-            let lhs = Float64(bitPattern: lhs)
-            let rhs = Float64(bitPattern: rhs)
-            return .f64(lhs.sign == rhs.sign ? lhs.bitPattern : (-lhs).bitPattern)
-        default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value.\(#function)` implementation")
-        }
-    }
-
-    static func divisionSigned(_ lhs: Self, _ rhs: Self) throws -> Self {
-        switch (lhs, rhs) {
-        case let (.i32(lhs), .i32(rhs)):
-            let (signed, overflow) = lhs.signed.dividedReportingOverflow(by: rhs.signed)
-            guard !overflow else { throw Trap.integerOverflowed }
-            return .i32(signed.unsigned)
-        case let (.i64(lhs), .i64(rhs)):
-            let (signed, overflow) = lhs.signed.dividedReportingOverflow(by: rhs.signed)
-            guard !overflow else { throw Trap.integerOverflowed }
-            return .i64(signed.unsigned)
-        default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value.\(#function)` implementation")
-        }
-    }
-
-    static func divisionUnsigned(_ lhs: Self, _ rhs: Self) throws -> Self {
-        switch (lhs, rhs) {
-        case let (.i32(lhs), .i32(rhs)):
-            let (signed, overflow) = lhs.dividedReportingOverflow(by: rhs)
-            guard !overflow else { throw Trap.integerOverflowed }
-            return .i32(signed)
-        case let (.i64(lhs), .i64(rhs)):
-            let (signed, overflow) = lhs.dividedReportingOverflow(by: rhs)
-            guard !overflow else { throw Trap.integerOverflowed }
-            return .i64(signed)
-        default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value.\(#function)` implementation")
-        }
-    }
-
-    static func remainderSigned(_ lhs: Self, _ rhs: Self) throws -> Self {
-        switch (lhs, rhs) {
-        case let (.i32(lhs), .i32(rhs)):
-            let (signed, overflow) = lhs.signed.remainderReportingOverflow(dividingBy: rhs.signed)
-            guard !overflow else { return .i32(0) }
-            return .i32(signed.unsigned)
-        case let (.i64(lhs), .i64(rhs)):
-            let (signed, overflow) = lhs.signed.remainderReportingOverflow(dividingBy: rhs.signed)
-            guard !overflow else { return .i64(0) }
-            return .i64(signed.unsigned)
-        default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value.\(#function)` implementation")
-        }
-    }
-
-    static func remainderUnsigned(_ lhs: Self, _ rhs: Self) throws -> Self {
-        switch (lhs, rhs) {
-        case let (.i32(lhs), .i32(rhs)):
-            let (signed, overflow) = lhs.remainderReportingOverflow(dividingBy: rhs)
-            guard !overflow else { throw Trap.integerOverflowed }
-            return .i32(signed)
-        case let (.i64(lhs), .i64(rhs)):
-            let (signed, overflow) = lhs.remainderReportingOverflow(dividingBy: rhs)
-            guard !overflow else { throw Trap.integerOverflowed }
-            return .i64(signed)
-        default: fatalError("Invalid types \(lhs.type) and \(rhs.type) for `Value.\(#function)` implementation")
-        }
-    }
-}
-
 extension ValueType {
     static func addressType(isMemory64: Bool) -> ValueType {
         return isMemory64 ? .i64 : .i32
     }
 }
 
+// MARK: Arithmetic
 
 extension FixedWidthInteger {
     func add(_ other: Self) -> Self { self &+ other }
