@@ -15,6 +15,20 @@ extension InstructionImmediate {
             emitSlot(buildCodeSlot(self))
         }
     }
+    static func emit<Parent>(to emitParent: @escaping ((Parent) -> CodeSlot) -> Void, _ child: KeyPath<Parent, Self>) {
+        Self.emit { emitChild in
+            emitParent { emitChild($0[keyPath: child]) }
+        }
+    }
+}
+
+extension VReg: InstructionImmediate {
+    static func load(from pc: inout Pc) -> Int16 {
+        VReg(bitPattern: UInt16(pc.read(UInt64.self)))
+    }
+    static func emit(to emitSlot: @escaping ((Self) -> CodeSlot) -> Void) {
+        emitSlot { CodeSlot(UInt16(bitPattern: $0)) }
+    }
 }
 
 extension LLVReg: InstructionImmediate {
@@ -60,12 +74,12 @@ extension Instruction {
         let result: LLVReg
         static func load(from pc: inout Pc) -> Self {
             let value = pc.read(UntypedValue.self)
-            let result = pc.read(LLVReg.self)
+            let result = LLVReg.load(from: &pc)
             return Self(value: value, result: result)
         }
-        static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+        static func emit(to emitSlot: @escaping ((Self) -> CodeSlot) -> Void) {
             emitSlot { $0.value.storage }
-            emitSlot { CodeSlot(bitPattern: $0.result) }
+            LLVReg.emit(to: emitSlot, \.result)
         }
     }
 
@@ -90,10 +104,25 @@ extension Instruction {
         let delta: VReg
     }
     
-    struct MemoryInitOperand: Equatable {
+    struct MemoryInitOperand: Equatable, InstructionImmediate {
+        let segmentIndex: UInt32
         let destOffset: VReg
         let sourceOffset: VReg
         let size: VReg
+
+        private typealias FirstSlot = (segmentIndex: UInt32, destOffset: VReg, sourceOffset: VReg)
+        static func load(from pc: inout Pc) -> Self {
+            let (segmentIndex, destOffset, sourceOffset) = pc.read(FirstSlot.self)
+            let size = VReg.load(from: &pc)
+            return Self(segmentIndex: segmentIndex, destOffset: destOffset, sourceOffset: sourceOffset, size: size)
+        }
+        static func emit(to emitSlot: @escaping ((Self) -> CodeSlot) -> Void) {
+            emitSlot {
+                let slot: FirstSlot = ($0.segmentIndex, $0.destOffset, $0.sourceOffset)
+                return unsafeBitCast(slot, to: UInt64.self)
+            }
+            VReg.emit(to: emitSlot, \.size)
+        }
     }
     
     struct MemoryCopyOperand: Equatable {
@@ -222,10 +251,10 @@ extension Instruction {
     struct CallLikeOperand: Equatable, InstructionImmediate {
         let spAddend: VReg
         static func load(from pc: inout Pc) -> Self {
-            return Self(spAddend: VReg(pc.read(UInt64.self)))
+            return Self(spAddend: VReg.load(from: &pc))
         }
         static func emit(to emitSlot: @escaping ((Self) -> CodeSlot) -> Void) {
-            emitSlot { UInt64($0.spAddend) }
+            VReg.emit(to: emitSlot, \.spAddend)
         }
     }
 
@@ -240,9 +269,7 @@ extension Instruction {
         }
         static func emit(to emitSlot: @escaping ((Self) -> CodeSlot) -> Void) {
             emitSlot { UInt64($0.callee.bitPattern) }
-            CallLikeOperand.emit { emitCallLike in
-                emitSlot { emitCallLike($0.callLike) }
-            }
+            CallLikeOperand.emit(to: emitSlot, \.callLike)
         }
     }
 

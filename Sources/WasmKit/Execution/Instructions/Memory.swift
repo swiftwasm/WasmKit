@@ -63,13 +63,11 @@ extension ExecutionState {
             sp[memoryGrowOperand.result] = UntypedValue(oldPageCount)
         }
     }
-    mutating func memoryInit(sp: Sp, pc: Pc, memoryInitOperand: Instruction.MemoryInitOperand) throws -> Pc {
-        var pc = pc
-        let segmentIndex = Int(pc.read(UInt64.self))
+    mutating func memoryInit(sp: Sp, memoryInitOperand: Instruction.MemoryInitOperand) throws {
         let instance = currentInstance
         let memory = instance.memories[0]
         try memory.withValue { memoryInstance in
-            let dataInstance = instance.dataSegments[segmentIndex]
+            let dataInstance = instance.dataSegments[Int(memoryInitOperand.segmentIndex)]
 
             let copyCounter = sp[memoryInitOperand.size].i32
             let sourceIndex = sp[memoryInitOperand.sourceOffset].i32
@@ -92,7 +90,6 @@ extension ExecutionState {
                     dataInstance.data[dataInstance.data.startIndex + Int(sourceIndex + i)]
             }
         }
-        return pc
     }
     mutating func memoryDataDrop(sp: Sp, dataIndex: DataIndex) {
         let segment = currentInstance.dataSegments[Int(dataIndex)]
