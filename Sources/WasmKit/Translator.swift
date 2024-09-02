@@ -1545,7 +1545,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         let is32Bit = type == .i32 || type == .f32
         if is32Bit {
             pushEmit(type, {
-                .const32(Instruction.Const32Operand(value: UInt32(value.storage), result: $0))
+                .const32(Instruction.Const32Operand(value: UInt32(value.storage), result: LVReg($0)))
             })
         } else {
             pushEmit(type, { .const64(Instruction.Const64Operand(result: $0)) })

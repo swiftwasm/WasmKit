@@ -244,7 +244,7 @@ enum VMGen {
         // Numeric
         Instruction(name: "const32", immediates: [
             Immediate(name: nil, type: "Instruction.Const32Operand")
-        ]),
+        ]).withRawOperand(),
         Instruction(name: "const64", hasData: true, immediates: [
             Immediate(name: nil, type: "Instruction.Const64Operand")
         ]),
