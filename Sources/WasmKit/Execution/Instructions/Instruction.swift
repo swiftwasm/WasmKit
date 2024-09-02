@@ -181,7 +181,7 @@ enum Instruction: Equatable {
     case f64Sqrt(Instruction.UnaryOperand)
     case f64PromoteF32(Instruction.UnaryOperand)
     case f32DemoteF64(Instruction.UnaryOperand)
-    case select
+    case select(Instruction.SelectOperand)
     case refNull(Instruction.RefNullOperand)
     case refIsNull(Instruction.RefIsNullOperand)
     case refFunc(Instruction.RefFuncOperand)
@@ -378,6 +378,7 @@ extension Instruction {
         case .f64Sqrt(let unaryOperand): return unaryOperand
         case .f64PromoteF32(let unaryOperand): return unaryOperand
         case .f32DemoteF64(let unaryOperand): return unaryOperand
+        case .select(let selectOperand): return selectOperand
         case .refNull(let refNullOperand): return refNullOperand
         case .refIsNull(let refIsNullOperand): return refIsNullOperand
         case .refFunc(let refFuncOperand): return refFuncOperand

@@ -6,8 +6,7 @@ extension ExecutionState {
         sp[const32Operand.result] = UntypedValue(storage32: const32Operand.value)
     }
     @inline(__always)
-    mutating func const64(sp: Sp, pc: Pc, const64Operand: Instruction.Const64Operand) -> Pc {
+    mutating func const64(sp: Sp, const64Operand: Instruction.Const64Operand) {
         sp[VReg(const64Operand.result)] = const64Operand.value
-        return pc
     }
 }

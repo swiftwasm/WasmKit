@@ -626,12 +626,6 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             }
         }
 
-        mutating func emitData<T>(_ data: T) {
-            let codeSlot = unsafeBitCast(data, to: UInt64.self)
-            trace("emitData: \(data) 0x\(String(codeSlot, radix: 16))")
-            emitSlot(codeSlot)
-        }
-
         mutating func putLabel() -> LabelRef {
             let ref = labels.count
             self.labels.append(.pinned(insertingPC))
@@ -1315,8 +1309,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
                 onTrue: ensureOnVReg(value2),
                 onFalse: ensureOnVReg(value1)
             )
-            emit(.select)
-            iseqBuilder.emitData(operand)
+            emit(.select(operand))
         }
     }
     mutating func visitTypedSelect(type: WasmParser.ValueType) throws -> Output {
@@ -1338,8 +1331,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
                 onTrue: ensureOnVReg(value2),
                 onFalse: ensureOnVReg(value1)
             )
-            emit(.select)
-            iseqBuilder.emitData(operand)
+            emit(.select(operand))
         }
     }
     mutating func visitLocalGet(localIndex: UInt32) throws -> Output {
@@ -1372,8 +1364,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             // Skip actual code emission if validation-only mode
             return
         }
-        emit(.globalGet(Instruction.GlobalGetOperand(result)))
-        iseqBuilder.emitData(global)
+        emit(.globalGet(Instruction.GlobalGetOperand(reg: LLVReg(result), global: global)))
     }
     mutating func visitGlobalSet(globalIndex: UInt32) throws -> Output {
         let type = try module.globalType(globalIndex)
@@ -1382,8 +1373,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             // Skip actual code emission if validation-only mode
             return
         }
-        emit(.globalSet(Instruction.GlobalSetOperand(value)))
-        iseqBuilder.emitData(global)
+        emit(.globalSet(Instruction.GlobalSetOperand(reg: LLVReg(value), global: global)))
     }
 
     private mutating func pushEmit(

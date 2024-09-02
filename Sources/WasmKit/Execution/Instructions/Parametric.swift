@@ -1,13 +1,10 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#parametric-instructions>
 extension ExecutionState {
-    mutating func select(sp: Sp, pc: Pc) -> Pc {
-        var pc = pc
-        let selectOperand = pc.read(Instruction.SelectOperand.self)
+    mutating func select(sp: Sp, selectOperand: Instruction.SelectOperand) {
         let flag = sp[selectOperand.condition].i32
         let selected = flag != 0 ? selectOperand.onTrue : selectOperand.onFalse
         let value = sp[selected]
         sp[selectOperand.result] = value
-        return pc
     }
 }

@@ -4,9 +4,7 @@ extension ExecutionState {
     func unreachable(sp: Sp, pc: Pc) throws -> Pc {
         throw Trap.unreachable
     }
-    mutating func nop(sp: Sp, pc: Pc) -> Pc {
-        return pc
-    }
+    mutating func nop(sp: Sp) {}
 
     mutating func br(sp: Sp, pc: Pc, offset: Int32) -> Pc {
         return pc.advancedPc(by: Int(offset))
@@ -38,11 +36,6 @@ extension ExecutionState {
 
     mutating func endOfExecution(sp: inout Sp, pc: Pc) throws -> Pc {
         throw EndOfExecution()
-    }
-
-    private mutating func endOfFunction(currentFrame: Frame, sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
-        // When reached at "end" of function
-        popFrame(sp: &sp, pc: &pc, md: &md, ms: &ms)
     }
 
     @inline(__always)

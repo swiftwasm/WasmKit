@@ -899,12 +899,12 @@ extension ExecutionState {
     @_silgen_name("wasmkit_execute_globalGet") @inline(__always)
     mutating func execute_globalGet(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
         let globalGetOperand = Instruction.GlobalGetOperand.load(from: &pc.pointee)
-        pc.pointee = self.globalGet(sp: sp.pointee, pc: pc.pointee, globalGetOperand: globalGetOperand)
+        self.globalGet(sp: sp.pointee, globalGetOperand: globalGetOperand)
     }
     @_silgen_name("wasmkit_execute_globalSet") @inline(__always)
     mutating func execute_globalSet(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
         let globalSetOperand = Instruction.GlobalSetOperand.load(from: &pc.pointee)
-        pc.pointee = self.globalSet(sp: sp.pointee, pc: pc.pointee, globalSetOperand: globalSetOperand)
+        self.globalSet(sp: sp.pointee, globalSetOperand: globalSetOperand)
     }
     @_silgen_name("wasmkit_execute_call") @inline(__always)
     mutating func execute_call(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
@@ -932,7 +932,7 @@ extension ExecutionState {
     }
     @_silgen_name("wasmkit_execute_nop") @inline(__always)
     mutating func execute_nop(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        pc.pointee = self.nop(sp: sp.pointee, pc: pc.pointee)
+        self.nop(sp: sp.pointee)
     }
     @_silgen_name("wasmkit_execute_br") @inline(__always)
     mutating func execute_br(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
@@ -1115,7 +1115,7 @@ extension ExecutionState {
     @_silgen_name("wasmkit_execute_const64") @inline(__always)
     mutating func execute_const64(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
         let const64Operand = Instruction.Const64Operand.load(from: &pc.pointee)
-        pc.pointee = self.const64(sp: sp.pointee, pc: pc.pointee, const64Operand: const64Operand)
+        self.const64(sp: sp.pointee, const64Operand: const64Operand)
     }
     @_silgen_name("wasmkit_execute_i32Add") @inline(__always)
     mutating func execute_i32Add(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
@@ -1799,7 +1799,8 @@ extension ExecutionState {
     }
     @_silgen_name("wasmkit_execute_select") @inline(__always)
     mutating func execute_select(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        pc.pointee = self.select(sp: sp.pointee, pc: pc.pointee)
+        let selectOperand = Instruction.SelectOperand.load(from: &pc.pointee)
+        self.select(sp: sp.pointee, selectOperand: selectOperand)
     }
     @_silgen_name("wasmkit_execute_refNull") @inline(__always)
     mutating func execute_refNull(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
@@ -1819,12 +1820,12 @@ extension ExecutionState {
     @_silgen_name("wasmkit_execute_tableGet") @inline(__always)
     mutating func execute_tableGet(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
         let tableGetOperand = Instruction.TableGetOperand.load(from: &pc.pointee)
-        pc.pointee = try self.tableGet(sp: sp.pointee, pc: pc.pointee, tableGetOperand: tableGetOperand)
+        try self.tableGet(sp: sp.pointee, tableGetOperand: tableGetOperand)
     }
     @_silgen_name("wasmkit_execute_tableSet") @inline(__always)
     mutating func execute_tableSet(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
         let tableSetOperand = Instruction.TableSetOperand.load(from: &pc.pointee)
-        pc.pointee = try self.tableSet(sp: sp.pointee, pc: pc.pointee, tableSetOperand: tableSetOperand)
+        try self.tableSet(sp: sp.pointee, tableSetOperand: tableSetOperand)
     }
     @_silgen_name("wasmkit_execute_tableSize") @inline(__always)
     mutating func execute_tableSize(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
@@ -1834,22 +1835,22 @@ extension ExecutionState {
     @_silgen_name("wasmkit_execute_tableGrow") @inline(__always)
     mutating func execute_tableGrow(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
         let tableGrowOperand = Instruction.TableGrowOperand.load(from: &pc.pointee)
-        pc.pointee = try self.tableGrow(sp: sp.pointee, pc: pc.pointee, tableGrowOperand: tableGrowOperand)
+        try self.tableGrow(sp: sp.pointee, tableGrowOperand: tableGrowOperand)
     }
     @_silgen_name("wasmkit_execute_tableFill") @inline(__always)
     mutating func execute_tableFill(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
         let tableFillOperand = Instruction.TableFillOperand.load(from: &pc.pointee)
-        pc.pointee = try self.tableFill(sp: sp.pointee, pc: pc.pointee, tableFillOperand: tableFillOperand)
+        try self.tableFill(sp: sp.pointee, tableFillOperand: tableFillOperand)
     }
     @_silgen_name("wasmkit_execute_tableCopy") @inline(__always)
     mutating func execute_tableCopy(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
         let tableCopyOperand = Instruction.TableCopyOperand.load(from: &pc.pointee)
-        pc.pointee = try self.tableCopy(sp: sp.pointee, pc: pc.pointee, tableCopyOperand: tableCopyOperand)
+        try self.tableCopy(sp: sp.pointee, tableCopyOperand: tableCopyOperand)
     }
     @_silgen_name("wasmkit_execute_tableInit") @inline(__always)
     mutating func execute_tableInit(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
         let tableInitOperand = Instruction.TableInitOperand.load(from: &pc.pointee)
-        pc.pointee = try self.tableInit(sp: sp.pointee, pc: pc.pointee, tableInitOperand: tableInitOperand)
+        try self.tableInit(sp: sp.pointee, tableInitOperand: tableInitOperand)
     }
     @_silgen_name("wasmkit_execute_tableElementDrop") @inline(__always)
     mutating func execute_tableElementDrop(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
