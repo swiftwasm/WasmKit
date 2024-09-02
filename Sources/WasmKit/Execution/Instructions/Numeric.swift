@@ -11,11 +11,6 @@ extension ExecutionState {
         return pc
     }
 
-    mutating func numericFloatUnary(sp: Sp, floatUnaryOperand: Instruction.FloatUnaryOperand) {
-        let value = sp[floatUnaryOperand.unary.input]
-        sp[floatUnaryOperand.unary.result] = UntypedValue(floatUnaryOperand.operation(value.cast(to: floatUnaryOperand.operation.type)))
-    }
-
     mutating func numericConversion(sp: Sp, conversionOperand: Instruction.ConversionOperand) throws {
         let value = sp[conversionOperand.unary.input]
         sp[conversionOperand.unary.result] = UntypedValue(try conversionOperand.operation(value))
@@ -25,53 +20,6 @@ extension ExecutionState {
 enum NumericInstruction {}
 
 /// Numeric Instructions
-extension NumericInstruction {
-    public enum FloatUnary: Equatable {
-        // funop
-        case abs(FloatValueType)
-        case neg(FloatValueType)
-        case ceil(FloatValueType)
-        case floor(FloatValueType)
-        case trunc(FloatValueType)
-        case nearest(FloatValueType)
-        case sqrt(FloatValueType)
-
-        var type: NumericType {
-            switch self {
-            case let .abs(type),
-                let .neg(type),
-                let .ceil(type),
-                let .floor(type),
-                let .trunc(type),
-                let .nearest(type),
-                let .sqrt(type):
-                return .float(type)
-            }
-        }
-
-        func callAsFunction(
-            _ value: Value
-        ) -> Value {
-            switch self {
-            case .abs:
-                return value.abs
-            case .neg:
-                return -value
-            case .ceil:
-                return value.ceil
-            case .floor:
-                return value.floor
-            case .trunc:
-                return value.truncate
-            case .nearest:
-                return value.nearest
-            case .sqrt:
-                return value.squareRoot
-            }
-        }
-    }
-}
-
 extension NumericInstruction {
     public enum Conversion: Equatable {
         case truncSaturatingSigned(IntValueType, FloatValueType)

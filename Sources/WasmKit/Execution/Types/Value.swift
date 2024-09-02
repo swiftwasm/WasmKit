@@ -293,90 +293,6 @@ extension Value {
         }
     }
 
-    var ceil: Value {
-        switch self {
-        case let .f32(rawValue):
-            var rawValue = Float32(bitPattern: rawValue)
-            rawValue.round(.up)
-            return .f32(rawValue.bitPattern)
-        case let .f64(rawValue):
-            var rawValue = Float64(bitPattern: rawValue)
-            rawValue.round(.up)
-            return .f64(rawValue.bitPattern)
-        default: fatalError("Invalid type \(type) for `Value.\(#function)` implementation")
-        }
-    }
-
-    var floor: Value {
-        switch self {
-        case let .f32(rawValue):
-            var rawValue = Float32(bitPattern: rawValue)
-            rawValue.round(.down)
-            return .f32(rawValue.bitPattern)
-        case let .f64(rawValue):
-            var rawValue = Float64(bitPattern: rawValue)
-            rawValue.round(.down)
-            return .f64(rawValue.bitPattern)
-        default: fatalError("Invalid type \(type) for `Value.\(#function)` implementation")
-        }
-    }
-
-    var truncate: Value {
-        switch self {
-        case let .f32(rawValue):
-            var rawValue = Float32(bitPattern: rawValue)
-            rawValue.round(.towardZero)
-            return .f32(rawValue.bitPattern)
-        case let .f64(rawValue):
-            var rawValue = Float64(bitPattern: rawValue)
-            rawValue.round(.towardZero)
-            return .f64(rawValue.bitPattern)
-        default: fatalError("Invalid type \(type) for `Value.\(#function)` implementation")
-        }
-    }
-
-    var nearest: Value {
-        switch self {
-        case let .f32(rawValue):
-            var rawValue = Float32(bitPattern: rawValue)
-            rawValue.round(.toNearestOrEven)
-            return .f32(rawValue.bitPattern)
-        case let .f64(rawValue):
-            var rawValue = Float64(bitPattern: rawValue)
-            rawValue.round(.toNearestOrEven)
-            return .f64(rawValue.bitPattern)
-        default: fatalError("Invalid type \(type) for `Value.\(#function)` implementation")
-        }
-    }
-
-    var squareRoot: Value {
-        switch self {
-        case let .f32(rawValue): return .f32(Float32(bitPattern: rawValue).squareRoot().bitPattern)
-        case let .f64(rawValue): return .f64(Float64(bitPattern: rawValue).squareRoot().bitPattern)
-        default: fatalError("Invalid type \(type) for `Value.\(#function)` implementation")
-        }
-    }
-
-    static prefix func - (_ value: Self) -> Self {
-        switch value {
-        case let .f32(rawValue):
-            let sign = rawValue & (1 << 31)
-            if sign != 0 {
-                return .f32(rawValue & ~(1 << 31))
-            } else {
-                return .f32(rawValue | (1 << 31))
-            }
-        case let .f64(rawValue):
-            let sign = rawValue & (1 << 63)
-            if sign != 0 {
-                return .f64(rawValue & ~(1 << 63))
-            } else {
-                return .f64(rawValue | (1 << 63))
-            }
-        default: fatalError("Invalid type \(value.type) for prefix `Value.-` implementation")
-        }
-    }
-
     static func copySign(_ lhs: Self, _ rhs: Self) -> Self {
         switch (lhs, rhs) {
         case let (.f32(lhs), .f32(rhs)):
@@ -594,6 +510,14 @@ extension FloatingPoint {
     func gt(_ other: Self) -> UInt32 { self > other ? 1 : 0 }
     func le(_ other: Self) -> UInt32 { self <= other ? 1 : 0 }
     func ge(_ other: Self) -> UInt32 { self >= other ? 1 : 0 }
+
+    var abs: Self { Swift.abs(self) }
+    var neg: Self { -self }
+    var ceil: Self { self.rounded(.up) }
+    var floor: Self { self.rounded(.down) }
+    var trunc: Self { self.rounded(.towardZero) }
+    var nearest: Self { self.rounded(.toNearestOrEven) }
+    var sqrt: Self { self.squareRoot() }
 }
 
 extension FloatingPoint {

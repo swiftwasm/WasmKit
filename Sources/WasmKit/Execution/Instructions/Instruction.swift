@@ -46,7 +46,6 @@ enum Instruction: Equatable {
     case memoryFill(Instruction.MemoryFillOperand)
     case const32(Instruction.Const32Operand)
     case const64(Instruction.Const64Operand)
-    case numericFloatUnary(Instruction.FloatUnaryOperand)
     case numericConversion(Instruction.ConversionOperand)
     case i32Add(Instruction.BinaryOperand)
     case i64Add(Instruction.BinaryOperand)
@@ -148,6 +147,20 @@ enum Instruction: Equatable {
     case f64Le(Instruction.BinaryOperand)
     case f32Ge(Instruction.BinaryOperand)
     case f64Ge(Instruction.BinaryOperand)
+    case f32Abs(Instruction.UnaryOperand)
+    case f64Abs(Instruction.UnaryOperand)
+    case f32Neg(Instruction.UnaryOperand)
+    case f64Neg(Instruction.UnaryOperand)
+    case f32Ceil(Instruction.UnaryOperand)
+    case f64Ceil(Instruction.UnaryOperand)
+    case f32Floor(Instruction.UnaryOperand)
+    case f64Floor(Instruction.UnaryOperand)
+    case f32Trunc(Instruction.UnaryOperand)
+    case f64Trunc(Instruction.UnaryOperand)
+    case f32Nearest(Instruction.UnaryOperand)
+    case f64Nearest(Instruction.UnaryOperand)
+    case f32Sqrt(Instruction.UnaryOperand)
+    case f64Sqrt(Instruction.UnaryOperand)
     case select
     case refNull(Instruction.RefNullOperand)
     case refIsNull(Instruction.RefIsNullOperand)
@@ -214,7 +227,6 @@ extension Instruction {
         case .memoryFill: return true
         case .const32: return true
         case .const64: return true
-        case .numericFloatUnary: return true
         case .numericConversion: return true
         case .i32Add: return true
         case .i64Add: return true
@@ -316,6 +328,20 @@ extension Instruction {
         case .f64Le: return true
         case .f32Ge: return true
         case .f64Ge: return true
+        case .f32Abs: return true
+        case .f64Abs: return true
+        case .f32Neg: return true
+        case .f64Neg: return true
+        case .f32Ceil: return true
+        case .f64Ceil: return true
+        case .f32Floor: return true
+        case .f64Floor: return true
+        case .f32Trunc: return true
+        case .f64Trunc: return true
+        case .f32Nearest: return true
+        case .f64Nearest: return true
+        case .f32Sqrt: return true
+        case .f64Sqrt: return true
         case .select: return false
         case .refNull: return true
         case .refIsNull: return true
@@ -398,7 +424,6 @@ extension Instruction {
         case memoryDataDrop(DataIndex)
         case memoryCopy(Instruction.MemoryCopyOperand)
         case memoryFill(Instruction.MemoryFillOperand)
-        case numericFloatUnary(Instruction.FloatUnaryOperand)
         case numericConversion(Instruction.ConversionOperand)
         case i32Add(Instruction.BinaryOperand)
         case i64Add(Instruction.BinaryOperand)
@@ -500,6 +525,20 @@ extension Instruction {
         case f64Le(Instruction.BinaryOperand)
         case f32Ge(Instruction.BinaryOperand)
         case f64Ge(Instruction.BinaryOperand)
+        case f32Abs(Instruction.UnaryOperand)
+        case f64Abs(Instruction.UnaryOperand)
+        case f32Neg(Instruction.UnaryOperand)
+        case f64Neg(Instruction.UnaryOperand)
+        case f32Ceil(Instruction.UnaryOperand)
+        case f64Ceil(Instruction.UnaryOperand)
+        case f32Floor(Instruction.UnaryOperand)
+        case f64Floor(Instruction.UnaryOperand)
+        case f32Trunc(Instruction.UnaryOperand)
+        case f64Trunc(Instruction.UnaryOperand)
+        case f32Nearest(Instruction.UnaryOperand)
+        case f64Nearest(Instruction.UnaryOperand)
+        case f32Sqrt(Instruction.UnaryOperand)
+        case f64Sqrt(Instruction.UnaryOperand)
         case refNull(Instruction.RefNullOperand)
         case refIsNull(Instruction.RefIsNullOperand)
         case refFunc(Instruction.RefFuncOperand)
@@ -555,7 +594,6 @@ extension Instruction {
         case let .memoryDataDrop(dataIndex): return .memoryDataDrop(dataIndex)
         case let .memoryCopy(memoryCopyOperand): return .memoryCopy(memoryCopyOperand)
         case let .memoryFill(memoryFillOperand): return .memoryFill(memoryFillOperand)
-        case let .numericFloatUnary(floatUnaryOperand): return .numericFloatUnary(floatUnaryOperand)
         case let .numericConversion(conversionOperand): return .numericConversion(conversionOperand)
         case let .i32Add(binaryOperand): return .i32Add(binaryOperand)
         case let .i64Add(binaryOperand): return .i64Add(binaryOperand)
@@ -657,6 +695,20 @@ extension Instruction {
         case let .f64Le(binaryOperand): return .f64Le(binaryOperand)
         case let .f32Ge(binaryOperand): return .f32Ge(binaryOperand)
         case let .f64Ge(binaryOperand): return .f64Ge(binaryOperand)
+        case let .f32Abs(unaryOperand): return .f32Abs(unaryOperand)
+        case let .f64Abs(unaryOperand): return .f64Abs(unaryOperand)
+        case let .f32Neg(unaryOperand): return .f32Neg(unaryOperand)
+        case let .f64Neg(unaryOperand): return .f64Neg(unaryOperand)
+        case let .f32Ceil(unaryOperand): return .f32Ceil(unaryOperand)
+        case let .f64Ceil(unaryOperand): return .f64Ceil(unaryOperand)
+        case let .f32Floor(unaryOperand): return .f32Floor(unaryOperand)
+        case let .f64Floor(unaryOperand): return .f64Floor(unaryOperand)
+        case let .f32Trunc(unaryOperand): return .f32Trunc(unaryOperand)
+        case let .f64Trunc(unaryOperand): return .f64Trunc(unaryOperand)
+        case let .f32Nearest(unaryOperand): return .f32Nearest(unaryOperand)
+        case let .f64Nearest(unaryOperand): return .f64Nearest(unaryOperand)
+        case let .f32Sqrt(unaryOperand): return .f32Sqrt(unaryOperand)
+        case let .f64Sqrt(unaryOperand): return .f64Sqrt(unaryOperand)
         case let .refNull(refNullOperand): return .refNull(refNullOperand)
         case let .refIsNull(refIsNullOperand): return .refIsNull(refIsNullOperand)
         case let .refFunc(refFuncOperand): return .refFunc(refFuncOperand)
