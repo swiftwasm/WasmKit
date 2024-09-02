@@ -238,6 +238,16 @@ enum VMGen {
     }
     static let floatBinOps: [BinOpInfo] = buildFloatBinOps()
 
+    static func buildFloatUnaryOps() -> [UnOpInfo] {
+        var results: [UnOpInfo] = []
+        // (T) -> T for all T in float types
+        results += ["Abs", "Neg", "Ceil", "Floor", "Trunc", "Nearest", "Sqrt"].flatMap { op -> [UnOpInfo] in
+            floatValueTypes.map { UnOpInfo(op: op, name: "\($0)\(op)", inputType: $0, resultType: $0) }
+        }
+        return results
+    }
+    static let floatUnaryOps: [UnOpInfo] = buildFloatUnaryOps()
+
     // MARK: - Minor numeric instructions
 
     static let numericOtherInsts: [Instruction] = [
@@ -248,9 +258,6 @@ enum VMGen {
         Instruction(name: "const64", hasData: true, immediates: [
             Immediate(name: nil, type: "Instruction.Const64Operand")
         ]).withRawOperand(),
-        Instruction(name: "numericFloatUnary", immediates: [
-            Immediate(name: nil, type: "Instruction.FloatUnaryOperand"),
-        ]),
         Instruction(name: "numericConversion", mayThrow: true, immediates: [
             Immediate(name: nil, type: "Instruction.ConversionOperand"),
         ]),
@@ -408,6 +415,7 @@ enum VMGen {
         instructions += intBinOps.map(\.instruction)
         instructions += intUnaryInsts.map(\.instruction)
         instructions += floatBinOps.map(\.instruction)
+        instructions += floatUnaryOps.map(\.instruction)
         instructions += miscInsts
         return instructions
     }
@@ -462,7 +470,7 @@ enum VMGen {
                 }
             """
         }
-        for op in intUnaryInsts {
+        for op in intUnaryInsts + floatUnaryOps {
             output += """
 
                 mutating \(instMethodDecl(op.instruction)) {

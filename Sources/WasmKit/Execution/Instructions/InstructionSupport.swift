@@ -54,8 +54,7 @@ extension Instruction {
         let result: VReg
         let input: VReg
     }
-    
-    /// size = 6, alignment = 4
+
     struct Const32Operand: Equatable, InstructionImmediate {
         let value: UInt32
         let result: LVReg
@@ -66,7 +65,7 @@ extension Instruction {
             emitSlot { unsafeBitCast($0, to: CodeSlot.self) }
         }
     }
-    /// size = 2, alignment = 2
+
     struct Const64Operand: Equatable, InstructionImmediate {
         let value: UntypedValue
         let result: LLVReg
@@ -79,11 +78,6 @@ extension Instruction {
             emitSlot { $0.value.storage }
             emitSlot { CodeSlot(bitPattern: $0.result) }
         }
-    }
-
-    struct FloatUnaryOperand: Equatable {
-        let operation: NumericInstruction.FloatUnary
-        let unary: UnaryOperand
     }
 
     struct ConversionOperand: Equatable {
@@ -242,30 +236,10 @@ extension Instruction {
 
     typealias OnEnterOperand = FunctionIndex
     typealias OnExitOperand = FunctionIndex
-    
 
-    static func numericFloatUnary(_ op: NumericInstruction.FloatUnary, _ unary: Instruction.UnaryOperand) -> Instruction {
-        .numericFloatUnary(FloatUnaryOperand(operation: op, unary: unary))
-    }
     static func numericConversion(_ op: NumericInstruction.Conversion, _ unary: Instruction.UnaryOperand) -> Instruction {
         .numericConversion(ConversionOperand(operation: op, unary: unary))
     }
-
-    static func f32Abs(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.abs(.f32), op) }
-    static func f32Neg(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.neg(.f32), op) }
-    static func f32Ceil(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.ceil(.f32), op) }
-    static func f32Floor(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.floor(.f32), op) }
-    static func f32Trunc(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.trunc(.f32), op) }
-    static func f32Nearest(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.nearest(.f32), op) }
-    static func f32Sqrt(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.sqrt(.f32), op) }
-
-    static func f64Abs(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.abs(.f64), op) }
-    static func f64Neg(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.neg(.f64), op) }
-    static func f64Ceil(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.ceil(.f64), op) }
-    static func f64Floor(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.floor(.f64), op) }
-    static func f64Trunc(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.trunc(.f64), op) }
-    static func f64Nearest(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.nearest(.f64), op) }
-    static func f64Sqrt(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.sqrt(.f64), op) }
 
     static func f32ConvertI32S(_ op: UnaryOperand) -> Instruction { .numericConversion(.convertSigned(.f32, .i32), op) }
     static func f32ConvertI32U(_ op: UnaryOperand) -> Instruction { .numericConversion(.convertUnsigned(.f32, .i32), op) }
