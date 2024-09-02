@@ -140,10 +140,8 @@ extension ExecutionState {
     @inline(__always)
     mutating func callIndirect(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, callIndirectOperand: Instruction.CallIndirectOperand) throws -> Pc {
         var pc = pc
-        let tableIndex = TableIndex(pc.read(UInt64.self))
-        let expectedType = InternedFuncType(id: UInt32((pc.read(UInt64.self))))
         let (function, callerInstance) = try prepareForIndirectCall(
-            sp: sp, tableIndex: tableIndex, expectedType: expectedType,
+            sp: sp, tableIndex: callIndirectOperand.tableIndex, expectedType: callIndirectOperand.type,
             callIndirectOperand: callIndirectOperand
         )
         (pc, sp) = try invoke(
