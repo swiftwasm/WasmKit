@@ -293,7 +293,7 @@ extension InternalFunction {
 }
 
 extension Sp {
-    subscript(_ index: VReg) -> UntypedValue {
+    subscript<R: FixedWidthInteger>(_ index: R) -> UntypedValue {
         get {
             return self[Int(index)]
         }
@@ -301,60 +301,27 @@ extension Sp {
             return self[Int(index)] = newValue
         }
     }
-    private func read<T: FixedWidthInteger>(_ index: VReg) -> T {
+    private func read<T: FixedWidthInteger, R: FixedWidthInteger>(_ index: R) -> T {
         return self.advanced(by: Int(index)).withMemoryRebound(to: T.self, capacity: 1) {
             $0.pointee
         }
     }
-    private func write(_ index: VReg, _ value: UntypedValue) {
-        self[index] = value
-    }
-    subscript(i32 index: VReg) -> UInt32 {
-        get { return read(index) }
-        nonmutating set { write(index, .i32(newValue)) }
-    }
-    subscript(i64 index: VReg) -> UInt64 {
-        get { return read(index) }
-        nonmutating set { write(index, .i64(newValue)) }
-    }
-    subscript(f32 index: VReg) -> Float32 {
-        get { return Float32(bitPattern: read(index)) }
-        nonmutating set { write(index, .f32(newValue)) }
-    }
-    subscript(f64 index: VReg) -> Float64 {
-        get { return Float64(bitPattern: read(index)) }
-        nonmutating set { write(index, .f64(newValue)) }
-    }
-
-    subscript(_ index: Int32) -> UntypedValue {
-        get {
-            return self[Int(index)]
-        }
-        nonmutating set {
-            return self[Int(index)] = newValue
-        }
-    }
-    private func read<T: FixedWidthInteger>(_ index: Int32) -> T {
-        return self.advanced(by: Int(index)).withMemoryRebound(to: T.self, capacity: 1) {
-            $0.pointee
-        }
-    }
-    private func write(_ index: Int32, _ value: UntypedValue) {
+    private func write<R: FixedWidthInteger>(_ index: R, _ value: UntypedValue) {
         self[Int(index)] = value
     }
-    subscript(i32 index: Int32) -> UInt32 {
+    subscript<R: FixedWidthInteger>(i32 index: R) -> UInt32 {
         get { return read(index) }
         nonmutating set { write(index, .i32(newValue)) }
     }
-    subscript(i64 index: Int32) -> UInt64 {
+    subscript<R: FixedWidthInteger>(i64 index: R) -> UInt64 {
         get { return read(index) }
         nonmutating set { write(index, .i64(newValue)) }
     }
-    subscript(f32 index: Int32) -> Float32 {
+    subscript<R: FixedWidthInteger>(f32 index: R) -> Float32 {
         get { return Float32(bitPattern: read(index)) }
         nonmutating set { write(index, .f32(newValue)) }
     }
-    subscript(f64 index: Int32) -> Float64 {
+    subscript<R: FixedWidthInteger>(f64 index: R) -> Float64 {
         get { return Float64(bitPattern: read(index)) }
         nonmutating set { write(index, .f64(newValue)) }
     }

@@ -247,7 +247,7 @@ enum VMGen {
         ]).withRawOperand(),
         Instruction(name: "const64", hasData: true, immediates: [
             Immediate(name: nil, type: "Instruction.Const64Operand")
-        ]),
+        ]).withRawOperand(),
         Instruction(name: "numericFloatUnary", immediates: [
             Immediate(name: nil, type: "Instruction.FloatUnaryOperand"),
         ]),
