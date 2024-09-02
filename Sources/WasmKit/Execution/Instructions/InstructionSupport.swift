@@ -22,6 +22,16 @@ extension InstructionImmediate {
     }
 }
 
+extension InstructionImmediate {
+    static func load(from pc: inout Pc) -> Self {
+        pc.read()
+    }
+    static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+        assert(MemoryLayout<Self>.size == 8)
+        emitSlot { unsafeBitCast($0, to: CodeSlot.self) }
+    }
+}
+
 extension VReg: InstructionImmediate {
     static func load(from pc: inout Pc) -> Self {
         VReg(bitPattern: UInt16(pc.read(UInt64.self)))
@@ -52,12 +62,21 @@ extension LLVReg: InstructionImmediate {
     }
 }
 
-extension FunctionIndex: InstructionImmediate {
+extension UInt32: InstructionImmediate {
     static func load(from pc: inout Pc) -> Self {
-        FunctionIndex(pc.read(UInt64.self))
+        UInt32(pc.read(UInt64.self))
     }
     static func emit(to emitSlot: @escaping ((Self) -> CodeSlot) -> Void) {
         emitSlot { CodeSlot($0) }
+    }
+}
+
+extension Int32: InstructionImmediate {
+    static func load(from pc: inout Pc) -> Self {
+        Int32(bitPattern: UInt32(pc.read(UInt64.self)))
+    }
+    static func emit(to emitSlot: @escaping ((Self) -> CodeSlot) -> Void) {
+        emitSlot { CodeSlot(UInt32(bitPattern: $0)) }
     }
 }
 
@@ -90,12 +109,6 @@ extension Instruction {
     struct Const32Operand: Equatable, InstructionImmediate {
         let value: UInt32
         let result: LVReg
-        static func load(from pc: inout Pc) -> Self {
-            pc.read()
-        }
-        static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { unsafeBitCast($0, to: CodeSlot.self) }
-        }
     }
 
     struct Const64Operand: Equatable, InstructionImmediate {
@@ -149,14 +162,15 @@ extension Instruction {
         }
     }
     
-    struct MemorySizeOperand: Equatable {
+    struct MemorySizeOperand: Equatable, InstructionImmediate {
         let memoryIndex: MemoryIndex
-        let result: VReg
+        let result: LVReg
     }
     
-    struct MemoryGrowOperand: Equatable {
+    struct MemoryGrowOperand: Equatable, InstructionImmediate {
         let result: VReg
         let delta: VReg
+        let memory: MemoryIndex
     }
     
     struct MemoryInitOperand: Equatable, InstructionImmediate {
@@ -180,77 +194,173 @@ extension Instruction {
         }
     }
     
-    struct MemoryCopyOperand: Equatable {
+    struct MemoryCopyOperand: Equatable, InstructionImmediate {
         let destOffset: VReg
         let sourceOffset: VReg
-        let size: VReg
+        let size: LVReg
     }
     
-    struct MemoryFillOperand: Equatable {
+    struct MemoryFillOperand: Equatable, InstructionImmediate {
         let destOffset: VReg
         let value: VReg
-        let size: VReg
+        let size: LVReg
     }
     
-    struct SelectOperand: Equatable {
+    struct SelectOperand: Equatable, InstructionImmediate {
         let result: VReg
         let condition: VReg
         let onTrue: VReg
         let onFalse: VReg
     }
     
-    struct RefNullOperand: Equatable {
+    struct RefNullOperand: Equatable, InstructionImmediate {
         let type: ReferenceType
         let result: VReg
+
+        private typealias Slot = (ReferenceType, VReg, UInt32)
+        static func load(from pc: inout Pc) -> Self {
+            let (type, result, _) = pc.read(Slot.self)
+            return Self(type: type, result: result)
+        }
+        static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot {
+                let slot: Slot = ($0.type, $0.result, 0)
+                return unsafeBitCast(slot, to: CodeSlot.self)
+            }
+        }
     }
     
-    struct RefIsNullOperand: Equatable {
-        let value: VReg
-        let result: VReg
+    struct RefIsNullOperand: Equatable, InstructionImmediate {
+        let value: LVReg
+        let result: LVReg
     }
     
-    struct RefFuncOperand: Equatable {
+    struct RefFuncOperand: Equatable, InstructionImmediate {
         let index: FunctionIndex
-        let result: VReg
+        let result: LVReg
     }
     
-    struct TableGetOperand: Equatable {
+    struct TableGetOperand: Equatable, InstructionImmediate {
         let index: VReg
         let result: VReg
+        let tableIndex: UInt32
     }
     
-    struct TableSetOperand: Equatable {
+    struct TableSetOperand: Equatable, InstructionImmediate {
         let index: VReg
         let value: VReg
+        let tableIndex: UInt32
     }
     
-    struct TableSizeOperand: Equatable {
+    struct TableSizeOperand: Equatable, InstructionImmediate {
         let tableIndex: TableIndex
-        let result: VReg
+        let result: LVReg
     }
     
-    struct TableGrowOperand: Equatable {
+    struct TableGrowOperand: Equatable, InstructionImmediate {
+        let tableIndex: UInt32
         let result: VReg
         let delta: VReg
         let value: VReg
+
+        private typealias Slot1 = (UInt32, VReg, VReg)
+        private typealias Slot2 = (VReg, pad1: UInt16, pad2: UInt32)
+
+        static func load(from pc: inout Pc) -> Self {
+            let (tableIndex, result, delta) = pc.read(Slot1.self)
+            let (value, _, _) = pc.read(Slot2.self)
+            return Self(tableIndex: tableIndex, result: result, delta: delta, value: value)
+        }
+        static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot {
+                let slot: Slot1 = ($0.tableIndex, $0.result, $0.delta)
+                return unsafeBitCast(slot, to: CodeSlot.self)
+            }
+            emitSlot {
+                let slot: Slot2 = ($0.value, 0, 0)
+                return unsafeBitCast(slot, to: CodeSlot.self)
+            }
+        }
     }
-    
-    struct TableFillOperand: Equatable {
+
+    struct TableFillOperand: Equatable, InstructionImmediate {
+        let tableIndex: UInt32
         let destOffset: VReg
         let value: VReg
         let size: VReg
+
+        private typealias Slot1 = (UInt32, VReg, VReg)
+        private typealias Slot2 = (VReg, pad1: UInt16, pad2: UInt32)
+
+        static func load(from pc: inout Pc) -> Self {
+            let (tableIndex, destOffset, value) = pc.read(Slot1.self)
+            let (size, _, _) = pc.read(Slot2.self)
+            return Self(tableIndex: tableIndex, destOffset: destOffset, value: value, size: size)
+        }
+        static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot {
+                let slot: Slot1 = ($0.tableIndex, $0.destOffset, $0.value)
+                return unsafeBitCast(slot, to: CodeSlot.self)
+            }
+            emitSlot {
+                let slot: Slot2 = ($0.size, 0, 0)
+                return unsafeBitCast(slot, to: CodeSlot.self)
+            }
+        }
     }
     
-    struct TableCopyOperand: Equatable {
-        let sourceOffset: VReg
+    struct TableCopyOperand: Equatable, InstructionImmediate {
+        let sourceIndex: UInt32
+        let destIndex: UInt32
         let destOffset: VReg
+        let sourceOffset: VReg
         let size: VReg
+        
+        private typealias Slot1 = (UInt32, UInt32)
+        private typealias Slot2 = (VReg, VReg, VReg, pad: UInt16)
+
+        static func load(from pc: inout Pc) -> Self {
+            let (sourceIndex, destIndex) = pc.read(Slot1.self)
+            let (destOffset, sourceOffset, size, _) = pc.read(Slot2.self)
+            return Self(sourceIndex: sourceIndex, destIndex: destIndex, destOffset: destOffset, sourceOffset: sourceOffset, size: size)
+        }
+        static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot {
+                let slot: Slot1 = ($0.sourceIndex, $0.destIndex)
+                return unsafeBitCast(slot, to: CodeSlot.self)
+            }
+            emitSlot {
+                let slot: Slot2 = ($0.destOffset, $0.sourceOffset, $0.size, 0)
+                return unsafeBitCast(slot, to: CodeSlot.self)
+            }
+        }
     }
     
-    struct TableInitOperand: Equatable {
+    struct TableInitOperand: Equatable, InstructionImmediate {
+        let tableIndex: UInt32
+        let segmentIndex: UInt32
         let destOffset: VReg
         let sourceOffset: VReg
         let size: VReg
+
+        private typealias Slot1 = (UInt32, UInt32)
+        private typealias Slot2 = (VReg, VReg, VReg, pad: UInt16)
+
+        static func load(from pc: inout Pc) -> Self {
+            let (tableIndex, segmentIndex) = pc.read(Slot1.self)
+            let (destOffset, sourceOffset, size, _) = pc.read(Slot2.self)
+            return Self(tableIndex: tableIndex, segmentIndex: segmentIndex, destOffset: destOffset, sourceOffset: sourceOffset, size: size)
+        }
+        static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot {
+                let slot: Slot1 = ($0.tableIndex, $0.segmentIndex)
+                return unsafeBitCast(slot, to: CodeSlot.self)
+            }
+            emitSlot {
+                let slot: Slot2 = ($0.destOffset, $0.sourceOffset, $0.size, 0)
+                return unsafeBitCast(slot, to: CodeSlot.self)
+            }
+        }
     }
 
     typealias GlobalGetOperand = LLVReg
@@ -367,30 +477,6 @@ extension Instruction {
 
     typealias OnEnterOperand = FunctionIndex
     typealias OnExitOperand = FunctionIndex
-}
-
-extension Instruction {
-    var rawValue: UInt64 {
-        assert(_isPOD(Instruction.self))
-        typealias RawInstruction = (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
-        let raw = unsafeBitCast(self.tagged, to: RawInstruction.self)
-        let slotData: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (
-            raw.0, raw.1, raw.2, raw.3, raw.4, raw.5, raw.6, 0
-        )
-        return unsafeBitCast(slotData, to: UInt64.self)
-    }
-}
-
-extension Instruction.Tagged {
-    init(rawValue: UInt64) {
-        assert(_isPOD(Instruction.Tagged.self))
-        typealias RawBytes = (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
-        let raw = unsafeBitCast(rawValue, to: RawBytes.self)
-        let rawInst: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (
-            raw.0, raw.1, raw.2, raw.3, raw.4, raw.5, raw.6
-        )
-        self = unsafeBitCast(rawInst, to: Instruction.Tagged.self)
-    }
 }
 
 struct InstructionPrintingContext {

@@ -198,391 +198,7 @@ enum Instruction: Equatable {
 }
 
 extension Instruction {
-    var hasImmediate: Bool {
-        switch self {
-        case .copyStack: return true
-        case .globalGet: return true
-        case .globalSet: return true
-        case .call: return true
-        case .compilingCall: return true
-        case .internalCall: return true
-        case .callIndirect: return true
-        case .unreachable: return false
-        case .nop: return false
-        case .br: return true
-        case .brIf: return true
-        case .brIfNot: return true
-        case .brTable: return true
-        case ._return: return false
-        case .endOfExecution: return false
-        case .i32Load: return true
-        case .i64Load: return true
-        case .f32Load: return true
-        case .f64Load: return true
-        case .i32Load8S: return true
-        case .i32Load8U: return true
-        case .i32Load16S: return true
-        case .i32Load16U: return true
-        case .i64Load8S: return true
-        case .i64Load8U: return true
-        case .i64Load16S: return true
-        case .i64Load16U: return true
-        case .i64Load32S: return true
-        case .i64Load32U: return true
-        case .i32Store: return true
-        case .i64Store: return true
-        case .f32Store: return true
-        case .f64Store: return true
-        case .i32Store8: return true
-        case .i32Store16: return true
-        case .i64Store8: return true
-        case .i64Store16: return true
-        case .i64Store32: return true
-        case .memorySize: return true
-        case .memoryGrow: return true
-        case .memoryInit: return true
-        case .memoryDataDrop: return true
-        case .memoryCopy: return true
-        case .memoryFill: return true
-        case .const32: return true
-        case .const64: return true
-        case .i32Add: return true
-        case .i64Add: return true
-        case .i32Sub: return true
-        case .i64Sub: return true
-        case .i32Mul: return true
-        case .i64Mul: return true
-        case .i32And: return true
-        case .i64And: return true
-        case .i32Or: return true
-        case .i64Or: return true
-        case .i32Xor: return true
-        case .i64Xor: return true
-        case .i32Shl: return true
-        case .i64Shl: return true
-        case .i32ShrS: return true
-        case .i64ShrS: return true
-        case .i32ShrU: return true
-        case .i64ShrU: return true
-        case .i32Rotl: return true
-        case .i64Rotl: return true
-        case .i32Rotr: return true
-        case .i64Rotr: return true
-        case .i32DivS: return true
-        case .i64DivS: return true
-        case .i32DivU: return true
-        case .i64DivU: return true
-        case .i32RemS: return true
-        case .i64RemS: return true
-        case .i32RemU: return true
-        case .i64RemU: return true
-        case .i32Eq: return true
-        case .i64Eq: return true
-        case .i32Ne: return true
-        case .i64Ne: return true
-        case .i32LtS: return true
-        case .i64LtS: return true
-        case .i32LtU: return true
-        case .i64LtU: return true
-        case .i32GtS: return true
-        case .i64GtS: return true
-        case .i32GtU: return true
-        case .i64GtU: return true
-        case .i32LeS: return true
-        case .i64LeS: return true
-        case .i32LeU: return true
-        case .i64LeU: return true
-        case .i32GeS: return true
-        case .i64GeS: return true
-        case .i32GeU: return true
-        case .i64GeU: return true
-        case .i32Clz: return true
-        case .i64Clz: return true
-        case .i32Ctz: return true
-        case .i64Ctz: return true
-        case .i32Popcnt: return true
-        case .i64Popcnt: return true
-        case .i32Eqz: return true
-        case .i64Eqz: return true
-        case .i32WrapI64: return true
-        case .i64ExtendI32S: return true
-        case .i64ExtendI32U: return true
-        case .i32Extend8S: return true
-        case .i64Extend8S: return true
-        case .i32Extend16S: return true
-        case .i64Extend16S: return true
-        case .i64Extend32S: return true
-        case .i32TruncF32S: return true
-        case .i32TruncF32U: return true
-        case .i32TruncSatF32S: return true
-        case .i32TruncSatF32U: return true
-        case .i32TruncF64S: return true
-        case .i32TruncF64U: return true
-        case .i32TruncSatF64S: return true
-        case .i32TruncSatF64U: return true
-        case .i64TruncF32S: return true
-        case .i64TruncF32U: return true
-        case .i64TruncSatF32S: return true
-        case .i64TruncSatF32U: return true
-        case .i64TruncF64S: return true
-        case .i64TruncF64U: return true
-        case .i64TruncSatF64S: return true
-        case .i64TruncSatF64U: return true
-        case .f32ConvertI32S: return true
-        case .f32ConvertI32U: return true
-        case .f32ConvertI64S: return true
-        case .f32ConvertI64U: return true
-        case .f64ConvertI32S: return true
-        case .f64ConvertI32U: return true
-        case .f64ConvertI64S: return true
-        case .f64ConvertI64U: return true
-        case .f32ReinterpretI32: return true
-        case .f64ReinterpretI64: return true
-        case .i32ReinterpretF32: return true
-        case .i64ReinterpretF64: return true
-        case .f32Add: return true
-        case .f64Add: return true
-        case .f32Sub: return true
-        case .f64Sub: return true
-        case .f32Mul: return true
-        case .f64Mul: return true
-        case .f32Div: return true
-        case .f64Div: return true
-        case .f32Min: return true
-        case .f64Min: return true
-        case .f32Max: return true
-        case .f64Max: return true
-        case .f32CopySign: return true
-        case .f64CopySign: return true
-        case .f32Eq: return true
-        case .f64Eq: return true
-        case .f32Ne: return true
-        case .f64Ne: return true
-        case .f32Lt: return true
-        case .f64Lt: return true
-        case .f32Gt: return true
-        case .f64Gt: return true
-        case .f32Le: return true
-        case .f64Le: return true
-        case .f32Ge: return true
-        case .f64Ge: return true
-        case .f32Abs: return true
-        case .f64Abs: return true
-        case .f32Neg: return true
-        case .f64Neg: return true
-        case .f32Ceil: return true
-        case .f64Ceil: return true
-        case .f32Floor: return true
-        case .f64Floor: return true
-        case .f32Trunc: return true
-        case .f64Trunc: return true
-        case .f32Nearest: return true
-        case .f64Nearest: return true
-        case .f32Sqrt: return true
-        case .f64Sqrt: return true
-        case .f64PromoteF32: return true
-        case .f32DemoteF64: return true
-        case .select: return false
-        case .refNull: return true
-        case .refIsNull: return true
-        case .refFunc: return true
-        case .tableGet: return true
-        case .tableSet: return true
-        case .tableSize: return true
-        case .tableGrow: return true
-        case .tableFill: return true
-        case .tableCopy: return true
-        case .tableInit: return true
-        case .tableElementDrop: return true
-        case .onEnter: return true
-        case .onExit: return true
-        }
-    }
-}
-
-extension Instruction {
-    var useRawOperand: Bool {
-        switch self {
-        case .copyStack: return true
-        case .globalGet: return true
-        case .globalSet: return true
-        case .call: return true
-        case .compilingCall: return true
-        case .internalCall: return true
-        case .callIndirect: return true
-        case .brIf: return true
-        case .brIfNot: return true
-        case .brTable: return true
-        case .i32Load: return true
-        case .i64Load: return true
-        case .f32Load: return true
-        case .f64Load: return true
-        case .i32Load8S: return true
-        case .i32Load8U: return true
-        case .i32Load16S: return true
-        case .i32Load16U: return true
-        case .i64Load8S: return true
-        case .i64Load8U: return true
-        case .i64Load16S: return true
-        case .i64Load16U: return true
-        case .i64Load32S: return true
-        case .i64Load32U: return true
-        case .i32Store: return true
-        case .i64Store: return true
-        case .f32Store: return true
-        case .f64Store: return true
-        case .i32Store8: return true
-        case .i32Store16: return true
-        case .i64Store8: return true
-        case .i64Store16: return true
-        case .i64Store32: return true
-        case .memoryInit: return true
-        case .const32: return true
-        case .const64: return true
-        case .i32Add: return true
-        case .i64Add: return true
-        case .i32Sub: return true
-        case .i64Sub: return true
-        case .i32Mul: return true
-        case .i64Mul: return true
-        case .i32And: return true
-        case .i64And: return true
-        case .i32Or: return true
-        case .i64Or: return true
-        case .i32Xor: return true
-        case .i64Xor: return true
-        case .i32Shl: return true
-        case .i64Shl: return true
-        case .i32ShrS: return true
-        case .i64ShrS: return true
-        case .i32ShrU: return true
-        case .i64ShrU: return true
-        case .i32Rotl: return true
-        case .i64Rotl: return true
-        case .i32Rotr: return true
-        case .i64Rotr: return true
-        case .i32DivS: return true
-        case .i64DivS: return true
-        case .i32DivU: return true
-        case .i64DivU: return true
-        case .i32RemS: return true
-        case .i64RemS: return true
-        case .i32RemU: return true
-        case .i64RemU: return true
-        case .i32Eq: return true
-        case .i64Eq: return true
-        case .i32Ne: return true
-        case .i64Ne: return true
-        case .i32LtS: return true
-        case .i64LtS: return true
-        case .i32LtU: return true
-        case .i64LtU: return true
-        case .i32GtS: return true
-        case .i64GtS: return true
-        case .i32GtU: return true
-        case .i64GtU: return true
-        case .i32LeS: return true
-        case .i64LeS: return true
-        case .i32LeU: return true
-        case .i64LeU: return true
-        case .i32GeS: return true
-        case .i64GeS: return true
-        case .i32GeU: return true
-        case .i64GeU: return true
-        case .i32Clz: return true
-        case .i64Clz: return true
-        case .i32Ctz: return true
-        case .i64Ctz: return true
-        case .i32Popcnt: return true
-        case .i64Popcnt: return true
-        case .i32Eqz: return true
-        case .i64Eqz: return true
-        case .i32WrapI64: return true
-        case .i64ExtendI32S: return true
-        case .i64ExtendI32U: return true
-        case .i32Extend8S: return true
-        case .i64Extend8S: return true
-        case .i32Extend16S: return true
-        case .i64Extend16S: return true
-        case .i64Extend32S: return true
-        case .i32TruncF32S: return true
-        case .i32TruncF32U: return true
-        case .i32TruncSatF32S: return true
-        case .i32TruncSatF32U: return true
-        case .i32TruncF64S: return true
-        case .i32TruncF64U: return true
-        case .i32TruncSatF64S: return true
-        case .i32TruncSatF64U: return true
-        case .i64TruncF32S: return true
-        case .i64TruncF32U: return true
-        case .i64TruncSatF32S: return true
-        case .i64TruncSatF32U: return true
-        case .i64TruncF64S: return true
-        case .i64TruncF64U: return true
-        case .i64TruncSatF64S: return true
-        case .i64TruncSatF64U: return true
-        case .f32ConvertI32S: return true
-        case .f32ConvertI32U: return true
-        case .f32ConvertI64S: return true
-        case .f32ConvertI64U: return true
-        case .f64ConvertI32S: return true
-        case .f64ConvertI32U: return true
-        case .f64ConvertI64S: return true
-        case .f64ConvertI64U: return true
-        case .f32ReinterpretI32: return true
-        case .f64ReinterpretI64: return true
-        case .i32ReinterpretF32: return true
-        case .i64ReinterpretF64: return true
-        case .f32Add: return true
-        case .f64Add: return true
-        case .f32Sub: return true
-        case .f64Sub: return true
-        case .f32Mul: return true
-        case .f64Mul: return true
-        case .f32Div: return true
-        case .f64Div: return true
-        case .f32Min: return true
-        case .f64Min: return true
-        case .f32Max: return true
-        case .f64Max: return true
-        case .f32CopySign: return true
-        case .f64CopySign: return true
-        case .f32Eq: return true
-        case .f64Eq: return true
-        case .f32Ne: return true
-        case .f64Ne: return true
-        case .f32Lt: return true
-        case .f64Lt: return true
-        case .f32Gt: return true
-        case .f64Gt: return true
-        case .f32Le: return true
-        case .f64Le: return true
-        case .f32Ge: return true
-        case .f64Ge: return true
-        case .f32Abs: return true
-        case .f64Abs: return true
-        case .f32Neg: return true
-        case .f64Neg: return true
-        case .f32Ceil: return true
-        case .f64Ceil: return true
-        case .f32Floor: return true
-        case .f64Floor: return true
-        case .f32Trunc: return true
-        case .f64Trunc: return true
-        case .f32Nearest: return true
-        case .f64Nearest: return true
-        case .f32Sqrt: return true
-        case .f64Sqrt: return true
-        case .f64PromoteF32: return true
-        case .f32DemoteF64: return true
-        case .onEnter: return true
-        case .onExit: return true
-        default: return false
-        }
-    }
-}
-extension Instruction {
-    var rawImmediate: any InstructionImmediate {
+    var rawImmediate: (any InstructionImmediate)? {
         switch self {
         case .copyStack(let copyStackOperand): return copyStackOperand
         case .globalGet(let globalGetOperand): return globalGetOperand
@@ -591,6 +207,7 @@ extension Instruction {
         case .compilingCall(let compilingCallOperand): return compilingCallOperand
         case .internalCall(let internalCallOperand): return internalCallOperand
         case .callIndirect(let callIndirectOperand): return callIndirectOperand
+        case .br(let offset): return offset
         case .brIf(let brIfOperand): return brIfOperand
         case .brIfNot(let brIfOperand): return brIfOperand
         case .brTable(let brTable): return brTable
@@ -617,7 +234,12 @@ extension Instruction {
         case .i64Store8(let storeOperand): return storeOperand
         case .i64Store16(let storeOperand): return storeOperand
         case .i64Store32(let storeOperand): return storeOperand
+        case .memorySize(let memorySizeOperand): return memorySizeOperand
+        case .memoryGrow(let memoryGrowOperand): return memoryGrowOperand
         case .memoryInit(let memoryInitOperand): return memoryInitOperand
+        case .memoryDataDrop(let dataIndex): return dataIndex
+        case .memoryCopy(let memoryCopyOperand): return memoryCopyOperand
+        case .memoryFill(let memoryFillOperand): return memoryFillOperand
         case .const32(let const32Operand): return const32Operand
         case .const64(let const64Operand): return const64Operand
         case .i32Add(let binaryOperand): return binaryOperand
@@ -756,53 +378,20 @@ extension Instruction {
         case .f64Sqrt(let unaryOperand): return unaryOperand
         case .f64PromoteF32(let unaryOperand): return unaryOperand
         case .f32DemoteF64(let unaryOperand): return unaryOperand
+        case .refNull(let refNullOperand): return refNullOperand
+        case .refIsNull(let refIsNullOperand): return refIsNullOperand
+        case .refFunc(let refFuncOperand): return refFuncOperand
+        case .tableGet(let tableGetOperand): return tableGetOperand
+        case .tableSet(let tableSetOperand): return tableSetOperand
+        case .tableSize(let tableSizeOperand): return tableSizeOperand
+        case .tableGrow(let tableGrowOperand): return tableGrowOperand
+        case .tableFill(let tableFillOperand): return tableFillOperand
+        case .tableCopy(let tableCopyOperand): return tableCopyOperand
+        case .tableInit(let tableInitOperand): return tableInitOperand
+        case .tableElementDrop(let elementIndex): return elementIndex
         case .onEnter(let onEnterOperand): return onEnterOperand
         case .onExit(let onExitOperand): return onExitOperand
-        default: preconditionFailure()
-        }
-    }
-}
-extension Instruction {
-    enum Tagged {
-        case br(Int32)
-        case memorySize(Instruction.MemorySizeOperand)
-        case memoryGrow(Instruction.MemoryGrowOperand)
-        case memoryDataDrop(DataIndex)
-        case memoryCopy(Instruction.MemoryCopyOperand)
-        case memoryFill(Instruction.MemoryFillOperand)
-        case refNull(Instruction.RefNullOperand)
-        case refIsNull(Instruction.RefIsNullOperand)
-        case refFunc(Instruction.RefFuncOperand)
-        case tableGet(Instruction.TableGetOperand)
-        case tableSet(Instruction.TableSetOperand)
-        case tableSize(Instruction.TableSizeOperand)
-        case tableGrow(Instruction.TableGrowOperand)
-        case tableFill(Instruction.TableFillOperand)
-        case tableCopy(Instruction.TableCopyOperand)
-        case tableInit(Instruction.TableInitOperand)
-        case tableElementDrop(ElementIndex)
-    }
-
-    var tagged: Tagged {
-        switch self {
-        case let .br(offset): return .br(offset)
-        case let .memorySize(memorySizeOperand): return .memorySize(memorySizeOperand)
-        case let .memoryGrow(memoryGrowOperand): return .memoryGrow(memoryGrowOperand)
-        case let .memoryDataDrop(dataIndex): return .memoryDataDrop(dataIndex)
-        case let .memoryCopy(memoryCopyOperand): return .memoryCopy(memoryCopyOperand)
-        case let .memoryFill(memoryFillOperand): return .memoryFill(memoryFillOperand)
-        case let .refNull(refNullOperand): return .refNull(refNullOperand)
-        case let .refIsNull(refIsNullOperand): return .refIsNull(refIsNullOperand)
-        case let .refFunc(refFuncOperand): return .refFunc(refFuncOperand)
-        case let .tableGet(tableGetOperand): return .tableGet(tableGetOperand)
-        case let .tableSet(tableSetOperand): return .tableSet(tableSetOperand)
-        case let .tableSize(tableSizeOperand): return .tableSize(tableSizeOperand)
-        case let .tableGrow(tableGrowOperand): return .tableGrow(tableGrowOperand)
-        case let .tableFill(tableFillOperand): return .tableFill(tableFillOperand)
-        case let .tableCopy(tableCopyOperand): return .tableCopy(tableCopyOperand)
-        case let .tableInit(tableInitOperand): return .tableInit(tableInitOperand)
-        case let .tableElementDrop(elementIndex): return .tableElementDrop(elementIndex)
-        default: preconditionFailure()
+        default: return nil
         }
     }
 }

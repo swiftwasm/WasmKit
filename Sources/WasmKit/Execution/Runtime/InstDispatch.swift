@@ -936,10 +936,7 @@ extension ExecutionState {
     }
     @_silgen_name("wasmkit_execute_br") @inline(__always)
     mutating func execute_br(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .br(offset) = inst else {
-            preconditionFailure()
-        }
+        let offset = Int32.load(from: &pc.pointee)
         pc.pointee = self.br(sp: sp.pointee, pc: pc.pointee, offset: offset)
     }
     @_silgen_name("wasmkit_execute_brIf") @inline(__always)
@@ -1082,18 +1079,12 @@ extension ExecutionState {
     }
     @_silgen_name("wasmkit_execute_memorySize") @inline(__always)
     mutating func execute_memorySize(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .memorySize(memorySizeOperand) = inst else {
-            preconditionFailure()
-        }
+        let memorySizeOperand = Instruction.MemorySizeOperand.load(from: &pc.pointee)
         self.memorySize(sp: sp.pointee, memorySizeOperand: memorySizeOperand)
     }
     @_silgen_name("wasmkit_execute_memoryGrow") @inline(__always)
     mutating func execute_memoryGrow(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .memoryGrow(memoryGrowOperand) = inst else {
-            preconditionFailure()
-        }
+        let memoryGrowOperand = Instruction.MemoryGrowOperand.load(from: &pc.pointee)
         try self.memoryGrow(sp: sp.pointee, md: &md.pointee, ms: &ms.pointee, memoryGrowOperand: memoryGrowOperand)
     }
     @_silgen_name("wasmkit_execute_memoryInit") @inline(__always)
@@ -1103,26 +1094,17 @@ extension ExecutionState {
     }
     @_silgen_name("wasmkit_execute_memoryDataDrop") @inline(__always)
     mutating func execute_memoryDataDrop(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .memoryDataDrop(dataIndex) = inst else {
-            preconditionFailure()
-        }
+        let dataIndex = DataIndex.load(from: &pc.pointee)
         self.memoryDataDrop(sp: sp.pointee, dataIndex: dataIndex)
     }
     @_silgen_name("wasmkit_execute_memoryCopy") @inline(__always)
     mutating func execute_memoryCopy(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .memoryCopy(memoryCopyOperand) = inst else {
-            preconditionFailure()
-        }
+        let memoryCopyOperand = Instruction.MemoryCopyOperand.load(from: &pc.pointee)
         try self.memoryCopy(sp: sp.pointee, memoryCopyOperand: memoryCopyOperand)
     }
     @_silgen_name("wasmkit_execute_memoryFill") @inline(__always)
     mutating func execute_memoryFill(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .memoryFill(memoryFillOperand) = inst else {
-            preconditionFailure()
-        }
+        let memoryFillOperand = Instruction.MemoryFillOperand.load(from: &pc.pointee)
         try self.memoryFill(sp: sp.pointee, memoryFillOperand: memoryFillOperand)
     }
     @_silgen_name("wasmkit_execute_const32") @inline(__always)
@@ -1821,90 +1803,57 @@ extension ExecutionState {
     }
     @_silgen_name("wasmkit_execute_refNull") @inline(__always)
     mutating func execute_refNull(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .refNull(refNullOperand) = inst else {
-            preconditionFailure()
-        }
+        let refNullOperand = Instruction.RefNullOperand.load(from: &pc.pointee)
         self.refNull(sp: sp.pointee, refNullOperand: refNullOperand)
     }
     @_silgen_name("wasmkit_execute_refIsNull") @inline(__always)
     mutating func execute_refIsNull(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .refIsNull(refIsNullOperand) = inst else {
-            preconditionFailure()
-        }
+        let refIsNullOperand = Instruction.RefIsNullOperand.load(from: &pc.pointee)
         self.refIsNull(sp: sp.pointee, refIsNullOperand: refIsNullOperand)
     }
     @_silgen_name("wasmkit_execute_refFunc") @inline(__always)
     mutating func execute_refFunc(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .refFunc(refFuncOperand) = inst else {
-            preconditionFailure()
-        }
+        let refFuncOperand = Instruction.RefFuncOperand.load(from: &pc.pointee)
         self.refFunc(sp: sp.pointee, refFuncOperand: refFuncOperand)
     }
     @_silgen_name("wasmkit_execute_tableGet") @inline(__always)
     mutating func execute_tableGet(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .tableGet(tableGetOperand) = inst else {
-            preconditionFailure()
-        }
+        let tableGetOperand = Instruction.TableGetOperand.load(from: &pc.pointee)
         pc.pointee = try self.tableGet(sp: sp.pointee, pc: pc.pointee, tableGetOperand: tableGetOperand)
     }
     @_silgen_name("wasmkit_execute_tableSet") @inline(__always)
     mutating func execute_tableSet(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .tableSet(tableSetOperand) = inst else {
-            preconditionFailure()
-        }
+        let tableSetOperand = Instruction.TableSetOperand.load(from: &pc.pointee)
         pc.pointee = try self.tableSet(sp: sp.pointee, pc: pc.pointee, tableSetOperand: tableSetOperand)
     }
     @_silgen_name("wasmkit_execute_tableSize") @inline(__always)
     mutating func execute_tableSize(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .tableSize(tableSizeOperand) = inst else {
-            preconditionFailure()
-        }
+        let tableSizeOperand = Instruction.TableSizeOperand.load(from: &pc.pointee)
         self.tableSize(sp: sp.pointee, tableSizeOperand: tableSizeOperand)
     }
     @_silgen_name("wasmkit_execute_tableGrow") @inline(__always)
     mutating func execute_tableGrow(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .tableGrow(tableGrowOperand) = inst else {
-            preconditionFailure()
-        }
+        let tableGrowOperand = Instruction.TableGrowOperand.load(from: &pc.pointee)
         pc.pointee = try self.tableGrow(sp: sp.pointee, pc: pc.pointee, tableGrowOperand: tableGrowOperand)
     }
     @_silgen_name("wasmkit_execute_tableFill") @inline(__always)
     mutating func execute_tableFill(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .tableFill(tableFillOperand) = inst else {
-            preconditionFailure()
-        }
+        let tableFillOperand = Instruction.TableFillOperand.load(from: &pc.pointee)
         pc.pointee = try self.tableFill(sp: sp.pointee, pc: pc.pointee, tableFillOperand: tableFillOperand)
     }
     @_silgen_name("wasmkit_execute_tableCopy") @inline(__always)
     mutating func execute_tableCopy(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .tableCopy(tableCopyOperand) = inst else {
-            preconditionFailure()
-        }
+        let tableCopyOperand = Instruction.TableCopyOperand.load(from: &pc.pointee)
         pc.pointee = try self.tableCopy(sp: sp.pointee, pc: pc.pointee, tableCopyOperand: tableCopyOperand)
     }
     @_silgen_name("wasmkit_execute_tableInit") @inline(__always)
     mutating func execute_tableInit(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .tableInit(tableInitOperand) = inst else {
-            preconditionFailure()
-        }
+        let tableInitOperand = Instruction.TableInitOperand.load(from: &pc.pointee)
         pc.pointee = try self.tableInit(sp: sp.pointee, pc: pc.pointee, tableInitOperand: tableInitOperand)
     }
     @_silgen_name("wasmkit_execute_tableElementDrop") @inline(__always)
     mutating func execute_tableElementDrop(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .tableElementDrop(elementIndex) = inst else {
-            preconditionFailure()
-        }
+        let elementIndex = ElementIndex.load(from: &pc.pointee)
         self.tableElementDrop(sp: sp.pointee, elementIndex: elementIndex)
     }
     @_silgen_name("wasmkit_execute_onEnter") @inline(__always)
