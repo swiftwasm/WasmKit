@@ -408,11 +408,6 @@ enum VMGen {
             Instruction(name: "unreachable", isControl: true, mayThrow: true, immediates: []),
             Instruction(name: "nop", isControl: true, immediates: []),
             Instruction(
-                name: "ifThen", isControl: true,
-                immediates: [
-                    Immediate(name: nil, type: "Instruction.IfOperand")
-                ]),
-            Instruction(
                 name: "br", isControl: true, mayUpdateFrame: false,
                 immediates: [
                     Immediate(name: "offset", type: "Int32"),
@@ -421,12 +416,12 @@ enum VMGen {
                 name: "brIf", isControl: true, mayUpdateFrame: false,
                 immediates: [
                     Immediate(name: nil, type: "Instruction.BrIfOperand")
-                ]),
+                ]).withRawOperand(),
             Instruction(
                 name: "brIfNot", isControl: true, mayUpdateFrame: false,
                 immediates: [
                     Immediate(name: nil, type: "Instruction.BrIfOperand")
-                ]),
+                ]).withRawOperand(),
             Instruction(
                 name: "brTable", isControl: true, mayUpdateFrame: false,
                 immediates: [

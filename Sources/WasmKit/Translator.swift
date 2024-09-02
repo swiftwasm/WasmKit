@@ -1025,9 +1025,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
                 targetPC = endPC
             }
             let elseOrEnd = UInt32(targetPC.offsetFromHead - selfPC.offsetFromHead)
-            return .ifThen(Instruction.IfOperand(
-                elseOrEndOffset: elseOrEnd, condition: condition
-            ))
+            return .brIfNot(Instruction.BrIfOperand(offset: Int32(elseOrEnd), condition: LVReg(condition)))
         }
     }
 
@@ -1141,7 +1139,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             iseqBuilder.emitWithLabel(frame.continuation) { _, selfPC, continuation in
                 let relativeOffset = continuation.offsetFromHead - selfPC.offsetFromHead
                 return .brIf(Instruction.BrIfOperand(
-                    offset: Int32(relativeOffset), condition: condition
+                    offset: Int32(relativeOffset), condition: LVReg(condition)
                 ))
             }
             return
@@ -1171,7 +1169,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         let onBranchNotTaken = iseqBuilder.allocLabel()
         iseqBuilder.emitWithLabel(onBranchNotTaken) { _, conditionCheckAt, continuation in
             let relativeOffset = continuation.offsetFromHead - conditionCheckAt.offsetFromHead
-            return .brIfNot(Instruction.BrIfOperand(offset: Int32(relativeOffset), condition: condition))
+            return .brIfNot(Instruction.BrIfOperand(offset: Int32(relativeOffset), condition: LVReg(condition)))
         }
         try copyOnBranch(targetFrame: frame)
         try emitBranch(relativeDepth: relativeDepth) { offset, copyCount, popCount in

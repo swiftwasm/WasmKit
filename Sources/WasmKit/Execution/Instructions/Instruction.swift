@@ -8,7 +8,6 @@ enum Instruction: Equatable {
     case callIndirect(Instruction.CallIndirectOperand)
     case unreachable
     case nop
-    case ifThen(Instruction.IfOperand)
     case br(offset: Int32)
     case brIf(Instruction.BrIfOperand)
     case brIfNot(Instruction.BrIfOperand)
@@ -210,7 +209,6 @@ extension Instruction {
         case .callIndirect: return true
         case .unreachable: return false
         case .nop: return false
-        case .ifThen: return true
         case .br: return true
         case .brIf: return true
         case .brIfNot: return true
@@ -412,6 +410,8 @@ extension Instruction {
         case .compilingCall: return true
         case .internalCall: return true
         case .callIndirect: return true
+        case .brIf: return true
+        case .brIfNot: return true
         case .brTable: return true
         case .i32Load: return true
         case .i64Load: return true
@@ -589,6 +589,8 @@ extension Instruction {
         case .compilingCall(let compilingCallOperand): return compilingCallOperand
         case .internalCall(let internalCallOperand): return internalCallOperand
         case .callIndirect(let callIndirectOperand): return callIndirectOperand
+        case .brIf(let brIfOperand): return brIfOperand
+        case .brIfNot(let brIfOperand): return brIfOperand
         case .brTable(let brTable): return brTable
         case .i32Load(let loadOperand): return loadOperand
         case .i64Load(let loadOperand): return loadOperand
@@ -758,10 +760,7 @@ extension Instruction {
 }
 extension Instruction {
     enum Tagged {
-        case ifThen(Instruction.IfOperand)
         case br(Int32)
-        case brIf(Instruction.BrIfOperand)
-        case brIfNot(Instruction.BrIfOperand)
         case memorySize(Instruction.MemorySizeOperand)
         case memoryGrow(Instruction.MemoryGrowOperand)
         case memoryDataDrop(DataIndex)
@@ -784,10 +783,7 @@ extension Instruction {
 
     var tagged: Tagged {
         switch self {
-        case let .ifThen(ifOperand): return .ifThen(ifOperand)
         case let .br(offset): return .br(offset)
-        case let .brIf(brIfOperand): return .brIf(brIfOperand)
-        case let .brIfNot(brIfOperand): return .brIfNot(brIfOperand)
         case let .memorySize(memorySizeOperand): return .memorySize(memorySizeOperand)
         case let .memoryGrow(memoryGrowOperand): return .memoryGrow(memoryGrowOperand)
         case let .memoryDataDrop(dataIndex): return .memoryDataDrop(dataIndex)
