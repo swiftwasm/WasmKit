@@ -363,8 +363,22 @@ extension Instruction {
         }
     }
 
-    typealias GlobalGetOperand = LLVReg
-    typealias GlobalSetOperand = LLVReg
+    struct GlobalAndVRegOperand: Equatable, InstructionImmediate {
+        let reg: LLVReg
+        let global: InternalGlobal
+
+        static func load(from pc: inout Pc) -> Self {
+            let reg = pc.read(LLVReg.self)
+            let global = InternalGlobal(unsafe: UnsafeMutablePointer(bitPattern: UInt(pc.read(UInt64.self))).unsafelyUnwrapped)
+            return Self(reg: reg, global: global)
+        }
+        static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { CodeSlot(bitPattern: $0.reg) }
+            emitSlot { UInt64(UInt(bitPattern: $0.global.bitPattern)) }
+        }
+    }
+    typealias GlobalGetOperand = GlobalAndVRegOperand
+    typealias GlobalSetOperand = GlobalAndVRegOperand
 
     struct CopyStackOperand: Equatable, InstructionImmediate {
         let source: Int32
@@ -376,12 +390,6 @@ extension Instruction {
         static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
             emitSlot { unsafeBitCast($0, to: CodeSlot.self) }
         }
-    }
-
-    struct IfOperand: Equatable {
-        // `else` for if-then-else-end sequence, `end` for if-then-end sequence
-        let elseOrEndOffset: UInt32
-        let condition: VReg
     }
     
     struct BrIfOperand: Equatable, InstructionImmediate {

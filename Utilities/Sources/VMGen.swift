@@ -37,36 +37,26 @@ enum VMGen {
         var mayThrow: Bool
         var mayUpdateFrame: Bool
         var mayUpdateSp: Bool = false
-        var hasData: Bool
         var useCurrentMemory: RegisterUse
-        var useRawOperand: Bool = false
-        var immediates: [Immediate]
+        var immediate: Immediate?
 
         var mayUpdatePc: Bool {
-            self.isControl || self.hasData
+            self.isControl
         }
 
         init(
             name: String, isControl: Bool = false,
             mayThrow: Bool = false, mayUpdateFrame: Bool = false,
-            hasData: Bool = false,
             useCurrentMemory: RegisterUse = .none,
-            immediates: [Immediate]
+            immediate: Immediate? = nil
         ) {
             self.name = name
             self.isControl = isControl
             self.mayThrow = mayThrow
             self.mayUpdateFrame = mayUpdateFrame
-            self.hasData = hasData
             self.useCurrentMemory = useCurrentMemory
-            self.immediates = immediates
+            self.immediate = immediate
             assert(isControl || !mayUpdateFrame, "non-control instruction should not update frame")
-        }
-
-        func withRawOperand() -> Instruction {
-            var copy = self
-            copy.useRawOperand = true
-            return copy
         }
 
         typealias Parameter = (label: String, type: String, isInout: Bool)
@@ -88,8 +78,8 @@ enum VMGen {
                 vregs += [(ExecParam.md, true), (ExecParam.ms, true)]
             }
             var parameters: [Parameter] = vregs.map { ($0.reg.label, $0.reg.type, $0.isInout) }
-            parameters += immediates.map {
-                return ($0.label, $0.type, false)
+            if let immediate = self.immediate {
+                parameters += [(immediate.label, immediate.type, false)]
             }
             return parameters
         }
@@ -103,18 +93,18 @@ enum VMGen {
 
         static func binop(op: String, type: String) -> OpInstruction {
             let base = Instruction(
-                name: "\(type)\(op)", immediates: [Immediate(name: nil, type: "Instruction.BinaryOperand")]
+                name: "\(type)\(op)", immediate: Immediate(name: nil, type: "Instruction.BinaryOperand")
             )
             return OpInstruction(op: op, inputType: type, resultType: type, base: base)
         }
         static func binop(op: String, inputType: String, resultType: String) -> OpInstruction {
             let base = Instruction(
-                name: "\(inputType)\(op)", immediates: [Immediate(name: nil, type: "Instruction.BinaryOperand")]
+                name: "\(inputType)\(op)", immediate: Immediate(name: nil, type: "Instruction.BinaryOperand")
             )
             return OpInstruction(op: op, inputType: inputType, resultType: resultType, base: base)
         }
         static func unop(op: String, type: String, resultType: String) -> OpInstruction {
-            let base = Instruction(name: "\(type)\(op)", immediates: [Immediate(name: nil, type: "Instruction.UnaryOperand")]).withRawOperand()
+            let base = Instruction(name: "\(type)\(op)", immediate: Immediate(name: nil, type: "Instruction.UnaryOperand"))
             return OpInstruction(op: op, inputType: type, resultType: resultType, base: base)
         }
     }
@@ -131,8 +121,8 @@ enum VMGen {
             Instruction(
                 name: name,
                 mayThrow: mayThrow,
-                immediates: [Immediate(name: nil, type: "Instruction.BinaryOperand")]
-            ).withRawOperand()
+                immediate: Immediate(name: nil, type: "Instruction.BinaryOperand")
+            )
         }
     }
 
@@ -144,7 +134,7 @@ enum VMGen {
         var mayThrow: Bool = false
 
         var instruction: Instruction {
-            Instruction(name: name, mayThrow: mayThrow, immediates: [Immediate(name: nil, type: "Instruction.UnaryOperand")]).withRawOperand()
+            Instruction(name: name, mayThrow: mayThrow, immediate: Immediate(name: nil, type: "Instruction.UnaryOperand"))
         }
     }
 
@@ -281,12 +271,8 @@ enum VMGen {
 
     static let numericOtherInsts: [Instruction] = [
         // Numeric
-        Instruction(name: "const32", immediates: [
-            Immediate(name: nil, type: "Instruction.Const32Operand")
-        ]).withRawOperand(),
-        Instruction(name: "const64", hasData: true, immediates: [
-            Immediate(name: nil, type: "Instruction.Const64Operand")
-        ]).withRawOperand(),
+        Instruction(name: "const32", immediate: Immediate(name: nil, type: "Instruction.Const32Operand")),
+        Instruction(name: "const64", immediate: Immediate(name: nil, type: "Instruction.Const64Operand")),
     ]
 
     // MARK: - Memory instructions
@@ -313,7 +299,7 @@ enum VMGen {
         ("i64Load32S", "Int32", ".init(signed: Int64($0))"),
         ("i64Load32U", "UInt32", ".i64(UInt64($0))"),
     ].map { (name, loadAs, castToValue) in
-        let base = Instruction(name: name, mayThrow: true, useCurrentMemory: .read, immediates: [Immediate(name: nil, type: "Instruction.LoadOperand")]).withRawOperand()
+        let base = Instruction(name: name, mayThrow: true, useCurrentMemory: .read, immediate: Immediate(name: nil, type: "Instruction.LoadOperand"))
         return LoadInstruction(loadAs: loadAs, castToValue: castToValue, base: base)
     }
 
@@ -332,48 +318,40 @@ enum VMGen {
         ("i64Store16", "UInt16(truncatingIfNeeded: $0.i64)"),
         ("i64Store32", "UInt32(truncatingIfNeeded: $0.i64)"),
     ].map { (name, castFromValue) in
-        let base = Instruction(name: name, mayThrow: true, useCurrentMemory: .read, immediates: [Immediate(name: nil, type: "Instruction.StoreOperand")]).withRawOperand()
+        let base = Instruction(name: name, mayThrow: true, useCurrentMemory: .read, immediate: Immediate(name: nil, type: "Instruction.StoreOperand"))
         return StoreInstruction(castFromValue: castFromValue, base: base)
     }
     static let memoryLoadStoreInsts: [Instruction] = memoryLoadInsts.map(\.base) + memoryStoreInsts.map(\.base)
     static let memoryOpInsts: [Instruction] = [
-        Instruction(name: "memorySize", immediates: [Immediate(name: nil, type: "Instruction.MemorySizeOperand")]).withRawOperand(),
-        Instruction(name: "memoryGrow", mayThrow: true, useCurrentMemory: .write, immediates: [
-            Immediate(name: nil, type: "Instruction.MemoryGrowOperand"),
-        ]).withRawOperand(),
-        Instruction(name: "memoryInit", mayThrow: true, immediates: [
-            Immediate(name: nil, type: "Instruction.MemoryInitOperand"),
-        ]).withRawOperand(),
-        Instruction(name: "memoryDataDrop", immediates: [Immediate(name: nil, type: "DataIndex")]).withRawOperand(),
-        Instruction(name: "memoryCopy", mayThrow: true, immediates: [
-            Immediate(name: nil, type: "Instruction.MemoryCopyOperand"),
-        ]).withRawOperand(),
-        Instruction(name: "memoryFill", mayThrow: true, immediates: [
-            Immediate(name: nil, type: "Instruction.MemoryFillOperand"),
-        ]).withRawOperand(),
+        Instruction(name: "memorySize", immediate: Immediate(name: nil, type: "Instruction.MemorySizeOperand")),
+        Instruction(name: "memoryGrow", mayThrow: true, useCurrentMemory: .write, immediate: Immediate(name: nil, type: "Instruction.MemoryGrowOperand")),
+        Instruction(name: "memoryInit", mayThrow: true, immediate: Immediate(name: nil, type: "Instruction.MemoryInitOperand")),
+        Instruction(name: "memoryDataDrop", immediate: Immediate(name: nil, type: "DataIndex")),
+        Instruction(name: "memoryCopy", mayThrow: true, immediate: Immediate(name: nil, type: "Instruction.MemoryCopyOperand")),
+        Instruction(name: "memoryFill", mayThrow: true, immediate: Immediate(name: nil, type: "Instruction.MemoryFillOperand")),
     ]
 
     // MARK: - Misc instructions
 
     static let miscInsts: [Instruction] = [
         // Parametric
-        Instruction(name: "select", hasData: true, immediates: []).withRawOperand(),
+        Instruction(name: "select", immediate: Immediate(name: nil, type: "Instruction.SelectOperand")),
         // Reference
-        Instruction(name: "refNull", immediates: [Immediate(name: nil, type: "Instruction.RefNullOperand")]).withRawOperand(),
-        Instruction(name: "refIsNull", immediates: [Immediate(name: nil, type: "Instruction.RefIsNullOperand")]).withRawOperand(),
-        Instruction(name: "refFunc", immediates: [Immediate(name: nil, type: "Instruction.RefFuncOperand")]).withRawOperand(),
+        Instruction(name: "refNull", immediate: Immediate(name: nil, type: "Instruction.RefNullOperand")),
+        Instruction(name: "refIsNull", immediate: Immediate(name: nil, type: "Instruction.RefIsNullOperand")),
+        Instruction(name: "refFunc", immediate: Immediate(name: nil, type: "Instruction.RefFuncOperand")),
         // Table
-        Instruction(name: "tableGet", mayThrow: true, hasData: true, immediates: [Immediate(name: nil, type: "Instruction.TableGetOperand")]).withRawOperand(),
-        Instruction(name: "tableSet", mayThrow: true, hasData: true, immediates: [Immediate(name: nil, type: "Instruction.TableSetOperand")]).withRawOperand(),
-        Instruction(name: "tableSize", immediates: [Immediate(name: nil, type: "Instruction.TableSizeOperand")]).withRawOperand(),
-        Instruction(name: "tableGrow", mayThrow: true, hasData: true, immediates: [Immediate(name: nil, type: "Instruction.TableGrowOperand")]).withRawOperand(),
-        Instruction(name: "tableFill", mayThrow: true, hasData: true, immediates: [Immediate(name: nil, type: "Instruction.TableFillOperand")]).withRawOperand(),
-        Instruction(name: "tableCopy", mayThrow: true, hasData: true, immediates: [Immediate(name: nil, type: "Instruction.TableCopyOperand")]).withRawOperand(),
-        Instruction(name: "tableInit", mayThrow: true, hasData: true, immediates: [Immediate(name: nil, type: "Instruction.TableInitOperand")]).withRawOperand(),
-        Instruction(name: "tableElementDrop", immediates: [Immediate(name: nil, type: "ElementIndex")]).withRawOperand(),
+        Instruction(name: "tableGet", mayThrow: true, immediate: Immediate(name: nil, type: "Instruction.TableGetOperand")),
+        Instruction(name: "tableSet", mayThrow: true, immediate: Immediate(name: nil, type: "Instruction.TableSetOperand")),
+        Instruction(name: "tableSize", immediate: Immediate(name: nil, type: "Instruction.TableSizeOperand")),
+        Instruction(name: "tableGrow", mayThrow: true, immediate: Immediate(name: nil, type: "Instruction.TableGrowOperand")),
+        Instruction(name: "tableFill", mayThrow: true, immediate: Immediate(name: nil, type: "Instruction.TableFillOperand")),
+        Instruction(name: "tableCopy", mayThrow: true, immediate: Immediate(name: nil, type: "Instruction.TableCopyOperand")),
+        Instruction(name: "tableInit", mayThrow: true, immediate: Immediate(name: nil, type: "Instruction.TableInitOperand")),
+        Instruction(name: "tableElementDrop", immediate: Immediate(name: nil, type: "ElementIndex")),
         // Profiling
-        Instruction(name: "onEnter", immediates: [Immediate(name: nil, type: "Instruction.OnEnterOperand")]).withRawOperand(),
-        Instruction(name: "onExit", immediates: [Immediate(name: nil, type: "Instruction.OnExitOperand")]).withRawOperand(),
+        Instruction(name: "onEnter", immediate: Immediate(name: nil, type: "Instruction.OnEnterOperand")),
+        Instruction(name: "onExit", immediate: Immediate(name: nil, type: "Instruction.OnExitOperand")),
     ]
 
     // MARK: - Instruction generation
@@ -381,54 +359,52 @@ enum VMGen {
     static func buildInstructions() -> [Instruction] {
         var instructions: [Instruction] = [
             // Variable
-            Instruction(name: "copyStack", immediates: [Immediate(name: nil, type: "Instruction.CopyStackOperand")]).withRawOperand(),
-            Instruction(name: "globalGet", hasData: true, immediates: [Immediate(name: nil, type: "Instruction.GlobalGetOperand")]).withRawOperand(),
-            Instruction(name: "globalSet", hasData: true, immediates: [Immediate(name: nil, type: "Instruction.GlobalSetOperand")]).withRawOperand(),
+            Instruction(name: "copyStack", immediate: Immediate(name: nil, type: "Instruction.CopyStackOperand")),
+            Instruction(name: "globalGet", immediate: Immediate(name: nil, type: "Instruction.GlobalGetOperand")),
+            Instruction(name: "globalSet", immediate: Immediate(name: nil, type: "Instruction.GlobalSetOperand")),
             // Controls
             Instruction(
                 name: "call", isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write,
-                immediates: [
-                    Immediate(name: nil, type: "Instruction.CallOperand")
-                ]).withRawOperand(),
+                immediate: Immediate(name: nil, type: "Instruction.CallOperand")
+                ),
             Instruction(
                 name: "compilingCall", isControl: true, mayThrow: true, mayUpdateFrame: true,
-                immediates: [
-                    Immediate(name: nil, type: "Instruction.CompilingCallOperand")
-                ]).withRawOperand(),
+                immediate: Immediate(name: nil, type: "Instruction.CompilingCallOperand")
+                ),
             Instruction(
                 name: "internalCall", isControl: true, mayThrow: true, mayUpdateFrame: true,
-                immediates: [
+                immediate: 
                     Immediate(name: nil, type: "Instruction.InternalCallOperand")
-                ]).withRawOperand(),
+                ),
             Instruction(
                 name: "callIndirect", isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write,
-                immediates: [
+                immediate:
                     Immediate(name: nil, type: "Instruction.CallIndirectOperand")
-                ]).withRawOperand(),
-            Instruction(name: "unreachable", isControl: true, mayThrow: true, immediates: []),
-            Instruction(name: "nop", isControl: true, immediates: []),
+                ),
+            Instruction(name: "unreachable", isControl: true, mayThrow: true),
+            Instruction(name: "nop"),
             Instruction(
                 name: "br", isControl: true, mayUpdateFrame: false,
-                immediates: [
-                    Immediate(name: "offset", type: "Int32"),
-                ]).withRawOperand(),
+                immediate: 
+                    Immediate(name: "offset", type: "Int32")
+                ),
             Instruction(
                 name: "brIf", isControl: true, mayUpdateFrame: false,
-                immediates: [
+                immediate:
                     Immediate(name: nil, type: "Instruction.BrIfOperand")
-                ]).withRawOperand(),
+                ),
             Instruction(
                 name: "brIfNot", isControl: true, mayUpdateFrame: false,
-                immediates: [
+                immediate: 
                     Immediate(name: nil, type: "Instruction.BrIfOperand")
-                ]).withRawOperand(),
+                ),
             Instruction(
                 name: "brTable", isControl: true, mayUpdateFrame: false,
-                immediates: [
+                immediate:
                     Immediate(name: nil, type: "Instruction.BrTable")
-                ]).withRawOperand(),
-            Instruction(name: "_return", isControl: true, mayUpdateFrame: true, useCurrentMemory: .write, immediates: []),
-            Instruction(name: "endOfExecution", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: []),
+                ),
+            Instruction(name: "_return", isControl: true, mayUpdateFrame: true, useCurrentMemory: .write),
+            Instruction(name: "endOfExecution", isControl: true, mayThrow: true, mayUpdateFrame: true),
         ]
         instructions += memoryLoadStoreInsts
         instructions += memoryOpInsts
@@ -615,15 +591,13 @@ enum VMGen {
         var output = "enum Instruction: Equatable {\n"
         for inst in instructions {
             output += "    case \(inst.name)"
-            if !inst.immediates.isEmpty {
+            if let immediate = inst.immediate {
                 output += "("
-                output += inst.immediates.map { immediate in
-                    if let name = immediate.name {
-                        return name + ": " + immediate.type
-                    } else {
-                        return immediate.type
-                    }
-                }.joined(separator: ", ")
+                if let name = immediate.name {
+                    output += name + ": " + immediate.type
+                } else {
+                    output += immediate.type
+                }
                 output += ")"
             }
             output += "\n"
@@ -637,9 +611,7 @@ enum VMGen {
 
         """
         for inst in instructions {
-            guard let immediate = inst.immediates.first, inst.useRawOperand else {
-                continue
-            }
+            guard let immediate = inst.immediate else { continue }
             output += "        case .\(inst.name)(let \(immediate.label)): return \(immediate.label)\n"
         }
         output += """
@@ -675,22 +647,11 @@ enum VMGen {
                 mutating func execute_\(inst.name)(\(ExecParam.allCases.map { "\($0.label): UnsafeMutablePointer<\($0.type)>" }.joined(separator: ", ")))\(throwsKwd) {
 
             """
-            if !inst.immediates.isEmpty {
-                if inst.useRawOperand {
-                    let immediate = inst.immediates[0]
-                    output += """
-                            let \(immediate.label) = \(immediate.type).load(from: &pc.pointee)
+            if let immediate = inst.immediate {
+                output += """
+                        let \(immediate.label) = \(immediate.type).load(from: &pc.pointee)
 
-                    """
-                } else {
-                    output += """
-                            let inst = pc.pointee.read(Instruction.Tagged.self)
-                            guard case let .\(inst.name)(\(inst.immediates.map { $0.label }.joined(separator: ", "))) = inst else {
-                                preconditionFailure()
-                            }
-
-                    """
-                }
+                """
             }
             output += """
                     \(mayAssignPc)\(tryKwd)self.\(inst.name)(\(args))
