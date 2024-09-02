@@ -30,11 +30,9 @@ extension ExecutionState {
         }
         return pc.advancedPc(by: Int(brIfOperand.offset))
     }
-    mutating func brTable(sp: Sp, pc: Pc, brTableOperand: Instruction.BrTableOperand) -> Pc {
-        var pc = pc
-        let brTable = pc.read(Instruction.BrTable.self)
-        let index = sp[brTableOperand.index].i32
-        let normalizedOffset = min(Int(index), Int(brTableOperand.count - 1))
+    mutating func brTable(sp: Sp, pc: Pc, brTable: Instruction.BrTable) -> Pc {
+        let index = sp[brTable.index].i32
+        let normalizedOffset = min(Int(index), Int(brTable.count - 1))
         let entry = brTable.baseAddress[normalizedOffset]
         return pc.advancedPc(by: Int(entry.offset))
     }

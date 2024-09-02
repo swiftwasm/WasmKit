@@ -12,7 +12,7 @@ enum Instruction: Equatable {
     case br(offset: Int32)
     case brIf(Instruction.BrIfOperand)
     case brIfNot(Instruction.BrIfOperand)
-    case brTable(Instruction.BrTableOperand)
+    case brTable(Instruction.BrTable)
     case _return
     case endOfExecution
     case i32Load(Instruction.LoadOperand)
@@ -408,6 +408,7 @@ extension Instruction {
         case .copyStack: return true
         case .globalGet: return true
         case .globalSet: return true
+        case .brTable: return true
         case .const32: return true
         case .const64: return true
         default: return false
@@ -420,6 +421,7 @@ extension Instruction {
         case .copyStack(let copyStackOperand): return copyStackOperand
         case .globalGet(let globalGetOperand): return globalGetOperand
         case .globalSet(let globalSetOperand): return globalSetOperand
+        case .brTable(let brTable): return brTable
         case .const32(let const32Operand): return const32Operand
         case .const64(let const64Operand): return const64Operand
         default: preconditionFailure()
@@ -436,7 +438,6 @@ extension Instruction {
         case br(Int32)
         case brIf(Instruction.BrIfOperand)
         case brIfNot(Instruction.BrIfOperand)
-        case brTable(Instruction.BrTableOperand)
         case i32Load(Instruction.LoadOperand)
         case i64Load(Instruction.LoadOperand)
         case f32Load(Instruction.LoadOperand)
@@ -627,7 +628,6 @@ extension Instruction {
         case let .br(offset): return .br(offset)
         case let .brIf(brIfOperand): return .brIf(brIfOperand)
         case let .brIfNot(brIfOperand): return .brIfNot(brIfOperand)
-        case let .brTable(brTableOperand): return .brTable(brTableOperand)
         case let .i32Load(loadOperand): return .i32Load(loadOperand)
         case let .i64Load(loadOperand): return .i64Load(loadOperand)
         case let .f32Load(loadOperand): return .f32Load(loadOperand)

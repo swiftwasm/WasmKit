@@ -30,17 +30,6 @@ extension Instruction {
     struct MemArg: Equatable {
         let offset: UInt64
     }
-    
-    struct BrTable: Equatable {
-        struct Entry {
-            var offset: Int32
-        }
-        let baseAddress: UnsafePointer<Entry>
-        
-        static func == (lhs: Instruction.BrTable, rhs: Instruction.BrTable) -> Bool {
-            lhs.baseAddress == rhs.baseAddress
-        }
-    }
 
     /// size = 6, alignment = 2
     struct BinaryOperand: Equatable {
@@ -206,9 +195,28 @@ extension Instruction {
         let condition: VReg
     }
     
-    struct BrTableOperand: Equatable {
+    struct BrTable: Equatable, InstructionImmediate {
+        struct Entry {
+            var offset: Int32
+        }
+        let baseAddress: UnsafePointer<Entry>
         let count: UInt16
         let index: VReg
+
+        private typealias MiscSlot = (count: UInt16, index: VReg, pad: UInt32)
+
+        static func load(from pc: inout Pc) -> Self {
+            let brTable = UnsafePointer<Entry>(bitPattern: UInt(pc.read(UInt64.self))).unsafelyUnwrapped
+            let (count, index, _) = pc.read(MiscSlot.self)
+            return Self(baseAddress: brTable, count: count, index: index)
+        }
+        static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { UInt64(UInt(bitPattern: $0.baseAddress)) }
+            emitSlot {
+                let slot: MiscSlot = ($0.count, $0.index, 0)
+                return unsafeBitCast(slot, to: CodeSlot.self)
+            }
+        }
     }
 
     struct CallLikeOperand: Equatable {
