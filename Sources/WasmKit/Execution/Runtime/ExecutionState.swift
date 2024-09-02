@@ -40,16 +40,18 @@ typealias Sp = UnsafeMutablePointer<UntypedValue>
 ///         "is compiled" check on the next execution.
 typealias Pc = UnsafeMutableRawPointer
 
+typealias CodeSlot = UInt64
+
 extension Pc {
     func advancedPc(by count: Int) -> Pc {
-        assert(Int(bitPattern: self) % MemoryLayout<Instruction>.alignment == 0)
-        return self + MemoryLayout<Instruction>.stride * count
+        assert(Int(bitPattern: self) % MemoryLayout<CodeSlot>.alignment == 0)
+        return self + MemoryLayout<CodeSlot>.stride * count
     }
 
     mutating func read<T>(_: T.Type = T.self) -> T {
         assert(MemoryLayout<T>.stride == 8)
         let value = self.assumingMemoryBound(to: T.self).pointee
-        self += MemoryLayout<UInt64>.size
+        self += MemoryLayout<CodeSlot>.size
         return value
     }
 }
@@ -78,8 +80,12 @@ func executeWasm(
             sp[VReg(index)] = UntypedValue(argument)
         }
         try withUnsafeTemporaryAllocation(of: UInt64.self, capacity: 2) { rootISeq in
-            rootISeq[0] = Instruction.endOfExecution.handler
-            rootISeq[1] = Instruction.endOfExecution.rawValue
+            switch runtime.value.configuration.threadingModel {
+            case .direct:
+                rootISeq[0] = Instruction.endOfExecution.handler
+            case .token:
+                rootISeq[0] = UInt64(Instruction.endOfExecution.rawIndex)
+            }
             // NOTE: unwinding a function jump into previous frame's PC + 1, so initial PC is -1ed
             try stack.execute(
                 sp: sp,
@@ -214,15 +220,12 @@ extension ExecutionState {
             }
         }
 #endif
-        var inst: Instruction
+        var inst: UInt64
         while true {
-            pc = pc.advancedPc(by: 1)
-            inst = pc.read(Instruction.self)
+            inst = pc.read(UInt64.self)
 #if WASMKIT_ENGINE_STATS
             stats[inst.name, default: 0] += 1
 #endif
-            // `doExecute` returns false when current frame *may* be updated
-            // print("[\(pc)] execute:", inst)
             try doExecute(inst, sp: &sp, pc: &pc, md: &md, ms: &ms)
         }
     }
@@ -319,6 +322,39 @@ extension Sp {
         nonmutating set { write(index, .f32(newValue)) }
     }
     subscript(f64 index: VReg) -> Float64 {
+        get { return Float64(bitPattern: read(index)) }
+        nonmutating set { write(index, .f64(newValue)) }
+    }
+
+    subscript(_ index: Int32) -> UntypedValue {
+        get {
+            return self[Int(index)]
+        }
+        nonmutating set {
+            return self[Int(index)] = newValue
+        }
+    }
+    private func read<T: FixedWidthInteger>(_ index: Int32) -> T {
+        return self.advanced(by: Int(index)).withMemoryRebound(to: T.self, capacity: 1) {
+            $0.pointee
+        }
+    }
+    private func write(_ index: Int32, _ value: UntypedValue) {
+        self[Int(index)] = value
+    }
+    subscript(i32 index: Int32) -> UInt32 {
+        get { return read(index) }
+        nonmutating set { write(index, .i32(newValue)) }
+    }
+    subscript(i64 index: Int32) -> UInt64 {
+        get { return read(index) }
+        nonmutating set { write(index, .i64(newValue)) }
+    }
+    subscript(f32 index: Int32) -> Float32 {
+        get { return Float32(bitPattern: read(index)) }
+        nonmutating set { write(index, .f32(newValue)) }
+    }
+    subscript(f64 index: Int32) -> Float64 {
         get { return Float64(bitPattern: read(index)) }
         nonmutating set { write(index, .f64(newValue)) }
     }

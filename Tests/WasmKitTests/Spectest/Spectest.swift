@@ -9,7 +9,8 @@ public func spectest(
     include: String?,
     exclude: String?,
     verbose: Bool = false,
-    parallel: Bool = true
+    parallel: Bool = true,
+    configuration: RuntimeConfiguration = .init()
 ) async throws -> Bool {
     let printVerbose = verbose
     @Sendable func log(_ message: String, verbose: Bool = false) {
@@ -81,7 +82,7 @@ public func spectest(
             logDuration = {}
         }
         log("Testing  \(testCase.relativePath)")
-        try testCase.run(spectestModule: hostModule) { testCase, location, result in
+        try testCase.run(spectestModule: hostModule, configuration: configuration) { testCase, location, result in
             switch result {
             case let .failed(reason):
                 log("\(result.banner) \(reason)", path: testCase.path, location: location)

@@ -32,14 +32,15 @@ enum VMGen {
     }
 
     struct Instruction {
-        let name: String
-        let isControl: Bool
-        let mayThrow: Bool
-        let mayUpdateFrame: Bool
-        let mayUpdateSp: Bool = false
-        let hasData: Bool
-        let useCurrentMemory: RegisterUse
-        let immediates: [Immediate]
+        var name: String
+        var isControl: Bool
+        var mayThrow: Bool
+        var mayUpdateFrame: Bool
+        var mayUpdateSp: Bool = false
+        var hasData: Bool
+        var useCurrentMemory: RegisterUse
+        var useRawOperand: Bool = false
+        var immediates: [Immediate]
 
         var mayUpdatePc: Bool {
             self.isControl || self.hasData
@@ -60,6 +61,12 @@ enum VMGen {
             self.useCurrentMemory = useCurrentMemory
             self.immediates = immediates
             assert(isControl || !mayUpdateFrame, "non-control instruction should not update frame")
+        }
+
+        func withRawOperand() -> Instruction {
+            var copy = self
+            copy.useRawOperand = true
+            return copy
         }
 
         typealias Parameter = (label: String, type: String, isInout: Bool)
@@ -242,12 +249,10 @@ enum VMGen {
             Immediate(name: nil, type: "Instruction.Const64Operand")
         ]),
         Instruction(name: "numericFloatUnary", immediates: [
-            Immediate(name: nil, type: "NumericInstruction.FloatUnary"),
-            Immediate(name: nil, type: "Instruction.UnaryOperand"),
+            Immediate(name: nil, type: "Instruction.FloatUnaryOperand"),
         ]),
         Instruction(name: "numericConversion", mayThrow: true, immediates: [
-            Immediate(name: nil, type: "NumericInstruction.Conversion"),
-            Immediate(name: nil, type: "Instruction.UnaryOperand"),
+            Immediate(name: nil, type: "Instruction.ConversionOperand"),
         ]),
     ]
 
@@ -343,7 +348,7 @@ enum VMGen {
     static func buildInstructions() -> [Instruction] {
         var instructions: [Instruction] = [
             // Variable
-            Instruction(name: "copyStack", immediates: [Immediate(name: nil, type: "Instruction.CopyStackOperand")]),
+            Instruction(name: "copyStack", immediates: [Immediate(name: nil, type: "Instruction.CopyStackOperand")]).withRawOperand(),
             Instruction(name: "globalGet", hasData: true, immediates: [Immediate(name: nil, type: "Instruction.GlobalGetOperand")]),
             Instruction(name: "globalSet", hasData: true, immediates: [Immediate(name: nil, type: "Instruction.GlobalSetOperand")]),
             // Controls
@@ -416,7 +421,7 @@ enum VMGen {
 
     static func generateDispatcher(instructions: [Instruction]) -> String {
         let doExecuteParams: [Instruction.Parameter] =
-            [("instruction", "Instruction", false)]
+            [("instruction", "UInt64", false)]
             + ExecParam.allCases.map { ($0.label, $0.type, true) }
         var output = """
             extension ExecutionState {
@@ -425,30 +430,17 @@ enum VMGen {
                     switch instruction {
             """
 
-        for inst in instructions {
+        for (index, inst) in instructions.enumerated() {
             let tryPrefix = inst.mayThrow ? "try " : ""
-            let args = inst.parameters.map { label, _, isInout in
-                "\(label): \(isInout ? "&" : "")\(label)"
-            }
-            if inst.immediates.isEmpty {
-                output += """
-
-                            case .\(inst.name):
-                    """
-            } else {
-                let labels = inst.immediates.map { $0.label }
-                output += """
-
-                            case .\(inst.name)(\(labels.map { "let \($0)" }.joined(separator: ", "))):
-                    """
-            }
-            let mayAssignPc = inst.mayUpdatePc ? "pc = " : ""
+            let args = ExecParam.allCases.map { "\($0.label): &\($0.label)" }
             output += """
 
-                            \(mayAssignPc)\(tryPrefix)self.\(inst.name)(\(args.joined(separator: ", ")))
+                        case \(index): \(tryPrefix)self.execute_\(inst.name)(\(args.joined(separator: ", ")))
                 """
         }
         output += """
+
+                    default: preconditionFailure("Unknown instruction!?")
 
                     }
                 }
@@ -553,6 +545,9 @@ enum VMGen {
 
         let files = try FileManager.default.contentsOfDirectory(at: sourceRoot.appendingPathComponent("Sources/WasmKit/Execution/Instructions"), includingPropertiesForKeys: nil)
         for file in files {
+            guard file.lastPathComponent != "InstructionSupport.swift" else {
+                continue
+            }
             if try tryReplace(file: file) {
                 print("Replaced \(inst.name) in \(file.lastPathComponent)")
                 return
@@ -615,6 +610,72 @@ enum VMGen {
         output += "        }\n"
         output += "    }\n"
         output += "}\n"
+        output += "\n"
+        output += """
+        extension Instruction {
+            var useRawOperand: Bool {
+                switch self {
+
+        """
+        for inst in instructions {
+            guard inst.useRawOperand else { continue }
+            output += "        case .\(inst.name): return true\n"
+        }
+        output += """
+                default: return false
+                }
+            }
+        }
+
+        """
+
+        output += """
+        extension Instruction {
+            var rawImmediate: UInt64 {
+                switch self {
+
+        """
+        for inst in instructions {
+            guard let immediate = inst.immediates.first, inst.useRawOperand else {
+                continue
+            }
+            output += "        case .\(inst.name)(let \(immediate.label)): return unsafeBitCast(\(immediate.label), to: UInt64.self)\n"
+        }
+        output += """
+                default: preconditionFailure()
+                }
+            }
+        }
+
+        """
+
+        output += """
+        extension Instruction {
+            enum Tagged {
+
+        """
+        for inst in instructions {
+            guard !inst.useRawOperand, !inst.immediates.isEmpty else { continue }
+            output += "        case \(inst.name)(\(inst.immediates.map { $0.type }.joined(separator: ", ")))\n"
+        }
+        output += """
+            }
+
+            var tagged: Tagged {
+                switch self {
+
+        """
+        for inst in instructions {
+            guard !inst.useRawOperand, !inst.immediates.isEmpty else { continue }
+            output += "        case let .\(inst.name)(\(inst.immediates.map { $0.label }.joined(separator: ", "))): return .\(inst.name)(\(inst.immediates.map { $0.label }.joined(separator: ", ")))\n"
+        }
+        output += """
+                default: preconditionFailure()
+                }
+            }
+        }
+
+        """
         return output
     }
 
@@ -636,18 +697,26 @@ enum VMGen {
             let mayAssignPc = inst.mayUpdatePc ? "pc.pointee = " : ""
             output += """
 
-                @_silgen_name("wasmkit_execute_\(inst.name)")
+                @_silgen_name("wasmkit_execute_\(inst.name)") @inline(__always)
                 mutating func execute_\(inst.name)(\(ExecParam.allCases.map { "\($0.label): UnsafeMutablePointer<\($0.type)>" }.joined(separator: ", ")))\(throwsKwd) {
 
             """
             if !inst.immediates.isEmpty {
-                output += """
-                        let inst = pc.pointee.read(Instruction.self)
-                        guard case let .\(inst.name)(\(inst.immediates.map { $0.label }.joined(separator: ", "))) = inst else {
-                            preconditionFailure()
-                        }
+                if inst.useRawOperand {
+                    let immediate = inst.immediates[0]
+                    output += """
+                            let \(immediate.label) = pc.pointee.read(\(immediate.type).self)
 
-                """
+                    """
+                } else {
+                    output += """
+                            let inst = pc.pointee.read(Instruction.Tagged.self)
+                            guard case let .\(inst.name)(\(inst.immediates.map { $0.label }.joined(separator: ", "))) = inst else {
+                                preconditionFailure()
+                            }
+
+                    """
+                }
             }
             output += """
                     \(mayAssignPc)\(tryKwd)\(inst.name)(\(args))
@@ -662,7 +731,7 @@ enum VMGen {
         output += "\n\n"
         output += """
         extension Instruction {
-            var dtcHandlerIndex: Int {
+            var rawIndex: Int {
                 switch self {
 
         """
@@ -762,7 +831,7 @@ enum VMGen {
 
                 @inline(never)
                 var handler: UInt64 {
-                    return Self.handlers[dtcHandlerIndex]
+                    return Self.handlers[rawIndex]
                 }
             }
 
