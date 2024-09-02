@@ -1,6 +1,7 @@
 import WasmParser
 
 typealias VReg = Int16
+typealias LLVReg = Int64
 
 protocol InstructionImmediate {
     static func load(from pc: inout Pc) -> Self
@@ -12,6 +13,15 @@ extension InstructionImmediate {
         Self.emit { buildCodeSlot in
             emitSlot(buildCodeSlot(self))
         }
+    }
+}
+
+extension LLVReg: InstructionImmediate {
+    static func load(from pc: inout Pc) -> Self {
+        Self(bitPattern: pc.read())
+    }
+    static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+        emitSlot { UInt64(bitPattern: $0) }
     }
 }
 
@@ -164,13 +174,8 @@ extension Instruction {
         let size: VReg
     }
 
-    struct GlobalGetOperand: Equatable {
-        let result: VReg
-    }
-    
-    struct GlobalSetOperand: Equatable {
-        let value: VReg
-    }
+    typealias GlobalGetOperand = LLVReg
+    typealias GlobalSetOperand = LLVReg
 
     struct CopyStackOperand: Equatable, InstructionImmediate {
         let source: Int32

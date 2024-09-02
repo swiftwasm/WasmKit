@@ -724,18 +724,12 @@ extension ExecutionState {
     }
     @_silgen_name("wasmkit_execute_globalGet") @inline(__always)
     mutating func execute_globalGet(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .globalGet(globalGetOperand) = inst else {
-            preconditionFailure()
-        }
+        let globalGetOperand = Instruction.GlobalGetOperand.load(from: &pc.pointee)
         pc.pointee = globalGet(sp: sp.pointee, pc: pc.pointee, globalGetOperand: globalGetOperand)
     }
     @_silgen_name("wasmkit_execute_globalSet") @inline(__always)
     mutating func execute_globalSet(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .globalSet(globalSetOperand) = inst else {
-            preconditionFailure()
-        }
+        let globalSetOperand = Instruction.GlobalSetOperand.load(from: &pc.pointee)
         pc.pointee = globalSet(sp: sp.pointee, pc: pc.pointee, globalSetOperand: globalSetOperand)
     }
     @_silgen_name("wasmkit_execute_call") @inline(__always)

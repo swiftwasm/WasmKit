@@ -617,7 +617,12 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         mutating func emit(_ instruction: Instruction, resultRelink: ResultRelink? = nil) {
             self.lastEmission = LastEmission(position: insertingPC, resultRelink: resultRelink)
             trace("emitInstruction[\(instructions.count)] \(instruction) index: \(instruction.rawIndex)")
-            emitSlot(instruction.handler)
+            switch runtimeConfiguration.threadingModel {
+            case .direct:
+                emitSlot(instruction.handler)
+            case .token:
+                emitSlot(UInt64(instruction.rawIndex))
+            }
             if instruction.hasImmediate {
                 if instruction.useRawOperand {
                     instruction.rawImmediate.emit(to: { emitSlot($0) })
@@ -1381,7 +1386,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             // Skip actual code emission if validation-only mode
             return
         }
-        emit(.globalGet(Instruction.GlobalGetOperand(result: result)))
+        emit(.globalGet(Instruction.GlobalGetOperand(result)))
         iseqBuilder.emitData(global)
     }
     mutating func visitGlobalSet(globalIndex: UInt32) throws -> Output {
@@ -1391,10 +1396,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             // Skip actual code emission if validation-only mode
             return
         }
-        let operand = Instruction.GlobalSetOperand(
-            value: value
-        )
-        emit(.globalSet(operand))
+        emit(.globalSet(Instruction.GlobalSetOperand(value)))
         iseqBuilder.emitData(global)
     }
 
