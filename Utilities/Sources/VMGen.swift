@@ -430,8 +430,8 @@ enum VMGen {
             Instruction(
                 name: "brTable", isControl: true, mayUpdateFrame: false,
                 immediates: [
-                    Immediate(name: nil, type: "Instruction.BrTableOperand")
-                ]),
+                    Immediate(name: nil, type: "Instruction.BrTable")
+                ]).withRawOperand(),
             Instruction(name: "_return", isControl: true, mayUpdateFrame: true, useCurrentMemory: .write, immediates: []),
             Instruction(name: "endOfExecution", isControl: true, mayThrow: true, mayUpdateFrame: true, immediates: []),
         ]
@@ -753,7 +753,7 @@ enum VMGen {
                 }
             }
             output += """
-                    \(mayAssignPc)\(tryKwd)\(inst.name)(\(args))
+                    \(mayAssignPc)\(tryKwd)self.\(inst.name)(\(args))
                 }
             """
         }

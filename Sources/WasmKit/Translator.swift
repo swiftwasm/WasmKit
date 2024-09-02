@@ -1183,13 +1183,11 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         preserveAllLocalsOnStack()
         let allLabelIndices = targets.labelIndices + [targets.defaultIndex]
         let tableBuffer = allocator.allocateBrTable(capacity: allLabelIndices.count)
-        let brTable = Instruction.BrTable(
-            baseAddress: tableBuffer.baseAddress!
-//            count: UInt16(tableBuffer.count)
+        let operand = Instruction.BrTable(
+            baseAddress: tableBuffer.baseAddress!,
+            count: UInt16(tableBuffer.count), index: index
         )
-        let operand = Instruction.BrTableOperand(count: UInt16(tableBuffer.count), index: index)
         iseqBuilder.emit(.brTable(operand))
-        iseqBuilder.emitData(brTable)
         let brTableAt = iseqBuilder.insertingPC
 
         // TODO(optimize): Eliminate landing pads when copyCount of a destination is 0
