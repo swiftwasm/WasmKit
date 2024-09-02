@@ -1909,18 +1909,12 @@ extension ExecutionState {
     }
     @_silgen_name("wasmkit_execute_onEnter") @inline(__always)
     mutating func execute_onEnter(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .onEnter(onEnterOperand) = inst else {
-            preconditionFailure()
-        }
+        let onEnterOperand = Instruction.OnEnterOperand.load(from: &pc.pointee)
         self.onEnter(sp: sp.pointee, onEnterOperand: onEnterOperand)
     }
     @_silgen_name("wasmkit_execute_onExit") @inline(__always)
     mutating func execute_onExit(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .onExit(onExitOperand) = inst else {
-            preconditionFailure()
-        }
+        let onExitOperand = Instruction.OnExitOperand.load(from: &pc.pointee)
         self.onExit(sp: sp.pointee, onExitOperand: onExitOperand)
     }
 }

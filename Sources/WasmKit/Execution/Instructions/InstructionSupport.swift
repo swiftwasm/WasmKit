@@ -52,6 +52,15 @@ extension LLVReg: InstructionImmediate {
     }
 }
 
+extension FunctionIndex: InstructionImmediate {
+    static func load(from pc: inout Pc) -> Self {
+        FunctionIndex(pc.read(UInt64.self))
+    }
+    static func emit(to emitSlot: @escaping ((Self) -> CodeSlot) -> Void) {
+        emitSlot { CodeSlot($0) }
+    }
+}
+
 extension Instruction {
     /// size = 6, alignment = 2
     struct BinaryOperand: Equatable, InstructionImmediate {

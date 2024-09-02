@@ -575,6 +575,8 @@ extension Instruction {
         case .f64Sqrt: return true
         case .f64PromoteF32: return true
         case .f32DemoteF64: return true
+        case .onEnter: return true
+        case .onExit: return true
         default: return false
         }
     }
@@ -754,6 +756,8 @@ extension Instruction {
         case .f64Sqrt(let unaryOperand): return unaryOperand
         case .f64PromoteF32(let unaryOperand): return unaryOperand
         case .f32DemoteF64(let unaryOperand): return unaryOperand
+        case .onEnter(let onEnterOperand): return onEnterOperand
+        case .onExit(let onExitOperand): return onExitOperand
         default: preconditionFailure()
         }
     }
@@ -777,8 +781,6 @@ extension Instruction {
         case tableCopy(Instruction.TableCopyOperand)
         case tableInit(Instruction.TableInitOperand)
         case tableElementDrop(ElementIndex)
-        case onEnter(Instruction.OnEnterOperand)
-        case onExit(Instruction.OnExitOperand)
     }
 
     var tagged: Tagged {
@@ -800,8 +802,6 @@ extension Instruction {
         case let .tableCopy(tableCopyOperand): return .tableCopy(tableCopyOperand)
         case let .tableInit(tableInitOperand): return .tableInit(tableInitOperand)
         case let .tableElementDrop(elementIndex): return .tableElementDrop(elementIndex)
-        case let .onEnter(onEnterOperand): return .onEnter(onEnterOperand)
-        case let .onExit(onExitOperand): return .onExit(onExitOperand)
         default: preconditionFailure()
         }
     }

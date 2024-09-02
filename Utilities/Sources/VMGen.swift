@@ -372,8 +372,8 @@ enum VMGen {
         Instruction(name: "tableInit", mayThrow: true, hasData: true, immediates: [Immediate(name: nil, type: "Instruction.TableInitOperand")]),
         Instruction(name: "tableElementDrop", immediates: [Immediate(name: nil, type: "ElementIndex")]),
         // Profiling
-        Instruction(name: "onEnter", immediates: [Immediate(name: nil, type: "Instruction.OnEnterOperand")]),
-        Instruction(name: "onExit", immediates: [Immediate(name: nil, type: "Instruction.OnExitOperand")]),
+        Instruction(name: "onEnter", immediates: [Immediate(name: nil, type: "Instruction.OnEnterOperand")]).withRawOperand(),
+        Instruction(name: "onExit", immediates: [Immediate(name: nil, type: "Instruction.OnExitOperand")]).withRawOperand(),
     ]
 
     // MARK: - Instruction generation
