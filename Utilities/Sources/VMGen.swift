@@ -209,7 +209,28 @@ enum VMGen {
         results += truncInOut.flatMap { source, result in
             [
                 UnOpInfo(op: "TruncTo\(result.uppercased())S", name: "\(result)Trunc\(source.uppercased())S", inputType: source, resultType: result, mayThrow: true),
-                UnOpInfo(op: "TruncTo\(result.uppercased())U", name: "\(result)Trunc\(source.uppercased())U", inputType: source, resultType: result, mayThrow: true)
+                UnOpInfo(op: "TruncTo\(result.uppercased())U", name: "\(result)Trunc\(source.uppercased())U", inputType: source, resultType: result, mayThrow: true),
+                UnOpInfo(op: "TruncSatTo\(result.uppercased())S", name: "\(result)TruncSat\(source.uppercased())S", inputType: source, resultType: result, mayThrow: true),
+                UnOpInfo(op: "TruncSatTo\(result.uppercased())U", name: "\(result)TruncSat\(source.uppercased())U", inputType: source, resultType: result, mayThrow: true)
+            ]
+        }
+        // Conversion
+        let convInOut: [(source: String, result: String)] = [
+            ("i32", "f32"), ("i64", "f32"), ("i32", "f64"), ("i64", "f64")
+        ]
+        results += convInOut.flatMap { source, result in
+            [
+                UnOpInfo(op: "ConvertTo\(result.uppercased())S", name: "\(result)Convert\(source.uppercased())S", inputType: source, resultType: result),
+                UnOpInfo(op: "ConvertTo\(result.uppercased())U", name: "\(result)Convert\(source.uppercased())U", inputType: source, resultType: result),
+            ]
+        }
+        // Reinterpret
+        let reinterpretInOut: [(source: String, result: String)] = [
+            ("i32", "f32"), ("i64", "f64"), ("f32", "i32"), ("f64", "i64")
+        ]
+        results += reinterpretInOut.flatMap { source, result in
+            [
+                UnOpInfo(op: "ReinterpretTo\(result.uppercased())", name: "\(result)Reinterpret\(source.uppercased())", inputType: source, resultType: result),
             ]
         }
         return results
@@ -244,6 +265,14 @@ enum VMGen {
         results += ["Abs", "Neg", "Ceil", "Floor", "Trunc", "Nearest", "Sqrt"].flatMap { op -> [UnOpInfo] in
             floatValueTypes.map { UnOpInfo(op: op, name: "\($0)\(op)", inputType: $0, resultType: $0) }
         }
+        // (f32) -> f64
+        results += ["PromoteF32"].map { op -> UnOpInfo in
+            UnOpInfo(op: op, name: "f64\(op)", inputType: "f32", resultType: "f64")
+        }
+        // (f64) -> f32
+        results += ["DemoteF64"].map { op -> UnOpInfo in
+            UnOpInfo(op: op, name: "f32\(op)", inputType: "f64", resultType: "f32")
+        }
         return results
     }
     static let floatUnaryOps: [UnOpInfo] = buildFloatUnaryOps()
@@ -258,9 +287,6 @@ enum VMGen {
         Instruction(name: "const64", hasData: true, immediates: [
             Immediate(name: nil, type: "Instruction.Const64Operand")
         ]).withRawOperand(),
-        Instruction(name: "numericConversion", mayThrow: true, immediates: [
-            Immediate(name: nil, type: "Instruction.ConversionOperand"),
-        ]),
     ]
 
     // MARK: - Memory instructions
