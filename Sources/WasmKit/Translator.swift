@@ -247,6 +247,9 @@ fileprivate struct MetaProgramCounter {
 /// | Offset                             | Description          |
 /// |------------------------------------|----------------------|
 /// | 0 ~ max(params, results)-1         | Frame header         |
+/// | SP-3                               |   * Saved Instance   |
+/// | SP-2                               |   * Saved PC         |
+/// | SP-1                               |   * Saved SP         |
 /// | SP+0                               | Local variable 0     |
 /// | SP+1                               | Local variable 1     |
 /// | ...                                | ...                  |
@@ -286,7 +289,7 @@ struct StackLayout {
         frameHeaderSize(parameters: type.parameters.count, results: type.results.count)
     }
     internal static func frameHeaderSize(parameters: Int, results: Int) -> VReg {
-        VReg(max(parameters, results))
+        VReg(max(parameters, results)) + 3
     }
 }
 

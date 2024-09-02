@@ -23,7 +23,7 @@ extension ExecutionState {
         sp[refIsNullOperand.result] = UntypedValue(result)
     }
     mutating func refFunc(sp: Sp, refFuncOperand: Instruction.RefFuncOperand) {
-        let function = currentInstance.functions[Int(refFuncOperand.index)]
+        let function = currentInstance(sp: sp).functions[Int(refFuncOperand.index)]
         sp[refFuncOperand.result] = UntypedValue(.ref(.function(from: function)))
     }
 }

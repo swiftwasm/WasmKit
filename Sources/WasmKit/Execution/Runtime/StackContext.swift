@@ -4,14 +4,8 @@ struct StackContext {
 
     private var limit: UInt16 { UInt16.max }
     private var stackEnd: UnsafeMutablePointer<UntypedValue>
-    private var frames: FixedSizeStack<Frame>
-    var currentFrame: Frame!
     let runtime: RuntimeRef
     var trap: UnsafeRawPointer?
-
-    var currentInstance: InternalInstance {
-        currentFrame.instance
-    }
 
     static func withContext<T>(
         runtime: RuntimeRef,
@@ -19,13 +13,16 @@ struct StackContext {
     ) rethrows -> T {
         let limit = UInt16.max
         let valueStack = ValueStack(capacity: Int(limit))
-        let frames = FixedSizeStack<Frame>(capacity: Int(limit))
         defer {
             valueStack.deallocate()
-            frames.deallocate()
         }
-        var context = StackContext(stackEnd: valueStack.endAddress, frames: frames, runtime: runtime)
+        var context = StackContext(stackEnd: valueStack.endAddress, runtime: runtime)
         return try body(&context, valueStack.frameBase)
+    }
+
+    @inline(__always)
+    func currentInstance(sp: Sp) -> InternalInstance {
+        InternalInstance(bitPattern: UInt(sp[-3].i64)).unsafelyUnwrapped
     }
 
     @inline(__always)
@@ -36,32 +33,26 @@ struct StackContext {
         sp: Sp, returnPC: Pc,
         spAddend: VReg
     ) throws -> Sp {
-        guard frames.count < limit else {
-            throw Trap.callStackExhausted
-        }
         let newSp = sp.advanced(by: Int(spAddend))
         guard newSp.advanced(by: iseq.maxStackHeight) < stackEnd else {
             throw Trap.callStackExhausted
         }
         // Initialize the locals with zeros (all types of value have the same representation)
         newSp.initialize(repeating: .default, count: numberOfNonParameterLocals)
-        let frame = Frame(instance: instance, savedSp: sp, returnPc: returnPC)
-        frames.push(frame)
-        self.currentFrame = frame
+        newSp[-1] = .i64(UInt64(UInt(bitPattern: sp)))
+        newSp[-2] = .i64(UInt64(UInt(bitPattern: returnPC)))
+        newSp[-3] = .i64(UInt64(UInt(bitPattern: instance.bitPattern)))
         return newSp
     }
 
     @inline(__always)
     mutating func popFrame(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) {
-        let popped = self.frames.pop()
-        let newCurrentFrame = self.frames.peek()
-        self.currentFrame = newCurrentFrame
-        sp = popped.savedSp
-        pc = popped.returnPc
-        CurrentMemory.mayUpdateCurrentInstance(instance: popped.instance, from: popped.instance, md: &md, ms: &ms)
-    }
-
-    func dump(store: Store) throws {
+        let oldSp = sp
+        sp = Sp(bitPattern: UInt(oldSp[-1].i64)).unsafelyUnwrapped
+        pc = Pc(bitPattern: UInt(oldSp[-2].i64)).unsafelyUnwrapped
+        let toInstance = InternalInstance(bitPattern: UInt(oldSp[-3].i64)).unsafelyUnwrapped
+        let fromInstance = InternalInstance(bitPattern: UInt(sp[-3].i64))
+        CurrentMemory.mayUpdateCurrentInstance(instance: toInstance, from: fromInstance, md: &md, ms: &ms)
     }
 }
 
@@ -82,76 +73,6 @@ struct ValueStack {
 
     func deallocate() {
         self.values.deallocate()
-    }
-}
-
-struct FixedSizeStack<Element> {
-    private let buffer: UnsafeMutableBufferPointer<Element>
-    private var numberOfElements: Int = 0
-
-    var count: Int { numberOfElements }
-
-    init(capacity: Int) {
-        self.buffer = .allocate(capacity: capacity)
-    }
-
-    mutating func push(_ element: Element) {
-        self.buffer[numberOfElements] = element
-        self.numberOfElements += 1
-    }
-
-    @discardableResult
-    mutating func pop() -> Element {
-        let element = self.buffer[self.numberOfElements - 1]
-        self.numberOfElements -= 1
-        return element
-    }
-
-    func peek() -> Element! {
-        guard self.numberOfElements > 0 else { return nil }
-        return self.buffer[self.numberOfElements - 1]
-    }
-
-    func deallocate() {
-        self.buffer.deallocate()
-    }
-}
-
-extension FixedSizeStack: Sequence {
-    struct Iterator: IteratorProtocol {
-        fileprivate var base: UnsafeMutableBufferPointer<Element>.SubSequence.Iterator
-
-        mutating func next() -> Element? {
-            base.next()
-        }
-    }
-
-    func makeIterator() -> Iterator {
-        Iterator(base: self.buffer[..<numberOfElements].makeIterator())
-    }
-}
-
-/// > Note:
-/// <https://webassembly.github.io/spec/core/exec/runtime.html#frames>
-struct Frame {
-    let instance: InternalInstance
-    let savedSp: Sp
-    let returnPc: Pc
-
-    init(
-        instance: InternalInstance,
-        savedSp: Sp,
-        returnPc: Pc
-    ) {
-        self.instance = instance
-        self.savedSp = savedSp
-        self.returnPc = returnPc
-    }
-}
-
-extension Frame: Equatable {
-    static func == (_ lhs: Frame, _ rhs: Frame) -> Bool {
-        lhs.instance == rhs.instance
     }
 }
 
