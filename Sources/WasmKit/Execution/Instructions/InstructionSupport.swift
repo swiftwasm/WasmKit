@@ -54,16 +54,28 @@ extension LLVReg: InstructionImmediate {
 
 extension Instruction {
     /// size = 6, alignment = 2
-    struct BinaryOperand: Equatable {
-        let result: VReg
+    struct BinaryOperand: Equatable, InstructionImmediate {
+        let result: LVReg
         let lhs: VReg
         let rhs: VReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            pc.read()
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast($0, to: CodeSlot.self) }
+        }
     }
     
     /// size = 4, alignment = 2
-    struct UnaryOperand: Equatable {
-        let result: VReg
-        let input: VReg
+    struct UnaryOperand: Equatable, InstructionImmediate {
+        let result: LVReg
+        let input: LVReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            pc.read()
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast($0, to: CodeSlot.self) }
+        }
     }
 
     struct Const32Operand: Equatable, InstructionImmediate {
@@ -348,8 +360,8 @@ struct InstructionPrintingContext {
     let function: Function
     var nameRegistry: NameRegistry
 
-    func reg(_ reg: VReg) -> String {
-        let adjusted = VReg(StackLayout.frameHeaderSize(type: function.type)) + reg
+    func reg<R: FixedWidthInteger>(_ reg: R) -> String {
+        let adjusted = R(StackLayout.frameHeaderSize(type: function.type)) + reg
         if shouldColor {
             let regColor = adjusted < 15 ? "\u{001B}[3\(adjusted + 1)m" : ""
             return "\(regColor)reg:\(reg)\u{001B}[0m"
