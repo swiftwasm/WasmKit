@@ -23,11 +23,23 @@ extension InstructionImmediate {
 }
 
 extension VReg: InstructionImmediate {
-    static func load(from pc: inout Pc) -> Int16 {
+    static func load(from pc: inout Pc) -> Self {
         VReg(bitPattern: UInt16(pc.read(UInt64.self)))
     }
     static func emit(to emitSlot: @escaping ((Self) -> CodeSlot) -> Void) {
         emitSlot { CodeSlot(UInt16(bitPattern: $0)) }
+    }
+
+    typealias Slot2 = (VReg, VReg, pad: UInt32)
+    static func load2(from pc: inout Pc) -> (Self, Self) {
+        let (x, y, _) = pc.read(Slot2.self)
+        return (x, y)
+    }
+    static func emit2(to emitSlot: @escaping ((Self, Self) -> CodeSlot) -> Void) {
+        emitSlot { x, y in
+            let slot: Slot2 = (x, y, 0)
+            return unsafeBitCast(slot, to: CodeSlot.self)
+        }
     }
 }
 
@@ -41,10 +53,6 @@ extension LLVReg: InstructionImmediate {
 }
 
 extension Instruction {
-    struct MemArg: Equatable {
-        let offset: UInt64
-    }
-
     /// size = 6, alignment = 2
     struct BinaryOperand: Equatable {
         let result: VReg
@@ -84,14 +92,40 @@ extension Instruction {
     }
 
     /// size = 4, alignment = 8
-    struct LoadOperand: Equatable {
+    struct LoadOperand: Equatable, InstructionImmediate {
+        let offset: UInt64
         let pointer: VReg
         let result: VReg
+
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let offset = pc.read(UInt64.self)
+            let (pointer, result) = VReg.load2(from: &pc)
+            return Self(offset: offset, pointer: pointer, result: result)
+        }
+        @inline(__always) static func emit(to emitSlot: @escaping ((Self) -> CodeSlot) -> Void) {
+            emitSlot { $0.offset }
+            VReg.emit2 { emitVRegs in
+                emitSlot { emitVRegs($0.pointer, $0.result) }
+            }
+        }
     }
 
-    struct StoreOperand: Equatable {
+    struct StoreOperand: Equatable, InstructionImmediate {
+        let offset: UInt64
         let pointer: VReg
         let value: VReg
+
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let offset = pc.read(UInt64.self)
+            let (pointer, value) = VReg.load2(from: &pc)
+            return Self(offset: offset, pointer: pointer, value: value)
+        }
+        @inline(__always) static func emit(to emitSlot: @escaping ((Self) -> CodeSlot) -> Void) {
+            emitSlot { $0.offset }
+            VReg.emit2 { emitVRegs in
+                emitSlot { emitVRegs($0.pointer, $0.value) }
+            }
+        }
     }
     
     struct MemorySizeOperand: Equatable {
@@ -324,8 +358,8 @@ struct InstructionPrintingContext {
         }
     }
 
-    func memarg(_ memarg: Instruction.MemArg) -> String {
-        "offset: \(memarg.offset)"
+    func offset(_ offset: UInt64) -> String {
+        "offset: \(offset)"
     }
 
     mutating func callee(_ callee: InternalFunction) -> String {

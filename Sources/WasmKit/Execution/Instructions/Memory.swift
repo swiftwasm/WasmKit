@@ -5,39 +5,31 @@ extension ExecutionState {
         throw Trap.outOfBoundsMemoryAccess
     }
     mutating func memoryLoad<T: FixedWidthInteger>(
-        sp: Sp, pc: Pc, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand, loadAs _: T.Type = T.self, castToValue: (T) -> UntypedValue
-    ) throws -> Pc {
-        var pc = pc
-        let memarg = pc.read(Instruction.MemArg.self)
-
+        sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand, loadAs _: T.Type = T.self, castToValue: (T) -> UntypedValue
+    ) throws {
         let length = UInt64(T.bitWidth) / 8
         let i = sp[loadOperand.pointer].asAddressOffset()
-        let (endAddress, isEndOverflow) = i.addingReportingOverflow(length &+ memarg.offset)
+        let (endAddress, isEndOverflow) = i.addingReportingOverflow(length &+ loadOperand.offset)
         if _fastPath(!isEndOverflow && endAddress <= ms) {
-            let address = memarg.offset + i
+            let address = loadOperand.offset + i
             let loaded = md.unsafelyUnwrapped.loadUnaligned(fromByteOffset: Int(address), as: T.self)
             sp[loadOperand.result] = castToValue(loaded)
-            return pc
         } else {
             try throwOutOfBoundsMemoryAccess()
         }
     }
 
     /// `[type].store[bitWidth]`
-    mutating func memoryStore<T: FixedWidthInteger>(sp: Sp, pc: Pc, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand, castFromValue: (UntypedValue) -> T) throws -> Pc {
-        var pc = pc
-        let memarg = pc.read(Instruction.MemArg.self)
-
+    mutating func memoryStore<T: FixedWidthInteger>(sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand, castFromValue: (UntypedValue) -> T) throws {
         let value = sp[storeOperand.value]
         let length = UInt64(T.bitWidth) / 8
         let i = sp[storeOperand.pointer].asAddressOffset()
-        let address = memarg.offset + i
-        let (endAddress, isEndOverflow) = i.addingReportingOverflow(length + memarg.offset)
+        let address = storeOperand.offset + i
+        let (endAddress, isEndOverflow) = i.addingReportingOverflow(length &+ storeOperand.offset)
         if _fastPath(!isEndOverflow && endAddress <= ms) {
             let toStore = castFromValue(value)
             md.unsafelyUnwrapped.advanced(by: Int(address))
                 .bindMemory(to: T.self, capacity: 1).pointee = toStore.littleEndian
-            return pc
         } else {
             try throwOutOfBoundsMemoryAccess()
         }

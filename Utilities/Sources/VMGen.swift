@@ -313,7 +313,7 @@ enum VMGen {
         ("i64Load32S", "Int32", ".init(signed: Int64($0))"),
         ("i64Load32U", "UInt32", ".i64(UInt64($0))"),
     ].map { (name, loadAs, castToValue) in
-        let base = Instruction(name: name, mayThrow: true, hasData: true, useCurrentMemory: .read, immediates: [Immediate(name: nil, type: "Instruction.LoadOperand")])
+        let base = Instruction(name: name, mayThrow: true, useCurrentMemory: .read, immediates: [Immediate(name: nil, type: "Instruction.LoadOperand")]).withRawOperand()
         return LoadInstruction(loadAs: loadAs, castToValue: castToValue, base: base)
     }
 
@@ -332,7 +332,7 @@ enum VMGen {
         ("i64Store16", "UInt16(truncatingIfNeeded: $0.i64)"),
         ("i64Store32", "UInt32(truncatingIfNeeded: $0.i64)"),
     ].map { (name, castFromValue) in
-        let base = Instruction(name: name, mayThrow: true, hasData: true, useCurrentMemory: .read, immediates: [Immediate(name: nil, type: "Instruction.StoreOperand")])
+        let base = Instruction(name: name, mayThrow: true, useCurrentMemory: .read, immediates: [Immediate(name: nil, type: "Instruction.StoreOperand")]).withRawOperand()
         return StoreInstruction(castFromValue: castFromValue, base: base)
     }
     static let memoryLoadStoreInsts: [Instruction] = memoryLoadInsts.map(\.base) + memoryStoreInsts.map(\.base)
@@ -509,7 +509,7 @@ enum VMGen {
             output += """
 
                 @inline(__always) mutating \(instMethodDecl(inst.base)) {
-                    return try memoryLoad(sp: sp, pc: pc, md: md, ms: ms, loadOperand: loadOperand, loadAs: \(inst.loadAs).self, castToValue: { \(inst.castToValue) })
+                    return try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: \(inst.loadAs).self, castToValue: { \(inst.castToValue) })
                 }
             """
         }
@@ -517,7 +517,7 @@ enum VMGen {
             output += """
 
                 @inline(__always) mutating \(instMethodDecl(inst.base)) {
-                    return try memoryStore(sp: sp, pc: pc, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { \(inst.castFromValue) })
+                    return try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { \(inst.castFromValue) })
                 }
             """
         }

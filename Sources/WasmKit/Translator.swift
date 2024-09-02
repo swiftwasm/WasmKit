@@ -1476,13 +1476,12 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
         try popPushEmit(.address(isMemory64: isMemory64), type) { value, result, stack in
             let loadOperand = Instruction.LoadOperand(
-//                memarg: Instruction.MemArg(offset: memarg.offset),
+                offset: memarg.offset,
                 pointer: value,
                 result: result
             )
             return instruction(loadOperand)
         }
-        iseqBuilder.emitData(Instruction.MemArg(offset: memarg.offset))
     }
     private mutating func visitStore(
         _ memarg: MemArg,
@@ -1494,13 +1493,12 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
         if let value = value, let pointer = pointer {
             let storeOperand = Instruction.StoreOperand(
-//                memarg: Instruction.MemArg(offset: memarg.offset),
+                offset: memarg.offset,
                 pointer: pointer,
                 value: value
             )
             emit(instruction(storeOperand))
         }
-        iseqBuilder.emitData(Instruction.MemArg(offset: memarg.offset))
     }
     mutating func visitI32Load(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i32, Instruction.i32Load) }
     mutating func visitI64Load(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, Instruction.i64Load) }
