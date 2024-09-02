@@ -41,6 +41,16 @@ extension Instruction {
         let result: VReg
     }
 
+    struct FloatUnaryOperand: Equatable {
+        let operation: NumericInstruction.FloatUnary
+        let unary: UnaryOperand
+    }
+
+    struct ConversionOperand: Equatable {
+        let operation: NumericInstruction.Conversion
+        let unary: UnaryOperand
+    }
+
     /// size = 4, alignment = 8
     struct LoadOperand: Equatable {
         let pointer: VReg
@@ -150,8 +160,8 @@ extension Instruction {
     }
 
     struct CopyStackOperand: Equatable {
-        let source: VReg
-        let dest: VReg
+        let source: Int32
+        let dest: Int32
     }
 
     struct IfOperand: Equatable {
@@ -190,6 +200,14 @@ extension Instruction {
 
     typealias OnEnterOperand = FunctionIndex
     typealias OnExitOperand = FunctionIndex
+    
+
+    static func numericFloatUnary(_ op: NumericInstruction.FloatUnary, _ unary: Instruction.UnaryOperand) -> Instruction {
+        .numericFloatUnary(FloatUnaryOperand(operation: op, unary: unary))
+    }
+    static func numericConversion(_ op: NumericInstruction.Conversion, _ unary: Instruction.UnaryOperand) -> Instruction {
+        .numericConversion(ConversionOperand(operation: op, unary: unary))
+    }
 
     static func f32Abs(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.abs(.f32), op) }
     static func f32Neg(_ op: UnaryOperand) -> Instruction { .numericFloatUnary(.neg(.f32), op) }
@@ -237,21 +255,23 @@ extension Instruction {
     var rawValue: UInt64 {
         assert(_isPOD(Instruction.self))
         typealias RawInstruction = (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
-        let raw = unsafeBitCast(self, to: RawInstruction.self)
+        let raw = unsafeBitCast(self.tagged, to: RawInstruction.self)
         let slotData: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (
             raw.0, raw.1, raw.2, raw.3, raw.4, raw.5, raw.6, 0
         )
         return unsafeBitCast(slotData, to: UInt64.self)
     }
-    
+}
+
+extension Instruction.Tagged {
     init(rawValue: UInt64) {
-        assert(_isPOD(Instruction.self))
+        assert(_isPOD(Instruction.Tagged.self))
         typealias RawBytes = (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
         let raw = unsafeBitCast(rawValue, to: RawBytes.self)
         let rawInst: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (
             raw.0, raw.1, raw.2, raw.3, raw.4, raw.5, raw.6
         )
-        self = unsafeBitCast(rawInst, to: Instruction.self)
+        self = unsafeBitCast(rawInst, to: Instruction.Tagged.self)
     }
 }
 
@@ -320,8 +340,8 @@ struct InstructionPrintingContext {
 //            target.write("\(reg(op.result)) = f32.load \(reg(op.pointer)), \(memarg(op.memarg))")
 //        case .f64Load(let op):
 //            target.write("\(reg(op.result)) = f64.load \(reg(op.pointer)), \(memarg(op.memarg))")
-        case .copyStack(let op):
-            target.write("\(reg(op.dest)) = copy \(reg(op.source))")
+//        case .copyStack(let op):
+//            target.write("\(reg(op.dest)) = copy \(reg(op.source))")
         case .i32Add(let op):
             target.write("\(reg(op.result)) = i32.add \(reg(op.lhs)), \(reg(op.rhs))")
         case .i32Sub(let op):

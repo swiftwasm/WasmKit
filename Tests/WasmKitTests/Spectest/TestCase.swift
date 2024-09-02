@@ -111,8 +111,8 @@ class WastRunContext {
 }
 
 extension TestCase {
-    func run(spectestModule: Module, handler: @escaping (TestCase, Location, Result) -> Void) throws {
-        let runtime = Runtime()
+    func run(spectestModule: Module, configuration: RuntimeConfiguration, handler: @escaping (TestCase, Location, Result) -> Void) throws {
+        let runtime = Runtime(configuration: configuration)
         let hostModuleInstance = try runtime.instantiate(module: spectestModule)
 
         try runtime.store.register(hostModuleInstance, as: "spectest")

@@ -103,7 +103,12 @@ extension ExecutionState {
         let callee = pc.read(InternalFunction.self)
         try callee.ensureCompiled(runtime: runtime)
         let replaced = Instruction.internalCall(compilingCallOperand)
-        callPc[-2] = replaced.handler
+        switch runtime.value.configuration.threadingModel {
+        case .direct:
+            callPc[-2] = replaced.handler
+        case .token:
+            callPc[-2] = UInt64(replaced.rawIndex)
+        }
         callPc[-1] = replaced.rawValue
         try _internalCall(sp: &sp, pc: &pc, callee: callee, internalCallOperand: compilingCallOperand)
         return pc

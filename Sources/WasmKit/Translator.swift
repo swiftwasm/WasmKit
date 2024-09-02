@@ -541,6 +541,11 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         fileprivate var insertingPC: MetaProgramCounter {
             MetaProgramCounter(offsetFromHead: instructions.count)
         }
+        let runtimeConfiguration: RuntimeConfiguration
+
+        init(runtimeConfiguration: RuntimeConfiguration) {
+            self.runtimeConfiguration = runtimeConfiguration
+        }
 
         func assertDanglingLabels() throws {
             for ref in unpinnedLabels {
@@ -554,10 +559,27 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             }
         }
 
+        func trace(_ message: @autoclosure () -> String) {
+            #if WASMKIT_TRANSLATOR_TRACE
+            print(message())
+            #endif
+        }
+
         private mutating func assign(at index: Int, _ instruction: Instruction) {
-            self.instructions[index] = instruction.handler
+            trace("assign[\(index)] \(instruction) index: \(instruction.rawIndex)")
+
+            switch runtimeConfiguration.threadingModel {
+            case .direct:
+                self.instructions[index] = instruction.handler
+            case .token:
+                self.instructions[index] = UInt64(instruction.rawIndex)
+            }
             if instruction.hasImmediate {
-                self.instructions[index + 1] = instruction.rawValue
+                if instruction.useRawOperand {
+                    self.instructions[index + 1] = (instruction.rawImmediate)
+                } else {
+                    self.instructions[index + 1] = (instruction.rawValue)
+                }
             }
         }
 
@@ -586,16 +608,27 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
         mutating func emit(_ instruction: Instruction, resultRelink: ResultRelink? = nil) {
             self.lastEmission = LastEmission(position: insertingPC, resultRelink: resultRelink)
-            // print("emitInstruction:", instruction, "0x" + String(instruction.rawValue, radix: 16))
+            trace("emitInstruction[\(instructions.count)] \(instruction) index: \(instruction.rawIndex)")
             self.instructions.append(instruction.handler)
+//            switch runtimeConfiguration.threadingModel {
+//            case .direct:
+//                self.instructions.append(instruction.handler)
+//            case .token:
+//                self.instructions.append(UInt64(instruction.rawIndex))
+//            }
             if instruction.hasImmediate {
-                self.instructions.append(instruction.rawValue)
+                if instruction.useRawOperand {
+                    self.instructions.append(instruction.rawImmediate)
+                } else {
+                    self.instructions.append(instruction.rawValue)
+                }
             }
         }
-        
+
         mutating func emitData<T>(_ data: T) {
-            // print("emitData:", data, "0x" + String(unsafeBitCast(data, to: UInt64.self), radix: 16))
-            self.instructions.append(unsafeBitCast(data, to: UInt64.self))
+            let codeSlot = unsafeBitCast(data, to: UInt64.self)
+            trace("emitData: \(data) 0x\(String(codeSlot, radix: 16))")
+            self.instructions.append(codeSlot)
         }
 
         mutating func putLabel() -> LabelRef {
@@ -702,6 +735,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
     init(
         allocator: ISeqAllocator,
+        runtimeConfiguration: RuntimeConfiguration,
         funcTypeInterner: Interner<FunctionType>,
         module: Context,
         type: FunctionType,
@@ -713,7 +747,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         self.funcTypeInterner = funcTypeInterner
         self.type = type
         self.module = module
-        self.iseqBuilder = ISeqBuilder()
+        self.iseqBuilder = ISeqBuilder(runtimeConfiguration: runtimeConfiguration)
         self.controlStack = ControlStack()
         self.valueStack = ValueStack(stackRegBase: VReg(locals.count))
         self.locals = Locals(types: type.parameters + locals)
@@ -746,7 +780,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
     private mutating func emitCopyStack(from source: VReg, to dest: VReg) {
         guard source != dest else { return }
-        emit(.copyStack(Instruction.CopyStackOperand(source: source, dest: dest)))
+        emit(.copyStack(Instruction.CopyStackOperand(source: Int32(source), dest: Int32(dest))))
     }
 
     private mutating func preserveLocalsOnStack(_ localIndex: LocalIndex) {

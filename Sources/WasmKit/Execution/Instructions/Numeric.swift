@@ -12,14 +12,14 @@ extension ExecutionState {
         return pc
     }
 
-    mutating func numericFloatUnary(sp: Sp, floatUnary: NumericInstruction.FloatUnary, unaryOperand: Instruction.UnaryOperand) {
-        let value = sp[unaryOperand.input]
-        sp[unaryOperand.result] = UntypedValue(floatUnary(value.cast(to: floatUnary.type)))
+    mutating func numericFloatUnary(sp: Sp, floatUnaryOperand: Instruction.FloatUnaryOperand) {
+        let value = sp[floatUnaryOperand.unary.input]
+        sp[floatUnaryOperand.unary.result] = UntypedValue(floatUnaryOperand.operation(value.cast(to: floatUnaryOperand.operation.type)))
     }
 
-    mutating func numericConversion(sp: Sp, conversion: NumericInstruction.Conversion, unaryOperand: Instruction.UnaryOperand) throws {
-        let value = sp[unaryOperand.input]
-        sp[unaryOperand.result] = UntypedValue(try conversion(value))
+    mutating func numericConversion(sp: Sp, conversionOperand: Instruction.ConversionOperand) throws {
+        let value = sp[conversionOperand.unary.input]
+        sp[conversionOperand.unary.result] = UntypedValue(try conversionOperand.operation(value))
     }
 }
 

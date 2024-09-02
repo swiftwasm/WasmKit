@@ -174,6 +174,7 @@ struct WasmFunctionEntity {
         let type = self.type
         var translator = InstructionTranslator(
             allocator: runtime.value.store.allocator.iseqAllocator,
+            runtimeConfiguration: runtime.value.configuration,
             funcTypeInterner: runtime.value.funcTypeInterner,
             module: instance,
             type: runtime.value.resolveType(type),
