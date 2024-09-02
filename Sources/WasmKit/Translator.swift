@@ -1295,14 +1295,12 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         guard let address = address else { return }
         let internType = funcTypeInterner.intern(calleeType)
         let operand = Instruction.CallIndirectOperand(
-//            tableIndex: tableIndex,
-//            type: internType,
+            tableIndex: tableIndex,
+            type: internType,
             index: address,
             callLike: Instruction.CallLikeOperand(spAddend: spAddend)
         )
         emit(.callIndirect(operand))
-        iseqBuilder.emitData(UInt64(tableIndex))
-        iseqBuilder.emitData(UInt64(internType.id))
     }
 
     mutating func visitDrop() throws -> Output {

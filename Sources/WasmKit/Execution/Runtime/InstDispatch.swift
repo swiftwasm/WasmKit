@@ -925,10 +925,7 @@ extension ExecutionState {
     }
     @_silgen_name("wasmkit_execute_callIndirect") @inline(__always)
     mutating func execute_callIndirect(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .callIndirect(callIndirectOperand) = inst else {
-            preconditionFailure()
-        }
+        let callIndirectOperand = Instruction.CallIndirectOperand.load(from: &pc.pointee)
         pc.pointee = try self.callIndirect(sp: &sp.pointee, pc: pc.pointee, md: &md.pointee, ms: &ms.pointee, callIndirectOperand: callIndirectOperand)
     }
     @_silgen_name("wasmkit_execute_unreachable") @inline(__always)

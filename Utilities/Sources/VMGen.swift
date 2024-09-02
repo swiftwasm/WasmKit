@@ -404,7 +404,7 @@ enum VMGen {
                 name: "callIndirect", isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write,
                 immediates: [
                     Immediate(name: nil, type: "Instruction.CallIndirectOperand")
-                ]),
+                ]).withRawOperand(),
             Instruction(name: "unreachable", isControl: true, mayThrow: true, immediates: []),
             Instruction(name: "nop", isControl: true, immediates: []),
             Instruction(

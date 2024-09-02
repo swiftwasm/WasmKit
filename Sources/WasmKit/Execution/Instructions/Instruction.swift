@@ -411,6 +411,7 @@ extension Instruction {
         case .call: return true
         case .compilingCall: return true
         case .internalCall: return true
+        case .callIndirect: return true
         case .brTable: return true
         case .i32Load: return true
         case .i64Load: return true
@@ -587,6 +588,7 @@ extension Instruction {
         case .call(let callOperand): return callOperand
         case .compilingCall(let compilingCallOperand): return compilingCallOperand
         case .internalCall(let internalCallOperand): return internalCallOperand
+        case .callIndirect(let callIndirectOperand): return callIndirectOperand
         case .brTable(let brTable): return brTable
         case .i32Load(let loadOperand): return loadOperand
         case .i64Load(let loadOperand): return loadOperand
@@ -756,7 +758,6 @@ extension Instruction {
 }
 extension Instruction {
     enum Tagged {
-        case callIndirect(Instruction.CallIndirectOperand)
         case ifThen(Instruction.IfOperand)
         case br(Int32)
         case brIf(Instruction.BrIfOperand)
@@ -783,7 +784,6 @@ extension Instruction {
 
     var tagged: Tagged {
         switch self {
-        case let .callIndirect(callIndirectOperand): return .callIndirect(callIndirectOperand)
         case let .ifThen(ifOperand): return .ifThen(ifOperand)
         case let .br(offset): return .br(offset)
         case let .brIf(brIfOperand): return .brIf(brIfOperand)

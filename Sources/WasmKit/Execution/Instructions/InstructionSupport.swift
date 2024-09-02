@@ -322,9 +322,32 @@ extension Instruction {
     typealias InternalCallOperand = CallOperand
     typealias CompilingCallOperand = CallOperand
     
-    struct CallIndirectOperand: Equatable {
+    struct CallIndirectOperand: Equatable, InstructionImmediate {
+        let tableIndex: UInt32
+        let type: InternedFuncType
         let index: VReg
         let callLike: CallLikeOperand
+
+        private typealias Slot1 = (UInt32, InternedFuncType)
+        private typealias Slot2 = (VReg, VReg, pad: UInt32)
+        static func load(from pc: inout Pc) -> Self {
+            let (tableIndex, type) = pc.read(Slot1.self)
+            let (index, spAddend, _) = pc.read(Slot2.self)
+            return Self(
+                tableIndex: tableIndex, type: type,
+                index: index, callLike: Instruction.CallLikeOperand(spAddend: spAddend)
+            )
+        }
+        static func emit(to emitSlot: @escaping ((Self) -> CodeSlot) -> Void) {
+            emitSlot {
+                let slot: Slot1 = ($0.tableIndex, $0.type)
+                return unsafeBitCast(slot, to: CodeSlot.self)
+            }
+            emitSlot {
+                let slot: Slot2 = ($0.index, $0.callLike.spAddend, 0)
+                return unsafeBitCast(slot, to: CodeSlot.self)
+            }
+        }
     }
 
     typealias OnEnterOperand = FunctionIndex
