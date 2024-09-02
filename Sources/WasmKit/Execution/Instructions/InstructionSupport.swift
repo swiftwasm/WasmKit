@@ -6,11 +6,11 @@ typealias LLVReg = Int64
 
 protocol InstructionImmediate {
     static func load(from pc: inout Pc) -> Self
-    static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void)
+    static func emit(to emitSlot: @escaping ((Self) -> CodeSlot) -> Void)
 }
 
 extension InstructionImmediate {
-    func emit(to emitSlot: (CodeSlot) -> Void) {
+    func emit(to emitSlot: @escaping (CodeSlot) -> Void) {
         Self.emit { buildCodeSlot in
             emitSlot(buildCodeSlot(self))
         }
@@ -219,18 +219,35 @@ extension Instruction {
         }
     }
 
-    struct CallLikeOperand: Equatable {
+    struct CallLikeOperand: Equatable, InstructionImmediate {
         let spAddend: VReg
-    }
-    struct CallOperand: Equatable {
-        let callLike: CallLikeOperand
+        static func load(from pc: inout Pc) -> Self {
+            return Self(spAddend: VReg(pc.read(UInt64.self)))
+        }
+        static func emit(to emitSlot: @escaping ((Self) -> CodeSlot) -> Void) {
+            emitSlot { UInt64($0.spAddend) }
+        }
     }
 
-    struct InternalCallOperand: Equatable {
+    struct CallOperand: Equatable, InstructionImmediate {
+        let callee: InternalFunction
         let callLike: CallLikeOperand
+
+        static func load(from pc: inout Pc) -> Self {
+            let callee = InternalFunction(bitPattern: Int(pc.read(UInt64.self)))
+            let callLike = CallLikeOperand.load(from: &pc)
+            return Self(callee: callee, callLike: callLike)
+        }
+        static func emit(to emitSlot: @escaping ((Self) -> CodeSlot) -> Void) {
+            emitSlot { UInt64($0.callee.bitPattern) }
+            CallLikeOperand.emit { emitCallLike in
+                emitSlot { emitCallLike($0.callLike) }
+            }
+        }
     }
 
-    typealias CompilingCallOperand = InternalCallOperand
+    typealias InternalCallOperand = CallOperand
+    typealias CompilingCallOperand = CallOperand
     
     struct CallIndirectOperand: Equatable {
         let index: VReg

@@ -408,6 +408,9 @@ extension Instruction {
         case .copyStack: return true
         case .globalGet: return true
         case .globalSet: return true
+        case .call: return true
+        case .compilingCall: return true
+        case .internalCall: return true
         case .brTable: return true
         case .const32: return true
         case .const64: return true
@@ -421,6 +424,9 @@ extension Instruction {
         case .copyStack(let copyStackOperand): return copyStackOperand
         case .globalGet(let globalGetOperand): return globalGetOperand
         case .globalSet(let globalSetOperand): return globalSetOperand
+        case .call(let callOperand): return callOperand
+        case .compilingCall(let compilingCallOperand): return compilingCallOperand
+        case .internalCall(let internalCallOperand): return internalCallOperand
         case .brTable(let brTable): return brTable
         case .const32(let const32Operand): return const32Operand
         case .const64(let const64Operand): return const64Operand
@@ -430,9 +436,6 @@ extension Instruction {
 }
 extension Instruction {
     enum Tagged {
-        case call(Instruction.CallOperand)
-        case compilingCall(Instruction.CompilingCallOperand)
-        case internalCall(Instruction.InternalCallOperand)
         case callIndirect(Instruction.CallIndirectOperand)
         case ifThen(Instruction.IfOperand)
         case br(Int32)
@@ -620,9 +623,6 @@ extension Instruction {
 
     var tagged: Tagged {
         switch self {
-        case let .call(callOperand): return .call(callOperand)
-        case let .compilingCall(compilingCallOperand): return .compilingCall(compilingCallOperand)
-        case let .internalCall(internalCallOperand): return .internalCall(internalCallOperand)
         case let .callIndirect(callIndirectOperand): return .callIndirect(callIndirectOperand)
         case let .ifThen(ifOperand): return .ifThen(ifOperand)
         case let .br(offset): return .br(offset)

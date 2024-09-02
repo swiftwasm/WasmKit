@@ -389,17 +389,17 @@ enum VMGen {
                 name: "call", isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write,
                 immediates: [
                     Immediate(name: nil, type: "Instruction.CallOperand")
-                ]),
+                ]).withRawOperand(),
             Instruction(
                 name: "compilingCall", isControl: true, mayThrow: true, mayUpdateFrame: true,
                 immediates: [
                     Immediate(name: nil, type: "Instruction.CompilingCallOperand")
-                ]),
+                ]).withRawOperand(),
             Instruction(
                 name: "internalCall", isControl: true, mayThrow: true, mayUpdateFrame: true,
                 immediates: [
                     Immediate(name: nil, type: "Instruction.InternalCallOperand")
-                ]),
+                ]).withRawOperand(),
             Instruction(
                 name: "callIndirect", isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write,
                 immediates: [

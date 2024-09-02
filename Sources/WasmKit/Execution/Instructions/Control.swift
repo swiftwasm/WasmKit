@@ -55,10 +55,9 @@ extension ExecutionState {
     @inline(__always)
     mutating func call(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, callOperand: Instruction.CallOperand) throws -> Pc {
         var pc = pc
-        let function = pc.read(InternalFunction.self)
 
         (pc, sp) = try invoke(
-            function: function,
+            function: callOperand.callee,
             callerInstance: currentFrame.instance,
             callLike: callOperand.callLike,
             sp: sp, pc: pc, md: &md, ms: &ms
@@ -75,7 +74,7 @@ extension ExecutionState {
     ) throws {
         // The callee is known to be a function defined within the same module, so we can
         // skip updating the current instance.
-        let (iseq, locals, instance) = callee.assumeCompiled()
+        let (iseq, locals, instance) = internalCallOperand.callee.assumeCompiled()
         sp = try pushFrame(
             iseq: iseq,
             instance: instance,
@@ -89,7 +88,7 @@ extension ExecutionState {
     @inline(__always)
     mutating func internalCall(sp: inout Sp, pc: Pc, internalCallOperand: Instruction.InternalCallOperand) throws -> Pc {
         var pc = pc
-        let callee = pc.read(InternalFunction.self)
+        let callee = internalCallOperand.callee
         try _internalCall(sp: &sp, pc: &pc, callee: callee, internalCallOperand: internalCallOperand)
         return pc
     }
@@ -97,17 +96,17 @@ extension ExecutionState {
     @inline(__always)
     mutating func compilingCall(sp: inout Sp, pc: Pc, compilingCallOperand: Instruction.CompilingCallOperand) throws -> Pc {
         var pc = pc
-        let callPc = pc.assumingMemoryBound(to: UInt64.self)
-        let callee = pc.read(InternalFunction.self)
+        // NOTE: `CompilingCallOperand` consumes 2 slots, discriminator is at -3
+        let discriminatorPc = pc.assumingMemoryBound(to: UInt64.self).advanced(by: -3)
+        let callee = compilingCallOperand.callee
         try callee.ensureCompiled(runtime: runtime)
         let replaced = Instruction.internalCall(compilingCallOperand)
         switch runtime.value.configuration.threadingModel {
         case .direct:
-            callPc[-2] = replaced.handler
+            discriminatorPc.pointee = replaced.handler
         case .token:
-            callPc[-2] = UInt64(replaced.rawIndex)
+            discriminatorPc.pointee = UInt64(replaced.rawIndex)
         }
-        callPc[-1] = replaced.rawValue
         try _internalCall(sp: &sp, pc: &pc, callee: callee, internalCallOperand: compilingCallOperand)
         return pc
     }

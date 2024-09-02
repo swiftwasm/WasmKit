@@ -910,26 +910,17 @@ extension ExecutionState {
     }
     @_silgen_name("wasmkit_execute_call") @inline(__always)
     mutating func execute_call(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .call(callOperand) = inst else {
-            preconditionFailure()
-        }
+        let callOperand = Instruction.CallOperand.load(from: &pc.pointee)
         pc.pointee = try self.call(sp: &sp.pointee, pc: pc.pointee, md: &md.pointee, ms: &ms.pointee, callOperand: callOperand)
     }
     @_silgen_name("wasmkit_execute_compilingCall") @inline(__always)
     mutating func execute_compilingCall(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .compilingCall(compilingCallOperand) = inst else {
-            preconditionFailure()
-        }
+        let compilingCallOperand = Instruction.CompilingCallOperand.load(from: &pc.pointee)
         pc.pointee = try self.compilingCall(sp: &sp.pointee, pc: pc.pointee, compilingCallOperand: compilingCallOperand)
     }
     @_silgen_name("wasmkit_execute_internalCall") @inline(__always)
     mutating func execute_internalCall(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .internalCall(internalCallOperand) = inst else {
-            preconditionFailure()
-        }
+        let internalCallOperand = Instruction.InternalCallOperand.load(from: &pc.pointee)
         pc.pointee = try self.internalCall(sp: &sp.pointee, pc: pc.pointee, internalCallOperand: internalCallOperand)
     }
     @_silgen_name("wasmkit_execute_callIndirect") @inline(__always)
