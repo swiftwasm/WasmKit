@@ -1,6 +1,7 @@
 import WasmParser
 
 typealias VReg = Int16
+typealias LVReg = Int32
 typealias LLVReg = Int64
 
 protocol InstructionImmediate {
@@ -55,9 +56,15 @@ extension Instruction {
     }
     
     /// size = 6, alignment = 4
-    struct Const32Operand: Equatable {
+    struct Const32Operand: Equatable, InstructionImmediate {
         let value: UInt32
-        let result: VReg
+        let result: LVReg
+        static func load(from pc: inout Pc) -> Self {
+            pc.read()
+        }
+        static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast($0, to: CodeSlot.self) }
+        }
     }
     /// size = 2, alignment = 2
     struct Const64Operand: Equatable {

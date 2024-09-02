@@ -340,6 +340,7 @@ extension Instruction {
         case .copyStack: return true
         case .globalGet: return true
         case .globalSet: return true
+        case .const32: return true
         default: return false
         }
     }
@@ -350,6 +351,7 @@ extension Instruction {
         case .copyStack(let copyStackOperand): return copyStackOperand
         case .globalGet(let globalGetOperand): return globalGetOperand
         case .globalSet(let globalSetOperand): return globalSetOperand
+        case .const32(let const32Operand): return const32Operand
         default: preconditionFailure()
         }
     }
@@ -394,7 +396,6 @@ extension Instruction {
         case memoryDataDrop(DataIndex)
         case memoryCopy(Instruction.MemoryCopyOperand)
         case memoryFill(Instruction.MemoryFillOperand)
-        case const32(Instruction.Const32Operand)
         case const64(Instruction.Const64Operand)
         case numericFloatUnary(Instruction.FloatUnaryOperand)
         case numericConversion(Instruction.ConversionOperand)
@@ -553,7 +554,6 @@ extension Instruction {
         case let .memoryDataDrop(dataIndex): return .memoryDataDrop(dataIndex)
         case let .memoryCopy(memoryCopyOperand): return .memoryCopy(memoryCopyOperand)
         case let .memoryFill(memoryFillOperand): return .memoryFill(memoryFillOperand)
-        case let .const32(const32Operand): return .const32(const32Operand)
         case let .const64(const64Operand): return .const64(const64Operand)
         case let .numericFloatUnary(floatUnaryOperand): return .numericFloatUnary(floatUnaryOperand)
         case let .numericConversion(conversionOperand): return .numericConversion(conversionOperand)

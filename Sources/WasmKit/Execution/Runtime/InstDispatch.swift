@@ -1054,10 +1054,7 @@ extension ExecutionState {
     }
     @_silgen_name("wasmkit_execute_const32") @inline(__always)
     mutating func execute_const32(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .const32(const32Operand) = inst else {
-            preconditionFailure()
-        }
+        let const32Operand = Instruction.Const32Operand.load(from: &pc.pointee)
         const32(sp: sp.pointee, const32Operand: const32Operand)
     }
     @_silgen_name("wasmkit_execute_const64") @inline(__always)
