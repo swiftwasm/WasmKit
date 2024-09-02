@@ -5,14 +5,14 @@ extension ExecutionState {
         var pc = pc
         let global = pc.read(InternalGlobal.self)
         global.withValue{
-            sp[globalGetOperand.result] = $0.rawValue
+            sp[VReg(globalGetOperand)] = $0.rawValue
         }
         return pc
     }
     mutating func globalSet(sp: Sp, pc: Pc, globalSetOperand: Instruction.GlobalSetOperand) -> Pc {
         var pc = pc
         let global = pc.read(InternalGlobal.self)
-        let value = sp[globalSetOperand.value]
+        let value = sp[VReg(globalSetOperand)]
         global.withValue{ $0.rawValue = value }
         return pc
     }

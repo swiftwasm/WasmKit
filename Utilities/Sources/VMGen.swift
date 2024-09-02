@@ -349,8 +349,8 @@ enum VMGen {
         var instructions: [Instruction] = [
             // Variable
             Instruction(name: "copyStack", immediates: [Immediate(name: nil, type: "Instruction.CopyStackOperand")]).withRawOperand(),
-            Instruction(name: "globalGet", hasData: true, immediates: [Immediate(name: nil, type: "Instruction.GlobalGetOperand")]),
-            Instruction(name: "globalSet", hasData: true, immediates: [Immediate(name: nil, type: "Instruction.GlobalSetOperand")]),
+            Instruction(name: "globalGet", hasData: true, immediates: [Immediate(name: nil, type: "Instruction.GlobalGetOperand")]).withRawOperand(),
+            Instruction(name: "globalSet", hasData: true, immediates: [Immediate(name: nil, type: "Instruction.GlobalSetOperand")]).withRawOperand(),
             // Controls
             Instruction(
                 name: "call", isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write,

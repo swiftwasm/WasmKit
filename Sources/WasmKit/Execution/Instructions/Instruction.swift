@@ -338,6 +338,8 @@ extension Instruction {
     var useRawOperand: Bool {
         switch self {
         case .copyStack: return true
+        case .globalGet: return true
+        case .globalSet: return true
         default: return false
         }
     }
@@ -346,14 +348,14 @@ extension Instruction {
     var rawImmediate: any InstructionImmediate {
         switch self {
         case .copyStack(let copyStackOperand): return copyStackOperand
+        case .globalGet(let globalGetOperand): return globalGetOperand
+        case .globalSet(let globalSetOperand): return globalSetOperand
         default: preconditionFailure()
         }
     }
 }
 extension Instruction {
     enum Tagged {
-        case globalGet(Instruction.GlobalGetOperand)
-        case globalSet(Instruction.GlobalSetOperand)
         case call(Instruction.CallOperand)
         case compilingCall(Instruction.CompilingCallOperand)
         case internalCall(Instruction.InternalCallOperand)
@@ -513,8 +515,6 @@ extension Instruction {
 
     var tagged: Tagged {
         switch self {
-        case let .globalGet(globalGetOperand): return .globalGet(globalGetOperand)
-        case let .globalSet(globalSetOperand): return .globalSet(globalSetOperand)
         case let .call(callOperand): return .call(callOperand)
         case let .compilingCall(compilingCallOperand): return .compilingCall(compilingCallOperand)
         case let .internalCall(internalCallOperand): return .internalCall(internalCallOperand)
