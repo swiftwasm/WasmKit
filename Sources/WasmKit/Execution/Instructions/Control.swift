@@ -10,19 +10,19 @@ extension ExecutionState {
         return pc.advancedPc(by: Int(offset))
     }
     mutating func brIf(sp: Sp, pc: Pc, brIfOperand: Instruction.BrIfOperand) -> Pc {
-        guard sp[brIfOperand.condition].i32 != 0 else {
+        guard sp[i32: brIfOperand.condition] != 0 else {
             return pc
         }
         return pc.advancedPc(by: Int(brIfOperand.offset))
     }
     mutating func brIfNot(sp: Sp, pc: Pc, brIfOperand: Instruction.BrIfOperand) -> Pc {
-        guard sp[brIfOperand.condition].i32 == 0 else {
+        guard sp[i32: brIfOperand.condition] == 0 else {
             return pc
         }
         return pc.advancedPc(by: Int(brIfOperand.offset))
     }
     mutating func brTable(sp: Sp, pc: Pc, brTable: Instruction.BrTable) -> Pc {
-        let index = sp[brTable.index].i32
+        let index = sp[i32: brTable.index]
         let normalizedOffset = min(Int(index), Int(brTable.count - 1))
         let entry = brTable.baseAddress[normalizedOffset]
         return pc.advancedPc(by: Int(entry.offset))
