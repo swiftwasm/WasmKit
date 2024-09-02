@@ -1186,11 +1186,8 @@ extension ExecutionState {
     }
     @_silgen_name("wasmkit_execute_memoryInit") @inline(__always)
     mutating func execute_memoryInit(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws {
-        let inst = pc.pointee.read(Instruction.Tagged.self)
-        guard case let .memoryInit(memoryInitOperand) = inst else {
-            preconditionFailure()
-        }
-        pc.pointee = try self.memoryInit(sp: sp.pointee, pc: pc.pointee, memoryInitOperand: memoryInitOperand)
+        let memoryInitOperand = Instruction.MemoryInitOperand.load(from: &pc.pointee)
+        try self.memoryInit(sp: sp.pointee, memoryInitOperand: memoryInitOperand)
     }
     @_silgen_name("wasmkit_execute_memoryDataDrop") @inline(__always)
     mutating func execute_memoryDataDrop(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {

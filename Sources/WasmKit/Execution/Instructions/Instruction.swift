@@ -412,6 +412,7 @@ extension Instruction {
         case .compilingCall: return true
         case .internalCall: return true
         case .brTable: return true
+        case .memoryInit: return true
         case .const32: return true
         case .const64: return true
         default: return false
@@ -428,6 +429,7 @@ extension Instruction {
         case .compilingCall(let compilingCallOperand): return compilingCallOperand
         case .internalCall(let internalCallOperand): return internalCallOperand
         case .brTable(let brTable): return brTable
+        case .memoryInit(let memoryInitOperand): return memoryInitOperand
         case .const32(let const32Operand): return const32Operand
         case .const64(let const64Operand): return const64Operand
         default: preconditionFailure()
@@ -466,7 +468,6 @@ extension Instruction {
         case i64Store32(Instruction.StoreOperand)
         case memorySize(Instruction.MemorySizeOperand)
         case memoryGrow(Instruction.MemoryGrowOperand)
-        case memoryInit(Instruction.MemoryInitOperand)
         case memoryDataDrop(DataIndex)
         case memoryCopy(Instruction.MemoryCopyOperand)
         case memoryFill(Instruction.MemoryFillOperand)
@@ -653,7 +654,6 @@ extension Instruction {
         case let .i64Store32(storeOperand): return .i64Store32(storeOperand)
         case let .memorySize(memorySizeOperand): return .memorySize(memorySizeOperand)
         case let .memoryGrow(memoryGrowOperand): return .memoryGrow(memoryGrowOperand)
-        case let .memoryInit(memoryInitOperand): return .memoryInit(memoryInitOperand)
         case let .memoryDataDrop(dataIndex): return .memoryDataDrop(dataIndex)
         case let .memoryCopy(memoryCopyOperand): return .memoryCopy(memoryCopyOperand)
         case let .memoryFill(memoryFillOperand): return .memoryFill(memoryFillOperand)

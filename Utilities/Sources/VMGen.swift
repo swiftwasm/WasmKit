@@ -341,9 +341,9 @@ enum VMGen {
         Instruction(name: "memoryGrow", mayThrow: true, useCurrentMemory: .write, immediates: [
             Immediate(name: nil, type: "Instruction.MemoryGrowOperand"),
         ]),
-        Instruction(name: "memoryInit", mayThrow: true, hasData: true, immediates: [
+        Instruction(name: "memoryInit", mayThrow: true, immediates: [
             Immediate(name: nil, type: "Instruction.MemoryInitOperand"),
-        ]),
+        ]).withRawOperand(),
         Instruction(name: "memoryDataDrop", immediates: [Immediate(name: nil, type: "DataIndex")]),
         Instruction(name: "memoryCopy", mayThrow: true, immediates: [
             Immediate(name: nil, type: "Instruction.MemoryCopyOperand"),

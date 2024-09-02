@@ -1740,14 +1740,13 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             let (size, sourceOffset, destOffset) = values
             return .memoryInit(
                 Instruction.MemoryInitOperand(
-//                    segmentIndex: dataIndex,
+                    segmentIndex: dataIndex,
                     destOffset: destOffset,
                     sourceOffset: sourceOffset,
                     size: size
                 )
             )
         }
-        iseqBuilder.emitData(UInt64(dataIndex))
     }
     mutating func visitDataDrop(dataIndex: UInt32) throws -> Output {
         try self.module.validateDataSegment(dataIndex)
