@@ -567,20 +567,11 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
         private mutating func assign(at index: Int, _ instruction: Instruction) {
             trace("assign[\(index)] \(instruction) index: \(instruction.rawIndex)")
-
-            switch runtimeConfiguration.threadingModel {
-            case .direct:
-                self.instructions[index] = instruction.handler
-            case .token:
-                self.instructions[index] = UInt64(instruction.rawIndex)
-            }
-            if instruction.hasImmediate {
-                if instruction.useRawOperand {
-                    self.instructions[index + 1] = (instruction.rawImmediate)
-                } else {
-                    self.instructions[index + 1] = (instruction.rawValue)
-                }
-            }
+            var index = index
+            emitInstruction(instruction, emitSlot: { slot in
+                self.instructions[index] = slot
+                index += 1
+            })
         }
 
         mutating func resetLastEmission() {
@@ -606,29 +597,36 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             return instructions
         }
 
+        private mutating func emitSlot(_ codeSlot: CodeSlot) {
+            self.instructions.append(codeSlot)
+        }
+
+        private func emitInstruction(_ instruction: Instruction, emitSlot: (CodeSlot) -> Void) {
+            switch runtimeConfiguration.threadingModel {
+            case .direct:
+                emitSlot(instruction.handler)
+            case .token:
+                emitSlot(UInt64(instruction.rawIndex))
+            }
+            if instruction.hasImmediate {
+                if instruction.useRawOperand {
+                    instruction.rawImmediate.emit(to: emitSlot)
+                } else {
+                    emitSlot(instruction.rawValue)
+                }
+            }
+        }
+
         mutating func emit(_ instruction: Instruction, resultRelink: ResultRelink? = nil) {
             self.lastEmission = LastEmission(position: insertingPC, resultRelink: resultRelink)
             trace("emitInstruction[\(instructions.count)] \(instruction) index: \(instruction.rawIndex)")
-            self.instructions.append(instruction.handler)
-//            switch runtimeConfiguration.threadingModel {
-//            case .direct:
-//                self.instructions.append(instruction.handler)
-//            case .token:
-//                self.instructions.append(UInt64(instruction.rawIndex))
-//            }
-            if instruction.hasImmediate {
-                if instruction.useRawOperand {
-                    self.instructions.append(instruction.rawImmediate)
-                } else {
-                    self.instructions.append(instruction.rawValue)
-                }
-            }
+            emitInstruction(instruction, emitSlot: { self.emitSlot($0) })
         }
 
         mutating func emitData<T>(_ data: T) {
             let codeSlot = unsafeBitCast(data, to: UInt64.self)
             trace("emitData: \(data) 0x\(String(codeSlot, radix: 16))")
-            self.instructions.append(codeSlot)
+            emitSlot(codeSlot)
         }
 
         mutating func putLabel() -> LabelRef {
@@ -685,6 +683,26 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             // Please change placeholder size based on whether the instruction has any immediate
             emit(.br(offset: 0))  // Emit dummy instruction to be replaced later
             emitWithLabel(ref, insertAt: insertAt, line: line, make: make)
+        }
+
+        mutating func emitWithLabel<Immediate: InstructionImmediate>(
+            _ ref: LabelRef,
+            _ instruction: @escaping (Immediate) -> Instruction,
+            line: UInt = #line,
+            make: @escaping (
+                ISeqBuilder,
+                _ source: MetaProgramCounter,
+                _ target: MetaProgramCounter
+            ) -> (Immediate)
+        ) {
+            let insertAt = insertingPC
+            // Emit a placeholder for instruction discriminator
+            emitSlot(0)
+            // Emit a placeholder for the instruction immediate
+            Immediate.emit(to: { _ in emitSlot(0) })
+            emitWithLabel(ref, insertAt: insertAt, line: line, make: {
+                instruction(make($0, $1, $2))
+            })
         }
 
         /// Emit an instruction at the specified position with resolved label position

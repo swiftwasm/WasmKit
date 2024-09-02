@@ -2,6 +2,19 @@ import WasmParser
 
 typealias VReg = Int16
 
+protocol InstructionImmediate {
+    static func load(from pc: inout Pc) -> Self
+    static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void)
+}
+
+extension InstructionImmediate {
+    func emit(to emitSlot: (CodeSlot) -> Void) {
+        Self.emit { buildCodeSlot in
+            emitSlot(buildCodeSlot(self))
+        }
+    }
+}
+
 extension Instruction {
     struct MemArg: Equatable {
         let offset: UInt64
@@ -159,9 +172,16 @@ extension Instruction {
         let value: VReg
     }
 
-    struct CopyStackOperand: Equatable {
+    struct CopyStackOperand: Equatable, InstructionImmediate {
         let source: Int32
         let dest: Int32
+
+        static func load(from pc: inout Pc) -> Self {
+            pc.read()
+        }
+        static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast($0, to: CodeSlot.self) }
+        }
     }
 
     struct IfOperand: Equatable {

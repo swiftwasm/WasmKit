@@ -719,7 +719,7 @@ extension ExecutionState {
 extension ExecutionState {
     @_silgen_name("wasmkit_execute_copyStack") @inline(__always)
     mutating func execute_copyStack(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) {
-        let copyStackOperand = pc.pointee.read(Instruction.CopyStackOperand.self)
+        let copyStackOperand = Instruction.CopyStackOperand.load(from: &pc.pointee)
         copyStack(sp: sp.pointee, copyStackOperand: copyStackOperand)
     }
     @_silgen_name("wasmkit_execute_globalGet") @inline(__always)
