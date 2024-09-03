@@ -377,13 +377,11 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
     enum MetaValueOnStack {
         case local(ValueType, LocalIndex)
-        case preg(ValueType, PReg)
         case stack(MetaValue)
 
         var type: MetaValue {
             switch self {
             case .local(let type, _): return .some(type)
-            case .preg(let type, _): return .some(type)
             case .stack(let type): return type
             }
         }
@@ -391,31 +389,13 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
     enum ValueSource {
         case vreg(VReg)
-        case preg(PReg, ValueType)
         case local(LocalIndex)
-
-        func intoOperandSource(_ stackLayout: StackLayout) -> OperandSource {
-            switch self {
-            case .vreg(let vReg):
-                return .vreg(vReg)
-            case .preg(let pReg, _):
-                return .preg(pReg)
-            case .local(let localIndex):
-                return .vreg(stackLayout.localReg(localIndex))
-            }
-        }
-    }
-
-    enum OperandSource {
-        case vreg(VReg)
-        case preg(PReg)
     }
 
     struct ValueStack {
         private var values: [MetaValueOnStack] = []
         /// The maximum height of the stack within the function
         private(set) var maxHeight: Int = 0
-        private(set) var pRegs: [PReg: ValueType] = [:]
         var height: Int { values.count }
         let stackRegBase: VReg
 
@@ -424,31 +404,19 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
 
         mutating func push(_ value: ValueType) -> VReg {
-            return push(.some(value))
+            push(.some(value))
         }
         mutating func push(_ value: MetaValue) -> VReg {
-            let usedRegister = self.values.count
-            push(.stack(value))
-            return stackRegBase + VReg(usedRegister)
-        }
-        mutating func push(_ value: MetaValueOnStack) {
             // Record the maximum height of the stack we have seen
             maxHeight = max(maxHeight, height)
-
-            self.values.append(value)
+            let usedRegister = self.values.count
+            self.values.append(.stack(value))
             assert(height < UInt16.max)
+            return stackRegBase + VReg(usedRegister)
         }
         mutating func pushLocal(_ localIndex: LocalIndex, locals: inout Locals) throws {
             let type = try locals.type(of: localIndex)
-            push(.local(type, localIndex))
-        }
-        mutating func pushPReg(_ pReg: PReg, type: ValueType) {
-            assert(pRegs[pReg] == nil)
-            push(.preg(type, pReg))
-            pRegs[pReg] = type
-        }
-        mutating func pushPReg(type: ValueType) {
-            pushPReg(type.pReg, type: type)
+            self.values.append(.local(type, localIndex))
         }
         mutating func preserveLocalsOnStack(_ localIndex: LocalIndex) -> [VReg] {
             var copyTo: [VReg] = []
@@ -458,19 +426,6 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
                 copyTo.append(stackRegBase + VReg(i))
             }
             return copyTo
-        }
-
-        /// Returns a VReg to store the preserved value
-        mutating func preservePReg(_ preg: PReg) -> (VReg, ValueType)? {
-            guard let _ = pRegs[preg] else { return nil }
-            pRegs[preg] = nil
-            for i in 0..<values.count {
-                guard case .preg(let type, preg) = self.values[i] else { continue }
-                self.values[i] = .stack(.some(type))
-                let copyTo = stackRegBase + VReg(i)
-                return (copyTo, type)
-            }
-            return nil
         }
 
         mutating func preserveLocalsOnStack(depth: Int) -> [(source: LocalIndex, to: VReg)] {
@@ -494,8 +449,6 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             switch value {
             case .local(_, let localIndex):
                 source = .local(localIndex)
-            case .preg(let type, let preg):
-                source = .preg(preg, type)
             case .stack:
                 source = .vreg(stackRegBase + VReg(height))
             }
@@ -505,9 +458,6 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         mutating func pop() throws -> (MetaValue, ValueSource) {
             guard let value = self.values.popLast() else {
                 throw TranslationError("Expected a value on stack but it's empty")
-            }
-            if case .preg(_, let pReg) = value {
-                pRegs[pReg] = nil
             }
             let source = makeValueSource(value)
             return (value.type, source)
@@ -830,17 +780,6 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         guard source != dest else { return }
         emit(.copyStack(Instruction.CopyStackOperand(source: Int32(source), dest: Int32(dest))))
     }
-    private mutating func emitCopyPRegToStack(from source: PReg, to dest: VReg, type: ValueType) {
-        let instruction: Instruction
-        switch type {
-        case .i32: instruction = .copyX0ToStackI32(dest: LLVReg(dest))
-        case .i64: instruction = .copyX0ToStackI64(dest: LLVReg(dest))
-        case .f32: instruction = .copyD0ToStackF32(dest: LLVReg(dest))
-        case .f64: instruction = .copyD0ToStackF64(dest: LLVReg(dest))
-        default: fatalError()
-        }
-        emit(instruction)
-    }
 
     private mutating func preserveLocalsOnStack(_ localIndex: LocalIndex) {
         for copyTo in valueStack.preserveLocalsOnStack(localIndex) {
@@ -856,18 +795,6 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     private mutating func preserveAllLocalsOnStack() {
         for localIndex in 0..<locals.count {
             preserveLocalsOnStack(LocalIndex(localIndex))
-        }
-    }
-
-    private mutating func preservePReg(_ preg: PReg) {
-        if let (copyTo, type) = valueStack.preservePReg(preg) {
-            emitCopyPRegToStack(from: preg, to: copyTo, type: type)
-        }
-    }
-
-    private mutating func preserveAllPRegs() {
-        for preg in PReg.allCases {
-            preservePReg(preg)
         }
     }
 
@@ -893,13 +820,11 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         return true
     }
     private mutating func ensureOnVReg(_ source: ValueSource) -> VReg {
-        let copyTo = valueStack.stackRegBase + VReg(valueStack.height)
+        // TODO: Copy to stack if source is on preg
+        // let copyTo = valueStack.stackRegBase + VReg(valueStack.height)
         switch source {
         case .vreg(let register):
             return register
-        case .preg(let pReg, let type):
-            emitCopyPRegToStack(from: pReg, to: copyTo, type: type)
-            return copyTo
         case .local(let index):
             return stackLayout.localReg(index)
         }
@@ -909,9 +834,6 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         switch source {
         case .vreg(let vReg):
             return vReg
-        case .preg(let pReg, let type):
-            emitCopyPRegToStack(from: pReg, to: copyTo, type: type)
-            return copyTo
         case .local(let localIndex):
             emitCopyStack(from: localReg(localIndex), to: copyTo)
             return copyTo
@@ -952,7 +874,6 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
     private mutating func copyOnBranch(targetFrame frame: ControlStack.ControlFrame) throws {
         preserveLocalsOnStack(depth: Int(valueStack.height - frame.stackHeight))
-        preserveAllPRegs()
         let copyCount = VReg(frame.copyCount)
         let sourceBase = valueStack.stackRegBase + VReg(valueStack.height)
         let destBase = valueStack.stackRegBase + VReg(frame.stackHeight)
@@ -1041,8 +962,6 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             case .local(let localIndex):
                 // Re-push local variables to the stack
                 _ = try valueStack.pushLocal(localIndex, locals: &locals)
-            case .preg(let preg, _):
-                valueStack.pushPReg(preg, type: param)
             case .vreg, nil:
                 _ = valueStack.push(param)
             }
@@ -1102,7 +1021,6 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         guard case let .if(elseLabel, endLabel) = frame.kind else {
             throw TranslationError("Expected `if` control frame on top of the stack for `else` but got \(frame)")
         }
-        preserveAllPRegs()
         preserveLocalsOnStack(depth: valueStack.height - frame.stackHeight)
         try controlStack.resetReachability()
         iseqBuilder.resetLastEmission()
@@ -1132,7 +1050,6 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
 
         preserveLocalsOnStack(depth: Int(valueStack.height - poppedFrame.stackHeight))
-        preserveAllPRegs()
         switch poppedFrame.kind {
         case .block:
             try iseqBuilder.pinLabelHere(poppedFrame.continuation)
@@ -1319,7 +1236,6 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         for parameter in calleeType.parameters.reversed() {
             guard let _ = try popOnStackOperand(parameter) else { return nil }
         }
-        preserveAllPRegs()
 
         let spAddend = valueStack.stackRegBase + VReg(valueStack.height)
             + StackLayout.frameHeaderSize(type: calleeType)
@@ -1427,21 +1343,14 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     mutating func visitLocalSetOrTee(localIndex: UInt32, isTee: Bool) throws {
         preserveLocalsOnStack(localIndex)
         let type = try locals.type(of: localIndex)
-        guard let value = try popOperand(type) else { return }
+        guard let value = try popVRegOperand(type) else { return }
         guard try controlStack.currentFrame().reachable else { return }
         let result = localReg(localIndex)
         if !isTee, iseqBuilder.relinkLastInstructionResult(result) {
             // Good news, copyStack is optimized out :)
             return
         }
-        switch value {
-        case .vreg(let vReg):
-            emitCopyStack(from: vReg, to: result)
-        case .preg(let pReg, let valueType):
-            emitCopyPRegToStack(from: pReg, to: result, type: valueType)
-        case .local(let localIndex):
-            emitCopyStack(from: stackLayout.localReg(localIndex), to: result)
-        }
+        emitCopyStack(from: value, to: result)
     }
     mutating func visitLocalSet(localIndex: UInt32) throws -> Output {
         try visitLocalSetOrTee(localIndex: localIndex, isTee: false)
@@ -1479,7 +1388,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             instruction(newResult)
         })
     }
-    private mutating func popPushEmitVReg(
+    private mutating func popPushEmit(
         _ pop: ValueType,
         _ push: ValueType,
         _ instruction: @escaping (_ popped: VReg, _ result: VReg, ValueStack) -> Instruction
@@ -1491,25 +1400,6 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
                 instruction(value, newResult, valueStack)
             })
         }
-    }
-
-    private mutating func popPushEmitPReg(
-        _ pop: ValueType,
-        _ push: ValueType,
-        r: @escaping (_ popped: PReg) -> Instruction,
-        s: @escaping (_ popped: VReg) -> Instruction
-    ) throws {
-        let value = try popOperand(pop)?.intoOperandSource(stackLayout)
-        if let value = value {
-            switch value {
-            case .vreg(let vReg):
-                preservePReg(push.pReg)
-                emit(s(vReg))
-            case .preg(let pReg):
-                emit(r(pReg))
-            }
-        }
-        valueStack.pushPReg(type: push)
     }
 
     private mutating func pop3Emit(
@@ -1556,18 +1446,21 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     private mutating func visitLoad(
         _ memarg: MemArg,
         _ type: ValueType,
-        _ instruction: Instruction.LoadInfo
+        _ instruction: @escaping (Instruction.LoadOperand) -> Instruction
     ) throws {
         let isMemory64 = try module.isMemory64(memoryIndex: 0)
         let alignLog2Limit = isMemory64 ? 64 : 32
         if memarg.align >= alignLog2Limit {
             throw TranslationError("Alignment 2**\(memarg.align) is out of limit \(alignLog2Limit)")
         }
-        try popPushEmitPReg(
-            .address(isMemory64: isMemory64), type,
-            r: { _ in instruction.r(Instruction.LoadOperandR(offset: memarg.offset)) },
-            s: { instruction.s(Instruction.LoadOperandS(offset: memarg.offset, pointer: LLVReg($0))) }
-        )
+        try popPushEmit(.address(isMemory64: isMemory64), type) { value, result, stack in
+            let loadOperand = Instruction.LoadOperand(
+                offset: memarg.offset,
+                pointer: value,
+                result: result
+            )
+            return instruction(loadOperand)
+        }
     }
     private mutating func visitStore(
         _ memarg: MemArg,
@@ -1617,7 +1510,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         let isMemory64 = try module.isMemory64(memoryIndex: memory)
         let sizeType = ValueType.address(isMemory64: isMemory64)
         // Just pop/push the same type (i64 or i32) value
-        try popPushEmitVReg(sizeType, sizeType) { value, result, stack in
+        try popPushEmit(sizeType, sizeType) { value, result, stack in
             .memoryGrow(Instruction.MemoryGrowOperand(
                 result: result, delta: value, memory: memory
             ))
@@ -1626,17 +1519,14 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
     private mutating func visitConst(_ type: ValueType, _ value: Value) {
         let value = UntypedValue(value)
-        let instruction: Instruction
-        switch type {
-        case .i32: instruction = .constI32(Instruction.Const32Operand(value: UInt32(value.storage)))
-        case .i64: instruction = .constI64(Instruction.Const64Operand(value: value.storage))
-        case .f32: instruction = .constF32(Instruction.Const32Operand(value: UInt32(value.storage)))
-        case .f64: instruction = .constF64(Instruction.Const64Operand(value: value.storage))
-        case .ref: fatalError()
+        let is32Bit = type == .i32 || type == .f32
+        if is32Bit {
+            pushEmit(type, {
+                .const32(Instruction.Const32Operand(value: UInt32(value.storage), result: LVReg($0)))
+            })
+        } else {
+            pushEmit(type, { .const64(Instruction.Const64Operand(value: value, result: LLVReg($0))) })
         }
-        preservePReg(type.pReg)
-        valueStack.pushPReg(type: type)
-        emit(instruction)
     }
     mutating func visitI32Const(value: Int32) -> Output { visitConst(.i32, .i32(UInt32(bitPattern: value))) }
     mutating func visitI64Const(value: Int64) -> Output { visitConst(.i64, .i64(UInt64(bitPattern: value))) }
@@ -1656,7 +1546,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
 
     private mutating func visitUnary(_ operand: ValueType, _ instruction: @escaping (Instruction.UnaryOperand) -> Instruction) throws {
-        try popPushEmitVReg(operand, operand) { value, result, stack in
+        try popPushEmit(operand, operand) { value, result, stack in
             return instruction(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
     }
@@ -1676,68 +1566,16 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             }
         )
     }
-    private mutating func visitBinary(
-        _ operand: ValueType,
-        _ result: ValueType,
-        _ commutative: Instruction.Commutative
-    ) throws {
-        let rhs = try popOperand(operand)?.intoOperandSource(stackLayout)
-        let lhs = try popOperand(operand)?.intoOperandSource(stackLayout)
-        if let lhs = lhs, let rhs = rhs {
-            let instruction: Instruction
-            switch (lhs, rhs) {
-            case (.vreg(let lhs), .vreg(let rhs)):
-                preservePReg(.x0)
-                instruction = commutative.ss(Instruction.BinaryOperandSS(lhs: LVReg(lhs), rhs: LVReg(rhs)))
-            case (.vreg(let vreg), .preg), (.preg, .vreg(let vreg)):
-                instruction = commutative.sr(Instruction.BinaryOperandSR(vreg))
-            case (.preg, .preg):
-                fatalError()
-            }
-            emit(instruction)
-        }
-        valueStack.pushPReg(.x0, type: result)
-    }
-    private mutating func visitBinary(
-        _ operand: ValueType,
-        _ result: ValueType,
-        _ nonCommutative: Instruction.NonCommutative
-    ) throws {
-        let rhs = try popOperand(operand)?.intoOperandSource(stackLayout)
-        let lhs = try popOperand(operand)?.intoOperandSource(stackLayout)
-        if let lhs = lhs, let rhs = rhs {
-            let instruction: Instruction
-            switch (lhs, rhs) {
-            case (.vreg(let lhs), .vreg(let rhs)):
-                preservePReg(.x0)
-                instruction = nonCommutative.ss(Instruction.BinaryOperandSS(lhs: LVReg(lhs), rhs: LVReg(rhs)))
-            case (.vreg(let vreg), .preg):
-                instruction = nonCommutative.sr(Instruction.BinaryOperandSR(vreg))
-            case (.preg, .vreg(let vreg)):
-                instruction = nonCommutative.rs(Instruction.BinaryOperandRS(vreg))
-            case (.preg, .preg):
-                fatalError()
-            }
-            emit(instruction)
-        }
-        valueStack.pushPReg(.x0, type: result)
-    }
     private mutating func visitCmp(_ operand: ValueType, _ instruction: @escaping (Instruction.BinaryOperand) -> Instruction) throws {
         try visitBinary(operand, .i32, instruction)
     }
-    private mutating func visitCmp(_ operand: ValueType, _ instruction: Instruction.Commutative) throws {
-        try visitBinary(operand, .i32, instruction)
-    }
-    private mutating func visitCmp(_ operand: ValueType, _ instruction: Instruction.NonCommutative) throws {
-        try visitBinary(operand, .i32, instruction)
-    }
     private mutating func visitConversion(_ from: ValueType, _ to: ValueType, _ instruction: @escaping (Instruction.UnaryOperand) -> Instruction) throws {
-        try popPushEmitVReg(from, to) { value, result, stack in
+        try popPushEmit(from, to) { value, result, stack in
             return instruction(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
     }
     mutating func visitI32Eqz() throws -> Output {
-        try popPushEmitVReg(.i32, .i32) { value, result, stack in
+        try popPushEmit(.i32, .i32) { value, result, stack in
                 .i32Eqz(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
     }
@@ -1752,7 +1590,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     mutating func visitI32GeS() throws -> Output { try visitCmp(.i32, Instruction.i32GeS) }
     mutating func visitI32GeU() throws -> Output { try visitCmp(.i32, Instruction.i32GeU) }
     mutating func visitI64Eqz() throws -> Output {
-        try popPushEmitVReg(.i64, .i32) { value, result, stack in
+        try popPushEmit(.i64, .i32) { value, result, stack in
                 .i64Eqz(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
     }
@@ -1986,7 +1824,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
     }
     mutating func visitTableGet(table: UInt32) throws -> Output {
-        try popPushEmitVReg(
+        try popPushEmit(
             module.addressType(tableIndex: table),
             .ref(module.elementType(table))
         ) { index, result, stack in
@@ -2072,12 +1910,5 @@ extension FunctionType {
 extension ValueType {
     fileprivate static func address(isMemory64: Bool) -> ValueType {
         return isMemory64 ? .i64 : .i32
-    }
-    fileprivate var pReg: PReg {
-        switch self {
-        case .i32, .i64: return .x0
-        case .f32, .f64: return .d0
-        case .ref: fatalError()
-        }
     }
 }

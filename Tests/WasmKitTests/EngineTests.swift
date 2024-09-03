@@ -14,6 +14,7 @@ final class EngineTests: XCTestCase {
         checkSize(Instruction.UnaryOperand.self)
         checkSize(Instruction.Const32Operand.self)
         checkSize(Instruction.Const64Operand.self)
+        checkSize(Instruction.LoadOperand.self)
         checkSize(Instruction.StoreOperand.self)
         checkSize(Instruction.MemorySizeOperand.self)
         checkSize(Instruction.MemoryGrowOperand.self)

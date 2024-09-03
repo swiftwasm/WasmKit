@@ -4,8 +4,7 @@ extension ExecutionState {
     func unreachable(sp: Sp, pc: Pc) throws -> Pc {
         throw Trap.unreachable
     }
-    mutating func nop(sp: Sp) {
-    }
+    mutating func nop(sp: Sp) {}
 
     mutating func br(sp: Sp, pc: Pc, offset: Int32) -> Pc {
         return pc.advancedPc(by: Int(offset))

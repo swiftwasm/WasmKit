@@ -4,15 +4,16 @@ extension ExecutionState {
     @inline(never) func throwOutOfBoundsMemoryAccess() throws -> Never {
         throw Trap.outOfBoundsMemoryAccess
     }
-    mutating func memoryLoad<T>(
-        sp: Sp, md: Md, ms: Ms, offset: UInt64, pointer: UInt64, loadAs _: T.Type = T.self
-    ) throws -> T {
-        let length = UInt64(MemoryLayout<T>.size)
-        let (endAddress, isEndOverflow) = pointer.addingReportingOverflow(length &+ offset)
+    mutating func memoryLoad<T: FixedWidthInteger>(
+        sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand, loadAs _: T.Type = T.self, castToValue: (T) -> UntypedValue
+    ) throws {
+        let length = UInt64(T.bitWidth) / 8
+        let i = sp[loadOperand.pointer].asAddressOffset()
+        let (endAddress, isEndOverflow) = i.addingReportingOverflow(length &+ loadOperand.offset)
         if _fastPath(!isEndOverflow && endAddress <= ms) {
-            let address = offset + pointer
+            let address = loadOperand.offset + i
             let loaded = md.unsafelyUnwrapped.loadUnaligned(fromByteOffset: Int(address), as: T.self)
-            return loaded
+            sp[loadOperand.result] = castToValue(loaded)
         } else {
             try throwOutOfBoundsMemoryAccess()
         }

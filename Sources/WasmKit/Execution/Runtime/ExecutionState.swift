@@ -56,30 +56,6 @@ extension Pc {
     }
 }
 
-typealias X0 = UInt64
-typealias D0 = Float64
-
-func writePReg<T: UnsignedInteger>(_ result: inout X0, _ value: T) {
-    result = X0(value)
-}
-func writePReg<T: RawSignedInteger>(_ result: inout X0, _ value: T) {
-    result = X0(value.unsigned)
-}
-
-func writePReg<T: BinaryFloatingPoint>(_ result: inout D0, _ value: T) {
-    result = D0(value)
-}
-
-func readPRegI32(_ source: X0) -> UInt32 {
-    return UInt32(source & 0xffffffff)
-}
-func readPRegI64(_ source: X0) -> UInt64 {
-    return UInt64(source)
-}
-func readPRegAddress(_ source: X0) -> UInt64 {
-    return readPRegI64(source)
-}
-
 /// Executes a WebAssembly function.
 ///
 /// - Parameters:
@@ -187,7 +163,7 @@ extension ExecutionState {
         handle: InternalFunction,
         type: FunctionType
     ) throws {
-        var sp: Sp = sp, x0: X0 = 0, d0: D0 = 0.0, md: Md = nil, ms: Ms = 0, pc = pc
+        var sp: Sp = sp, md: Md = nil, ms: Ms = 0, pc = pc
         (pc, sp) = try invoke(
             function: handle,
             callerInstance: nil,
@@ -199,9 +175,9 @@ extension ExecutionState {
         do {
             switch self.runtime.value.configuration.threadingModel {
             case .direct:
-                try runDirectThreaded(sp: sp, x0: x0, d0: d0, pc: pc, md: md, ms: ms)
+                try runDirectThreaded(sp: sp, pc: pc, md: md, ms: ms)
             case .token:
-                try runTokenThreaded(sp: &sp, x0: &x0, d0: &d0, pc: &pc, md: &md, ms: &ms)
+                try runTokenThreaded(sp: &sp, pc: &pc, md: &md, ms: &ms)
             }
         } catch is EndOfExecution {
             return
@@ -210,12 +186,12 @@ extension ExecutionState {
 
     @inline(never)
     mutating func runDirectThreaded(
-        sp: Sp, x0: X0, d0: D0, pc: Pc, md: Md, ms: Ms
+        sp: Sp, pc: Pc, md: Md, ms: Ms
     ) throws {
         let handler = pc.assumingMemoryBound(to: wasmkit_tc_exec.self).pointee
         handler(
             UnsafeMutableRawPointer(sp).assumingMemoryBound(to: UInt64.self),
-            x0, d0, pc, md, ms, &self
+            pc, md, ms, &self
         )
         if let error = self.trap {
             throw unsafeBitCast(error, to: Error.self)
@@ -224,7 +200,7 @@ extension ExecutionState {
 
     /// The main execution loop. Be careful when modifying this function as it is performance-critical.
     @inline(__always)
-    mutating func runTokenThreaded(sp: inout Sp, x0: inout X0, d0: inout D0, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
+    mutating func runTokenThreaded(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
 #if WASMKIT_ENGINE_STATS
         var stats: [String: Int] = [:]
         defer {
@@ -239,7 +215,7 @@ extension ExecutionState {
 #if WASMKIT_ENGINE_STATS
             stats[inst.name, default: 0] += 1
 #endif
-            try doExecute(inst, sp: &sp, x0: &x0, d0: &d0, pc: &pc, md: &md, ms: &ms)
+            try doExecute(inst, sp: &sp, pc: &pc, md: &md, ms: &ms)
         }
     }
 
@@ -269,7 +245,7 @@ extension InternalFunction {
             let iseq = try function.withValue {
                 try $0.ensureCompiled(context: &executionState)
             }
-
+            
             let newSp = try executionState.pushFrame(
                 iseq: iseq,
                 instance: function.instance,
