@@ -113,20 +113,17 @@ extension Instruction {
 
     struct Const32Operand: Equatable, InstructionImmediate {
         let value: UInt32
-        let result: LVReg
+        let padding: UInt32 = 0
     }
 
     struct Const64Operand: Equatable, InstructionImmediate {
-        let value: UntypedValue
-        let result: LLVReg
+        let value: UInt64
         static func load(from pc: inout Pc) -> Self {
-            let value = pc.read(UntypedValue.self)
-            let result = LLVReg.load(from: &pc)
-            return Self(value: value, result: result)
+            let value = pc.read(UInt64.self)
+            return Self(value: value)
         }
         static func emit(to emitSlot: @escaping ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.value.storage }
-            LLVReg.emit(to: emitSlot, \.result)
+            emitSlot { $0.value }
         }
     }
 

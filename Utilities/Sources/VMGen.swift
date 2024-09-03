@@ -362,8 +362,10 @@ enum VMGen {
 
     static let numericOtherInsts: [Instruction] = [
         // Numeric
-        Instruction(name: "const32", immediate: Immediate(name: nil, type: "Instruction.Const32Operand")),
-        Instruction(name: "const64", immediate: Immediate(name: nil, type: "Instruction.Const64Operand")),
+        Instruction(name: "constI32", useX0: .write, immediate: Immediate(name: nil, type: "Instruction.Const32Operand")),
+        Instruction(name: "constI64", useX0: .write, immediate: Immediate(name: nil, type: "Instruction.Const64Operand")),
+        Instruction(name: "constF32", useD0: .write, immediate: Immediate(name: nil, type: "Instruction.Const32Operand")),
+        Instruction(name: "constF64", useD0: .write, immediate: Immediate(name: nil, type: "Instruction.Const64Operand")),
     ]
 
     // MARK: - Memory instructions
