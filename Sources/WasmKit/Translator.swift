@@ -481,19 +481,23 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
 
         private mutating func assign(at index: Int, _ instruction: Instruction) {
-            trace("assign[\(index)] \(instruction) index: \(instruction.rawIndex)")
-
+            trace("assign: \(instruction)")
+            let headSlot: CodeSlot
             switch runtimeConfiguration.threadingModel {
             case .direct:
-                self.instructions[index] = instruction.handler
+                headSlot = instruction.handler
             case .token:
-                self.instructions[index] = UInt64(instruction.rawIndex)
+                headSlot = UInt64(instruction.rawIndex)
             }
+            trace("        [\(index)] = 0x\(String(headSlot, radix: 16))")
+            self.instructions[index] = headSlot
             if let immediate = instruction.rawImmediate {
                 var slots: [CodeSlot] = []
                 immediate.emit(to: { slots.append($0) })
                 for (i, slot) in slots.enumerated() {
-                    self.instructions[index + 1 + i] = slot
+                    let slotIndex = index + 1 + i
+                    trace("        [\(slotIndex)] = 0x\(String(slot, radix: 16))")
+                    self.instructions[slotIndex] = slot
                 }
             }
         }
@@ -512,6 +516,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
 
         private mutating func emitSlot(_ codeSlot: CodeSlot) {
+            trace("emitSlot[\(instructions.count)]: 0x\(String(codeSlot, radix: 16))")
             self.instructions.append(codeSlot)
         }
 
@@ -527,7 +532,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
         mutating func emit(_ instruction: Instruction, resultRelink: ResultRelink? = nil) {
             self.lastEmission = LastEmission(position: insertingPC, resultRelink: resultRelink)
-            trace("emitInstruction[\(instructions.count)] \(instruction) index: \(instruction.rawIndex)")
+            trace("emitInstruction: \(instruction)")
             switch runtimeConfiguration.threadingModel {
             case .direct:
                 emitSlot(instruction.handler)
