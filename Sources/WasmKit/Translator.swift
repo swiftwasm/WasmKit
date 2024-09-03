@@ -703,15 +703,15 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             emitCopyStack(from: localReg(localIndex), to: copyTo)
         }
     }
+
+    /// Emit copy instructions to ensure local variable values on the logical
+    /// stack are on the physical stack.
+    ///
+    /// - Parameter depth: The depth of the logical stack to ensure the values
+    ///   are on the physical stack.
     private mutating func preserveLocalsOnStack(depth: Int) {
         for (sourceLocal, destReg) in valueStack.preserveLocalsOnStack(depth: depth) {
             emitCopyStack(from: localReg(sourceLocal), to: destReg)
-        }
-    }
-
-    private mutating func preserveAllLocalsOnStack() {
-        for localIndex in 0..<locals.count {
-            preserveLocalsOnStack(LocalIndex(localIndex))
         }
     }
 
@@ -957,6 +957,19 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         guard let poppedFrame = controlStack.popFrame() else {
             throw TranslationError("Unexpected `end` instruction")
         }
+        // Reset the last emission to avoid relinking the result of the last instruction inside the block.
+        // Relinking results across the block boundary is invalid because the producer instruction is not
+        // statically known. Think about the following case:
+        // ```
+        // local.get 0
+        // if
+        //   i32.const 2
+        // else
+        //   i32.const 3
+        // end
+        // local.set 0
+        // ```
+        //
         iseqBuilder.resetLastEmission()
         if case .block(root: true) = poppedFrame.kind {
             if poppedFrame.reachable {
@@ -966,6 +979,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             return
         }
 
+        // NOTE: `valueStack.height - poppedFrame.stackHeight` is usually the same as `poppedFrame.copyCount`
+        // but it's not always the case when this block is already unreachable.
         preserveLocalsOnStack(depth: Int(valueStack.height - poppedFrame.stackHeight))
         switch poppedFrame.kind {
         case .block:
@@ -1086,7 +1101,9 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         guard let index = try popVRegOperand(.i32) else { return }
         guard try controlStack.currentFrame().reachable else { return }
 
-        preserveAllLocalsOnStack()
+        let defaultFrame = try controlStack.branchTarget(relativeDepth: targets.defaultIndex)
+
+        preserveLocalsOnStack(depth: Int(defaultFrame.copyCount))
         let allLabelIndices = targets.labelIndices + [targets.defaultIndex]
         let tableBuffer = allocator.allocateBrTable(capacity: allLabelIndices.count)
         let operand = Instruction.BrTable(
