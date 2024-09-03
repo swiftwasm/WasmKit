@@ -86,7 +86,7 @@ enum VMGen {
             case .read:
                 vregs += [(ExecParam.d0, false)]
             case .write:
-                vregs += [(ExecParam.x0, true)]
+                vregs += [(ExecParam.d0, true)]
             }
             if self.mayUpdatePc {
                 vregs += [(ExecParam.pc, false)]
@@ -115,7 +115,7 @@ enum VMGen {
         func selectExecParam() -> ExecParam {
             switch self {
             case .i32, .i64: return .x0
-            case .f32, .f64: fatalError()
+            case .f32, .f64: return .d0
             }
         }
 
@@ -125,6 +125,14 @@ enum VMGen {
             case .i64: return "I64"
             case .f32: return "F32"
             case .f64: return "F64"
+            }
+        }
+        func lowercased() -> String {
+            switch self {
+            case .i32: return "i32"
+            case .i64: return "i64"
+            case .f32: return "f32"
+            case .f64: return "f64"
             }
         }
     }
@@ -176,6 +184,7 @@ enum VMGen {
             assert(useFastPath)
             return Instruction(
                 name: name + lhs.marker + rhs.marker,
+                mayThrow: mayThrow,
                 useX0: .write,
                 immediate: Immediate(name: nil, type: "Instruction.BinaryOperand\(lhs.marker)\(rhs.marker)")
             )
@@ -232,14 +241,19 @@ enum VMGen {
         results += [
             "DivS", "DivU", "RemS", "RemU",
         ].flatMap { op -> [BinOpInfo] in
-            intValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: $0, mayThrow: true) }
+            intValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: $0, mayThrow: true, isCommutative: false, useFastPath: true) }
         }
 
         // (T, T) -> i32 for all T in int types
         results += [
-            "Eq", "Ne", "LtS", "LtU", "GtS", "GtU", "LeS", "LeU", "GeS", "GeU",
+            "Eq", "Ne",
         ].flatMap { op -> [BinOpInfo] in
-            intValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: .i32) }
+            intValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: .i32, isCommutative: true, useFastPath: true) }
+        }
+        results += [
+            "LtS", "LtU", "GtS", "GtU", "LeS", "LeU", "GeS", "GeU",
+        ].flatMap { op -> [BinOpInfo] in
+            intValueTypes.map { BinOpInfo(op: op, name: "\($0)\(op)", lhsType: $0, rhsType: $0, resultType: .i32, isCommutative: false, useFastPath: true) }
         }
         return results
     }
@@ -355,29 +369,54 @@ enum VMGen {
     // MARK: - Memory instructions
 
     struct LoadInstruction {
+        let name: String
         let loadAs: String
+        let resultType: ValueType
         let castToValue: String
-        let base: Instruction
+
+        func instruction(_ operand: OperandSource) -> Instruction {
+            switch resultType {
+            case .i32, .i64:
+                return Instruction(
+                    name: name + operand.marker,
+                    mayThrow: true, useCurrentMemory: .read, useX0: .write,
+                    immediate: Immediate(name: nil, type: "Instruction.LoadOperand\(operand.marker)")
+                )
+            case .f32, .f64:
+                return Instruction(
+                    name: name + operand.marker,
+                    mayThrow: true, useCurrentMemory: .read, useX0: .read, useD0: .write,
+                    immediate: Immediate(name: nil, type: "Instruction.LoadOperand\(operand.marker)")
+                )
+            }
+        }
+
+        var operandSources: [OperandSource] {
+            [.stack, .register]
+        }
+
+        var instructions: [Instruction] {
+            operandSources.map(instruction)
+        }
     }
 
     static let memoryLoadInsts: [LoadInstruction] = [
-        ("i32Load", "UInt32", ".i32($0)"),
-        ("i64Load", "UInt64", ".i64($0)"),
-        ("f32Load", "UInt32", ".rawF32($0)"),
-        ("f64Load", "UInt64", ".rawF64($0)"),
-        ("i32Load8S", "Int8", ".init(signed: Int32($0))"),
-        ("i32Load8U", "UInt8", ".i32(UInt32($0))"),
-        ("i32Load16S", "Int16", ".init(signed: Int32($0))"),
-        ("i32Load16U", "UInt16", ".i32(UInt32($0))"),
-        ("i64Load8S", "Int8", ".init(signed: Int64($0))"),
-        ("i64Load8U", "UInt8", ".i64(UInt64($0))"),
-        ("i64Load16S", "Int16", ".init(signed: Int64($0))"),
-        ("i64Load16U", "UInt16", ".i64(UInt64($0))"),
-        ("i64Load32S", "Int32", ".init(signed: Int64($0))"),
-        ("i64Load32U", "UInt32", ".i64(UInt64($0))"),
-    ].map { (name, loadAs, castToValue) in
-        let base = Instruction(name: name, mayThrow: true, useCurrentMemory: .read, immediate: Immediate(name: nil, type: "Instruction.LoadOperand"))
-        return LoadInstruction(loadAs: loadAs, castToValue: castToValue, base: base)
+        (.i32, "i32Load", "Int32", "Int32"),
+        (.i64, "i64Load", "Int64", "Int64"),
+        (.f32, "f32Load", "Float32", "Float32"),
+        (.f64, "f64Load", "Float64", "Float64"),
+        (.i32, "i32Load8S", "Int8", "Int32"),
+        (.i32, "i32Load8U", "UInt8", "UInt32"),
+        (.i32, "i32Load16S", "Int16", "Int32"),
+        (.i32, "i32Load16U", "UInt16", "UInt32"),
+        (.i64, "i64Load8S", "Int8", "Int64"),
+        (.i64, "i64Load8U", "UInt8", "UInt64"),
+        (.i64, "i64Load16S", "Int16", "Int64"),
+        (.i64, "i64Load16U", "UInt16", "UInt64"),
+        (.i64, "i64Load32S", "Int32", "Int64"),
+        (.i64, "i64Load32U", "UInt32", "UInt64"),
+    ].map { (resultType: ValueType, name, loadAs, castToValue) in
+        return LoadInstruction(name: name, loadAs: loadAs, resultType: resultType, castToValue: castToValue)
     }
 
     struct StoreInstruction {
@@ -398,7 +437,7 @@ enum VMGen {
         let base = Instruction(name: name, mayThrow: true, useCurrentMemory: .read, immediate: Immediate(name: nil, type: "Instruction.StoreOperand"))
         return StoreInstruction(castFromValue: castFromValue, base: base)
     }
-    static let memoryLoadStoreInsts: [Instruction] = memoryLoadInsts.map(\.base) + memoryStoreInsts.map(\.base)
+    static let memoryLoadStoreInsts: [Instruction] = memoryLoadInsts.flatMap(\.instructions) + memoryStoreInsts.map(\.base)
     static let memoryOpInsts: [Instruction] = [
         Instruction(name: "memorySize", immediate: Immediate(name: nil, type: "Instruction.MemorySizeOperand")),
         Instruction(name: "memoryGrow", mayThrow: true, useCurrentMemory: .write, immediate: Immediate(name: nil, type: "Instruction.MemoryGrowOperand")),
@@ -437,10 +476,10 @@ enum VMGen {
         var instructions: [Instruction] = [
             // Variable
             Instruction(name: "copyStack", immediate: Immediate(name: nil, type: "Instruction.CopyStackOperand")),
-            Instruction(name: "copyX0ToStackI32", useX0: .read, immediate: Immediate(name: "dest", type: "VReg")),
-            Instruction(name: "copyX0ToStackI64", useX0: .read, immediate: Immediate(name: "dest", type: "VReg")),
-            Instruction(name: "copyD0ToStackF32", useD0: .read, immediate: Immediate(name: "dest", type: "VReg")),
-            Instruction(name: "copyD0ToStackF64", useD0: .read, immediate: Immediate(name: "dest", type: "VReg")),
+            Instruction(name: "copyX0ToStackI32", useX0: .read, immediate: Immediate(name: "dest", type: "LLVReg")),
+            Instruction(name: "copyX0ToStackI64", useX0: .read, immediate: Immediate(name: "dest", type: "LLVReg")),
+            Instruction(name: "copyD0ToStackF32", useD0: .read, immediate: Immediate(name: "dest", type: "LLVReg")),
+            Instruction(name: "copyD0ToStackF64", useD0: .read, immediate: Immediate(name: "dest", type: "LLVReg")),
             Instruction(name: "globalGet", immediate: Immediate(name: nil, type: "Instruction.GlobalGetOperand")),
             Instruction(name: "globalSet", immediate: Immediate(name: nil, type: "Instruction.GlobalSetOperand")),
             // Controls
@@ -544,7 +583,7 @@ enum VMGen {
             if op.useFastPath {
                 func operand(_ name: String, _ source: OperandSource, _ type: ValueType) -> String {
                     switch source {
-                    case .stack: return "sp[\(name)].\(op.resultType)"
+                    case .stack: return "sp[\(name)].\(type.lowercased())"
                     case .register: return "readPReg\(String(describing: type).uppercased())(" + type.selectExecParam().label + ")"
                     }
                 }
@@ -558,7 +597,7 @@ enum VMGen {
                     let result = op.resultType.selectExecParam().label
                     let immediate = inst.immediate!.label
                     output += """
-                    writePReg(&\(result), \(operand("\(immediate).lhs", lhs, op.lhsType)).\(camelCase(pascalCase: op.op))(\(operand("\(immediate).rhs", rhs, op.rhsType))))
+                    \(op.mayThrow ? "try " : "")writePReg(&\(result), \(operand("\(immediate).lhs", lhs, op.lhsType)).\(camelCase(pascalCase: op.op))(\(operand("\(immediate).rhs", rhs, op.rhsType))))
                     """
                     output += " }"
                 }
@@ -580,13 +619,23 @@ enum VMGen {
             """
         }
 
-        for inst in memoryLoadInsts {
-            output += """
-
-                @inline(__always) mutating \(instMethodDecl(inst.base)) {
-                    return try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: \(inst.loadAs).self, castToValue: { \(inst.castToValue) })
+        for loadInst in memoryLoadInsts {
+            for operand in loadInst.operandSources {
+                let inst = loadInst.instruction(operand)
+                let pointer: String
+                switch operand {
+                case .stack: pointer = "sp[\(inst.immediate!.label).pointer].asAddressOffset()"
+                case .register: pointer = "readPRegAddress(x0)"
                 }
-            """
+                let offset = "\(inst.immediate!.label).offset"
+                let result = loadInst.resultType.selectExecParam().label
+                output += """
+
+                    @inline(__always) mutating \(instMethodDecl(inst)) {
+                        writePReg(&\(result), try \(loadInst.castToValue)(memoryLoad(sp: sp, md: md, ms: ms, offset: \(offset), pointer: \(pointer), loadAs: \(loadInst.loadAs).self)))
+                    }
+                """
+            }
         }
         for inst in memoryStoreInsts {
             output += """
@@ -799,6 +848,12 @@ enum VMGen {
                 output += "rs: \(binOp.instruction(lhs: .register, rhs: .stack).name)"
                 output += ")\n"
             }
+        }
+        for loadInst in memoryLoadInsts {
+            output += "    static let \(loadInst.name) = LoadInfo("
+            output += "s: \(loadInst.instruction(.stack).name), "
+            output += "r: \(loadInst.instruction(.register).name)"
+            output += ")\n"
         }
         output += "}\n"
         return output

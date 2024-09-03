@@ -59,8 +59,15 @@ extension Pc {
 typealias X0 = UInt64
 typealias D0 = Float64
 
-func writePReg<T: FixedWidthInteger>(_ result: inout X0, _ value: T) {
+func writePReg<T: UnsignedInteger>(_ result: inout X0, _ value: T) {
     result = X0(value)
+}
+func writePReg<T: RawSignedInteger>(_ result: inout X0, _ value: T) {
+    result = X0(value.unsigned)
+}
+
+func writePReg<T: BinaryFloatingPoint>(_ result: inout D0, _ value: T) {
+    result = D0(value)
 }
 
 func readPRegI32(_ source: X0) -> UInt32 {
@@ -68,6 +75,9 @@ func readPRegI32(_ source: X0) -> UInt32 {
 }
 func readPRegI64(_ source: X0) -> UInt64 {
     return UInt64(source)
+}
+func readPRegAddress(_ source: X0) -> UInt64 {
+    return readPRegI64(source)
 }
 
 /// Executes a WebAssembly function.

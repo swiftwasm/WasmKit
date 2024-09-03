@@ -447,6 +447,9 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             push(.preg(type, pReg))
             pRegs[pReg] = type
         }
+        mutating func pushPReg(type: ValueType) {
+            pushPReg(type.pReg, type: type)
+        }
         mutating func preserveLocalsOnStack(_ localIndex: LocalIndex) -> [VReg] {
             var copyTo: [VReg] = []
             for i in 0..<values.count {
@@ -830,10 +833,10 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     private mutating func emitCopyPRegToStack(from source: PReg, to dest: VReg, type: ValueType) {
         let instruction: Instruction
         switch type {
-        case .i32: instruction = .copyX0ToStackI32(dest: dest)
-        case .i64: instruction = .copyX0ToStackI64(dest: dest)
-        case .f32: instruction = .copyD0ToStackF32(dest: dest)
-        case .f64: instruction = .copyD0ToStackF64(dest: dest)
+        case .i32: instruction = .copyX0ToStackI32(dest: LLVReg(dest))
+        case .i64: instruction = .copyX0ToStackI64(dest: LLVReg(dest))
+        case .f32: instruction = .copyD0ToStackF32(dest: LLVReg(dest))
+        case .f64: instruction = .copyD0ToStackF64(dest: LLVReg(dest))
         default: fatalError()
         }
         emit(instruction)
@@ -1469,7 +1472,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             instruction(newResult)
         })
     }
-    private mutating func popPushEmit(
+    private mutating func popPushEmitVReg(
         _ pop: ValueType,
         _ push: ValueType,
         _ instruction: @escaping (_ popped: VReg, _ result: VReg, ValueStack) -> Instruction
@@ -1481,6 +1484,25 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
                 instruction(value, newResult, valueStack)
             })
         }
+    }
+
+    private mutating func popPushEmitPReg(
+        _ pop: ValueType,
+        _ push: ValueType,
+        r: @escaping (_ popped: PReg) -> Instruction,
+        s: @escaping (_ popped: VReg) -> Instruction
+    ) throws {
+        let value = try popOperand(pop)?.intoOperandSource(stackLayout)
+        if let value = value {
+            switch value {
+            case .vreg(let vReg):
+                preservePReg(push.pReg)
+                emit(s(vReg))
+            case .preg(let pReg):
+                emit(r(pReg))
+            }
+        }
+        valueStack.pushPReg(type: push)
     }
 
     private mutating func pop3Emit(
@@ -1527,21 +1549,18 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     private mutating func visitLoad(
         _ memarg: MemArg,
         _ type: ValueType,
-        _ instruction: @escaping (Instruction.LoadOperand) -> Instruction
+        _ instruction: Instruction.LoadInfo
     ) throws {
         let isMemory64 = try module.isMemory64(memoryIndex: 0)
         let alignLog2Limit = isMemory64 ? 64 : 32
         if memarg.align >= alignLog2Limit {
             throw TranslationError("Alignment 2**\(memarg.align) is out of limit \(alignLog2Limit)")
         }
-        try popPushEmit(.address(isMemory64: isMemory64), type) { value, result, stack in
-            let loadOperand = Instruction.LoadOperand(
-                offset: memarg.offset,
-                pointer: value,
-                result: result
-            )
-            return instruction(loadOperand)
-        }
+        try popPushEmitPReg(
+            .address(isMemory64: isMemory64), type,
+            r: { _ in instruction.r(Instruction.LoadOperandR(offset: memarg.offset)) },
+            s: { instruction.s(Instruction.LoadOperandS(offset: memarg.offset, pointer: LLVReg($0))) }
+        )
     }
     private mutating func visitStore(
         _ memarg: MemArg,
@@ -1591,7 +1610,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         let isMemory64 = try module.isMemory64(memoryIndex: memory)
         let sizeType = ValueType.address(isMemory64: isMemory64)
         // Just pop/push the same type (i64 or i32) value
-        try popPushEmit(sizeType, sizeType) { value, result, stack in
+        try popPushEmitVReg(sizeType, sizeType) { value, result, stack in
             .memoryGrow(Instruction.MemoryGrowOperand(
                 result: result, delta: value, memory: memory
             ))
@@ -1627,7 +1646,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
 
     private mutating func visitUnary(_ operand: ValueType, _ instruction: @escaping (Instruction.UnaryOperand) -> Instruction) throws {
-        try popPushEmit(operand, operand) { value, result, stack in
+        try popPushEmitVReg(operand, operand) { value, result, stack in
             return instruction(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
     }
@@ -1658,7 +1677,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             let instruction: Instruction
             switch (lhs, rhs) {
             case (.vreg(let lhs), .vreg(let rhs)):
-                preservePReg(.r0)
+                preservePReg(.x0)
                 instruction = commutative.ss(Instruction.BinaryOperandSS(lhs: LVReg(lhs), rhs: LVReg(rhs)))
             case (.vreg(let vreg), .preg), (.preg, .vreg(let vreg)):
                 instruction = commutative.sr(Instruction.BinaryOperandSR(vreg))
@@ -1667,7 +1686,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             }
             emit(instruction)
         }
-        valueStack.pushPReg(.r0, type: result)
+        valueStack.pushPReg(.x0, type: result)
     }
     private mutating func visitBinary(
         _ operand: ValueType,
@@ -1680,7 +1699,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             let instruction: Instruction
             switch (lhs, rhs) {
             case (.vreg(let lhs), .vreg(let rhs)):
-                preservePReg(.r0)
+                preservePReg(.x0)
                 instruction = nonCommutative.ss(Instruction.BinaryOperandSS(lhs: LVReg(lhs), rhs: LVReg(rhs)))
             case (.vreg(let vreg), .preg):
                 instruction = nonCommutative.sr(Instruction.BinaryOperandSR(vreg))
@@ -1691,18 +1710,24 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             }
             emit(instruction)
         }
-        valueStack.pushPReg(.r0, type: result)
+        valueStack.pushPReg(.x0, type: result)
     }
     private mutating func visitCmp(_ operand: ValueType, _ instruction: @escaping (Instruction.BinaryOperand) -> Instruction) throws {
         try visitBinary(operand, .i32, instruction)
     }
+    private mutating func visitCmp(_ operand: ValueType, _ instruction: Instruction.Commutative) throws {
+        try visitBinary(operand, .i32, instruction)
+    }
+    private mutating func visitCmp(_ operand: ValueType, _ instruction: Instruction.NonCommutative) throws {
+        try visitBinary(operand, .i32, instruction)
+    }
     private mutating func visitConversion(_ from: ValueType, _ to: ValueType, _ instruction: @escaping (Instruction.UnaryOperand) -> Instruction) throws {
-        try popPushEmit(from, to) { value, result, stack in
+        try popPushEmitVReg(from, to) { value, result, stack in
             return instruction(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
     }
     mutating func visitI32Eqz() throws -> Output {
-        try popPushEmit(.i32, .i32) { value, result, stack in
+        try popPushEmitVReg(.i32, .i32) { value, result, stack in
                 .i32Eqz(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
     }
@@ -1717,7 +1742,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     mutating func visitI32GeS() throws -> Output { try visitCmp(.i32, Instruction.i32GeS) }
     mutating func visitI32GeU() throws -> Output { try visitCmp(.i32, Instruction.i32GeU) }
     mutating func visitI64Eqz() throws -> Output {
-        try popPushEmit(.i64, .i32) { value, result, stack in
+        try popPushEmitVReg(.i64, .i32) { value, result, stack in
                 .i64Eqz(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
     }
@@ -1951,7 +1976,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
     }
     mutating func visitTableGet(table: UInt32) throws -> Output {
-        try popPushEmit(
+        try popPushEmitVReg(
             module.addressType(tableIndex: table),
             .ref(module.elementType(table))
         ) { index, result, stack in
@@ -2037,5 +2062,12 @@ extension FunctionType {
 extension ValueType {
     fileprivate static func address(isMemory64: Bool) -> ValueType {
         return isMemory64 ? .i64 : .i32
+    }
+    fileprivate var pReg: PReg {
+        switch self {
+        case .i32, .i64: return .x0
+        case .f32, .f64: return .d0
+        case .ref: fatalError()
+        }
     }
 }
