@@ -120,6 +120,9 @@ public struct Instance {
         handle.exports.mapValues { ExternalValue(handle: $0, allocator: allocator) }
     }
 
+    /// Dumps the textual representation of all functions in the instance.
+    ///
+    /// - Precondition: The instance must be compiled with the token threading model.
     @_spi(OnlyForCLI)
     public func dumpFunctions<Target>(to target: inout Target, module: Module, runtime: Runtime) throws where Target: TextOutputStream {
         for (offset, function) in self.handle.functions.enumerated() {

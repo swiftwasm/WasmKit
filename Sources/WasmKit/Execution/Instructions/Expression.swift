@@ -22,16 +22,23 @@ struct InstructionSequence: Equatable {
 
 extension InstructionSequence {
     func write<Target>(to target: inout Target, context: inout InstructionPrintingContext) where Target : TextOutputStream {
-//        var hexOffsetWidth = String(instructions.count - 1, radix: 16).count
-//        hexOffsetWidth = (hexOffsetWidth + 1) & ~1
-//        for (index, instruction) in instructions.enumerated() {
-//            var hexOffset = String(index, radix: 16)
-//            while hexOffset.count < hexOffsetWidth {
-//                hexOffset = "0" + hexOffset
-//            }
-//            target.write("0x\(hexOffset): ")
-//            context.print(instruction: instruction, to: &target)
-//            target.write("\n")
-//        }
+        var hexOffsetWidth = String(instructions.count - 1, radix: 16).count
+        hexOffsetWidth = (hexOffsetWidth + 1) & ~1
+
+        guard let cursorStart = instructions.baseAddress else { return }
+        let cursorEnd = cursorStart.advanced(by: instructions.count)
+
+        var cursor = cursorStart
+        while cursor < cursorEnd {
+            let index = cursor - cursorStart
+            var hexOffset = String(index, radix: 16)
+            while hexOffset.count < hexOffsetWidth {
+                hexOffset = "0" + hexOffset
+            }
+            target.write("0x\(hexOffset): ")
+            let instruction = Instruction.load(from: &cursor)
+            context.print(instruction: instruction, to: &target)
+            target.write("\n")
+        }
     }
 }
