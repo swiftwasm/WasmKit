@@ -47,9 +47,6 @@ struct ModuleImports {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#modules>
 public struct Module {
-    public var types: [FunctionType] {
-        translatorContext.typeSection
-    }
     var functions: [GuestFunction]
     let elements: [ElementSegment]
     let data: [DataSegment]
@@ -58,13 +55,17 @@ public struct Module {
     public let imports: [Import]
     public let exports: [Export]
     public let customSections: [CustomSection]
+    public let types: [FunctionType]
 
-    let translatorContext: TranslatorModuleContext
+    let moduleImports: ModuleImports
+    let memoryTypes: [MemoryType]
+    let tableTypes: [TableType]
     let allocator: ISeqAllocator
     let features: WasmFeatureSet
     let hasDataCount: Bool
 
     init(
+        types: [FunctionType],
         functions: [GuestFunction],
         elements: [ElementSegment],
         data: [DataSegment],
@@ -72,8 +73,9 @@ public struct Module {
         imports: [Import],
         exports: [Export],
         globals: [WasmParser.Global],
+        memories: [MemoryType],
+        tables: [TableType],
         customSections: [CustomSection],
-        translatorContext: TranslatorModuleContext,
         allocator: ISeqAllocator,
         features: WasmFeatureSet,
         hasDataCount: Bool
@@ -86,10 +88,32 @@ public struct Module {
         self.exports = exports
         self.globals = globals
         self.customSections = customSections
-        self.translatorContext = translatorContext
         self.allocator = allocator
         self.features = features
         self.hasDataCount = hasDataCount
+
+        var functionTypeIndices: [TypeIndex] = []
+        var globalTypes: [GlobalType] = []
+        var memoryTypes: [MemoryType] = []
+        var tableTypes: [TableType] = []
+
+        self.moduleImports = ModuleImports.build(
+            from: imports,
+            functionTypeIndices: &functionTypeIndices,
+            globalTypes: &globalTypes,
+            memoryTypes: &memoryTypes,
+            tableTypes: &tableTypes
+        )
+        self.types = types
+        self.memoryTypes = memoryTypes + memories
+        self.tableTypes = tableTypes + tables
+    }
+
+    static func resolveType(_ index: TypeIndex, typeSection: [FunctionType]) throws -> FunctionType {
+        guard Int(index) < typeSection.count else {
+            throw TranslationError("Type index \(index) is out of range")
+        }
+        return typeSection[Int(index)]
     }
 
     /// Materialize lazily-computed elements in this module
@@ -104,10 +128,10 @@ public struct Module {
 
 extension Module {
     var internalMemories: ArraySlice<MemoryType> {
-        return translatorContext.memoryTypes[translatorContext.imports.numberOfMemories...]
+        return memoryTypes[moduleImports.numberOfMemories...]
     }
     var internalTables: ArraySlice<TableType> {
-        return translatorContext.tableTypes[translatorContext.imports.numberOfTables...]
+        return tableTypes[moduleImports.numberOfTables...]
     }
 }
 

@@ -138,19 +138,11 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
         )
     }
 
-    let translatorContext = TranslatorModuleContext(
-        typeSection: types,
-        importSection: imports,
-        functionSection: typeIndices,
-        globals: globals.map(\.type),
-        memories: memories,
-        tables: tables
-    )
     let allocator = ISeqAllocator()
     let functions = try codes.enumerated().map { index, code in
         // SAFETY: The number of typeIndices is guaranteed to be the same as the number of codes
         let funcTypeIndex = typeIndices[index]
-        let funcType = try translatorContext.resolveType(funcTypeIndex)
+        let funcType = try Module.resolveType(funcTypeIndex, typeSection: types)
         return GuestFunction(
             type: funcType,
             code: code
@@ -158,6 +150,7 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
     }
 
     return Module(
+        types: types,
         functions: functions,
         elements: elements,
         data: data,
@@ -165,8 +158,9 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
         imports: imports,
         exports: exports,
         globals: globals,
+        memories: memories,
+        tables: tables,
         customSections: customSections,
-        translatorContext: translatorContext,
         allocator: allocator,
         features: features,
         hasDataCount: dataCount != nil
