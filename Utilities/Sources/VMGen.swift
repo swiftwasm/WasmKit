@@ -24,12 +24,13 @@ enum VMGen {
         let type: String
 
         static let sp = ExecParam(label: "sp", type: "Sp")
-        static let r0 = ExecParam(label: "r0", type: "R0")
+        static let x0 = ExecParam(label: "x0", type: "X0")
+        static let d0 = ExecParam(label: "d0", type: "D0")
         static let pc = ExecParam(label: "pc", type: "Pc")
         static let md = ExecParam(label: "md", type: "Md")
         static let ms = ExecParam(label: "ms", type: "Ms")
 
-        static var allCases = [sp, r0, pc, md, ms]
+        static var allCases = [sp, x0, d0, pc, md, ms]
     }
 
     struct Instruction {
@@ -39,7 +40,8 @@ enum VMGen {
         var mayUpdateFrame: Bool
         var mayUpdateSp: Bool = false
         var useCurrentMemory: RegisterUse
-        var useR0: RegisterUse
+        var useX0: RegisterUse
+        var useD0: RegisterUse
         var immediate: Immediate?
 
         var mayUpdatePc: Bool {
@@ -50,7 +52,7 @@ enum VMGen {
             name: String, isControl: Bool = false,
             mayThrow: Bool = false, mayUpdateFrame: Bool = false,
             useCurrentMemory: RegisterUse = .none,
-            useR0: RegisterUse = .none,
+            useX0: RegisterUse = .none, useD0: RegisterUse = .none,
             immediate: Immediate? = nil
         ) {
             self.name = name
@@ -59,7 +61,8 @@ enum VMGen {
             self.mayUpdateFrame = mayUpdateFrame
             self.useCurrentMemory = useCurrentMemory
             self.immediate = immediate
-            self.useR0 = useR0
+            self.useX0 = useX0
+            self.useD0 = useD0
             assert(isControl || !mayUpdateFrame, "non-control instruction should not update frame")
         }
 
@@ -71,12 +74,19 @@ enum VMGen {
             } else {
                 vregs += [(ExecParam.sp, false)]
             }
-            switch useR0 {
+            switch useX0 {
             case .none: break
             case .read:
-                vregs += [(ExecParam.r0, false)]
+                vregs += [(ExecParam.x0, false)]
             case .write:
-                vregs += [(ExecParam.r0, true)]
+                vregs += [(ExecParam.x0, true)]
+            }
+            switch useD0 {
+            case .none: break
+            case .read:
+                vregs += [(ExecParam.d0, false)]
+            case .write:
+                vregs += [(ExecParam.x0, true)]
             }
             if self.mayUpdatePc {
                 vregs += [(ExecParam.pc, false)]
@@ -104,7 +114,7 @@ enum VMGen {
 
         func selectExecParam() -> ExecParam {
             switch self {
-            case .i32, .i64: return .r0
+            case .i32, .i64: return .x0
             case .f32, .f64: fatalError()
             }
         }
@@ -166,7 +176,7 @@ enum VMGen {
             assert(useFastPath)
             return Instruction(
                 name: name + lhs.marker + rhs.marker,
-                useR0: .write,
+                useX0: .write,
                 immediate: Immediate(name: nil, type: "Instruction.BinaryOperand\(lhs.marker)\(rhs.marker)")
             )
         }
@@ -427,10 +437,10 @@ enum VMGen {
         var instructions: [Instruction] = [
             // Variable
             Instruction(name: "copyStack", immediate: Immediate(name: nil, type: "Instruction.CopyStackOperand")),
-            Instruction(name: "copyR0ToStackI32", useR0: .read, immediate: Immediate(name: "dest", type: "VReg")),
-            Instruction(name: "copyR0ToStackI64", useR0: .read, immediate: Immediate(name: "dest", type: "VReg")),
-            Instruction(name: "copyR0ToStackF32", useR0: .read, immediate: Immediate(name: "dest", type: "VReg")),
-            Instruction(name: "copyR0ToStackF64", useR0: .read, immediate: Immediate(name: "dest", type: "VReg")),
+            Instruction(name: "copyX0ToStackI32", useX0: .read, immediate: Immediate(name: "dest", type: "VReg")),
+            Instruction(name: "copyX0ToStackI64", useX0: .read, immediate: Immediate(name: "dest", type: "VReg")),
+            Instruction(name: "copyD0ToStackF32", useD0: .read, immediate: Immediate(name: "dest", type: "VReg")),
+            Instruction(name: "copyD0ToStackF64", useD0: .read, immediate: Immediate(name: "dest", type: "VReg")),
             Instruction(name: "globalGet", immediate: Immediate(name: nil, type: "Instruction.GlobalGetOperand")),
             Instruction(name: "globalSet", immediate: Immediate(name: nil, type: "Instruction.GlobalSetOperand")),
             // Controls
