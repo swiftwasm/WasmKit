@@ -80,11 +80,6 @@ extension Int32: InstructionImmediate {
     }
 }
 
-enum PReg: Int, CaseIterable {
-    case x0 = 0
-    case d0 = 1
-}
-
 extension Instruction {
     /// size = 6, alignment = 2
     struct BinaryOperand: Equatable, InstructionImmediate {
@@ -113,45 +108,39 @@ extension Instruction {
 
     struct Const32Operand: Equatable, InstructionImmediate {
         let value: UInt32
-        let padding: UInt32 = 0
+        let result: LVReg
     }
 
     struct Const64Operand: Equatable, InstructionImmediate {
-        let value: UInt64
+        let value: UntypedValue
+        let result: LLVReg
         static func load(from pc: inout Pc) -> Self {
-            let value = pc.read(UInt64.self)
-            return Self(value: value)
+            let value = pc.read(UntypedValue.self)
+            let result = LLVReg.load(from: &pc)
+            return Self(value: value, result: result)
         }
         static func emit(to emitSlot: @escaping ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.value }
+            emitSlot { $0.value.storage }
+            LLVReg.emit(to: emitSlot, \.result)
         }
     }
 
     /// size = 4, alignment = 8
-    struct LoadOperandS: Equatable, InstructionImmediate {
+    struct LoadOperand: Equatable, InstructionImmediate {
         let offset: UInt64
-        let pointer: LLVReg
+        let pointer: VReg
+        let result: VReg
 
         @inline(__always) static func load(from pc: inout Pc) -> Self {
             let offset = pc.read(UInt64.self)
-            let pointer = pc.read(LLVReg.self)
-            return Self(offset: offset, pointer: pointer)
+            let (pointer, result) = VReg.load2(from: &pc)
+            return Self(offset: offset, pointer: pointer, result: result)
         }
         @inline(__always) static func emit(to emitSlot: @escaping ((Self) -> CodeSlot) -> Void) {
             emitSlot { $0.offset }
-            emitSlot { CodeSlot(bitPattern: $0.pointer) }
-        }
-    }
-
-    struct LoadOperandR: Equatable, InstructionImmediate {
-        let offset: UInt64
-
-        @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let offset = pc.read(UInt64.self)
-            return Self(offset: offset)
-        }
-        @inline(__always) static func emit(to emitSlot: @escaping ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.offset }
+            VReg.emit2 { emitVRegs in
+                emitSlot { emitVRegs($0.pointer, $0.result) }
+            }
         }
     }
 
@@ -496,38 +485,6 @@ extension Instruction {
 
     typealias OnEnterOperand = FunctionIndex
     typealias OnExitOperand = FunctionIndex
-    
-    struct BinaryOperandSS: Equatable, InstructionImmediate {
-        let lhs: LVReg
-        let rhs: LVReg
-    }
-    struct BinaryOperandSR: Equatable, InstructionImmediate {
-        let lhs: LLVReg
-        init(_ lhs: VReg) {
-            self.lhs = LLVReg(lhs)
-        }
-    }
-    struct BinaryOperandRS: Equatable, InstructionImmediate {
-        let rhs: LLVReg
-        init(_ rhs: VReg) {
-            self.rhs = LLVReg(rhs)
-        }
-    }
-    struct NonCommutative {
-        let ss: (BinaryOperandSS) -> Instruction
-        let sr: (BinaryOperandSR) -> Instruction
-        let rs: (BinaryOperandRS) -> Instruction
-    }
-
-    struct Commutative {
-        let ss: (BinaryOperandSS) -> Instruction
-        let sr: (BinaryOperandSR) -> Instruction
-    }
-
-    struct LoadInfo {
-        let s: (LoadOperandS) -> Instruction
-        let r: (LoadOperandR) -> Instruction
-    }
 }
 
 struct InstructionPrintingContext {
@@ -597,14 +554,14 @@ struct InstructionPrintingContext {
 //            target.write("\(reg(op.result)) = f64.load \(reg(op.pointer)), \(memarg(op.memarg))")
 //        case .copyStack(let op):
 //            target.write("\(reg(op.dest)) = copy \(reg(op.source))")
-//        case .i32Add(let op):
-//            target.write("\(reg(op.result)) = i32.add \(reg(op.lhs)), \(reg(op.rhs))")
-//        case .i32Sub(let op):
-//            target.write("\(reg(op.result)) = i32.sub \(reg(op.lhs)), \(reg(op.rhs))")
-//        case .i32LtU(let op):
-//            target.write("\(reg(op.result)) = i32.lt_u \(reg(op.lhs)), \(reg(op.rhs))")
-//        case .i32Eq(let op):
-//            target.write("\(reg(op.result)) = i32.eq \(reg(op.lhs)), \(reg(op.rhs))")
+        case .i32Add(let op):
+            target.write("\(reg(op.result)) = i32.add \(reg(op.lhs)), \(reg(op.rhs))")
+        case .i32Sub(let op):
+            target.write("\(reg(op.result)) = i32.sub \(reg(op.lhs)), \(reg(op.rhs))")
+        case .i32LtU(let op):
+            target.write("\(reg(op.result)) = i32.lt_u \(reg(op.lhs)), \(reg(op.rhs))")
+        case .i32Eq(let op):
+            target.write("\(reg(op.result)) = i32.eq \(reg(op.lhs)), \(reg(op.rhs))")
         case .i32Eqz(let op):
             target.write("\(reg(op.result)) = i32.eqz \(reg(op.input))")
 //        case .i32Store(let op):
