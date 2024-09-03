@@ -830,10 +830,10 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     private mutating func emitCopyPRegToStack(from source: PReg, to dest: VReg, type: ValueType) {
         let instruction: Instruction
         switch type {
-        case .i32: instruction = .copyR0ToStackI32(dest: dest)
-        case .i64: instruction = .copyR0ToStackI64(dest: dest)
-        case .f32: instruction = .copyR0ToStackF32(dest: dest)
-        case .f64: instruction = .copyR0ToStackF64(dest: dest)
+        case .i32: instruction = .copyX0ToStackI32(dest: dest)
+        case .i64: instruction = .copyX0ToStackI64(dest: dest)
+        case .f32: instruction = .copyD0ToStackF32(dest: dest)
+        case .f64: instruction = .copyD0ToStackF64(dest: dest)
         default: fatalError()
         }
         emit(instruction)
