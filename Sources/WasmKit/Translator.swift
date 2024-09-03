@@ -203,6 +203,46 @@ struct StackLayout {
     internal static func frameHeaderSize(parameters: Int, results: Int) -> VReg {
         VReg(max(parameters, results)) + 3
     }
+
+    func dump<Target: TextOutputStream>(to target: inout Target, iseq: InstructionSequence) {
+        let frameHeaderSize = FrameHeaderLayout.size(of: frameHeader.type)
+        let slotMinIndex = VReg(-frameHeaderSize)
+        let slotMaxIndex = VReg(numberOfLocals + iseq.constants.count - 1)
+        let slotIndexWidth = max(String(slotMinIndex).count, String(slotMaxIndex).count)
+        func writeSlot(_ target: inout Target, _ index: VReg, _ description: String) {
+            var index = String(index)
+            index = String(repeating: " ", count: slotIndexWidth - index.count) + index
+
+            target.write(" [\(index)] \(description)\n")
+        }
+        func hex(_ value: UInt64) -> String {
+            let value = String(value, radix: 16)
+            return String(repeating: "0", count: 16 - value.count) + value
+        }
+
+        let savedItems: [String] = ["Instance", "Pc", "Sp"]
+        for i in 0..<frameHeaderSize-VReg(savedItems.count) {
+            var descriptions: [String] = []
+            if i < frameHeader.type.parameters.count {
+                descriptions.append("Param \(i)")
+            }
+            if i < frameHeader.type.results.count {
+                descriptions.append("Result \(i)")
+            }
+            writeSlot(&target, VReg(i - frameHeaderSize), descriptions.joined(separator: ", "))
+        }
+
+        for (i, name) in savedItems.enumerated() {
+            writeSlot(&target, VReg(i - savedItems.count), "Saved \(name)")
+        }
+
+        for i in 0..<numberOfLocals {
+            writeSlot(&target, VReg(i), "Local \(i)")
+        }
+        for (i, const) in iseq.constants.enumerated() {
+            writeSlot(&target, VReg(numberOfLocals + i), "Const 0x\(hex(const.storage))")
+        }
+    }
 }
 
 struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
