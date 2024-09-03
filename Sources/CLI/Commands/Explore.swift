@@ -28,7 +28,9 @@ struct Explore: ParsableCommand {
             }
             hostModuleStubs[importEntry.module] = hostModule
         }
-        let runtime = Runtime(hostModules: hostModuleStubs)
+        // Instruction dumping requires token threading model for now
+        let configuration = RuntimeConfiguration(threadingModel: .token)
+        let runtime = Runtime(hostModules: hostModuleStubs, configuration: configuration)
         let instance = try runtime.instantiate(module: module)
         var stdout = Stdout()
         try instance.dumpFunctions(to: &stdout, module: module, runtime: runtime)

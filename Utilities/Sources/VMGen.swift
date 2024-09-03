@@ -622,6 +622,49 @@ enum VMGen {
 
         """
 
+        output += "\n\n"
+        output += """
+        extension Instruction {
+            var rawIndex: Int {
+                switch self {
+
+        """
+        for (i, inst) in instructions.enumerated() {
+            output += "        case .\(inst.name): return \(i)\n"
+        }
+        output += """
+                }
+            }
+        }
+
+        """
+
+        output += """
+        extension Instruction {
+            /// Load an instruction from the given program counter.
+            /// - Parameter pc: The program counter to read from.
+            /// - Returns: The instruction read from the program counter.
+            /// - Precondition: The instruction sequence must be compiled with token threading model.
+            static func load(from pc: inout Pc) -> Instruction {
+                let rawIndex = pc.read(UInt64.self)
+                switch rawIndex {
+
+        """
+        for (i, inst) in instructions.enumerated() {
+            if let immediate = inst.immediate {
+                let maybeLabel = immediate.name.map { "\($0): " } ?? ""
+                output += "        case \(i): return .\(inst.name)(\(maybeLabel)\(immediate.type).load(from: &pc))\n"
+            } else {
+                output += "        case \(i): return .\(inst.name)\n"
+            }
+        }
+        output += """
+                default: fatalError("Unknown instruction index: \\(rawIndex)")
+                }
+            }
+        }
+
+        """
         return output
     }
 
@@ -661,24 +704,8 @@ enum VMGen {
         output += """
 
             }
+
             """
-
-        output += "\n\n"
-        output += """
-        extension Instruction {
-            var rawIndex: Int {
-                switch self {
-
-        """
-        for (i, inst) in instructions.enumerated() {
-            output += "        case .\(inst.name): return \(i)\n"
-        }
-        output += """
-                }
-            }
-        }
-
-        """
         return output
     }
 
