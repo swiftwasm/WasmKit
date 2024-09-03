@@ -1626,14 +1626,17 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
     private mutating func visitConst(_ type: ValueType, _ value: Value) {
         let value = UntypedValue(value)
-        let is32Bit = type == .i32 || type == .f32
-        if is32Bit {
-            pushEmit(type, {
-                .const32(Instruction.Const32Operand(value: UInt32(value.storage), result: LVReg($0)))
-            })
-        } else {
-            pushEmit(type, { .const64(Instruction.Const64Operand(value: value, result: LLVReg($0))) })
+        let instruction: Instruction
+        switch type {
+        case .i32: instruction = .constI32(Instruction.Const32Operand(value: UInt32(value.storage)))
+        case .i64: instruction = .constI64(Instruction.Const64Operand(value: value.storage))
+        case .f32: instruction = .constF32(Instruction.Const32Operand(value: UInt32(value.storage)))
+        case .f64: instruction = .constF64(Instruction.Const64Operand(value: value.storage))
+        case .ref: fatalError()
         }
+        preservePReg(type.pReg)
+        valueStack.pushPReg(type: type)
+        emit(instruction)
     }
     mutating func visitI32Const(value: Int32) -> Output { visitConst(.i32, .i32(UInt32(bitPattern: value))) }
     mutating func visitI64Const(value: Int64) -> Output { visitConst(.i64, .i64(UInt64(bitPattern: value))) }

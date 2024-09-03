@@ -61,8 +61,10 @@ enum Instruction: Equatable {
     case memoryDataDrop(DataIndex)
     case memoryCopy(Instruction.MemoryCopyOperand)
     case memoryFill(Instruction.MemoryFillOperand)
-    case const32(Instruction.Const32Operand)
-    case const64(Instruction.Const64Operand)
+    case constI32(Instruction.Const32Operand)
+    case constI64(Instruction.Const64Operand)
+    case constF32(Instruction.Const32Operand)
+    case constF64(Instruction.Const64Operand)
     case i32AddSS(Instruction.BinaryOperandSS)
     case i32AddSR(Instruction.BinaryOperandSR)
     case i64AddSS(Instruction.BinaryOperandSS)
@@ -362,8 +364,10 @@ extension Instruction {
         case .memoryDataDrop(let dataIndex): return dataIndex
         case .memoryCopy(let memoryCopyOperand): return memoryCopyOperand
         case .memoryFill(let memoryFillOperand): return memoryFillOperand
-        case .const32(let const32Operand): return const32Operand
-        case .const64(let const64Operand): return const64Operand
+        case .constI32(let const32Operand): return const32Operand
+        case .constI64(let const64Operand): return const64Operand
+        case .constF32(let const32Operand): return const32Operand
+        case .constF64(let const64Operand): return const64Operand
         case .i32AddSS(let binaryOperandSS): return binaryOperandSS
         case .i32AddSR(let binaryOperandSR): return binaryOperandSR
         case .i64AddSS(let binaryOperandSS): return binaryOperandSS
