@@ -14,16 +14,16 @@ extension ExecutionState {
     mutating func copyStack(sp: Sp, copyStackOperand: Instruction.CopyStackOperand) {
         sp[copyStackOperand.dest] = sp[copyStackOperand.source]
     }
-    mutating func copyX0ToStackI32(sp: Sp, x0: X0, dest: VReg) {
-        sp[dest] = .i32(UInt32(x0 & 0xffffffff))
+    mutating func copyX0ToStackI32(sp: Sp, x0: X0, dest: LLVReg) {
+        sp[i32: dest] = UInt32(x0 & 0xffffffff)
     }
-    mutating func copyX0ToStackI64(sp: Sp, x0: X0, dest: VReg) {
-        sp[dest] = .i64(UInt64(x0))
+    mutating func copyX0ToStackI64(sp: Sp, x0: X0, dest: LLVReg) {
+        sp[i64: dest] = x0
     }
-    mutating func copyD0ToStackF32(sp: Sp, d0: D0, dest: VReg) {
-        sp[dest] = .f32(Float(d0))
+    mutating func copyD0ToStackF32(sp: Sp, d0: D0, dest: LLVReg) {
+        sp[f32: dest] = Float(d0)
     }
-    mutating func copyD0ToStackF64(sp: Sp, d0: D0, dest: VReg) {
-        sp[dest] = .f64(d0)
+    mutating func copyD0ToStackF64(sp: Sp, d0: D0, dest: LLVReg) {
+        sp[f64: dest] = d0
     }
 }
