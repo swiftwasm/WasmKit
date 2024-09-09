@@ -572,11 +572,6 @@ struct InstructionPrintingContext {
             target.write("br_if \(reg(op.condition)), +\(op.offset)")
         case .br(let offset):
             target.write("br \(offset > 0 ? "+" : "")\(offset)")
-        case .brTable(let table):
-            target.write("br_table \(reg(table.index)), \(table.count) cases")
-            for i in 0..<table.count {
-                target.write("\n  \(i): +\(table.baseAddress[Int(i)].offset)")
-            }
         case ._return:
             target.write("return")
         default:
