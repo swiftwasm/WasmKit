@@ -3,7 +3,7 @@
 struct StackContext {
 
     private var limit: UInt16 { UInt16.max }
-    private var stackEnd: UnsafeMutablePointer<UntypedValue>
+    private var stackEnd: UnsafeMutablePointer<StackSlot>
     let runtime: RuntimeRef
     var trap: UnsafeRawPointer?
 
@@ -38,7 +38,7 @@ struct StackContext {
             throw Trap.callStackExhausted
         }
         // Initialize the locals with zeros (all types of value have the same representation)
-        newSp.initialize(repeating: .default, count: numberOfNonParameterLocals)
+        newSp.initialize(repeating: UntypedValue.default.storage, count: numberOfNonParameterLocals)
         newSp[-1] = .i64(UInt64(UInt(bitPattern: sp)))
         newSp[-2] = .i64(UInt64(UInt(bitPattern: returnPC)))
         newSp[-3] = .i64(UInt64(UInt(bitPattern: instance.bitPattern)))
@@ -57,12 +57,12 @@ struct StackContext {
 }
 
 struct ValueStack {
-    private let values: UnsafeMutableBufferPointer<UntypedValue>
-    fileprivate(set) var frameBase: UnsafeMutablePointer<UntypedValue>
-    var baseAddress: UnsafeMutablePointer<UntypedValue> {
+    private let values: UnsafeMutableBufferPointer<StackSlot>
+    fileprivate(set) var frameBase: UnsafeMutablePointer<StackSlot>
+    var baseAddress: UnsafeMutablePointer<StackSlot> {
         values.baseAddress!
     }
-    var endAddress: UnsafeMutablePointer<UntypedValue> {
+    var endAddress: UnsafeMutablePointer<StackSlot> {
         baseAddress.advanced(by: self.values.count)
     }
 

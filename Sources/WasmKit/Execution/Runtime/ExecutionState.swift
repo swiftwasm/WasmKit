@@ -24,6 +24,8 @@ struct RuntimeRef {
     }
 }
 
+typealias StackSlot = UInt64
+
 /// The "m"emory "d"ata storage intended to be bound to a physical register.
 /// Stores the base address of the default memory of the current execution context.
 typealias Md = UnsafeMutableRawPointer?
@@ -32,7 +34,7 @@ typealias Md = UnsafeMutableRawPointer?
 typealias Ms = Int
 /// The "s"tack "p"ointer intended to be bound to a physical register.
 /// Stores the base address of the current frame's register storage.
-typealias Sp = UnsafeMutablePointer<UntypedValue>
+typealias Sp = UnsafeMutablePointer<StackSlot>
 /// The program counter pointing to the current instruction.
 /// - Note: This pointer is mutable to allow patching the instruction during execution.
 ///         For example, "compile" VM instruction lazily compiles the callee function and
@@ -284,10 +286,10 @@ extension InternalFunction {
 extension Sp {
     subscript<R: FixedWidthInteger>(_ index: R) -> UntypedValue {
         get {
-            return self[Int(index)]
+            return UntypedValue(storage: self[Int(index)])
         }
         nonmutating set {
-            return self[Int(index)] = newValue
+            return self[Int(index)] = newValue.storage
         }
     }
     private func read<T: FixedWidthInteger, R: FixedWidthInteger>(_ index: R) -> T {
