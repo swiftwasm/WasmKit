@@ -14,7 +14,7 @@ extension Code: Equatable {
     }
 }
 
-public struct MemArg: Equatable {
+public struct MemArg: Equatable, Hashable {
     public let offset: UInt64
     public let align: UInt32
 
@@ -24,7 +24,7 @@ public struct MemArg: Equatable {
     }
 }
 
-public enum BlockType: Equatable {
+public enum BlockType: Equatable, Hashable {
     case empty
     case type(ValueType)
     case funcType(UInt32)
@@ -32,7 +32,7 @@ public enum BlockType: Equatable {
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#limits>
-public struct Limits: Equatable {
+public struct Limits: Equatable, Hashable {
     public let min: UInt64
     public let max: UInt64?
     public let isMemory64: Bool
@@ -52,7 +52,7 @@ public typealias MemoryType = Limits
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#table-types>
-public struct TableType: Equatable {
+public struct TableType: Equatable, Hashable {
     public let elementType: ReferenceType
     public let limits: Limits
 
@@ -64,14 +64,14 @@ public struct TableType: Equatable {
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#global-types>
-public enum Mutability: Equatable {
+public enum Mutability: Equatable, Hashable {
     case constant
     case variable
 }
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#global-types>
-public struct GlobalType: Equatable {
+public struct GlobalType: Equatable, Hashable {
     public let mutability: Mutability
     public let valueType: ValueType
 
@@ -91,14 +91,14 @@ public enum ExternalType {
 }
 
 public enum IEEE754 {
-    public struct Float32: Equatable {
+    public struct Float32: Equatable, Hashable {
         public let bitPattern: UInt32
 
         public init(bitPattern: UInt32) {
             self.bitPattern = bitPattern
         }
     }
-    public struct Float64: Equatable {
+    public struct Float64: Equatable, Hashable {
         public let bitPattern: UInt64
 
         public init(bitPattern: UInt64) {
@@ -107,7 +107,7 @@ public enum IEEE754 {
     }
 }
 
-public struct BrTable: Equatable {
+public struct BrTable: Equatable, Hashable {
     public let labelIndices: [UInt32]
     public let defaultIndex: UInt32
 

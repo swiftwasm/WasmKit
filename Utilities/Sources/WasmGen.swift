@@ -137,7 +137,7 @@ enum WasmGen {
 
     static func generateInstructionEnum(_ instructions: InstructionSet) -> String {
         var code = """
-            public enum Instruction: Equatable {
+            public enum Instruction: Equatable, Hashable {
 
             """
 
