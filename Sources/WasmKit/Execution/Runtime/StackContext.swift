@@ -11,13 +11,13 @@ struct StackContext {
         runtime: RuntimeRef,
         body: (inout StackContext, Sp) throws -> T
     ) rethrows -> T {
-        let limit = UInt16.max
-        let valueStack = ValueStack(capacity: Int(limit))
+        let limit = Int(UInt16.max)
+        let valueStack = UnsafeMutablePointer<StackSlot>.allocate(capacity: limit)
         defer {
             valueStack.deallocate()
         }
-        var context = StackContext(stackEnd: valueStack.endAddress, runtime: runtime)
-        return try body(&context, valueStack.frameBase)
+        var context = StackContext(stackEnd: valueStack.advanced(by: limit), runtime: runtime)
+        return try body(&context, valueStack)
     }
 
     @inline(__always)
@@ -53,26 +53,6 @@ struct StackContext {
         let toInstance = InternalInstance(bitPattern: UInt(oldSp[-3])).unsafelyUnwrapped
         let fromInstance = InternalInstance(bitPattern: UInt(sp[-3]))
         CurrentMemory.mayUpdateCurrentInstance(instance: toInstance, from: fromInstance, md: &md, ms: &ms)
-    }
-}
-
-struct ValueStack {
-    private let values: UnsafeMutableBufferPointer<StackSlot>
-    fileprivate(set) var frameBase: UnsafeMutablePointer<StackSlot>
-    var baseAddress: UnsafeMutablePointer<StackSlot> {
-        values.baseAddress!
-    }
-    var endAddress: UnsafeMutablePointer<StackSlot> {
-        baseAddress.advanced(by: self.values.count)
-    }
-
-    init(capacity: Int) {
-        self.values = .allocate(capacity: capacity)
-        self.frameBase = self.values.baseAddress!
-    }
-
-    func deallocate() {
-        self.values.deallocate()
     }
 }
 
