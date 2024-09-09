@@ -39,19 +39,19 @@ struct StackContext {
         }
         // Initialize the locals with zeros (all types of value have the same representation)
         newSp.initialize(repeating: UntypedValue.default.storage, count: numberOfNonParameterLocals)
-        newSp[-1] = .i64(UInt64(UInt(bitPattern: sp)))
-        newSp[-2] = .i64(UInt64(UInt(bitPattern: returnPC)))
-        newSp[-3] = .i64(UInt64(UInt(bitPattern: instance.bitPattern)))
+        newSp[-1] = UInt64(UInt(bitPattern: sp))
+        newSp[-2] = UInt64(UInt(bitPattern: returnPC))
+        newSp[-3] = UInt64(UInt(bitPattern: instance.bitPattern))
         return newSp
     }
 
     @inline(__always)
     mutating func popFrame(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) {
         let oldSp = sp
-        sp = Sp(bitPattern: UInt(oldSp[-1].i64)).unsafelyUnwrapped
-        pc = Pc(bitPattern: UInt(oldSp[-2].i64)).unsafelyUnwrapped
-        let toInstance = InternalInstance(bitPattern: UInt(oldSp[-3].i64)).unsafelyUnwrapped
-        let fromInstance = InternalInstance(bitPattern: UInt(sp[-3].i64))
+        sp = Sp(bitPattern: UInt(oldSp[-1])).unsafelyUnwrapped
+        pc = Pc(bitPattern: UInt(oldSp[-2])).unsafelyUnwrapped
+        let toInstance = InternalInstance(bitPattern: UInt(oldSp[-3])).unsafelyUnwrapped
+        let fromInstance = InternalInstance(bitPattern: UInt(sp[-3]))
         CurrentMemory.mayUpdateCurrentInstance(instance: toInstance, from: fromInstance, md: &md, ms: &ms)
     }
 }
