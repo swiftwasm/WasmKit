@@ -24,7 +24,11 @@ struct RuntimeRef {
     }
 }
 
+/// A slot of runtime-managed stack
 typealias StackSlot = UInt64
+
+/// A slot of code sequence
+typealias CodeSlot = UInt64
 
 /// The "m"emory "d"ata storage intended to be bound to a physical register.
 /// Stores the base address of the default memory of the current execution context.
@@ -40,20 +44,17 @@ typealias Sp = UnsafeMutablePointer<StackSlot>
 ///         For example, "compile" VM instruction lazily compiles the callee function and
 ///         replaces the instruction with the "internalCall" instruction to bypass
 ///         "is compiled" check on the next execution.
-typealias Pc = UnsafeMutableRawPointer
-
-typealias CodeSlot = UInt64
+typealias Pc = UnsafeMutablePointer<CodeSlot>
 
 extension Pc {
     func advancedPc(by count: Int) -> Pc {
-        assert(Int(bitPattern: self) % MemoryLayout<CodeSlot>.alignment == 0)
-        return self + MemoryLayout<CodeSlot>.stride * count
+        return self + count
     }
 
     mutating func read<T>(_: T.Type = T.self) -> T {
         assert(MemoryLayout<T>.stride == 8)
-        let value = self.assumingMemoryBound(to: T.self).pointee
-        self += MemoryLayout<CodeSlot>.size
+        let value = self.withMemoryRebound(to: T.self, capacity: 1) { $0.pointee }
+        self += 1
         return value
     }
 }
@@ -85,7 +86,7 @@ func executeWasm(
             sp[VReg(index)] = UntypedValue(argument)
         }
 
-        try withUnsafeTemporaryAllocation(of: UInt64.self, capacity: 2) { rootISeq in
+        try withUnsafeTemporaryAllocation(of: CodeSlot.self, capacity: 2) { rootISeq in
             switch runtime.value.configuration.threadingModel {
             case .direct:
                 rootISeq[0] = Instruction.endOfExecution.handler
@@ -194,12 +195,10 @@ extension ExecutionState {
     mutating func runDirectThreaded(
         sp: Sp, pc: Pc, md: Md, ms: Ms
     ) throws {
-        let handler = pc.assumingMemoryBound(to: wasmkit_tc_exec.self).pointee
-        wasmkit_tc_start(
-            handler,
-            UnsafeMutableRawPointer(sp).assumingMemoryBound(to: UInt64.self),
-            pc, md, ms, &self
-        )
+        let handler = pc.withMemoryRebound(to: wasmkit_tc_exec.self, capacity: 1) {
+            $0.pointee
+        }
+        wasmkit_tc_start(handler, sp, pc, md, ms, &self)
         if let error = self.trap {
             throw unsafeBitCast(error, to: Error.self)
         }

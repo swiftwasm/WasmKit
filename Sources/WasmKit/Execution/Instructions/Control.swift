@@ -85,7 +85,7 @@ extension ExecutionState {
     mutating func compilingCall(sp: inout Sp, pc: Pc, compilingCallOperand: Instruction.CompilingCallOperand) throws -> Pc {
         var pc = pc
         // NOTE: `CompilingCallOperand` consumes 2 slots, discriminator is at -3
-        let discriminatorPc = pc.assumingMemoryBound(to: UInt64.self).advanced(by: -3)
+        let discriminatorPc = pc.advanced(by: -3)
         let callee = compilingCallOperand.callee
         try callee.ensureCompiled(runtime: runtime)
         let replaced = Instruction.internalCall(compilingCallOperand)
