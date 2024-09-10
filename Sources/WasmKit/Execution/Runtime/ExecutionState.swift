@@ -78,9 +78,13 @@ func executeWasm(
     // NOTE: `runtime` variable must not outlive this function
     let runtime = RuntimeRef(runtime)
     return try StackContext.withContext(runtime: runtime) { (stack, sp) in
+        // Advance the stack pointer to be able to reference negative indices
+        // for saving slots.
+        let sp = sp.advanced(by: FrameHeaderLayout.numberOfSavingSlots)
         for (index, argument) in arguments.enumerated() {
             sp[VReg(index)] = UntypedValue(argument)
         }
+
         try withUnsafeTemporaryAllocation(of: UInt64.self, capacity: 2) { rootISeq in
             switch runtime.value.configuration.threadingModel {
             case .direct:
