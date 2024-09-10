@@ -47,10 +47,6 @@ typealias Sp = UnsafeMutablePointer<StackSlot>
 typealias Pc = UnsafeMutablePointer<CodeSlot>
 
 extension Pc {
-    func advancedPc(by count: Int) -> Pc {
-        return self + count
-    }
-
     mutating func read<T>(_: T.Type = T.self) -> T {
         assert(MemoryLayout<T>.stride == 8)
         let value = self.withMemoryRebound(to: T.self, capacity: 1) { $0.pointee }

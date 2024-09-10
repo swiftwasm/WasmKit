@@ -8,25 +8,25 @@ extension ExecutionState {
     }
 
     mutating func br(sp: Sp, pc: Pc, offset: Int32) -> Pc {
-        return pc.advancedPc(by: Int(offset))
+        return pc.advanced(by: Int(offset))
     }
     mutating func brIf(sp: Sp, pc: Pc, brIfOperand: Instruction.BrIfOperand) -> Pc {
         guard sp[i32: brIfOperand.condition] != 0 else {
             return pc
         }
-        return pc.advancedPc(by: Int(brIfOperand.offset))
+        return pc.advanced(by: Int(brIfOperand.offset))
     }
     mutating func brIfNot(sp: Sp, pc: Pc, brIfOperand: Instruction.BrIfOperand) -> Pc {
         guard sp[i32: brIfOperand.condition] == 0 else {
             return pc
         }
-        return pc.advancedPc(by: Int(brIfOperand.offset))
+        return pc.advanced(by: Int(brIfOperand.offset))
     }
     mutating func brTable(sp: Sp, pc: Pc, brTable: Instruction.BrTable) -> Pc {
         let index = sp[i32: brTable.index]
         let normalizedOffset = min(Int(index), Int(brTable.count - 1))
         let entry = brTable.baseAddress[normalizedOffset]
-        return pc.advancedPc(by: Int(entry.offset))
+        return pc.advanced(by: Int(entry.offset))
     }
 
     @inline(__always)
