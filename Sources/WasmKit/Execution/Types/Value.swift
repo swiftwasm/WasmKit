@@ -410,19 +410,3 @@ extension Float64 {
     var demoteF64: Float32 { Float32(self) }
     var reinterpretToI64: UInt64 { bitPattern }
 }
-
-extension UInt32 {
-    var untyped: UntypedValue { UntypedValue.i32(self) }
-}
-
-extension UInt64 {
-    var untyped: UntypedValue { UntypedValue.i64(self) }
-}
-
-extension Float32 {
-    var untyped: UntypedValue { UntypedValue.f32(self) }
-}
-
-extension Float64 {
-    var untyped: UntypedValue { UntypedValue.f64(self) }
-}
