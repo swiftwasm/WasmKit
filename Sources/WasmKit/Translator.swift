@@ -194,8 +194,10 @@ struct FrameHeaderLayout {
         size(parameters: of.parameters.count, results: of.results.count)
     }
     internal static func size(parameters: Int, results: Int) -> VReg {
-        VReg(max(parameters, results)) + 3
+        VReg(max(parameters, results)) + VReg(numberOfSavingSlots)
     }
+    /// The number of slots used to save the current instance, PC, and SP
+    internal static var numberOfSavingSlots: Int { 3 }
 }
 
 struct StackLayout {
