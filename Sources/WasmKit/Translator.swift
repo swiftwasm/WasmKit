@@ -172,13 +172,14 @@ fileprivate struct MetaProgramCounter {
 /// | SP+len(locals)+heighest(stack)-1   | Value stack N        |
 /// ```
 ///
-struct StackLayout {
+
+struct FrameHeaderLayout {
     let type: FunctionType
     let paramResultBase: VReg
-
+    
     init(type: FunctionType) {
         self.type = type
-        self.paramResultBase = Self.frameHeaderSize(type: type)
+        self.paramResultBase = Self.size(of: type)
     }
 
     func paramReg(_ index: Int) -> VReg {
@@ -189,19 +190,71 @@ struct StackLayout {
         return VReg(index) - paramResultBase
     }
 
+    internal static func size(of: FunctionType) -> VReg {
+        size(parameters: of.parameters.count, results: of.results.count)
+    }
+    internal static func size(parameters: Int, results: Int) -> VReg {
+        VReg(max(parameters, results)) + 3
+    }
+}
+
+struct StackLayout {
+    let frameHeader: FrameHeaderLayout
+    let constantSlotSize: Int = 8
+    let numberOfLocals: Int
+
+    var stackRegBase: VReg {
+        return VReg(numberOfLocals + constantSlotSize)
+    }
+
+    init(type: FunctionType, numberOfLocals: Int) {
+        self.frameHeader = FrameHeaderLayout(type: type)
+        self.numberOfLocals = numberOfLocals
+    }
+
     func localReg(_ index: LocalIndex) -> VReg {
-        if index < type.parameters.count {
-            return paramReg(Int(index))
+        if index < frameHeader.type.parameters.count {
+            return frameHeader.paramReg(Int(index))
         } else {
-            return VReg(index) - VReg(type.parameters.count)
+            return VReg(index) - VReg(frameHeader.type.parameters.count)
         }
     }
 
-    internal static func frameHeaderSize(type: FunctionType) -> VReg {
-        frameHeaderSize(parameters: type.parameters.count, results: type.results.count)
-    }
-    internal static func frameHeaderSize(parameters: Int, results: Int) -> VReg {
-        VReg(max(parameters, results)) + 3
+    func dump<Target: TextOutputStream>(to target: inout Target, iseq: InstructionSequence) {
+        let frameHeaderSize = FrameHeaderLayout.size(of: frameHeader.type)
+        let slotMinIndex = VReg(-frameHeaderSize)
+        let slotMaxIndex = VReg(numberOfLocals - 1)
+        let slotIndexWidth = max(String(slotMinIndex).count, String(slotMaxIndex).count)
+        func writeSlot(_ target: inout Target, _ index: VReg, _ description: String) {
+            var index = String(index)
+            index = String(repeating: " ", count: slotIndexWidth - index.count) + index
+
+            target.write(" [\(index)] \(description)\n")
+        }
+        func hex(_ value: UInt64) -> String {
+            let value = String(value, radix: 16)
+            return String(repeating: "0", count: 16 - value.count) + value
+        }
+
+        let savedItems: [String] = ["Instance", "Pc", "Sp"]
+        for i in 0..<frameHeaderSize-VReg(savedItems.count) {
+            var descriptions: [String] = []
+            if i < frameHeader.type.parameters.count {
+                descriptions.append("Param \(i)")
+            }
+            if i < frameHeader.type.results.count {
+                descriptions.append("Result \(i)")
+            }
+            writeSlot(&target, VReg(i - frameHeaderSize), descriptions.joined(separator: ", "))
+        }
+
+        for (i, name) in savedItems.enumerated() {
+            writeSlot(&target, VReg(i - savedItems.count), "Saved \(name)")
+        }
+
+        for i in 0..<numberOfLocals {
+            writeSlot(&target, VReg(i), "Local \(i)")
+        }
     }
 }
 
@@ -666,7 +719,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         self.controlStack = ControlStack()
         self.valueStack = ValueStack(stackRegBase: VReg(locals.count))
         self.locals = Locals(types: type.parameters + locals)
-        self.stackLayout = StackLayout(type: type)
+        self.stackLayout = StackLayout(type: type, numberOfLocals: locals.count)
         self.functionIndex = functionIndex
         self.intercepting = intercepting
 
@@ -683,7 +736,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
 
     private func returnReg(_ index: Int) -> VReg {
-        return stackLayout.returnReg(index)
+        return stackLayout.frameHeader.returnReg(index)
     }
     private func localReg(_ index: LocalIndex) -> VReg {
         return stackLayout.localReg(index)
@@ -1172,7 +1225,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
 
         let spAddend = valueStack.stackRegBase + VReg(valueStack.height)
-            + StackLayout.frameHeaderSize(type: calleeType)
+            + FrameHeaderLayout.size(of: calleeType)
 
         for result in calleeType.results {
             _ = valueStack.push(result)
