@@ -7,6 +7,6 @@ extension ExecutionState {
     }
     @inline(__always)
     mutating func const64(sp: Sp, const64Operand: Instruction.Const64Operand) {
-        sp[VReg(const64Operand.result)] = const64Operand.value
+        sp[const64Operand.result] = const64Operand.value
     }
 }

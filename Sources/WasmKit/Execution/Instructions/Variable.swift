@@ -3,11 +3,11 @@
 extension ExecutionState {
     mutating func globalGet(sp: Sp, globalGetOperand: Instruction.GlobalGetOperand) {
         globalGetOperand.global.withValue{
-            sp[VReg(globalGetOperand.reg)] = $0.rawValue
+            sp[globalGetOperand.reg] = $0.rawValue
         }
     }
     mutating func globalSet(sp: Sp, globalSetOperand: Instruction.GlobalSetOperand) {
-        let value = sp[VReg(globalSetOperand.reg)]
+        let value = sp[globalSetOperand.reg]
         globalSetOperand.global.withValue{ $0.rawValue = value }
     }
 
