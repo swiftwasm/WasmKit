@@ -493,7 +493,7 @@ struct InstructionPrintingContext {
     var nameRegistry: NameRegistry
 
     func reg<R: FixedWidthInteger>(_ reg: R) -> String {
-        let adjusted = R(StackLayout.frameHeaderSize(type: function.type)) + reg
+        let adjusted = R(FrameHeaderLayout.size(of: function.type)) + reg
         if shouldColor {
             let regColor = adjusted < 15 ? "\u{001B}[3\(adjusted + 1)m" : ""
             return "\(regColor)reg:\(reg)\u{001B}[0m"
@@ -572,6 +572,11 @@ struct InstructionPrintingContext {
             target.write("br_if \(reg(op.condition)), +\(op.offset)")
         case .br(let offset):
             target.write("br \(offset > 0 ? "+" : "")\(offset)")
+        case .brTable(let table):
+            target.write("br_table \(reg(table.index)), \(table.count) cases")
+            for i in 0..<table.count {
+                target.write("\n  \(i): +\(table.baseAddress[Int(i)].offset)")
+            }
         case ._return:
             target.write("return")
         default:

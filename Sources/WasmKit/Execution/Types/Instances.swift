@@ -134,7 +134,12 @@ public struct Instance {
             }
             target.write(" ====\n")
             try function.ensureCompiled(runtime: RuntimeRef(runtime))
-            let (iseq, _, _) = function.assumeCompiled()
+            let (iseq, locals, _) = function.assumeCompiled()
+
+            // Print slot space information
+            let stackLayout = StackLayout(type: runtime.funcTypeInterner.resolve(function.type), numberOfLocals: locals)
+            stackLayout.dump(to: &target, iseq: iseq)
+
             var context = InstructionPrintingContext(
                 shouldColor: true,
                 function: Function(handle: function, allocator: allocator),

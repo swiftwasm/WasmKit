@@ -170,7 +170,7 @@ extension ExecutionState {
             function: handle,
             callerInstance: nil,
             callLike: Instruction.CallLikeOperand(
-                spAddend: StackLayout.frameHeaderSize(type: type)
+                spAddend: FrameHeaderLayout.size(of: type)
             ),
             sp: sp, pc: pc, md: &md, ms: &ms
         )
@@ -265,7 +265,7 @@ extension InternalFunction {
             let function = host
             let runtime = executionState.runtime
             let resolvedType = runtime.value.resolveType(function.type)
-            let layout = StackLayout(type: resolvedType)
+            let layout = FrameHeaderLayout(type: resolvedType)
             let parameters = resolvedType.parameters.enumerated().map { (i, type) in
                 sp[callLike.spAddend + layout.paramReg(i)].cast(to: type)
             }
