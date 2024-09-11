@@ -195,7 +195,8 @@ extension ExecutionState {
         sp: Sp, pc: Pc, md: Md, ms: Ms
     ) throws {
         let handler = pc.assumingMemoryBound(to: wasmkit_tc_exec.self).pointee
-        handler(
+        wasmkit_tc_start(
+            handler,
             UnsafeMutableRawPointer(sp).assumingMemoryBound(to: UInt64.self),
             pc, md, ms, &self
         )
