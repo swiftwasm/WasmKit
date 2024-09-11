@@ -20,7 +20,22 @@ typedef size_t Ms;
 ///
 /// See https://clang.llvm.org/docs/AttributeReference.html#swiftasynccall for
 /// more information about `swiftasynccall`.
-typedef SWIFT_CC(swiftasync) void (*wasmkit_tc_exec)(
+typedef SWIFT_CC(swiftasync) void (* _Nonnull wasmkit_tc_exec)(
     uint64_t *_Nonnull sp, Pc, Md, Ms, SWIFT_CONTEXT void *_Nullable state);
+
+/// The entry point for executing a direct-threaded interpreter loop.
+/// The interpreter loop is implemented as a tail-recursive function that
+/// executes a single instruction and transitions to the next instruction by
+/// tail calling.
+///
+/// NOTE: This entry point must be implemented in C for now because of an issue
+/// with the ClangImporter that ignores the explicitly specified calling
+/// convention and it leads to a miscompilation of the tail call.
+/// See https://github.com/swiftlang/swift/issues/69264
+static inline void wasmkit_tc_start(
+    wasmkit_tc_exec exec, Sp sp, Pc pc, Md md, Ms ms, void *_Nullable state
+) {
+  exec(sp, pc, md, ms, state);
+}
 
 #endif // WASMKIT__CWASMKIT_H
