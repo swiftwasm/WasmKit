@@ -601,6 +601,10 @@ extension Instruction {
     }
 }
 extension Instruction {
+    /// Load an instruction from the given program counter.
+    /// - Parameter pc: The program counter to read from.
+    /// - Returns: The instruction read from the program counter.
+    /// - Precondition: The instruction sequence must be compiled with token threading model.
     static func load(from pc: inout Pc) -> Instruction {
         let rawIndex = pc.read(UInt64.self)
         switch rawIndex {
