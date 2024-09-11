@@ -736,11 +736,11 @@ enum VMGen {
         }
 
         output += """
-        static const uint64_t wasmkit_tc_exec_handlers[] = {
+        static const uintptr_t wasmkit_tc_exec_handlers[] = {
 
         """
         for inst in instructions {
-            output += "    (uint64_t)((wasmkit_tc_exec)&\(handlerName(inst))),\n"
+            output += "    (uintptr_t)((wasmkit_tc_exec)&\(handlerName(inst))),\n"
         }
         output += """
         };

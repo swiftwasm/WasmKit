@@ -41,7 +41,7 @@ SWIFT_CC(swift) void wasmkit_execution_state_set_error(void *trap, SWIFT_CONTEXT
 
 /// The fallback table of instruction handlers when direct-threaded code is not
 /// supported. Never used when running on token-threading model.
-static const uint64_t wasmkit_tc_exec_handlers[] = {};
+static const uintptr_t wasmkit_tc_exec_handlers[] = {};
 
 #endif // WASMKIT_USE_DIRECT_THREADED_CODE
 
