@@ -16,7 +16,7 @@
 #if WASMKIT_USE_DIRECT_THREADED_CODE
 // Inline instruction implementation written in Swift side into C handler
 // function. Used in DirectThreadedCode.inc.
-#  if defined(__clang__) && (__clang_major__ >= 16)
+#  if defined(__clang__) && (__clang_major__ >= 16) && __has_attribute(always_inline)
 // `always_inline` at statement level is available since Clang 16.
 #    define INLINE_CALL [[clang::always_inline]]
 #  else
