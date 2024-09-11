@@ -1,3 +1,4 @@
+add_subdirectory(_CWasmKit)
 add_subdirectory(WasmKit)
 add_subdirectory(WasmKitWASI)
 add_subdirectory(SystemExtras)

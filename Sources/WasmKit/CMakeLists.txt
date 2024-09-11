@@ -35,4 +35,4 @@ add_wasmkit_library(WasmKit
 )
 
 target_link_wasmkit_libraries(WasmKit PUBLIC
-  WasmParser SystemExtras WasmTypes SystemPackage)
+  _CWasmKit WasmParser SystemExtras WasmTypes SystemPackage)
