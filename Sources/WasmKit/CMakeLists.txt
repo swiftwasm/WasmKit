@@ -21,6 +21,7 @@ add_wasmkit_library(WasmKit
   Execution/Types/Instances.swift
   Execution/Types/Errors.swift
   Execution/Types/Value.swift
+  Execution/Types/UntypedValue.swift
   Execution/Runtime/InstDispatch.swift
   Execution/Runtime/StackContext.swift
   Execution/Runtime/Runtime.swift
