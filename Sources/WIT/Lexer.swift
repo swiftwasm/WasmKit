@@ -44,6 +44,12 @@ struct Lexer {
     }
 
     var cursor: Cursor
+    let requireSemicolon: Bool
+
+    init(cursor: Cursor, requireSemicolon: Bool = false) {
+        self.cursor = cursor
+        self.requireSemicolon = requireSemicolon
+    }
 
     mutating func advanceToEndOfBlockComment() -> Diagnostic? {
         var depth = 1
@@ -243,6 +249,24 @@ struct Lexer {
             throw ParseError(description: "\(expected) expected but got \(actual.kind)")
         }
         return actual
+    }
+
+    @discardableResult
+    mutating func expectIdentifier(_ expected: String) throws -> Lexer.Lexeme {
+        let lexme = try self.expect(.id)
+        let actualText = self.parseText(in: lexme.textRange)
+        guard actualText == expected else {
+            throw ParseError(description: "\(expected) expected but got \(actualText)")
+        }
+        return lexme
+    }
+
+    mutating func expectSemicolon() throws {
+        if self.requireSemicolon {
+            try self.expect(.semicolon)
+        } else {
+            self.eat(.semicolon)
+        }
     }
 
     @discardableResult

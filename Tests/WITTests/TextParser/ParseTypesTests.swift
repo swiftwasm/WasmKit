@@ -48,7 +48,7 @@ class ParseTestsTests: XCTestCase {
                     """
             )
         )
-        let interface = try InterfaceSyntax.parse(lexer: &lexer, documents: .init(comments: []))
+        let interface = try InterfaceSyntax.parse(lexer: &lexer, documents: .init(comments: []), attributes: [])
         XCTAssertEqual(interface.items.count, 30)
     }
 
@@ -72,7 +72,7 @@ class ParseTestsTests: XCTestCase {
                     """
             )
         )
-        let typeDef = try TypeDefSyntax.parseResource(lexer: &lexer, documents: .init(comments: []))
+        let typeDef = try TypeDefSyntax.parseResource(lexer: &lexer, documents: .init(comments: []), attributes: [])
         XCTAssertEqual(typeDef.name.text, "r1")
         guard case let .resource(resource) = typeDef.body else {
             XCTFail("unexpected type kind: \(typeDef.body)")
@@ -93,7 +93,7 @@ class ParseTestsTests: XCTestCase {
                     """
             )
         )
-        let typeDef = try TypeDefSyntax.parseVariant(lexer: &lexer, documents: .init(comments: []))
+        let typeDef = try TypeDefSyntax.parseVariant(lexer: &lexer, documents: .init(comments: []), attributes: [])
         XCTAssertEqual(typeDef.name.text, "r1")
         guard case let .variant(variant) = typeDef.body else {
             XCTFail("unexpected type kind: \(typeDef.body)")

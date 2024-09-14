@@ -1,5 +1,9 @@
 extension ResourceFunctionSyntax {
-    static func parse(lexer: inout Lexer, documents: DocumentsSyntax) throws -> ResourceFunctionSyntax {
+    static func parse(
+        lexer: inout Lexer,
+        documents: DocumentsSyntax,
+        attributes: [AttributeSyntax]
+    ) throws -> ResourceFunctionSyntax {
         guard let token = lexer.peek() else {
             throw ParseError(description: "`constructor` or identifier expected but got nothing")
         }
@@ -18,10 +22,12 @@ extension ResourceFunctionSyntax {
                 let type = try TypeReprSyntax.parse(lexer: &lexer)
                 return ParameterSyntax(name: name, type: type, textRange: start..<lexer.cursor.nextIndex)
             }
+            try lexer.expectSemicolon()
             return .constructor(
                 .init(
                     syntax: NamedFunctionSyntax(
                         documents: documents,
+                        attributes: attributes,
                         name: Identifier(text: "constructor", textRange: token.textRange),
                         function: FunctionSyntax(
                             parameters: params,
@@ -41,11 +47,13 @@ extension ResourceFunctionSyntax {
                 ctor = ResourceFunctionSyntax.method
             }
             let function = try FunctionSyntax.parse(lexer: &lexer)
+            try lexer.expectSemicolon()
             return ctor(
                 .init(
                     syntax:
                         NamedFunctionSyntax(
                             documents: documents,
+                            attributes: attributes,
                             name: name,
                             function: function
                         )
@@ -95,6 +103,7 @@ extension NamedFunctionSyntax {
         let name = try Identifier.parse(lexer: &lexer)
         try lexer.expect(.colon)
         let function = try FunctionSyntax.parse(lexer: &lexer)
-        return .init(syntax: NamedFunctionSyntax(documents: documents, name: name, function: function))
+        try lexer.expectSemicolon()
+        return .init(syntax: NamedFunctionSyntax(documents: documents, attributes: [], name: name, function: function))
     }
 }

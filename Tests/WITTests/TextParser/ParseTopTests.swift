@@ -109,7 +109,7 @@ class ParseTopTests: XCTestCase {
 
     func testTopLevelUseAs() throws {
         var lexer = Lexer(cursor: .init(input: "use abc as xyz"))
-        let use = try TopLevelUseSyntax.parse(lexer: &lexer, documents: .init(comments: []))
+        let use = try TopLevelUseSyntax.parse(lexer: &lexer, documents: .init(comments: []), attributes: [])
         XCTAssertEqual(use.item.name.text, "abc")
         XCTAssertEqual(use.asName?.text, "xyz")
     }
@@ -132,7 +132,7 @@ class ParseTopTests: XCTestCase {
 
     func testUsePath() throws {
         var lexer = Lexer(cursor: .init(input: "use ns1:pkg1/item1@1.0.0"))
-        let use = try TopLevelUseSyntax.parse(lexer: &lexer, documents: .init(comments: []))
+        let use = try TopLevelUseSyntax.parse(lexer: &lexer, documents: .init(comments: []), attributes: [])
         XCTAssertEqual(use.item.name.text, "item1")
         guard case let .package(id, _) = use.item else {
             XCTFail("expected package but got \(use.item)")
@@ -140,6 +140,59 @@ class ParseTopTests: XCTestCase {
         }
         XCTAssertEqual(id.namespace.text, "ns1")
         XCTAssertEqual(id.name.text, "pkg1")
+    }
+
+    func testAttributeSince() throws {
+        var lexer = Lexer(
+            cursor: .init(
+                input: """
+                    @since(version = 1.0.0)
+                    @since(version = 1.0.0, feature = foo-bar)
+                    """
+            ))
+        let attributes = try AttributeSyntax.parseItems(lexer: &lexer)
+        guard attributes.count == 2 else {
+            XCTFail("expected 2 attributes but got \(attributes)")
+            return
+        }
+        do {
+            guard case let .since(attribute) = attributes[0] else {
+                XCTFail("expected since but got \(attributes[0])")
+                return
+            }
+            XCTAssertEqual(attribute.version.description, "1.0.0")
+            XCTAssertEqual(attribute.feature?.text, nil)
+        }
+        do {
+            guard case let .since(attribute) = attributes[1] else {
+                XCTFail("expected since but got \(attributes[1])")
+                return
+            }
+            XCTAssertEqual(attribute.version.description, "1.0.0")
+            XCTAssertEqual(attribute.feature?.text, "foo-bar")
+        }
+    }
+
+    func testAttributeUnstable() throws {
+        var lexer = Lexer(cursor: .init(input: "@unstable(feature = foo)"))
+        let attributes = try AttributeSyntax.parseItems(lexer: &lexer)
+        XCTAssertEqual(attributes.count, 1)
+        guard case let .unstable(attribute) = attributes.first else {
+            XCTFail("expected since but got \(attributes)")
+            return
+        }
+        XCTAssertEqual(attribute.feature.text, "foo")
+    }
+
+    func testAttributeDeprecated() throws {
+        var lexer = Lexer(cursor: .init(input: "@deprecated(version = 1.0.3)"))
+        let attributes = try AttributeSyntax.parseItems(lexer: &lexer)
+        XCTAssertEqual(attributes.count, 1)
+        guard case let .deprecated(attribute) = attributes.first else {
+            XCTFail("expected since but got \(attributes)")
+            return
+        }
+        XCTAssertEqual(attribute.version.description, "1.0.3")
     }
 }
 

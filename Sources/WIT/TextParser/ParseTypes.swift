@@ -126,15 +126,16 @@ extension TypeReprSyntax {
 }
 
 extension TypeDefSyntax {
-    static func parse(lexer: inout Lexer, documents: DocumentsSyntax) throws -> TypeDefSyntax {
+    static func parse(lexer: inout Lexer, documents: DocumentsSyntax, attributes: [AttributeSyntax]) throws -> TypeDefSyntax {
         try lexer.expect(.type)
         let name = try Identifier.parse(lexer: &lexer)
         try lexer.expect(.equals)
         let repr = try TypeReprSyntax.parse(lexer: &lexer)
-        return TypeDefSyntax(documents: documents, name: name, body: .alias(TypeAliasSyntax(typeRepr: repr)))
+        try lexer.expectSemicolon()
+        return TypeDefSyntax(documents: documents, attributes: attributes, name: name, body: .alias(TypeAliasSyntax(typeRepr: repr)))
     }
 
-    static func parseFlags(lexer: inout Lexer, documents: DocumentsSyntax) throws -> TypeDefSyntax {
+    static func parseFlags(lexer: inout Lexer, documents: DocumentsSyntax, attributes: [AttributeSyntax]) throws -> TypeDefSyntax {
         try lexer.expect(.flags)
         let name = try Identifier.parse(lexer: &lexer)
         let body = try TypeDefBodySyntax.flags(
@@ -147,24 +148,26 @@ extension TypeDefSyntax {
                     return FlagSyntax(documents: docs, name: name)
                 }
             ))
-        return TypeDefSyntax(documents: documents, name: name, body: body)
+        return TypeDefSyntax(documents: documents, attributes: attributes, name: name, body: body)
     }
 
-    static func parseResource(lexer: inout Lexer, documents: DocumentsSyntax) throws -> SyntaxNode<TypeDefSyntax> {
+    static func parseResource(lexer: inout Lexer, documents: DocumentsSyntax, attributes: [AttributeSyntax]) throws -> SyntaxNode<TypeDefSyntax> {
         try lexer.expect(.resource)
         let name = try Identifier.parse(lexer: &lexer)
         var functions: [ResourceFunctionSyntax] = []
         if lexer.eat(.leftBrace) {
             while !lexer.eat(.rightBrace) {
                 let docs = try DocumentsSyntax.parse(lexer: &lexer)
-                functions.append(try ResourceFunctionSyntax.parse(lexer: &lexer, documents: docs))
+                functions.append(try ResourceFunctionSyntax.parse(lexer: &lexer, documents: docs, attributes: []))
             }
+        } else {
+            try lexer.expectSemicolon()
         }
         let body = TypeDefBodySyntax.resource(ResourceSyntax(functions: functions))
-        return .init(syntax: TypeDefSyntax(documents: documents, name: name, body: body))
+        return .init(syntax: TypeDefSyntax(documents: documents, attributes: attributes, name: name, body: body))
     }
 
-    static func parseRecord(lexer: inout Lexer, documents: DocumentsSyntax) throws -> TypeDefSyntax {
+    static func parseRecord(lexer: inout Lexer, documents: DocumentsSyntax, attributes: [AttributeSyntax]) throws -> TypeDefSyntax {
         try lexer.expect(.record)
         let name = try Identifier.parse(lexer: &lexer)
         let body = try TypeDefBodySyntax.record(
@@ -180,10 +183,10 @@ extension TypeDefSyntax {
                     return FieldSyntax(documents: docs, name: name, type: type, textRange: start..<lexer.cursor.nextIndex)
                 }
             ))
-        return TypeDefSyntax(documents: documents, name: name, body: body)
+        return TypeDefSyntax(documents: documents, attributes: attributes, name: name, body: body)
     }
 
-    static func parseVariant(lexer: inout Lexer, documents: DocumentsSyntax) throws -> TypeDefSyntax {
+    static func parseVariant(lexer: inout Lexer, documents: DocumentsSyntax, attributes: [AttributeSyntax]) throws -> TypeDefSyntax {
         try lexer.expect(.variant)
         let name = try Identifier.parse(lexer: &lexer)
         let body = try TypeDefBodySyntax.variant(
@@ -203,10 +206,10 @@ extension TypeDefSyntax {
                 },
                 textRange: name.textRange
             ))
-        return TypeDefSyntax(documents: documents, name: name, body: body)
+        return TypeDefSyntax(documents: documents, attributes: attributes, name: name, body: body)
     }
 
-    static func parseUnion(lexer: inout Lexer, documents: DocumentsSyntax) throws -> TypeDefSyntax {
+    static func parseUnion(lexer: inout Lexer, documents: DocumentsSyntax, attributes: [AttributeSyntax]) throws -> TypeDefSyntax {
         try lexer.expect(.union)
         let name = try Identifier.parse(lexer: &lexer)
         let body = try TypeDefBodySyntax.union(
@@ -221,10 +224,10 @@ extension TypeDefSyntax {
                 },
                 textRange: name.textRange
             ))
-        return TypeDefSyntax(documents: documents, name: name, body: body)
+        return TypeDefSyntax(documents: documents, attributes: attributes, name: name, body: body)
     }
 
-    static func parseEnum(lexer: inout Lexer, documents: DocumentsSyntax) throws -> TypeDefSyntax {
+    static func parseEnum(lexer: inout Lexer, documents: DocumentsSyntax, attributes: [AttributeSyntax]) throws -> TypeDefSyntax {
         try lexer.expect(.enum)
         let name = try Identifier.parse(lexer: &lexer)
         let body = try TypeDefBodySyntax.enum(
@@ -239,6 +242,6 @@ extension TypeDefSyntax {
                 },
                 textRange: name.textRange
             ))
-        return TypeDefSyntax(documents: documents, name: name, body: body)
+        return TypeDefSyntax(documents: documents, attributes: attributes, name: name, body: body)
     }
 }

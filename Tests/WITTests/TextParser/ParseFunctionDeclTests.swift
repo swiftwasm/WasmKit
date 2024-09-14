@@ -8,7 +8,8 @@ class ParseFunctionDeclTests: XCTestCase {
         var lexer = Lexer(cursor: .init(input: text))
         return try ResourceFunctionSyntax.parse(
             lexer: &lexer,
-            documents: DocumentsSyntax(comments: [])
+            documents: DocumentsSyntax(comments: []),
+            attributes: []
         )
     }
 
