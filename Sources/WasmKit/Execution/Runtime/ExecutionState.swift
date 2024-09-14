@@ -85,7 +85,7 @@ struct RuntimeRef {
     }
 }
 
-/// A slot of runtime-managed stack
+/// A slot of VM stack
 typealias StackSlot = UInt64
 
 /// A slot of code sequence
@@ -165,41 +165,29 @@ func executeWasm(
 }
 
 extension ExecutionState {
-    /// > Note:
-    /// <https://webassembly.github.io/spec/core/exec/instructions.html#invocation-of-function-address>
-    @inline(never)
-    mutating func invoke(
-        function: InternalFunction,
-        callerInstance: InternalInstance?,
-        callLike: Instruction.CallLikeOperand,
-        sp: Sp, pc: Pc, md: inout Md, ms: inout Ms
-    ) throws -> (Pc, Sp) {
-        return try function.execute(
-            executionState: &self,
-            callerInstance: callerInstance,
-            callLike: callLike,
-            sp: sp, pc: pc, md: &md, ms: &ms
-        )
-    }
-
-    struct CurrentMemory {
+    /// A namespace for the "current memory" (Md and Ms) management.
+    enum CurrentMemory {
+        /// Assigns the current memory to the given internal memory.
         @inline(__always)
-        static func assign(md: inout Md, ms: inout Ms, memory: InternalMemory) {
+        private static func assign(md: inout Md, ms: inout Ms, memory: InternalMemory) {
             memory.withValue { assign(md: &md, ms: &ms, memory: &$0) }
         }
 
+        /// Assigns the current memory to the given memory entity.
         @inline(__always)
         static func assign(md: inout Md, ms: inout Ms, memory: inout MemoryEntity) {
             md = UnsafeMutableRawPointer(memory.data._baseAddressIfContiguous)
             ms = memory.data.count
         }
 
+        /// Assigns the current memory to nil.
         @inline(__always)
-        static func assignNil(md: inout Md, ms: inout Ms) {
+        private static func assignNil(md: inout Md, ms: inout Ms) {
             md = nil
             ms = 0
         }
 
+        /// Updates the current memory if the instance has changed.
         @inline(__always)
         static func mayUpdateCurrentInstance(
             instance: InternalInstance,
@@ -210,6 +198,8 @@ extension ExecutionState {
                 mayUpdateCurrentInstance(instance: instance, md: &md, ms: &ms)
             }
         }
+
+        /// Updates the current memory if the instance has the default memory instance.
         @inline(__always)
         static func mayUpdateCurrentInstance(instance: InternalInstance, md: inout Md, ms: inout Ms) {
             guard let memory = instance.memories.first else {
@@ -220,8 +210,10 @@ extension ExecutionState {
         }
     }
 
+    /// A ``Error`` thrown when the execution normally ends.
     struct EndOfExecution: Error {}
 
+    /// The entry point for the execution of the WebAssembly function.
     @inline(never)
     mutating func execute(
         sp: Sp, pc: Pc,
@@ -249,6 +241,7 @@ extension ExecutionState {
         }
     }
 
+    /// Starts the main execution loop using the direct threading model.
     @inline(never)
     mutating func runDirectThreaded(
         sp: Sp, pc: Pc, md: Md, ms: Ms
@@ -262,7 +255,8 @@ extension ExecutionState {
         }
     }
 
-    /// The main execution loop. Be careful when modifying this function as it is performance-critical.
+    /// Starts the main execution loop using the token threading model.
+    /// Be careful when modifying this function as it is performance-critical.
     @inline(__always)
     mutating func runTokenThreaded(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
 #if WASMKIT_ENGINE_STATS
@@ -293,24 +287,22 @@ extension ExecutionState {
         precondition(self.trap == nil)
         self.trap = trap
     }
-}
 
-extension InternalFunction {
-    /// Returns the new program counter after the function call.
-    @inline(__always)
-    func execute(
-        executionState: inout ExecutionState,
+    /// Returns the new program counter and stack pointer.
+    @inline(never)
+    mutating func invoke(
+        function: InternalFunction,
         callerInstance: InternalInstance?,
         callLike: Instruction.CallLikeOperand,
         sp: Sp, pc: Pc, md: inout Md, ms: inout Ms
     ) throws -> (Pc, Sp) {
-        if self.isWasm {
-            let function = wasm
+        if function.isWasm {
+            let function = function.wasm
             let iseq = try function.withValue {
-                try $0.ensureCompiled(context: &executionState)
+                try $0.ensureCompiled(context: &self)
             }
-            
-            let newSp = try executionState.pushFrame(
+
+            let newSp = try pushFrame(
                 iseq: iseq,
                 instance: function.instance,
                 numberOfNonParameterLocals: function.numberOfNonParameterLocals,
@@ -324,14 +316,13 @@ extension InternalFunction {
             )
             return (iseq.baseAddress, newSp)
         } else {
-            let function = host
-            let runtime = executionState.runtime
+            let function = function.host
             let resolvedType = runtime.value.resolveType(function.type)
             let layout = FrameHeaderLayout(type: resolvedType)
             let parameters = resolvedType.parameters.enumerated().map { (i, type) in
                 sp[callLike.spAddend + layout.paramReg(i)].cast(to: type)
             }
-            let instance = executionState.currentInstance(sp: sp)
+            let instance = self.currentInstance(sp: sp)
             let caller = Caller(
                 instanceHandle: instance,
                 runtime: runtime.value
