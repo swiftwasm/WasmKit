@@ -4,7 +4,68 @@ import _CWasmKit
 ///
 /// Each new invocation through exported function has a separate ``ExecutionState``
 /// even though the invocation happens during another invocation.
-typealias ExecutionState = StackContext
+struct ExecutionState {
+    /// The reference to the ``Runtime`` associated with the execution.
+    let runtime: RuntimeRef
+    /// The end of the VM stack space.
+    private var stackEnd: UnsafeMutablePointer<StackSlot>
+    /// The error trap thrown during execution.
+    /// This property must not be assigned to be non-nil more than once.
+    private var trap: UnsafeRawPointer? = nil
+
+    /// Executes the given closure with a new execution state associated with
+    /// the given ``Runtime`` instance.
+    static func with<T>(
+        runtime: RuntimeRef,
+        body: (inout ExecutionState, Sp) throws -> T
+    ) rethrows -> T {
+        let limit = Int(UInt16.max)
+        let valueStack = UnsafeMutablePointer<StackSlot>.allocate(capacity: limit)
+        defer {
+            valueStack.deallocate()
+        }
+        var context = ExecutionState(runtime: runtime, stackEnd: valueStack.advanced(by: limit))
+        return try body(&context, valueStack)
+    }
+
+    /// Gets the current instance from the stack pointer.
+    @inline(__always)
+    func currentInstance(sp: Sp) -> InternalInstance {
+        InternalInstance(bitPattern: UInt(sp[-3].i64)).unsafelyUnwrapped
+    }
+
+    /// Pushes a new call frame to the VM stack.
+    @inline(__always)
+    mutating func pushFrame(
+        iseq: InstructionSequence,
+        instance: InternalInstance,
+        numberOfNonParameterLocals: Int,
+        sp: Sp, returnPC: Pc,
+        spAddend: VReg
+    ) throws -> Sp {
+        let newSp = sp.advanced(by: Int(spAddend))
+        guard newSp.advanced(by: iseq.maxStackHeight) < stackEnd else {
+            throw Trap.callStackExhausted
+        }
+        // Initialize the locals with zeros (all types of value have the same representation)
+        newSp.initialize(repeating: UntypedValue.default.storage, count: numberOfNonParameterLocals)
+        newSp[-1] = UInt64(UInt(bitPattern: sp))
+        newSp[-2] = UInt64(UInt(bitPattern: returnPC))
+        newSp[-3] = UInt64(UInt(bitPattern: instance.bitPattern))
+        return newSp
+    }
+
+    /// Pops the current frame from the VM stack.
+    @inline(__always)
+    mutating func popFrame(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) {
+        let oldSp = sp
+        sp = Sp(bitPattern: UInt(oldSp[-1])).unsafelyUnwrapped
+        pc = Pc(bitPattern: UInt(oldSp[-2])).unsafelyUnwrapped
+        let toInstance = InternalInstance(bitPattern: UInt(oldSp[-3])).unsafelyUnwrapped
+        let fromInstance = InternalInstance(bitPattern: UInt(sp[-3]))
+        CurrentMemory.mayUpdateCurrentInstance(instance: toInstance, from: fromInstance, md: &md, ms: &ms)
+    }
+}
 
 /// An unmanaged reference to a runtime.
 /// - Note: This is used to avoid ARC overhead during VM execution.
@@ -47,6 +108,7 @@ typealias Sp = UnsafeMutablePointer<StackSlot>
 typealias Pc = UnsafeMutablePointer<CodeSlot>
 
 extension Pc {
+    /// Reads a value from the current program counter and advances the pointer.
     mutating func read<T>(_: T.Type = T.self) -> T {
         assert(MemoryLayout<T>.stride == 8)
         let value = self.withMemoryRebound(to: T.self, capacity: 1) { $0.pointee }
@@ -74,7 +136,7 @@ func executeWasm(
 ) throws -> [Value] {
     // NOTE: `runtime` variable must not outlive this function
     let runtime = RuntimeRef(runtime)
-    return try StackContext.withContext(runtime: runtime) { (stack, sp) in
+    return try ExecutionState.with(runtime: runtime) { (stack, sp) in
         // Advance the stack pointer to be able to reference negative indices
         // for saving slots.
         let sp = sp.advanced(by: FrameHeaderLayout.numberOfSavingSlots)
