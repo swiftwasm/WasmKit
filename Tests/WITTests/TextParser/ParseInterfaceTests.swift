@@ -8,7 +8,7 @@ class ParseInterfaceTests: XCTestCase {
         var lexer = Lexer(cursor: .init(input: text))
         return try InterfaceSyntax.parse(
             lexer: &lexer,
-            documents: DocumentsSyntax(comments: [])
+            documents: DocumentsSyntax(comments: []), attributes: []
         )
     }
 

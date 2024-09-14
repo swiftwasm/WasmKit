@@ -3,6 +3,7 @@ extension SourceFileSyntax {
         var packageId: PackageNameSyntax?
         if lexer.peek()?.kind == .package {
             packageId = try PackageNameSyntax.parse(lexer: &lexer)
+            try lexer.expectSemicolon()
         }
 
         var items: [ASTItemSyntax] = []
@@ -136,12 +137,24 @@ extension ASTItemSyntax {
     static func parse(
         lexer: inout Lexer, documents: DocumentsSyntax
     ) throws -> ASTItemSyntax {
+        let attributes = try AttributeSyntax.parseItems(lexer: &lexer)
         switch lexer.peek()?.kind {
         case .interface:
-            return try .interface(InterfaceSyntax.parse(lexer: &lexer, documents: documents))
+            return try .interface(
+                InterfaceSyntax.parse(
+                    lexer: &lexer, documents: documents, attributes: attributes
+                ))
         case .world:
-            return try .world(WorldSyntax.parse(lexer: &lexer, documents: documents))
-        case .use: return try .use(.init(syntax: .parse(lexer: &lexer, documents: documents)))
+            return try .world(
+                WorldSyntax.parse(
+                    lexer: &lexer, documents: documents, attributes: attributes
+                ))
+        case .use:
+            return try .use(
+                .init(
+                    syntax: .parse(
+                        lexer: &lexer, documents: documents, attributes: attributes
+                    )))
         default:
             throw ParseError(description: "`world`, `interface` or `use` expected")
         }
@@ -149,14 +162,18 @@ extension ASTItemSyntax {
 }
 
 extension TopLevelUseSyntax {
-    static func parse(lexer: inout Lexer, documents: DocumentsSyntax) throws -> TopLevelUseSyntax {
+    static func parse(
+        lexer: inout Lexer,
+        documents: DocumentsSyntax, attributes: [AttributeSyntax]
+    ) throws -> TopLevelUseSyntax {
         try lexer.expect(.use)
         let item = try UsePathSyntax.parse(lexer: &lexer)
         var asName: Identifier?
         if lexer.eat(.as) {
             asName = try .parse(lexer: &lexer)
         }
-        return TopLevelUseSyntax(item: item, asName: asName)
+        try lexer.expectSemicolon()
+        return TopLevelUseSyntax(attributes: attributes, item: item, asName: asName)
     }
 }
 
@@ -179,7 +196,8 @@ extension UseSyntax {
                 break
             }
         }
-        return .init(syntax: UseSyntax(from: from, names: names))
+        try lexer.expectSemicolon()
+        return .init(syntax: UseSyntax(attributes: [], from: from, names: names))
     }
 }
 
@@ -220,5 +238,72 @@ extension DocumentsSyntax {
             lexer = copy  // consume comments for real
         }
         return DocumentsSyntax(comments: comments)
+    }
+}
+
+extension AttributeSyntax {
+    static func parseItems(lexer: inout Lexer) throws -> [AttributeSyntax] {
+        var items: [AttributeSyntax] = []
+        while lexer.eat(.at) {
+            let id = try Identifier.parse(lexer: &lexer)
+            let item: AttributeSyntax
+            switch id.text {
+            case "since": item = .since(try .parse(lexer: &lexer, id: id))
+            case "unstable": item = .unstable(try .parse(lexer: &lexer, id: id))
+            case "deprecated": item = .deprecated(try .parse(lexer: &lexer, id: id))
+            default:
+                throw ParseError(description: "Unexpected attribute: \(id.text)")
+            }
+            items.append(item)
+        }
+        return items
+    }
+}
+
+extension SinceAttributeSyntax {
+    static func parse(lexer: inout Lexer, id: Identifier) throws -> SinceAttributeSyntax {
+        try lexer.expect(.leftParen)
+        try lexer.expectIdentifier("version")
+        try lexer.expect(.equals)
+        let version = try Version.parse(lexer: &lexer)
+        var feature: Identifier?
+        if lexer.eat(.comma) {
+            try lexer.expectIdentifier("feature")
+            try lexer.expect(.equals)
+            feature = try Identifier.parse(lexer: &lexer)
+        }
+        try lexer.expect(.rightParen)
+        return SinceAttributeSyntax(
+            version: version, feature: feature,
+            textRange: id.textRange.lowerBound..<lexer.cursor.nextIndex
+        )
+    }
+}
+
+extension UnstableAttributeSyntax {
+    static func parse(lexer: inout Lexer, id: Identifier) throws -> UnstableAttributeSyntax {
+        try lexer.expect(.leftParen)
+        try lexer.expectIdentifier("feature")
+        try lexer.expect(.equals)
+        let feature = try Identifier.parse(lexer: &lexer)
+        try lexer.expect(.rightParen)
+        return UnstableAttributeSyntax(
+            textRange: id.textRange.lowerBound..<lexer.cursor.nextIndex,
+            feature: feature
+        )
+    }
+}
+
+extension DeprecatedAttributeSyntax {
+    static func parse(lexer: inout Lexer, id: Identifier) throws -> DeprecatedAttributeSyntax {
+        try lexer.expect(.leftParen)
+        try lexer.expectIdentifier("version")
+        try lexer.expect(.equals)
+        let version = try Version.parse(lexer: &lexer)
+        try lexer.expect(.rightParen)
+        return DeprecatedAttributeSyntax(
+            textRange: id.textRange.lowerBound..<lexer.cursor.nextIndex,
+            version: version
+        )
     }
 }

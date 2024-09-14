@@ -68,6 +68,7 @@ public struct PackageNameSyntax: Equatable, Hashable, CustomStringConvertible {
 }
 
 public struct TopLevelUseSyntax: Equatable, Hashable, SyntaxNodeProtocol {
+    var attributes: [AttributeSyntax]
     var item: UsePathSyntax
     var asName: Identifier?
 }
@@ -75,6 +76,7 @@ public struct TopLevelUseSyntax: Equatable, Hashable, SyntaxNodeProtocol {
 public struct WorldSyntax: Equatable, Hashable, SyntaxNodeProtocol {
     public typealias Parent = SourceFileSyntax
     public var documents: DocumentsSyntax
+    public var attributes: [AttributeSyntax]
     public var name: Identifier
     public var items: [WorldItemSyntax]
 }
@@ -89,11 +91,13 @@ public enum WorldItemSyntax: Equatable, Hashable {
 
 public struct ImportSyntax: Equatable, Hashable {
     public var documents: DocumentsSyntax
+    public var attributes: [AttributeSyntax]
     public var kind: ExternKindSyntax
 }
 
 public struct ExportSyntax: Equatable, Hashable {
     public var documents: DocumentsSyntax
+    public var attributes: [AttributeSyntax]
     public var kind: ExternKindSyntax
 }
 
@@ -105,6 +109,7 @@ public enum ExternKindSyntax: Equatable, Hashable {
 
 public struct InterfaceSyntax: Equatable, Hashable, CustomStringConvertible, SyntaxNodeProtocol {
     public var documents: DocumentsSyntax
+    public var attributes: [AttributeSyntax]
     public var name: Identifier
     public var items: [InterfaceItemSyntax]
 
@@ -121,6 +126,7 @@ public enum InterfaceItemSyntax: Equatable, Hashable, SyntaxNodeProtocol {
 
 public struct TypeDefSyntax: Equatable, Hashable, SyntaxNodeProtocol {
     public var documents: DocumentsSyntax
+    public var attributes: [AttributeSyntax]
     public var name: Identifier
     public var body: TypeDefBodySyntax
 }
@@ -240,6 +246,7 @@ public struct StreamSyntax: Equatable, Hashable {
 
 public struct NamedFunctionSyntax: Equatable, Hashable, SyntaxNodeProtocol {
     public var documents: DocumentsSyntax
+    public var attributes: [AttributeSyntax]
     public var name: Identifier
     public var function: FunctionSyntax
 }
@@ -281,6 +288,7 @@ public struct FunctionSyntax: Equatable, Hashable {
 }
 
 public struct UseSyntax: Equatable, Hashable, SyntaxNodeProtocol {
+    public var attributes: [AttributeSyntax]
     public var from: UsePathSyntax
     public var names: [UseNameSyntax]
 }
@@ -303,6 +311,7 @@ public struct UseNameSyntax: Equatable, Hashable {
 }
 
 public struct IncludeSyntax: Equatable, Hashable {
+    var attributes: [AttributeSyntax]
     var from: UsePathSyntax
     var names: [IncludeNameSyntax]
 }
@@ -323,4 +332,26 @@ public struct Identifier: Equatable, Hashable, CustomStringConvertible {
 
 public struct DocumentsSyntax: Equatable, Hashable {
     var comments: [String]
+}
+
+public enum AttributeSyntax: Equatable, Hashable {
+    case since(SinceAttributeSyntax)
+    case unstable(UnstableAttributeSyntax)
+    case deprecated(DeprecatedAttributeSyntax)
+}
+
+public struct SinceAttributeSyntax: Equatable, Hashable {
+    let version: Version
+    let feature: Identifier?
+    let textRange: TextRange
+}
+
+public struct UnstableAttributeSyntax: Equatable, Hashable {
+    let textRange: TextRange
+    let feature: Identifier
+}
+
+public struct DeprecatedAttributeSyntax: Equatable, Hashable {
+    let textRange: TextRange
+    let version: Version
 }

@@ -8,7 +8,8 @@ final class ParseWorldTests: XCTestCase {
         var lexer = Lexer(cursor: .init(input: text))
         return try WorldSyntax.parse(
             lexer: &lexer,
-            documents: DocumentsSyntax(comments: [])
+            documents: DocumentsSyntax(comments: []),
+            attributes: []
         )
     }
 
