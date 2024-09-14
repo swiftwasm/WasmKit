@@ -246,9 +246,8 @@ extension ExecutionState {
     mutating func runDirectThreaded(
         sp: Sp, pc: Pc, md: Md, ms: Ms
     ) throws {
-        let handler = pc.withMemoryRebound(to: wasmkit_tc_exec.self, capacity: 1) {
-            $0.pointee
-        }
+        var pc = pc
+        let handler = pc.read(wasmkit_tc_exec.self)
         wasmkit_tc_start(handler, sp, pc, md, ms, &self)
         if let error = self.trap {
             throw unsafeBitCast(error, to: Error.self)
