@@ -47,6 +47,14 @@ struct Run: ParsableCommand {
     @Option(name: .customLong("dir"), help: "Grant access to the given host directory")
     var directories: [String] = []
 
+    enum ThreadingModel: String, ExpressibleByArgument {
+        case direct
+        case token
+    }
+
+    @Option(help: ArgumentHelp("The execution threading model to use", visibility: .hidden))
+    var threadingModel: ThreadingModel?
+
     @Argument
     var path: String
 
@@ -134,6 +142,16 @@ struct Run: ParsableCommand {
         return nil
     }
 
+    private func deriveRuntimeConfiguration() -> RuntimeConfiguration {
+        let threadingModel: RuntimeConfiguration.ThreadingModel?
+        switch self.threadingModel {
+        case .direct: threadingModel = .direct
+        case .token: threadingModel = .token
+        case nil: threadingModel = nil
+        }
+        return RuntimeConfiguration(threadingModel: threadingModel)
+    }
+
     func instantiateWASI(module: Module, interceptor: RuntimeInterceptor?) throws -> () throws -> Void {
         // Flatten environment variables into a dictionary (Respect the last value if a key is duplicated)
         let environment = environment.reduce(into: [String: String]()) {
@@ -143,7 +161,7 @@ struct Run: ParsableCommand {
             $0[$1] = $1
         }
         let wasi = try WASIBridgeToHost(args: [path] + arguments, environment: environment, preopens: preopens)
-        let runtime = Runtime(hostModules: wasi.hostModules, interceptor: interceptor)
+        let runtime = Runtime(hostModules: wasi.hostModules, interceptor: interceptor, configuration: deriveRuntimeConfiguration())
         let moduleInstance = try runtime.instantiate(module: module)
         return {
             let exitCode = try wasi.start(moduleInstance, runtime: runtime)
@@ -174,7 +192,7 @@ struct Run: ParsableCommand {
             return nil
         }
 
-        let runtime = Runtime(interceptor: interceptor)
+        let runtime = Runtime(interceptor: interceptor, configuration: deriveRuntimeConfiguration())
         let moduleInstance = try runtime.instantiate(module: module)
         return {
             log("Started invoking function \"\(functionName)\" with parameters: \(parameters)", verbose: true)
