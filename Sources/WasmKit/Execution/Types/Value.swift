@@ -32,26 +32,6 @@ extension Value {
         default: return nil
         }
     }
-
-    /// Returns if the given values are equal.
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        switch (lhs, rhs) {
-        case let (.i32(lhs), .i32(rhs)):
-            return lhs == rhs
-        case let (.i64(lhs), .i64(rhs)):
-            return lhs == rhs
-        case let (.f32(lhs), .f32(rhs)):
-            return Float32(bitPattern: lhs) == Float32(bitPattern: rhs)
-        case let (.f64(lhs), .f64(rhs)):
-            return Float64(bitPattern: lhs) == Float64(bitPattern: rhs)
-        case let (.ref(.extern(lhs)), .ref(.extern(rhs))):
-            return lhs == rhs
-        case let (.ref(.function(lhs)), .ref(.function(rhs))):
-            return lhs == rhs
-        default:
-            return false
-        }
-    }
 }
 
 // Integers
