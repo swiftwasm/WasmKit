@@ -165,7 +165,7 @@ struct WasmFunctionEntity {
         self.index = index
     }
 
-    mutating func ensureCompiled(context: inout StackContext) throws -> InstructionSequence {
+    mutating func ensureCompiled(context: inout ExecutionState) throws -> InstructionSequence {
         try ensureCompiled(runtime: context.runtime)
     }
 
