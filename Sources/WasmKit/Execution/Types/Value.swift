@@ -8,23 +8,6 @@ import enum WasmParser.ValueType
 public typealias ReferenceType = WasmParser.ReferenceType
 
 extension Value {
-    var type: WasmParser.ValueType {
-        switch self {
-        case .i32:
-            return .i32
-        case .i64:
-            return .i64
-        case .f32:
-            return .f32
-        case .f64:
-            return .f64
-        case .ref(.function):
-            return .ref(.funcRef)
-        case .ref(.extern):
-            return .ref(.externRef)
-        }
-    }
-
     func maybeAddressOffset(_ isMemory64: Bool) -> UInt64? {
         switch (isMemory64, self) {
         case (true, .i64(let value)): return value

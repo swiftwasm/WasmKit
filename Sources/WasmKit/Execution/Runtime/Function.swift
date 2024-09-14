@@ -98,19 +98,28 @@ extension InternalFunction {
         }
     }
 
-    private func check(functionType: FunctionType, parameters: [Value]) throws {
-        let parameterTypes = parameters.map { $0.type }
+    private func check(expectedTypes: [ValueType], values: [Value]) -> Bool {
+        guard expectedTypes.count == values.count else { return false }
+        for (expected, value) in zip(expectedTypes, values) {
+            switch (expected, value) {
+            case (.i32, .i32), (.i64, .i64), (.f32, .f32), (.f64, .f64),
+                (.ref(.funcRef), .ref(.function)), (.ref(.externRef), .ref(.extern)):
+                break
+            default: return false
+            }
+        }
+        return true
+    }
 
-        guard parameterTypes == functionType.parameters else {
-            throw Trap._raw("parameters types don't match, expected \(functionType.parameters), got \(parameterTypes)")
+    private func check(functionType: FunctionType, parameters: [Value]) throws {
+        guard check(expectedTypes: functionType.parameters, values: parameters) else {
+            throw Trap._raw("parameters types don't match, expected \(functionType.parameters), got \(parameters)")
         }
     }
 
     private func check(functionType: FunctionType, results: [Value]) throws {
-        let resultTypes = results.map { $0.type }
-
-        guard resultTypes == functionType.results else {
-            throw Trap._raw("result types don't match, expected \(functionType.results), got \(resultTypes)")
+        guard check(expectedTypes: functionType.results, values: results) else {
+            throw Trap._raw("result types don't match, expected \(functionType.results), got \(results)")
         }
     }
 
