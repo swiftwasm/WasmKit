@@ -56,24 +56,6 @@ struct StackContext {
     }
 }
 
-protocol BitPatternRepresentable {
-    associatedtype BitPattern
-    init(bitPattern: BitPattern)
-}
-
-extension Int32: BitPatternRepresentable {
-    typealias BitPattern = UInt32
-}
-extension Int64: BitPatternRepresentable {
-    typealias BitPattern = UInt64
-}
-extension Float32: BitPatternRepresentable {
-    typealias BitPattern = UInt32
-}
-extension Float64: BitPatternRepresentable {
-    typealias BitPattern = UInt64
-}
-
 struct UntypedValue: Equatable {
     let storage: UInt64
 
