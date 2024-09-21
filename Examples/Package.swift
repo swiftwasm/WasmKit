@@ -10,15 +10,15 @@ let package = Package(
     ],
     targets: [
         .executableTarget(name: "Factorial", dependencies: [
-            "WasmKit",
+            .product(name: "WasmKit", package: "WasmKit"),
             .product(name: "WAT", package: "WasmKit")
         ]),
         .executableTarget(name: "PrintAdd", dependencies: [
-            "WasmKit",
+            .product(name: "WasmKit", package: "WasmKit"),
             .product(name: "WAT", package: "WasmKit")
         ]),
         .executableTarget(name: "WASI-Hello", dependencies: [
-            "WasmKit",
+            .product(name: "WasmKit", package: "WasmKit"),
             .product(name: "WasmKitWASI", package: "WasmKit"),
             .product(name: "WAT", package: "WasmKit"),
         ]),
