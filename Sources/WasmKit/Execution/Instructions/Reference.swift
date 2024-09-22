@@ -1,6 +1,6 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#reference-instructions>
-extension ExecutionState {
+extension Execution {
     mutating func refNull(sp: Sp, refNullOperand: Instruction.RefNullOperand) {
         let value: Value
         switch refNullOperand.type {

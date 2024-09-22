@@ -1,6 +1,6 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#numeric-instructions>
-extension ExecutionState {
+extension Execution {
     @inline(__always)
     mutating func const32(sp: Sp, const32Operand: Instruction.Const32Operand) {
         sp[const32Operand.result] = UntypedValue(storage32: const32Operand.value)

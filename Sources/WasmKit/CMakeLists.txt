@@ -18,20 +18,20 @@ add_wasmkit_library(WasmKit
   Execution/Instructions/InstructionSupport.swift
   Execution/Instructions/Numeric.swift
   Execution/Instructions/Variable.swift
-  Execution/Types/Instances.swift
-  Execution/Types/Errors.swift
-  Execution/Types/Value.swift
-  Execution/Types/UntypedValue.swift
-  Execution/Runtime/InstDispatch.swift
-  Execution/Runtime/Runtime.swift
-  Execution/Runtime/RuntimeInterceptor.swift
-  Execution/Runtime/ExecutionState.swift
-  Execution/Runtime/Profiler.swift
-  Execution/Runtime/NameRegistry.swift
-  Execution/Runtime/Store.swift
-  Execution/Runtime/StoreAllocator.swift
-  Execution/Runtime/SignpostTracer.swift
-  Execution/Runtime/Function.swift
+  Execution/DispatchInstruction.swift
+  Execution/Errors.swift
+  Execution/Execution.swift
+  Execution/Function.swift
+  Execution/Instances.swift
+  Execution/NameRegistry.swift
+  Execution/Profiler.swift
+  Execution/Runtime.swift
+  Execution/RuntimeInterceptor.swift
+  Execution/SignpostTracer.swift
+  Execution/Store.swift
+  Execution/StoreAllocator.swift
+  Execution/UntypedValue.swift
+  Execution/Value.swift
 )
 
 target_link_wasmkit_libraries(WasmKit PUBLIC

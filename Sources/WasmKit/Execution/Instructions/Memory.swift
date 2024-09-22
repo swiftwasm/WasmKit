@@ -1,6 +1,6 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#memory-instructions>
-extension ExecutionState {
+extension Execution {
     @inline(never) func throwOutOfBoundsMemoryAccess() throws -> Never {
         throw Trap.outOfBoundsMemoryAccess
     }

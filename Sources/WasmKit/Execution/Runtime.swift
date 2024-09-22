@@ -174,12 +174,12 @@ extension Runtime {
 }
 
 extension Runtime {
-    @available(*, unavailable, message: "Runtime doesn't manage execution state anymore. Use ExecutionState.step instead")
+    @available(*, unavailable, message: "Runtime doesn't manage execution state anymore. Use Execution.step instead")
     public func step() throws {
         fatalError()
     }
 
-    @available(*, unavailable, message: "Runtime doesn't manage execution state anymore. Use ExecutionState.step instead")
+    @available(*, unavailable, message: "Runtime doesn't manage execution state anymore. Use Execution.step instead")
     public func run() throws {
         fatalError()
     }

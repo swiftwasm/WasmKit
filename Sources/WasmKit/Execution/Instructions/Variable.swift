@@ -1,6 +1,6 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/instructions.html#variable-instructions>
-extension ExecutionState {
+extension Execution {
     mutating func globalGet(sp: Sp, globalGetOperand: Instruction.GlobalGetOperand) {
         globalGetOperand.global.withValue{
             sp[globalGetOperand.reg] = $0.rawValue

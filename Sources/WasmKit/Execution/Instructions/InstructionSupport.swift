@@ -81,7 +81,6 @@ extension Int32: InstructionImmediate {
 }
 
 extension Instruction {
-    /// size = 6, alignment = 2
     struct BinaryOperand: Equatable, InstructionImmediate {
         let result: LVReg
         let lhs: VReg
@@ -94,7 +93,6 @@ extension Instruction {
         }
     }
     
-    /// size = 4, alignment = 2
     struct UnaryOperand: Equatable, InstructionImmediate {
         let result: LVReg
         let input: LVReg
@@ -125,7 +123,6 @@ extension Instruction {
         }
     }
 
-    /// size = 4, alignment = 8
     struct LoadOperand: Equatable, InstructionImmediate {
         let offset: UInt64
         let pointer: VReg
