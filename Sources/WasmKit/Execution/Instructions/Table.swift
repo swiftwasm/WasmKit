@@ -2,7 +2,7 @@
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#table-instructions>
 
 import WasmParser
-extension ExecutionState {
+extension Execution {
     mutating func tableGet(sp: Sp, tableGetOperand: Instruction.TableGetOperand) throws {
         let runtime = runtime.value
         let table = getTable(tableGetOperand.tableIndex, sp: sp, store: runtime.store)
@@ -131,7 +131,7 @@ extension ExecutionState {
     }
 }
 
-extension ExecutionState {
+extension Execution {
     fileprivate func getTable(_ tableIndex: UInt32, sp: Sp, store: Store) -> InternalTable {
         return currentInstance(sp: sp).tables[Int(tableIndex)]
     }

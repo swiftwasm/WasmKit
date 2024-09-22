@@ -1,6 +1,6 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#control-instructions>
-extension ExecutionState {
+extension Execution {
     func unreachable(sp: Sp, pc: Pc) throws -> Pc {
         throw Trap.unreachable
     }

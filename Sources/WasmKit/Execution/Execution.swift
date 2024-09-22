@@ -2,9 +2,9 @@ import _CWasmKit
 
 /// An execution state of an invocation of exported function.
 ///
-/// Each new invocation through exported function has a separate ``ExecutionState``
+/// Each new invocation through exported function has a separate ``Execution``
 /// even though the invocation happens during another invocation.
-struct ExecutionState {
+struct Execution {
     /// The reference to the ``Runtime`` associated with the execution.
     let runtime: RuntimeRef
     /// The end of the VM stack space.
@@ -17,14 +17,14 @@ struct ExecutionState {
     /// the given ``Runtime`` instance.
     static func with<T>(
         runtime: RuntimeRef,
-        body: (inout ExecutionState, Sp) throws -> T
+        body: (inout Execution, Sp) throws -> T
     ) rethrows -> T {
         let limit = Int(UInt16.max)
         let valueStack = UnsafeMutablePointer<StackSlot>.allocate(capacity: limit)
         defer {
             valueStack.deallocate()
         }
-        var context = ExecutionState(runtime: runtime, stackEnd: valueStack.advanced(by: limit))
+        var context = Execution(runtime: runtime, stackEnd: valueStack.advanced(by: limit))
         return try body(&context, valueStack)
     }
 
@@ -136,7 +136,7 @@ func executeWasm(
 ) throws -> [Value] {
     // NOTE: `runtime` variable must not outlive this function
     let runtime = RuntimeRef(runtime)
-    return try ExecutionState.with(runtime: runtime) { (stack, sp) in
+    return try Execution.with(runtime: runtime) { (stack, sp) in
         // Advance the stack pointer to be able to reference negative indices
         // for saving slots.
         let sp = sp.advanced(by: FrameHeaderLayout.numberOfSavingSlots)
@@ -164,7 +164,7 @@ func executeWasm(
     }
 }
 
-extension ExecutionState {
+extension Execution {
     /// A namespace for the "current memory" (Md and Ms) management.
     enum CurrentMemory {
         /// Assigns the current memory to the given internal memory.
@@ -309,7 +309,7 @@ extension ExecutionState {
                 returnPC: pc,
                 spAddend: callLike.spAddend
             )
-            ExecutionState.CurrentMemory.mayUpdateCurrentInstance(
+            Execution.CurrentMemory.mayUpdateCurrentInstance(
                 instance: function.instance,
                 from: callerInstance, md: &md, ms: &ms
             )
