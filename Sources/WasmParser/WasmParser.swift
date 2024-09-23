@@ -1,4 +1,5 @@
 import SystemPackage
+import WasmTypes
 
 #if os(Windows)
     import ucrt
@@ -76,76 +77,52 @@ extension Parser where Stream == FileHandleStream {
     }
 }
 
-/// Parse a WebAssembly expression from the given byte stream
-///
-/// - Parameters:
-///   - stream: The byte stream to parse
-///   - features: The enabled WebAssembly features
-///   - hasDataCount: Whether the module has a data count section
-///   - visitor: The instruction visitor to visit the parsed instructions
-/// - Throws: `WasmParserError` if the parsing fails
-@inlinable
-public func parseExpression<V: InstructionVisitor, Stream: ByteStream>(
-    stream: Stream,
-    features: WasmFeatureSet = .default,
-    hasDataCount: Bool = false,
-    visitor: inout V
-) throws {
-    let parser = Parser(stream: stream, features: features, hasDataCount: hasDataCount)
-    var lastCode: InstructionCode?
-    while try !parser.stream.hasReachedEnd() {
-        (lastCode, _) = try parser.parseInstruction(visitor: &visitor)
+extension Code {
+    /// Parse a WebAssembly expression from the given byte stream
+    ///
+    /// - Parameters:
+    ///   - visitor: The instruction visitor to visit the parsed instructions
+    /// - Throws: `WasmParserError` if the parsing fails
+    ///
+    /// The input bytes sequence is usually extracted from a WebAssembly module's code section.
+    ///
+    /// ```swift
+    /// import WasmParser
+    ///
+    /// struct MyVisitor: VoidInstructionVisitor {
+    ///     func visitLocalGet(localIndex: UInt32) {
+    ///         print("local.get \(localIndex)")
+    ///     }
+    /// }
+    ///
+    /// var parser = WasmParser.Parser(bytes: [
+    ///     0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x01, 0x06, 0x01, 0x60,
+    ///     0x01, 0x7e, 0x01, 0x7e, 0x03, 0x02, 0x01, 0x00, 0x07, 0x07, 0x01, 0x03,
+    ///     0x66, 0x61, 0x63, 0x00, 0x00, 0x0a, 0x17, 0x01, 0x15, 0x00, 0x20, 0x00,
+    ///     0x50, 0x04, 0x7e, 0x42, 0x01, 0x05, 0x20, 0x00, 0x20, 0x00, 0x42, 0x01,
+    ///     0x7d, 0x10, 0x00, 0x7e, 0x0b, 0x0b
+    /// ])
+    /// while let payload = try parser.parseNext() {
+    ///     switch payload {
+    ///     case .codeSection(let section):
+    ///         for code in section {
+    ///             var visitor = MyVisitor()
+    ///             try code.parseExpression(visitor: &visitor)
+    ///         }
+    ///     default: break
+    ///     }
+    /// }
+    /// ````
+    public func parseExpression<V: InstructionVisitor>(visitor: inout V) throws {
+        let parser = Parser(stream: StaticByteStream(bytes: self.expression), features: self.features, hasDataCount: self.hasDataCount)
+        var lastCode: InstructionCode?
+        while try !parser.stream.hasReachedEnd() {
+            (lastCode, _) = try parser.parseInstruction(visitor: &visitor)
+        }
+        guard lastCode == .end else {
+            throw WasmParserError.endOpcodeExpected
+        }
     }
-    guard lastCode == .end else {
-        throw WasmParserError.endOpcodeExpected
-    }
-}
-
-/// Parse a WebAssembly expression from the given byte stream
-///
-/// - Parameters:
-///   - bytes: The bytes to parse
-///   - features: The enabled WebAssembly features
-///   - hasDataCount: Whether the module has a data count section
-///   - visitor: The instruction visitor to visit the parsed instructions
-/// - Throws: `WasmParserError` if the parsing fails
-///
-/// See ``parseExpression(stream:features:hasDataCount:visitor:)`` for stream version.
-///
-/// The input bytes sequence is usually extracted from a WebAssembly module's code section.
-///
-/// ```swift
-/// import WasmParser
-///
-/// struct MyVisitor: VoidInstructionVisitor {
-///     func visitLocalGet(localIndex: UInt32) {
-///         print("local.get \(localIndex)")
-///     }
-/// }
-///
-/// var parser = WasmParser.Parser(bytes: [
-///     0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, 0x01, 0x06, 0x01, 0x60,
-///     0x01, 0x7e, 0x01, 0x7e, 0x03, 0x02, 0x01, 0x00, 0x07, 0x07, 0x01, 0x03,
-///     0x66, 0x61, 0x63, 0x00, 0x00, 0x0a, 0x17, 0x01, 0x15, 0x00, 0x20, 0x00,
-///     0x50, 0x04, 0x7e, 0x42, 0x01, 0x05, 0x20, 0x00, 0x20, 0x00, 0x42, 0x01,
-///     0x7d, 0x10, 0x00, 0x7e, 0x0b, 0x0b
-/// ])
-/// while let payload = try parser.parseNext() {
-///     switch payload {
-///     case .codeSection(let section):
-///         for code in section {
-///             var visitor = MyVisitor()
-///             try parseExpression(bytes: Array(code.expression), visitor: &visitor)
-///         }
-///     default: break
-///     }
-/// }
-/// ````
-public func parseExpression<V: InstructionVisitor>(bytes: [UInt8], features: WasmFeatureSet = .default, hasDataCount: Bool = false, visitor: inout V) throws {
-    try parseExpression(
-        stream: StaticByteStream(bytes: bytes), features: features,
-        hasDataCount: hasDataCount, visitor: &visitor
-    )
 }
 
 /// Flags for enabling/disabling WebAssembly features
@@ -1048,7 +1025,7 @@ extension Parser {
             let expressionBytes = try stream.consume(
                 count: Int(size) - (stream.currentIndex - bodyStart)
             )
-            return Code(locals: locals, expression: expressionBytes)
+            return Code(locals: locals, expression: expressionBytes, hasDataCount: hasDataCount, features: features)
         }
     }
 

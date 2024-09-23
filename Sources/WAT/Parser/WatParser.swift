@@ -1,4 +1,5 @@
 import WasmParser
+import WasmTypes
 
 struct WatParser {
     var parser: Parser
@@ -40,7 +41,7 @@ struct WatParser {
     }
 
     struct FunctionType {
-        let signature: WasmParser.FunctionType
+        let signature: WasmTypes.FunctionType
         /// Names of the parameters. The number of names must match the number of parameters in `type`.
         let parameterNames: [String?]
     }
@@ -554,7 +555,7 @@ struct WatParser {
         let (params, names) = try params()
         let results = try results()
         try parser.expect(.rightParen)
-        return FunctionType(signature: WasmParser.FunctionType(parameters: params, results: results), parameterNames: names)
+        return FunctionType(signature: WasmTypes.FunctionType(parameters: params, results: results), parameterNames: names)
     }
 
     mutating func optionalFunctionType() throws -> FunctionType? {
@@ -563,7 +564,7 @@ struct WatParser {
         if results.isEmpty, params.isEmpty {
             return nil
         }
-        return FunctionType(signature: WasmParser.FunctionType(parameters: params, results: results), parameterNames: names)
+        return FunctionType(signature: WasmTypes.FunctionType(parameters: params, results: results), parameterNames: names)
     }
 
     mutating func params() throws -> ([ValueType], [String?]) {

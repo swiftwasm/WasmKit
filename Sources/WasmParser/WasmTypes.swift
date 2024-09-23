@@ -1,11 +1,17 @@
-@_exported import WasmTypes
+import WasmTypes
 
 /// Function code in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-code>
 public struct Code {
+    /// Local variables in the function
     public let locals: [ValueType]
+    /// Expression body of the function
     public let expression: ArraySlice<UInt8>
+
+    // Parser state used to parse the expression body lazily
+    internal let hasDataCount: Bool
+    internal let features: WasmFeatureSet
 }
 
 extension Code: Equatable {
