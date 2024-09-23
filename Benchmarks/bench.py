@@ -6,45 +6,116 @@ from dataclasses import dataclass
 
 SOURCE_ROOT = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..")
 
+
+class Engine:
+    def __call__(self, runner, path):
+        raise NotImplementedError()
+
+
+class SimpleEngine(Engine):
+    def __init__(self, name, command_to_prepend):
+        self.name = name
+        self.command_to_prepend = command_to_prepend
+
+    def command(self, path):
+        return self.command_to_prepend + [path]
+
+    def __call__(self, runner, path):
+        runner.run_command(self.command(path))
+
+
 def available_engines():
-    engines = {
-        "WasmKit": lambda runner, path: runner.run_command([
-            os.path.join(SOURCE_ROOT, ".build/release/wasmkit-cli"), "run", path,
-        ]),
-    }
+    engines = {}
+
+    def add_engine(engine):
+        engines[engine.name] = engine
+
+    add_engine(SimpleEngine("WasmKit", [
+        os.path.join(SOURCE_ROOT, ".build/release/wasmkit-cli"), "run",
+    ]))
+
     if shutil.which("wasmi_cli"):
-        engines["wasmi"] = lambda runner, path: runner.run_command([
-            "wasmi_cli", path,
-        ])
+        add_engine(SimpleEngine("wasmi", ["wasmi_cli"]))
     if shutil.which("wasmtime"):
-        engines["wasmtime"] = lambda runner, path: runner.run_command([
-            "wasmtime", path,
-        ])
+        add_engine(SimpleEngine("wasmtime", ["wasmtime"]))
     return engines
+
 
 @dataclass
 class Benchmark:
     name: str
-    path: str
     eta_sec: float
+
+
+class CoreMarkBenchmark(Benchmark):
+    def __init__(self):
+        super().__init__("CoreMark", 20.0)
+        self.path = os.path.join(
+            SOURCE_ROOT, "Vendor", "coremark", "coremark.wasm")
+
+    def __call__(self, runner, engine):
+        engine(runner, self.path)
+
+
+class WishYouWereFastBenchmark(Benchmark):
+    def __init__(self):
+        super().__init__("WishYouWereFast", 10.0)
+
+        suites_path = os.path.join(
+            SOURCE_ROOT, "Vendor", "wish-you-were-fast", "wasm", "suites")
+        targets = []
+
+        def add_dir(subpath):
+            path = os.path.join(suites_path, subpath)
+            for filename in os.listdir(path):
+                if filename.endswith(".wasm"):
+                    targets.append(os.path.join(path, filename))
+
+        add_dir("libsodium")
+        self.targets = sorted(targets)
+
+    def __call__(self, runner, engine):
+        # Save the result CSV file at ./results/{engine_name}/{target_name}.csv
+        results_dir = runner.results_dir
+        runner.run_command([
+            "mkdir", "-p", os.path.join(results_dir, engine.name)])
+
+        for i, target in enumerate(self.targets):
+            print(f"===== Running {i+1}/{len(self.targets)}: {target} =====")
+            if not isinstance(engine, SimpleEngine):
+                raise NotImplementedError(
+                    "WishYouWereFastBenchmark only supports SimpleEngine")
+
+            csv_path = os.path.join(
+                results_dir, engine.name, os.path.basename(target) + ".csv")
+            command = engine.command(target)
+            command = [
+                "hyperfine", "--warmup", "5", "--export-csv", csv_path,
+                " ".join(command)
+            ]
+            runner.run_command(command)
+
 
 def available_benchmarks():
     benchmarks = [
-        Benchmark("CoreMark", os.path.join(SOURCE_ROOT, "Vendor", "coremark", "coremark.wasm"), 20.0),
+        CoreMarkBenchmark(),
+        WishYouWereFastBenchmark(),
     ]
     return {b.name: b for b in benchmarks}
+
 
 class Runner:
 
     def __init__(self, args, engines, benchmarks):
         self.verbose = args.verbose
         self.dry_run = args.dry_run
+        self.results_dir = args.results_dir
 
         def filter_dict(d, keys):
             if keys is None:
                 return d
             return {k: v for k, v in d.items() if k in keys}
-        
+
         self.engines = filter_dict(engines, args.engine)
         self.benchmarks = filter_dict(benchmarks, args.benchmark)
 
@@ -79,7 +150,32 @@ class Runner:
         for engine_name, engine in sorted(self.engines.items(), key=lambda x: x[0]):
             for benchmark_name, benchmark in self.benchmarks.items():
                 print(f"===== Running {benchmark_name} with {engine_name} (ETA: {benchmark.eta_sec} sec) =====")
-                engine(self, benchmark.path)
+                benchmark(self, engine)
+
+
+def concat_results(args):
+    import glob
+
+    results_dir = args.results_dir
+    results = []
+    original_header = None
+    for csv_path in glob.glob(os.path.join(results_dir, "**/*.csv"), recursive=True):
+        engine_name = csv_path.split("/")[1]
+        target_name = csv_path.split("/")[-1].replace(".csv", "")
+        with open(csv_path) as f:
+            lines = f.readlines()
+            if len(lines) == 1:
+                print(f"Warning: {csv_path} is empty")
+                continue
+            if original_header is None:
+                original_header = lines[0]
+            for line in lines[1:]:
+                results.append(f"{engine_name},{target_name},{line}")
+
+    with open(os.path.join(results_dir, "data.csv"), "w") as f:
+        f.write(f"engine,target,{original_header}")
+        f.writelines(results)
+
 
 def main():
     import argparse
@@ -92,13 +188,21 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Print commands without running them")
     parser.add_argument("--engine", action="append", help="Engines to run", choices=engines.keys())
     parser.add_argument("--benchmark", action="append", help="Benchmarks to run", choices=benchmarks.keys())
+    parser.add_argument("--step", action="append", help="Steps to run",
+                        choices=["build", "run", "concat"])
+    parser.add_argument("--results-dir", help="Directory to save results",
+                        defaults="./.build/results")
 
     args = parser.parse_args()
 
     runner = Runner(args, engines, benchmarks)
-    if not args.skip_build:
+    if not args.skip_build and "build" in args.step:
         runner.build()
-    runner.run()
+    if "run" in args.step:
+        runner.run()
+    if "concat" in args.step:
+        concat_results(args)
+
 
 if __name__ == "__main__":
     main()
