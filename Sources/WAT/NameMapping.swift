@@ -1,4 +1,5 @@
 import WasmParser
+import WasmTypes
 
 /// A module field declaration that may have its name
 protocol NamedModuleFieldDecl {
@@ -126,7 +127,7 @@ struct TypesMap {
         return .empty
     }
     private mutating func resolveBlockType(
-        signature: WasmParser.FunctionType,
+        signature: WasmTypes.FunctionType,
         resolveSignatureIndex: (inout TypesMap) -> Int
     ) throws -> BlockType {
         if signature.parameters.isEmpty {
@@ -146,7 +147,7 @@ struct TypesMap {
     }
 
     /// Resolves a block type from a function type signature
-    mutating func resolveBlockType(signature: WasmParser.FunctionType) throws -> BlockType {
+    mutating func resolveBlockType(signature: WasmTypes.FunctionType) throws -> BlockType {
         return try resolveBlockType(
             signature: signature,
             resolveSignatureIndex: {
@@ -171,7 +172,7 @@ struct TypesMap {
         case let (indexOrId?, _):
             return try nameMapping.resolveIndex(use: indexOrId)
         case (nil, let inline):
-            let inline = inline?.signature ?? WasmParser.FunctionType(parameters: [], results: [])
+            let inline = inline?.signature ?? WasmTypes.FunctionType(parameters: [], results: [])
             return addAnonymousSignature(inline)
         }
     }
@@ -196,7 +197,7 @@ struct TypesMap {
             return (found, Int(index))
         case (nil, let inline):
             // If no index and no inline type, then it's a function type with no parameters or results
-            let inline = inline ?? WatParser.FunctionType(signature: WasmParser.FunctionType(parameters: [], results: []), parameterNames: [])
+            let inline = inline ?? WatParser.FunctionType(signature: WasmTypes.FunctionType(parameters: [], results: []), parameterNames: [])
             // Check if the inline type already exists
             if let index = indices[inline.signature] {
                 return (inline, index)

@@ -191,10 +191,9 @@ struct WasmFunctionEntity {
             functionIndex: index,
             intercepting: runtime.value.interceptor != nil
         )
-        let iseq = try translator.translate(
-            expression: code.expression,
-            instance: instance
-        )
+        let iseq = try code.withValue { code in
+            try translator.translate(code: code, instance: instance)
+        }
         self.code = .compiled(iseq)
         return iseq
     }

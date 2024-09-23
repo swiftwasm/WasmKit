@@ -1,4 +1,4 @@
-import WasmParser
+import WasmTypes
 
 public enum Trap: Error {
     // FIXME: for debugging purposes, to be eventually deleted
@@ -10,7 +10,7 @@ public enum Trap: Error {
     /// Stack overflow
     case stackOverflow
     /// The stack value type does not match the expected type
-    case stackValueTypesMismatch(expected: WasmParser.ValueType, actual: WasmParser.ValueType)
+    case stackValueTypesMismatch(expected: WasmTypes.ValueType, actual: WasmTypes.ValueType)
     /// Too deep call stack
     case callStackExhausted
 

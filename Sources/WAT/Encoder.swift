@@ -1,4 +1,5 @@
 import WasmParser
+import WasmTypes
 
 struct Encoder {
     var output: [UInt8] = []

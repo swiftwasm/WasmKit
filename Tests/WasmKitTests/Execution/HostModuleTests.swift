@@ -38,7 +38,7 @@ final class HostModuleTests: XCTestCase {
 
     func testReentrancy() throws {
         let runtime = Runtime()
-        let voidSignature = WasmParser.FunctionType(parameters: [], results: [])
+        let voidSignature = WasmTypes.FunctionType(parameters: [], results: [])
         let module = try parseWasm(
             bytes: wat2wasm(
                 """

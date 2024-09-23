@@ -1,4 +1,5 @@
 import WasmParser
+import WasmTypes
 
 struct ExpressionParser<Visitor: InstructionVisitor> {
     typealias LocalsMap = NameMapping<WatParser.LocalDecl>

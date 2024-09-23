@@ -1,4 +1,5 @@
 import WasmParser
+import WasmTypes
 
 class ISeqAllocator {
 
@@ -264,7 +265,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     typealias Output = Void
 
     typealias LabelRef = Int
-    typealias ValueType = WasmParser.ValueType
+    typealias ValueType = WasmTypes.ValueType
 
     struct ControlStack {
         typealias BlockType = FunctionType
@@ -709,7 +710,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         funcTypeInterner: Interner<FunctionType>,
         module: Context,
         type: FunctionType,
-        locals: [WasmParser.ValueType],
+        locals: [WasmTypes.ValueType],
         functionIndex: FunctionIndex,
         intercepting: Bool
     ) {
@@ -898,18 +899,14 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
     /// Translate a Wasm expression into a sequence of instructions.
     mutating func translate(
-        expression: ArraySlice<UInt8>,
+        code: Code,
         instance: InternalInstance
     ) throws -> InstructionSequence {
         if intercepting {
             // Emit `onEnter` instruction at the beginning of the function
             emit(.onEnter(functionIndex))
         }
-        try WasmParser.parseExpression(
-            bytes: Array(expression),
-            features: instance.features, hasDataCount: instance.hasDataCount,
-            visitor: &self
-        )
+        try code.parseExpression(visitor: &self)
         return try finalize()
     }
 
@@ -1304,7 +1301,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             emit(.select(operand))
         }
     }
-    mutating func visitTypedSelect(type: WasmParser.ValueType) throws -> Output {
+    mutating func visitTypedSelect(type: WasmTypes.ValueType) throws -> Output {
         let condition = try popVRegOperand(.i32)
         let (value1Type, value1) = try popAnyOperand()
         let (_, value2) = try popAnyOperand()
@@ -1521,7 +1518,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     mutating func visitI64Const(value: Int64) -> Output { visitConst(.i64, .i64(UInt64(bitPattern: value))) }
     mutating func visitF32Const(value: IEEE754.Float32) -> Output { visitConst(.f32, .f32(value.bitPattern)) }
     mutating func visitF64Const(value: IEEE754.Float64) -> Output { visitConst(.f64, .f64(value.bitPattern)) }
-    mutating func visitRefNull(type: WasmParser.ReferenceType) -> Output {
+    mutating func visitRefNull(type: WasmTypes.ReferenceType) -> Output {
         pushEmit(.ref(type), { .refNull(Instruction.RefNullOperand(type: type, result: $0)) })
     }
     mutating func visitRefIsNull() throws -> Output {

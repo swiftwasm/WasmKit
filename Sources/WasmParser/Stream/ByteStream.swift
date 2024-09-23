@@ -1,10 +1,15 @@
 public protocol ByteStream: Stream where Element == UInt8 {}
 
 public final class StaticByteStream: ByteStream {
-    public let bytes: [UInt8]
+    public let bytes: ArraySlice<UInt8>
     public var currentIndex: Int
 
     public init(bytes: [UInt8]) {
+        self.bytes = ArraySlice(bytes)
+        currentIndex = bytes.startIndex
+    }
+
+    init(bytes: ArraySlice<UInt8>) {
         self.bytes = bytes
         currentIndex = bytes.startIndex
     }

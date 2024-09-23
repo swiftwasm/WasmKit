@@ -1,11 +1,11 @@
-import enum WasmParser.ReferenceType
-import enum WasmParser.ValueType
+import enum WasmTypes.ReferenceType
+import enum WasmTypes.ValueType
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#value-types>
 
 
-public typealias ReferenceType = WasmParser.ReferenceType
+public typealias ReferenceType = WasmTypes.ReferenceType
 
 extension Value {
     func maybeAddressOffset(_ isMemory64: Bool) -> UInt64? {

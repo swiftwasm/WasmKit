@@ -48,8 +48,6 @@ while let payload = try parser.parseNext() {
 
 - ``Parser``
 - ``Parser/parseNext()``
-- ``parseExpression(bytes:features:hasDataCount:visitor:)``
-- ``parseExpression(stream:features:hasDataCount:visitor:)``
 - ``NameSectionParser``
 
 ### Visitor
