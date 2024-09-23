@@ -10,7 +10,9 @@ public struct Code {
     public let expression: ArraySlice<UInt8>
 
     // Parser state used to parse the expression body lazily
+    @usableFromInline
     internal let hasDataCount: Bool
+    @usableFromInline
     internal let features: WasmFeatureSet
 }
 
