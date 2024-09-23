@@ -15,6 +15,10 @@
     "repository": "https://github.com/swiftlang/swift-format.git",
     "revision": "b268009b0d1182f9a573311c1a69eee9a7fd3d3f"
   },
+  "wish-you-were-fast": {
+    "repository": "https://github.com/composablesys/wish-you-were-fast.git",
+    "revision": "65c968685d66eea3ae88ef747df95210690c6b46"
+  },
   "coremark": {
     "repository": "https://github.com/eembc/coremark.git",
     "revision": "d5fad6bd094899101a4e5fd53af7298160ced6ab"
