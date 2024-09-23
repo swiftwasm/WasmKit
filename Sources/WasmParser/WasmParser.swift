@@ -1174,20 +1174,20 @@ extension Parser {
     }
 }
 
+/// A map of names by its index.
+public typealias NameMap = [UInt32: String]
+
+/// Parsed names.
+public enum ParsedNames {
+    /// Function names.
+    case functions(NameMap)
+}
+
 /// A parser for the name custom section.
 ///
 /// > Note: <https://webassembly.github.io/spec/core/appendix/custom.html#name-section>
 public struct NameSectionParser<Stream: ByteStream> {
     let stream: Stream
-
-    /// A map of names by its index.
-    public typealias NameMap = [UInt32: String]
-
-    /// Parsed names.
-    public enum ParsedNames {
-        /// Function names.
-        case functions(NameMap)
-    }
 
     public init(stream: Stream) {
         self.stream = stream
