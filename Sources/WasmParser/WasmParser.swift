@@ -113,6 +113,7 @@ extension Code {
     ///     }
     /// }
     /// ````
+    @inlinable
     public func parseExpression<V: InstructionVisitor>(visitor: inout V) throws {
         let parser = Parser(stream: StaticByteStream(bytes: self.expression), features: self.features, hasDataCount: self.hasDataCount)
         var lastCode: InstructionCode?

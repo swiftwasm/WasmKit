@@ -9,7 +9,7 @@ public final class StaticByteStream: ByteStream {
         currentIndex = bytes.startIndex
     }
 
-    init(bytes: ArraySlice<UInt8>) {
+    public init(bytes: ArraySlice<UInt8>) {
         self.bytes = bytes
         currentIndex = bytes.startIndex
     }
