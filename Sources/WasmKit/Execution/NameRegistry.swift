@@ -1,5 +1,6 @@
 import struct WasmParser.CustomSection
 import struct WasmParser.NameSectionParser
+import struct WasmParser.NameMap
 import class WasmParser.StaticByteStream
 
 struct NameRegistry {
@@ -21,7 +22,7 @@ struct NameRegistry {
         }
     }
 
-    private mutating func register(instance: InternalInstance, nameMap: NameSectionParser.NameMap) {
+    private mutating func register(instance: InternalInstance, nameMap: NameMap) {
         for (index, name) in nameMap {
             let addr = instance.functions[Int(index)]
             self.functionNames[addr] = name
