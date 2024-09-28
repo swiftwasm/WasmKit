@@ -6,9 +6,12 @@ struct InstructionSequence: Equatable {
     /// This height does not count the locals.
     let maxStackHeight: Int
 
-    init(instructions: UnsafeMutableBufferPointer<CodeSlot>, maxStackHeight: Int) {
+    let constants: UnsafeBufferPointer<UntypedValue>
+
+    init(instructions: UnsafeMutableBufferPointer<CodeSlot>, maxStackHeight: Int, constants: UnsafeBufferPointer<UntypedValue>) {
         self.instructions = instructions
         self.maxStackHeight = maxStackHeight
+        self.constants = constants
     }
 
     var baseAddress: UnsafeMutablePointer<CodeSlot> {

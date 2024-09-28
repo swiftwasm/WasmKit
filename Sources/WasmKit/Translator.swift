@@ -12,6 +12,13 @@ class ISeqAllocator {
         return buffer
     }
 
+    func allocateConstants(_ slots: [UntypedValue]) -> UnsafeBufferPointer<UntypedValue> {
+        let buffer = UnsafeMutableBufferPointer<UntypedValue>.allocate(capacity: slots.count)
+        _ = buffer.initialize(fromContentsOf: slots)
+        self.buffers.append(UnsafeMutableRawBufferPointer(buffer))
+        return UnsafeBufferPointer(buffer)
+    }
+
     func allocateInstructions(capacity: Int) -> UnsafeMutableBufferPointer<UInt64> {
         assert(_isPOD(Instruction.self), "Instruction must be POD")
         let buffer = UnsafeMutableBufferPointer<UInt64>.allocate(capacity: capacity)
@@ -167,12 +174,16 @@ fileprivate struct MetaProgramCounter {
 /// | SP+1                               | Local variable 1     |
 /// | ...                                | ...                  |
 /// | SP+len(locals)-1                   | Local variable N     |
-/// | SP+len(locals)                     | Value stack 0        |
-/// | SP+len(locals)+1                   | Value stack 1        |
+/// | SP+len(locals)                     | Const 0              |
+/// | SP+len(locals)+1                   | Const 1              |
 /// | ...                                | ...                  |
-/// | SP+len(locals)+heighest(stack)-1   | Value stack N        |
+/// | SP+len(locals)+C                   | Const C              |
+/// | SP+len(locals)+C                   | Value stack 0        |
+/// | SP+len(locals)+C+1                 | Value stack 1        |
+/// | ...                                | ...                  |
+/// | SP+len(locals)+C+heighest(stack)-1 | Value stack N        |
 /// ```
-///
+/// where `C` is the number of constant slots.
 
 struct FrameHeaderLayout {
     let type: FunctionType
@@ -223,6 +234,10 @@ struct StackLayout {
         }
     }
 
+    func constReg(_ index: Int) -> VReg {
+        return VReg(numberOfLocals + index)
+    }
+
     func dump<Target: TextOutputStream>(to target: inout Target, iseq: InstructionSequence) {
         let frameHeaderSize = FrameHeaderLayout.size(of: frameHeader.type)
         let slotMinIndex = VReg(-frameHeaderSize)
@@ -257,6 +272,9 @@ struct StackLayout {
 
         for i in 0..<numberOfLocals {
             writeSlot(&target, VReg(i), "Local \(i)")
+        }
+        for i in 0..<iseq.constants.count {
+            writeSlot(&target, VReg(numberOfLocals + i), "Const \(i) = \(iseq.constants[i])")
         }
     }
 }
@@ -346,17 +364,20 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     enum MetaValueOnStack {
         case local(ValueType, LocalIndex)
         case stack(MetaValue)
+        case const(ValueType, Int)
 
         var type: MetaValue {
             switch self {
             case .local(let type, _): return .some(type)
             case .stack(let type): return type
+            case .const(let type, _): return .some(type)
             }
         }
     }
 
     enum ValueSource {
         case vreg(VReg)
+        case const(Int, ValueType)
         case local(LocalIndex)
     }
 
@@ -366,9 +387,11 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         private(set) var maxHeight: Int = 0
         var height: Int { values.count }
         let stackRegBase: VReg
+        let stackLayout: StackLayout
 
-        init(stackRegBase: VReg) {
-            self.stackRegBase = stackRegBase
+        init(stackLayout: StackLayout) {
+            self.stackRegBase = stackLayout.stackRegBase
+            self.stackLayout = stackLayout
         }
 
         mutating func push(_ value: ValueType) -> VReg {
@@ -385,6 +408,10 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         mutating func pushLocal(_ localIndex: LocalIndex, locals: inout Locals) throws {
             let type = try locals.type(of: localIndex)
             self.values.append(.local(type, localIndex))
+        }
+        mutating func pushConst(_ index: Int, type: ValueType) {
+            assert(index < stackLayout.constantSlotSize)
+            self.values.append(.const(type, index))
         }
         mutating func preserveLocalsOnStack(_ localIndex: LocalIndex) -> [VReg] {
             var copyTo: [VReg] = []
@@ -408,6 +435,18 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             return copies
         }
 
+        mutating func preserveConstsOnStack(depth: Int) -> [(source: VReg, to: VReg)] {
+            var copies: [(source: VReg, to: VReg)] = []
+            for offset in 0..<depth {
+                let valueIndex = self.values.count - 1 - offset
+                let value = self.values[valueIndex]
+                guard case .const(let type, let index) = value else { continue }
+                self.values[valueIndex] = .stack(.some(type))
+                copies.append((stackLayout.constReg(index), self.stackRegBase + VReg(valueIndex)))
+            }
+            return copies
+        }
+
         func peek(depth: Int) -> ValueSource {
             return makeValueSource(self.values[height - 1 - depth])
         }
@@ -419,6 +458,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
                 source = .local(localIndex)
             case .stack:
                 source = .vreg(stackRegBase + VReg(height))
+            case .const(let type, let index):
+                source = .const(index, type)
             }
             return source
         }
@@ -703,6 +744,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     let functionIndex: FunctionIndex
     /// Whether a call to this function should be intercepted
     let intercepting: Bool
+    var constantSlots: [UntypedValue]
 
     init(
         allocator: ISeqAllocator,
@@ -720,11 +762,12 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         self.module = module
         self.iseqBuilder = ISeqBuilder(runtimeConfiguration: runtimeConfiguration)
         self.controlStack = ControlStack()
-        self.valueStack = ValueStack(stackRegBase: VReg(locals.count))
-        self.locals = Locals(types: type.parameters + locals)
         self.stackLayout = StackLayout(type: type, numberOfLocals: locals.count)
+        self.valueStack = ValueStack(stackLayout: stackLayout)
+        self.locals = Locals(types: type.parameters + locals)
         self.functionIndex = functionIndex
         self.intercepting = intercepting
+        self.constantSlots = []
 
         do {
             let endLabel = self.iseqBuilder.allocLabel()
@@ -752,6 +795,13 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     private mutating func emitCopyStack(from source: VReg, to dest: VReg) {
         guard source != dest else { return }
         emit(.copyStack(Instruction.CopyStackOperand(source: Int32(source), dest: Int32(dest))))
+    }
+
+    private mutating func preserveOnStack(depth: Int) {
+        preserveLocalsOnStack(depth: depth)
+        for (source, dest) in valueStack.preserveConstsOnStack(depth: depth) {
+            emitCopyStack(from: source, to: dest)
+        }
     }
 
     private mutating func preserveLocalsOnStack(_ localIndex: LocalIndex) {
@@ -800,6 +850,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             return register
         case .local(let index):
             return stackLayout.localReg(index)
+        case .const(let index, _):
+            return stackLayout.constReg(index)
         }
     }
     private mutating func ensureOnStack(_ source: ValueSource) -> VReg {
@@ -809,6 +861,9 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             return vReg
         case .local(let localIndex):
             emitCopyStack(from: localReg(localIndex), to: copyTo)
+            return copyTo
+        case .const(let index, _):
+            emitCopyStack(from: stackLayout.constReg(index), to: copyTo)
             return copyTo
         }
     }
@@ -837,7 +892,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
 
     private mutating func visitReturnLike() throws {
-        preserveLocalsOnStack(depth: self.type.results.count)
+        preserveOnStack(depth: self.type.results.count)
         for (index, resultType) in self.type.results.enumerated().reversed() {
             let source = ensureOnVReg(try valueStack.pop(resultType))
             let dest = returnReg(index)
@@ -846,7 +901,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
 
     private mutating func copyOnBranch(targetFrame frame: ControlStack.ControlFrame) throws {
-        preserveLocalsOnStack(depth: Int(valueStack.height - frame.stackHeight))
+        preserveOnStack(depth: min(Int(frame.copyCount), valueStack.height - frame.stackHeight))
         let copyCount = VReg(frame.copyCount)
         let sourceBase = valueStack.stackRegBase + VReg(valueStack.height)
         let destBase = valueStack.stackRegBase + VReg(frame.stackHeight)
@@ -889,9 +944,11 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         for (idx, instruction) in instructions.enumerated() {
             buffer[idx] = instruction
         }
+        let constants = allocator.allocateConstants(self.constantSlots)
         return InstructionSequence(
             instructions: buffer,
-            maxStackHeight: Int(valueStack.stackRegBase) + valueStack.maxHeight
+            maxStackHeight: Int(valueStack.stackRegBase) + valueStack.maxHeight,
+            constants: constants
         )
     }
 
@@ -933,6 +990,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
                 _ = try valueStack.pushLocal(localIndex, locals: &locals)
             case .vreg, nil:
                 _ = valueStack.push(param)
+            case .const(let index, let type):
+                valueStack.pushConst(index, type: type)
             }
         }
         controlStack.pushFrame(ControlStack.ControlFrame(blockType: blockType, stackHeight: stackHeight, continuation: endLabel, kind: .block))
@@ -940,7 +999,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
     mutating func visitLoop(blockType: WasmParser.BlockType) throws -> Output {
         let blockType = try module.resolveBlockType(blockType)
-        preserveLocalsOnStack(depth: blockType.parameters.count)
+        preserveOnStack(depth: blockType.parameters.count)
         iseqBuilder.resetLastEmission()
         for param in blockType.parameters.reversed() {
             _ = try popOperand(param)
@@ -957,6 +1016,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         // Pop condition value
         let condition = try popVRegOperand(.i32)
         let blockType = try module.resolveBlockType(blockType)
+        preserveOnStack(depth: blockType.parameters.count)
         let endLabel = iseqBuilder.allocLabel()
         let elseLabel = iseqBuilder.allocLabel()
         for param in blockType.parameters.reversed() {
@@ -990,7 +1050,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         guard case let .if(elseLabel, endLabel) = frame.kind else {
             throw TranslationError("Expected `if` control frame on top of the stack for `else` but got \(frame)")
         }
-        preserveLocalsOnStack(depth: valueStack.height - frame.stackHeight)
+        preserveOnStack(depth: valueStack.height - frame.stackHeight)
         try controlStack.resetReachability()
         iseqBuilder.resetLastEmission()
         iseqBuilder.emitWithLabel(endLabel) { _, selfPC, endPC in
@@ -1033,7 +1093,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
         // NOTE: `valueStack.height - poppedFrame.stackHeight` is usually the same as `poppedFrame.copyCount`
         // but it's not always the case when this block is already unreachable.
-        preserveLocalsOnStack(depth: Int(valueStack.height - poppedFrame.stackHeight))
+        preserveOnStack(depth: Int(valueStack.height - poppedFrame.stackHeight))
         switch poppedFrame.kind {
         case .block:
             try iseqBuilder.pinLabelHere(poppedFrame.continuation)
@@ -1115,7 +1175,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             }
             return
         }
-        preserveLocalsOnStack(depth: valueStack.height - frame.stackHeight)
+        preserveOnStack(depth: valueStack.height - frame.stackHeight)
 
         // If branch taken, fallthrough to landing pad, copy stack values
         // then branch to the actual place
@@ -1155,7 +1215,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
         let defaultFrame = try controlStack.branchTarget(relativeDepth: targets.defaultIndex)
 
-        preserveLocalsOnStack(depth: Int(defaultFrame.copyCount))
+        preserveOnStack(depth: Int(defaultFrame.copyCount))
         let allLabelIndices = targets.labelIndices + [targets.defaultIndex]
         let tableBuffer = allocator.allocateBrTable(capacity: allLabelIndices.count)
         let operand = Instruction.BrTable(
@@ -1503,7 +1563,18 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
     }
 
+    private mutating func allocateConstSlot(_ type: ValueType, _ value: Value) -> Int? {
+        guard constantSlots.count < stackLayout.constantSlotSize else { return nil }
+        let constSlotIndex = constantSlots.count
+        constantSlots.append(UntypedValue(value))
+        return constSlotIndex
+    }
+
     private mutating func visitConst(_ type: ValueType, _ value: Value) {
+        if let constSlotIndex = allocateConstSlot(type, value) {
+            valueStack.pushConst(constSlotIndex, type: type)
+            return
+        }
         let value = UntypedValue(value)
         let is32Bit = type == .i32 || type == .f32
         if is32Bit {
