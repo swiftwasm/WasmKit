@@ -153,28 +153,6 @@ enum VMGen {
         }
     }
 
-    static func generateInstName(instructions: [Instruction]) -> String {
-        var output = """
-            extension Instruction {
-                var name: String {
-                    switch self {
-            """
-        for inst in instructions {
-            output += """
-
-                        case .\(inst.name): return "\(inst.name)"
-                """
-        }
-        output += """
-
-                    }
-                }
-            }
-
-            """
-        return output
-    }
-
     static func generateEnumDefinition(instructions: [Instruction]) -> String {
         var output = "enum Instruction: Equatable {\n"
         for inst in instructions {
@@ -251,6 +229,33 @@ enum VMGen {
                 }
             }
         }
+
+        """
+        output += """
+
+        #if EngineStats
+        extension Instruction {
+            /// The name of the instruction.
+            /// - Parameter rawIndex: The raw index of the instruction.
+            /// - Returns: The name of the instruction.
+            ///
+            /// NOTE: This function is used for debugging purposes.
+            static func name(rawIndex: UInt64) -> String {
+                switch rawIndex {
+        """
+        for (i, inst) in instructions.enumerated() {
+            output += """
+
+                        case \(i): return "\(inst.name)"
+                """
+        }
+        output += """
+
+                default: fatalError("Unknown instruction index: \\(rawIndex)")
+                }
+            }
+        }
+        #endif // EngineStats
 
         """
         return output
@@ -366,8 +371,6 @@ enum VMGen {
             GeneratedFile(
                 projectSources + ["WasmKit", "Execution", "DispatchInstruction.swift"],
                 header + generateDispatcher(instructions: instructions)
-                + "\n\n"
-                + generateInstName(instructions: instructions)
                 + "\n\n"
                 + generateBasicInstImplementations()
                 + "\n\n"

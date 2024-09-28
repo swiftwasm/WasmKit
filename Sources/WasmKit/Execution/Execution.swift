@@ -254,23 +254,82 @@ extension Execution {
         }
     }
 
+#if EngineStats
+    /// A helper structure for collecting instruction statistics.
+    /// - Note: This is used only when the `EngineStats` flag is enabled.
+    struct StatsCollector {
+        struct Trigram: Hashable {
+            var a: UInt64
+            var b: UInt64
+            var c: UInt64
+        }
+
+        struct CircularBuffer<T> {
+            private var buffer: [T?]
+            private var index: Int = 0
+
+            init(capacity: Int) {
+                buffer = Array(repeating: nil, count: capacity)
+            }
+
+            /// Accesses the element at the specified position counted from the oldest element.
+            subscript(_ index: Int) -> T? {
+                get {
+                    return buffer[(self.index + index) % buffer.count]
+                }
+                set {
+                    buffer[(self.index + index) % buffer.count] = newValue
+                }
+            }
+
+            mutating func append(_ value: T) {
+                buffer[index] = value
+                index = (index + 1) % buffer.count
+            }
+        }
+
+        /// A dictionary that stores the count of each trigram pattern.
+        private var countByTrigram: [Trigram: Int] = [:]
+        /// A circular buffer that stores the last three instructions.
+        private var buffer = CircularBuffer<UInt64>(capacity: 3)
+
+        /// Tracks the given instruction index. This function is called for each instruction execution.
+        mutating func track(_ rawIndex: UInt64) {
+            buffer.append(rawIndex)
+            if let a = buffer[0], let b = buffer[1], let c = buffer[2] {
+                let trigram = Trigram(a: a, b: b, c: c)
+                countByTrigram[trigram, default: 0] += 1
+            }
+        }
+
+        func dump<TargetStream: TextOutputStream>(target: inout TargetStream, limit: Int) {
+            print("Instruction statistics:", to: &target)
+            for (trigram, count) in countByTrigram.sorted(by: { $0.value > $1.value }).prefix(limit) {
+                print("  \(Instruction.name(rawIndex: trigram.a)) -> \(Instruction.name(rawIndex: trigram.b)) -> \(Instruction.name(rawIndex: trigram.c)) = \(count)", to: &target)
+            }
+        }
+
+        /// Dumps the instruction statistics to the standard error output stream.
+        func dump(limit: Int = 10) {
+            var target = _Stderr()
+            dump(target: &target, limit: limit)
+        }
+    }
+#endif
+
     /// Starts the main execution loop using the token threading model.
     /// Be careful when modifying this function as it is performance-critical.
     @inline(__always)
     mutating func runTokenThreaded(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
-#if WASMKIT_ENGINE_STATS
-        var stats: [String: Int] = [:]
-        defer {
-            for (name, count) in stats.sorted(by: { $0.value < $1.value }) {
-                print(count, name)
-            }
-        }
+#if EngineStats
+        var stats = StatsCollector()
+        defer { stats.dump() }
 #endif
         var inst: UInt64
         while true {
             inst = pc.read(UInt64.self)
-#if WASMKIT_ENGINE_STATS
-            stats[inst.name, default: 0] += 1
+#if EngineStats
+            stats.track(inst)
 #endif
             try doExecute(inst, sp: &sp, pc: &pc, md: &md, ms: &ms)
         }

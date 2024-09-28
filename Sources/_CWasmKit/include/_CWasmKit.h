@@ -3,6 +3,8 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #include "Platform.h"
 
@@ -36,6 +38,10 @@ static inline void wasmkit_tc_start(
     wasmkit_tc_exec exec, Sp sp, Pc pc, Md md, Ms ms, void *_Nullable state
 ) {
   exec(sp, pc, md, ms, state);
+}
+
+static inline void wasmkit_fwrite_stderr(const char *_Nonnull str, size_t len) {
+  fwrite(str, 1, len, stderr);
 }
 
 #endif // WASMKIT__CWASMKIT_H
