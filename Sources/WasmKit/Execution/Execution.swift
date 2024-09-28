@@ -49,6 +49,12 @@ struct Execution {
         }
         // Initialize the locals with zeros (all types of value have the same representation)
         newSp.initialize(repeating: UntypedValue.default.storage, count: numberOfNonParameterLocals)
+        if let constants = iseq.constants.baseAddress {
+            let count = iseq.constants.count
+            newSp.advanced(by: numberOfNonParameterLocals).withMemoryRebound(to: UntypedValue.self, capacity: count) {
+                $0.initialize(from: constants, count: count)
+            }
+        }
         newSp[-1] = UInt64(UInt(bitPattern: sp))
         newSp[-2] = UInt64(UInt(bitPattern: returnPC))
         newSp[-3] = UInt64(UInt(bitPattern: instance.bitPattern))
