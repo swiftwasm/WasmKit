@@ -1636,6 +1636,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     private mutating func visitConst(_ type: ValueType, _ value: Value) {
         if let constSlotIndex = constantSlots.allocate(value) {
             valueStack.pushConst(constSlotIndex, type: type)
+            iseqBuilder.resetLastEmission()
             return
         }
         let value = UntypedValue(value)
