@@ -214,16 +214,18 @@ struct FrameHeaderLayout {
 
 struct StackLayout {
     let frameHeader: FrameHeaderLayout
-    let constantSlotSize: Int = 8
+    let constantSlotSize: Int
     let numberOfLocals: Int
 
     var stackRegBase: VReg {
         return VReg(numberOfLocals + constantSlotSize)
     }
 
-    init(type: FunctionType, numberOfLocals: Int) {
+    init(type: FunctionType, numberOfLocals: Int, codeSize: Int) {
         self.frameHeader = FrameHeaderLayout(type: type)
         self.numberOfLocals = numberOfLocals
+        // The number of constant slots is determined by the code size
+        self.constantSlotSize = max(codeSize / 20, 4)
     }
 
     func localReg(_ index: LocalIndex) -> VReg {
@@ -780,6 +782,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         type: FunctionType,
         locals: [WasmTypes.ValueType],
         functionIndex: FunctionIndex,
+        codeSize: Int,
         intercepting: Bool
     ) {
         self.allocator = allocator
@@ -788,7 +791,11 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         self.module = module
         self.iseqBuilder = ISeqBuilder(runtimeConfiguration: runtimeConfiguration)
         self.controlStack = ControlStack()
-        self.stackLayout = StackLayout(type: type, numberOfLocals: locals.count)
+        self.stackLayout = StackLayout(
+            type: type,
+            numberOfLocals: locals.count,
+            codeSize: codeSize
+        )
         self.valueStack = ValueStack(stackLayout: stackLayout)
         self.locals = Locals(types: type.parameters + locals)
         self.functionIndex = functionIndex

@@ -189,6 +189,7 @@ struct WasmFunctionEntity {
             type: runtime.value.resolveType(type),
             locals: code.locals,
             functionIndex: index,
+            codeSize: code.expression.count,
             intercepting: runtime.value.interceptor != nil
         )
         let iseq = try code.withValue { code in
