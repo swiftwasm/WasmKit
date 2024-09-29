@@ -133,11 +133,18 @@ public struct Instance {
                 target.write(" '\(name)'")
             }
             target.write(" ====\n")
+            guard case .uncompiled(let code) = function.wasm.code else {
+                fatalError("Already compiled!?")
+            }
             try function.ensureCompiled(runtime: RuntimeRef(runtime))
             let (iseq, locals, _) = function.assumeCompiled()
 
             // Print slot space information
-            let stackLayout = StackLayout(type: runtime.funcTypeInterner.resolve(function.type), numberOfLocals: locals)
+            let stackLayout = StackLayout(
+                type: runtime.funcTypeInterner.resolve(function.type),
+                numberOfLocals: locals,
+                codeSize: code.expression.count
+            )
             stackLayout.dump(to: &target, iseq: iseq)
 
             var context = InstructionPrintingContext(
