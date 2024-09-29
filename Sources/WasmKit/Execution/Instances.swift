@@ -140,7 +140,7 @@ public struct Instance {
             let (iseq, locals, _) = function.assumeCompiled()
 
             // Print slot space information
-            let stackLayout = StackLayout(
+            let stackLayout = try StackLayout(
                 type: runtime.funcTypeInterner.resolve(function.type),
                 numberOfLocals: locals,
                 codeSize: code.expression.count

@@ -181,7 +181,7 @@ struct WasmFunctionEntity {
     @inline(never)
     mutating func compile(runtime: RuntimeRef, code: InternalUncompiledCode) throws -> InstructionSequence {
         let type = self.type
-        var translator = InstructionTranslator(
+        var translator = try InstructionTranslator(
             allocator: runtime.value.store.allocator.iseqAllocator,
             runtimeConfiguration: runtime.value.configuration,
             funcTypeInterner: runtime.value.funcTypeInterner,

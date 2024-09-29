@@ -221,11 +221,15 @@ struct StackLayout {
         return VReg(numberOfLocals + constantSlotSize)
     }
 
-    init(type: FunctionType, numberOfLocals: Int, codeSize: Int) {
+    init(type: FunctionType, numberOfLocals: Int, codeSize: Int) throws {
         self.frameHeader = FrameHeaderLayout(type: type)
         self.numberOfLocals = numberOfLocals
         // The number of constant slots is determined by the code size
         self.constantSlotSize = max(codeSize / 20, 4)
+        let (maxSlots, overflow) = self.constantSlotSize.addingReportingOverflow(numberOfLocals)
+        guard !overflow, maxSlots < VReg.max else {
+            throw TranslationError("The number of constant slots overflows")
+        }
     }
 
     func localReg(_ index: LocalIndex) -> VReg {
@@ -805,14 +809,14 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         functionIndex: FunctionIndex,
         codeSize: Int,
         intercepting: Bool
-    ) {
+    ) throws {
         self.allocator = allocator
         self.funcTypeInterner = funcTypeInterner
         self.type = type
         self.module = module
         self.iseqBuilder = ISeqBuilder(runtimeConfiguration: runtimeConfiguration)
         self.controlStack = ControlStack()
-        self.stackLayout = StackLayout(
+        self.stackLayout = try StackLayout(
             type: type,
             numberOfLocals: locals.count,
             codeSize: codeSize
