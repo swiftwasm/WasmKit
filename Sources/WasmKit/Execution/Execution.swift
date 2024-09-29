@@ -11,6 +11,7 @@ struct Execution {
     private var stackEnd: UnsafeMutablePointer<StackSlot>
     /// The error trap thrown during execution.
     /// This property must not be assigned to be non-nil more than once.
+    /// - Note: If the trap is set, it must be released manually.
     private var trap: UnsafeRawPointer? = nil
 
     /// Executes the given closure with a new execution state associated with
@@ -25,6 +26,13 @@ struct Execution {
             valueStack.deallocate()
         }
         var context = Execution(runtime: runtime, stackEnd: valueStack.advanced(by: limit))
+        defer {
+            if let trap = context.trap {
+                // Manually release the error object because the trap is caught in C and
+                // held as a raw pointer.
+                wasmkit_swift_errorRelease(trap)
+            }
+        }
         return try body(&context, valueStack)
     }
 

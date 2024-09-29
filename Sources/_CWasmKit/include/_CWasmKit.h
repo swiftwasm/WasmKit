@@ -44,4 +44,14 @@ static inline void wasmkit_fwrite_stderr(const char *_Nonnull str, size_t len) {
   fwrite(str, 1, len, stderr);
 }
 
+// MARK: - Swift Runtime Functions
+
+struct SwiftError;
+
+/// Releases the given Swift error object.
+static inline void wasmkit_swift_errorRelease(const void *_Nonnull object) {
+    extern void swift_errorRelease(const struct SwiftError *_Nonnull object);
+    swift_errorRelease(object);
+}
+
 #endif // WASMKIT__CWASMKIT_H
