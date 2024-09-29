@@ -243,7 +243,7 @@ struct StackLayout {
     func dump<Target: TextOutputStream>(to target: inout Target, iseq: InstructionSequence) {
         let frameHeaderSize = FrameHeaderLayout.size(of: frameHeader.type)
         let slotMinIndex = VReg(-frameHeaderSize)
-        let slotMaxIndex = VReg(numberOfLocals - 1)
+        let slotMaxIndex = VReg(stackRegBase - 1)
         let slotIndexWidth = max(String(slotMinIndex).count, String(slotMaxIndex).count)
         func writeSlot(_ target: inout Target, _ index: VReg, _ description: String) {
             var index = String(index)
@@ -718,6 +718,27 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
                 self.labels[ref] = .unpinned(users: users)
             }
         }
+
+        /// Schedule to fill a br_table entry with the resolved label position
+        /// - Parameters:
+        ///   - ref: Label reference to be resolved
+        ///   - table: Building br_table buffer
+        ///   - index: Index of the entry to fill
+        ///   - make: Factory closure to make an br_table entry
+        mutating func fillBrTableEntry(
+            _ ref: LabelRef,
+            table: BuildingBrTable,
+            index: Int, line: UInt = #line,
+            make: @escaping BrTableEntryFactory
+        ) {
+            switch self.labels[ref] {
+            case .pinned(let pc):
+                table[index] = make(self, pc)
+            case .unpinned(var users):
+                users.append(LabelUser(action: .fillBrTableEntry(buildingTable: table, index: index, make: make), sourceLine: line))
+                self.labels[ref] = .unpinned(users: users)
+            }
+        }
     }
 
     struct Locals {
@@ -825,9 +846,11 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         iseqBuilder.emit(instruction, resultRelink: resultRelink)
     }
 
-    private mutating func emitCopyStack(from source: VReg, to dest: VReg) {
-        guard source != dest else { return }
+    @discardableResult
+    private mutating func emitCopyStack(from source: VReg, to dest: VReg) -> Bool {
+        guard source != dest else { return false }
         emit(.copyStack(Instruction.CopyStackOperand(source: Int32(source), dest: Int32(dest))))
+        return true
     }
 
     private mutating func preserveOnStack(depth: Int) {
@@ -933,11 +956,13 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
     }
 
-    private mutating func copyOnBranch(targetFrame frame: ControlStack.ControlFrame) throws {
+    @discardableResult
+    private mutating func copyOnBranch(targetFrame frame: ControlStack.ControlFrame) throws -> Bool {
         preserveOnStack(depth: min(Int(frame.copyCount), valueStack.height - frame.stackHeight))
         let copyCount = VReg(frame.copyCount)
         let sourceBase = valueStack.stackRegBase + VReg(valueStack.height)
         let destBase = valueStack.stackRegBase + VReg(frame.stackHeight)
+        var emittedCopy = false
         for i in (0..<copyCount).reversed() {
             let source = sourceBase - 1 - VReg(i)
             let dest: VReg
@@ -946,8 +971,10 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             } else {
                 dest = destBase + copyCount - 1 - VReg(i)
             }
-            emitCopyStack(from: source, to: dest)
+            let copied = emitCopyStack(from: source, to: dest)
+            emittedCopy = emittedCopy || copied
         }
+        return emittedCopy
     }
     private mutating func translateReturn() throws {
         if intercepting {
@@ -1258,7 +1285,6 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         iseqBuilder.emit(.brTable(operand))
         let brTableAt = iseqBuilder.insertingPC
 
-        // TODO(optimize): Eliminate landing pads when copyCount of a destination is 0
         //
         // (block $l1 (result i32)
         //   (i32.const 63)
@@ -1296,10 +1322,17 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
                     offset: Int32(relativeOffset)
                 )
             }
-            try copyOnBranch(targetFrame: frame)
-            iseqBuilder.emitWithLabel(frame.continuation) { _, brAt, continuation in
-                let relativeOffset = continuation.offsetFromHead - brAt.offsetFromHead
-                return .br(offset: Int32(relativeOffset))
+            let emittedCopy = try copyOnBranch(targetFrame: frame)
+            if emittedCopy {
+                iseqBuilder.emitWithLabel(frame.continuation) { _, brAt, continuation in
+                    let relativeOffset = continuation.offsetFromHead - brAt.offsetFromHead
+                    return .br(offset: Int32(relativeOffset))
+                }
+            } else {
+                // Optimization: If no value is copied, we can directly jump to the target
+                iseqBuilder.fillBrTableEntry(frame.continuation, table: tableBuffer, index: entryIndex) { _, continuation in
+                    return Instruction.BrTable.Entry(offset: Int32(continuation.offsetFromHead - brTableAt.offsetFromHead))
+                }
             }
         }
         try markUnreachable()
