@@ -1454,6 +1454,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
     }
     mutating func visitLocalGet(localIndex: UInt32) throws -> Output {
+        iseqBuilder.resetLastEmission()
         try valueStack.pushLocal(localIndex, locals: &locals)
     }
     mutating func visitLocalSetOrTee(localIndex: UInt32, isTee: Bool) throws {
