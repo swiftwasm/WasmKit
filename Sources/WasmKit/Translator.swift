@@ -1460,9 +1460,24 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     mutating func visitLocalSetOrTee(localIndex: UInt32, isTee: Bool) throws {
         preserveLocalsOnStack(localIndex)
         let type = try locals.type(of: localIndex)
-        guard let value = try popVRegOperand(type) else { return }
-        guard try controlStack.currentFrame().reachable else { return }
         let result = localReg(localIndex)
+
+        guard let op = try popOperand(type) else { return }
+
+        if case .const(let slotIndex, _) = op {
+            // Optimize (local.set $x (i32.const $c)) to reg:$x = 42 rather than through const slot
+            let value = constantSlots.values[slotIndex]
+            let is32Bit = type == .i32 || type == .f32
+            if is32Bit {
+                emit(.const32(Instruction.Const32Operand(value: UInt32(value.storage), result: LVReg(result))))
+            } else {
+                emit(.const64(Instruction.Const64Operand(value: value, result: LLVReg(result))))
+            }
+            return
+        }
+
+        let value = ensureOnVReg(op)
+        guard try controlStack.currentFrame().reachable else { return }
         if !isTee, iseqBuilder.relinkLastInstructionResult(result) {
             // Good news, copyStack is optimized out :)
             return
