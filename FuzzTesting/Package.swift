@@ -21,6 +21,7 @@ let package = Package(
         ]),
         .executableTarget(name: "FuzzDifferential", dependencies: [
             .product(name: "WasmKit", package: "WasmKit"),
+            .product(name: "WAT", package: "WasmKit"),
             "WasmCAPI",
         ]),
         .target(name: "WasmCAPI"),

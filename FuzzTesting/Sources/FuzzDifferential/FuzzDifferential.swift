@@ -1,5 +1,6 @@
 import WasmCAPI
 import WasmKit
+import WAT
 import SystemPackage
 import Foundation
 
@@ -257,8 +258,13 @@ struct ReferenceEngine: Engine {
             WasmKitEngine(),
             ReferenceEngine()
         ]
-        let moduleBytes = try Data(contentsOf: URL(fileURLWithPath: moduleFile))
-        let results = try engines.map { try $0.run(moduleBytes: Array(moduleBytes)) }
+        let moduleBytes: [UInt8]
+        if moduleFile.hasSuffix(".wat") {
+            moduleBytes = try wat2wasm(String(contentsOf: URL(fileURLWithPath: moduleFile)))
+        } else {
+            moduleBytes = try Array(Data(contentsOf: URL(fileURLWithPath: moduleFile)))
+        }
+        let results = try engines.map { try $0.run(moduleBytes: moduleBytes) }
         guard results.count > 1 else {
             throw ExecError("Expected at least two engines")
         }
