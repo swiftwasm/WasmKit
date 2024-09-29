@@ -51,12 +51,12 @@ def run(args):
             crash_file = os.path.join(fail_dir, f"diff-{i}.wasm")
             shutil.copy(wasm_file, crash_file)
             print(f"Found crash in iteration {i};"
-                  " reproduce with {args.program} {crash_file}")
+                  f" reproduce with {args.program} {crash_file}")
         except subprocess.TimeoutExpired:
             timeout_file = os.path.join(fail_dir, f"timeout-{i}.wasm")
             shutil.copy(wasm_file, timeout_file)
             print(f"Timeout in iteration {i};"
-                  " reproduce with {args.program} {timeout_file})")
+                  f" reproduce with {args.program} {timeout_file})")
         except KeyboardInterrupt:
             print("Interrupted by user")
             break
