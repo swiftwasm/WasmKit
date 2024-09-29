@@ -731,6 +731,32 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
     }
 
+    struct ConstSlots {
+        private(set) var values: [UntypedValue]
+        private var indexByValue: [UntypedValue: Int]
+        let stackLayout: StackLayout
+
+        init(stackLayout: StackLayout) {
+            self.values = []
+            self.indexByValue = [:]
+            self.stackLayout = stackLayout
+        }
+
+        mutating func allocate(_ value: Value) -> Int? {
+            let untyped = UntypedValue(value)
+            if let allocated = indexByValue[untyped] {
+                // NOTE: Share the same const slot for exactly the same bit pattern
+                // values even having different types
+                return allocated
+            }
+            guard values.count < stackLayout.constantSlotSize else { return nil }
+            let constSlotIndex = values.count
+            values.append(untyped)
+            indexByValue[untyped] = constSlotIndex
+            return constSlotIndex
+        }
+    }
+
     let allocator: ISeqAllocator
     let funcTypeInterner: Interner<FunctionType>
     let module: Context
@@ -744,7 +770,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     let functionIndex: FunctionIndex
     /// Whether a call to this function should be intercepted
     let intercepting: Bool
-    var constantSlots: [UntypedValue]
+    var constantSlots: ConstSlots
 
     init(
         allocator: ISeqAllocator,
@@ -767,7 +793,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         self.locals = Locals(types: type.parameters + locals)
         self.functionIndex = functionIndex
         self.intercepting = intercepting
-        self.constantSlots = []
+        self.constantSlots = ConstSlots(stackLayout: stackLayout)
 
         do {
             let endLabel = self.iseqBuilder.allocLabel()
@@ -944,7 +970,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         for (idx, instruction) in instructions.enumerated() {
             buffer[idx] = instruction
         }
-        let constants = allocator.allocateConstants(self.constantSlots)
+        let constants = allocator.allocateConstants(self.constantSlots.values)
         return InstructionSequence(
             instructions: buffer,
             maxStackHeight: Int(valueStack.stackRegBase) + valueStack.maxHeight,
@@ -1563,15 +1589,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
     }
 
-    private mutating func allocateConstSlot(_ type: ValueType, _ value: Value) -> Int? {
-        guard constantSlots.count < stackLayout.constantSlotSize else { return nil }
-        let constSlotIndex = constantSlots.count
-        constantSlots.append(UntypedValue(value))
-        return constSlotIndex
-    }
-
     private mutating func visitConst(_ type: ValueType, _ value: Value) {
-        if let constSlotIndex = allocateConstSlot(type, value) {
+        if let constSlotIndex = constantSlots.allocate(value) {
             valueStack.pushConst(constSlotIndex, type: type)
             return
         }
