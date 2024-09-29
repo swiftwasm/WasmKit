@@ -3,7 +3,7 @@
 /// NOTE: This type assumes any non-null references can be represented as a
 ///       63-bits unsigned integer. This assumption allows us to use the
 ///       same storage space for all value types.
-struct UntypedValue: Equatable {
+struct UntypedValue: Equatable, Hashable {
     /// The internal storage of the value.
     let storage: UInt64
 
