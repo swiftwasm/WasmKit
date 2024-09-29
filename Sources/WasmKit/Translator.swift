@@ -427,7 +427,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
         mutating func preserveLocalsOnStack(depth: Int) -> [(source: LocalIndex, to: VReg)] {
             var copies: [(source: LocalIndex, to: VReg)] = []
-            for offset in 0..<depth {
+            for offset in 0..<min(depth, self.values.count) {
                 let valueIndex = self.values.count - 1 - offset
                 let value = self.values[valueIndex]
                 guard case .local(let type, let localIndex) = value else { continue }
@@ -439,7 +439,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
         mutating func preserveConstsOnStack(depth: Int) -> [(source: VReg, to: VReg)] {
             var copies: [(source: VReg, to: VReg)] = []
-            for offset in 0..<depth {
+            for offset in 0..<min(depth, self.values.count) {
                 let valueIndex = self.values.count - 1 - offset
                 let value = self.values[valueIndex]
                 guard case .const(let type, let index) = value else { continue }
