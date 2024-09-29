@@ -15,7 +15,7 @@ enum VMGen {
         var output = """
             extension Execution {
                 @inline(__always)
-                mutating func doExecute(_ \(doExecuteParams.map { "\($0.label): \($0.isInout ? "inout " : "")\($0.type)" }.joined(separator: ", "))) throws {
+                mutating func doExecute(_ \(doExecuteParams.map { "\($0.label): \($0.isInout ? "inout " : "")\($0.type)" }.joined(separator: ", "))) throws -> CodeSlot {
                     switch instruction {
             """
 
@@ -24,7 +24,7 @@ enum VMGen {
             let args = ExecutionParameter.allCases.map { "\($0.label): &\($0.label)" }
             output += """
 
-                        case \(index): \(tryPrefix)self.execute_\(inst.name)(\(args.joined(separator: ", ")))
+                        case \(index): return \(tryPrefix)self.execute_\(inst.name)(\(args.joined(separator: ", ")))
                 """
         }
         output += """
@@ -87,7 +87,7 @@ enum VMGen {
 
     static func instMethodDecl(_ inst: Instruction) -> String {
         let throwsKwd = inst.mayThrow ? " throws" : ""
-        let returnClause = inst.mayUpdatePc ? " -> Pc" : ""
+        let returnClause = inst.mayUpdatePc ? " -> (Pc, CodeSlot)" : ""
         let args = inst.parameters
         return "func \(inst.name)(\(args.map { "\($0.label): \($0.isInout ? "inout " : "")\($0.type)" }.joined(separator: ", ")))\(throwsKwd)\(returnClause)"
     }
@@ -276,11 +276,10 @@ enum VMGen {
             }.joined(separator: ", ")
             let throwsKwd = inst.mayThrow ? " throws" : ""
             let tryKwd = inst.mayThrow ? "try " : ""
-            let mayAssignPc = inst.mayUpdatePc ? "pc.pointee = " : ""
             output += """
 
                 @_silgen_name("wasmkit_execute_\(inst.name)") @inline(__always)
-                mutating func execute_\(inst.name)(\(ExecutionParameter.allCases.map { "\($0.label): UnsafeMutablePointer<\($0.type)>" }.joined(separator: ", ")))\(throwsKwd) {
+                mutating func execute_\(inst.name)(\(ExecutionParameter.allCases.map { "\($0.label): UnsafeMutablePointer<\($0.type)>" }.joined(separator: ", ")))\(throwsKwd) -> CodeSlot {
 
             """
             if let immediate = inst.immediate {
@@ -289,8 +288,23 @@ enum VMGen {
 
                 """
             }
+            let call = "\(tryKwd)self.\(inst.name)(\(args))"
+            if inst.mayUpdatePc {
+                output += """
+                        let next: CodeSlot
+                        (pc.pointee, next) = \(call)
+
+                """
+            } else {
+                output += """
+                        \(call)
+                        let next = pc.pointee.pointee
+                        pc.pointee = pc.pointee.advanced(by: 1)
+
+                """
+            }
             output += """
-                    \(mayAssignPc)\(tryKwd)self.\(inst.name)(\(args))
+                    return next
                 }
             """
         }
@@ -313,17 +327,15 @@ enum VMGen {
             let params = ExecutionParameter.allCases
             output += """
             SWIFT_CC(swiftasync) static inline void \(handlerName(inst))(\(params.map { "\($0.type) \($0.label)" }.joined(separator: ", ")), SWIFT_CONTEXT void *state) {
-                SWIFT_CC(swift) void wasmkit_execute_\(inst.name)(\(params.map { "\($0.type) *\($0.label)" }.joined(separator: ", ")), SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
-                void * _Nullable error = NULL;
-                INLINE_CALL wasmkit_execute_\(inst.name)(\(params.map { "&\($0.label)" }.joined(separator: ", ")), state, &error);\n
+                SWIFT_CC(swift) uint64_t wasmkit_execute_\(inst.name)(\(params.map { "\($0.type) *\($0.label)" }.joined(separator: ", ")), SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+                void * _Nullable error = NULL; uint64_t next;
+                INLINE_CALL next = wasmkit_execute_\(inst.name)(\(params.map { "&\($0.label)" }.joined(separator: ", ")), state, &error);\n
             """
             if inst.mayThrow {
                 output += "    if (error) return wasmkit_execution_state_set_error(error, state);\n"
             }
             output += """
-                wasmkit_tc_exec next = (wasmkit_tc_exec)(*(void **)pc);
-                pc += sizeof(uint64_t);
-                return next(sp, pc, md, ms, state);
+                return ((wasmkit_tc_exec)next)(sp, pc, md, ms, state);
             }
 
             """
