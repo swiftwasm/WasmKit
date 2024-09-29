@@ -156,6 +156,10 @@ extension Pc {
         self += 1
         return value
     }
+
+    func next() -> (Pc, CodeSlot) {
+        return (self.advanced(by: 1), pointee)
+    }
 }
 
 /// Executes a WebAssembly function.
@@ -366,13 +370,12 @@ extension Execution {
         var stats = StatsCollector()
         defer { stats.dump() }
 #endif
-        var inst: UInt64
+        var inst = pc.read(UInt64.self)
         while true {
-            inst = pc.read(UInt64.self)
 #if EngineStats
             stats.track(inst)
 #endif
-            try doExecute(inst, sp: &sp, pc: &pc, md: &md, ms: &ms)
+            inst = try doExecute(inst, sp: &sp, pc: &pc, md: &md, ms: &ms)
         }
     }
 

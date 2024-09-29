@@ -390,10 +390,16 @@ extension Instruction {
     }
     
     struct BrIfOperand: Equatable, InstructionImmediate {
-        let offset: Int32
         let condition: LVReg
+        let offset: Int32
+
+        init(condition: LLVReg, offset: Int64) {
+            self.offset = Int32(offset)
+            self.condition = LVReg(condition)
+        }
+
         static func load(from pc: inout Pc) -> Self {
-            pc.read()
+            return pc.read()
         }
         static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
             emitSlot { unsafeBitCast($0, to: CodeSlot.self) }

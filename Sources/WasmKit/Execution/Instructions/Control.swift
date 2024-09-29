@@ -1,47 +1,62 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#control-instructions>
 extension Execution {
-    func unreachable(sp: Sp, pc: Pc) throws -> Pc {
+    func unreachable(sp: Sp, pc: Pc) throws -> (Pc, CodeSlot) {
         throw Trap.unreachable
     }
     mutating func nop(sp: Sp) {
     }
 
-    mutating func br(sp: Sp, pc: Pc, offset: Int32) -> Pc {
-        return pc.advanced(by: Int(offset))
+    mutating func br(sp: Sp, pc: Pc, offset: Int32) -> (Pc, CodeSlot) {
+        return pc.advanced(by: Int(offset)).next()
     }
-    mutating func brIf(sp: Sp, pc: Pc, brIfOperand: Instruction.BrIfOperand) -> Pc {
-        guard sp[i32: brIfOperand.condition] != 0 else {
-            return pc
+    mutating func brIf(sp: Sp, pc: Pc, brIfOperand: Instruction.BrIfOperand) -> (Pc, CodeSlot) {
+        // NOTE: Marked as `_fastPath` to teach the compiler not to use conditional
+        // instructions (e.g. csel) to utilize the branch prediction. Typically
+        // if-conversion is applied to optimize branches into conditional instructions
+        // but it's not always the best choice for performance when the branch is
+        // highly predictable:
+        //
+        // > Use branches when the condition is highly predictable. The cost of
+        // > mispredicts will be low, and the code will be executed with optimal
+        // > latency.
+        // >
+        // > Apple Silicon CPU Optimization Guide: 3.0 (Page 105)
+        //
+        // We prefer branch instructions over conditional instructions to provide
+        // the best performance when guest code is highly predictable.
+        guard _fastPath(sp[i32: brIfOperand.condition] != 0) else {
+            return pc.next()
         }
-        return pc.advanced(by: Int(brIfOperand.offset))
+        return pc.advanced(by: Int(brIfOperand.offset)).next()
     }
-    mutating func brIfNot(sp: Sp, pc: Pc, brIfOperand: Instruction.BrIfOperand) -> Pc {
-        guard sp[i32: brIfOperand.condition] == 0 else {
-            return pc
+    mutating func brIfNot(sp: Sp, pc: Pc, brIfOperand: Instruction.BrIfOperand) -> (Pc, CodeSlot) {
+        // NOTE: See `brIf` for the rationale.
+        guard _fastPath(sp[i32: brIfOperand.condition] == 0) else {
+            return pc.next()
         }
-        return pc.advanced(by: Int(brIfOperand.offset))
+        return pc.advanced(by: Int(brIfOperand.offset)).next()
     }
-    mutating func brTable(sp: Sp, pc: Pc, brTable: Instruction.BrTable) -> Pc {
+    mutating func brTable(sp: Sp, pc: Pc, brTable: Instruction.BrTable) -> (Pc, CodeSlot) {
         let index = sp[i32: brTable.index]
         let normalizedOffset = min(Int(index), Int(brTable.count - 1))
         let entry = brTable.baseAddress[normalizedOffset]
-        return pc.advanced(by: Int(entry.offset))
+        return pc.advanced(by: Int(entry.offset)).next()
     }
 
     @inline(__always)
-    mutating func _return(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms) -> Pc {
+    mutating func _return(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms) -> (Pc, CodeSlot) {
         var pc = pc
         popFrame(sp: &sp, pc: &pc, md: &md, ms: &ms)
-        return pc
+        return pc.next()
     }
 
-    mutating func endOfExecution(sp: inout Sp, pc: Pc) throws -> Pc {
+    mutating func endOfExecution(sp: inout Sp, pc: Pc) throws -> (Pc, CodeSlot) {
         throw EndOfExecution()
     }
 
     @inline(__always)
-    mutating func call(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, callOperand: Instruction.CallOperand) throws -> Pc {
+    mutating func call(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, callOperand: Instruction.CallOperand) throws -> (Pc, CodeSlot) {
         var pc = pc
 
         (pc, sp) = try invoke(
@@ -50,7 +65,7 @@ extension Execution {
             callLike: callOperand.callLike,
             sp: sp, pc: pc, md: &md, ms: &ms
         )
-        return pc
+        return pc.next()
     }
 
     @inline(__always)
@@ -74,15 +89,15 @@ extension Execution {
     }
 
     @inline(__always)
-    mutating func internalCall(sp: inout Sp, pc: Pc, internalCallOperand: Instruction.InternalCallOperand) throws -> Pc {
+    mutating func internalCall(sp: inout Sp, pc: Pc, internalCallOperand: Instruction.InternalCallOperand) throws -> (Pc, CodeSlot) {
         var pc = pc
         let callee = internalCallOperand.callee
         try _internalCall(sp: &sp, pc: &pc, callee: callee, internalCallOperand: internalCallOperand)
-        return pc
+        return pc.next()
     }
 
     @inline(__always)
-    mutating func compilingCall(sp: inout Sp, pc: Pc, compilingCallOperand: Instruction.CompilingCallOperand) throws -> Pc {
+    mutating func compilingCall(sp: inout Sp, pc: Pc, compilingCallOperand: Instruction.CompilingCallOperand) throws -> (Pc, CodeSlot) {
         var pc = pc
         // NOTE: `CompilingCallOperand` consumes 2 slots, discriminator is at -3
         let discriminatorPc = pc.advanced(by: -3)
@@ -96,7 +111,7 @@ extension Execution {
             discriminatorPc.pointee = UInt64(replaced.rawIndex)
         }
         try _internalCall(sp: &sp, pc: &pc, callee: callee, internalCallOperand: compilingCallOperand)
-        return pc
+        return pc.next()
     }
 
     @inline(never)
@@ -126,7 +141,7 @@ extension Execution {
     }
 
     @inline(__always)
-    mutating func callIndirect(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, callIndirectOperand: Instruction.CallIndirectOperand) throws -> Pc {
+    mutating func callIndirect(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, callIndirectOperand: Instruction.CallIndirectOperand) throws -> (Pc, CodeSlot) {
         var pc = pc
         let (function, callerInstance) = try prepareForIndirectCall(
             sp: sp, tableIndex: callIndirectOperand.tableIndex, expectedType: callIndirectOperand.type,
@@ -138,7 +153,7 @@ extension Execution {
             callLike: callIndirectOperand.callLike,
             sp: sp, pc: pc, md: &md, ms: &ms
         )
-        return pc
+        return pc.next()
     }
 
     mutating func onEnter(sp: Sp, onEnterOperand: Instruction.OnEnterOperand) {
