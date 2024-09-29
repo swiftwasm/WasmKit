@@ -130,8 +130,8 @@ extension RawUnsignedInteger {
         return self << shift
     }
     func shrS(_ other: Self) -> Self {
-        let shift = other.signed % Self.Signed(Self.bitWidth)
-        return (self.signed >> shift.unsigned).unsigned
+        let shift = other % Self(Self.bitWidth)
+        return (self.signed >> shift).unsigned
     }
     func shrU(_ other: Self) -> Self {
         let shift = other % Self(Self.bitWidth)
