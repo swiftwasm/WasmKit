@@ -111,50 +111,6 @@ extension Int32: InstructionImmediate {
 }
 
 extension Instruction {
-    struct MemorySizeOperand: Equatable, InstructionImmediate {
-        let memoryIndex: MemoryIndex
-        let result: LVReg
-    }
-    
-    struct MemoryGrowOperand: Equatable, InstructionImmediate {
-        let result: VReg
-        let delta: VReg
-        let memory: MemoryIndex
-    }
-    
-    struct MemoryInitOperand: Equatable, InstructionImmediate {
-        let segmentIndex: UInt32
-        let destOffset: VReg
-        let sourceOffset: VReg
-        let size: VReg
-
-        private typealias FirstSlot = (segmentIndex: UInt32, destOffset: VReg, sourceOffset: VReg)
-        static func load(from pc: inout Pc) -> Self {
-            let (segmentIndex, destOffset, sourceOffset) = pc.read(FirstSlot.self)
-            let size = VReg.load(from: &pc)
-            return Self(segmentIndex: segmentIndex, destOffset: destOffset, sourceOffset: sourceOffset, size: size)
-        }
-        static func emit(to emitSlot: @escaping ((Self) -> CodeSlot) -> Void) {
-            emitSlot {
-                let slot: FirstSlot = ($0.segmentIndex, $0.destOffset, $0.sourceOffset)
-                return unsafeBitCast(slot, to: UInt64.self)
-            }
-            VReg.emit(to: emitSlot, \.size)
-        }
-    }
-    
-    struct MemoryCopyOperand: Equatable, InstructionImmediate {
-        let destOffset: VReg
-        let sourceOffset: VReg
-        let size: LVReg
-    }
-    
-    struct MemoryFillOperand: Equatable, InstructionImmediate {
-        let destOffset: VReg
-        let value: VReg
-        let size: LVReg
-    }
-    
     struct SelectOperand: Equatable, InstructionImmediate {
         let result: VReg
         let condition: VReg
@@ -341,7 +297,6 @@ extension Instruction {
         }
     }
 
-    typealias MemoryDataDropOperand = DataIndex
     typealias TableElementDropOperand = ElementIndex
 
     typealias BrOperand = Int32

@@ -1864,7 +1864,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
     mutating func visitDataDrop(dataIndex: UInt32) throws -> Output {
         try self.module.validateDataSegment(dataIndex)
-        emit(.memoryDataDrop(dataIndex))
+        emit(.memoryDataDrop(Instruction.MemoryDataDropOperand(segmentIndex: dataIndex)))
     }
     mutating func visitMemoryCopy(dstMem: UInt32, srcMem: UInt32) throws -> Output {
         //     C.mems[0] = it limits
