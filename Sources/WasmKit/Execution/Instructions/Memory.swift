@@ -35,35 +35,35 @@ extension Execution {
         }
     }
 
-    mutating func memorySize(sp: Sp, memorySizeOperand: Instruction.MemorySizeOperand) {
-        let memory = currentInstance(sp: sp).memories[Int(memorySizeOperand.memoryIndex)]
+    mutating func memorySize(sp: Sp, immediate: Instruction.MemorySizeOperand) {
+        let memory = currentInstance(sp: sp).memories[Int(immediate.memoryIndex)]
 
         let pageCount = memory.data.count / MemoryEntity.pageSize
         let value: Value = memory.limit.isMemory64 ? .i64(UInt64(pageCount)) : .i32(UInt32(pageCount))
-        sp[memorySizeOperand.result] = UntypedValue(value)
+        sp[immediate.result] = UntypedValue(value)
     }
 
-    mutating func memoryGrow(sp: Sp, md: inout Md, ms: inout Ms, memoryGrowOperand: Instruction.MemoryGrowOperand) throws {
-        let memory = currentInstance(sp: sp).memories[Int(memoryGrowOperand.memory)]
+    mutating func memoryGrow(sp: Sp, md: inout Md, ms: inout Ms, immediate: Instruction.MemoryGrowOperand) throws {
+        let memory = currentInstance(sp: sp).memories[Int(immediate.memory)]
         try memory.withValue { memory in
             let isMemory64 = memory.limit.isMemory64
 
-            let value = sp[memoryGrowOperand.delta]
+            let value = sp[immediate.delta]
             let pageCount: UInt64 = isMemory64 ? value.i64 : UInt64(value.i32)
             let oldPageCount = try memory.grow(by: Int(pageCount), resourceLimiter: runtime.store.resourceLimiter)
             CurrentMemory.assign(md: &md, ms: &ms, memory: &memory)
-            sp[memoryGrowOperand.result] = UntypedValue(oldPageCount)
+            sp[immediate.result] = UntypedValue(oldPageCount)
         }
     }
-    mutating func memoryInit(sp: Sp, memoryInitOperand: Instruction.MemoryInitOperand) throws {
+    mutating func memoryInit(sp: Sp, immediate: Instruction.MemoryInitOperand) throws {
         let instance = currentInstance(sp: sp)
         let memory = instance.memories[0]
         try memory.withValue { memoryInstance in
-            let dataInstance = instance.dataSegments[Int(memoryInitOperand.segmentIndex)]
+            let dataInstance = instance.dataSegments[Int(immediate.segmentIndex)]
 
-            let copyCounter = sp[memoryInitOperand.size].i32
-            let sourceIndex = sp[memoryInitOperand.sourceOffset].i32
-            let destinationIndex = sp[memoryInitOperand.destOffset].asAddressOffset(memoryInstance.limit.isMemory64)
+            let copyCounter = sp[immediate.size].i32
+            let sourceIndex = sp[immediate.sourceOffset].i32
+            let destinationIndex = sp[immediate.destOffset].asAddressOffset(memoryInstance.limit.isMemory64)
 
             guard copyCounter > 0 else { return }
 
@@ -83,17 +83,17 @@ extension Execution {
             }
         }
     }
-    mutating func memoryDataDrop(sp: Sp, memoryDataDropOperand: Instruction.MemoryDataDropOperand) {
-        let segment = currentInstance(sp: sp).dataSegments[Int(memoryDataDropOperand.segmentIndex)]
+    mutating func memoryDataDrop(sp: Sp, immediate: Instruction.MemoryDataDropOperand) {
+        let segment = currentInstance(sp: sp).dataSegments[Int(immediate.segmentIndex)]
         segment.withValue { $0.drop() }
     }
-    mutating func memoryCopy(sp: Sp, memoryCopyOperand: Instruction.MemoryCopyOperand) throws {
+    mutating func memoryCopy(sp: Sp, immediate: Instruction.MemoryCopyOperand) throws {
         let memory = currentInstance(sp: sp).memories[0]
         try memory.withValue { memory in
             let isMemory64 = memory.limit.isMemory64
-            let copyCounter = sp[memoryCopyOperand.size].asAddressOffset(isMemory64)
-            let sourceIndex = sp[memoryCopyOperand.sourceOffset].asAddressOffset(isMemory64)
-            let destinationIndex = sp[memoryCopyOperand.destOffset].asAddressOffset(isMemory64)
+            let copyCounter = sp[immediate.size].asAddressOffset(isMemory64)
+            let sourceIndex = sp[immediate.sourceOffset].asAddressOffset(isMemory64)
+            let destinationIndex = sp[immediate.destOffset].asAddressOffset(isMemory64)
 
             guard copyCounter > 0 else { return }
 
@@ -117,13 +117,13 @@ extension Execution {
             }
         }
     }
-    mutating func memoryFill(sp: Sp, memoryFillOperand: Instruction.MemoryFillOperand) throws {
+    mutating func memoryFill(sp: Sp, immediate: Instruction.MemoryFillOperand) throws {
         let memory = currentInstance(sp: sp).memories[0]
         try memory.withValue { memoryInstance in
             let isMemory64 = memoryInstance.limit.isMemory64
-            let copyCounter = Int(sp[memoryFillOperand.size].asAddressOffset(isMemory64))
-            let value = sp[memoryFillOperand.value].i32
-            let destinationIndex = Int(sp[memoryFillOperand.destOffset].asAddressOffset(isMemory64))
+            let copyCounter = Int(sp[immediate.size].asAddressOffset(isMemory64))
+            let value = sp[immediate.value].i32
+            let destinationIndex = Int(sp[immediate.destOffset].asAddressOffset(isMemory64))
 
             guard
                 !destinationIndex.addingReportingOverflow(copyCounter).overflow

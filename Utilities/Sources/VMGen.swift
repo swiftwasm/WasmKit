@@ -56,7 +56,7 @@ enum VMGen {
             output += """
 
                 @inline(__always) mutating \(instMethodDecl(op.instruction)) {
-                    sp[\(op.resultType): binaryOperand.result] = \(op.mayThrow ? "try " : "")sp[\(op.lhsType): binaryOperand.lhs].\(camelCase(pascalCase: op.op))(sp[\(op.rhsType): binaryOperand.rhs])
+                    sp[\(op.resultType): immediate.result] = \(op.mayThrow ? "try " : "")sp[\(op.lhsType): immediate.lhs].\(camelCase(pascalCase: op.op))(sp[\(op.rhsType): immediate.rhs])
                 }
             """
         }
@@ -64,7 +64,7 @@ enum VMGen {
             output += """
 
                 mutating \(instMethodDecl(op.instruction)) {
-                    sp[\(op.resultType): unaryOperand.result] = \(op.mayThrow ? "try " : "")sp[\(op.inputType): unaryOperand.input].\(camelCase(pascalCase: op.op))
+                    sp[\(op.resultType): immediate.result] = \(op.mayThrow ? "try " : "")sp[\(op.inputType): immediate.input].\(camelCase(pascalCase: op.op))
                 }
             """
         }
@@ -73,7 +73,7 @@ enum VMGen {
             output += """
 
                 @inline(__always) mutating \(instMethodDecl(inst.base)) {
-                    return try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: loadOperand, loadAs: \(inst.loadAs).self, castToValue: { \(inst.castToValue) })
+                    return try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: immediate, loadAs: \(inst.loadAs).self, castToValue: { \(inst.castToValue) })
                 }
             """
         }
@@ -81,7 +81,7 @@ enum VMGen {
             output += """
 
                 @inline(__always) mutating \(instMethodDecl(inst.base)) {
-                    return try memoryStore(sp: sp, md: md, ms: ms, storeOperand: storeOperand, castFromValue: { \(inst.castFromValue) })
+                    return try memoryStore(sp: sp, md: md, ms: ms, storeOperand: immediate, castFromValue: { \(inst.castFromValue) })
                 }
             """
         }
