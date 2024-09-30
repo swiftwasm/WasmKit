@@ -466,6 +466,18 @@ extension Instruction {
         }
     }
 
+    struct BrIfOperand: Equatable, InstructionImmediate {
+        var condition: LVReg
+        var offset: Int32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (condition, offset) = pc.read((LVReg, Int32).self)
+            return Self(condition: condition, offset: offset)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.condition, $0.offset) as (LVReg, Int32), to: CodeSlot.self) }
+        }
+    }
+
     struct BrTableOperand: Equatable, InstructionImmediate {
         var rawBaseAddress: UInt64
         var count: UInt16
