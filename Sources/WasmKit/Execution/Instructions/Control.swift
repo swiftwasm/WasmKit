@@ -7,8 +7,8 @@ extension Execution {
     mutating func nop(sp: Sp) {
     }
 
-    mutating func br(sp: Sp, pc: Pc, offset: Int32) -> (Pc, CodeSlot) {
-        return pc.advanced(by: Int(offset)).next()
+    mutating func br(sp: Sp, pc: Pc, brOperand: Instruction.BrOperand) -> (Pc, CodeSlot) {
+        return pc.advanced(by: Int(brOperand)).next()
     }
     mutating func brIf(sp: Sp, pc: Pc, brIfOperand: Instruction.BrIfOperand) -> (Pc, CodeSlot) {
         // NOTE: Marked as `_fastPath` to teach the compiler not to use conditional

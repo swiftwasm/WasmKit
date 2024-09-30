@@ -83,8 +83,8 @@ extension Execution {
             }
         }
     }
-    mutating func memoryDataDrop(sp: Sp, dataIndex: DataIndex) {
-        let segment = currentInstance(sp: sp).dataSegments[Int(dataIndex)]
+    mutating func memoryDataDrop(sp: Sp, memoryDataDropOperand: Instruction.MemoryDataDropOperand) {
+        let segment = currentInstance(sp: sp).dataSegments[Int(memoryDataDropOperand)]
         segment.withValue { $0.drop() }
     }
     mutating func memoryCopy(sp: Sp, memoryCopyOperand: Instruction.MemoryCopyOperand) throws {

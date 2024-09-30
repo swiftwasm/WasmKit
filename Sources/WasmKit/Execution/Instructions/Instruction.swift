@@ -11,7 +11,7 @@ enum Instruction: Equatable {
     case callIndirect(Instruction.CallIndirectOperand)
     case unreachable
     case nop
-    case br(offset: Int32)
+    case br(Instruction.BrOperand)
     case brIf(Instruction.BrIfOperand)
     case brIfNot(Instruction.BrIfOperand)
     case brTable(Instruction.BrTable)
@@ -43,7 +43,7 @@ enum Instruction: Equatable {
     case memorySize(Instruction.MemorySizeOperand)
     case memoryGrow(Instruction.MemoryGrowOperand)
     case memoryInit(Instruction.MemoryInitOperand)
-    case memoryDataDrop(DataIndex)
+    case memoryDataDrop(Instruction.MemoryDataDropOperand)
     case memoryCopy(Instruction.MemoryCopyOperand)
     case memoryFill(Instruction.MemoryFillOperand)
     case const32(Instruction.Const32Operand)
@@ -195,7 +195,7 @@ enum Instruction: Equatable {
     case tableFill(Instruction.TableFillOperand)
     case tableCopy(Instruction.TableCopyOperand)
     case tableInit(Instruction.TableInitOperand)
-    case tableElementDrop(ElementIndex)
+    case tableElementDrop(Instruction.TableElementDropOperand)
     case onEnter(Instruction.OnEnterOperand)
     case onExit(Instruction.OnExitOperand)
 }
@@ -210,7 +210,7 @@ extension Instruction {
         case .compilingCall(let compilingCallOperand): return compilingCallOperand
         case .internalCall(let internalCallOperand): return internalCallOperand
         case .callIndirect(let callIndirectOperand): return callIndirectOperand
-        case .br(let offset): return offset
+        case .br(let brOperand): return brOperand
         case .brIf(let brIfOperand): return brIfOperand
         case .brIfNot(let brIfOperand): return brIfOperand
         case .brTable(let brTable): return brTable
@@ -240,7 +240,7 @@ extension Instruction {
         case .memorySize(let memorySizeOperand): return memorySizeOperand
         case .memoryGrow(let memoryGrowOperand): return memoryGrowOperand
         case .memoryInit(let memoryInitOperand): return memoryInitOperand
-        case .memoryDataDrop(let dataIndex): return dataIndex
+        case .memoryDataDrop(let memoryDataDropOperand): return memoryDataDropOperand
         case .memoryCopy(let memoryCopyOperand): return memoryCopyOperand
         case .memoryFill(let memoryFillOperand): return memoryFillOperand
         case .const32(let const32Operand): return const32Operand
@@ -392,7 +392,7 @@ extension Instruction {
         case .tableFill(let tableFillOperand): return tableFillOperand
         case .tableCopy(let tableCopyOperand): return tableCopyOperand
         case .tableInit(let tableInitOperand): return tableInitOperand
-        case .tableElementDrop(let elementIndex): return elementIndex
+        case .tableElementDrop(let tableElementDropOperand): return tableElementDropOperand
         case .onEnter(let onEnterOperand): return onEnterOperand
         case .onExit(let onExitOperand): return onExitOperand
         default: return nil
@@ -620,7 +620,7 @@ extension Instruction {
         case 6: return .callIndirect(Instruction.CallIndirectOperand.load(from: &pc))
         case 7: return .unreachable
         case 8: return .nop
-        case 9: return .br(offset: Int32.load(from: &pc))
+        case 9: return .br(Instruction.BrOperand.load(from: &pc))
         case 10: return .brIf(Instruction.BrIfOperand.load(from: &pc))
         case 11: return .brIfNot(Instruction.BrIfOperand.load(from: &pc))
         case 12: return .brTable(Instruction.BrTable.load(from: &pc))
@@ -652,7 +652,7 @@ extension Instruction {
         case 38: return .memorySize(Instruction.MemorySizeOperand.load(from: &pc))
         case 39: return .memoryGrow(Instruction.MemoryGrowOperand.load(from: &pc))
         case 40: return .memoryInit(Instruction.MemoryInitOperand.load(from: &pc))
-        case 41: return .memoryDataDrop(DataIndex.load(from: &pc))
+        case 41: return .memoryDataDrop(Instruction.MemoryDataDropOperand.load(from: &pc))
         case 42: return .memoryCopy(Instruction.MemoryCopyOperand.load(from: &pc))
         case 43: return .memoryFill(Instruction.MemoryFillOperand.load(from: &pc))
         case 44: return .const32(Instruction.Const32Operand.load(from: &pc))
@@ -804,7 +804,7 @@ extension Instruction {
         case 190: return .tableFill(Instruction.TableFillOperand.load(from: &pc))
         case 191: return .tableCopy(Instruction.TableCopyOperand.load(from: &pc))
         case 192: return .tableInit(Instruction.TableInitOperand.load(from: &pc))
-        case 193: return .tableElementDrop(ElementIndex.load(from: &pc))
+        case 193: return .tableElementDrop(Instruction.TableElementDropOperand.load(from: &pc))
         case 194: return .onEnter(Instruction.OnEnterOperand.load(from: &pc))
         case 195: return .onExit(Instruction.OnExitOperand.load(from: &pc))
         default: fatalError("Unknown instruction index: \(rawIndex)")

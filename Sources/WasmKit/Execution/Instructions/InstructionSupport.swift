@@ -97,10 +97,13 @@ extension Instruction {
         let result: LVReg
         let input: LVReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            pc.read()
+            let slot = pc.read(UInt64.self)
+            let result = LVReg(bitPattern: UInt32(slot >> 32))
+            let input = LVReg(bitPattern: UInt32(slot & 0xFFFFFFFF))
+            return Self(result: result, input: input)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { unsafeBitCast($0, to: CodeSlot.self) }
+            emitSlot { UInt64(UInt32(bitPattern: $0.result)) << 32 | UInt64(UInt32(bitPattern: $0.input)) }
         }
     }
 
@@ -388,6 +391,11 @@ extension Instruction {
             emitSlot { unsafeBitCast($0, to: CodeSlot.self) }
         }
     }
+
+    typealias MemoryDataDropOperand = DataIndex
+    typealias TableElementDropOperand = ElementIndex
+
+    typealias BrOperand = Int32
     
     struct BrIfOperand: Equatable, InstructionImmediate {
         let condition: LVReg

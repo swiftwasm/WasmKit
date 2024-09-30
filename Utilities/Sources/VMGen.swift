@@ -8,6 +8,11 @@ enum VMGen {
         return first + pascalCase.dropFirst()
     }
 
+    static func pascalCase(camelCase: String) -> String {
+        let first = camelCase.first!.uppercased()
+        return first + camelCase.dropFirst()
+    }
+
     static func generateDispatcher(instructions: [Instruction]) -> String {
         let doExecuteParams: [Instruction.Parameter] =
             [("instruction", "UInt64", false)]

@@ -756,9 +756,9 @@ extension Execution {
     }
     @_silgen_name("wasmkit_execute_br") @inline(__always)
     mutating func execute_br(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
-        let offset = Int32.load(from: &pc.pointee)
+        let brOperand = Instruction.BrOperand.load(from: &pc.pointee)
         let next: CodeSlot
-        (pc.pointee, next) = self.br(sp: sp.pointee, pc: pc.pointee, offset: offset)
+        (pc.pointee, next) = self.br(sp: sp.pointee, pc: pc.pointee, brOperand: brOperand)
         return next
     }
     @_silgen_name("wasmkit_execute_brIf") @inline(__always)
@@ -1004,8 +1004,8 @@ extension Execution {
     }
     @_silgen_name("wasmkit_execute_memoryDataDrop") @inline(__always)
     mutating func execute_memoryDataDrop(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
-        let dataIndex = DataIndex.load(from: &pc.pointee)
-        self.memoryDataDrop(sp: sp.pointee, dataIndex: dataIndex)
+        let memoryDataDropOperand = Instruction.MemoryDataDropOperand.load(from: &pc.pointee)
+        self.memoryDataDrop(sp: sp.pointee, memoryDataDropOperand: memoryDataDropOperand)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2220,8 +2220,8 @@ extension Execution {
     }
     @_silgen_name("wasmkit_execute_tableElementDrop") @inline(__always)
     mutating func execute_tableElementDrop(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
-        let elementIndex = ElementIndex.load(from: &pc.pointee)
-        self.tableElementDrop(sp: sp.pointee, elementIndex: elementIndex)
+        let tableElementDropOperand = Instruction.TableElementDropOperand.load(from: &pc.pointee)
+        self.tableElementDrop(sp: sp.pointee, tableElementDropOperand: tableElementDropOperand)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
