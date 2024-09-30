@@ -699,7 +699,7 @@ extension Execution {
     }
     @_silgen_name("wasmkit_execute_globalGet") @inline(__always)
     mutating func execute_globalGet(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
-        let immediate = Instruction.GlobalGetOperand.load(from: &pc.pointee)
+        let immediate = Instruction.GlobalAndVRegOperand.load(from: &pc.pointee)
         self.globalGet(sp: sp.pointee, immediate: immediate)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
@@ -707,7 +707,7 @@ extension Execution {
     }
     @_silgen_name("wasmkit_execute_globalSet") @inline(__always)
     mutating func execute_globalSet(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
-        let immediate = Instruction.GlobalSetOperand.load(from: &pc.pointee)
+        let immediate = Instruction.GlobalAndVRegOperand.load(from: &pc.pointee)
         self.globalSet(sp: sp.pointee, immediate: immediate)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
@@ -722,14 +722,14 @@ extension Execution {
     }
     @_silgen_name("wasmkit_execute_compilingCall") @inline(__always)
     mutating func execute_compilingCall(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
-        let immediate = Instruction.CompilingCallOperand.load(from: &pc.pointee)
+        let immediate = Instruction.CallOperand.load(from: &pc.pointee)
         let next: CodeSlot
         (pc.pointee, next) = try self.compilingCall(sp: &sp.pointee, pc: pc.pointee, immediate: immediate)
         return next
     }
     @_silgen_name("wasmkit_execute_internalCall") @inline(__always)
     mutating func execute_internalCall(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
-        let immediate = Instruction.InternalCallOperand.load(from: &pc.pointee)
+        let immediate = Instruction.CallOperand.load(from: &pc.pointee)
         let next: CodeSlot
         (pc.pointee, next) = try self.internalCall(sp: &sp.pointee, pc: pc.pointee, immediate: immediate)
         return next
@@ -777,7 +777,7 @@ extension Execution {
     }
     @_silgen_name("wasmkit_execute_brTable") @inline(__always)
     mutating func execute_brTable(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
-        let immediate = Instruction.BrTable.load(from: &pc.pointee)
+        let immediate = Instruction.BrTableOperand.load(from: &pc.pointee)
         let next: CodeSlot
         (pc.pointee, next) = self.brTable(sp: sp.pointee, pc: pc.pointee, immediate: immediate)
         return next

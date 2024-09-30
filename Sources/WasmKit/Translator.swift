@@ -5,9 +5,9 @@ class ISeqAllocator {
 
     private var buffers: [UnsafeMutableRawBufferPointer] = []
 
-    func allocateBrTable(capacity: Int) -> UnsafeMutableBufferPointer<Instruction.BrTable.Entry> {
-        assert(_isPOD(Instruction.BrTable.Entry.self), "Instruction.BrTable.Entry must be POD")
-        let buffer = UnsafeMutableBufferPointer<Instruction.BrTable.Entry>.allocate(capacity: capacity)
+    func allocateBrTable(capacity: Int) -> UnsafeMutableBufferPointer<Instruction.BrTableOperand.Entry> {
+        assert(_isPOD(Instruction.BrTableOperand.Entry.self), "Instruction.BrTableOperand.Entry must be POD")
+        let buffer = UnsafeMutableBufferPointer<Instruction.BrTableOperand.Entry>.allocate(capacity: capacity)
         self.buffers.append(UnsafeMutableRawBufferPointer(buffer))
         return buffer
     }
@@ -519,8 +519,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             // The position of the resolved label
             _ target: MetaProgramCounter
         ) -> (WasmKit.Instruction)
-        typealias BrTableEntryFactory = (ISeqBuilder, MetaProgramCounter) -> Instruction.BrTable.Entry
-        typealias BuildingBrTable = UnsafeMutableBufferPointer<Instruction.BrTable.Entry>
+        typealias BrTableEntryFactory = (ISeqBuilder, MetaProgramCounter) -> Instruction.BrTableOperand.Entry
+        typealias BuildingBrTable = UnsafeMutableBufferPointer<Instruction.BrTableOperand.Entry>
 
         enum OnPinAction {
             case emitInstruction(
@@ -1105,7 +1105,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
                 targetPC = endPC
             }
             let elseOrEnd = UInt32(targetPC.offsetFromHead - selfPC.offsetFromHead)
-            return .brIfNot(Instruction.BrIfOperand(condition: LLVReg(condition), offset: Int64(elseOrEnd)))
+            return .brIfNot(Instruction.BrIfOperand(condition: LVReg(condition), offset: Int32(elseOrEnd)))
         }
     }
 
@@ -1234,7 +1234,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             iseqBuilder.emitWithLabel(frame.continuation) { _, selfPC, continuation in
                 let relativeOffset = continuation.offsetFromHead - selfPC.offsetFromHead
                 return .brIf(Instruction.BrIfOperand(
-                    condition: LLVReg(condition), offset: Int64(relativeOffset)
+                    condition: LVReg(condition), offset: Int32(relativeOffset)
                 ))
             }
             return
@@ -1264,7 +1264,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         let onBranchNotTaken = iseqBuilder.allocLabel()
         iseqBuilder.emitWithLabel(onBranchNotTaken) { _, conditionCheckAt, continuation in
             let relativeOffset = continuation.offsetFromHead - conditionCheckAt.offsetFromHead
-            return .brIfNot(Instruction.BrIfOperand(condition: LLVReg(condition), offset: Int64(relativeOffset)))
+            return .brIfNot(Instruction.BrIfOperand(condition: LVReg(condition), offset: Int32(relativeOffset)))
         }
         try copyOnBranch(targetFrame: frame)
         try emitBranch(relativeDepth: relativeDepth) { offset, copyCount, popCount in
@@ -1282,7 +1282,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         preserveOnStack(depth: Int(defaultFrame.copyCount))
         let allLabelIndices = targets.labelIndices + [targets.defaultIndex]
         let tableBuffer = allocator.allocateBrTable(capacity: allLabelIndices.count)
-        let operand = Instruction.BrTable(
+        let operand = Instruction.BrTableOperand(
             baseAddress: tableBuffer.baseAddress!,
             count: UInt16(tableBuffer.count), index: index
         )
@@ -1322,7 +1322,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             let frame = try controlStack.branchTarget(relativeDepth: labelIndex)
             do {
                 let relativeOffset = iseqBuilder.insertingPC.offsetFromHead - brTableAt.offsetFromHead
-                tableBuffer[entryIndex] = Instruction.BrTable.Entry(
+                tableBuffer[entryIndex] = Instruction.BrTableOperand.Entry(
                     offset: Int32(relativeOffset)
                 )
             }
@@ -1335,7 +1335,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             } else {
                 // Optimization: If no value is copied, we can directly jump to the target
                 iseqBuilder.fillBrTableEntry(frame.continuation, table: tableBuffer, index: entryIndex) { _, continuation in
-                    return Instruction.BrTable.Entry(offset: Int32(continuation.offsetFromHead - brTableAt.offsetFromHead))
+                    return Instruction.BrTableOperand.Entry(offset: Int32(continuation.offsetFromHead - brTableAt.offsetFromHead))
                 }
             }
         }
@@ -1368,24 +1368,13 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             // Skip actual code emission if validation-only mode
             return
         }
-        let callLike = Instruction.CallLikeOperand(spAddend: spAddend)
         if callee.isWasm {
             if module.isSameInstance(callee.wasm.instance) {
-                emit(.compilingCall(
-                    Instruction.InternalCallOperand(
-                        callee: callee,
-                        callLike: callLike
-                    )
-                ))
+                emit(.compilingCall(Instruction.CallOperand(callee: callee, spAddend: spAddend)))
                 return
             }
         }
-        emit(.call(
-            Instruction.CallOperand(
-                callee: callee,
-                callLike: Instruction.CallLikeOperand(spAddend: spAddend)
-            )
-        ))
+        emit(.call(Instruction.CallOperand(callee: callee, spAddend: spAddend)))
     }
 
     mutating func visitCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws -> Output {
@@ -1399,7 +1388,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             tableIndex: tableIndex,
             type: internType,
             index: address,
-            callLike: Instruction.CallLikeOperand(spAddend: spAddend)
+            spAddend: spAddend
         )
         emit(.callIndirect(operand))
     }
@@ -1499,7 +1488,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             // Skip actual code emission if validation-only mode
             return
         }
-        emit(.globalGet(Instruction.GlobalGetOperand(reg: LLVReg(result), global: global)))
+        emit(.globalGet(Instruction.GlobalAndVRegOperand(reg: LLVReg(result), global: global)))
     }
     mutating func visitGlobalSet(globalIndex: UInt32) throws -> Output {
         let type = try module.globalType(globalIndex)
@@ -1508,7 +1497,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             // Skip actual code emission if validation-only mode
             return
         }
-        emit(.globalSet(Instruction.GlobalSetOperand(reg: LLVReg(value), global: global)))
+        emit(.globalSet(Instruction.GlobalAndVRegOperand(reg: LLVReg(value), global: global)))
     }
 
     private mutating func pushEmit(
@@ -1670,7 +1659,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     mutating func visitF32Const(value: IEEE754.Float32) -> Output { visitConst(.f32, .f32(value.bitPattern)) }
     mutating func visitF64Const(value: IEEE754.Float64) -> Output { visitConst(.f64, .f64(value.bitPattern)) }
     mutating func visitRefNull(type: WasmTypes.ReferenceType) -> Output {
-        pushEmit(.ref(type), { .refNull(Instruction.RefNullOperand(type: type, result: $0)) })
+        pushEmit(.ref(type), { .refNull(Instruction.RefNullOperand(result: $0, type: type)) })
     }
     mutating func visitRefIsNull() throws -> Output {
         let value = try valueStack.popRef()
@@ -1917,7 +1906,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
     mutating func visitElemDrop(elemIndex: UInt32) throws -> Output {
         try self.module.validateElementSegment(elemIndex)
-        emit(.tableElementDrop(elemIndex))
+        emit(.tableElementDrop(Instruction.TableElementDropOperand(index: elemIndex)))
     }
     mutating func visitTableCopy(dstTable: UInt32, srcTable: UInt32) throws -> Output {
         //   C.tables[d] = iN limits t   C.tables[s] = iM limits t    K = min {N, M}

@@ -110,294 +110,62 @@ extension Int32: InstructionImmediate {
     }
 }
 
+extension Instruction.RefNullOperand {
+    init(result: VReg, type: ReferenceType) {
+        self.init(result: result, rawType: type.rawValue)
+    }
+
+    var type: ReferenceType {
+        ReferenceType(rawValue: rawType).unsafelyUnwrapped
+    }
+}
+
+extension Instruction.GlobalAndVRegOperand {
+    init(reg: LLVReg, global: InternalGlobal) {
+        self.init(reg: reg, rawGlobal: UInt64(UInt(bitPattern: global.bitPattern)))
+    }
+    var global: InternalGlobal {
+        InternalGlobal(bitPattern: UInt(rawGlobal)).unsafelyUnwrapped
+    }
+}
+
+extension Instruction.BrTableOperand {
+    struct Entry {
+        var offset: Int32
+    }
+
+    init(baseAddress: UnsafePointer<Entry>, count: UInt16, index: VReg) {
+        self.init(rawBaseAddress: UInt64(UInt(bitPattern: baseAddress)), count: count, index: index)
+    }
+
+    var baseAddress: UnsafePointer<Entry> {
+        UnsafePointer(bitPattern: UInt(rawBaseAddress)).unsafelyUnwrapped
+    }
+}
+
+extension Instruction.CallOperand {
+    init(callee: InternalFunction, spAddend: VReg) {
+        self.init(rawCallee: UInt64(UInt(bitPattern: callee.bitPattern)), spAddend: spAddend)
+    }
+
+    var callee: InternalFunction {
+        InternalFunction(bitPattern: Int(bitPattern: UInt(rawCallee)))
+    }
+}
+
+extension Instruction.CallIndirectOperand {
+
+    init(tableIndex: UInt32, type: InternedFuncType, index: VReg, spAddend: VReg) {
+        self.init(tableIndex: tableIndex, rawType: type.id, index: index, spAddend: spAddend)
+    }
+
+    var type: InternedFuncType {
+        InternedFuncType(id: rawType)
+    }
+}
+
 extension Instruction {
-    struct SelectOperand: Equatable, InstructionImmediate {
-        let result: VReg
-        let condition: VReg
-        let onTrue: VReg
-        let onFalse: VReg
-    }
-    
-    struct RefNullOperand: Equatable, InstructionImmediate {
-        let type: ReferenceType
-        let result: VReg
-
-        private typealias Slot = (ReferenceType, VReg, UInt32)
-        static func load(from pc: inout Pc) -> Self {
-            let (type, result, _) = pc.read(Slot.self)
-            return Self(type: type, result: result)
-        }
-        static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot {
-                let slot: Slot = ($0.type, $0.result, 0)
-                return unsafeBitCast(slot, to: CodeSlot.self)
-            }
-        }
-    }
-    
-    struct RefIsNullOperand: Equatable, InstructionImmediate {
-        let value: LVReg
-        let result: LVReg
-    }
-    
-    struct RefFuncOperand: Equatable, InstructionImmediate {
-        let index: FunctionIndex
-        let result: LVReg
-    }
-    
-    struct TableGetOperand: Equatable, InstructionImmediate {
-        let index: VReg
-        let result: VReg
-        let tableIndex: UInt32
-    }
-    
-    struct TableSetOperand: Equatable, InstructionImmediate {
-        let index: VReg
-        let value: VReg
-        let tableIndex: UInt32
-    }
-    
-    struct TableSizeOperand: Equatable, InstructionImmediate {
-        let tableIndex: TableIndex
-        let result: LVReg
-    }
-    
-    struct TableGrowOperand: Equatable, InstructionImmediate {
-        let tableIndex: UInt32
-        let result: VReg
-        let delta: VReg
-        let value: VReg
-
-        private typealias Slot1 = (UInt32, VReg, VReg)
-        private typealias Slot2 = (VReg, pad1: UInt16, pad2: UInt32)
-
-        static func load(from pc: inout Pc) -> Self {
-            let (tableIndex, result, delta) = pc.read(Slot1.self)
-            let (value, _, _) = pc.read(Slot2.self)
-            return Self(tableIndex: tableIndex, result: result, delta: delta, value: value)
-        }
-        static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot {
-                let slot: Slot1 = ($0.tableIndex, $0.result, $0.delta)
-                return unsafeBitCast(slot, to: CodeSlot.self)
-            }
-            emitSlot {
-                let slot: Slot2 = ($0.value, 0, 0)
-                return unsafeBitCast(slot, to: CodeSlot.self)
-            }
-        }
-    }
-
-    struct TableFillOperand: Equatable, InstructionImmediate {
-        let tableIndex: UInt32
-        let destOffset: VReg
-        let value: VReg
-        let size: VReg
-
-        private typealias Slot1 = (UInt32, VReg, VReg)
-        private typealias Slot2 = (VReg, pad1: UInt16, pad2: UInt32)
-
-        static func load(from pc: inout Pc) -> Self {
-            let (tableIndex, destOffset, value) = pc.read(Slot1.self)
-            let (size, _, _) = pc.read(Slot2.self)
-            return Self(tableIndex: tableIndex, destOffset: destOffset, value: value, size: size)
-        }
-        static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot {
-                let slot: Slot1 = ($0.tableIndex, $0.destOffset, $0.value)
-                return unsafeBitCast(slot, to: CodeSlot.self)
-            }
-            emitSlot {
-                let slot: Slot2 = ($0.size, 0, 0)
-                return unsafeBitCast(slot, to: CodeSlot.self)
-            }
-        }
-    }
-    
-    struct TableCopyOperand: Equatable, InstructionImmediate {
-        let sourceIndex: UInt32
-        let destIndex: UInt32
-        let destOffset: VReg
-        let sourceOffset: VReg
-        let size: VReg
-        
-        private typealias Slot1 = (UInt32, UInt32)
-        private typealias Slot2 = (VReg, VReg, VReg, pad: UInt16)
-
-        static func load(from pc: inout Pc) -> Self {
-            let (sourceIndex, destIndex) = pc.read(Slot1.self)
-            let (destOffset, sourceOffset, size, _) = pc.read(Slot2.self)
-            return Self(sourceIndex: sourceIndex, destIndex: destIndex, destOffset: destOffset, sourceOffset: sourceOffset, size: size)
-        }
-        static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot {
-                let slot: Slot1 = ($0.sourceIndex, $0.destIndex)
-                return unsafeBitCast(slot, to: CodeSlot.self)
-            }
-            emitSlot {
-                let slot: Slot2 = ($0.destOffset, $0.sourceOffset, $0.size, 0)
-                return unsafeBitCast(slot, to: CodeSlot.self)
-            }
-        }
-    }
-    
-    struct TableInitOperand: Equatable, InstructionImmediate {
-        let tableIndex: UInt32
-        let segmentIndex: UInt32
-        let destOffset: VReg
-        let sourceOffset: VReg
-        let size: VReg
-
-        private typealias Slot1 = (UInt32, UInt32)
-        private typealias Slot2 = (VReg, VReg, VReg, pad: UInt16)
-
-        static func load(from pc: inout Pc) -> Self {
-            let (tableIndex, segmentIndex) = pc.read(Slot1.self)
-            let (destOffset, sourceOffset, size, _) = pc.read(Slot2.self)
-            return Self(tableIndex: tableIndex, segmentIndex: segmentIndex, destOffset: destOffset, sourceOffset: sourceOffset, size: size)
-        }
-        static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot {
-                let slot: Slot1 = ($0.tableIndex, $0.segmentIndex)
-                return unsafeBitCast(slot, to: CodeSlot.self)
-            }
-            emitSlot {
-                let slot: Slot2 = ($0.destOffset, $0.sourceOffset, $0.size, 0)
-                return unsafeBitCast(slot, to: CodeSlot.self)
-            }
-        }
-    }
-
-    struct GlobalAndVRegOperand: Equatable, InstructionImmediate {
-        let reg: LLVReg
-        let global: InternalGlobal
-
-        static func load(from pc: inout Pc) -> Self {
-            let reg = pc.read(LLVReg.self)
-            let global = InternalGlobal(unsafe: UnsafeMutablePointer(bitPattern: UInt(pc.read(UInt64.self))).unsafelyUnwrapped)
-            return Self(reg: reg, global: global)
-        }
-        static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { CodeSlot(bitPattern: $0.reg) }
-            emitSlot { UInt64(UInt(bitPattern: $0.global.bitPattern)) }
-        }
-    }
-    typealias GlobalGetOperand = GlobalAndVRegOperand
-    typealias GlobalSetOperand = GlobalAndVRegOperand
-
-    struct CopyStackOperand: Equatable, InstructionImmediate {
-        let source: Int32
-        let dest: Int32
-
-        static func load(from pc: inout Pc) -> Self {
-            pc.read()
-        }
-        static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { unsafeBitCast($0, to: CodeSlot.self) }
-        }
-    }
-
-    typealias TableElementDropOperand = ElementIndex
-
     typealias BrOperand = Int32
-    
-    struct BrIfOperand: Equatable, InstructionImmediate {
-        let condition: LVReg
-        let offset: Int32
-
-        init(condition: LLVReg, offset: Int64) {
-            self.offset = Int32(offset)
-            self.condition = LVReg(condition)
-        }
-
-        static func load(from pc: inout Pc) -> Self {
-            return pc.read()
-        }
-        static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { unsafeBitCast($0, to: CodeSlot.self) }
-        }
-    }
-    
-    struct BrTable: Equatable, InstructionImmediate {
-        struct Entry {
-            var offset: Int32
-        }
-        let baseAddress: UnsafePointer<Entry>
-        let count: UInt16
-        let index: VReg
-
-        private typealias MiscSlot = (count: UInt16, index: VReg, pad: UInt32)
-
-        static func load(from pc: inout Pc) -> Self {
-            let brTable = UnsafePointer<Entry>(bitPattern: UInt(pc.read(UInt64.self))).unsafelyUnwrapped
-            let (count, index, _) = pc.read(MiscSlot.self)
-            return Self(baseAddress: brTable, count: count, index: index)
-        }
-        static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { UInt64(UInt(bitPattern: $0.baseAddress)) }
-            emitSlot {
-                let slot: MiscSlot = ($0.count, $0.index, 0)
-                return unsafeBitCast(slot, to: CodeSlot.self)
-            }
-        }
-    }
-
-    struct CallLikeOperand: Equatable, InstructionImmediate {
-        let spAddend: VReg
-        static func load(from pc: inout Pc) -> Self {
-            return Self(spAddend: VReg.load(from: &pc))
-        }
-        static func emit(to emitSlot: @escaping ((Self) -> CodeSlot) -> Void) {
-            VReg.emit(to: emitSlot, \.spAddend)
-        }
-    }
-
-    struct CallOperand: Equatable, InstructionImmediate {
-        let callee: InternalFunction
-        let callLike: CallLikeOperand
-
-        static func load(from pc: inout Pc) -> Self {
-            let callee = InternalFunction(bitPattern: Int(pc.read(UInt64.self)))
-            let callLike = CallLikeOperand.load(from: &pc)
-            return Self(callee: callee, callLike: callLike)
-        }
-        static func emit(to emitSlot: @escaping ((Self) -> CodeSlot) -> Void) {
-            emitSlot { UInt64($0.callee.bitPattern) }
-            CallLikeOperand.emit(to: emitSlot, \.callLike)
-        }
-    }
-
-    typealias InternalCallOperand = CallOperand
-    typealias CompilingCallOperand = CallOperand
-    
-    struct CallIndirectOperand: Equatable, InstructionImmediate {
-        let tableIndex: UInt32
-        let type: InternedFuncType
-        let index: VReg
-        let callLike: CallLikeOperand
-
-        private typealias Slot1 = (UInt32, InternedFuncType)
-        private typealias Slot2 = (VReg, VReg, pad: UInt32)
-        static func load(from pc: inout Pc) -> Self {
-            let (tableIndex, type) = pc.read(Slot1.self)
-            let (index, spAddend, _) = pc.read(Slot2.self)
-            return Self(
-                tableIndex: tableIndex, type: type,
-                index: index, callLike: Instruction.CallLikeOperand(spAddend: spAddend)
-            )
-        }
-        static func emit(to emitSlot: @escaping ((Self) -> CodeSlot) -> Void) {
-            emitSlot {
-                let slot: Slot1 = ($0.tableIndex, $0.type)
-                return unsafeBitCast(slot, to: CodeSlot.self)
-            }
-            emitSlot {
-                let slot: Slot2 = ($0.index, $0.callLike.spAddend, 0)
-                return unsafeBitCast(slot, to: CodeSlot.self)
-            }
-        }
-    }
-
     typealias OnEnterOperand = FunctionIndex
     typealias OnExitOperand = FunctionIndex
 }
@@ -454,11 +222,11 @@ struct InstructionPrintingContext {
         case .const32(let op):
             target.write("\(reg(op.result)) = \(hex(op.value))")
         case .call(let op):
-            target.write("call \(callee(op.callee)), sp: +\(op.callLike.spAddend)")
+            target.write("call \(callee(op.callee)), sp: +\(op.spAddend)")
         case .callIndirect(let op):
-            target.write("call_indirect \(reg(op.index)), \(op.tableIndex), (func_ty id:\(op.type.id)), sp: +\(op.callLike.spAddend)")
+            target.write("call_indirect \(reg(op.index)), \(op.tableIndex), (func_ty id:\(op.type.id)), sp: +\(op.spAddend)")
         case .compilingCall(let op):
-            target.write("compiling_call \(callee(op.callee)), sp: +\(op.callLike.spAddend)")
+            target.write("compiling_call \(callee(op.callee)), sp: +\(op.spAddend)")
         case .i32Load(let op):
             target.write("\(reg(op.result)) = i32.load \(reg(op.pointer)), \(offset(op.offset))")
         case .i64Load(let op):

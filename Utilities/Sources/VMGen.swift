@@ -13,6 +13,17 @@ enum VMGen {
         return first + camelCase.dropFirst()
     }
 
+    static func snakeCase(pascalCase: String) -> String {
+        var result = ""
+        for (i, c) in pascalCase.enumerated() {
+            if i > 0, c.isUppercase {
+                result += "_"
+            }
+            result.append(c.lowercased())
+        }
+        return result
+    }
+
     static func alignUp(_ size: Int, to alignment: Int) -> Int {
         (size + alignment - 1) / alignment * alignment
     }
@@ -69,19 +80,19 @@ enum VMGen {
             """
         }
 
-        for inst in memoryLoadInsts {
+        for op in memoryLoadOps {
             output += """
 
-                @inline(__always) mutating \(instMethodDecl(inst.base)) {
-                    return try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: immediate, loadAs: \(inst.loadAs).self, castToValue: { \(inst.castToValue) })
+                @inline(__always) mutating \(instMethodDecl(op.instruction)) {
+                    return try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: immediate, loadAs: \(op.loadAs).self, castToValue: { \(op.castToValue) })
                 }
             """
         }
-        for inst in memoryStoreInsts {
+        for op in memoryStoreOps {
             output += """
 
-                @inline(__always) mutating \(instMethodDecl(inst.base)) {
-                    return try memoryStore(sp: sp, md: md, ms: ms, storeOperand: immediate, castFromValue: { \(inst.castFromValue) })
+                @inline(__always) mutating \(instMethodDecl(op.instruction)) {
+                    return try memoryStore(sp: sp, md: md, ms: ms, storeOperand: immediate, castFromValue: { \(op.castFromValue) })
                 }
             """
         }
@@ -163,8 +174,20 @@ enum VMGen {
     }
 
     static func generateEnumDefinition(instructions: [Instruction]) -> String {
-        var output = "enum Instruction: Equatable {\n"
+        var output = """
+        /// An internal VM instruction.
+        ///
+        /// NOTE: This enum representation is just for modeling purposes. The actual
+        /// runtime representation can be different.
+        enum Instruction: Equatable {
+
+        """
         for inst in instructions {
+            if let documentation = inst.documentation {
+                for line in documentation.split(separator: "\n", omittingEmptySubsequences: false) {
+                    output += "    /// \(line)\n"
+                }
+            }
             output += "    case \(inst.name)"
             if let immediate = inst.immediate {
                 output += "("

@@ -277,9 +277,7 @@ extension Execution {
         (pc, sp) = try invoke(
             function: handle,
             callerInstance: nil,
-            callLike: Instruction.CallLikeOperand(
-                spAddend: FrameHeaderLayout.size(of: type)
-            ),
+            spAddend: FrameHeaderLayout.size(of: type),
             sp: sp, pc: pc, md: &md, ms: &ms
         )
         do {
@@ -403,7 +401,7 @@ extension Execution {
     mutating func invoke(
         function: InternalFunction,
         callerInstance: InternalInstance?,
-        callLike: Instruction.CallLikeOperand,
+        spAddend: VReg,
         sp: Sp, pc: Pc, md: inout Md, ms: inout Ms
     ) throws -> (Pc, Sp) {
         if function.isWasm {
@@ -418,7 +416,7 @@ extension Execution {
                 numberOfNonParameterLocals: function.numberOfNonParameterLocals,
                 sp: sp,
                 returnPC: pc,
-                spAddend: callLike.spAddend
+                spAddend: spAddend
             )
             Execution.CurrentMemory.mayUpdateCurrentInstance(
                 instance: function.instance,
@@ -430,7 +428,7 @@ extension Execution {
             let resolvedType = runtime.value.resolveType(function.type)
             let layout = FrameHeaderLayout(type: resolvedType)
             let parameters = resolvedType.parameters.enumerated().map { (i, type) in
-                sp[callLike.spAddend + layout.paramReg(i)].cast(to: type)
+                sp[spAddend + layout.paramReg(i)].cast(to: type)
             }
             let instance = self.currentInstance(sp: sp)
             let caller = Caller(
@@ -439,7 +437,7 @@ extension Execution {
             )
             let results = try function.implementation(caller, Array(parameters))
             for (index, result) in results.enumerated() {
-                sp[callLike.spAddend + layout.returnReg(index)] = UntypedValue(result)
+                sp[spAddend + layout.returnReg(index)] = UntypedValue(result)
             }
             return (pc, sp)
         }

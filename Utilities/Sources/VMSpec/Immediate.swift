@@ -167,14 +167,34 @@ extension VMGen.ImmediateLayout {
         $0.field(name: "pointer", type: .VReg)
         $0.field(name: "value", type: .VReg)
     }
+
+    static let globalAndVRegOperand = Self(name: "GlobalAndVRegOperand") {
+        $0.field(name: "reg", type: .LLVReg)
+        $0.field(name: "rawGlobal", type: .UInt64)
+    }
+
+    static let brIfOperand = Self(name: "BrIfOperand") {
+        $0.field(name: "condition", type: .LVReg)
+        $0.field(name: "offset", type: .Int32)
+    }
+
+    static let call = Self(name: "CallOperand") {
+        $0.field(name: "rawCallee", type: .UInt64)
+        $0.field(name: "spAddend", type: .VReg)
+    }
 }
 
 extension VMGen.PrimitiveType {
     static let VReg = Self(name: "VReg", size: 2)
     static let LVReg = Self(name: "LVReg", size: 4)
     static let LLVReg = Self(name: "LLVReg", size: 8)
+    static let Int32 = Self(name: "Int32", size: 4)
+    static let UInt8 = Self(name: "UInt8", size: 1)
+    static let UInt16 = Self(name: "UInt16", size: 2)
     static let UInt32 = Self(name: "UInt32", size: 4)
     static let UInt64 = Self(name: "UInt64", size: 8)
     static let UntypedValue = Self(name: "UntypedValue", size: 8)
     static let MemoryIndex = Self.UInt32
+    static let FunctionIndex = Self.UInt32
+    static let ElementIndex = Self.UInt32
 }
