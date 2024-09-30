@@ -38,7 +38,7 @@ extension VMGen {
         }
 
         var label: String {
-            name ?? VMGen.camelCase(pascalCase: String(type.split(separator: ".").last!))
+            name ?? "immediate"
         }
     }
 

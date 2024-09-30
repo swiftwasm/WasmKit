@@ -7,10 +7,10 @@ extension Execution {
     mutating func nop(sp: Sp) {
     }
 
-    mutating func br(sp: Sp, pc: Pc, brOperand: Instruction.BrOperand) -> (Pc, CodeSlot) {
-        return pc.advanced(by: Int(brOperand)).next()
+    mutating func br(sp: Sp, pc: Pc, immediate: Instruction.BrOperand) -> (Pc, CodeSlot) {
+        return pc.advanced(by: Int(immediate)).next()
     }
-    mutating func brIf(sp: Sp, pc: Pc, brIfOperand: Instruction.BrIfOperand) -> (Pc, CodeSlot) {
+    mutating func brIf(sp: Sp, pc: Pc, immediate: Instruction.BrIfOperand) -> (Pc, CodeSlot) {
         // NOTE: Marked as `_fastPath` to teach the compiler not to use conditional
         // instructions (e.g. csel) to utilize the branch prediction. Typically
         // if-conversion is applied to optimize branches into conditional instructions
@@ -25,22 +25,22 @@ extension Execution {
         //
         // We prefer branch instructions over conditional instructions to provide
         // the best performance when guest code is highly predictable.
-        guard _fastPath(sp[i32: brIfOperand.condition] != 0) else {
+        guard _fastPath(sp[i32: immediate.condition] != 0) else {
             return pc.next()
         }
-        return pc.advanced(by: Int(brIfOperand.offset)).next()
+        return pc.advanced(by: Int(immediate.offset)).next()
     }
-    mutating func brIfNot(sp: Sp, pc: Pc, brIfOperand: Instruction.BrIfOperand) -> (Pc, CodeSlot) {
+    mutating func brIfNot(sp: Sp, pc: Pc, immediate: Instruction.BrIfOperand) -> (Pc, CodeSlot) {
         // NOTE: See `brIf` for the rationale.
-        guard _fastPath(sp[i32: brIfOperand.condition] == 0) else {
+        guard _fastPath(sp[i32: immediate.condition] == 0) else {
             return pc.next()
         }
-        return pc.advanced(by: Int(brIfOperand.offset)).next()
+        return pc.advanced(by: Int(immediate.offset)).next()
     }
-    mutating func brTable(sp: Sp, pc: Pc, brTable: Instruction.BrTable) -> (Pc, CodeSlot) {
-        let index = sp[i32: brTable.index]
-        let normalizedOffset = min(Int(index), Int(brTable.count - 1))
-        let entry = brTable.baseAddress[normalizedOffset]
+    mutating func brTable(sp: Sp, pc: Pc, immediate: Instruction.BrTable) -> (Pc, CodeSlot) {
+        let index = sp[i32: immediate.index]
+        let normalizedOffset = min(Int(index), Int(immediate.count - 1))
+        let entry = immediate.baseAddress[normalizedOffset]
         return pc.advanced(by: Int(entry.offset)).next()
     }
 
@@ -56,13 +56,13 @@ extension Execution {
     }
 
     @inline(__always)
-    mutating func call(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, callOperand: Instruction.CallOperand) throws -> (Pc, CodeSlot) {
+    mutating func call(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.CallOperand) throws -> (Pc, CodeSlot) {
         var pc = pc
 
         (pc, sp) = try invoke(
-            function: callOperand.callee,
+            function: immediate.callee,
             callerInstance: currentInstance(sp: sp),
-            callLike: callOperand.callLike,
+            callLike: immediate.callLike,
             sp: sp, pc: pc, md: &md, ms: &ms
         )
         return pc.next()
@@ -89,28 +89,28 @@ extension Execution {
     }
 
     @inline(__always)
-    mutating func internalCall(sp: inout Sp, pc: Pc, internalCallOperand: Instruction.InternalCallOperand) throws -> (Pc, CodeSlot) {
+    mutating func internalCall(sp: inout Sp, pc: Pc, immediate: Instruction.InternalCallOperand) throws -> (Pc, CodeSlot) {
         var pc = pc
-        let callee = internalCallOperand.callee
-        try _internalCall(sp: &sp, pc: &pc, callee: callee, internalCallOperand: internalCallOperand)
+        let callee = immediate.callee
+        try _internalCall(sp: &sp, pc: &pc, callee: callee, internalCallOperand: immediate)
         return pc.next()
     }
 
     @inline(__always)
-    mutating func compilingCall(sp: inout Sp, pc: Pc, compilingCallOperand: Instruction.CompilingCallOperand) throws -> (Pc, CodeSlot) {
+    mutating func compilingCall(sp: inout Sp, pc: Pc, immediate: Instruction.CompilingCallOperand) throws -> (Pc, CodeSlot) {
         var pc = pc
         // NOTE: `CompilingCallOperand` consumes 2 slots, discriminator is at -3
         let discriminatorPc = pc.advanced(by: -3)
-        let callee = compilingCallOperand.callee
+        let callee = immediate.callee
         try callee.ensureCompiled(runtime: runtime)
-        let replaced = Instruction.internalCall(compilingCallOperand)
+        let replaced = Instruction.internalCall(immediate)
         switch runtime.value.configuration.threadingModel {
         case .direct:
             discriminatorPc.pointee = replaced.handler
         case .token:
             discriminatorPc.pointee = UInt64(replaced.rawIndex)
         }
-        try _internalCall(sp: &sp, pc: &pc, callee: callee, internalCallOperand: compilingCallOperand)
+        try _internalCall(sp: &sp, pc: &pc, callee: callee, internalCallOperand: immediate)
         return pc.next()
     }
 
@@ -141,30 +141,30 @@ extension Execution {
     }
 
     @inline(__always)
-    mutating func callIndirect(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, callIndirectOperand: Instruction.CallIndirectOperand) throws -> (Pc, CodeSlot) {
+    mutating func callIndirect(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.CallIndirectOperand) throws -> (Pc, CodeSlot) {
         var pc = pc
         let (function, callerInstance) = try prepareForIndirectCall(
-            sp: sp, tableIndex: callIndirectOperand.tableIndex, expectedType: callIndirectOperand.type,
-            callIndirectOperand: callIndirectOperand
+            sp: sp, tableIndex: immediate.tableIndex, expectedType: immediate.type,
+            callIndirectOperand: immediate
         )
         (pc, sp) = try invoke(
             function: function,
             callerInstance: callerInstance,
-            callLike: callIndirectOperand.callLike,
+            callLike: immediate.callLike,
             sp: sp, pc: pc, md: &md, ms: &ms
         )
         return pc.next()
     }
 
-    mutating func onEnter(sp: Sp, onEnterOperand: Instruction.OnEnterOperand) {
-        let function = currentInstance(sp: sp).functions[Int(onEnterOperand)]
+    mutating func onEnter(sp: Sp, immediate: Instruction.OnEnterOperand) {
+        let function = currentInstance(sp: sp).functions[Int(immediate)]
         self.runtime.value.interceptor?.onEnterFunction(
             Function(handle: function, allocator: self.runtime.store.allocator),
             store: self.runtime.store
         )
     }
-    mutating func onExit(sp: Sp, onExitOperand: Instruction.OnExitOperand) {
-        let function = currentInstance(sp: sp).functions[Int(onExitOperand)]
+    mutating func onExit(sp: Sp, immediate: Instruction.OnExitOperand) {
+        let function = currentInstance(sp: sp).functions[Int(immediate)]
         self.runtime.value.interceptor?.onExitFunction(
             Function(handle: function, allocator: self.runtime.store.allocator),
             store: self.runtime.store
