@@ -10,7 +10,6 @@ add_wasmkit_library(WasmKit
   Component/ComponentTypes.swift
   Execution/Instructions/Reference.swift
   Execution/Instructions/Control.swift
-  Execution/Instructions/Expression.swift
   Execution/Instructions/Instruction.swift
   Execution/Instructions/Parametric.swift
   Execution/Instructions/Table.swift

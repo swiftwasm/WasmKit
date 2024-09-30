@@ -44,91 +44,34 @@ struct LLVReg: Equatable, ShiftedVReg {
     }
 }
 
-extension RawUnsignedInteger {
-    init(_ slot: CodeSlot, shiftWidth: Int) {
-        let mask = CodeSlot(Self.max)
-        let bitPattern = (slot >> shiftWidth) & mask
-        self = Self(bitPattern)
-    }
+// MARK: - Immediate load/emit support
 
-    func bits(shiftWidth: Int) -> CodeSlot {
-        CodeSlot(self) << shiftWidth
-    }
-}
-
-extension RawSignedInteger {
-    init(_ slot: CodeSlot, shiftWidth: Int) {
-        self.init(bitPattern: Unsigned(slot, shiftWidth: shiftWidth))
-    }
-
-    func bits(shiftWidth: Int) -> CodeSlot {
-        Unsigned(bitPattern: self).bits(shiftWidth: shiftWidth)
-    }
-}
-
-extension UntypedValue {
-    init(_ slot: CodeSlot, shiftWidth: Int) {
-        self.init(storage: slot)
-    }
-
-    func bits(shiftWidth: Int) -> CodeSlot { storage }
-}
-
+/// A protocol that represents an immediate associated with an instruction.
 protocol InstructionImmediate {
+    /// Loads an immediate from the instruction sequence.
+    ///
+    /// - Parameter pc: The program counter to read from.
+    /// - Returns: The loaded immediate.
     static func load(from pc: inout Pc) -> Self
+
+    /// Emits the layout of the immediate to be emitted.
+    ///
+    /// - Parameter emitSlot: The closure to schedule a slot emission.
+    ///             This closure receives a builder closure that builds the slot.
+    ///
+    /// - Note: This method is intended to work at meta-level to allow
+    ///         knowing the size of slots without actual immediate values.
     static func emit(to emitSlot: @escaping ((Self) -> CodeSlot) -> Void)
 }
 
 extension InstructionImmediate {
+    /// Emits the immediate value
+    ///
+    /// - Parameter emitSlot: The closure to emit a slot.
     func emit(to emitSlot: @escaping (CodeSlot) -> Void) {
         Self.emit { buildCodeSlot in
             emitSlot(buildCodeSlot(self))
         }
-    }
-    static func emit<Parent>(to emitParent: @escaping ((Parent) -> CodeSlot) -> Void, _ child: KeyPath<Parent, Self>) {
-        Self.emit { emitChild in
-            emitParent { emitChild($0[keyPath: child]) }
-        }
-    }
-}
-
-extension InstructionImmediate {
-    static func load(from pc: inout Pc) -> Self {
-        pc.read()
-    }
-    static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-        assert(MemoryLayout<Self>.size == 8)
-        emitSlot { unsafeBitCast($0, to: CodeSlot.self) }
-    }
-}
-
-extension VReg: InstructionImmediate {
-    static func load(from pc: inout Pc) -> Self {
-        VReg(bitPattern: UInt16(pc.read(UInt64.self)))
-    }
-    static func emit(to emitSlot: @escaping ((Self) -> CodeSlot) -> Void) {
-        emitSlot { CodeSlot(UInt16(bitPattern: $0)) }
-    }
-
-    typealias Slot2 = (VReg, VReg, pad: UInt32)
-    static func load2(from pc: inout Pc) -> (Self, Self) {
-        let (x, y, _) = pc.read(Slot2.self)
-        return (x, y)
-    }
-    static func emit2(to emitSlot: @escaping ((Self, Self) -> CodeSlot) -> Void) {
-        emitSlot { x, y in
-            let slot: Slot2 = (x, y, 0)
-            return unsafeBitCast(slot, to: CodeSlot.self)
-        }
-    }
-}
-
-extension LLVReg: InstructionImmediate {
-    static func load(from pc: inout Pc) -> Self {
-        Self(storage: Int64(bitPattern: pc.read()))
-    }
-    static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-        emitSlot { UInt64(bitPattern: $0.value) }
     }
 }
 
@@ -149,6 +92,8 @@ extension Int32: InstructionImmediate {
         emitSlot { CodeSlot(UInt32(bitPattern: $0)) }
     }
 }
+
+// MARK: - Immediate type extensions
 
 extension Instruction.RefNullOperand {
     init(result: VReg, type: ReferenceType) {
@@ -210,8 +155,63 @@ extension Instruction {
     typealias OnExitOperand = FunctionIndex
 }
 
+extension RawUnsignedInteger {
+    init(_ slot: CodeSlot, shiftWidth: Int) {
+        let mask = CodeSlot(Self.max)
+        let bitPattern = (slot >> shiftWidth) & mask
+        self = Self(bitPattern)
+    }
+
+    func bits(shiftWidth: Int) -> CodeSlot {
+        CodeSlot(self) << shiftWidth
+    }
+}
+
+extension RawSignedInteger {
+    init(_ slot: CodeSlot, shiftWidth: Int) {
+        self.init(bitPattern: Unsigned(slot, shiftWidth: shiftWidth))
+    }
+
+    func bits(shiftWidth: Int) -> CodeSlot {
+        Unsigned(bitPattern: self).bits(shiftWidth: shiftWidth)
+    }
+}
+
+extension UntypedValue {
+    init(_ slot: CodeSlot, shiftWidth: Int) {
+        self.init(storage: slot)
+    }
+
+    func bits(shiftWidth: Int) -> CodeSlot { storage }
+}
+
 /// The type of an opcode identifier.
 typealias OpcodeID = UInt64
+
+// MARK: - Instruction printing support
+
+extension InstructionSequence {
+    func write<Target>(to target: inout Target, context: inout InstructionPrintingContext) where Target : TextOutputStream {
+        var hexOffsetWidth = String(instructions.count - 1, radix: 16).count
+        hexOffsetWidth = (hexOffsetWidth + 1) & ~1
+
+        guard let cursorStart = instructions.baseAddress else { return }
+        let cursorEnd = cursorStart.advanced(by: instructions.count)
+
+        var cursor = cursorStart
+        while cursor < cursorEnd {
+            let index = cursor - cursorStart
+            var hexOffset = String(index, radix: 16)
+            while hexOffset.count < hexOffsetWidth {
+                hexOffset = "0" + hexOffset
+            }
+            target.write("0x\(hexOffset): ")
+            let instruction = Instruction.load(from: &cursor)
+            context.print(instruction: instruction, to: &target)
+            target.write("\n")
+        }
+    }
+}
 
 struct InstructionPrintingContext {
     let shouldColor: Bool
