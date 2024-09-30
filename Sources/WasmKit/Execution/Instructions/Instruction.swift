@@ -203,6 +203,36 @@ enum Instruction: Equatable {
 extension Instruction {
     // MARK: - Instruction Immediates
 
+    struct Const32Operand: Equatable, InstructionImmediate {
+        var value: UInt32
+        var result: LVReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let slot0 = pc.read(CodeSlot.self)
+            let value = UInt32(slot0, shiftWidth: 32)
+            let result = LVReg(slot0, shiftWidth: 0)
+            return Self(value: value, result: result)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { $0.value.bits(shiftWidth: 32) | $0.result.bits(shiftWidth: 0) }
+        }
+    }
+
+    struct Const64Operand: Equatable, InstructionImmediate {
+        var value: UntypedValue
+        var result: LLVReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let slot0 = pc.read(CodeSlot.self)
+            let value = UntypedValue(slot0, shiftWidth: 0)
+            let slot1 = pc.read(CodeSlot.self)
+            let result = LLVReg(slot1, shiftWidth: 0)
+            return Self(value: value, result: result)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { $0.value.bits(shiftWidth: 0) }
+            emitSlot { $0.result.bits(shiftWidth: 0) }
+        }
+    }
+
     struct BinaryOperand: Equatable, InstructionImmediate {
         var result: LVReg
         var lhs: VReg

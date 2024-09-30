@@ -6,7 +6,7 @@ typealias LLVReg = Int64
 
 extension RawUnsignedInteger {
     init(_ slot: CodeSlot, shiftWidth: Int) {
-        let mask = CodeSlot((1 << Self.bitWidth) - 1)
+        let mask = CodeSlot(Self.max)
         let bitPattern = (slot >> shiftWidth) & mask
         self = Self(bitPattern)
     }
@@ -24,6 +24,14 @@ extension RawSignedInteger {
     func bits(shiftWidth: Int) -> CodeSlot {
         Unsigned(bitPattern: self).bits(shiftWidth: shiftWidth)
     }
+}
+
+extension UntypedValue {
+    init(_ slot: CodeSlot, shiftWidth: Int) {
+        self.init(storage: slot)
+    }
+
+    func bits(shiftWidth: Int) -> CodeSlot { storage }
 }
 
 protocol InstructionImmediate {
@@ -103,25 +111,6 @@ extension Int32: InstructionImmediate {
 }
 
 extension Instruction {
-    struct Const32Operand: Equatable, InstructionImmediate {
-        let value: UInt32
-        let result: LVReg
-    }
-
-    struct Const64Operand: Equatable, InstructionImmediate {
-        let value: UntypedValue
-        let result: LLVReg
-        static func load(from pc: inout Pc) -> Self {
-            let value = pc.read(UntypedValue.self)
-            let result = LLVReg.load(from: &pc)
-            return Self(value: value, result: result)
-        }
-        static func emit(to emitSlot: @escaping ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.value.storage }
-            LLVReg.emit(to: emitSlot, \.result)
-        }
-    }
-
     struct LoadOperand: Equatable, InstructionImmediate {
         let offset: UInt64
         let pointer: VReg
