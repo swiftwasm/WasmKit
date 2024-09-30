@@ -13,6 +13,10 @@ enum VMGen {
         return first + camelCase.dropFirst()
     }
 
+    static func alignUp(_ size: Int, to alignment: Int) -> Int {
+        (size + alignment - 1) / alignment * alignment
+    }
+
     static func generateDispatcher(instructions: [Instruction]) -> String {
         let doExecuteParams: [Instruction.Parameter] =
             [("instruction", "UInt64", false)]
@@ -173,7 +177,10 @@ enum VMGen {
             }
             output += "\n"
         }
-        output += "}\n\n"
+        output += "}\n"
+
+        output += generateImmediateDefinitions(instructions: instructions)
+        output += "\n"
 
         output += """
         extension Instruction {
@@ -263,6 +270,33 @@ enum VMGen {
         #endif // EngineStats
 
         """
+        return output
+    }
+
+    static func generateImmediateDefinitions(instructions: [Instruction]) -> String {
+        var output = ""
+
+        output += """
+
+        extension Instruction {
+            // MARK: - Instruction Immediates
+
+        """
+
+        var emittedImmediateTypes = Set<String>()
+        for inst in instructions {
+            guard let layout = inst.immediateLayout else { continue }
+            guard emittedImmediateTypes.insert(layout.name).inserted else { continue }
+
+            let definition = layout.buildDeclaration()
+            output += "\n"
+            for line in definition.split(separator: "\n") {
+                output += "    " + line + "\n"
+            }
+        }
+
+        output += "}\n"
+
         return output
     }
 
