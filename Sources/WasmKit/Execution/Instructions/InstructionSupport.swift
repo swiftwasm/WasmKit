@@ -210,6 +210,9 @@ extension Instruction {
     typealias OnExitOperand = FunctionIndex
 }
 
+/// The type of an opcode identifier.
+typealias OpcodeID = UInt64
+
 struct InstructionPrintingContext {
     let shouldColor: Bool
     let function: Function

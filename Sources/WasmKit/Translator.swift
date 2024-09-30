@@ -590,7 +590,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             case .direct:
                 headSlot = instruction.handler
             case .token:
-                headSlot = UInt64(instruction.rawIndex)
+                headSlot = UInt64(instruction.opcodeID)
             }
             trace("        [\(index)] = 0x\(String(headSlot, radix: 16))")
             self.instructions[index] = headSlot
@@ -640,7 +640,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             case .direct:
                 emitSlot(instruction.handler)
             case .token:
-                emitSlot(UInt64(instruction.rawIndex))
+                emitSlot(UInt64(instruction.opcodeID))
             }
             if let immediate = instruction.rawImmediate {
                 var slots: [CodeSlot] = []

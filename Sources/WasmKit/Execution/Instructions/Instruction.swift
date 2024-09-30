@@ -1020,7 +1020,8 @@ extension Instruction {
 
 
 extension Instruction {
-    var rawIndex: Int {
+    /// The opcode ID of the instruction.
+    var opcodeID: OpcodeID {
         switch self {
         case .copyStack: return 0
         case .globalGet: return 1
@@ -1227,8 +1228,8 @@ extension Instruction {
     /// - Returns: The instruction read from the program counter.
     /// - Precondition: The instruction sequence must be compiled with token threading model.
     static func load(from pc: inout Pc) -> Instruction {
-        let rawIndex = pc.read(UInt64.self)
-        switch rawIndex {
+        let opcode = pc.read(UInt64.self)
+        switch opcode {
         case 0: return .copyStack(Instruction.CopyStackOperand.load(from: &pc))
         case 1: return .globalGet(Instruction.GlobalAndVRegOperand.load(from: &pc))
         case 2: return .globalSet(Instruction.GlobalAndVRegOperand.load(from: &pc))
@@ -1425,7 +1426,7 @@ extension Instruction {
         case 193: return .tableElementDrop(Instruction.TableElementDropOperand.load(from: &pc))
         case 194: return .onEnter(Instruction.OnEnterOperand.load(from: &pc))
         case 195: return .onExit(Instruction.OnExitOperand.load(from: &pc))
-        default: fatalError("Unknown instruction index: \(rawIndex)")
+        default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
 }
@@ -1433,12 +1434,12 @@ extension Instruction {
 #if EngineStats
 extension Instruction {
     /// The name of the instruction.
-    /// - Parameter rawIndex: The raw index of the instruction.
+    /// - Parameter opcode: The opcode ID of the instruction.
     /// - Returns: The name of the instruction.
     ///
     /// NOTE: This function is used for debugging purposes.
-    static func name(rawIndex: UInt64) -> String {
-        switch rawIndex {
+    static func name(opcode: OpcodeID) -> String {
+        switch opcode {
         case 0: return "copyStack"
         case 1: return "globalGet"
         case 2: return "globalSet"
@@ -1635,7 +1636,7 @@ extension Instruction {
         case 193: return "tableElementDrop"
         case 194: return "onEnter"
         case 195: return "onExit"
-        default: fatalError("Unknown instruction index: \(rawIndex)")
+        default: fatalError("Unknown instruction index: \(opcode)")
         }
     }
 }

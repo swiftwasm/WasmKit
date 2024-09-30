@@ -238,7 +238,7 @@ func executeWasm(
             case .direct:
                 rootISeq[0] = Instruction.endOfExecution.handler
             case .token:
-                rootISeq[0] = UInt64(Instruction.endOfExecution.rawIndex)
+                rootISeq[0] = UInt64(Instruction.endOfExecution.opcodeID)
             }
             try stack.execute(
                 sp: sp,
@@ -381,8 +381,8 @@ extension Execution {
         private var buffer = CircularBuffer<UInt64>(capacity: 3)
 
         /// Tracks the given instruction index. This function is called for each instruction execution.
-        mutating func track(_ rawIndex: UInt64) {
-            buffer.append(rawIndex)
+        mutating func track(_ opcode: UInt64) {
+            buffer.append(opcode)
             if let a = buffer[0], let b = buffer[1], let c = buffer[2] {
                 let trigram = Trigram(a: a, b: b, c: c)
                 countByTrigram[trigram, default: 0] += 1
@@ -392,7 +392,7 @@ extension Execution {
         func dump<TargetStream: TextOutputStream>(target: inout TargetStream, limit: Int) {
             print("Instruction statistics:", to: &target)
             for (trigram, count) in countByTrigram.sorted(by: { $0.value > $1.value }).prefix(limit) {
-                print("  \(Instruction.name(rawIndex: trigram.a)) -> \(Instruction.name(rawIndex: trigram.b)) -> \(Instruction.name(rawIndex: trigram.c)) = \(count)", to: &target)
+                print("  \(Instruction.name(opcode: trigram.a)) -> \(Instruction.name(opcode: trigram.b)) -> \(Instruction.name(opcode: trigram.c)) = \(count)", to: &target)
             }
         }
 
@@ -412,12 +412,12 @@ extension Execution {
         var stats = StatsCollector()
         defer { stats.dump() }
 #endif
-        var inst = pc.read(UInt64.self)
+        var opcode = pc.read(OpcodeID.self)
         while true {
 #if EngineStats
             stats.track(inst)
 #endif
-            inst = try doExecute(inst, sp: &sp, pc: &pc, md: &md, ms: &ms)
+            opcode = try doExecute(opcode, sp: &sp, pc: &pc, md: &md, ms: &ms)
         }
     }
 
