@@ -414,13 +414,11 @@ extension Instruction {
         var source: LVReg
         var dest: LVReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let slot0 = pc.read(CodeSlot.self)
-            let source = LVReg(slot0, shiftWidth: 32)
-            let dest = LVReg(slot0, shiftWidth: 0)
+            let (source, dest) = pc.read((LVReg, LVReg).self)
             return Self(source: source, dest: dest)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.source.bits(shiftWidth: 32) | $0.dest.bits(shiftWidth: 0) }
+            emitSlot { unsafeBitCast(($0.source, $0.dest) as (LVReg, LVReg), to: CodeSlot.self) }
         }
     }
 
@@ -428,15 +426,13 @@ extension Instruction {
         var reg: LLVReg
         var rawGlobal: UInt64
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let slot0 = pc.read(CodeSlot.self)
-            let reg = LLVReg(slot0, shiftWidth: 0)
-            let slot1 = pc.read(CodeSlot.self)
-            let rawGlobal = UInt64(slot1, shiftWidth: 0)
+            let (reg) = pc.read((LLVReg).self)
+            let (rawGlobal) = pc.read((UInt64).self)
             return Self(reg: reg, rawGlobal: rawGlobal)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.reg.bits(shiftWidth: 0) }
-            emitSlot { $0.rawGlobal.bits(shiftWidth: 0) }
+            emitSlot { CodeSlot(bitPattern: $0.reg) }
+            emitSlot { $0.rawGlobal }
         }
     }
 
@@ -444,15 +440,13 @@ extension Instruction {
         var rawCallee: UInt64
         var spAddend: VReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let slot0 = pc.read(CodeSlot.self)
-            let rawCallee = UInt64(slot0, shiftWidth: 0)
-            let slot1 = pc.read(CodeSlot.self)
-            let spAddend = VReg(slot1, shiftWidth: 48)
+            let (rawCallee) = pc.read((UInt64).self)
+            let (spAddend, _, _, _, _, _, _) = pc.read((VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8).self)
             return Self(rawCallee: rawCallee, spAddend: spAddend)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.rawCallee.bits(shiftWidth: 0) }
-            emitSlot { $0.spAddend.bits(shiftWidth: 48) }
+            emitSlot { $0.rawCallee }
+            emitSlot { unsafeBitCast(($0.spAddend, 0, 0, 0, 0, 0, 0) as (VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
         }
     }
 
@@ -462,17 +456,13 @@ extension Instruction {
         var index: VReg
         var spAddend: VReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let slot0 = pc.read(CodeSlot.self)
-            let tableIndex = UInt32(slot0, shiftWidth: 32)
-            let rawType = UInt32(slot0, shiftWidth: 0)
-            let slot1 = pc.read(CodeSlot.self)
-            let index = VReg(slot1, shiftWidth: 48)
-            let spAddend = VReg(slot1, shiftWidth: 32)
+            let (tableIndex, rawType) = pc.read((UInt32, UInt32).self)
+            let (index, spAddend, _, _, _, _) = pc.read((VReg, VReg, UInt8, UInt8, UInt8, UInt8).self)
             return Self(tableIndex: tableIndex, rawType: rawType, index: index, spAddend: spAddend)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.tableIndex.bits(shiftWidth: 32) | $0.rawType.bits(shiftWidth: 0) }
-            emitSlot { $0.index.bits(shiftWidth: 48) | $0.spAddend.bits(shiftWidth: 32) }
+            emitSlot { unsafeBitCast(($0.tableIndex, $0.rawType) as (UInt32, UInt32), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.index, $0.spAddend, 0, 0, 0, 0) as (VReg, VReg, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
         }
     }
 
@@ -481,16 +471,13 @@ extension Instruction {
         var count: UInt16
         var index: VReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let slot0 = pc.read(CodeSlot.self)
-            let rawBaseAddress = UInt64(slot0, shiftWidth: 0)
-            let slot1 = pc.read(CodeSlot.self)
-            let count = UInt16(slot1, shiftWidth: 48)
-            let index = VReg(slot1, shiftWidth: 32)
+            let (rawBaseAddress) = pc.read((UInt64).self)
+            let (count, index, _, _, _, _) = pc.read((UInt16, VReg, UInt8, UInt8, UInt8, UInt8).self)
             return Self(rawBaseAddress: rawBaseAddress, count: count, index: index)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.rawBaseAddress.bits(shiftWidth: 0) }
-            emitSlot { $0.count.bits(shiftWidth: 48) | $0.index.bits(shiftWidth: 32) }
+            emitSlot { $0.rawBaseAddress }
+            emitSlot { unsafeBitCast(($0.count, $0.index, 0, 0, 0, 0) as (UInt16, VReg, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
         }
     }
 
@@ -499,16 +486,13 @@ extension Instruction {
         var pointer: VReg
         var result: VReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let slot0 = pc.read(CodeSlot.self)
-            let offset = UInt64(slot0, shiftWidth: 0)
-            let slot1 = pc.read(CodeSlot.self)
-            let pointer = VReg(slot1, shiftWidth: 48)
-            let result = VReg(slot1, shiftWidth: 32)
+            let (offset) = pc.read((UInt64).self)
+            let (pointer, result, _, _, _, _) = pc.read((VReg, VReg, UInt8, UInt8, UInt8, UInt8).self)
             return Self(offset: offset, pointer: pointer, result: result)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.offset.bits(shiftWidth: 0) }
-            emitSlot { $0.pointer.bits(shiftWidth: 48) | $0.result.bits(shiftWidth: 32) }
+            emitSlot { $0.offset }
+            emitSlot { unsafeBitCast(($0.pointer, $0.result, 0, 0, 0, 0) as (VReg, VReg, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
         }
     }
 
@@ -517,16 +501,13 @@ extension Instruction {
         var pointer: VReg
         var value: VReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let slot0 = pc.read(CodeSlot.self)
-            let offset = UInt64(slot0, shiftWidth: 0)
-            let slot1 = pc.read(CodeSlot.self)
-            let pointer = VReg(slot1, shiftWidth: 48)
-            let value = VReg(slot1, shiftWidth: 32)
+            let (offset) = pc.read((UInt64).self)
+            let (pointer, value, _, _, _, _) = pc.read((VReg, VReg, UInt8, UInt8, UInt8, UInt8).self)
             return Self(offset: offset, pointer: pointer, value: value)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.offset.bits(shiftWidth: 0) }
-            emitSlot { $0.pointer.bits(shiftWidth: 48) | $0.value.bits(shiftWidth: 32) }
+            emitSlot { $0.offset }
+            emitSlot { unsafeBitCast(($0.pointer, $0.value, 0, 0, 0, 0) as (VReg, VReg, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
         }
     }
 
@@ -534,13 +515,11 @@ extension Instruction {
         var memoryIndex: UInt32
         var result: LVReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let slot0 = pc.read(CodeSlot.self)
-            let memoryIndex = UInt32(slot0, shiftWidth: 32)
-            let result = LVReg(slot0, shiftWidth: 0)
+            let (memoryIndex, result) = pc.read((UInt32, LVReg).self)
             return Self(memoryIndex: memoryIndex, result: result)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.memoryIndex.bits(shiftWidth: 32) | $0.result.bits(shiftWidth: 0) }
+            emitSlot { unsafeBitCast(($0.memoryIndex, $0.result) as (UInt32, LVReg), to: CodeSlot.self) }
         }
     }
 
@@ -549,14 +528,11 @@ extension Instruction {
         var delta: VReg
         var memory: UInt32
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let slot0 = pc.read(CodeSlot.self)
-            let result = VReg(slot0, shiftWidth: 48)
-            let delta = VReg(slot0, shiftWidth: 32)
-            let memory = UInt32(slot0, shiftWidth: 0)
+            let (result, delta, memory) = pc.read((VReg, VReg, UInt32).self)
             return Self(result: result, delta: delta, memory: memory)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.result.bits(shiftWidth: 48) | $0.delta.bits(shiftWidth: 32) | $0.memory.bits(shiftWidth: 0) }
+            emitSlot { unsafeBitCast(($0.result, $0.delta, $0.memory) as (VReg, VReg, UInt32), to: CodeSlot.self) }
         }
     }
 
@@ -566,29 +542,24 @@ extension Instruction {
         var sourceOffset: VReg
         var size: VReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let slot0 = pc.read(CodeSlot.self)
-            let segmentIndex = UInt32(slot0, shiftWidth: 32)
-            let destOffset = VReg(slot0, shiftWidth: 16)
-            let sourceOffset = VReg(slot0, shiftWidth: 0)
-            let slot1 = pc.read(CodeSlot.self)
-            let size = VReg(slot1, shiftWidth: 48)
+            let (segmentIndex, destOffset, sourceOffset) = pc.read((UInt32, VReg, VReg).self)
+            let (size, _, _, _, _, _, _) = pc.read((VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8).self)
             return Self(segmentIndex: segmentIndex, destOffset: destOffset, sourceOffset: sourceOffset, size: size)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.segmentIndex.bits(shiftWidth: 32) | $0.destOffset.bits(shiftWidth: 16) | $0.sourceOffset.bits(shiftWidth: 0) }
-            emitSlot { $0.size.bits(shiftWidth: 48) }
+            emitSlot { unsafeBitCast(($0.segmentIndex, $0.destOffset, $0.sourceOffset) as (UInt32, VReg, VReg), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.size, 0, 0, 0, 0, 0, 0) as (VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
         }
     }
 
     struct MemoryDataDropOperand: Equatable, InstructionImmediate {
         var segmentIndex: UInt32
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let slot0 = pc.read(CodeSlot.self)
-            let segmentIndex = UInt32(slot0, shiftWidth: 32)
+            let (segmentIndex, _, _, _, _) = pc.read((UInt32, UInt8, UInt8, UInt8, UInt8).self)
             return Self(segmentIndex: segmentIndex)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.segmentIndex.bits(shiftWidth: 32) }
+            emitSlot { unsafeBitCast(($0.segmentIndex, 0, 0, 0, 0) as (UInt32, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
         }
     }
 
@@ -597,14 +568,11 @@ extension Instruction {
         var sourceOffset: VReg
         var size: LVReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let slot0 = pc.read(CodeSlot.self)
-            let destOffset = VReg(slot0, shiftWidth: 48)
-            let sourceOffset = VReg(slot0, shiftWidth: 32)
-            let size = LVReg(slot0, shiftWidth: 0)
+            let (destOffset, sourceOffset, size) = pc.read((VReg, VReg, LVReg).self)
             return Self(destOffset: destOffset, sourceOffset: sourceOffset, size: size)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.destOffset.bits(shiftWidth: 48) | $0.sourceOffset.bits(shiftWidth: 32) | $0.size.bits(shiftWidth: 0) }
+            emitSlot { unsafeBitCast(($0.destOffset, $0.sourceOffset, $0.size) as (VReg, VReg, LVReg), to: CodeSlot.self) }
         }
     }
 
@@ -613,14 +581,11 @@ extension Instruction {
         var value: VReg
         var size: LVReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let slot0 = pc.read(CodeSlot.self)
-            let destOffset = VReg(slot0, shiftWidth: 48)
-            let value = VReg(slot0, shiftWidth: 32)
-            let size = LVReg(slot0, shiftWidth: 0)
+            let (destOffset, value, size) = pc.read((VReg, VReg, LVReg).self)
             return Self(destOffset: destOffset, value: value, size: size)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.destOffset.bits(shiftWidth: 48) | $0.value.bits(shiftWidth: 32) | $0.size.bits(shiftWidth: 0) }
+            emitSlot { unsafeBitCast(($0.destOffset, $0.value, $0.size) as (VReg, VReg, LVReg), to: CodeSlot.self) }
         }
     }
 
@@ -628,13 +593,11 @@ extension Instruction {
         var value: UInt32
         var result: LVReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let slot0 = pc.read(CodeSlot.self)
-            let value = UInt32(slot0, shiftWidth: 32)
-            let result = LVReg(slot0, shiftWidth: 0)
+            let (value, result) = pc.read((UInt32, LVReg).self)
             return Self(value: value, result: result)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.value.bits(shiftWidth: 32) | $0.result.bits(shiftWidth: 0) }
+            emitSlot { unsafeBitCast(($0.value, $0.result) as (UInt32, LVReg), to: CodeSlot.self) }
         }
     }
 
@@ -642,15 +605,13 @@ extension Instruction {
         var value: UntypedValue
         var result: LLVReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let slot0 = pc.read(CodeSlot.self)
-            let value = UntypedValue(slot0, shiftWidth: 0)
-            let slot1 = pc.read(CodeSlot.self)
-            let result = LLVReg(slot1, shiftWidth: 0)
+            let (value) = pc.read((UntypedValue).self)
+            let (result) = pc.read((LLVReg).self)
             return Self(value: value, result: result)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.value.bits(shiftWidth: 0) }
-            emitSlot { $0.result.bits(shiftWidth: 0) }
+            emitSlot { unsafeBitCast(($0.value) as (UntypedValue), to: CodeSlot.self) }
+            emitSlot { CodeSlot(bitPattern: $0.result) }
         }
     }
 
@@ -659,14 +620,11 @@ extension Instruction {
         var lhs: VReg
         var rhs: VReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let slot0 = pc.read(CodeSlot.self)
-            let result = LVReg(slot0, shiftWidth: 32)
-            let lhs = VReg(slot0, shiftWidth: 16)
-            let rhs = VReg(slot0, shiftWidth: 0)
+            let (result, lhs, rhs) = pc.read((LVReg, VReg, VReg).self)
             return Self(result: result, lhs: lhs, rhs: rhs)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.result.bits(shiftWidth: 32) | $0.lhs.bits(shiftWidth: 16) | $0.rhs.bits(shiftWidth: 0) }
+            emitSlot { unsafeBitCast(($0.result, $0.lhs, $0.rhs) as (LVReg, VReg, VReg), to: CodeSlot.self) }
         }
     }
 
@@ -674,13 +632,11 @@ extension Instruction {
         var result: LVReg
         var input: LVReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let slot0 = pc.read(CodeSlot.self)
-            let result = LVReg(slot0, shiftWidth: 32)
-            let input = LVReg(slot0, shiftWidth: 0)
+            let (result, input) = pc.read((LVReg, LVReg).self)
             return Self(result: result, input: input)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.result.bits(shiftWidth: 32) | $0.input.bits(shiftWidth: 0) }
+            emitSlot { unsafeBitCast(($0.result, $0.input) as (LVReg, LVReg), to: CodeSlot.self) }
         }
     }
 
@@ -690,15 +646,11 @@ extension Instruction {
         var onTrue: VReg
         var onFalse: VReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let slot0 = pc.read(CodeSlot.self)
-            let result = VReg(slot0, shiftWidth: 48)
-            let condition = VReg(slot0, shiftWidth: 32)
-            let onTrue = VReg(slot0, shiftWidth: 16)
-            let onFalse = VReg(slot0, shiftWidth: 0)
+            let (result, condition, onTrue, onFalse) = pc.read((VReg, VReg, VReg, VReg).self)
             return Self(result: result, condition: condition, onTrue: onTrue, onFalse: onFalse)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.result.bits(shiftWidth: 48) | $0.condition.bits(shiftWidth: 32) | $0.onTrue.bits(shiftWidth: 16) | $0.onFalse.bits(shiftWidth: 0) }
+            emitSlot { unsafeBitCast(($0.result, $0.condition, $0.onTrue, $0.onFalse) as (VReg, VReg, VReg, VReg), to: CodeSlot.self) }
         }
     }
 
@@ -706,13 +658,11 @@ extension Instruction {
         var result: VReg
         var rawType: UInt8
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let slot0 = pc.read(CodeSlot.self)
-            let result = VReg(slot0, shiftWidth: 48)
-            let rawType = UInt8(slot0, shiftWidth: 40)
+            let (result, rawType, _, _, _, _, _) = pc.read((VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8).self)
             return Self(result: result, rawType: rawType)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.result.bits(shiftWidth: 48) | $0.rawType.bits(shiftWidth: 40) }
+            emitSlot { unsafeBitCast(($0.result, $0.rawType, 0, 0, 0, 0, 0) as (VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
         }
     }
 
@@ -720,13 +670,11 @@ extension Instruction {
         var value: LVReg
         var result: LVReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let slot0 = pc.read(CodeSlot.self)
-            let value = LVReg(slot0, shiftWidth: 32)
-            let result = LVReg(slot0, shiftWidth: 0)
+            let (value, result) = pc.read((LVReg, LVReg).self)
             return Self(value: value, result: result)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.value.bits(shiftWidth: 32) | $0.result.bits(shiftWidth: 0) }
+            emitSlot { unsafeBitCast(($0.value, $0.result) as (LVReg, LVReg), to: CodeSlot.self) }
         }
     }
 
@@ -734,13 +682,11 @@ extension Instruction {
         var index: UInt32
         var result: LVReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let slot0 = pc.read(CodeSlot.self)
-            let index = UInt32(slot0, shiftWidth: 32)
-            let result = LVReg(slot0, shiftWidth: 0)
+            let (index, result) = pc.read((UInt32, LVReg).self)
             return Self(index: index, result: result)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.index.bits(shiftWidth: 32) | $0.result.bits(shiftWidth: 0) }
+            emitSlot { unsafeBitCast(($0.index, $0.result) as (UInt32, LVReg), to: CodeSlot.self) }
         }
     }
 
@@ -749,14 +695,11 @@ extension Instruction {
         var result: VReg
         var tableIndex: UInt32
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let slot0 = pc.read(CodeSlot.self)
-            let index = VReg(slot0, shiftWidth: 48)
-            let result = VReg(slot0, shiftWidth: 32)
-            let tableIndex = UInt32(slot0, shiftWidth: 0)
+            let (index, result, tableIndex) = pc.read((VReg, VReg, UInt32).self)
             return Self(index: index, result: result, tableIndex: tableIndex)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.index.bits(shiftWidth: 48) | $0.result.bits(shiftWidth: 32) | $0.tableIndex.bits(shiftWidth: 0) }
+            emitSlot { unsafeBitCast(($0.index, $0.result, $0.tableIndex) as (VReg, VReg, UInt32), to: CodeSlot.self) }
         }
     }
 
@@ -765,14 +708,11 @@ extension Instruction {
         var value: VReg
         var tableIndex: UInt32
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let slot0 = pc.read(CodeSlot.self)
-            let index = VReg(slot0, shiftWidth: 48)
-            let value = VReg(slot0, shiftWidth: 32)
-            let tableIndex = UInt32(slot0, shiftWidth: 0)
+            let (index, value, tableIndex) = pc.read((VReg, VReg, UInt32).self)
             return Self(index: index, value: value, tableIndex: tableIndex)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.index.bits(shiftWidth: 48) | $0.value.bits(shiftWidth: 32) | $0.tableIndex.bits(shiftWidth: 0) }
+            emitSlot { unsafeBitCast(($0.index, $0.value, $0.tableIndex) as (VReg, VReg, UInt32), to: CodeSlot.self) }
         }
     }
 
@@ -780,13 +720,11 @@ extension Instruction {
         var tableIndex: UInt32
         var result: LVReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let slot0 = pc.read(CodeSlot.self)
-            let tableIndex = UInt32(slot0, shiftWidth: 32)
-            let result = LVReg(slot0, shiftWidth: 0)
+            let (tableIndex, result) = pc.read((UInt32, LVReg).self)
             return Self(tableIndex: tableIndex, result: result)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.tableIndex.bits(shiftWidth: 32) | $0.result.bits(shiftWidth: 0) }
+            emitSlot { unsafeBitCast(($0.tableIndex, $0.result) as (UInt32, LVReg), to: CodeSlot.self) }
         }
     }
 
@@ -796,17 +734,13 @@ extension Instruction {
         var delta: VReg
         var value: VReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let slot0 = pc.read(CodeSlot.self)
-            let tableIndex = UInt32(slot0, shiftWidth: 32)
-            let result = VReg(slot0, shiftWidth: 16)
-            let delta = VReg(slot0, shiftWidth: 0)
-            let slot1 = pc.read(CodeSlot.self)
-            let value = VReg(slot1, shiftWidth: 48)
+            let (tableIndex, result, delta) = pc.read((UInt32, VReg, VReg).self)
+            let (value, _, _, _, _, _, _) = pc.read((VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8).self)
             return Self(tableIndex: tableIndex, result: result, delta: delta, value: value)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.tableIndex.bits(shiftWidth: 32) | $0.result.bits(shiftWidth: 16) | $0.delta.bits(shiftWidth: 0) }
-            emitSlot { $0.value.bits(shiftWidth: 48) }
+            emitSlot { unsafeBitCast(($0.tableIndex, $0.result, $0.delta) as (UInt32, VReg, VReg), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.value, 0, 0, 0, 0, 0, 0) as (VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
         }
     }
 
@@ -816,17 +750,13 @@ extension Instruction {
         var value: VReg
         var size: VReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let slot0 = pc.read(CodeSlot.self)
-            let tableIndex = UInt32(slot0, shiftWidth: 32)
-            let destOffset = VReg(slot0, shiftWidth: 16)
-            let value = VReg(slot0, shiftWidth: 0)
-            let slot1 = pc.read(CodeSlot.self)
-            let size = VReg(slot1, shiftWidth: 48)
+            let (tableIndex, destOffset, value) = pc.read((UInt32, VReg, VReg).self)
+            let (size, _, _, _, _, _, _) = pc.read((VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8).self)
             return Self(tableIndex: tableIndex, destOffset: destOffset, value: value, size: size)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.tableIndex.bits(shiftWidth: 32) | $0.destOffset.bits(shiftWidth: 16) | $0.value.bits(shiftWidth: 0) }
-            emitSlot { $0.size.bits(shiftWidth: 48) }
+            emitSlot { unsafeBitCast(($0.tableIndex, $0.destOffset, $0.value) as (UInt32, VReg, VReg), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.size, 0, 0, 0, 0, 0, 0) as (VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
         }
     }
 
@@ -837,18 +767,13 @@ extension Instruction {
         var sourceOffset: VReg
         var size: VReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let slot0 = pc.read(CodeSlot.self)
-            let sourceIndex = UInt32(slot0, shiftWidth: 32)
-            let destIndex = UInt32(slot0, shiftWidth: 0)
-            let slot1 = pc.read(CodeSlot.self)
-            let destOffset = VReg(slot1, shiftWidth: 48)
-            let sourceOffset = VReg(slot1, shiftWidth: 32)
-            let size = VReg(slot1, shiftWidth: 16)
+            let (sourceIndex, destIndex) = pc.read((UInt32, UInt32).self)
+            let (destOffset, sourceOffset, size, _, _) = pc.read((VReg, VReg, VReg, UInt8, UInt8).self)
             return Self(sourceIndex: sourceIndex, destIndex: destIndex, destOffset: destOffset, sourceOffset: sourceOffset, size: size)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.sourceIndex.bits(shiftWidth: 32) | $0.destIndex.bits(shiftWidth: 0) }
-            emitSlot { $0.destOffset.bits(shiftWidth: 48) | $0.sourceOffset.bits(shiftWidth: 32) | $0.size.bits(shiftWidth: 16) }
+            emitSlot { unsafeBitCast(($0.sourceIndex, $0.destIndex) as (UInt32, UInt32), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.destOffset, $0.sourceOffset, $0.size, 0, 0) as (VReg, VReg, VReg, UInt8, UInt8), to: CodeSlot.self) }
         }
     }
 
@@ -859,30 +784,24 @@ extension Instruction {
         var sourceOffset: VReg
         var size: VReg
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let slot0 = pc.read(CodeSlot.self)
-            let tableIndex = UInt32(slot0, shiftWidth: 32)
-            let segmentIndex = UInt32(slot0, shiftWidth: 0)
-            let slot1 = pc.read(CodeSlot.self)
-            let destOffset = VReg(slot1, shiftWidth: 48)
-            let sourceOffset = VReg(slot1, shiftWidth: 32)
-            let size = VReg(slot1, shiftWidth: 16)
+            let (tableIndex, segmentIndex) = pc.read((UInt32, UInt32).self)
+            let (destOffset, sourceOffset, size, _, _) = pc.read((VReg, VReg, VReg, UInt8, UInt8).self)
             return Self(tableIndex: tableIndex, segmentIndex: segmentIndex, destOffset: destOffset, sourceOffset: sourceOffset, size: size)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.tableIndex.bits(shiftWidth: 32) | $0.segmentIndex.bits(shiftWidth: 0) }
-            emitSlot { $0.destOffset.bits(shiftWidth: 48) | $0.sourceOffset.bits(shiftWidth: 32) | $0.size.bits(shiftWidth: 16) }
+            emitSlot { unsafeBitCast(($0.tableIndex, $0.segmentIndex) as (UInt32, UInt32), to: CodeSlot.self) }
+            emitSlot { unsafeBitCast(($0.destOffset, $0.sourceOffset, $0.size, 0, 0) as (VReg, VReg, VReg, UInt8, UInt8), to: CodeSlot.self) }
         }
     }
 
     struct TableElementDropOperand: Equatable, InstructionImmediate {
         var index: UInt32
         @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let slot0 = pc.read(CodeSlot.self)
-            let index = UInt32(slot0, shiftWidth: 32)
+            let (index, _, _, _, _) = pc.read((UInt32, UInt8, UInt8, UInt8, UInt8).self)
             return Self(index: index)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.index.bits(shiftWidth: 32) }
+            emitSlot { unsafeBitCast(($0.index, 0, 0, 0, 0) as (UInt32, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
         }
     }
 }
