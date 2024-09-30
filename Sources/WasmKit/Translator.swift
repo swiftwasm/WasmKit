@@ -701,7 +701,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             // TODO: Skip emitting nop if the label is already pinned
             // FIXME: ****THIS IS ABSOLUTELY WRONG. JUST FOR PERF EVALUATION**
             // Please change placeholder size based on whether the instruction has any immediate
-            emit(.br(offset: 0))  // Emit dummy instruction to be replaced later
+            emit(.br(0))  // Emit dummy instruction to be replaced later
             emitWithLabel(ref, insertAt: insertAt, line: line, make: make)
         }
 
@@ -1119,7 +1119,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         iseqBuilder.resetLastEmission()
         iseqBuilder.emitWithLabel(endLabel) { _, selfPC, endPC in
             let offset = endPC.offsetFromHead - selfPC.offsetFromHead
-            return .br(offset: Int32(offset))
+            return .br(Int32(offset))
         }
         try valueStack.truncate(height: frame.stackHeight)
         // Re-push parameters
@@ -1220,7 +1220,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         //              [  i64 ]---+
         try copyOnBranch(targetFrame: frame)
         try emitBranch(relativeDepth: relativeDepth) { offset, copyCount, popCount in
-            return .br(offset: offset)
+            return .br(offset)
         }
         try markUnreachable()
     }
@@ -1268,7 +1268,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
         try copyOnBranch(targetFrame: frame)
         try emitBranch(relativeDepth: relativeDepth) { offset, copyCount, popCount in
-            return .br(offset: offset)
+            return .br(offset)
         }
         try iseqBuilder.pinLabelHere(onBranchNotTaken)
     }
@@ -1330,7 +1330,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             if emittedCopy {
                 iseqBuilder.emitWithLabel(frame.continuation) { _, brAt, continuation in
                     let relativeOffset = continuation.offsetFromHead - brAt.offsetFromHead
-                    return .br(offset: Int32(relativeOffset))
+                    return .br(Int32(relativeOffset))
                 }
             } else {
                 // Optimization: If no value is copied, we can directly jump to the target

@@ -58,24 +58,78 @@ extension VMGen {
         var mayUpdateSp: Bool = false
         var useCurrentMemory: RegisterUse
         var immediate: Immediate?
+        var immediateLayout: ImmediateLayout?
 
         var mayUpdatePc: Bool {
             self.isControl
+        }
+
+        private init(
+            name: String, isControl: Bool,
+            mayThrow: Bool, mayUpdateFrame: Bool,
+            mayUpdateSp: Bool,
+            useCurrentMemory: RegisterUse,
+            immediate: Immediate?,
+            immediateLayout: ImmediateLayout?
+        ) {
+            self.name = name
+            self.isControl = isControl
+            self.mayThrow = mayThrow
+            self.mayUpdateFrame = mayUpdateFrame
+            self.mayUpdateSp = mayUpdateSp
+            self.useCurrentMemory = useCurrentMemory
+            self.immediate = immediate
+            self.immediateLayout = immediateLayout
+            assert(isControl || !mayUpdateFrame, "non-control instruction should not update frame")
         }
 
         init(
             name: String, isControl: Bool = false,
             mayThrow: Bool = false, mayUpdateFrame: Bool = false,
             useCurrentMemory: RegisterUse = .none,
-            immediate: Immediate? = nil
+            immediate: String? = nil
         ) {
-            self.name = name
-            self.isControl = isControl
-            self.mayThrow = mayThrow
-            self.mayUpdateFrame = mayUpdateFrame
-            self.useCurrentMemory = useCurrentMemory
-            self.immediate = immediate
-            assert(isControl || !mayUpdateFrame, "non-control instruction should not update frame")
+            self.init(
+                name: name, isControl: isControl,
+                mayThrow: mayThrow, mayUpdateFrame: mayUpdateFrame,
+                mayUpdateSp: false,
+                useCurrentMemory: useCurrentMemory,
+                immediate: immediate.map { Immediate(type: "Instruction." + $0) },
+                immediateLayout: nil
+            )
+        }
+
+        init(
+            name: String, isControl: Bool = false,
+            mayThrow: Bool = false, mayUpdateFrame: Bool = false,
+            useCurrentMemory: RegisterUse = .none,
+            layout: (ImmediateLayout) -> ImmediateLayout
+        ) {
+            let immediateName = pascalCase(camelCase: name)
+            self.init(
+                name: name, isControl: isControl,
+                mayThrow: mayThrow, mayUpdateFrame: mayUpdateFrame,
+                mayUpdateSp: false,
+                useCurrentMemory: useCurrentMemory,
+                immediate: Immediate(type: "Instruction." + immediateName),
+                immediateLayout: layout(ImmediateLayout(name: immediateName))
+            )
+        }
+
+        init(
+            name: String, isControl: Bool = false,
+            mayThrow: Bool = false, mayUpdateFrame: Bool = false,
+            useCurrentMemory: RegisterUse = .none,
+            immediateLayout: ImmediateLayout
+        ) {
+            self.init(
+                name: name, isControl: isControl,
+                mayThrow: mayThrow, mayUpdateFrame: mayUpdateFrame,
+                mayUpdateSp: false,
+                useCurrentMemory: useCurrentMemory,
+                immediate: Immediate(type: "Instruction." + immediateLayout.name),
+                immediateLayout: immediateLayout
+            )
         }
 
         typealias Parameter = (label: String, type: String, isInout: Bool)
@@ -117,11 +171,7 @@ extension VMGen {
 
         /// The instruction definition of this binary operation.
         var instruction: Instruction {
-            Instruction(
-                name: name,
-                mayThrow: mayThrow,
-                immediate: "Instruction.BinaryOperand"
-            )
+            Instruction(name: name, mayThrow: mayThrow, immediateLayout: .binary)
         }
     }
 
@@ -135,7 +185,7 @@ extension VMGen {
 
         /// The instruction definition of this unary operation.
         var instruction: Instruction {
-            Instruction(name: name, mayThrow: mayThrow, immediate: Immediate(type: "Instruction.UnaryOperand"))
+            Instruction(name: name, mayThrow: mayThrow, immediateLayout: .unary)
         }
     }
 
@@ -271,8 +321,8 @@ extension VMGen {
 
     static let numericOtherInsts: [Instruction] = [
         // Numeric
-        Instruction(name: "const32", immediate: "Instruction.Const32Operand"),
-        Instruction(name: "const64", immediate: "Instruction.Const64Operand"),
+        Instruction(name: "const32", immediate: "Const32Operand"),
+        Instruction(name: "const64", immediate: "Const64Operand"),
     ]
 
     // MARK: - Memory instructions
@@ -299,7 +349,7 @@ extension VMGen {
         ("i64Load32S", "Int32", ".init(signed: Int64($0))"),
         ("i64Load32U", "UInt32", ".i64(UInt64($0))"),
     ].map { (name, loadAs, castToValue) in
-        let base = Instruction(name: name, mayThrow: true, useCurrentMemory: .read, immediate: "Instruction.LoadOperand")
+        let base = Instruction(name: name, mayThrow: true, useCurrentMemory: .read, immediate: "LoadOperand")
         return LoadInstruction(loadAs: loadAs, castToValue: castToValue, base: base)
     }
 
@@ -318,40 +368,40 @@ extension VMGen {
         ("i64Store16", "UInt16(truncatingIfNeeded: $0.i64)"),
         ("i64Store32", "UInt32(truncatingIfNeeded: $0.i64)"),
     ].map { (name, castFromValue) in
-        let base = Instruction(name: name, mayThrow: true, useCurrentMemory: .read, immediate: "Instruction.StoreOperand")
+        let base = Instruction(name: name, mayThrow: true, useCurrentMemory: .read, immediate: "StoreOperand")
         return StoreInstruction(castFromValue: castFromValue, base: base)
     }
     static let memoryLoadStoreInsts: [Instruction] = memoryLoadInsts.map(\.base) + memoryStoreInsts.map(\.base)
     static let memoryOpInsts: [Instruction] = [
-        Instruction(name: "memorySize", immediate: "Instruction.MemorySizeOperand"),
-        Instruction(name: "memoryGrow", mayThrow: true, useCurrentMemory: .write, immediate: "Instruction.MemoryGrowOperand"),
-        Instruction(name: "memoryInit", mayThrow: true, immediate: "Instruction.MemoryInitOperand"),
-        Instruction(name: "memoryDataDrop", immediate: "DataIndex"),
-        Instruction(name: "memoryCopy", mayThrow: true, immediate: "Instruction.MemoryCopyOperand"),
-        Instruction(name: "memoryFill", mayThrow: true, immediate: "Instruction.MemoryFillOperand"),
+        Instruction(name: "memorySize", immediate: "MemorySizeOperand"),
+        Instruction(name: "memoryGrow", mayThrow: true, useCurrentMemory: .write, immediate: "MemoryGrowOperand"),
+        Instruction(name: "memoryInit", mayThrow: true, immediate: "MemoryInitOperand"),
+        Instruction(name: "memoryDataDrop", immediate: "MemoryDataDropOperand"),
+        Instruction(name: "memoryCopy", mayThrow: true, immediate: "MemoryCopyOperand"),
+        Instruction(name: "memoryFill", mayThrow: true, immediate: "MemoryFillOperand"),
     ]
 
     // MARK: - Misc instructions
 
     static let miscInsts: [Instruction] = [
         // Parametric
-        Instruction(name: "select", immediate: "Instruction.SelectOperand"),
+        Instruction(name: "select", immediate: "SelectOperand"),
         // Reference
-        Instruction(name: "refNull", immediate: "Instruction.RefNullOperand"),
-        Instruction(name: "refIsNull", immediate: "Instruction.RefIsNullOperand"),
-        Instruction(name: "refFunc", immediate: "Instruction.RefFuncOperand"),
+        Instruction(name: "refNull", immediate: "RefNullOperand"),
+        Instruction(name: "refIsNull", immediate: "RefIsNullOperand"),
+        Instruction(name: "refFunc", immediate: "RefFuncOperand"),
         // Table
-        Instruction(name: "tableGet", mayThrow: true, immediate: "Instruction.TableGetOperand"),
-        Instruction(name: "tableSet", mayThrow: true, immediate: "Instruction.TableSetOperand"),
-        Instruction(name: "tableSize", immediate: "Instruction.TableSizeOperand"),
-        Instruction(name: "tableGrow", mayThrow: true, immediate: "Instruction.TableGrowOperand"),
-        Instruction(name: "tableFill", mayThrow: true, immediate: "Instruction.TableFillOperand"),
-        Instruction(name: "tableCopy", mayThrow: true, immediate: "Instruction.TableCopyOperand"),
-        Instruction(name: "tableInit", mayThrow: true, immediate: "Instruction.TableInitOperand"),
-        Instruction(name: "tableElementDrop", immediate: "ElementIndex"),
+        Instruction(name: "tableGet", mayThrow: true, immediate: "TableGetOperand"),
+        Instruction(name: "tableSet", mayThrow: true, immediate: "TableSetOperand"),
+        Instruction(name: "tableSize", immediate: "TableSizeOperand"),
+        Instruction(name: "tableGrow", mayThrow: true, immediate: "TableGrowOperand"),
+        Instruction(name: "tableFill", mayThrow: true, immediate: "TableFillOperand"),
+        Instruction(name: "tableCopy", mayThrow: true, immediate: "TableCopyOperand"),
+        Instruction(name: "tableInit", mayThrow: true, immediate: "TableInitOperand"),
+        Instruction(name: "tableElementDrop", immediate: "TableElementDropOperand"),
         // Profiling
-        Instruction(name: "onEnter", immediate: "Instruction.OnEnterOperand"),
-        Instruction(name: "onExit", immediate: "Instruction.OnExitOperand"),
+        Instruction(name: "onEnter", immediate: "OnEnterOperand"),
+        Instruction(name: "onExit", immediate: "OnExitOperand"),
     ]
 
     // MARK: - Instruction generation
@@ -359,49 +409,47 @@ extension VMGen {
     static func buildInstructions() -> [Instruction] {
         var instructions: [Instruction] = [
             // Variable
-            Instruction(name: "copyStack", immediate: "Instruction.CopyStackOperand"),
-            Instruction(name: "globalGet", immediate: "Instruction.GlobalGetOperand"),
-            Instruction(name: "globalSet", immediate: "Instruction.GlobalSetOperand"),
+            Instruction(name: "copyStack", immediate: "CopyStackOperand"),
+            Instruction(name: "globalGet", immediate: "GlobalGetOperand"),
+            Instruction(name: "globalSet", immediate: "GlobalSetOperand"),
             // Controls
             Instruction(
                 name: "call", isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write,
-                immediate: "Instruction.CallOperand"
+                immediate: "CallOperand"
                 ),
             Instruction(
                 name: "compilingCall", isControl: true, mayThrow: true, mayUpdateFrame: true,
-                immediate: "Instruction.CompilingCallOperand"
+                immediate: "CompilingCallOperand"
                 ),
             Instruction(
                 name: "internalCall", isControl: true, mayThrow: true, mayUpdateFrame: true,
                 immediate: 
-                    "Instruction.InternalCallOperand"
+                    "InternalCallOperand"
                 ),
             Instruction(
                 name: "callIndirect", isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write,
                 immediate:
-                    "Instruction.CallIndirectOperand"
+                    "CallIndirectOperand"
                 ),
             Instruction(name: "unreachable", isControl: true, mayThrow: true),
             Instruction(name: "nop"),
             Instruction(
                 name: "br", isControl: true, mayUpdateFrame: false,
-                immediate: 
-                    Immediate(name: "offset", type: "Int32")
+                immediate: "BrOperand"
                 ),
             Instruction(
                 name: "brIf", isControl: true, mayUpdateFrame: false,
                 immediate:
-                    "Instruction.BrIfOperand"
+                    "BrIfOperand"
                 ),
             Instruction(
                 name: "brIfNot", isControl: true, mayUpdateFrame: false,
-                immediate: 
-                    "Instruction.BrIfOperand"
+                immediate: "BrIfOperand"
                 ),
             Instruction(
                 name: "brTable", isControl: true, mayUpdateFrame: false,
                 immediate:
-                    "Instruction.BrTable"
+                    "BrTable"
                 ),
             Instruction(name: "_return", isControl: true, mayUpdateFrame: true, useCurrentMemory: .write),
             Instruction(name: "endOfExecution", isControl: true, mayThrow: true, mayUpdateFrame: true),
