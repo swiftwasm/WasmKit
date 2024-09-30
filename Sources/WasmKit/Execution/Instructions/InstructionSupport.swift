@@ -4,6 +4,28 @@ typealias VReg = Int16
 typealias LVReg = Int32
 typealias LLVReg = Int64
 
+extension RawUnsignedInteger {
+    init(_ slot: CodeSlot, shiftWidth: Int) {
+        let mask = CodeSlot((1 << Self.bitWidth) - 1)
+        let bitPattern = (slot >> shiftWidth) & mask
+        self = Self(bitPattern)
+    }
+
+    func bits(shiftWidth: Int) -> CodeSlot {
+        CodeSlot(self) << shiftWidth
+    }
+}
+
+extension RawSignedInteger {
+    init(_ slot: CodeSlot, shiftWidth: Int) {
+        self.init(bitPattern: Unsigned(slot, shiftWidth: shiftWidth))
+    }
+
+    func bits(shiftWidth: Int) -> CodeSlot {
+        Unsigned(bitPattern: self).bits(shiftWidth: shiftWidth)
+    }
+}
+
 protocol InstructionImmediate {
     static func load(from pc: inout Pc) -> Self
     static func emit(to emitSlot: @escaping ((Self) -> CodeSlot) -> Void)
@@ -81,32 +103,6 @@ extension Int32: InstructionImmediate {
 }
 
 extension Instruction {
-    struct BinaryOperand: Equatable, InstructionImmediate {
-        let result: LVReg
-        let lhs: VReg
-        let rhs: VReg
-        @inline(__always) static func load(from pc: inout Pc) -> Self {
-            pc.read()
-        }
-        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { unsafeBitCast($0, to: CodeSlot.self) }
-        }
-    }
-    
-    struct UnaryOperand: Equatable, InstructionImmediate {
-        let result: LVReg
-        let input: LVReg
-        @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let slot = pc.read(UInt64.self)
-            let result = LVReg(bitPattern: UInt32(slot >> 32))
-            let input = LVReg(bitPattern: UInt32(slot & 0xFFFFFFFF))
-            return Self(result: result, input: input)
-        }
-        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { UInt64(UInt32(bitPattern: $0.result)) << 32 | UInt64(UInt32(bitPattern: $0.input)) }
-        }
-    }
-
     struct Const32Operand: Equatable, InstructionImmediate {
         let value: UInt32
         let result: LVReg

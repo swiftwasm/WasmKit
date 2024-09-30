@@ -201,6 +201,40 @@ enum Instruction: Equatable {
 }
 
 extension Instruction {
+    // MARK: - Instruction Immediates
+
+    struct BinaryOperand: Equatable, InstructionImmediate {
+        var result: LVReg
+        var lhs: VReg
+        var rhs: VReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let slot0 = pc.read(CodeSlot.self)
+            let result = LVReg(slot0, shiftWidth: 32)
+            let lhs = VReg(slot0, shiftWidth: 16)
+            let rhs = VReg(slot0, shiftWidth: 0)
+            return Self(result: result, lhs: lhs, rhs: rhs)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { $0.result.bits(shiftWidth: 32) | $0.lhs.bits(shiftWidth: 16) | $0.rhs.bits(shiftWidth: 0) }
+        }
+    }
+
+    struct UnaryOperand: Equatable, InstructionImmediate {
+        var result: LVReg
+        var input: LVReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let slot0 = pc.read(CodeSlot.self)
+            let result = LVReg(slot0, shiftWidth: 32)
+            let input = LVReg(slot0, shiftWidth: 0)
+            return Self(result: result, input: input)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { $0.result.bits(shiftWidth: 32) | $0.input.bits(shiftWidth: 0) }
+        }
+    }
+}
+
+extension Instruction {
     var rawImmediate: (any InstructionImmediate)? {
         switch self {
         case .copyStack(let copyStackOperand): return copyStackOperand
