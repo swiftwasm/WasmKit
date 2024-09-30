@@ -111,42 +111,6 @@ extension Int32: InstructionImmediate {
 }
 
 extension Instruction {
-    struct LoadOperand: Equatable, InstructionImmediate {
-        let offset: UInt64
-        let pointer: VReg
-        let result: VReg
-
-        @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let offset = pc.read(UInt64.self)
-            let (pointer, result) = VReg.load2(from: &pc)
-            return Self(offset: offset, pointer: pointer, result: result)
-        }
-        @inline(__always) static func emit(to emitSlot: @escaping ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.offset }
-            VReg.emit2 { emitVRegs in
-                emitSlot { emitVRegs($0.pointer, $0.result) }
-            }
-        }
-    }
-
-    struct StoreOperand: Equatable, InstructionImmediate {
-        let offset: UInt64
-        let pointer: VReg
-        let value: VReg
-
-        @inline(__always) static func load(from pc: inout Pc) -> Self {
-            let offset = pc.read(UInt64.self)
-            let (pointer, value) = VReg.load2(from: &pc)
-            return Self(offset: offset, pointer: pointer, value: value)
-        }
-        @inline(__always) static func emit(to emitSlot: @escaping ((Self) -> CodeSlot) -> Void) {
-            emitSlot { $0.offset }
-            VReg.emit2 { emitVRegs in
-                emitSlot { emitVRegs($0.pointer, $0.value) }
-            }
-        }
-    }
-    
     struct MemorySizeOperand: Equatable, InstructionImmediate {
         let memoryIndex: MemoryIndex
         let result: LVReg

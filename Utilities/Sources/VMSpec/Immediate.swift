@@ -2,16 +2,21 @@ extension VMGen {
 
     static let CodeSlotSize: Int = 8
 
+    /// A primitive type less than or equal to 64 bits.
     struct PrimitiveType {
         var name: String
         var size: Int
         var alignment: Int { size }
         var bitWidth: Int { size * 8 }
     }
+
+    /// A field in an immediate type.
     struct ImmediateField {
         var name: String
         var type: PrimitiveType
     }
+
+    /// A layout for an immediate type of VM instructions.
     struct ImmediateLayout {
         var name: String
         var fields: [ImmediateField] = []
@@ -31,6 +36,7 @@ extension VMGen {
 
         typealias SlotLayout = [ImmediateField]
 
+        /// Splits the fields into CodeSlot sized slots.
         func slots() -> [SlotLayout] {
             let slotSize = VMGen.CodeSlotSize
             var slots: [SlotLayout] = []
@@ -54,6 +60,7 @@ extension VMGen {
             return slots
         }
 
+        /// Builds the type declaration derived from the layout.
         func buildDeclaration() -> String {
             let fieldDeclarations = fields.map { field in
                 "    var \(field.name): \(field.type.name)"
@@ -148,6 +155,18 @@ extension VMGen.ImmediateLayout {
         $0.field(name: "result", type: .LVReg)
         $0.field(name: "input", type: .LVReg)
     }
+
+    static let load = Self(name: "LoadOperand") {
+        $0.field(name: "offset", type: .UInt64)
+        $0.field(name: "pointer", type: .VReg)
+        $0.field(name: "result", type: .VReg)
+    }
+
+    static let store = Self(name: "StoreOperand") {
+        $0.field(name: "offset", type: .UInt64)
+        $0.field(name: "pointer", type: .VReg)
+        $0.field(name: "value", type: .VReg)
+    }
 }
 
 extension VMGen.PrimitiveType {
@@ -155,5 +174,6 @@ extension VMGen.PrimitiveType {
     static let LVReg = Self(name: "LVReg", size: 4)
     static let LLVReg = Self(name: "LLVReg", size: 8)
     static let UInt32 = Self(name: "UInt32", size: 4)
+    static let UInt64 = Self(name: "UInt64", size: 8)
     static let UntypedValue = Self(name: "UntypedValue", size: 8)
 }

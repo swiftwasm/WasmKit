@@ -203,6 +203,42 @@ enum Instruction: Equatable {
 extension Instruction {
     // MARK: - Instruction Immediates
 
+    struct LoadOperand: Equatable, InstructionImmediate {
+        var offset: UInt64
+        var pointer: VReg
+        var result: VReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let slot0 = pc.read(CodeSlot.self)
+            let offset = UInt64(slot0, shiftWidth: 0)
+            let slot1 = pc.read(CodeSlot.self)
+            let pointer = VReg(slot1, shiftWidth: 48)
+            let result = VReg(slot1, shiftWidth: 32)
+            return Self(offset: offset, pointer: pointer, result: result)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { $0.offset.bits(shiftWidth: 0) }
+            emitSlot { $0.pointer.bits(shiftWidth: 48) | $0.result.bits(shiftWidth: 32) }
+        }
+    }
+
+    struct StoreOperand: Equatable, InstructionImmediate {
+        var offset: UInt64
+        var pointer: VReg
+        var value: VReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let slot0 = pc.read(CodeSlot.self)
+            let offset = UInt64(slot0, shiftWidth: 0)
+            let slot1 = pc.read(CodeSlot.self)
+            let pointer = VReg(slot1, shiftWidth: 48)
+            let value = VReg(slot1, shiftWidth: 32)
+            return Self(offset: offset, pointer: pointer, value: value)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { $0.offset.bits(shiftWidth: 0) }
+            emitSlot { $0.pointer.bits(shiftWidth: 48) | $0.value.bits(shiftWidth: 32) }
+        }
+    }
+
     struct Const32Operand: Equatable, InstructionImmediate {
         var value: UInt32
         var result: LVReg
