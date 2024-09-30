@@ -8,15 +8,12 @@ add_wasmkit_library(WasmKit
   Component/CanonicalCall.swift
   Component/CanonicalOptions.swift
   Component/ComponentTypes.swift
-  Execution/Instructions/Reference.swift
   Execution/Instructions/Control.swift
   Execution/Instructions/Instruction.swift
-  Execution/Instructions/Parametric.swift
   Execution/Instructions/Table.swift
   Execution/Instructions/Memory.swift
+  Execution/Instructions/Misc.swift
   Execution/Instructions/InstructionSupport.swift
-  Execution/Instructions/Numeric.swift
-  Execution/Instructions/Variable.swift
   Execution/DispatchInstruction.swift
   Execution/Errors.swift
   Execution/Execution.swift
