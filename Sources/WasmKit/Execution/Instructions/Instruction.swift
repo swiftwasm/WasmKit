@@ -239,6 +239,100 @@ extension Instruction {
         }
     }
 
+    struct MemorySizeOperand: Equatable, InstructionImmediate {
+        var memoryIndex: UInt32
+        var result: LVReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let slot0 = pc.read(CodeSlot.self)
+            let memoryIndex = UInt32(slot0, shiftWidth: 32)
+            let result = LVReg(slot0, shiftWidth: 0)
+            return Self(memoryIndex: memoryIndex, result: result)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { $0.memoryIndex.bits(shiftWidth: 32) | $0.result.bits(shiftWidth: 0) }
+        }
+    }
+
+    struct MemoryGrowOperand: Equatable, InstructionImmediate {
+        var result: VReg
+        var delta: VReg
+        var memory: UInt32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let slot0 = pc.read(CodeSlot.self)
+            let result = VReg(slot0, shiftWidth: 48)
+            let delta = VReg(slot0, shiftWidth: 32)
+            let memory = UInt32(slot0, shiftWidth: 0)
+            return Self(result: result, delta: delta, memory: memory)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { $0.result.bits(shiftWidth: 48) | $0.delta.bits(shiftWidth: 32) | $0.memory.bits(shiftWidth: 0) }
+        }
+    }
+
+    struct MemoryInitOperand: Equatable, InstructionImmediate {
+        var segmentIndex: UInt32
+        var destOffset: VReg
+        var sourceOffset: VReg
+        var size: VReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let slot0 = pc.read(CodeSlot.self)
+            let segmentIndex = UInt32(slot0, shiftWidth: 32)
+            let destOffset = VReg(slot0, shiftWidth: 16)
+            let sourceOffset = VReg(slot0, shiftWidth: 0)
+            let slot1 = pc.read(CodeSlot.self)
+            let size = VReg(slot1, shiftWidth: 48)
+            return Self(segmentIndex: segmentIndex, destOffset: destOffset, sourceOffset: sourceOffset, size: size)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { $0.segmentIndex.bits(shiftWidth: 32) | $0.destOffset.bits(shiftWidth: 16) | $0.sourceOffset.bits(shiftWidth: 0) }
+            emitSlot { $0.size.bits(shiftWidth: 48) }
+        }
+    }
+
+    struct MemoryDataDropOperand: Equatable, InstructionImmediate {
+        var segmentIndex: UInt32
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let slot0 = pc.read(CodeSlot.self)
+            let segmentIndex = UInt32(slot0, shiftWidth: 32)
+            return Self(segmentIndex: segmentIndex)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { $0.segmentIndex.bits(shiftWidth: 32) }
+        }
+    }
+
+    struct MemoryCopyOperand: Equatable, InstructionImmediate {
+        var destOffset: VReg
+        var sourceOffset: VReg
+        var size: LVReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let slot0 = pc.read(CodeSlot.self)
+            let destOffset = VReg(slot0, shiftWidth: 48)
+            let sourceOffset = VReg(slot0, shiftWidth: 32)
+            let size = LVReg(slot0, shiftWidth: 0)
+            return Self(destOffset: destOffset, sourceOffset: sourceOffset, size: size)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { $0.destOffset.bits(shiftWidth: 48) | $0.sourceOffset.bits(shiftWidth: 32) | $0.size.bits(shiftWidth: 0) }
+        }
+    }
+
+    struct MemoryFillOperand: Equatable, InstructionImmediate {
+        var destOffset: VReg
+        var value: VReg
+        var size: LVReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let slot0 = pc.read(CodeSlot.self)
+            let destOffset = VReg(slot0, shiftWidth: 48)
+            let value = VReg(slot0, shiftWidth: 32)
+            let size = LVReg(slot0, shiftWidth: 0)
+            return Self(destOffset: destOffset, value: value, size: size)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { $0.destOffset.bits(shiftWidth: 48) | $0.value.bits(shiftWidth: 32) | $0.size.bits(shiftWidth: 0) }
+        }
+    }
+
     struct Const32Operand: Equatable, InstructionImmediate {
         var value: UInt32
         var result: LVReg

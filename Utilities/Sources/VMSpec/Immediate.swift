@@ -176,4 +176,5 @@ extension VMGen.PrimitiveType {
     static let UInt32 = Self(name: "UInt32", size: 4)
     static let UInt64 = Self(name: "UInt64", size: 8)
     static let UntypedValue = Self(name: "UntypedValue", size: 8)
+    static let MemoryIndex = Self.UInt32
 }

@@ -84,7 +84,7 @@ extension Execution {
         }
     }
     mutating func memoryDataDrop(sp: Sp, memoryDataDropOperand: Instruction.MemoryDataDropOperand) {
-        let segment = currentInstance(sp: sp).dataSegments[Int(memoryDataDropOperand)]
+        let segment = currentInstance(sp: sp).dataSegments[Int(memoryDataDropOperand.segmentIndex)]
         segment.withValue { $0.drop() }
     }
     mutating func memoryCopy(sp: Sp, memoryCopyOperand: Instruction.MemoryCopyOperand) throws {

@@ -381,12 +381,34 @@ extension VMGen {
     }
     static let memoryLoadStoreInsts: [Instruction] = memoryLoadInsts.map(\.base) + memoryStoreInsts.map(\.base)
     static let memoryOpInsts: [Instruction] = [
-        Instruction(name: "memorySize", immediate: "MemorySizeOperand"),
-        Instruction(name: "memoryGrow", mayThrow: true, useCurrentMemory: .write, immediate: "MemoryGrowOperand"),
-        Instruction(name: "memoryInit", mayThrow: true, immediate: "MemoryInitOperand"),
-        Instruction(name: "memoryDataDrop", immediate: "MemoryDataDropOperand"),
-        Instruction(name: "memoryCopy", mayThrow: true, immediate: "MemoryCopyOperand"),
-        Instruction(name: "memoryFill", mayThrow: true, immediate: "MemoryFillOperand"),
+        Instruction(name: "memorySize") {
+            $0.field(name: "memoryIndex", type: .MemoryIndex)
+            $0.field(name: "result", type: .LVReg)
+        },
+        Instruction(name: "memoryGrow", mayThrow: true, useCurrentMemory: .write) {
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "delta", type: .VReg)
+            $0.field(name: "memory", type: .MemoryIndex)
+        },
+        Instruction(name: "memoryInit", mayThrow: true) {
+            $0.field(name: "segmentIndex", type: .UInt32)
+            $0.field(name: "destOffset", type: .VReg)
+            $0.field(name: "sourceOffset", type: .VReg)
+            $0.field(name: "size", type: .VReg)
+        },
+        Instruction(name: "memoryDataDrop") {
+            $0.field(name: "segmentIndex", type: .UInt32)
+        },
+        Instruction(name: "memoryCopy", mayThrow: true) {
+            $0.field(name: "destOffset", type: .VReg)
+            $0.field(name: "sourceOffset", type: .VReg)
+            $0.field(name: "size", type: .LVReg)
+        },
+        Instruction(name: "memoryFill", mayThrow: true) {
+            $0.field(name: "destOffset", type: .VReg)
+            $0.field(name: "value", type: .VReg)
+            $0.field(name: "size", type: .LVReg)
+        },
     ]
 
     // MARK: - Misc instructions
