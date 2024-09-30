@@ -103,16 +103,18 @@ extension VMGen {
             name: String, isControl: Bool = false,
             mayThrow: Bool = false, mayUpdateFrame: Bool = false,
             useCurrentMemory: RegisterUse = .none,
-            layout: (ImmediateLayout) -> ImmediateLayout
+            layout: (inout ImmediateLayout) -> Void
         ) {
-            let immediateName = pascalCase(camelCase: name)
+            let immediateName = pascalCase(camelCase: name) + "Operand"
+            var building = ImmediateLayout(name: immediateName)
+            layout(&building)
             self.init(
                 name: name, isControl: isControl,
                 mayThrow: mayThrow, mayUpdateFrame: mayUpdateFrame,
                 mayUpdateSp: false,
                 useCurrentMemory: useCurrentMemory,
                 immediate: Immediate(type: "Instruction." + immediateName),
-                immediateLayout: layout(ImmediateLayout(name: immediateName))
+                immediateLayout: building
             )
         }
 
@@ -321,8 +323,14 @@ extension VMGen {
 
     static let numericOtherInsts: [Instruction] = [
         // Numeric
-        Instruction(name: "const32", immediate: "Const32Operand"),
-        Instruction(name: "const64", immediate: "Const64Operand"),
+        Instruction(name: "const32") {
+            $0.field(name: "value", type: .UInt32)
+            $0.field(name: "result", type: .LVReg)
+        },
+        Instruction(name: "const64") {
+            $0.field(name: "value", type: .UntypedValue)
+            $0.field(name: "result", type: .LLVReg)
+        },
     ]
 
     // MARK: - Memory instructions

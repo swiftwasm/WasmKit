@@ -16,10 +16,17 @@ extension VMGen {
         var name: String
         var fields: [ImmediateField] = []
 
-        func field(name: String, type: PrimitiveType) -> ImmediateLayout {
-            var new = self
-            new.fields.append(ImmediateField(name: name, type: type))
-            return new
+        init(name: String) {
+            self.name = name
+        }
+
+        init(name: String, _ build: (inout Self) -> Void) {
+            self.name = name
+            build(&self)
+        }
+
+        mutating func field(name: String, type: PrimitiveType) {
+            fields.append(ImmediateField(name: name, type: type))
         }
 
         typealias SlotLayout = [ImmediateField]
@@ -38,6 +45,7 @@ extension VMGen {
                     currentSize = 0
                 }
                 currentSlot.append(field)
+                currentSize += field.type.size
             }
             if !currentSlot.isEmpty {
                 slots.append(currentSlot)
@@ -130,17 +138,22 @@ extension VMGen {
 }
 
 extension VMGen.ImmediateLayout {
-    static let binary = Self(name: "BinaryOperand")
-        .field(name: "result", type: .LVReg)
-        .field(name: "lhs", type: .VReg)
-        .field(name: "rhs", type: .VReg)
+    static let binary = Self(name: "BinaryOperand") {
+        $0.field(name: "result", type: .LVReg)
+        $0.field(name: "lhs", type: .VReg)
+        $0.field(name: "rhs", type: .VReg)
+    }
 
-    static let unary = Self(name: "UnaryOperand")
-        .field(name: "result", type: .LVReg)
-        .field(name: "input", type: .LVReg)
+    static let unary = Self(name: "UnaryOperand") {
+        $0.field(name: "result", type: .LVReg)
+        $0.field(name: "input", type: .LVReg)
+    }
 }
 
 extension VMGen.PrimitiveType {
     static let VReg = Self(name: "VReg", size: 2)
     static let LVReg = Self(name: "LVReg", size: 4)
+    static let LLVReg = Self(name: "LLVReg", size: 8)
+    static let UInt32 = Self(name: "UInt32", size: 4)
+    static let UntypedValue = Self(name: "UntypedValue", size: 8)
 }
