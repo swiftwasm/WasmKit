@@ -357,7 +357,7 @@ extension VMGen {
         ("i64Load32S", "Int32", ".init(signed: Int64($0))"),
         ("i64Load32U", "UInt32", ".i64(UInt64($0))"),
     ].map { (name, loadAs, castToValue) in
-        let base = Instruction(name: name, mayThrow: true, useCurrentMemory: .read, immediate: "LoadOperand")
+        let base = Instruction(name: name, mayThrow: true, useCurrentMemory: .read, immediateLayout: .load)
         return LoadInstruction(loadAs: loadAs, castToValue: castToValue, base: base)
     }
 
@@ -376,7 +376,7 @@ extension VMGen {
         ("i64Store16", "UInt16(truncatingIfNeeded: $0.i64)"),
         ("i64Store32", "UInt32(truncatingIfNeeded: $0.i64)"),
     ].map { (name, castFromValue) in
-        let base = Instruction(name: name, mayThrow: true, useCurrentMemory: .read, immediate: "StoreOperand")
+        let base = Instruction(name: name, mayThrow: true, useCurrentMemory: .read, immediateLayout: .store)
         return StoreInstruction(castFromValue: castFromValue, base: base)
     }
     static let memoryLoadStoreInsts: [Instruction] = memoryLoadInsts.map(\.base) + memoryStoreInsts.map(\.base)
