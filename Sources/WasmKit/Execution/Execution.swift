@@ -130,14 +130,50 @@ extension Sp {
             return self[Int(index)] = newValue.storage
         }
     }
+
+    subscript<R: ShiftedVReg>(_ index: R) -> UntypedValue {
+        get {
+            return UntypedValue(storage: read(shifted: index))
+        }
+        nonmutating set {
+            write(shifted: index, newValue)
+        }
+    }
+
+    private func read<T: FixedWidthInteger, R: ShiftedVReg>(shifted index: R) -> T {
+        return UnsafeRawPointer(self).advanced(by: Int(index.value)).withMemoryRebound(to: T.self, capacity: 1) {
+            $0.pointee
+        }
+    }
     private func read<T: FixedWidthInteger, R: FixedWidthInteger>(_ index: R) -> T {
         return self.advanced(by: Int(index)).withMemoryRebound(to: T.self, capacity: 1) {
             $0.pointee
         }
     }
+    private func write<R: ShiftedVReg>(shifted index: R, _ value: UntypedValue) {
+        UnsafeMutableRawPointer(self).advanced(by: Int(index.value)).storeBytes(of: value.storage, as: UInt64.self)
+    }
     private func write<R: FixedWidthInteger>(_ index: R, _ value: UntypedValue) {
         self[Int(index)] = value
     }
+
+    subscript<R: ShiftedVReg>(i32 index: R) -> UInt32 {
+        get { return read(shifted: index) }
+        nonmutating set { write(shifted: index, .i32(newValue)) }
+    }
+    subscript<R: ShiftedVReg>(i64 index: R) -> UInt64 {
+        get { return read(shifted: index) }
+        nonmutating set { write(shifted: index, .i64(newValue)) }
+    }
+    subscript<R: ShiftedVReg>(f32 index: R) -> Float32 {
+        get { return Float32(bitPattern: read(shifted: index)) }
+        nonmutating set { write(shifted: index, .f32(newValue)) }
+    }
+    subscript<R: ShiftedVReg>(f64 index: R) -> Float64 {
+        get { return Float64(bitPattern: read(shifted: index)) }
+        nonmutating set { write(shifted: index, .f64(newValue)) }
+    }
+
     subscript<R: FixedWidthInteger>(i32 index: R) -> UInt32 {
         get { return read(index) }
         nonmutating set { write(index, .i32(newValue)) }

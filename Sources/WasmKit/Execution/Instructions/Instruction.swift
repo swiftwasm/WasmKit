@@ -431,7 +431,7 @@ extension Instruction {
             return Self(reg: reg, rawGlobal: rawGlobal)
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-            emitSlot { CodeSlot(bitPattern: $0.reg) }
+            emitSlot { unsafeBitCast(($0.reg) as (LLVReg), to: CodeSlot.self) }
             emitSlot { $0.rawGlobal }
         }
     }
@@ -623,7 +623,7 @@ extension Instruction {
         }
         @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
             emitSlot { unsafeBitCast(($0.value) as (UntypedValue), to: CodeSlot.self) }
-            emitSlot { CodeSlot(bitPattern: $0.result) }
+            emitSlot { unsafeBitCast(($0.result) as (LLVReg), to: CodeSlot.self) }
         }
     }
 

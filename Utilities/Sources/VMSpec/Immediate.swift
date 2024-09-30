@@ -127,12 +127,6 @@ extension VMGen {
 
                         """
                         continue
-                    case "LLVReg":
-                        output += """
-                                emitSlot { CodeSlot(bitPattern: $0.\(slot[0].name)) }
-
-                        """
-                        continue
                     default: break
                     }
                 }
