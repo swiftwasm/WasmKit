@@ -81,23 +81,25 @@ extension VMGen {
 
             let slots = self.slots()
 
-            for (slotIndex, slot) in slots.enumerated() {
-                let slotVar = "slot\(slotIndex)"
+            func makeSlotTupleType(slot: SlotLayout) -> (tupleName: String, elements: [(type: String, name: String?)]) {
+                var elemenets: [(type: String, String?)] = slot.map { ($0.type.name, $0.name) }
+                var elementsSize = slot.reduce(0) {
+                    VMGen.alignUp($0, to: $1.type.alignment) + $1.type.size
+                }
+                // Padding to make the tuple size CodeSlotSize
+                while elementsSize < VMGen.CodeSlotSize {
+                    elemenets.append(("UInt8", nil))
+                    elementsSize += 1
+                }
+                return ("(" + elemenets.map { $0.type }.joined(separator: ", ") + ")", elemenets)
+            }
+
+            for slot in slots {
+                let (tupleTy, elements) = makeSlotTupleType(slot: slot)
                 output += """
-                        let \(slotVar) = pc.read(CodeSlot.self)
+                        let (\(elements.map { $0.name ?? "_" }.joined(separator: ", "))) = pc.read(\(tupleTy).self)
 
                 """
-
-                var bitOffset = 0
-                for field in slot {
-                    let shiftWidth = VMGen.CodeSlotSize * 8 - bitOffset - field.type.bitWidth
-                    output += """
-                            let \(field.name) = \(field.type.name)(\(slotVar), shiftWidth: \(shiftWidth))
-
-                    """
-
-                    bitOffset += field.type.bitWidth
-                }
             }
 
             output += """
@@ -114,16 +116,29 @@ extension VMGen {
             """
 
             for slot in slots {
-                var slotFields: [String] = []
-                var bitOffset = 0
-                for field in slot {
-                    let shiftWidth = VMGen.CodeSlotSize * 8 - bitOffset - field.type.bitWidth
-                    slotFields.append("$0.\(field.name).bits(shiftWidth: \(shiftWidth))")
-                    bitOffset += field.type.bitWidth
+                let (tupleTy, elements) = makeSlotTupleType(slot: slot)
+                if slot.count == 1, slot[0].type.size == VMGen.CodeSlotSize {
+                    // Special case for a single field that is the size of a CodeSlot
+                    // to avoid suspicious warning diagnostic from the compiler.
+                    switch slot[0].type.name {
+                    case "UInt64":
+                        output += """
+                                emitSlot { $0.\(slot[0].name) }
+
+                        """
+                        continue
+                    case "LLVReg":
+                        output += """
+                                emitSlot { CodeSlot(bitPattern: $0.\(slot[0].name)) }
+
+                        """
+                        continue
+                    default: break
+                    }
                 }
 
                 output += """
-                        emitSlot { \(slotFields.joined(separator: " | ")) }
+                        emitSlot { unsafeBitCast((\(elements.map { $0.name.flatMap { "$0.\($0)" } ?? "0" }.joined(separator: ", "))) as \(tupleTy), to: CodeSlot.self) }
 
                 """
             }
