@@ -1,8 +1,48 @@
 import WasmParser
 
+/// A register that is used to store a value in the stack.
 typealias VReg = Int16
-typealias LVReg = Int32
-typealias LLVReg = Int64
+
+/// A register value that is pre-shifted to avoid runtime shift operation.
+protocol ShiftedVReg {
+    associatedtype Storage: FixedWidthInteger
+
+    /// The value of the shifted register.
+    /// Must be a multiple of `MemoryLayout<StackSlot>.size`.
+    var value: Storage { get }
+}
+
+/// A larger (32-bit) version of `VReg`
+/// Used to utilize halfword loads instructions.
+struct LVReg: Equatable, ShiftedVReg {
+    let value: Int32
+
+    init(_ value: VReg) {
+        // Pre-shift to avoid runtime shift operation by using
+        // unused high bits.
+        self.value = Int32(value) * Int32(MemoryLayout<StackSlot>.size)
+    }
+
+    init(storage: Int32) {
+        self.value = storage
+    }
+}
+
+/// A larger (64-bit) version of `VReg`
+/// Used to utilize word loads instructions.
+struct LLVReg: Equatable, ShiftedVReg {
+    let value: Int64
+
+    init(_ value: VReg) {
+        // Pre-shift to avoid runtime shift operation by using
+        // unused high bits.
+        self.value = Int64(value) * Int64(MemoryLayout<StackSlot>.size)
+    }
+
+    init(storage: Int64) {
+        self.value = storage
+    }
+}
 
 extension RawUnsignedInteger {
     init(_ slot: CodeSlot, shiftWidth: Int) {
@@ -85,10 +125,10 @@ extension VReg: InstructionImmediate {
 
 extension LLVReg: InstructionImmediate {
     static func load(from pc: inout Pc) -> Self {
-        Self(bitPattern: pc.read())
+        Self(storage: Int64(bitPattern: pc.read()))
     }
     static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
-        emitSlot { UInt64(bitPattern: $0) }
+        emitSlot { UInt64(bitPattern: $0.value) }
     }
 }
 
@@ -184,6 +224,8 @@ struct InstructionPrintingContext {
             return "reg:\(reg)"
         }
     }
+    func reg(_ x: LVReg) -> String { reg(x.value) }
+    func reg(_ x: LLVReg) -> String { reg(x.value) }
 
     func offset(_ offset: UInt64) -> String {
         "offset: \(offset)"

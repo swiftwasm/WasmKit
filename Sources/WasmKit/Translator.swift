@@ -853,7 +853,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     @discardableResult
     private mutating func emitCopyStack(from source: VReg, to dest: VReg) -> Bool {
         guard source != dest else { return false }
-        emit(.copyStack(Instruction.CopyStackOperand(source: Int32(source), dest: Int32(dest))))
+        emit(.copyStack(Instruction.CopyStackOperand(source: LVReg(source), dest: LVReg(dest))))
         return true
     }
 
