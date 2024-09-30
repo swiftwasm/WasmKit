@@ -168,6 +168,17 @@ extension Instruction {
     typealias BrOperand = Int32
     typealias OnEnterOperand = FunctionIndex
     typealias OnExitOperand = FunctionIndex
+
+    struct BrIfOperand: Equatable, InstructionImmediate {
+        let condition: LVReg
+        let offset: Int32
+        static func load(from pc: inout Pc) -> Self {
+            return pc.read()
+        }
+        static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast($0, to: CodeSlot.self) }
+        }
+   }
 }
 
 struct InstructionPrintingContext {
