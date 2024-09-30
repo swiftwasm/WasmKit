@@ -553,10 +553,10 @@ extension VMGen {
                 immediate: "BrOperand"),
             Instruction(
                 name: "brIf", documentation: "Conditional pc-relative branch if the condition is true",
-                isControl: true, mayUpdateFrame: false, immediate: "BrIfOperand"),
+                isControl: true, mayUpdateFrame: false, immediateLayout: .brIfOperand),
             Instruction(
                 name: "brIfNot", documentation: "Conditional pc-relative branch if the condition is false",
-                isControl: true, mayUpdateFrame: false, immediate: "BrIfOperand"),
+                isControl: true, mayUpdateFrame: false, immediateLayout: .brIfOperand),
             Instruction(name: "brTable", documentation: "WebAssembly Core Instruction `br_table`",
                         isControl: true, mayUpdateFrame: false) {
                 $0.field(name: "rawBaseAddress", type: .UInt64)
