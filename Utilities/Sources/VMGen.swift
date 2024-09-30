@@ -30,21 +30,21 @@ enum VMGen {
 
     static func generateDispatcher(instructions: [Instruction]) -> String {
         let doExecuteParams: [Instruction.Parameter] =
-            [("instruction", "UInt64", false)]
+            [("opcode", "OpcodeID", false)]
             + ExecutionParameter.allCases.map { ($0.label, $0.type, true) }
         var output = """
             extension Execution {
                 @inline(__always)
                 mutating func doExecute(_ \(doExecuteParams.map { "\($0.label): \($0.isInout ? "inout " : "")\($0.type)" }.joined(separator: ", "))) throws -> CodeSlot {
-                    switch instruction {
+                    switch opcode {
             """
 
-        for (index, inst) in instructions.enumerated() {
+        for (opcode, inst) in instructions.enumerated() {
             let tryPrefix = inst.mayThrow ? "try " : ""
             let args = ExecutionParameter.allCases.map { "\($0.label): &\($0.label)" }
             output += """
 
-                        case \(index): return \(tryPrefix)self.execute_\(inst.name)(\(args.joined(separator: ", ")))
+                        case \(opcode): return \(tryPrefix)self.execute_\(inst.name)(\(args.joined(separator: ", ")))
                 """
         }
         output += """
@@ -226,7 +226,8 @@ enum VMGen {
         output += "\n\n"
         output += """
         extension Instruction {
-            var rawIndex: Int {
+            /// The opcode ID of the instruction.
+            var opcodeID: OpcodeID {
                 switch self {
 
         """
@@ -247,8 +248,8 @@ enum VMGen {
             /// - Returns: The instruction read from the program counter.
             /// - Precondition: The instruction sequence must be compiled with token threading model.
             static func load(from pc: inout Pc) -> Instruction {
-                let rawIndex = pc.read(UInt64.self)
-                switch rawIndex {
+                let opcode = pc.read(UInt64.self)
+                switch opcode {
 
         """
         for (i, inst) in instructions.enumerated() {
@@ -260,7 +261,7 @@ enum VMGen {
             }
         }
         output += """
-                default: fatalError("Unknown instruction index: \\(rawIndex)")
+                default: fatalError("Unknown instruction opcode: \\(opcode)")
                 }
             }
         }
@@ -271,12 +272,12 @@ enum VMGen {
         #if EngineStats
         extension Instruction {
             /// The name of the instruction.
-            /// - Parameter rawIndex: The raw index of the instruction.
+            /// - Parameter opcode: The opcode ID of the instruction.
             /// - Returns: The name of the instruction.
             ///
             /// NOTE: This function is used for debugging purposes.
-            static func name(rawIndex: UInt64) -> String {
-                switch rawIndex {
+            static func name(opcode: OpcodeID) -> String {
+                switch opcode {
         """
         for (i, inst) in instructions.enumerated() {
             output += """
@@ -286,7 +287,7 @@ enum VMGen {
         }
         output += """
 
-                default: fatalError("Unknown instruction index: \\(rawIndex)")
+                default: fatalError("Unknown instruction index: \\(opcode)")
                 }
             }
         }
@@ -464,7 +465,7 @@ enum VMGen {
 
                     @inline(never)
                     var handler: UInt64 {
-                        return Self.handlers[rawIndex]
+                        return Self.handlers[Int(self.opcodeID)]
                     }
                 }
 

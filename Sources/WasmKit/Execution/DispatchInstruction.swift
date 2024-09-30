@@ -2257,6 +2257,6 @@ extension Instruction {
 
     @inline(never)
     var handler: UInt64 {
-        return Self.handlers[rawIndex]
+        return Self.handlers[Int(self.opcodeID)]
     }
 }

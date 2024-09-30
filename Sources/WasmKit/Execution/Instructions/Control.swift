@@ -108,7 +108,7 @@ extension Execution {
         case .direct:
             discriminatorPc.pointee = replaced.handler
         case .token:
-            discriminatorPc.pointee = UInt64(replaced.rawIndex)
+            discriminatorPc.pointee = UInt64(replaced.opcodeID)
         }
         try _internalCall(sp: &sp, pc: &pc, callee: callee, internalCallOperand: immediate)
         return pc.next()
