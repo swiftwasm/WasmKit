@@ -37,7 +37,7 @@ extension Execution {
         }
         return pc.advanced(by: Int(immediate.offset)).next()
     }
-    mutating func brTable(sp: Sp, pc: Pc, immediate: Instruction.BrTable) -> (Pc, CodeSlot) {
+    mutating func brTable(sp: Sp, pc: Pc, immediate: Instruction.BrTableOperand) -> (Pc, CodeSlot) {
         let index = sp[i32: immediate.index]
         let normalizedOffset = min(Int(index), Int(immediate.count - 1))
         let entry = immediate.baseAddress[normalizedOffset]
@@ -62,7 +62,7 @@ extension Execution {
         (pc, sp) = try invoke(
             function: immediate.callee,
             callerInstance: currentInstance(sp: sp),
-            callLike: immediate.callLike,
+            spAddend: immediate.spAddend,
             sp: sp, pc: pc, md: &md, ms: &ms
         )
         return pc.next()
@@ -73,7 +73,7 @@ extension Execution {
         sp: inout Sp,
         pc: inout Pc,
         callee: InternalFunction,
-        internalCallOperand: Instruction.InternalCallOperand
+        internalCallOperand: Instruction.CallOperand
     ) throws {
         // The callee is known to be a function defined within the same module, so we can
         // skip updating the current instance.
@@ -83,13 +83,13 @@ extension Execution {
             instance: instance,
             numberOfNonParameterLocals: locals,
             sp: sp, returnPC: pc,
-            spAddend: internalCallOperand.callLike.spAddend
+            spAddend: internalCallOperand.spAddend
         )
         pc = iseq.baseAddress
     }
 
     @inline(__always)
-    mutating func internalCall(sp: inout Sp, pc: Pc, immediate: Instruction.InternalCallOperand) throws -> (Pc, CodeSlot) {
+    mutating func internalCall(sp: inout Sp, pc: Pc, immediate: Instruction.CallOperand) throws -> (Pc, CodeSlot) {
         var pc = pc
         let callee = immediate.callee
         try _internalCall(sp: &sp, pc: &pc, callee: callee, internalCallOperand: immediate)
@@ -97,7 +97,7 @@ extension Execution {
     }
 
     @inline(__always)
-    mutating func compilingCall(sp: inout Sp, pc: Pc, immediate: Instruction.CompilingCallOperand) throws -> (Pc, CodeSlot) {
+    mutating func compilingCall(sp: inout Sp, pc: Pc, immediate: Instruction.CallOperand) throws -> (Pc, CodeSlot) {
         var pc = pc
         // NOTE: `CompilingCallOperand` consumes 2 slots, discriminator is at -3
         let discriminatorPc = pc.advanced(by: -3)
@@ -150,7 +150,7 @@ extension Execution {
         (pc, sp) = try invoke(
             function: function,
             callerInstance: callerInstance,
-            callLike: immediate.callLike,
+            spAddend: immediate.spAddend,
             sp: sp, pc: pc, md: &md, ms: &ms
         )
         return pc.next()

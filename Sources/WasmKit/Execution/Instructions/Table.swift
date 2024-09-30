@@ -116,7 +116,7 @@ extension Execution {
         }
     }
     mutating func tableElementDrop(sp: Sp, immediate: Instruction.TableElementDropOperand) {
-        let segment = currentInstance(sp: sp).elementSegments[Int(immediate)]
+        let segment = currentInstance(sp: sp).elementSegments[Int(immediate.index)]
         segment.withValue { $0.drop() }
     }
 

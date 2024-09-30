@@ -15,7 +15,7 @@ public struct FunctionType: Equatable, Hashable {
 }
 
 /// Reference types
-public enum ReferenceType: Equatable, Hashable {
+public enum ReferenceType: UInt8, Equatable, Hashable {
     /// A nullable reference type to a function.
     case funcRef
     /// A nullable external reference type.

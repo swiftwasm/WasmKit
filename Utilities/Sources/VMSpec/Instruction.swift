@@ -52,12 +52,15 @@ extension VMGen {
     /// An instruction definition for the internal VM.
     struct Instruction {
         var name: String
+        var documentation: String?
         var isControl: Bool
         var mayThrow: Bool
         var mayUpdateFrame: Bool
         var mayUpdateSp: Bool = false
         var useCurrentMemory: RegisterUse
+        /// The immediate operand of the instruction.
         var immediate: Immediate?
+        /// The layout of the immediate operand.
         var immediateLayout: ImmediateLayout?
 
         var mayUpdatePc: Bool {
@@ -65,7 +68,9 @@ extension VMGen {
         }
 
         private init(
-            name: String, isControl: Bool,
+            name: String,
+            documentation: String?,
+            isControl: Bool,
             mayThrow: Bool, mayUpdateFrame: Bool,
             mayUpdateSp: Bool,
             useCurrentMemory: RegisterUse,
@@ -73,6 +78,7 @@ extension VMGen {
             immediateLayout: ImmediateLayout?
         ) {
             self.name = name
+            self.documentation = documentation
             self.isControl = isControl
             self.mayThrow = mayThrow
             self.mayUpdateFrame = mayUpdateFrame
@@ -84,13 +90,15 @@ extension VMGen {
         }
 
         init(
-            name: String, isControl: Bool = false,
+            name: String,
+            documentation: String? = nil,
+            isControl: Bool = false,
             mayThrow: Bool = false, mayUpdateFrame: Bool = false,
             useCurrentMemory: RegisterUse = .none,
             immediate: String? = nil
         ) {
             self.init(
-                name: name, isControl: isControl,
+                name: name, documentation: documentation, isControl: isControl,
                 mayThrow: mayThrow, mayUpdateFrame: mayUpdateFrame,
                 mayUpdateSp: false,
                 useCurrentMemory: useCurrentMemory,
@@ -100,7 +108,9 @@ extension VMGen {
         }
 
         init(
-            name: String, isControl: Bool = false,
+            name: String,
+            documentation: String? = nil,
+            isControl: Bool = false,
             mayThrow: Bool = false, mayUpdateFrame: Bool = false,
             useCurrentMemory: RegisterUse = .none,
             layout: (inout ImmediateLayout) -> Void
@@ -109,7 +119,7 @@ extension VMGen {
             var building = ImmediateLayout(name: immediateName)
             layout(&building)
             self.init(
-                name: name, isControl: isControl,
+                name: name, documentation: documentation, isControl: isControl,
                 mayThrow: mayThrow, mayUpdateFrame: mayUpdateFrame,
                 mayUpdateSp: false,
                 useCurrentMemory: useCurrentMemory,
@@ -119,13 +129,15 @@ extension VMGen {
         }
 
         init(
-            name: String, isControl: Bool = false,
+            name: String,
+            documentation: String? = nil,
+            isControl: Bool = false,
             mayThrow: Bool = false, mayUpdateFrame: Bool = false,
             useCurrentMemory: RegisterUse = .none,
             immediateLayout: ImmediateLayout
         ) {
             self.init(
-                name: name, isControl: isControl,
+                name: name, documentation: documentation, isControl: isControl,
                 mayThrow: mayThrow, mayUpdateFrame: mayUpdateFrame,
                 mayUpdateSp: false,
                 useCurrentMemory: useCurrentMemory,
@@ -173,7 +185,8 @@ extension VMGen {
 
         /// The instruction definition of this binary operation.
         var instruction: Instruction {
-            Instruction(name: name, mayThrow: mayThrow, immediateLayout: .binary)
+            Instruction(name: name, documentation: "WebAssembly Core Instruction `\(lhsType).\(VMGen.snakeCase(pascalCase: op))`",
+                        mayThrow: mayThrow, immediateLayout: .binary)
         }
     }
 
@@ -187,7 +200,8 @@ extension VMGen {
 
         /// The instruction definition of this unary operation.
         var instruction: Instruction {
-            Instruction(name: name, mayThrow: mayThrow, immediateLayout: .unary)
+            Instruction(name: name, documentation: "WebAssembly Core Instruction `\(inputType).\(VMGen.snakeCase(pascalCase: op))`",
+                        mayThrow: mayThrow, immediateLayout: .unary)
         }
     }
 
@@ -323,11 +337,11 @@ extension VMGen {
 
     static let numericOtherInsts: [Instruction] = [
         // Numeric
-        Instruction(name: "const32") {
+        Instruction(name: "const32", documentation: "Assign a 32-bit constant to a register") {
             $0.field(name: "value", type: .UInt32)
             $0.field(name: "result", type: .LVReg)
         },
-        Instruction(name: "const64") {
+        Instruction(name: "const64", documentation: "Assign a 64-bit constant to a register") {
             $0.field(name: "value", type: .UntypedValue)
             $0.field(name: "result", type: .LLVReg)
         },
@@ -335,76 +349,84 @@ extension VMGen {
 
     // MARK: - Memory instructions
 
-    struct LoadInstruction {
+    struct LoadOpInfo {
+        let type: String
+        let op: String
         let loadAs: String
         let castToValue: String
-        let base: Instruction
+        var instruction: Instruction {
+            Instruction(name: "\(type)\(op)", documentation: "WebAssembly Core Instruction `\(type).\(VMGen.snakeCase(pascalCase: op))`",
+                        mayThrow: true, useCurrentMemory: .read, immediateLayout: .load)
+        }
     }
 
-    static let memoryLoadInsts: [LoadInstruction] = [
-        ("i32Load", "UInt32", ".i32($0)"),
-        ("i64Load", "UInt64", ".i64($0)"),
-        ("f32Load", "UInt32", ".rawF32($0)"),
-        ("f64Load", "UInt64", ".rawF64($0)"),
-        ("i32Load8S", "Int8", ".init(signed: Int32($0))"),
-        ("i32Load8U", "UInt8", ".i32(UInt32($0))"),
-        ("i32Load16S", "Int16", ".init(signed: Int32($0))"),
-        ("i32Load16U", "UInt16", ".i32(UInt32($0))"),
-        ("i64Load8S", "Int8", ".init(signed: Int64($0))"),
-        ("i64Load8U", "UInt8", ".i64(UInt64($0))"),
-        ("i64Load16S", "Int16", ".init(signed: Int64($0))"),
-        ("i64Load16U", "UInt16", ".i64(UInt64($0))"),
-        ("i64Load32S", "Int32", ".init(signed: Int64($0))"),
-        ("i64Load32U", "UInt32", ".i64(UInt64($0))"),
-    ].map { (name, loadAs, castToValue) in
-        let base = Instruction(name: name, mayThrow: true, useCurrentMemory: .read, immediateLayout: .load)
-        return LoadInstruction(loadAs: loadAs, castToValue: castToValue, base: base)
+    static let memoryLoadOps: [LoadOpInfo] = [
+        ("i32", "Load", "UInt32", ".i32($0)"),
+        ("i64", "Load", "UInt64", ".i64($0)"),
+        ("f32", "Load", "UInt32", ".rawF32($0)"),
+        ("f64", "Load", "UInt64", ".rawF64($0)"),
+        ("i32", "Load8S", "Int8", ".init(signed: Int32($0))"),
+        ("i32", "Load8U", "UInt8", ".i32(UInt32($0))"),
+        ("i32", "Load16S", "Int16", ".init(signed: Int32($0))"),
+        ("i32", "Load16U", "UInt16", ".i32(UInt32($0))"),
+        ("i64", "Load8S", "Int8", ".init(signed: Int64($0))"),
+        ("i64", "Load8U", "UInt8", ".i64(UInt64($0))"),
+        ("i64", "Load16S", "Int16", ".init(signed: Int64($0))"),
+        ("i64", "Load16U", "UInt16", ".i64(UInt64($0))"),
+        ("i64", "Load32S", "Int32", ".init(signed: Int64($0))"),
+        ("i64", "Load32U", "UInt32", ".i64(UInt64($0))"),
+    ].map { (type, op, loadAs, castToValue) in
+        return LoadOpInfo(type: type, op: op, loadAs: loadAs, castToValue: castToValue)
     }
 
-    struct StoreInstruction {
+    struct StoreOpInfo {
+        let type: String
+        let op: String
         let castFromValue: String
-        let base: Instruction
+        var instruction: Instruction {
+            Instruction(name: "\(type)\(op)", documentation: "WebAssembly Core Instruction `\(type).\(VMGen.snakeCase(pascalCase: op))`",
+                        mayThrow: true, useCurrentMemory: .read, immediateLayout: .store)
+        }
     }
-    static let memoryStoreInsts: [StoreInstruction] = [
-        ("i32Store", "$0.i32"),
-        ("i64Store", "$0.i64"),
-        ("f32Store", "$0.rawF32"),
-        ("f64Store", "$0.rawF64"),
-        ("i32Store8", "UInt8(truncatingIfNeeded: $0.i32)"),
-        ("i32Store16", "UInt16(truncatingIfNeeded: $0.i32)"),
-        ("i64Store8", "UInt8(truncatingIfNeeded: $0.i64)"),
-        ("i64Store16", "UInt16(truncatingIfNeeded: $0.i64)"),
-        ("i64Store32", "UInt32(truncatingIfNeeded: $0.i64)"),
-    ].map { (name, castFromValue) in
-        let base = Instruction(name: name, mayThrow: true, useCurrentMemory: .read, immediateLayout: .store)
-        return StoreInstruction(castFromValue: castFromValue, base: base)
+    static let memoryStoreOps: [StoreOpInfo] = [
+        ("i32", "Store", "$0.i32"),
+        ("i64", "Store", "$0.i64"),
+        ("f32", "Store", "$0.rawF32"),
+        ("f64", "Store", "$0.rawF64"),
+        ("i32", "Store8", "UInt8(truncatingIfNeeded: $0.i32)"),
+        ("i32", "Store16", "UInt16(truncatingIfNeeded: $0.i32)"),
+        ("i64", "Store8", "UInt8(truncatingIfNeeded: $0.i64)"),
+        ("i64", "Store16", "UInt16(truncatingIfNeeded: $0.i64)"),
+        ("i64", "Store32", "UInt32(truncatingIfNeeded: $0.i64)"),
+    ].map { (type, op, castFromValue) in
+        return StoreOpInfo(type: type, op: op, castFromValue: castFromValue)
     }
-    static let memoryLoadStoreInsts: [Instruction] = memoryLoadInsts.map(\.base) + memoryStoreInsts.map(\.base)
+    static let memoryLoadStoreInsts: [Instruction] = memoryLoadOps.map(\.instruction) + memoryStoreOps.map(\.instruction)
     static let memoryOpInsts: [Instruction] = [
-        Instruction(name: "memorySize") {
+        Instruction(name: "memorySize", documentation: "WebAssembly Core Instruction `memory.size`") {
             $0.field(name: "memoryIndex", type: .MemoryIndex)
             $0.field(name: "result", type: .LVReg)
         },
-        Instruction(name: "memoryGrow", mayThrow: true, useCurrentMemory: .write) {
+        Instruction(name: "memoryGrow", documentation: "WebAssembly Core Instruction `memory.grow`", mayThrow: true, useCurrentMemory: .write) {
             $0.field(name: "result", type: .VReg)
             $0.field(name: "delta", type: .VReg)
             $0.field(name: "memory", type: .MemoryIndex)
         },
-        Instruction(name: "memoryInit", mayThrow: true) {
+        Instruction(name: "memoryInit", documentation: "WebAssembly Core Instruction `memory.init`", mayThrow: true) {
             $0.field(name: "segmentIndex", type: .UInt32)
             $0.field(name: "destOffset", type: .VReg)
             $0.field(name: "sourceOffset", type: .VReg)
             $0.field(name: "size", type: .VReg)
         },
-        Instruction(name: "memoryDataDrop") {
+        Instruction(name: "memoryDataDrop", documentation: "WebAssembly Core Instruction `memory.drop`") {
             $0.field(name: "segmentIndex", type: .UInt32)
         },
-        Instruction(name: "memoryCopy", mayThrow: true) {
+        Instruction(name: "memoryCopy", documentation: "WebAssembly Core Instruction `memory.copy`", mayThrow: true) {
             $0.field(name: "destOffset", type: .VReg)
             $0.field(name: "sourceOffset", type: .VReg)
             $0.field(name: "size", type: .LVReg)
         },
-        Instruction(name: "memoryFill", mayThrow: true) {
+        Instruction(name: "memoryFill", documentation: "WebAssembly Core Instruction `memory.fill`", mayThrow: true) {
             $0.field(name: "destOffset", type: .VReg)
             $0.field(name: "value", type: .VReg)
             $0.field(name: "size", type: .LVReg)
@@ -415,23 +437,72 @@ extension VMGen {
 
     static let miscInsts: [Instruction] = [
         // Parametric
-        Instruction(name: "select", immediate: "SelectOperand"),
+        Instruction(name: "select", documentation: "WebAssembly Core Instruction `select`") {
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "condition", type: .VReg)
+            $0.field(name: "onTrue", type: .VReg)
+            $0.field(name: "onFalse", type: .VReg)
+        },
         // Reference
-        Instruction(name: "refNull", immediate: "RefNullOperand"),
-        Instruction(name: "refIsNull", immediate: "RefIsNullOperand"),
-        Instruction(name: "refFunc", immediate: "RefFuncOperand"),
+        Instruction(name: "refNull", documentation: "WebAssembly Core Instruction `ref.null`") {
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "rawType", type: .UInt8)
+        },
+        Instruction(name: "refIsNull", documentation: "WebAssembly Core Instruction `ref.is_null`") {
+            $0.field(name: "value", type: .LVReg)
+            $0.field(name: "result", type: .LVReg)
+        },
+        Instruction(name: "refFunc", documentation: "WebAssembly Core Instruction `ref.func`") {
+            $0.field(name: "index", type: .FunctionIndex)
+            $0.field(name: "result", type: .LVReg)
+        },
         // Table
-        Instruction(name: "tableGet", mayThrow: true, immediate: "TableGetOperand"),
-        Instruction(name: "tableSet", mayThrow: true, immediate: "TableSetOperand"),
-        Instruction(name: "tableSize", immediate: "TableSizeOperand"),
-        Instruction(name: "tableGrow", mayThrow: true, immediate: "TableGrowOperand"),
-        Instruction(name: "tableFill", mayThrow: true, immediate: "TableFillOperand"),
-        Instruction(name: "tableCopy", mayThrow: true, immediate: "TableCopyOperand"),
-        Instruction(name: "tableInit", mayThrow: true, immediate: "TableInitOperand"),
-        Instruction(name: "tableElementDrop", immediate: "TableElementDropOperand"),
+        Instruction(name: "tableGet", documentation: "WebAssembly Core Instruction `table.get`", mayThrow: true) {
+            $0.field(name: "index", type: .VReg)
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "tableIndex", type: .UInt32)
+        },
+        Instruction(name: "tableSet", documentation: "WebAssembly Core Instruction `table.set`", mayThrow: true) {
+            $0.field(name: "index", type: .VReg)
+            $0.field(name: "value", type: .VReg)
+            $0.field(name: "tableIndex", type: .UInt32)
+        },
+        Instruction(name: "tableSize", documentation: "WebAssembly Core Instruction `table.size`") {
+            $0.field(name: "tableIndex", type: .UInt32)
+            $0.field(name: "result", type: .LVReg)
+        },
+        Instruction(name: "tableGrow", documentation: "WebAssembly Core Instruction `table.grow`", mayThrow: true) {
+            $0.field(name: "tableIndex", type: .UInt32)
+            $0.field(name: "result", type: .VReg)
+            $0.field(name: "delta", type: .VReg)
+            $0.field(name: "value", type: .VReg)
+        },
+        Instruction(name: "tableFill", documentation: "WebAssembly Core Instruction `table.fill`", mayThrow: true) {
+            $0.field(name: "tableIndex", type: .UInt32)
+            $0.field(name: "destOffset", type: .VReg)
+            $0.field(name: "value", type: .VReg)
+            $0.field(name: "size", type: .VReg)
+        },
+        Instruction(name: "tableCopy", documentation: "WebAssembly Core Instruction `table.copy`", mayThrow: true) {
+            $0.field(name: "sourceIndex", type: .UInt32)
+            $0.field(name: "destIndex", type: .UInt32)
+            $0.field(name: "destOffset", type: .VReg)
+            $0.field(name: "sourceOffset", type: .VReg)
+            $0.field(name: "size", type: .VReg)
+        },
+        Instruction(name: "tableInit", documentation: "WebAssembly Core Instruction `table.init`", mayThrow: true) {
+            $0.field(name: "tableIndex", type: .UInt32)
+            $0.field(name: "segmentIndex", type: .UInt32)
+            $0.field(name: "destOffset", type: .VReg)
+            $0.field(name: "sourceOffset", type: .VReg)
+            $0.field(name: "size", type: .VReg)
+        },
+        Instruction(name: "tableElementDrop", documentation: "WebAssembly Core Instruction `table.drop`") {
+            $0.field(name: "index", type: .ElementIndex)
+        },
         // Profiling
-        Instruction(name: "onEnter", immediate: "OnEnterOperand"),
-        Instruction(name: "onExit", immediate: "OnExitOperand"),
+        Instruction(name: "onEnter", documentation: "Intercept the entry of a function", immediate: "OnEnterOperand"),
+        Instruction(name: "onExit", documentation: "Intercept the exit of a function", immediate: "OnExitOperand"),
     ]
 
     // MARK: - Instruction generation
@@ -439,50 +510,68 @@ extension VMGen {
     static func buildInstructions() -> [Instruction] {
         var instructions: [Instruction] = [
             // Variable
-            Instruction(name: "copyStack", immediate: "CopyStackOperand"),
-            Instruction(name: "globalGet", immediate: "GlobalGetOperand"),
-            Instruction(name: "globalSet", immediate: "GlobalSetOperand"),
+            Instruction(name: "copyStack", documentation: "Copy a register value to another register") {
+                $0.field(name: "source", type: .LVReg)
+                $0.field(name: "dest", type: .LVReg)
+            },
+            Instruction(name: "globalGet", documentation: "WebAssembly Core Instruction `global.get`", immediateLayout: .globalAndVRegOperand),
+            Instruction(name: "globalSet", documentation: "WebAssembly Core Instruction `global.set`", immediateLayout: .globalAndVRegOperand),
             // Controls
             Instruction(
-                name: "call", isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write,
-                immediate: "CallOperand"
-                ),
+                name: "call", documentation: "WebAssembly Core Instruction `call`",
+                isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write, immediateLayout: .call
+            ),
             Instruction(
-                name: "compilingCall", isControl: true, mayThrow: true, mayUpdateFrame: true,
-                immediate: "CompilingCallOperand"
-                ),
+                name: "compilingCall", documentation: """
+                Compile a callee function (if not compiled) and call it.
+
+                This instruction is replaced by `internalCall` after the callee is compiled.
+                """,
+                isControl: true, mayThrow: true, mayUpdateFrame: true, immediateLayout: .call
+            ),
             Instruction(
-                name: "internalCall", isControl: true, mayThrow: true, mayUpdateFrame: true,
-                immediate: 
-                    "InternalCallOperand"
-                ),
+                name: "internalCall", documentation: """
+                Call a function defined in the current module
+
+                This instruction can skip switching the current instance.
+                """,
+                isControl: true, mayThrow: true, mayUpdateFrame: true, immediateLayout: .call
+            ),
+            Instruction(name: "callIndirect", documentation: "WebAssembly Core Instruction `call_indirect`",
+                        isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write) {
+                $0.field(name: "tableIndex", type: .UInt32)
+                $0.field(name: "rawType", type: .UInt32)
+                $0.field(name: "index", type: .VReg)
+                $0.field(name: "spAddend", type: .VReg)
+            },
+            Instruction(name: "unreachable", documentation: "WebAssembly Core Instruction `unreachable`",
+                        isControl: true, mayThrow: true),
+            Instruction(name: "nop", documentation: "WebAssembly Core Instruction `nop`"),
             Instruction(
-                name: "callIndirect", isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write,
-                immediate:
-                    "CallIndirectOperand"
-                ),
-            Instruction(name: "unreachable", isControl: true, mayThrow: true),
-            Instruction(name: "nop"),
+                name: "br", documentation: "Unconditional pc-relative branch",
+                isControl: true, mayUpdateFrame: false,
+                immediate: "BrOperand"),
             Instruction(
-                name: "br", isControl: true, mayUpdateFrame: false,
-                immediate: "BrOperand"
-                ),
+                name: "brIf", documentation: "Conditional pc-relative branch if the condition is true",
+                isControl: true, mayUpdateFrame: false, immediateLayout: .brIfOperand),
             Instruction(
-                name: "brIf", isControl: true, mayUpdateFrame: false,
-                immediate:
-                    "BrIfOperand"
-                ),
-            Instruction(
-                name: "brIfNot", isControl: true, mayUpdateFrame: false,
-                immediate: "BrIfOperand"
-                ),
-            Instruction(
-                name: "brTable", isControl: true, mayUpdateFrame: false,
-                immediate:
-                    "BrTable"
-                ),
-            Instruction(name: "_return", isControl: true, mayUpdateFrame: true, useCurrentMemory: .write),
-            Instruction(name: "endOfExecution", isControl: true, mayThrow: true, mayUpdateFrame: true),
+                name: "brIfNot", documentation: "Conditional pc-relative branch if the condition is false",
+                isControl: true, mayUpdateFrame: false, immediateLayout: .brIfOperand),
+            Instruction(name: "brTable", documentation: "WebAssembly Core Instruction `br_table`",
+                        isControl: true, mayUpdateFrame: false) {
+                $0.field(name: "rawBaseAddress", type: .UInt64)
+                $0.field(name: "count", type: .UInt16)
+                $0.field(name: "index", type: .VReg)
+            },
+            Instruction(name: "_return", documentation: "Return from a function",
+                        isControl: true, mayUpdateFrame: true, useCurrentMemory: .write),
+            Instruction(name: "endOfExecution", documentation: """
+                        End the execution of the VM
+
+                        This instruction is used to signal the end of the execution of the VM at
+                        the root frame.
+                        """,
+                        isControl: true, mayThrow: true, mayUpdateFrame: true),
         ]
         instructions += memoryLoadStoreInsts
         instructions += memoryOpInsts
