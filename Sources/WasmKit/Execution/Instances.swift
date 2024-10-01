@@ -78,6 +78,21 @@ struct InstanceEntity /* : ~Copyable */ {
     var exports: [String: InternalExternalValue]
     var features: WasmFeatureSet
     var hasDataCount: Bool
+
+    static var empty: InstanceEntity {
+        InstanceEntity(
+            types: [],
+            functions: ImmutableArray(),
+            tables: ImmutableArray(),
+            memories: ImmutableArray(),
+            globals: ImmutableArray(),
+            elementSegments: ImmutableArray(),
+            dataSegments: ImmutableArray(),
+            exports: [:],
+            features: [],
+            hasDataCount: false
+        )
+    }
 }
 
 typealias InternalInstance = EntityHandle<InstanceEntity>
