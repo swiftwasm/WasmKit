@@ -14,16 +14,17 @@ public func FuzzCheck(_ start: UnsafePointer<UInt8>, _ count: Int) -> CInt {
     let bytes = Array(UnsafeBufferPointer(start: start, count: count))
     do {
         let module = try WasmKit.parseWasm(bytes: bytes)
-        let runtime = WasmKit.Runtime()
-        runtime.store.resourceLimiter = FuzzerResourceLimiter()
-        let instance = try runtime.instantiate(module: module)
+        let engine = WasmKit.Engine()
+        let store = WasmKit.Store(engine: engine)
+        store.resourceLimiter = FuzzerResourceLimiter()
+        let instance = try module.instantiate(store: store)
         for export in instance.exports.values {
             guard case let .function(fn) = export else {
                 continue
             }
             let type = fn.type
             let arguments = type.parameters.map { $0.defaultValue }
-            _ = try fn.invoke(arguments, runtime: runtime)
+            _ = try fn(arguments)
         }
     } catch {
         // Ignore errors

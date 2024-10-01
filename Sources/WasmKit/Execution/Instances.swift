@@ -85,11 +85,16 @@ typealias InternalInstance = EntityHandle<InstanceEntity>
 /// A map of exported entities by name.
 public struct Exports: Sequence {
     let store: Store
-    let values: [String: InternalExternalValue]
+    let items: [String: InternalExternalValue]
+
+    /// A collection of exported entities without their names.
+    public var values: [ExternalValue] {
+        self.map { $0.value }
+    }
 
     /// Returns the exported entity with the given name.
     public subscript(_ name: String) -> ExternalValue? {
-        guard let entity = values[name] else { return nil }
+        guard let entity = items[name] else { return nil }
         return ExternalValue(handle: entity, store: store)
     }
 
@@ -123,10 +128,10 @@ public struct Exports: Sequence {
 
         init(parent: Exports) {
             self.store = parent.store
-            self.iterator = parent.values.makeIterator()
+            self.iterator = parent.items.makeIterator()
         }
 
-        public mutating func next() -> (String, ExternalValue)? {
+        public mutating func next() -> (name: String, value: ExternalValue)? {
             guard let (name, entity) = iterator.next() else { return nil }
             return (name, ExternalValue(handle: entity, store: store))
         }
@@ -170,7 +175,7 @@ public struct Instance {
 
     /// A dictionary of exported entities by name.
     public var exports: Exports {
-        Exports(store: store, values: handle.exports)
+        Exports(store: store, items: handle.exports)
     }
 
     /// Dumps the textual representation of all functions in the instance.
