@@ -9,15 +9,15 @@ public struct Imports {
     }
 
     /// Define a value to be imported by the given module and name.
-    public mutating func define(module: String, name: String, _ value: ExternalValue) {
-        definitions[module, default: [:]][name] = value
+    public mutating func define<Extern: ExternalValueConvertible>(module: String, name: String, _ value: Extern) {
+        definitions[module, default: [:]][name] = value.externalValue
     }
 
     /// Define a set of values to be imported by the given module.
     /// - Parameters:
     ///   - module: The module name to be used for resolving the imports.
     ///   - values: The values to be imported keyed by their name.
-    public mutating func define(module: String, _ values: Instance.Exports) {
+    public mutating func define(module: String, _ values: Exports) {
         definitions[module, default: [:]].merge(values, uniquingKeysWith: { _, new in new })
     }
 
@@ -34,6 +34,10 @@ public struct Imports {
 /// A value that can be imported or exported from an instance.
 public protocol ExternalValueConvertible {
     var externalValue: ExternalValue { get }
+}
+
+extension ExternalValue: ExternalValueConvertible {
+    public var externalValue: ExternalValue { self }
 }
 
 extension Memory: ExternalValueConvertible {

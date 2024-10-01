@@ -82,6 +82,61 @@ struct InstanceEntity /* : ~Copyable */ {
 
 typealias InternalInstance = EntityHandle<InstanceEntity>
 
+/// A map of exported entities by name.
+public struct Exports: Sequence {
+    let store: Store
+    let values: [String: InternalExternalValue]
+
+    /// Returns the exported entity with the given name.
+    public subscript(_ name: String) -> ExternalValue? {
+        guard let entity = values[name] else { return nil }
+        return ExternalValue(handle: entity, store: store)
+    }
+
+    /// Returns the exported function with the given name.
+    public subscript(function name: String) -> Function? {
+        guard case .function(let function) = self[name] else { return nil }
+        return function
+    }
+
+    /// Returns the exported table with the given name.
+    public subscript(table name: String) -> Table? {
+        guard case .table(let table) = self[name] else { return nil }
+        return table
+    }
+
+    /// Returns the exported memory with the given name.
+    public subscript(memory name: String) -> Memory? {
+        guard case .memory(let memory) = self[name] else { return nil }
+        return memory
+    }
+
+    /// Returns the exported global with the given name.
+    public subscript(global name: String) -> Global? {
+        guard case .global(let global) = self[name] else { return nil }
+        return global
+    }
+
+    public struct Iterator: IteratorProtocol {
+        private let store: Store
+        private var iterator: Dictionary<String, InternalExternalValue>.Iterator
+
+        init(parent: Exports) {
+            self.store = parent.store
+            self.iterator = parent.values.makeIterator()
+        }
+
+        public mutating func next() -> (String, ExternalValue)? {
+            guard let (name, entity) = iterator.next() else { return nil }
+            return (name, ExternalValue(handle: entity, store: store))
+        }
+    }
+
+    public func makeIterator() -> Iterator {
+        Iterator(parent: self)
+    }
+}
+
 /// A stateful instance of a WebAssembly module.
 /// Usually instantiated by ``Runtime/instantiate(module:)``.
 /// > Note:
@@ -113,11 +168,9 @@ public struct Instance {
         return function
     }
 
-    public typealias Exports = [String: ExternalValue]
-
     /// A dictionary of exported entities by name.
     public var exports: Exports {
-        handle.exports.mapValues { ExternalValue(handle: $0, store: store) }
+        Exports(store: store, values: handle.exports)
     }
 
     /// Dumps the textual representation of all functions in the instance.

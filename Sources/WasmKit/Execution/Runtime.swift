@@ -24,6 +24,7 @@ public final class Runtime {
     /// - Parameter hostModules: Host module names mapped to their corresponding ``HostModule`` definitions.
     /// - Parameter interceptor: An optional runtime interceptor to intercept execution of instructions.
     /// - Parameter configuration: An optional runtime configuration to customize the runtime behavior.
+    @available(*, deprecated)
     public init(
         hostModules: [String: HostModule] = [:],
         interceptor: EngineInterceptor? = nil,
@@ -59,7 +60,7 @@ extension Runtime {
             throw ImportError.moduleInstanceAlreadyRegistered(name)
         }
 
-        availableExports[name] = instance.exports
+        availableExports[name] = Dictionary(uniqueKeysWithValues: instance.exports)
     }
 
     /// Legacy compatibility method to register a host module with a name.

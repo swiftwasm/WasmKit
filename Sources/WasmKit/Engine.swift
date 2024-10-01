@@ -16,6 +16,10 @@ public final class Engine {
         self.interceptor = interceptor
         self.funcTypeInterner = Interner()
     }
+
+    /// Migration aid for the old ``Runtime/instantiate(module:)``
+    @available(*, unavailable, message: "Use ``Module/instantiate(store:imports:)`` instead")
+    public func instantiate(module: Module) -> Instance { fatalError() }
 }
 
 public struct EngineConfiguration {
