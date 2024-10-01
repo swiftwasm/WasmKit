@@ -29,19 +29,27 @@ let module = try parseWasm(
     )
 )
 
-// Define a host function that prints an i32 value.
-let hostPrint = HostFunction(type: FunctionType(parameters: [.i32])) { _, args in
-    // This function is called from "print_add" in the WebAssembly module.
-    print(args[0])
-    return []
-}
-// Create a runtime importing the host function.
-let runtime = Runtime(hostModules: [
-    "printer": HostModule(functions: ["print_i32": hostPrint])
-])
-let instance = try runtime.instantiate(module: module)
+// Create engine and store
+let engine = Engine()
+let store = Store(engine: engine)
+
+// Instantiate a parsed module with importing a host function
+let instance = try module.instantiate(
+    store: store,
+    // Import a host function that prints an i32 value.
+    imports: [
+        "printer": [
+            "print_i32": Function(store: store, parameters: [.i32]) { _, args in
+                // This function is called from "print_add" in the WebAssembly module.
+                print(args[0])
+                return []
+            }
+        ]
+    ]
+)
 // Invoke the exported function "print_add"
-_ = try runtime.invoke(instance, function: "print_add", with: [.i32(42), .i32(3)])
+let printAdd = instance.exports[function: "print_add"]!
+try printAdd([.i32(42), .i32(3)])
 ```
 
 See [examples](https://github.com/swiftwasm/WasmKit/tree/main/Examples) for executable examples.
@@ -61,12 +69,16 @@ let module = try parseWasm(filePath: "wasm/hello.wasm")
 
 // Create a WASI instance forwarding to the host environment.
 let wasi = try WASIBridgeToHost()
-// Create a runtime with WASI host modules.
-let runtime = Runtime(hostModules: wasi.hostModules)
-let instance = try runtime.instantiate(module: module)
+// Create engine and store
+let engine = Engine()
+let store = Store(engine: engine)
+// Instantiate a parsed module importing WASI
+var imports = Imports()
+wasi.link(to: &imports, store: store)
+let instance = try module.instantiate(store: store, imports: imports)
 
 // Start the WASI command-line application.
-let exitCode = try wasi.start(instance, runtime: runtime)
+let exitCode = try wasi.start(instance)
 // Exit the Swift program with the WASI exit code.
 exit(Int32(exitCode))
 ```
