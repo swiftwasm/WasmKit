@@ -5,7 +5,6 @@ public typealias WASIBridgeToHost = WASI.WASIBridgeToHost
 
 extension WASIBridgeToHost {
     public func link(to imports: inout Imports, store: Store) {
-        var imports = Imports()
         for (moduleName, module) in wasiHostModules {
             for (name, function) in module.functions {
                 imports.define(

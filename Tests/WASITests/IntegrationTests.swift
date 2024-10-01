@@ -116,10 +116,13 @@ final class IntegrationTests: XCTestCase {
                 $0[$1] = suitePath.appendingPathComponent($1).path
             }
         )
-        let runtime = Runtime(hostModules: wasi.hostModules)
+        let engine = Engine()
+        let store = Store(engine: engine)
+        var imports = Imports()
+        wasi.link(to: &imports, store: store)
         let module = try parseWasm(filePath: FilePath(path.path))
-        let instance = try runtime.instantiate(module: module)
-        let exitCode = try wasi.start(instance, runtime: runtime)
+        let instance = try module.instantiate(store: store, imports: imports)
+        let exitCode = try wasi.start(instance)
         XCTAssertEqual(exitCode, manifest.exitCode ?? 0, path.path)
     }
 }

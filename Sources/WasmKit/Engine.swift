@@ -11,7 +11,7 @@ public final class Engine {
     /// - Parameters:
     ///   - configuration: The engine configuration.
     ///   - interceptor: An optional runtime interceptor to intercept execution of instructions.
-    public init(configuration: EngineConfiguration, interceptor: EngineInterceptor? = nil) {
+    public init(configuration: EngineConfiguration = EngineConfiguration(), interceptor: EngineInterceptor? = nil) {
         self.configuration = configuration
         self.interceptor = interceptor
         self.funcTypeInterner = Interner()
