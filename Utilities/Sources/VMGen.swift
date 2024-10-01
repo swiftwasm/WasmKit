@@ -436,16 +436,13 @@ enum VMGen {
                 import _CWasmKit.InlineCode
 
                 extension Instruction {
-                    private static let handlers: [UInt64] = withUnsafePointer(to: wasmkit_tc_exec_handlers) {
-                        let count = MemoryLayout.size(ofValue: wasmkit_tc_exec_handlers) / MemoryLayout<wasmkit_tc_exec>.size
-                        return $0.withMemoryRebound(to: UInt64.self, capacity: count) {
-                            Array(UnsafeBufferPointer(start: $0, count: count))
-                        }
-                    }
-
-                    @inline(never)
                     var handler: UInt64 {
-                        return Self.handlers[Int(self.opcodeID)]
+                        return withUnsafePointer(to: wasmkit_tc_exec_handlers) {
+                            let count = MemoryLayout.size(ofValue: wasmkit_tc_exec_handlers) / MemoryLayout<wasmkit_tc_exec>.size
+                            return $0.withMemoryRebound(to: UInt64.self, capacity: count) {
+                                $0[Int(self.opcodeID)]
+                            }
+                        }
                     }
                 }
 
