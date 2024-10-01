@@ -122,7 +122,7 @@ public struct Module {
     ///   - store: The ``Store`` to allocate the instance in.
     ///   - imports: The imports to use for instantiation. All imported entities
     ///     must be allocated in the given store.
-    public func instantiate(store: Store, imports: Imports) throws -> Instance {
+    public func instantiate(store: Store, imports: Imports = [:]) throws -> Instance {
         Instance(handle: try self.instantiateHandle(store: store, imports: imports), store: store)
     }
 

@@ -100,8 +100,26 @@ enum Result {
     }
 }
 
+struct SpectestError: Error, CustomStringConvertible {
+    var description: String
+    init(_ description: String) {
+        self.description = description
+    }
+}
+
 class WastRunContext {
+    let store: Store
+    var engine: Engine { store.engine }
+    let rootPath: String
     private var namedModuleInstances: [String: Instance] = [:]
+    var currentInstance: Instance?
+    var importsSpace = Imports()
+
+    init(store: Store, rootPath: String) {
+        self.store = store
+        self.rootPath = rootPath
+    }
+
     func lookupInstance(_ name: String) -> Instance? {
         return namedModuleInstances[name]
     }
@@ -112,24 +130,22 @@ class WastRunContext {
 
 extension TestCase {
     func run(spectestModule: Module, configuration: EngineConfiguration, handler: @escaping (TestCase, Location, Result) -> Void) throws {
-        let runtime = Runtime(configuration: configuration)
-        let hostModuleInstance = try runtime.instantiate(module: spectestModule)
+        let engine = Engine(configuration: configuration)
+        let store = Store(engine: engine)
+        let spectestInstance = try spectestModule.instantiate(store: store)
 
-        try runtime.register(hostModuleInstance, as: "spectest")
-
-        var currentInstance: Instance?
         let rootPath = FilePath(path).removingLastComponent().string
         var content = content
-        let context = WastRunContext()
+        let context = WastRunContext(store: store, rootPath: rootPath)
+        context.importsSpace.define(module: "spectest", spectestInstance.exports)
         do {
             while let (directive, location) = try content.nextDirective() {
-                directive.run(
-                    runtime: runtime,
-                    context: context,
-                    instance: &currentInstance,
-                    rootPath: rootPath
-                ) { command, result in
-                    handler(self, location, result)
+                do {
+                    if let result = try context.run(directive: directive) {
+                        handler(self, location, result)
+                    }
+                } catch let error as SpectestError {
+                    handler(self, location, .failed(error.description))
                 }
             }
         } catch let parseError as WatParserError {
@@ -142,43 +158,37 @@ extension TestCase {
     }
 }
 
-extension WastDirective {
-    func run(
-        runtime: Runtime,
-        context: WastRunContext,
-        instance currentInstance: inout Instance?,
-        rootPath: String,
-        handler: (WastDirective, Result) -> Void
-    ) {
-        func instantiate(module: Module, name: String? = nil) throws -> Instance {
-            let instance = try runtime.instantiate(module: module)
-            if let name {
-                context.register(name, instance: instance)
+extension WastRunContext {
+    func instantiate(module: Module, name: String? = nil) throws -> Instance {
+        let instance = try module.instantiate(store: store, imports: importsSpace)
+        if let name {
+            register(name, instance: instance)
+        }
+        return instance
+    }
+    func deriveModuleInstance(from execute: WastExecute) throws -> Instance? {
+        switch execute {
+        case .invoke(let invoke):
+            if let module = invoke.module {
+                return lookupInstance(module)
+            } else {
+                return currentInstance
             }
+        case .wat(var wat):
+            let module = try parseModule(rootPath: rootPath, moduleSource: .binary(wat.encode()))
+            let instance = try instantiate(module: module)
             return instance
-        }
-        func deriveModuleInstance(from execute: WastExecute) throws -> Instance? {
-            switch execute {
-            case .invoke(let invoke):
-                if let module = invoke.module {
-                    return context.lookupInstance(module)
-                } else {
-                    return currentInstance
-                }
-            case .wat(var wat):
-                let module = try parseModule(rootPath: rootPath, moduleSource: .binary(wat.encode()))
-                let instance = try instantiate(module: module)
-                return instance
-            case .get(let module, _):
-                if let module {
-                    return context.lookupInstance(module)
-                } else {
-                    return currentInstance
-                }
+        case .get(let module, _):
+            if let module {
+                return lookupInstance(module)
+            } else {
+                return currentInstance
             }
         }
+    }
 
-        switch self {
+    func run(directive: WastDirective) throws -> Result? {
+        switch directive {
         case .module(let moduleDirective):
             currentInstance = nil
 
@@ -186,41 +196,37 @@ extension WastDirective {
             do {
                 module = try parseModule(rootPath: rootPath, moduleSource: moduleDirective.source)
             } catch {
-                return handler(self, .failed("module could not be parsed: \(error)"))
+                return .failed("module could not be parsed: \(error)")
             }
 
             do {
                 currentInstance = try instantiate(module: module, name: moduleDirective.id)
             } catch {
-                return handler(self, .failed("module could not be instantiated: \(error)"))
+                return .failed("module could not be instantiated: \(error)")
             }
 
-            return handler(self, .passed)
+            return .passed
 
         case .register(let name, let moduleId):
-            let module: Instance
+            let instance: Instance
             if let moduleId {
-                guard let found = context.lookupInstance(moduleId) else {
-                    return handler(self, .failed("module \(moduleId) not found"))
+                guard let found = self.lookupInstance(moduleId) else {
+                    return .failed("module \(moduleId) not found")
                 }
-                module = found
+                instance = found
             } else {
                 guard let currentInstance else {
-                    return handler(self, .failed("no current module to register"))
+                    return .failed("no current module to register")
                 }
-                module = currentInstance
+                instance = currentInstance
             }
-
-            do {
-                try runtime.register(module, as: name)
-            } catch {
-                return handler(self, .failed("module could not be registered: \(error)"))
-            }
+            importsSpace.define(module: name, instance.exports)
+            return nil
 
         case .assertMalformed(let module, let message):
             currentInstance = nil
             guard case .binary = module.source else {
-                return handler(self, .skipped("assert_malformed is only supported for binary modules for now"))
+                return .skipped("assert_malformed is only supported for binary modules for now")
             }
 
             do {
@@ -228,9 +234,9 @@ extension WastDirective {
                 // Materialize all functions to see all errors in the module
                 try module.materializeAll()
             } catch {
-                return handler(self, .passed)
+                return .passed
             }
-            return handler(self, .failed("module should not be parsed: expected \"\(message)\""))
+            return .failed("module should not be parsed: expected \"\(message)\"")
 
         case .assertTrap(execute: .wat(var wat), let message):
             currentInstance = nil
@@ -239,33 +245,33 @@ extension WastDirective {
             do {
                 module = try parseModule(rootPath: rootPath, moduleSource: .binary(wat.encode()))
             } catch {
-                return handler(self, .failed("module could not be parsed: \(error)"))
+                return .failed("module could not be parsed: \(error)")
             }
 
             do {
                 _ = try instantiate(module: module)
             } catch let error as InstantiationError {
                 guard error.assertionText.contains(message) else {
-                    return handler(self, .failed("assertion mismatch: expected: \(message), actual: \(error.assertionText)"))
+                    return .failed("assertion mismatch: expected: \(message), actual: \(error.assertionText)")
                 }
             } catch let error as Trap {
                 guard error.assertionText.contains(message) else {
-                    return handler(self, .failed("assertion mismatch: expected: \(message), actual: \(error.assertionText)"))
+                    return .failed("assertion mismatch: expected: \(message), actual: \(error.assertionText)")
                 }
             } catch {
-                return handler(self, .failed("\(error)"))
+                return .failed("\(error)")
             }
-            return handler(self, .passed)
+            return .passed
 
         case .assertReturn(let execute, let results):
             let instance: Instance?
             do {
                 instance = try deriveModuleInstance(from: execute)
             } catch {
-                return handler(self, .failed("failed to derive module instance: \(error)"))
+                return .failed("failed to derive module instance: \(error)")
             }
             guard let instance else {
-                return handler(self, .failed("no module to execute"))
+                return .failed("no module to execute")
             }
 
             let expected = parseValues(args: results)
@@ -274,14 +280,14 @@ extension WastDirective {
             case .invoke(let invoke):
                 let result: [WasmKit.Value]
                 do {
-                    result = try runtime.invoke(instance, function: invoke.name, with: invoke.args)
+                    result = try wastInvoke(call: invoke)
                 } catch {
-                    return handler(self, .failed("\(error)"))
+                    return .failed("\(error)")
                 }
                 guard result.isTestEquivalent(to: expected) else {
-                    return handler(self, .failed("invoke result mismatch: expected: \(expected), actual: \(result)"))
+                    return .failed("invoke result mismatch: expected: \(expected), actual: \(result)")
                 }
-                return handler(self, .passed)
+                return .passed
 
             case .get(_, let globalName):
                 let result: WasmKit.Value
@@ -291,65 +297,43 @@ extension WastDirective {
                     }
                     result = global.value
                 } catch {
-                    return handler(self, .failed("\(error)"))
+                    return .failed("\(error)")
                 }
                 guard result.isTestEquivalent(to: expected[0]) else {
-                    return handler(self, .failed("get result mismatch: expected: \(expected), actual: \(result)"))
+                    return .failed("get result mismatch: expected: \(expected), actual: \(result)")
                 }
-                return handler(self, .passed)
-            case .wat: break
+                return .passed
+            case .wat: return .skipped("TBD")
             }
 
         case .assertTrap(let execute, let message):
-            let moduleInstance: Instance?
-            do {
-                moduleInstance = try deriveModuleInstance(from: execute)
-            } catch {
-                return handler(self, .failed("failed to derive module instance: \(error)"))
-            }
-            guard let moduleInstance else {
-                return handler(self, .failed("no module to execute"))
-            }
-
             switch execute {
             case .invoke(let invoke):
                 do {
-                    _ = try runtime.invoke(moduleInstance, function: invoke.name, with: invoke.args)
+                    _ = try wastInvoke(call: invoke)
                     // XXX: This is wrong but just keep it as is
-                    // return handler(self, .failed("trap expected: \(message)"))
-                    return handler(self, .passed)
+                    // return .failed("trap expected: \(message)")
+                    return .passed
                 } catch let trap as Trap {
                     guard trap.assertionText.contains(message) else {
-                        return handler(self, .failed("assertion mismatch: expected: \(message), actual: \(trap.assertionText)"))
+                        return .failed("assertion mismatch: expected: \(message), actual: \(trap.assertionText)")
                     }
-                    return handler(self, .passed)
+                    return .passed
                 } catch {
-                    return handler(self, .failed("\(error)"))
+                    return .failed("\(error)")
                 }
             default:
-                return handler(self, .failed("assert_trap is not implemented non-invoke actions"))
+                return .failed("assert_trap is not implemented non-invoke actions")
             }
         case .assertExhaustion(let call, let message):
-            let moduleInstance: Instance?
             do {
-                moduleInstance = try deriveModuleInstance(from: .invoke(call))
-            } catch {
-                return handler(self, .failed("failed to derive module instance: \(error)"))
-            }
-            guard let moduleInstance else {
-                return handler(self, .failed("no module to execute"))
-            }
-
-            do {
-                _ = try runtime.invoke(moduleInstance, function: call.name, with: call.args)
-                return handler(self, .failed("trap expected: \(message)"))
+                _ = try wastInvoke(call: call)
+                return .failed("trap expected: \(message)")
             } catch let trap as Trap {
                 guard trap.assertionText.contains(message) else {
-                    return handler(self, .failed("assertion mismatch: expected: \(message), actual: \(trap.assertionText)"))
+                    return .failed("assertion mismatch: expected: \(message), actual: \(trap.assertionText)")
                 }
-                return handler(self, .passed)
-            } catch {
-                return handler(self, .failed("\(error)"))
+                return .passed
             }
         case .assertUnlinkable(let wat, let message):
             currentInstance = nil
@@ -358,41 +342,43 @@ extension WastDirective {
             do {
                 module = try parseModule(rootPath: rootPath, moduleSource: .text(wat))
             } catch {
-                return handler(self, .failed("module could not be parsed: \(error)"))
+                return .failed("module could not be parsed: \(error)")
             }
 
             do {
                 _ = try instantiate(module: module)
             } catch let error as ImportError {
                 guard error.assertionText.contains(message) else {
-                    return handler(self, .failed("assertion mismatch: expected: \(message), actual: \(error.assertionText)"))
+                    return .failed("assertion mismatch: expected: \(message), actual: \(error.assertionText)")
                 }
             } catch {
-                return handler(self, .failed("\(error)"))
+                return .failed("\(error)")
             }
-            return handler(self, .passed)
+            return .passed
 
         case .assertInvalid:
-            return handler(self, .skipped("validation is no implemented yet"))
+            return .skipped("validation is no implemented yet")
 
         case .invoke(let invoke):
-            let moduleInstance: Instance?
-            do {
-                moduleInstance = try deriveModuleInstance(from: .invoke(invoke))
-            } catch {
-                return handler(self, .failed("failed to derive module instance: \(error)"))
-            }
-            guard let moduleInstance else {
-                return handler(self, .failed("no module to execute"))
-            }
-
-            do {
-                _ = try runtime.invoke(moduleInstance, function: invoke.name, with: invoke.args)
-            } catch {
-                return handler(self, .failed("\(error)"))
-            }
-            return handler(self, .passed)
+            _ = try wastInvoke(call: invoke)
+            return .passed
         }
+    }
+
+    private func wastInvoke(call: WastInvoke) throws -> [Value] {
+        let instance: Instance?
+        do {
+            instance = try deriveModuleInstance(from: .invoke(call))
+        } catch {
+            throw SpectestError("failed to derive module instance: \(error)")
+        }
+        guard let instance else {
+            throw SpectestError("no module to execute")
+        }
+        guard let function = instance.exportedFunction(name: call.name) else {
+            throw SpectestError("function \(call.name) not exported")
+        }
+        return try function.invoke(call.args)
     }
 
     private func deriveFeatureSet(rootPath: FilePath) -> WasmFeatureSet {
