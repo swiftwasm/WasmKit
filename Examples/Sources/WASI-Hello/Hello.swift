@@ -2,7 +2,6 @@
 
 import WasmKit
 import WasmKitWASI
-import WAT
 import Foundation
 
 @main
