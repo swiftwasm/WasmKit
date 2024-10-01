@@ -189,7 +189,7 @@ extension UntypedValue {
 typealias OpcodeID = UInt64
 
 extension Instruction {
-    func headSlot(threadingModel: RuntimeConfiguration.ThreadingModel) -> CodeSlot {
+    func headSlot(threadingModel: EngineConfiguration.ThreadingModel) -> CodeSlot {
         switch threadingModel {
         case .direct:
             return CodeSlot(handler)

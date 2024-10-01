@@ -1,12 +1,11 @@
 import WasmParser
-import _CWasmKit.Platform
 
 /// A container to manage execution state of one or more module instances.
 public final class Runtime {
     public let store: Store
-    let interceptor: RuntimeInterceptor?
+    let interceptor: EngineInterceptor?
     let funcTypeInterner: Interner<FunctionType>
-    let configuration: RuntimeConfiguration
+    let configuration: EngineConfiguration
 
     /// Initializes a new instant of a WebAssembly interpreter runtime.
     /// - Parameter hostModules: Host module names mapped to their corresponding ``HostModule`` definitions.
@@ -14,8 +13,8 @@ public final class Runtime {
     /// - Parameter configuration: An optional runtime configuration to customize the runtime behavior.
     public init(
         hostModules: [String: HostModule] = [:],
-        interceptor: RuntimeInterceptor? = nil,
-        configuration: RuntimeConfiguration = RuntimeConfiguration()
+        interceptor: EngineInterceptor? = nil,
+        configuration: EngineConfiguration = EngineConfiguration()
     ) {
         self.funcTypeInterner = Interner<FunctionType>()
         store = Store(funcTypeInterner: funcTypeInterner)
@@ -32,37 +31,6 @@ public final class Runtime {
     }
     func internType(_ type: FunctionType) -> InternedFuncType {
         return funcTypeInterner.intern(type)
-    }
-}
-
-public struct RuntimeConfiguration {
-    /// The threading model, which determines how to dispatch instruction
-    /// execution, to use for the virtual machine interpreter.
-    public enum ThreadingModel {
-        /// Direct threaded code
-        /// - Note: This is the default model for platforms that support
-        /// `musttail` calls.
-        case direct
-        /// Indirect threaded code
-        /// - Note: This is a fallback model for platforms that do not support
-        /// `musttail` calls.
-        case token
-
-        static var useDirectThreadedCode: Bool {
-            return WASMKIT_USE_DIRECT_THREADED_CODE == 1
-        }
-
-        static var defaultForCurrentPlatform: ThreadingModel {
-            return useDirectThreadedCode ? .direct : .token
-        }
-    }
-
-    /// The threading model to use for the virtual machine interpreter.
-    public var threadingModel: ThreadingModel
-
-    /// Initializes a new instance of `RuntimeConfiguration`.
-    public init(threadingModel: ThreadingModel? = nil) {
-        self.threadingModel = threadingModel ?? .defaultForCurrentPlatform
     }
 }
 

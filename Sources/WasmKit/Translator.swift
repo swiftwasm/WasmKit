@@ -559,10 +559,10 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         fileprivate var insertingPC: MetaProgramCounter {
             MetaProgramCounter(offsetFromHead: instructions.count)
         }
-        let runtimeConfiguration: RuntimeConfiguration
+        let engineConfiguration: EngineConfiguration
 
-        init(runtimeConfiguration: RuntimeConfiguration) {
-            self.runtimeConfiguration = runtimeConfiguration
+        init(engineConfiguration: EngineConfiguration) {
+            self.engineConfiguration = engineConfiguration
         }
 
         func assertDanglingLabels() throws {
@@ -585,7 +585,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
         private mutating func assign(at index: Int, _ instruction: Instruction) {
             trace("assign: \(instruction)")
-            let headSlot = instruction.headSlot(threadingModel: runtimeConfiguration.threadingModel)
+            let headSlot = instruction.headSlot(threadingModel: engineConfiguration.threadingModel)
             trace("        [\(index)] = 0x\(String(headSlot, radix: 16))")
             self.instructions[index] = headSlot
             if let immediate = instruction.rawImmediate {
@@ -630,7 +630,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         mutating func emit(_ instruction: Instruction, resultRelink: ResultRelink? = nil) {
             self.lastEmission = LastEmission(position: insertingPC, resultRelink: resultRelink)
             trace("emitInstruction: \(instruction)")
-            emitSlot(instruction.headSlot(threadingModel: runtimeConfiguration.threadingModel))
+            emitSlot(instruction.headSlot(threadingModel: engineConfiguration.threadingModel))
             if let immediate = instruction.rawImmediate {
                 var slots: [CodeSlot] = []
                 immediate.emit(to: { slots.append($0) })
@@ -807,7 +807,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
     init(
         allocator: ISeqAllocator,
-        runtimeConfiguration: RuntimeConfiguration,
+        engineConfiguration: EngineConfiguration,
         funcTypeInterner: Interner<FunctionType>,
         module: Context,
         type: FunctionType,
@@ -820,7 +820,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         self.funcTypeInterner = funcTypeInterner
         self.type = type
         self.module = module
-        self.iseqBuilder = ISeqBuilder(runtimeConfiguration: runtimeConfiguration)
+        self.iseqBuilder = ISeqBuilder(engineConfiguration: engineConfiguration)
         self.controlStack = ControlStack()
         self.stackLayout = try StackLayout(
             type: type,

@@ -97,8 +97,8 @@ struct Run: ParsableCommand {
     }
 
     /// Derives the runtime interceptor based on the command line arguments
-    func deriveInterceptor() throws -> (interceptor: RuntimeInterceptor?, finalize: () -> Void) {
-        var interceptors: [RuntimeInterceptor] = []
+    func deriveInterceptor() throws -> (interceptor: EngineInterceptor?, finalize: () -> Void) {
+        var interceptors: [EngineInterceptor] = []
         var finalizers: [() -> Void] = []
 
         if self.signpost {
@@ -131,7 +131,7 @@ struct Run: ParsableCommand {
         return (MultiplexingInterceptor(interceptors), { finalizers.forEach { $0() } })
     }
 
-    private func deriveSignpostTracer() -> RuntimeInterceptor? {
+    private func deriveSignpostTracer() -> EngineInterceptor? {
         #if canImport(os.signpost)
         if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
             let signposter = SignpostTracer(signposter: OSSignposter())
@@ -142,17 +142,17 @@ struct Run: ParsableCommand {
         return nil
     }
 
-    private func deriveRuntimeConfiguration() -> RuntimeConfiguration {
-        let threadingModel: RuntimeConfiguration.ThreadingModel?
+    private func deriveRuntimeConfiguration() -> EngineConfiguration {
+        let threadingModel: EngineConfiguration.ThreadingModel?
         switch self.threadingModel {
         case .direct: threadingModel = .direct
         case .token: threadingModel = .token
         case nil: threadingModel = nil
         }
-        return RuntimeConfiguration(threadingModel: threadingModel)
+        return EngineConfiguration(threadingModel: threadingModel)
     }
 
-    func instantiateWASI(module: Module, interceptor: RuntimeInterceptor?) throws -> () throws -> Void {
+    func instantiateWASI(module: Module, interceptor: EngineInterceptor?) throws -> () throws -> Void {
         // Flatten environment variables into a dictionary (Respect the last value if a key is duplicated)
         let environment = environment.reduce(into: [String: String]()) {
             $0[$1.key] = $1.value
@@ -169,7 +169,7 @@ struct Run: ParsableCommand {
         }
     }
 
-    func instantiateNonWASI(module: Module, interceptor: RuntimeInterceptor?) throws -> (() throws -> Void)? {
+    func instantiateNonWASI(module: Module, interceptor: EngineInterceptor?) throws -> (() throws -> Void)? {
         let functionName = arguments.first
         let arguments = arguments.dropFirst()
 
