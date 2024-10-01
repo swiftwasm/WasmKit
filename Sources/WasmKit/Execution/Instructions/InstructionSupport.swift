@@ -188,6 +188,17 @@ extension UntypedValue {
 /// The type of an opcode identifier.
 typealias OpcodeID = UInt64
 
+extension Instruction {
+    func headSlot(threadingModel: RuntimeConfiguration.ThreadingModel) -> CodeSlot {
+        switch threadingModel {
+        case .direct:
+            return CodeSlot(handler)
+        case .token:
+            return opcodeID
+        }
+    }
+}
+
 // MARK: - Instruction printing support
 
 extension InstructionSequence {

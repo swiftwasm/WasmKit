@@ -585,13 +585,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
         private mutating func assign(at index: Int, _ instruction: Instruction) {
             trace("assign: \(instruction)")
-            let headSlot: CodeSlot
-            switch runtimeConfiguration.threadingModel {
-            case .direct:
-                headSlot = instruction.handler
-            case .token:
-                headSlot = UInt64(instruction.opcodeID)
-            }
+            let headSlot = instruction.headSlot(threadingModel: runtimeConfiguration.threadingModel)
             trace("        [\(index)] = 0x\(String(headSlot, radix: 16))")
             self.instructions[index] = headSlot
             if let immediate = instruction.rawImmediate {
@@ -636,12 +630,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         mutating func emit(_ instruction: Instruction, resultRelink: ResultRelink? = nil) {
             self.lastEmission = LastEmission(position: insertingPC, resultRelink: resultRelink)
             trace("emitInstruction: \(instruction)")
-            switch runtimeConfiguration.threadingModel {
-            case .direct:
-                emitSlot(instruction.handler)
-            case .token:
-                emitSlot(UInt64(instruction.opcodeID))
-            }
+            emitSlot(instruction.headSlot(threadingModel: runtimeConfiguration.threadingModel))
             if let immediate = instruction.rawImmediate {
                 var slots: [CodeSlot] = []
                 immediate.emit(to: { slots.append($0) })
