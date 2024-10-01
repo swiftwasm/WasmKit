@@ -16,6 +16,7 @@ extension WASIBridgeToHost {
         }
     }
 
+    @available(*, deprecated, renamed: "link(to:store:)", message: "Use `Engine`-based API instead")
     public var hostModules: [String: HostModule] {
         wasiHostModules.mapValues { (module: WASIHostModule) -> HostModule in
             HostModule(

@@ -16,7 +16,7 @@ public final class Store {
     /// The allocator allocating and retaining resources for this store.
     let allocator: StoreAllocator
     /// The engine associated with this store.
-    let engine: Engine
+    public let engine: Engine
 
     /// Create a new store associated with the given engine.
     public init(engine: Engine) {

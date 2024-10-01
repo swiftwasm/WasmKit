@@ -1,7 +1,12 @@
 import _CWasmKit.Platform
 
 /// A WebAssembly execution engine.
+///
+/// An engine is responsible storing the configuration for the execution of
+/// WebAssembly code such as interpreting mode, enabled features, etc.
+/// Typically, you will need a single engine instance per application.
 public final class Engine {
+    /// The engine configuration.
     public let configuration: EngineConfiguration
     let interceptor: EngineInterceptor?
     let funcTypeInterner: Interner<FunctionType>
@@ -22,6 +27,7 @@ public final class Engine {
     public func instantiate(module: Module) -> Instance { fatalError() }
 }
 
+/// The configuration for the WebAssembly execution engine.
 public struct EngineConfiguration {
     /// The threading model, which determines how to dispatch instruction
     /// execution, to use for the virtual machine interpreter.

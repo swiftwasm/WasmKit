@@ -143,7 +143,7 @@ public struct Exports: Sequence {
 }
 
 /// A stateful instance of a WebAssembly module.
-/// Usually instantiated by ``Runtime/instantiate(module:)``.
+/// Usually instantiated by ``Module/instantiate(store:imports:)``.
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#module-instances>
 public struct Instance {
@@ -310,6 +310,30 @@ typealias InternalTable = EntityHandle<TableEntity>
 public struct Table: Equatable {
     let handle: InternalTable
     let allocator: StoreAllocator
+
+    init(handle: InternalTable, allocator: StoreAllocator) {
+        self.handle = handle
+        self.allocator = allocator
+    }
+
+    /// Creates a new table instance with the given type.
+    public init(store: Store, type: TableType) throws {
+        self.init(
+            handle: try store.allocator.allocate(tableType: type, resourceLimiter: store.resourceLimiter),
+            allocator: store.allocator
+        )
+    }
+
+    /// The type of the table instance.
+    public var type: TableType {
+        handle.tableType
+    }
+
+    /// Accesses the element at the given index.
+    public subscript(index: Int) -> Reference {
+        get { handle.elements[index] }
+        nonmutating set { handle.withValue { $0.elements[index] = newValue } }
+    }
 }
 
 struct MemoryEntity /* : ~Copyable */ {
@@ -388,6 +412,11 @@ public struct Memory: Equatable {
     /// Returns a copy of the memory data.
     public var data: [UInt8] {
         handle.data
+    }
+
+    /// The type of the memory instance.
+    public var type: MemoryType {
+        handle.limit
     }
 }
 
