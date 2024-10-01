@@ -1,7 +1,13 @@
 @_exported import WasmTypes
 
-struct CanonicalABIError: Error, CustomStringConvertible {
-    let description: String
+/// Error type for canonical ABI operations.
+public struct CanonicalABIError: Error, CustomStringConvertible {
+    public let description: String
+
+    @_documentation(visibility: internal)
+    public init(description: String) {
+        self.description = description
+    }
 }
 
 /// Call context for `(canon lift)` or `(canon lower)` operations.
@@ -14,17 +20,14 @@ public struct CanonicalCallContext {
     public let options: CanonicalOptions
     /// The module instance that defines the lift/lower operation.
     public let instance: Instance
-    /// The executing `Runtime` instance
-    public let runtime: Runtime
     /// A reference to the guest memory.
     public var guestMemory: Memory {
         options.memory
     }
 
-    public init(options: CanonicalOptions, instance: Instance, runtime: Runtime) {
+    public init(options: CanonicalOptions, instance: Instance) {
         self.options = options
         self.instance = instance
-        self.runtime = runtime
     }
 
     /// Call `cabi_realloc` export with the given arguments.
@@ -56,9 +59,9 @@ extension CanonicalCallContext {
         return instance
     }
 
-    @available(*, deprecated, renamed: "init(options:instance:runtime:)")
+    @available(*, deprecated, renamed: "init(options:instance:)")
     public init(options: CanonicalOptions, moduleInstance: Instance, runtime: Runtime) {
-        self.init(options: options, instance: moduleInstance, runtime: runtime)
+        self.init(options: options, instance: moduleInstance)
     }
 }
 

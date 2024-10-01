@@ -252,13 +252,12 @@ struct HostExportFunction {
         )
         var signature = try signatureTranslation.signature(function: function, name: ConvertCase.camelCase(kebab: name.apiSwiftName))
         let witParameters = signature.parameters.map(\.label)
-        signature.parameters.insert(("runtime", "Runtime"), at: 0)
         signature.hasThrows = true
         printer.write(line: signature.description + " {")
         try printer.indent {
             let optionsVar = builder.variable("options")
             printer.write(line: "let \(optionsVar) = CanonicalOptions._derive(from: instance, exportName: \"\(name.abiName)\")")
-            printer.write(line: "let \(context.contextVar) = CanonicalCallContext(options: \(optionsVar), instance: instance, runtime: runtime)")
+            printer.write(line: "let \(context.contextVar) = CanonicalCallContext(options: \(optionsVar), instance: instance)")
             // Suppress unused variable warning for "context"
             printer.write(line: "_ = \(context.contextVar)")
 
@@ -266,9 +265,15 @@ struct HostExportFunction {
                 parameterNames: witParameters, coreSignature: coreSignature,
                 typeResolver: typeResolver, printer: printer
             )
-            var call = "try runtime.invoke(instance, function: \"\(name.abiName)\""
+            let functionVar = builder.variable("function")
+            printer.write(multiline: """
+            guard let \(functionVar) = instance.exports[function: \"\(name.abiName)\"] else {
+                throw CanonicalABIError(description: "Function \\"\(name.abiName)\\" not found in the instance")
+            }
+            """)
+            var call = "try \(functionVar)("
             if !arguments.isEmpty {
-                call += ", with: [\(arguments.map(\.description).joined(separator: ", "))]"
+                call += "[\(arguments.map(\.description).joined(separator: ", "))]"
             }
             call += ")"
             if coreSignature.isIndirectResult {

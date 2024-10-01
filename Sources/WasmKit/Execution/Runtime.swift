@@ -1,6 +1,7 @@
 import WasmParser
 
 /// A container to manage execution state of one or more module instances.
+@available(*, deprecated, message: "Use `Engine` instead")
 public final class Runtime {
     public let store: Store
     let engine: Engine
@@ -24,7 +25,6 @@ public final class Runtime {
     /// - Parameter hostModules: Host module names mapped to their corresponding ``HostModule`` definitions.
     /// - Parameter interceptor: An optional runtime interceptor to intercept execution of instructions.
     /// - Parameter configuration: An optional runtime configuration to customize the runtime behavior.
-    @available(*, deprecated)
     public init(
         hostModules: [String: HostModule] = [:],
         interceptor: EngineInterceptor? = nil,
@@ -44,9 +44,7 @@ public final class Runtime {
     func internType(_ type: FunctionType) -> InternedFuncType {
         return funcTypeInterner.intern(type)
     }
-}
 
-extension Runtime {
     public func instantiate(module: Module) throws -> Instance {
         return try module.instantiate(
             store: store,
@@ -137,9 +135,7 @@ extension Runtime {
 
         return result
     }
-}
 
-extension Runtime {
     @available(*, unavailable, message: "Runtime doesn't manage execution state anymore. Use Execution.step instead")
     public func step() throws {
         fatalError()

@@ -8,7 +8,7 @@ class RuntimeSmokeTests: XCTestCase {
         var harness = try RuntimeTestHarness(fixture: "Smoke")
         try harness.build(link: SmokeTestWorld.link(_:)) { (runtime, instance) in
             let component = SmokeTestWorld(instance: instance)
-            _ = try component.hello(runtime: runtime)
+            _ = try component.hello()
         }
     }
 }
