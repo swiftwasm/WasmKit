@@ -20,9 +20,11 @@ final class ExecutionTests: XCTestCase {
             """
             )
         )
-        let runtime = Runtime()
-        let instance = try runtime.instantiate(module: module)
-        let results = try runtime.invoke(instance, function: "_start")
+        let engine = Engine()
+        let store = Store(engine: engine)
+        let instance = try module.instantiate(store: store)
+        let _start = try XCTUnwrap(instance.exports[function: "_start"])
+        let results = try _start()
         XCTAssertEqual(results, [.i32(42)])
     }
 
@@ -41,9 +43,11 @@ final class ExecutionTests: XCTestCase {
             """
             )
         )
-        let runtime = Runtime()
-        let instance = try runtime.instantiate(module: module)
-        let results = try runtime.invoke(instance, function: "_start")
+        let engine = Engine()
+        let store = Store(engine: engine)
+        let instance = try module.instantiate(store: store)
+        let _start = try XCTUnwrap(instance.exports[function: "_start"])
+        let results = try _start()
         XCTAssertEqual(results, [.i32(42)])
     }
 }

@@ -34,9 +34,10 @@ final class StoreAllocatorTests: XCTestCase {
                 (memory (;0;) 0)
                 (export "a" (memory 0)))
             """))
-            let runtime = Runtime()
-            _ = try runtime.instantiate(module: module)
-            weakAllocator = runtime.store.allocator
+            let engine = Engine()
+            let store = Store(engine: engine)
+            _ = try module.instantiate(store: store)
+            weakAllocator = store.allocator
         }
         XCTAssertNil(weakAllocator)
     }

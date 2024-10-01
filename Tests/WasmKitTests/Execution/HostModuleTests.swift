@@ -6,22 +6,13 @@ import XCTest
 
 final class HostModuleTests: XCTestCase {
     func testImportMemory() throws {
-        let runtime = Runtime()
+        let engine = Engine()
+        let store = Store(engine: engine)
         let memoryType = MemoryType(min: 1, max: nil)
-        let memory = try runtime.store.allocator.allocate(
-            memoryType: memoryType, resourceLimiter: DefaultResourceLimiter())
-        try runtime.register(
-            HostModule(
-                memories: [
-                    "memory": Memory(
-                        handle: memory,
-                        allocator: runtime.store
-                            .allocator
-                    )
-                ]
-            ),
-            as: "env"
-        )
+        let memory = try WasmKit.Memory(store: store, type: memoryType)
+        let imports: Imports = [
+            "env": ["memory": memory]
+        ]
 
         let module = try parseWasm(
             bytes: wat2wasm(
@@ -30,13 +21,14 @@ final class HostModuleTests: XCTestCase {
                     (import "env" "memory" (memory 1))
                 )
                 """))
-        XCTAssertNoThrow(try runtime.instantiate(module: module))
+        XCTAssertNoThrow(try module.instantiate(store: store, imports: imports))
         // Ensure the allocated address is valid
         _ = memory.data
     }
 
     func testReentrancy() throws {
-        let runtime = Runtime()
+        let engine = Engine()
+        let store = Store(engine: engine)
         let voidSignature = WasmTypes.FunctionType(parameters: [], results: [])
         let module = try parseWasm(
             bytes: wat2wasm(
@@ -58,9 +50,9 @@ final class HostModuleTests: XCTestCase {
 
         var isExecutingFoo = false
         var isQuxCalled = false
-        let hostModule = HostModule(
-            functions: [
-                "bar": HostFunction(type: voidSignature) { caller, _ in
+        let imports: Imports = [
+            "env": [
+                "bar": Function(store: store, type: voidSignature) { caller, _ in
                     // Ensure "invoke" executes instructions under the current call
                     XCTAssertFalse(isExecutingFoo, "bar should not be called recursively")
                     isExecutingFoo = true
@@ -69,17 +61,17 @@ final class HostModuleTests: XCTestCase {
                     _ = try foo()
                     return []
                 },
-                "qux": HostFunction(type: voidSignature) { _, _ in
+                "qux": Function(store: store, type: voidSignature) { caller, _ in
                     XCTAssertTrue(isExecutingFoo)
                     isQuxCalled = true
                     return []
                 },
             ]
-        )
-        try runtime.register(hostModule, as: "env")
-        let instance = try runtime.instantiate(module: module)
+        ]
+        let instance = try module.instantiate(store: store, imports: imports)
         // Check foo(wasm) -> bar(host) -> baz(wasm) -> qux(host)
-        _ = try runtime.invoke(instance, function: "foo")
+        let foo = try XCTUnwrap(instance.exports[function: "foo"])
+        try foo()
         XCTAssertTrue(isQuxCalled)
     }
 }

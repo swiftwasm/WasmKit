@@ -123,21 +123,24 @@ struct RuntimeTestHarness {
 
     /// Build up WebAssembly module from the fixture and instantiate WasmKit runtime with the module.
     mutating func build(
-        link: (inout [String: HostModule]) -> Void,
-        run: (Runtime, Instance) throws -> Void
+        link: (inout Imports, Store) -> Void,
+        run: (Instance) throws -> Void
     ) throws {
         for compile in [compileForEmbedded, compileForWASI] {
             defer { cleanupTemporaryFiles() }
             let compiled = try compile(collectGuestInputFiles())
 
+            let engine = Engine()
+            let store = Store(engine: engine)
+
             let wasi = try WASIBridgeToHost(args: [compiled.path])
-            var hostModules: [String: HostModule] = wasi.hostModules
-            link(&hostModules)
+            var imports = Imports()
+            wasi.link(to: &imports, store: store)
+            link(&imports, store)
 
             let module = try parseWasm(filePath: .init(compiled.path))
-            let runtime = Runtime(hostModules: hostModules)
-            let instance = try runtime.instantiate(module: module)
-            try run(runtime, instance)
+            let instance = try module.instantiate(store: store, imports: imports)
+            try run(instance)
         }
     }
 

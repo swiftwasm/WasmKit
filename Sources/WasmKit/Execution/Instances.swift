@@ -367,6 +367,19 @@ public struct Memory: Equatable {
     let handle: InternalMemory
     let allocator: StoreAllocator
 
+    init(handle: InternalMemory, allocator: StoreAllocator) {
+        self.handle = handle
+        self.allocator = allocator
+    }
+
+    /// Creates a new memory instance with the given type.
+    public init(store: Store, type: MemoryType) throws {
+        self.init(
+            handle: try store.allocator.allocate(memoryType: type, resourceLimiter: store.resourceLimiter),
+            allocator: store.allocator
+        )
+    }
+
     /// Returns a copy of the memory data.
     public var data: [UInt8] {
         handle.data
