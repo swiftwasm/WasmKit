@@ -5,7 +5,7 @@ import os.signpost
 /// - Note: This interceptor is available only on Apple platforms
 @_documentation(visibility: internal)
 @available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *)
-public class SignpostTracer: RuntimeInterceptor {
+public class SignpostTracer: EngineInterceptor {
     /// The `OSSignposter` to use for emitting signposts
     let signposter: OSSignposter
     /// The stack of signpost states for each function call in progress

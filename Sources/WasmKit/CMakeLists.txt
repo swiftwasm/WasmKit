@@ -1,4 +1,5 @@
 add_wasmkit_library(WasmKit
+  Engine.swift
   Module.swift
   ModuleParser.swift
   Translator.swift
@@ -15,6 +16,7 @@ add_wasmkit_library(WasmKit
   Execution/Instructions/Misc.swift
   Execution/Instructions/InstructionSupport.swift
   Execution/DispatchInstruction.swift
+  Execution/EngineInterceptor.swift
   Execution/Errors.swift
   Execution/Execution.swift
   Execution/Function.swift
@@ -23,7 +25,6 @@ add_wasmkit_library(WasmKit
   Execution/NameRegistry.swift
   Execution/Profiler.swift
   Execution/Runtime.swift
-  Execution/RuntimeInterceptor.swift
   Execution/SignpostTracer.swift
   Execution/Store.swift
   Execution/StoreAllocator.swift
