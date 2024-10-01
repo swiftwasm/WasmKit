@@ -3,9 +3,16 @@ import WasmParser
 /// A container to manage execution state of one or more module instances.
 public final class Runtime {
     public let store: Store
-    let interceptor: EngineInterceptor?
-    let funcTypeInterner: Interner<FunctionType>
-    let configuration: EngineConfiguration
+    let engine: Engine
+    var interceptor: EngineInterceptor? {
+        engine.interceptor
+    }
+    var funcTypeInterner: Interner<FunctionType> {
+        engine.funcTypeInterner
+    }
+    var configuration: EngineConfiguration {
+        engine.configuration
+    }
 
     /// Initializes a new instant of a WebAssembly interpreter runtime.
     /// - Parameter hostModules: Host module names mapped to their corresponding ``HostModule`` definitions.
@@ -16,10 +23,8 @@ public final class Runtime {
         interceptor: EngineInterceptor? = nil,
         configuration: EngineConfiguration = EngineConfiguration()
     ) {
-        self.funcTypeInterner = Interner<FunctionType>()
-        store = Store(funcTypeInterner: funcTypeInterner)
-        self.interceptor = interceptor
-        self.configuration = configuration
+        self.engine = Engine(configuration: configuration, interceptor: interceptor)
+        store = Store(engine: engine)
 
         for (moduleName, hostModule) in hostModules {
             store.registerUniqueHostModule(hostModule, as: moduleName, runtime: self)
