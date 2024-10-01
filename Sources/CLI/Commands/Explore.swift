@@ -14,24 +14,28 @@ struct Explore: ParsableCommand {
 
     func run() throws {
         let module = try parseWasm(filePath: FilePath(path))
-        var hostModuleStubs: [String: HostModule] = [:]
+        // Instruction dumping requires token threading model for now
+        let configuration = EngineConfiguration(threadingModel: .token)
+        let engine = Engine(configuration: configuration)
+        let store = Store(engine: engine)
+
+        var imports: Imports = [:]
         for importEntry in module.imports {
-            var hostModule = hostModuleStubs[importEntry.module] ?? HostModule()
             switch importEntry.descriptor {
             case .function(let typeIndex):
                 let type = module.types[Int(typeIndex)]
-                hostModule.functions[importEntry.name] = HostFunction(type: type) { _, _ in
-                    fatalError("unreachable")
-                }
+                imports.define(
+                    module: importEntry.module,
+                    name: importEntry.name,
+                    Function(store: store, type: type) { _, _ in
+                        fatalError("unreachable")
+                    }
+                )
             default:
                 fatalError("Import \(importEntry) not supported in explore mode yet")
             }
-            hostModuleStubs[importEntry.module] = hostModule
         }
-        // Instruction dumping requires token threading model for now
-        let configuration = EngineConfiguration(threadingModel: .token)
-        let runtime = Runtime(hostModules: hostModuleStubs, configuration: configuration)
-        let instance = try runtime.instantiate(module: module)
+        let instance = try module.instantiate(store: store, imports: imports)
         var stdout = Stdout()
         try instance.dumpFunctions(to: &stdout, module: module)
     }

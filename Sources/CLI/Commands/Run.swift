@@ -161,10 +161,13 @@ struct Run: ParsableCommand {
             $0[$1] = $1
         }
         let wasi = try WASIBridgeToHost(args: [path] + arguments, environment: environment, preopens: preopens)
-        let runtime = Runtime(hostModules: wasi.hostModules, interceptor: interceptor, configuration: deriveRuntimeConfiguration())
-        let moduleInstance = try runtime.instantiate(module: module)
+        let engine = Engine(configuration: deriveRuntimeConfiguration(), interceptor: interceptor)
+        let store = Store(engine: engine)
+        var imports = Imports()
+        wasi.link(to: &imports, store: store)
+        let moduleInstance = try module.instantiate(store: store, imports: imports)
         return {
-            let exitCode = try wasi.start(moduleInstance, runtime: runtime)
+            let exitCode = try wasi.start(moduleInstance)
             throw ExitCode(Int32(exitCode))
         }
     }
@@ -192,11 +195,16 @@ struct Run: ParsableCommand {
             return nil
         }
 
-        let runtime = Runtime(interceptor: interceptor, configuration: deriveRuntimeConfiguration())
-        let moduleInstance = try runtime.instantiate(module: module)
+        let engine = Engine(configuration: deriveRuntimeConfiguration(), interceptor: interceptor)
+        let store = Store(engine: engine)
+        let instance = try module.instantiate(store: store)
         return {
             log("Started invoking function \"\(functionName)\" with parameters: \(parameters)", verbose: true)
-            let results = try runtime.invoke(moduleInstance, function: functionName, with: parameters)
+            guard let toInvoke = instance.exports[function: functionName] else {
+                log("Error: Function \"\(functionName)\" not found in the module.")
+                return
+            }
+            let results = try toInvoke.invoke(parameters)
             print(results.description)
         }
     }
