@@ -47,6 +47,7 @@ extension WASIBridgeToHost {
         return 0
     }
 
+    @available(*, deprecated, message: "Use `Engine`-based API instead")
     public func start(_ instance: Instance, runtime: Runtime) throws -> UInt32 {
         return try start(instance)
     }
