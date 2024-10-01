@@ -205,8 +205,9 @@ public final class Runtime {
 ///     return []
 /// }
 /// ```
+@available(*, deprecated, renamed: "Function", message: "`HostFunction` is now unified with `Function`")
 public struct HostFunction {
-    // @available(*, deprecated, renamed: "Function.init(store:type:implementation:)")
+    @available(*, deprecated, renamed: "Function.init(store:type:implementation:)", message: "Use `Engine`-based API instead")
     public init(type: FunctionType, implementation: @escaping (Caller, [Value]) throws -> [Value]) {
         self.type = type
         self.implementation = implementation
@@ -217,6 +218,7 @@ public struct HostFunction {
 }
 
 /// A collection of globals and functions that are exported from a host module.
+@available(*, deprecated, message: "Use `Imports`")
 public struct HostModule {
     public init(
         globals: [String: Global] = [:],

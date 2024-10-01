@@ -467,7 +467,7 @@ extension StoreAllocator {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-table>
-    private func allocate(tableType: TableType, resourceLimiter: any ResourceLimiter) throws -> InternalTable {
+    func allocate(tableType: TableType, resourceLimiter: any ResourceLimiter) throws -> InternalTable {
         let pointer = try tables.allocate(initializing: TableEntity(tableType, resourceLimiter: resourceLimiter))
         return InternalTable(unsafe: pointer)
     }

@@ -89,20 +89,26 @@ See [examples](https://github.com/swiftwasm/WasmKit/tree/main/Examples) for exec
 
 ### Basic Concepts
 
+- ``Engine``
+- ``Store``
 - ``Module``
 - ``Instance``
-- ``Runtime``
-- ``Store``
+- ``Function``
 
 ### Binary Parser
 
 - ``parseWasm(bytes:features:)``
 - ``parseWasm(filePath:features:)``
 
+### Other WebAssembly Entities
+
+- ``Global``
+- ``Memory``
+- ``Table``
+
 ### Extending Runtime
 
-- ``HostModule``
-- ``HostFunction``
+- ``Imports``
 - ``Caller``
 - ``GuestMemory``
 - ``UnsafeGuestPointer``

@@ -1243,9 +1243,7 @@ public struct InstructionTracingVisitor<V: InstructionVisitor>: InstructionVisit
 /// A visitor for WebAssembly instructions.
 ///
 /// The visitor pattern is used while parsing WebAssembly expressions to allow for easy extensibility.
-/// See the following parsing functions:
-/// - ``parseExpression(bytes:features:hasDataCount:visitor:)``
-/// - ``parseExpression(stream:features:hasDataCount:visitor:)``
+/// See the expression parsing method ``Code/parseExpression(visitor:)``
 public protocol InstructionVisitor {
 
     /// The return type of visitor methods.

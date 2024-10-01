@@ -60,7 +60,6 @@ while let payload = try parser.parseNext() {
 
 ### Core Module Elements
 
-- ``FunctionType``
 - ``Import``
 - ``ImportDescriptor``
 - ``Export``
