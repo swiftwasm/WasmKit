@@ -10,7 +10,7 @@ public func spectest(
     exclude: String?,
     verbose: Bool = false,
     parallel: Bool = true,
-    configuration: RuntimeConfiguration = .init()
+    configuration: EngineConfiguration = .init()
 ) async throws -> Bool {
     let printVerbose = verbose
     @Sendable func log(_ message: String, verbose: Bool = false) {

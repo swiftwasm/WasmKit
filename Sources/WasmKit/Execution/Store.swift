@@ -26,8 +26,6 @@ public struct HostModule {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#store>
 public final class Store {
-    var hostFunctions: [HostFunction] = []
-    private var hostGlobals: [Global] = []
     var nameRegistry = NameRegistry()
     @_spi(Fuzzing) // Consider making this public
     public var resourceLimiter: ResourceLimiter = DefaultResourceLimiter()
@@ -36,10 +34,6 @@ public final class Store {
     public var namedModuleInstances: [String: Any] {
         fatalError()
     }
-
-    /// This property is separate from `registeredModuleInstances`, as host exports
-    /// won't have a corresponding module instance.
-    fileprivate var availableExports: [String: [String: ExternalValue]] = [:]
 
     /// The allocator allocating and retaining resources for this store.
     let allocator: StoreAllocator
@@ -53,6 +47,13 @@ public final class Store {
     }
 }
 
+extension Store: Equatable {
+    public static func == (lhs: Store, rhs: Store) -> Bool {
+        /// Use reference identity for equality comparison.
+        return lhs === rhs
+    }
+}
+
 /// A caller context passed to host functions
 public struct Caller {
     private let instanceHandle: InternalInstance?
@@ -60,18 +61,22 @@ public struct Caller {
     /// - Note: This property is `nil` if a `Function` backed by a host function is called directly.
     public var instance: Instance? {
         guard let instanceHandle else { return nil }
-        return Instance(handle: instanceHandle, allocator: runtime.store.allocator)
-    }
-    /// The runtime that called the host function.
-    public let runtime: Runtime
-    /// The store associated with the caller execution context.
-    public var store: Store {
-        runtime.store
+        return Instance(handle: instanceHandle, store: store)
     }
 
-    init(instanceHandle: InternalInstance?, runtime: Runtime) {
+    /// The engine associated with the caller execution context.
+    public var engine: Engine { store.engine }
+
+    /// The store associated with the caller execution context.
+    public let store: Store
+
+    /// The runtime that called the host function.
+    @available(*, unavailable, message: "Use `engine` instead")
+    public var runtime: Runtime { fatalError() }
+
+    init(instanceHandle: InternalInstance?, store: Store) {
         self.instanceHandle = instanceHandle
-        self.runtime = runtime
+        self.store = store
     }
 }
 
@@ -120,52 +125,16 @@ struct HostFunctionEntity {
 }
 
 extension Store {
-    public func register(_ instance: Instance, as name: String) throws {
-        guard availableExports[name] == nil else {
-            throw ImportError.moduleInstanceAlreadyRegistered(name)
-        }
-
-        availableExports[name] = instance.exports
-    }
+    @available(*, unavailable, message: "Use ``Imports/define(_:as:)`` instead. Or use ``Runtime/register(_:as:)`` as a temporary drop-in replacement.")
+    public func register(_ instance: Instance, as name: String) throws {}
 
     /// Register the given host module in this store with the given name.
     ///
     /// - Parameters:
     ///   - hostModule: A host module to register.
     ///   - name: A name to register the given host module.
-    public func register(_ hostModule: HostModule, as name: String, runtime: Runtime) throws {
-        guard availableExports[name] == nil else {
-            throw ImportError.moduleInstanceAlreadyRegistered(name)
-        }
-
-        registerUniqueHostModule(hostModule, as: name, runtime: runtime)
-    }
-
-    /// Register the given host module assuming that the given name is not registered yet.
-    func registerUniqueHostModule(_ hostModule: HostModule, as name: String, runtime: Runtime) {
-        var moduleExports = [String: ExternalValue]()
-
-        for (globalName, global) in hostModule.globals {
-            moduleExports[globalName] = .global(global)
-            hostGlobals.append(global)
-        }
-
-        for (functionName, function) in hostModule.functions {
-            moduleExports[functionName] = .function(
-                Function(
-                    handle: allocator.allocate(hostFunction: function, runtime: runtime),
-                    allocator: allocator
-                )
-            )
-            hostFunctions.append(function)
-        }
-
-        for (memoryName, memoryAddr) in hostModule.memories {
-            moduleExports[memoryName] = .memory(memoryAddr)
-        }
-
-        availableExports[name] = moduleExports
-    }
+    @available(*, unavailable, message: "Use ``Imports/define(_:as:)`` instead. Or use ``Runtime/register(_:as:)`` as a temporary drop-in replacement.")
+    public func register(_ hostModule: HostModule, as name: String, runtime: Any) throws {}
 
     @available(*, deprecated, message: "Address-based APIs has been removed; use Memory instead")
     public func memory(at address: Memory) -> Memory {
@@ -175,45 +144,5 @@ extension Store {
     @available(*, deprecated, message: "Address-based APIs has been removed; use Memory instead")
     public func withMemory<T>(at address: Memory, _ body: (Memory) throws -> T) rethrows -> T {
         try body(address)
-    }
-
-    func getExternalValues(_ module: Module, runtime: Runtime) throws -> [ExternalValue] {
-        var result = [ExternalValue]()
-
-        for i in module.imports {
-            guard let moduleExports = availableExports[i.module], let external = moduleExports[i.name] else {
-                throw ImportError.unknownImport(moduleName: i.module, externalName: i.name)
-            }
-
-            switch (i.descriptor, external) {
-            case let (.function(typeIndex), .function(externalFunc)):
-                let type = externalFunc.handle.type
-                guard runtime.internType(module.types[Int(typeIndex)]) == type else {
-                    throw ImportError.incompatibleImportType
-                }
-                result.append(external)
-
-            case let (.table(tableType), .table(table)):
-                if let max = table.handle.limits.max, max < tableType.limits.min {
-                    throw ImportError.incompatibleImportType
-                }
-                result.append(external)
-
-            case let (.memory(memoryType), .memory(memory)):
-                if let max = memory.handle.limit.max, max < memoryType.min {
-                    throw ImportError.incompatibleImportType
-                }
-                result.append(external)
-
-            case let (.global(globalType), .global(global))
-                where globalType == global.handle.globalType:
-                result.append(external)
-
-            default:
-                throw ImportError.incompatibleImportType
-            }
-        }
-
-        return result
     }
 }
