@@ -34,6 +34,9 @@ enum VMGen {
             + ExecutionParameter.allCases.map { ($0.label, $0.type, true) }
         var output = """
             extension Execution {
+
+                /// Execute an instruction identified by the opcode.
+                /// Note: This function is only used when using token threading model.
                 @inline(__always)
                 mutating func doExecute(_ \(doExecuteParams.map { "\($0.label): \($0.isInout ? "inout " : "")\($0.type)" }.joined(separator: ", "))) throws -> CodeSlot {
                     switch opcode {
@@ -427,19 +430,30 @@ enum VMGen {
         let generatedFiles = [
             GeneratedFile(
                 projectSources + ["WasmKit", "Execution", "DispatchInstruction.swift"],
-                header + generateDispatcher(instructions: instructions)
-                + "\n\n"
-                + generateDirectThreadedCode(instructions: instructions, inlineImpls: inlineImpls)
+                header
+                + """
+                // Include the C inline code to codegen together with the Swift code.
+                import _CWasmKit.InlineCode
+
+                // MARK: - Token Threaded Code
+
+                """
+                + generateDispatcher(instructions: instructions)
                 + """
 
 
-                import _CWasmKit.InlineCode
+                // MARK: - Direct Threaded Code
+
+                """
+                + generateDirectThreadedCode(instructions: instructions, inlineImpls: inlineImpls)
+                + """
 
                 extension Instruction {
-                    var handler: UInt64 {
+                    /// The tail-calling execution handler for the instruction.
+                    var handler: UInt {
                         return withUnsafePointer(to: wasmkit_tc_exec_handlers) {
                             let count = MemoryLayout.size(ofValue: wasmkit_tc_exec_handlers) / MemoryLayout<wasmkit_tc_exec>.size
-                            return $0.withMemoryRebound(to: UInt64.self, capacity: count) {
+                            return $0.withMemoryRebound(to: UInt.self, capacity: count) {
                                 $0[Int(self.opcodeID)]
                             }
                         }

@@ -100,16 +100,11 @@ extension Execution {
     mutating func compilingCall(sp: inout Sp, pc: Pc, immediate: Instruction.CallOperand) throws -> (Pc, CodeSlot) {
         var pc = pc
         // NOTE: `CompilingCallOperand` consumes 2 slots, discriminator is at -3
-        let discriminatorPc = pc.advanced(by: -3)
+        let headSlotPc = pc.advanced(by: -3)
         let callee = immediate.callee
         try callee.ensureCompiled(runtime: runtime)
         let replaced = Instruction.internalCall(immediate)
-        switch runtime.value.configuration.threadingModel {
-        case .direct:
-            discriminatorPc.pointee = replaced.handler
-        case .token:
-            discriminatorPc.pointee = UInt64(replaced.opcodeID)
-        }
+        headSlotPc.pointee = replaced.headSlot(threadingModel: runtime.value.configuration.threadingModel)
         try _internalCall(sp: &sp, pc: &pc, callee: callee, internalCallOperand: immediate)
         return pc.next()
     }
