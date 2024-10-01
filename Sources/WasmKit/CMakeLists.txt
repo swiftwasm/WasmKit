@@ -1,5 +1,6 @@
 add_wasmkit_library(WasmKit
   Engine.swift
+  Imports.swift
   Module.swift
   ModuleParser.swift
   Translator.swift
