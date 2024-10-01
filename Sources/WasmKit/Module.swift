@@ -116,34 +116,19 @@ public struct Module {
         return typeSection[Int(index)]
     }
 
-    public func instantiate(store: Store, imports: HostModule) throws -> Instance {
-        fatalError("TODO")
+    /// Instantiate this module in the given imports.
+    ///
+    /// - Parameters:
+    ///   - store: The ``Store`` to allocate the instance in.
+    ///   - imports: The imports to use for instantiation. All imported entities
+    ///     must be allocated in the given store.
+    public func instantiate(store: Store, imports: Imports) throws -> Instance {
+        Instance(handle: try self.instantiateHandle(store: store, imports: imports), store: store)
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#instantiation>
-    func instantiate(store: Store, externalValues: [ExternalValue]) throws -> InternalInstance {
-        // Step 3 of instantiation algorithm, according to Wasm 2.0 spec.
-        guard imports.count == externalValues.count else {
-            throw InstantiationError.importsAndExternalValuesMismatch
-        }
-
-        // Step 4.
-        let isValid = zip(imports, externalValues).map { i, e -> Bool in
-            switch (i.descriptor, e) {
-            case (.function, .function),
-                (.table, .table),
-                (.memory, .memory),
-                (.global, .global):
-                return true
-            default: return false
-            }
-        }.reduce(true) { $0 && $1 }
-
-        guard isValid else {
-            throw InstantiationError.importsAndExternalValuesMismatch
-        }
-
+    private func instantiateHandle(store: Store, imports: Imports) throws -> InternalInstance {
         // Steps 5-8.
 
         // Step 9.
@@ -153,7 +138,7 @@ public struct Module {
         let instance = try store.allocator.allocate(
             module: self, engine: store.engine,
             resourceLimiter: store.resourceLimiter,
-            externalValues: externalValues
+            imports: imports
         )
 
         if let nameSection = customSections.first(where: { $0.name == "name" }) {

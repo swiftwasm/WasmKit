@@ -95,6 +95,7 @@ public enum InstantiationError: Error {
 public enum ImportError: Error {
     case unknownImport(moduleName: String, externalName: String)
     case incompatibleImportType
+    case importedEntityFromDifferentStore
     case moduleInstanceAlreadyRegistered(String)
 
     /// Human-readable text representation of the trap that `.wast` text format expects in assertions
@@ -104,6 +105,8 @@ public enum ImportError: Error {
             return "unknown import"
         case .incompatibleImportType:
             return "incompatible import type"
+        case .importedEntityFromDifferentStore:
+            return "imported entity from different store"
         case let .moduleInstanceAlreadyRegistered(name):
             return "a module instance is already registered under a name `\(name)"
         }

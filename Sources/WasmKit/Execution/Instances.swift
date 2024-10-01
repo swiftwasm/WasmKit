@@ -455,6 +455,19 @@ public enum ExternalValue: Equatable {
             self = .global(Global(handle: global, allocator: store.allocator))
         }
     }
+
+    func internalize() -> (InternalExternalValue, StoreAllocator) {
+        switch self {
+        case .function(let function):
+            return (.function(function.handle), function.store.allocator)
+        case .table(let table):
+            return (.table(table.handle), table.allocator)
+        case .memory(let memory):
+            return (.memory(memory.handle), memory.allocator)
+        case .global(let global):
+            return (.global(global.handle), global.allocator)
+        }
+    }
 }
 
 enum InternalExternalValue {

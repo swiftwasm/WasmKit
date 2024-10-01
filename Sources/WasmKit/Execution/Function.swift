@@ -1,4 +1,5 @@
 import WasmParser
+import struct WasmTypes.FunctionType
 
 /// A WebAssembly guest function or host function.
 ///
@@ -7,6 +8,40 @@ import WasmParser
 public struct Function: Equatable {
     internal let handle: InternalFunction
     let store: Store
+
+    internal init(handle: InternalFunction, store: Store) {
+        self.handle = handle
+        self.store = store
+    }
+
+    /// Creates a new function instance backed by a native host function.
+    ///
+    /// - Parameters:
+    ///   - store: The store to allocate the function in.
+    ///   - parameters: The types of the function parameters.
+    ///   - results: The types of the function results.
+    ///   - body: The implementation of the function.
+    public init(
+        store: Store,
+        parameters: [ValueType], results: [ValueType] = [],
+        body: @escaping (Caller, [Value]) throws -> [Value]
+    ) {
+        self.init(store: store, type: FunctionType(parameters: parameters, results: results), body: body)
+    }
+
+    /// Creates a new function instance backed by a native host function.
+    ///
+    /// - Parameters:
+    ///   - store: The store to allocate the function in.
+    ///   - type: The signature type of the function.
+    ///   - body: The implementation of the function.
+    public init(
+        store: Store,
+        type: FunctionType,
+        body: @escaping (Caller, [Value]) throws -> [Value]
+    ) {
+        self.init(handle: store.allocator.allocate(type: type, implementation: body, engine: store.engine), store: store)
+    }
 
     /// The signature type of the function.
     public var type: FunctionType {
