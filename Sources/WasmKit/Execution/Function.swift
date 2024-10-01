@@ -54,6 +54,7 @@ public struct Function: Equatable {
     ///   - arguments: The arguments to pass to the function.
     /// - Throws: A trap if the function invocation fails.
     /// - Returns: The results of the function invocation.
+    @discardableResult
     public func invoke(_ arguments: [Value] = []) throws -> [Value] {
         return try handle.invoke(arguments, store: store)
     }
@@ -64,6 +65,7 @@ public struct Function: Equatable {
     ///   - arguments: The arguments to pass to the function.
     /// - Throws: A trap if the function invocation fails.
     /// - Returns: The results of the function invocation.
+    @discardableResult
     public func callAsFunction(_ arguments: [Value] = []) throws -> [Value] {
         return try invoke(arguments)
     }
@@ -76,6 +78,7 @@ public struct Function: Equatable {
     /// - Throws: A trap if the function invocation fails.
     /// - Returns: The results of the function invocation.
     @available(*, deprecated, renamed: "invoke(_:)")
+    @discardableResult
     public func invoke(_ arguments: [Value] = [], runtime: Runtime) throws -> [Value] {
         return try invoke(arguments)
     }
