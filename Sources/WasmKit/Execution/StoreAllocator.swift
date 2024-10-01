@@ -106,6 +106,11 @@ struct ImmutableArray<T> {
         buffer = UnsafeBufferPointer(mutable)
     }
 
+    /// Initializes an empty immutable array.
+    init() {
+        buffer = UnsafeBufferPointer(start: nil, count: 0)
+    }
+
     /// Accesses the element at the specified position.
     subscript(index: Int) -> T {
         buffer[index]
@@ -254,9 +259,6 @@ extension StoreAllocator {
         // Step 1 of module allocation algorithm, according to Wasm 2.0 spec.
 
         let types = module.types
-        // Uninitialized instance
-        let instancePointer = instances.allocate()
-        let instanceHandle = InternalInstance(unsafe: instancePointer)
         var importedFunctions: [InternalFunction] = []
         var importedTables: [InternalTable] = []
         var importedMemories: [InternalMemory] = []
@@ -317,6 +319,20 @@ extension StoreAllocator {
                 }
             }
         }
+
+        // Uninitialized instance
+        let instancePointer = instances.allocate()
+        var instanceInitialized = false
+        defer {
+            // If the instance is not initialized due to an exception, initialize it with an empty instance
+            // to allow bump deallocation by the bump allocator.
+            // This is not optimal as it leaves an empty instance without deallocating the space but
+            // good at code simplicity.
+            if !instanceInitialized {
+                instancePointer.initialize(to: .empty)
+            }
+        }
+        let instanceHandle = InternalInstance(unsafe: instancePointer)
 
         // Step 2.
         let functions = allocateEntities(
@@ -430,6 +446,7 @@ extension StoreAllocator {
             hasDataCount: module.hasDataCount
         )
         instancePointer.initialize(to: instanceEntity)
+        instanceInitialized = true
         return instanceHandle
     }
 
