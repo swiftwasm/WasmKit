@@ -203,12 +203,14 @@ struct WasmFunctionEntity {
 typealias InternalUncompiledCode = EntityHandle<Code>
 
 /// A compiled instruction sequence.
-struct InstructionSequence: Equatable {
+struct InstructionSequence {
     let instructions: UnsafeMutableBufferPointer<CodeSlot>
     /// The maximum height of the value stack during execution of this function.
     /// This height does not count the locals.
     let maxStackHeight: Int
 
+    /// The constant value pool associated with this instruction sequence.
+    /// See ``FrameHeaderLayout`` for how they are laid out on the stack.
     let constants: UnsafeBufferPointer<UntypedValue>
 
     init(instructions: UnsafeMutableBufferPointer<CodeSlot>, maxStackHeight: Int, constants: UnsafeBufferPointer<UntypedValue>) {
@@ -219,10 +221,6 @@ struct InstructionSequence: Equatable {
 
     var baseAddress: UnsafeMutablePointer<CodeSlot> {
         self.instructions.baseAddress!
-    }
-
-    static func == (lhs: InstructionSequence, rhs: InstructionSequence) -> Bool {
-        lhs.instructions.baseAddress == rhs.instructions.baseAddress
     }
 }
 
