@@ -58,51 +58,31 @@ enum VMGen {
         return output
     }
 
-    static func generateBasicInstImplementations() -> String {
-        var output = """
-            extension Execution {
-            """
-
+    static func generateBasicInstImplementations() -> [String: String] {
+        var inlineImpls: [String: String] = [:]
         for op in intBinOps + floatBinOps {
-            output += """
-
-                @inline(__always) mutating \(instMethodDecl(op.instruction)) {
-                    sp[\(op.resultType): immediate.result] = \(op.mayThrow ? "try " : "")sp[\(op.lhsType): immediate.lhs].\(camelCase(pascalCase: op.op))(sp[\(op.rhsType): immediate.rhs])
-                }
+            inlineImpls[op.instruction.name] = """
+            sp.pointee[\(op.resultType): immediate.result] = \(op.mayThrow ? "try " : "")sp.pointee[\(op.lhsType): immediate.lhs].\(camelCase(pascalCase: op.op))(sp.pointee[\(op.rhsType): immediate.rhs])
             """
         }
         for op in intUnaryInsts + floatUnaryOps {
-            output += """
-
-                mutating \(instMethodDecl(op.instruction)) {
-                    sp[\(op.resultType): immediate.result] = \(op.mayThrow ? "try " : "")sp[\(op.inputType): immediate.input].\(camelCase(pascalCase: op.op))
-                }
+            inlineImpls[op.instruction.name] = """
+            sp.pointee[\(op.resultType): immediate.result] = \(op.mayThrow ? "try " : "")sp.pointee[\(op.inputType): immediate.input].\(camelCase(pascalCase: op.op))
             """
         }
 
         for op in memoryLoadOps {
-            output += """
-
-                @inline(__always) mutating \(instMethodDecl(op.instruction)) {
-                    return try memoryLoad(sp: sp, md: md, ms: ms, loadOperand: immediate, loadAs: \(op.loadAs).self, castToValue: { \(op.castToValue) })
-                }
+            inlineImpls[op.instruction.name] = """
+            try memoryLoad(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: immediate, loadAs: \(op.loadAs).self, castToValue: { \(op.castToValue) })
             """
         }
         for op in memoryStoreOps {
-            output += """
-
-                @inline(__always) mutating \(instMethodDecl(op.instruction)) {
-                    return try memoryStore(sp: sp, md: md, ms: ms, storeOperand: immediate, castFromValue: { \(op.castFromValue) })
-                }
+            inlineImpls[op.instruction.name] = """
+            try memoryStore(sp: sp.pointee, md: md.pointee, ms: ms.pointee, storeOperand: immediate, castFromValue: { \(op.castFromValue) })
             """
         }
 
-        output += """
-
-            }
-
-            """
-        return output
+        return inlineImpls
     }
 
     static func instMethodDecl(_ inst: Instruction) -> String {
@@ -324,7 +304,7 @@ enum VMGen {
         return output
     }
 
-    static func generateDirectThreadedCode(instructions: [Instruction]) -> String {
+    static func generateDirectThreadedCode(instructions: [Instruction], inlineImpls: [String: String]) -> String {
         var output = """
             extension Execution {
             """
@@ -360,7 +340,7 @@ enum VMGen {
                 """
             } else {
                 output += """
-                        \(call)
+                        \(inlineImpls[inst.name] ?? call)
                         let next = pc.pointee.pointee
                         pc.pointee = pc.pointee.advanced(by: 1)
 
@@ -442,14 +422,14 @@ enum VMGen {
 
         let projectSources = ["Sources"]
 
+        let inlineImpls = generateBasicInstImplementations()
+
         let generatedFiles = [
             GeneratedFile(
                 projectSources + ["WasmKit", "Execution", "DispatchInstruction.swift"],
                 header + generateDispatcher(instructions: instructions)
                 + "\n\n"
-                + generateBasicInstImplementations()
-                + "\n\n"
-                + generateDirectThreadedCode(instructions: instructions)
+                + generateDirectThreadedCode(instructions: instructions, inlineImpls: inlineImpls)
                 + """
 
 
