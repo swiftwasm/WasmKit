@@ -13,11 +13,13 @@ struct Example {
         )
 
         // Create a module instance from the parsed module.
-        let runtime = Runtime()
-        let instance = try runtime.instantiate(module: module)
+        let engine = Engine()
+        let store = Store(engine: engine)
+        let instance = try module.instantiate(store: store)
         let input: UInt64 = 5
         // Invoke the exported function "fac" with a single argument.
-        let result = try runtime.invoke(instance, function: "fac", with: [.i64(input)])
+        let fac = instance.exports[function: "fac"]!
+        let result = try fac([.i64(input)])
         print("fac(\(input)) = \(result[0].i64)")
     }
 }

@@ -12,12 +12,16 @@ struct Example {
 
         // Create a WASI instance forwarding to the host environment.
         let wasi = try WASIBridgeToHost()
-        // Create a runtime with WASI host modules.
-        let runtime = Runtime(hostModules: wasi.hostModules)
-        let instance = try runtime.instantiate(module: module)
+        // Create engine and store
+        let engine = Engine()
+        let store = Store(engine: engine)
+        // Instantiate a parsed module importing WASI
+        var imports = Imports()
+        wasi.link(to: &imports, store: store)
+        let instance = try module.instantiate(store: store, imports: imports)
 
         // Start the WASI command-line application.
-        let exitCode = try wasi.start(instance, runtime: runtime)
+        let exitCode = try wasi.start(instance)
         // Exit the Swift program with the WASI exit code.
         exit(Int32(exitCode))
     }
