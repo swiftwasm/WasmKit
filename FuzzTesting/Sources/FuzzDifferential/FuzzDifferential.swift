@@ -92,9 +92,10 @@ extension wasm_name_t {
 struct WasmKitEngine: Engine {
     func run(moduleBytes: [UInt8]) throws -> ExecResult {
         let module = try WasmKit.parseWasm(bytes: moduleBytes)
-        let runtime = Runtime()
-        let instance = try runtime.instantiate(module: module)
-        let exports = instance.exports.sorted(by: { $0.key < $1.key })
+        let engine = WasmKit.Engine()
+        let store = WasmKit.Store(engine: engine)
+        let instance = try module.instantiate(store: store)
+        let exports = instance.exports.sorted(by: { $0.name < $1.name })
         let memories: [Memory] = exports.compactMap {
             guard case let .memory(memory) = $0.value else {
                 return nil
@@ -117,7 +118,7 @@ struct WasmKitEngine: Engine {
         let type = fn.type
         let arguments = type.parameters.map { $0.defaultValue }
         do {
-            let results = try fn.invoke(arguments, runtime: runtime)
+            let results = try fn(arguments)
             return ExecResult(values: results, trap: nil, memory: memory?.data)
         } catch {
             return ExecResult(values: nil, trap: String(describing: error), memory: memory?.data)

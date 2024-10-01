@@ -18,7 +18,7 @@ public struct Imports {
     ///   - module: The module name to be used for resolving the imports.
     ///   - values: The values to be imported keyed by their name.
     public mutating func define(module: String, _ values: Exports) {
-        definitions[module, default: [:]].merge(values, uniquingKeysWith: { _, new in new })
+        definitions[module, default: [:]].merge(values.map { ($0, $1) }, uniquingKeysWith: { _, new in new })
     }
 
     mutating func define(_ importEntry: Import, _ value: ExternalValue) {

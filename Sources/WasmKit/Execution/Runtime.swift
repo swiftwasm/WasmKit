@@ -58,7 +58,7 @@ public final class Runtime {
             throw ImportError.moduleInstanceAlreadyRegistered(name)
         }
 
-        availableExports[name] = Dictionary(uniqueKeysWithValues: instance.exports)
+        availableExports[name] = Dictionary(uniqueKeysWithValues: instance.exports.map { ($0, $1) })
     }
 
     /// Legacy compatibility method to register a host module with a name.
