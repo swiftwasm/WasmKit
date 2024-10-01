@@ -5,8 +5,8 @@ import _CWasmKit
 /// Each new invocation through exported function has a separate ``Execution``
 /// even though the invocation happens during another invocation.
 struct Execution {
-    /// The reference to the ``Runtime`` associated with the execution.
-    let runtime: RuntimeRef
+    /// The reference to the ``Store`` associated with the execution.
+    let store: StoreRef
     /// The end of the VM stack space.
     private var stackEnd: UnsafeMutablePointer<StackSlot>
     /// The error trap thrown during execution.
@@ -15,9 +15,9 @@ struct Execution {
     private var trap: UnsafeRawPointer? = nil
 
     /// Executes the given closure with a new execution state associated with
-    /// the given ``Runtime`` instance.
+    /// the given ``Store`` instance.
     static func with<T>(
-        runtime: RuntimeRef,
+        store: StoreRef,
         body: (inout Execution, Sp) throws -> T
     ) rethrows -> T {
         let limit = Int(UInt16.max)
@@ -25,7 +25,7 @@ struct Execution {
         defer {
             valueStack.deallocate()
         }
-        var context = Execution(runtime: runtime, stackEnd: valueStack.advanced(by: limit))
+        var context = Execution(store: store, stackEnd: valueStack.advanced(by: limit))
         defer {
             if let trap = context.trap {
                 // Manually release the error object because the trap is caught in C and
@@ -81,20 +81,16 @@ struct Execution {
     }
 }
 
-/// An unmanaged reference to a runtime.
+/// An unmanaged reference to a ``Store`` instance.
 /// - Note: This is used to avoid ARC overhead during VM execution.
-struct RuntimeRef {
-    private let _value: Unmanaged<Runtime>
+struct StoreRef {
+    private let _value: Unmanaged<Store>
 
-    var value: Runtime {
+    var value: Store {
         _value.takeUnretainedValue()
     }
 
-    var store: Store {
-        value.store
-    }
-
-    init(_ value: __shared Runtime) {
+    init(_ value: __shared Store) {
         self._value = .passUnretained(value)
     }
 }
@@ -217,15 +213,15 @@ extension Pc {
 /// - Returns: The result values of the function.
 @inline(never)
 func executeWasm(
-    runtime: Runtime,
+    store: Store,
     function handle: InternalFunction,
     type: FunctionType,
     arguments: [Value],
     callerInstance: InternalInstance
 ) throws -> [Value] {
     // NOTE: `runtime` variable must not outlive this function
-    let runtime = RuntimeRef(runtime)
-    return try Execution.with(runtime: runtime) { (stack, sp) in
+    let store = StoreRef(store)
+    return try Execution.with(store: store) { (stack, sp) in
         // Advance the stack pointer to be able to reference negative indices
         // for saving slots.
         let sp = sp.advanced(by: FrameHeaderLayout.numberOfSavingSlots)
@@ -235,7 +231,7 @@ func executeWasm(
 
         try withUnsafeTemporaryAllocation(of: CodeSlot.self, capacity: 2) { rootISeq in
             rootISeq[0] = Instruction.endOfExecution.headSlot(
-                threadingModel: runtime.value.configuration.threadingModel
+                threadingModel: store.value.engine.configuration.threadingModel
             )
             try stack.execute(
                 sp: sp,
@@ -314,7 +310,7 @@ extension Execution {
             sp: sp, pc: pc, md: &md, ms: &ms
         )
         do {
-            switch self.runtime.value.configuration.threadingModel {
+            switch self.store.value.engine.configuration.threadingModel {
             case .direct:
                 try runDirectThreaded(sp: sp, pc: pc, md: md, ms: ms)
             case .token:
@@ -458,7 +454,7 @@ extension Execution {
             return (iseq.baseAddress, newSp)
         } else {
             let function = function.host
-            let resolvedType = runtime.value.resolveType(function.type)
+            let resolvedType = store.value.engine.resolveType(function.type)
             let layout = FrameHeaderLayout(type: resolvedType)
             let parameters = resolvedType.parameters.enumerated().map { (i, type) in
                 sp[spAddend + layout.paramReg(i)].cast(to: type)
@@ -466,7 +462,7 @@ extension Execution {
             let instance = self.currentInstance(sp: sp)
             let caller = Caller(
                 instanceHandle: instance,
-                runtime: runtime.value
+                store: store.value
             )
             let results = try function.implementation(caller, Array(parameters))
             for (index, result) in results.enumerated() {

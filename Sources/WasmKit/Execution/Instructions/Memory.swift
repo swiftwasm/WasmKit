@@ -50,7 +50,7 @@ extension Execution {
 
             let value = sp[immediate.delta]
             let pageCount: UInt64 = isMemory64 ? value.i64 : UInt64(value.i32)
-            let oldPageCount = try memory.grow(by: Int(pageCount), resourceLimiter: runtime.store.resourceLimiter)
+            let oldPageCount = try memory.grow(by: Int(pageCount), resourceLimiter: store.value.resourceLimiter)
             CurrentMemory.assign(md: &md, ms: &ms, memory: &memory)
             sp[immediate.result] = UntypedValue(oldPageCount)
         }

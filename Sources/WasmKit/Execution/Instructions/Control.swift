@@ -102,9 +102,9 @@ extension Execution {
         // NOTE: `CompilingCallOperand` consumes 2 slots, discriminator is at -3
         let headSlotPc = pc.advanced(by: -3)
         let callee = immediate.callee
-        try callee.ensureCompiled(runtime: runtime)
+        try callee.ensureCompiled(store: store)
         let replaced = Instruction.internalCall(immediate)
-        headSlotPc.pointee = replaced.headSlot(threadingModel: runtime.value.configuration.threadingModel)
+        headSlotPc.pointee = replaced.headSlot(threadingModel: store.value.engine.configuration.threadingModel)
         try _internalCall(sp: &sp, pc: &pc, callee: callee, internalCallOperand: immediate)
         return pc.next()
     }
@@ -128,8 +128,8 @@ extension Execution {
         let function = InternalFunction(bitPattern: rawBitPattern)
         guard function.type == expectedType else {
             throw Trap.callIndirectFunctionTypeMismatch(
-                actual: runtime.value.resolveType(function.type),
-                expected: runtime.value.resolveType(expectedType)
+                actual: store.value.engine.resolveType(function.type),
+                expected: store.value.engine.resolveType(expectedType)
             )
         }
         return (function, callerInstance)
@@ -153,16 +153,14 @@ extension Execution {
 
     mutating func onEnter(sp: Sp, immediate: Instruction.OnEnterOperand) {
         let function = currentInstance(sp: sp).functions[Int(immediate)]
-        self.runtime.value.interceptor?.onEnterFunction(
-            Function(handle: function, allocator: self.runtime.store.allocator),
-            store: self.runtime.store
+        self.store.value.engine.interceptor?.onEnterFunction(
+            Function(handle: function, store: store.value)
         )
     }
     mutating func onExit(sp: Sp, immediate: Instruction.OnExitOperand) {
         let function = currentInstance(sp: sp).functions[Int(immediate)]
-        self.runtime.value.interceptor?.onExitFunction(
-            Function(handle: function, allocator: self.runtime.store.allocator),
-            store: self.runtime.store
+        self.store.value.engine.interceptor?.onExitFunction(
+            Function(handle: function, store: store.value)
         )
     }
 }

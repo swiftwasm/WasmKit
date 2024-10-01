@@ -4,8 +4,7 @@
 import WasmParser
 extension Execution {
     mutating func tableGet(sp: Sp, immediate: Instruction.TableGetOperand) throws {
-        let runtime = runtime.value
-        let table = getTable(immediate.tableIndex, sp: sp, store: runtime.store)
+        let table = getTable(immediate.tableIndex, sp: sp, store: store.value)
 
         let elementIndex = try getElementIndex(sp: sp, VReg(immediate.index), table)
 
@@ -13,36 +12,32 @@ extension Execution {
         sp[immediate.result] = UntypedValue(.ref(reference))
     }
     mutating func tableSet(sp: Sp, immediate: Instruction.TableSetOperand) throws {
-        let runtime = runtime.value
-        let table = getTable(immediate.tableIndex, sp: sp, store: runtime.store)
+        let table = getTable(immediate.tableIndex, sp: sp, store: store.value)
 
         let reference = sp.getReference(VReg(immediate.value), type: table.tableType)
         let elementIndex = try getElementIndex(sp: sp, VReg(immediate.index), table)
         setTableElement(table: table, Int(elementIndex), reference)
     }
     mutating func tableSize(sp: Sp, immediate: Instruction.TableSizeOperand) {
-        let runtime = runtime.value
-        let table = getTable(immediate.tableIndex, sp: sp, store: runtime.store)
+        let table = getTable(immediate.tableIndex, sp: sp, store: store.value)
         let elementsCount = table.elements.count
         sp[immediate.result] = UntypedValue(table.limits.isMemory64 ? .i64(UInt64(elementsCount)) : .i32(UInt32(elementsCount)))
     }
     mutating func tableGrow(sp: Sp, immediate: Instruction.TableGrowOperand) throws {
-        let runtime = runtime.value
-        let table = getTable(immediate.tableIndex, sp: sp, store: runtime.store)
+        let table = getTable(immediate.tableIndex, sp: sp, store: store.value)
 
         let growthSize = sp[immediate.delta].asAddressOffset(table.limits.isMemory64)
         let growthValue = sp.getReference(VReg(immediate.value), type: table.tableType)
 
         let oldSize = table.elements.count
-        guard try table.withValue({ try $0.grow(by: growthSize, value: growthValue, resourceLimiter: runtime.store.resourceLimiter) }) else {
+        guard try table.withValue({ try $0.grow(by: growthSize, value: growthValue, resourceLimiter: store.value.resourceLimiter) }) else {
             sp[immediate.result] = UntypedValue(.i32(Int32(-1).unsigned))
             return
         }
         sp[immediate.result] = UntypedValue(table.limits.isMemory64 ? .i64(UInt64(oldSize)) : .i32(UInt32(oldSize)))
     }
     mutating func tableFill(sp: Sp, immediate: Instruction.TableFillOperand) throws {
-        let runtime = runtime.value
-        let table = getTable(immediate.tableIndex, sp: sp, store: runtime.store)
+        let table = getTable(immediate.tableIndex, sp: sp, store: store.value)
         let fillCounter = sp[immediate.size].asAddressOffset(table.limits.isMemory64)
         let fillValue = sp.getReference(immediate.value, type: table.tableType)
         let startIndex = sp[immediate.destOffset].asAddressOffset(table.limits.isMemory64)
@@ -62,9 +57,9 @@ extension Execution {
     mutating func tableCopy(sp: Sp, immediate: Instruction.TableCopyOperand) throws {
         let sourceTableIndex = immediate.sourceIndex
         let destinationTableIndex = immediate.destIndex
-        let runtime = runtime.value
-        let sourceTable = getTable(sourceTableIndex, sp: sp, store: runtime.store)
-        let destinationTable = getTable(destinationTableIndex, sp: sp, store: runtime.store)
+        let store = self.store.value
+        let sourceTable = getTable(sourceTableIndex, sp: sp, store: store)
+        let destinationTable = getTable(destinationTableIndex, sp: sp, store: store)
 
         let copyCounter = sp[immediate.size].asAddressOffset(
             sourceTable.limits.isMemory64 || destinationTable.limits.isMemory64
@@ -100,7 +95,7 @@ extension Execution {
     mutating func tableInit(sp: Sp, immediate: Instruction.TableInitOperand) throws {
         let tableIndex = immediate.tableIndex
         let segmentIndex = immediate.segmentIndex
-        let destinationTable = getTable(tableIndex, sp: sp, store: runtime.store)
+        let destinationTable = getTable(tableIndex, sp: sp, store: store.value)
         let sourceElement = currentInstance(sp: sp).elementSegments[Int(segmentIndex)]
 
         let copyCounter = UInt64(sp[immediate.size].i32)

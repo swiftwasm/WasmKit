@@ -22,13 +22,13 @@ public class SignpostTracer: EngineInterceptor {
         "Function Call"
     }
 
-    public func onEnterFunction(_ function: Function, store: Store) {
-        let name = store.nameRegistry.symbolicate(function.handle)
+    public func onEnterFunction(_ function: Function) {
+        let name = function.store.nameRegistry.symbolicate(function.handle)
         let state = self.signposter.beginInterval(functionCallName, "\(name)")
         signpostStates.append(state)
     }
 
-    public func onExitFunction(_ function: Function, store: Store) {
+    public func onExitFunction(_ function: Function) {
         let state = signpostStates.popLast()!
         self.signposter.endInterval(functionCallName, state)
     }

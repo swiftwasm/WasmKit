@@ -82,19 +82,19 @@ public class GuestTimeProfiler: EngineInterceptor {
         }
     }
 
-    public func onEnterFunction(_ function: Function, store: Store) {
+    public func onEnterFunction(_ function: Function) {
         let event = Event(
             ph: .begin, pid: 1,
-            name: store.nameRegistry.symbolicate(function.handle),
+            name: function.store.nameRegistry.symbolicate(function.handle),
             ts: getDurationSinceStart()
         )
         addEventLine(event)
     }
 
-    public func onExitFunction(_ function: Function, store: Store) {
+    public func onExitFunction(_ function: Function) {
         let event = Event(
             ph: .end, pid: 1,
-            name: store.nameRegistry.symbolicate(function.handle),
+            name: function.store.nameRegistry.symbolicate(function.handle),
             ts: getDurationSinceStart()
         )
         addEventLine(event)

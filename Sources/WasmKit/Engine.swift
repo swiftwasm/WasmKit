@@ -54,8 +54,8 @@ public struct EngineConfiguration {
 
 @_documentation(visibility: internal)
 public protocol EngineInterceptor {
-    func onEnterFunction(_ function: Function, store: Store)
-    func onExitFunction(_ function: Function, store: Store)
+    func onEnterFunction(_ function: Function)
+    func onExitFunction(_ function: Function)
 }
 
 /// An interceptor that multiplexes multiple interceptors
@@ -69,15 +69,24 @@ public class MultiplexingInterceptor: EngineInterceptor {
         self.interceptors = interceptors
     }
 
-    public func onEnterFunction(_ function: Function, store: Store) {
+    public func onEnterFunction(_ function: Function) {
         for interceptor in interceptors {
-            interceptor.onEnterFunction(function, store: store)
+            interceptor.onEnterFunction(function)
         }
     }
 
-    public func onExitFunction(_ function: Function, store: Store) {
+    public func onExitFunction(_ function: Function) {
         for interceptor in interceptors {
-            interceptor.onExitFunction(function, store: store)
+            interceptor.onExitFunction(function)
         }
+    }
+}
+
+extension Engine {
+    func resolveType(_ type: InternedFuncType) -> FunctionType {
+        return funcTypeInterner.resolve(type)
+    }
+    func internType(_ type: FunctionType) -> InternedFuncType {
+        return funcTypeInterner.intern(type)
     }
 }

@@ -88,11 +88,11 @@ typealias InternalInstance = EntityHandle<InstanceEntity>
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#module-instances>
 public struct Instance {
     let handle: InternalInstance
-    let allocator: StoreAllocator
+    let store: Store
 
-    init(handle: InternalInstance, allocator: StoreAllocator) {
+    init(handle: InternalInstance, store: Store) {
         self.handle = handle
-        self.allocator = allocator
+        self.store = store
     }
 
     /// Finds an exported entity by name.
@@ -101,7 +101,7 @@ public struct Instance {
     /// - Returns: The exported entity if found, otherwise `nil`.
     public func export(_ name: String) -> ExternalValue? {
         guard let entity = handle.exports[name] else { return nil }
-        return ExternalValue(handle: entity, allocator: allocator)
+        return ExternalValue(handle: entity, store: store)
     }
 
     /// Finds an exported function by name.
@@ -117,31 +117,31 @@ public struct Instance {
 
     /// A dictionary of exported entities by name.
     public var exports: Exports {
-        handle.exports.mapValues { ExternalValue(handle: $0, allocator: allocator) }
+        handle.exports.mapValues { ExternalValue(handle: $0, store: store) }
     }
 
     /// Dumps the textual representation of all functions in the instance.
     ///
     /// - Precondition: The instance must be compiled with the token threading model.
     @_spi(OnlyForCLI)
-    public func dumpFunctions<Target>(to target: inout Target, module: Module, runtime: Runtime) throws where Target: TextOutputStream {
+    public func dumpFunctions<Target>(to target: inout Target, module: Module) throws where Target: TextOutputStream {
         for (offset, function) in self.handle.functions.enumerated() {
             let index = offset
             guard function.isWasm else { continue }
             target.write("==== Function[\(index)]")
-            if let name = try? runtime.store.nameRegistry.lookup(function) {
+            if let name = try? store.nameRegistry.lookup(function) {
                 target.write(" '\(name)'")
             }
             target.write(" ====\n")
             guard case .uncompiled(let code) = function.wasm.code else {
                 fatalError("Already compiled!?")
             }
-            try function.ensureCompiled(runtime: RuntimeRef(runtime))
+            try function.ensureCompiled(store: StoreRef(store))
             let (iseq, locals, _) = function.assumeCompiled()
 
             // Print slot space information
             let stackLayout = try StackLayout(
-                type: runtime.funcTypeInterner.resolve(function.type),
+                type: store.engine.funcTypeInterner.resolve(function.type),
                 numberOfLocals: locals,
                 codeSize: code.expression.count
             )
@@ -149,8 +149,8 @@ public struct Instance {
 
             var context = InstructionPrintingContext(
                 shouldColor: true,
-                function: Function(handle: function, allocator: allocator),
-                nameRegistry: runtime.store.nameRegistry
+                function: Function(handle: function, store: store),
+                nameRegistry: store.nameRegistry
             )
             iseq.write(to: &target, context: &context)
         }
@@ -443,16 +443,16 @@ public enum ExternalValue: Equatable {
     case memory(Memory)
     case global(Global)
 
-    init(handle: InternalExternalValue, allocator: StoreAllocator) {
+    init(handle: InternalExternalValue, store: Store) {
         switch handle {
         case .function(let function):
-            self = .function(Function(handle: function, allocator: allocator))
+            self = .function(Function(handle: function, store: store))
         case .table(let table):
-            self = .table(Table(handle: table, allocator: allocator))
+            self = .table(Table(handle: table, allocator: store.allocator))
         case .memory(let memory):
-            self = .memory(Memory(handle: memory, allocator: allocator))
+            self = .memory(Memory(handle: memory, allocator: store.allocator))
         case .global(let global):
-            self = .global(Global(handle: global, allocator: allocator))
+            self = .global(Global(handle: global, allocator: store.allocator))
         }
     }
 }

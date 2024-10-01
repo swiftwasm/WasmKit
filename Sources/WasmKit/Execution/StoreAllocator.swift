@@ -247,10 +247,10 @@ extension StoreAllocator {
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-module>
     func allocate(
         module: Module,
-        runtime: Runtime,
+        engine: Engine,
+        resourceLimiter: any ResourceLimiter,
         externalValues: [ExternalValue]
     ) throws -> InternalInstance {
-        let resourceLimiter = runtime.store.resourceLimiter
         // Step 1 of module allocation algorithm, according to Wasm 2.0 spec.
 
         let types = module.types
@@ -301,7 +301,7 @@ extension StoreAllocator {
             imports: importedFunctions,
             internals: module.functions,
             allocateHandle: { f, index in
-                allocate(function: f, index: FunctionIndex(index), instance: instanceHandle, runtime: runtime)
+                allocate(function: f, index: FunctionIndex(index), instance: instanceHandle, engine: engine)
             }
         )
 
@@ -418,12 +418,12 @@ extension StoreAllocator {
         function: GuestFunction,
         index: FunctionIndex,
         instance: InternalInstance,
-        runtime: Runtime
+        engine: Engine
     ) -> InternalFunction {
         let code = InternalUncompiledCode(unsafe: codes.allocate(initializing: function.code))
         let pointer = functions.allocate(
             initializing: WasmFunctionEntity(
-                index: index, type: runtime.internType(function.type),
+                index: index, type: engine.internType(function.type),
                 code: code,
                 instance: instance
             )
@@ -431,10 +431,10 @@ extension StoreAllocator {
         return InternalFunction.wasm(EntityHandle(unsafe: pointer))
     }
 
-    func allocate(hostFunction: HostFunction, runtime: Runtime) -> InternalFunction {
+    func allocate(hostFunction: HostFunction, engine: Engine) -> InternalFunction {
         let pointer = hostFunctions.allocate(
             initializing: HostFunctionEntity(
-                type: runtime.internType(hostFunction.type),
+                type: engine.internType(hostFunction.type),
                 implementation: hostFunction.implementation
             )
         )

@@ -116,6 +116,107 @@ public struct Module {
         return typeSection[Int(index)]
     }
 
+    public func instantiate(store: Store, imports: HostModule) throws -> Instance {
+        fatalError("TODO")
+    }
+
+    /// > Note:
+    /// <https://webassembly.github.io/spec/core/exec/modules.html#instantiation>
+    func instantiate(store: Store, externalValues: [ExternalValue]) throws -> InternalInstance {
+        // Step 3 of instantiation algorithm, according to Wasm 2.0 spec.
+        guard imports.count == externalValues.count else {
+            throw InstantiationError.importsAndExternalValuesMismatch
+        }
+
+        // Step 4.
+        let isValid = zip(imports, externalValues).map { i, e -> Bool in
+            switch (i.descriptor, e) {
+            case (.function, .function),
+                (.table, .table),
+                (.memory, .memory),
+                (.global, .global):
+                return true
+            default: return false
+            }
+        }.reduce(true) { $0 && $1 }
+
+        guard isValid else {
+            throw InstantiationError.importsAndExternalValuesMismatch
+        }
+
+        // Steps 5-8.
+
+        // Step 9.
+        // Process `elem.init` evaluation during allocation
+
+        // Step 11.
+        let instance = try store.allocator.allocate(
+            module: self, engine: store.engine,
+            resourceLimiter: store.resourceLimiter,
+            externalValues: externalValues
+        )
+
+        if let nameSection = customSections.first(where: { $0.name == "name" }) {
+            // FIXME?: Just ignore parsing error of name section for now.
+            // Should emit warning instead of just discarding it?
+            try? store.nameRegistry.register(instance: instance, nameSection: nameSection)
+        }
+
+        // Step 12-13.
+
+        // Steps 14-15.
+        do {
+            for element in elements {
+                guard case let .active(tableIndex, offset) = element.mode else { continue }
+                let offsetValue = try offset.evaluate(context: instance)
+                let table = try instance.tables[validating: Int(tableIndex)]
+                try table.withValue { table in
+                    guard let offset = offsetValue.maybeAddressOffset(table.limits.isMemory64) else {
+                        throw InstantiationError.unsupported(
+                            "Expect \(ValueType.addressType(isMemory64: table.limits.isMemory64)) offset of active element segment but got \(offsetValue)"
+                        )
+                    }
+                    let references = try element.evaluateInits(context: instance)
+                    try table.initialize(
+                        elements: references, from: 0, to: Int(offset), count: references.count
+                    )
+                }
+            }
+        } catch Trap.undefinedElement, Trap.tableSizeOverflow, Trap.outOfBoundsTableAccess {
+            throw InstantiationError.outOfBoundsTableAccess
+        } catch {
+            throw error
+        }
+
+        // Step 16.
+        do {
+            for case let .active(data) in data {
+                let offsetValue = try data.offset.evaluate(context: instance)
+                let memory = try instance.memories[validating: Int(data.index)]
+                try memory.withValue { memory in
+                    guard let offset = offsetValue.maybeAddressOffset(memory.limit.isMemory64) else {
+                        throw InstantiationError.unsupported(
+                            "Expect \(ValueType.addressType(isMemory64: memory.limit.isMemory64)) offset of active data segment but got \(offsetValue)"
+                        )
+                    }
+                    try memory.write(offset: Int(offset), bytes: data.initializer)
+                }
+            }
+        } catch Trap.outOfBoundsMemoryAccess {
+            throw InstantiationError.outOfBoundsMemoryAccess
+        } catch {
+            throw error
+        }
+
+        // Step 17.
+        if let startIndex = start {
+            let startFunction = try instance.functions[validating: Int(startIndex)]
+            _ = try startFunction.invoke([], store: store)
+        }
+
+        return instance
+    }
+
     /// Materialize lazily-computed elements in this module
     public mutating func materializeAll() throws {
         let allocator = ISeqAllocator()

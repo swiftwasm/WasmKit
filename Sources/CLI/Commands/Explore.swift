@@ -33,6 +33,6 @@ struct Explore: ParsableCommand {
         let runtime = Runtime(hostModules: hostModuleStubs, configuration: configuration)
         let instance = try runtime.instantiate(module: module)
         var stdout = Stdout()
-        try instance.dumpFunctions(to: &stdout, module: module, runtime: runtime)
+        try instance.dumpFunctions(to: &stdout, module: module)
     }
 }

@@ -111,11 +111,11 @@ class WastRunContext {
 }
 
 extension TestCase {
-    func run(spectestModule: Module, configuration: RuntimeConfiguration, handler: @escaping (TestCase, Location, Result) -> Void) throws {
+    func run(spectestModule: Module, configuration: EngineConfiguration, handler: @escaping (TestCase, Location, Result) -> Void) throws {
         let runtime = Runtime(configuration: configuration)
         let hostModuleInstance = try runtime.instantiate(module: spectestModule)
 
-        try runtime.store.register(hostModuleInstance, as: "spectest")
+        try runtime.register(hostModuleInstance, as: "spectest")
 
         var currentInstance: Instance?
         let rootPath = FilePath(path).removingLastComponent().string
@@ -212,7 +212,7 @@ extension WastDirective {
             }
 
             do {
-                try runtime.store.register(module, as: name)
+                try runtime.register(module, as: name)
             } catch {
                 return handler(self, .failed("module could not be registered: \(error)"))
             }

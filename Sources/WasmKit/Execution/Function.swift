@@ -6,11 +6,31 @@ import WasmParser
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#function-instances>
 public struct Function: Equatable {
     internal let handle: InternalFunction
-    let allocator: StoreAllocator
+    let store: Store
 
     /// The signature type of the function.
     public var type: FunctionType {
-        allocator.funcTypeInterner.resolve(handle.type)
+        store.allocator.funcTypeInterner.resolve(handle.type)
+    }
+
+    /// Invokes a function of the given address with the given parameters.
+    ///
+    /// - Parameters:
+    ///   - arguments: The arguments to pass to the function.
+    /// - Throws: A trap if the function invocation fails.
+    /// - Returns: The results of the function invocation.
+    public func invoke(_ arguments: [Value] = []) throws -> [Value] {
+        return try handle.invoke(arguments, store: store)
+    }
+
+    /// Invokes a function of the given address with the given parameters.
+    ///
+    /// - Parameter
+    ///   - arguments: The arguments to pass to the function.
+    /// - Throws: A trap if the function invocation fails.
+    /// - Returns: The results of the function invocation.
+    public func callAsFunction(_ arguments: [Value] = []) throws -> [Value] {
+        return try invoke(arguments)
     }
 
     /// Invokes a function of the given address with the given parameters.
@@ -20,9 +40,9 @@ public struct Function: Equatable {
     ///   - runtime: The runtime to use for the function invocation.
     /// - Throws: A trap if the function invocation fails.
     /// - Returns: The results of the function invocation.
+    @available(*, deprecated, renamed: "invoke(_:)")
     public func invoke(_ arguments: [Value] = [], runtime: Runtime) throws -> [Value] {
-        assert(allocator === runtime.store.allocator, "Function is not from the same store as the runtime")
-        return try handle.invoke(arguments, runtime: runtime)
+        return try invoke(arguments)
     }
 }
 
@@ -75,13 +95,13 @@ extension InternalFunction: ValidatableEntity {
 }
 
 extension InternalFunction {
-    func invoke(_ arguments: [Value], runtime: Runtime) throws -> [Value] {
+    func invoke(_ arguments: [Value], store: Store) throws -> [Value] {
         if isWasm {
             let entity = wasm
-            let resolvedType = runtime.resolveType(entity.type)
+            let resolvedType = store.engine.resolveType(entity.type)
             try check(functionType: resolvedType, parameters: arguments)
             return try executeWasm(
-                runtime: runtime,
+                store: store,
                 function: self,
                 type: resolvedType,
                 arguments: arguments,
@@ -89,9 +109,9 @@ extension InternalFunction {
             )
         } else {
             let entity = host
-            let resolvedType = runtime.resolveType(entity.type)
+            let resolvedType = store.engine.resolveType(entity.type)
             try check(functionType: resolvedType, parameters: arguments)
-            let caller = Caller(instanceHandle: nil, runtime: runtime)
+            let caller = Caller(instanceHandle: nil, store: store)
             let results = try entity.implementation(caller, arguments)
             try check(functionType: resolvedType, results: results)
             return results
@@ -124,12 +144,12 @@ extension InternalFunction {
     }
 
     @inline(never)
-    func ensureCompiled(runtime: RuntimeRef) throws {
+    func ensureCompiled(store: StoreRef) throws {
         let entity = self.wasm
         switch entity.code {
         case .uncompiled(let code):
             try entity.withValue {
-                let iseq = try $0.compile(runtime: runtime, code: code)
+                let iseq = try $0.compile(store: store, code: code)
                 $0.code = .compiled(iseq)
             }
         case .compiled: break
@@ -166,31 +186,33 @@ struct WasmFunctionEntity {
     }
 
     mutating func ensureCompiled(context: inout Execution) throws -> InstructionSequence {
-        try ensureCompiled(runtime: context.runtime)
+        try ensureCompiled(store: context.store)
     }
 
-    mutating func ensureCompiled(runtime: RuntimeRef) throws -> InstructionSequence {
+    mutating func ensureCompiled(store: StoreRef) throws -> InstructionSequence {
         switch code {
         case .uncompiled(let code):
-            return try compile(runtime: runtime, code: code)
+            return try compile(store: store, code: code)
         case .compiled(let iseq):
             return iseq
         }
     }
 
     @inline(never)
-    mutating func compile(runtime: RuntimeRef, code: InternalUncompiledCode) throws -> InstructionSequence {
+    mutating func compile(store: StoreRef, code: InternalUncompiledCode) throws -> InstructionSequence {
+        let store = store.value
+        let engine = store.engine
         let type = self.type
         var translator = try InstructionTranslator(
-            allocator: runtime.value.store.allocator.iseqAllocator,
-            engineConfiguration: runtime.value.configuration,
-            funcTypeInterner: runtime.value.funcTypeInterner,
+            allocator: store.allocator.iseqAllocator,
+            engineConfiguration: engine.configuration,
+            funcTypeInterner: engine.funcTypeInterner,
             module: instance,
-            type: runtime.value.resolveType(type),
+            type: engine.resolveType(type),
             locals: code.locals,
             functionIndex: index,
             codeSize: code.expression.count,
-            intercepting: runtime.value.interceptor != nil
+            intercepting: engine.interceptor != nil
         )
         let iseq = try code.withValue { code in
             try translator.translate(code: code, instance: instance)

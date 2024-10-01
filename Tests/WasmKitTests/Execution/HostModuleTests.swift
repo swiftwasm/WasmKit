@@ -10,7 +10,7 @@ final class HostModuleTests: XCTestCase {
         let memoryType = MemoryType(min: 1, max: nil)
         let memory = try runtime.store.allocator.allocate(
             memoryType: memoryType, resourceLimiter: DefaultResourceLimiter())
-        try runtime.store.register(
+        try runtime.register(
             HostModule(
                 memories: [
                     "memory": Memory(
@@ -20,8 +20,7 @@ final class HostModuleTests: XCTestCase {
                     )
                 ]
             ),
-            as: "env",
-            runtime: runtime
+            as: "env"
         )
 
         let module = try parseWasm(
@@ -67,7 +66,7 @@ final class HostModuleTests: XCTestCase {
                     isExecutingFoo = true
                     defer { isExecutingFoo = false }
                     let foo = try XCTUnwrap(caller.instance?.exportedFunction(name: "baz"))
-                    _ = try foo.invoke([], runtime: caller.runtime)
+                    _ = try foo()
                     return []
                 },
                 "qux": HostFunction(type: voidSignature) { _, _ in
@@ -77,7 +76,7 @@ final class HostModuleTests: XCTestCase {
                 },
             ]
         )
-        try runtime.store.register(hostModule, as: "env", runtime: runtime)
+        try runtime.register(hostModule, as: "env")
         let instance = try runtime.instantiate(module: module)
         // Check foo(wasm) -> bar(host) -> baz(wasm) -> qux(host)
         _ = try runtime.invoke(instance, function: "foo")
