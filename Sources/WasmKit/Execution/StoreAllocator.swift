@@ -249,7 +249,7 @@ extension StoreAllocator {
         module: Module,
         engine: Engine,
         resourceLimiter: any ResourceLimiter,
-        externalValues: [ExternalValue]
+        imports: Imports
     ) throws -> InternalInstance {
         // Step 1 of module allocation algorithm, according to Wasm 2.0 spec.
 
@@ -264,20 +264,42 @@ extension StoreAllocator {
 
         // External values imported in this module should be included in corresponding index spaces before definitions
         // local to to the module are added.
-        for external in externalValues {
-            switch external {
-            case let .function(function):
-                // Step 14.
-                importedFunctions.append(function.handle)
-            case let .table(table):
-                // Step 15.
-                importedTables.append(table.handle)
-            case let .memory(memory):
-                // Step 16.
-                importedMemories.append(memory.handle)
-            case let .global(global):
-                // Step 17.
-                importedGlobals.append(global.handle)
+        for importEntry in module.imports {
+            guard let (external, allocator) = imports.lookup(module: importEntry.module, name: importEntry.name) else {
+                throw ImportError.unknownImport(moduleName: importEntry.module, externalName: importEntry.name)
+            }
+            guard allocator === self else {
+                throw ImportError.importedEntityFromDifferentStore
+            }
+
+            switch (importEntry.descriptor, external) {
+            case let (.function(typeIndex), .function(externalFunc)):
+                let type = externalFunc.type
+                guard engine.internType(module.types[Int(typeIndex)]) == type else {
+                    throw ImportError.incompatibleImportType
+                }
+                importedFunctions.append(externalFunc)
+
+            case let (.table(tableType), .table(table)):
+                if let max = table.limits.max, max < tableType.limits.min {
+                    throw ImportError.incompatibleImportType
+                }
+                importedTables.append(table)
+
+            case let (.memory(memoryType), .memory(memory)):
+                if let max = memory.limit.max, max < memoryType.min {
+                    throw ImportError.incompatibleImportType
+                }
+                importedMemories.append(memory)
+
+            case let (.global(globalType), .global(global)):
+                guard globalType == global.globalType else {
+                    throw ImportError.incompatibleImportType
+                }
+                importedGlobals.append(global)
+
+            default:
+                throw ImportError.incompatibleImportType
             }
         }
 
@@ -413,8 +435,7 @@ extension StoreAllocator {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-func>
-    /// TODO: Mark as private
-    func allocate(
+    private func allocate(
         function: GuestFunction,
         index: FunctionIndex,
         instance: InternalInstance,
@@ -431,11 +452,14 @@ extension StoreAllocator {
         return InternalFunction.wasm(EntityHandle(unsafe: pointer))
     }
 
-    func allocate(hostFunction: HostFunction, engine: Engine) -> InternalFunction {
+    internal func allocate(
+        type: FunctionType,
+        implementation: @escaping (Caller, [Value]) throws -> [Value],
+        engine: Engine
+    ) -> InternalFunction {
         let pointer = hostFunctions.allocate(
             initializing: HostFunctionEntity(
-                type: engine.internType(hostFunction.type),
-                implementation: hostFunction.implementation
+                type: engine.internType(type), implementation: implementation
             )
         )
         return InternalFunction.host(EntityHandle(unsafe: pointer))
