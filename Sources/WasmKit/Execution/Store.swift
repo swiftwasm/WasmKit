@@ -41,10 +41,15 @@ public final class Store {
     /// won't have a corresponding module instance.
     fileprivate var availableExports: [String: [String: ExternalValue]] = [:]
 
+    /// The allocator allocating and retaining resources for this store.
     let allocator: StoreAllocator
+    /// The engine associated with this store.
+    let engine: Engine
 
-    init(funcTypeInterner: Interner<FunctionType>) {
-        self.allocator = StoreAllocator(funcTypeInterner: funcTypeInterner)
+    /// Create a new store associated with the given engine.
+    public init(engine: Engine) {
+        self.engine = engine
+        self.allocator = StoreAllocator(funcTypeInterner: engine.funcTypeInterner)
     }
 }
 
