@@ -16,6 +16,7 @@ add_wasmkit_library(WasmKit
   Execution/Instructions/Memory.swift
   Execution/Instructions/Misc.swift
   Execution/Instructions/InstructionSupport.swift
+  Execution/ConstEvaluation.swift
   Execution/DispatchInstruction.swift
   Execution/EngineInterceptor.swift
   Execution/Errors.swift
