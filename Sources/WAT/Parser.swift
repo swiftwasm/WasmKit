@@ -274,7 +274,7 @@ internal struct Parser {
 
     enum IndexOrId {
         case index(UInt32, Location)
-        case id(String, Location)
+        case id(Name, Location)
         var location: Location {
             switch self {
             case .index(_, let location), .id(_, let location):
@@ -303,10 +303,10 @@ internal struct Parser {
         return token
     }
 
-    mutating func takeId() throws -> String? {
+    mutating func takeId() throws -> Name? {
         guard let token = try peek(.id) else { return nil }
         try consume()
-        return token.text(from: lexer)
+        return Name(value: token.text(from: lexer), location: token.location(in: lexer))
     }
 
     mutating func skipParenBlock() throws {

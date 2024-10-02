@@ -43,7 +43,7 @@ struct WatParser {
     struct FunctionType {
         let signature: WasmTypes.FunctionType
         /// Names of the parameters. The number of names must match the number of parameters in `type`.
-        let parameterNames: [String?]
+        let parameterNames: [Name?]
     }
 
     /// Represents a type use in a function signature.
@@ -59,12 +59,12 @@ struct WatParser {
     }
 
     struct LocalDecl: NamedModuleFieldDecl {
-        var id: String?
+        var id: Name?
         var type: ValueType
     }
 
     struct FunctionDecl: NamedModuleFieldDecl, ImportableModuleFieldDecl {
-        var id: String?
+        var id: Name?
         var exports: [String]
         var typeUse: TypeUse
         var kind: FunctionKind
@@ -92,12 +92,12 @@ struct WatParser {
     }
 
     struct FunctionTypeDecl: NamedModuleFieldDecl {
-        let id: String?
+        let id: Name?
         let type: FunctionType
     }
 
     struct TableDecl: NamedModuleFieldDecl, ImportableModuleFieldDecl {
-        var id: String?
+        var id: Name?
         var exports: [String]
         var type: TableType
         var importNames: ImportNames?
@@ -121,7 +121,7 @@ struct WatParser {
             case elementExprList(Lexer)
         }
 
-        var id: String?
+        var id: Name?
         var mode: Mode
         var type: ReferenceType
         var indices: Indices
@@ -134,7 +134,7 @@ struct WatParser {
     }
 
     struct GlobalDecl: NamedModuleFieldDecl, ImportableModuleFieldDecl {
-        var id: String?
+        var id: Name?
         var exports: [String]
         var type: GlobalType
         var kind: GlobalKind
@@ -148,7 +148,7 @@ struct WatParser {
     }
 
     struct MemoryDecl: NamedModuleFieldDecl, ImportableModuleFieldDecl {
-        var id: String?
+        var id: Name?
         var exports: [String]
         var type: MemoryType
         var importNames: ImportNames?
@@ -156,7 +156,7 @@ struct WatParser {
     }
 
     struct DataSegmentDecl: NamedModuleFieldDecl {
-        var id: String?
+        var id: Name?
         var memory: Parser.IndexOrId?
         enum Offset {
             case source(Lexer)
@@ -567,9 +567,9 @@ struct WatParser {
         return FunctionType(signature: WasmTypes.FunctionType(parameters: params, results: results), parameterNames: names)
     }
 
-    mutating func params() throws -> ([ValueType], [String?]) {
+    mutating func params() throws -> ([ValueType], [Name?]) {
         var types: [ValueType] = []
-        var names: [String?] = []
+        var names: [Name?] = []
         while try parser.takeParenBlockStart("param") {
             if let id = try parser.takeId() {
                 let valueType = try valueType()
