@@ -230,9 +230,10 @@ extension WastRunContext {
             }
 
             do {
-                var module = try parseModule(rootPath: rootPath, moduleSource: module.source)
+                let module = try parseModule(rootPath: rootPath, moduleSource: module.source)
+                let instance = try instantiate(module: module)
                 // Materialize all functions to see all errors in the module
-                try module.materializeAll()
+                try instance.handle.withValue { try $0.compileAllFunctions(store: store) }
             } catch {
                 return .passed
             }
