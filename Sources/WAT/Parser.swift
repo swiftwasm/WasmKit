@@ -80,25 +80,22 @@ internal struct Parser {
         }
         try consume()
         let value: UnsignedType
+        let makeError = { [lexer] in
+            WatParserError("invalid literal \(token.text(from: lexer))", location: token.location(in: lexer))
+        }
         switch pattern {
         case .hexPattern(let pattern):
-            guard let index = UnsignedType(pattern, radix: 16) else {
-                throw WatParserError("invalid index \(pattern)", location: token.location(in: lexer))
-            }
+            guard let index = UnsignedType(pattern, radix: 16) else { throw makeError() }
             value = index
         case .decimalPattern(let pattern):
-            guard let index = UnsignedType(pattern) else {
-                throw WatParserError("invalid index \(pattern)", location: token.location(in: lexer))
-            }
+            guard let index = UnsignedType(pattern) else { throw makeError() }
             value = index
         }
         switch sign {
         case .plus, nil: return fromBitPattern(value)
         case .minus:
             let casted = fromBitPattern(~value &+ 1)
-            guard casted <= 0 else {
-                throw WatParserError("invalid literal \(token.text(from: lexer))", location: token.location(in: lexer))
-            }
+            guard casted <= 0 else { throw makeError() }
             return casted
         }
     }
@@ -185,7 +182,7 @@ internal struct Parser {
     }
 
     mutating func expectFloatingPoint<F: BinaryFloatingPoint & LosslessStringConvertible, BitPattern: FixedWidthInteger>(
-        _: F.Type, toBitPattern: (F) -> BitPattern,
+        _: F.Type, toBitPattern: (F) -> BitPattern, isNaN: (BitPattern) -> Bool,
         buildBitPattern: (
             _ sign: FloatingPointSign,
             _ exponentBitPattern: UInt,
@@ -198,44 +195,43 @@ internal struct Parser {
             return 1 &<< UInt(F.exponentBitCount) - 1
         }
 
+        let makeError = { [lexer] in
+            WatParserError("invalid float literal \(token.text(from: lexer))", location: token.location(in: lexer))
+        }
+        let parse = { (pattern: String) throws -> F in
+            // Swift's Float{32,64} initializer returns +/- infinity for too large/too small values.
+            // We know that the given pattern will not be expected to be parsed as infinity,
+            // so we can check if the parsing succeeded by checking if the returned value is infinite.
+            guard let value = F(pattern), !value.isInfinite else { throw makeError() }
+            return value
+        }
         switch token.kind {
         case let .float(sign, pattern):
             let float: F
             switch pattern {
             case .decimalPattern(let pattern):
-                guard let value = F(pattern) else {
-                    throw WatParserError("invalid float \(pattern)", location: token.location(in: lexer))
-                }
-                float = value
+                float = try parse(pattern)
             case .hexPattern(let pattern):
-                guard let value = F("0x" + pattern) else {
-                    throw WatParserError("invalid float \(pattern)", location: token.location(in: lexer))
-                }
-                float = value
+                float = try parse("0x" + pattern)
             case .inf:
                 float = .infinity
             case .nan(hexPattern: nil):
                 float = .nan
             case .nan(let hexPattern?):
-                guard let bitPattern = BitPattern(hexPattern, radix: 16) else {
-                    throw WatParserError("invalid float \(hexPattern)", location: token.location(in: lexer))
-                }
-                return buildBitPattern(sign ?? .plus, infinityExponent, UInt(bitPattern))
+                guard let significandBitPattern = BitPattern(hexPattern, radix: 16) else { throw makeError() }
+                let bitPattern = buildBitPattern(sign ?? .plus, infinityExponent, UInt(significandBitPattern))
+                // Ensure that the given bit pattern is a NaN.
+                guard isNaN(bitPattern) else { throw makeError() }
+                return bitPattern
             }
             return toBitPattern(sign == .minus ? -float : float)
         case let .integer(sign, pattern):
             let float: F
             switch pattern {
             case .hexPattern(let pattern):
-                guard let value = F("0x" + pattern) else {
-                    throw WatParserError("invalid float \(pattern)", location: token.location(in: lexer))
-                }
-                float = value
+                float = try parse("0x" + pattern)
             case .decimalPattern(let pattern):
-                guard let value = F(pattern) else {
-                    throw WatParserError("invalid float \(pattern)", location: token.location(in: lexer))
-                }
-                float = value
+                float = try parse(pattern)
             }
             return toBitPattern(sign == .minus ? -float : float)
         default:
@@ -246,6 +242,7 @@ internal struct Parser {
     mutating func expectFloat32() throws -> IEEE754.Float32 {
         let bitPattern = try expectFloatingPoint(
             Float32.self, toBitPattern: \.bitPattern,
+            isNaN: { Float32(bitPattern: $0).isNaN },
             buildBitPattern: {
                 UInt32(
                     ($0 == .minus ? 1 : 0) << (Float32.exponentBitCount + Float32.significandBitCount)
@@ -259,6 +256,7 @@ internal struct Parser {
     mutating func expectFloat64() throws -> IEEE754.Float64 {
         let bitPattern = try expectFloatingPoint(
             Float64.self, toBitPattern: \.bitPattern,
+            isNaN: { Float64(bitPattern: $0).isNaN },
             buildBitPattern: {
                 UInt64(
                     ($0 == .minus ? 1 : 0) << (Float64.exponentBitCount + Float64.significandBitCount)
