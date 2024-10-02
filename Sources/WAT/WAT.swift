@@ -17,8 +17,8 @@ import WasmParser
 /// )
 /// """)
 /// ```
-public func wat2wasm(_ input: String) throws -> [UInt8] {
-    var wat = try parseWAT(input)
+public func wat2wasm(_ input: String, features: WasmFeatureSet = .default) throws -> [UInt8] {
+    var wat = try parseWAT(input, features: features)
     return try encode(module: &wat)
 }
 
@@ -36,10 +36,11 @@ public struct Wat {
     let imports: [Import]
     let exports: [Export]
     let customSections = [CustomSection]()
+    let features: WasmFeatureSet
 
     let parser: Parser
 
-    static func empty() -> Wat {
+    static func empty(features: WasmFeatureSet) -> Wat {
         Wat(
             types: TypesMap(),
             functionsMap: NameMapping<WatParser.FunctionDecl>(),
@@ -52,6 +53,7 @@ public struct Wat {
             start: nil,
             imports: [],
             exports: [],
+            features: features,
             parser: Parser("")
         )
     }
@@ -89,15 +91,15 @@ public struct Wat {
 ///
 /// let wasm = try wat.encode()
 /// ```
-public func parseWAT(_ input: String) throws -> Wat {
+public func parseWAT(_ input: String, features: WasmFeatureSet = .default) throws -> Wat {
     var parser = Parser(input)
     let wat: Wat
     if try parser.takeParenBlockStart("module") {
-        wat = try parseWAT(&parser)
+        wat = try parseWAT(&parser, features: features)
         try parser.skipParenBlock()
     } else {
         // The root (module) may be omitted
-        wat = try parseWAT(&parser)
+        wat = try parseWAT(&parser, features: features)
     }
     return wat
 }
@@ -106,8 +108,8 @@ public func parseWAT(_ input: String) throws -> Wat {
 public struct Wast {
     var parser: WastParser
 
-    init(_ input: String) {
-        self.parser = WastParser(input)
+    init(_ input: String, features: WasmFeatureSet) {
+        self.parser = WastParser(input, features: features)
     }
 
     /// Parses the next directive in the WAST script.
@@ -147,11 +149,11 @@ public struct Wast {
 ///     print("\(location): \(directive)")
 /// }
 /// ```
-public func parseWAST(_ input: String) throws -> Wast {
-    return Wast(input)
+public func parseWAST(_ input: String, features: WasmFeatureSet = .default) throws -> Wast {
+    return Wast(input, features: features)
 }
 
-func parseWAT(_ parser: inout Parser) throws -> Wat {
+func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws -> Wat {
     // This parser is 2-pass: first it collects all module items and creates a mapping of names to indices.
 
     let initialParser = parser
@@ -285,6 +287,7 @@ func parseWAT(_ parser: inout Parser) throws -> Wat {
         start: startIndex,
         imports: imports,
         exports: exports,
+        features: features,
         parser: parser
     )
 }

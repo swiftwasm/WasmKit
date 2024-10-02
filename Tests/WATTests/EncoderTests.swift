@@ -27,7 +27,7 @@ class EncoderTests: XCTestCase {
         }
 
         print("Checking\n  wast: \(wast.path)\n  json: \(json.path)")
-        var parser = WastParser(try String(contentsOf: wast))
+        var parser = WastParser(try String(contentsOf: wast), features: Spectest.deriveFeatureSet(wast: wast))
         var watModules: [ModuleDirective] = []
 
         while let directive = try parser.nextDirective() {
@@ -107,7 +107,6 @@ class EncoderTests: XCTestCase {
 
             var stats = CompatibilityTestStats()
             let excluded: [String] = [
-                "address.wast",
                 "align.wast",
                 "align64.wast",
                 "block.wast",
