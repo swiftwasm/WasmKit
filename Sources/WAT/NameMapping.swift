@@ -169,8 +169,8 @@ struct TypesMap {
     /// Resolves a block type from a type use
     mutating func resolveBlockType(use: WatParser.TypeUse) throws -> BlockType {
         switch (use.index, use.inline) {
-        case let (indexOrId?, _):
-            let (type, index) = try resolve(use: indexOrId)
+        case let (indexOrId?, inline):
+            let (type, index) = try resolveAndCheck(use: indexOrId, inline: inline)
             return try resolveBlockType(signature: type.signature, resolveSignatureIndex: { _ in index })
         case (nil, let inline?):
             return try resolveBlockType(signature: inline.signature)
@@ -194,18 +194,22 @@ struct TypesMap {
         return (decl.type, index)
     }
 
+    private func resolveAndCheck(use indexOrId: Parser.IndexOrId, inline: WatParser.FunctionType?) throws -> (type: WatParser.FunctionType, index: Int) {
+        let (found, index) = try resolve(use: indexOrId)
+        if let inline {
+            // If both index and inline type, then they must match
+            guard found.signature == inline.signature else {
+                throw WatParserError("Type mismatch \(found) != \(inline)", location: indexOrId.location)
+            }
+        }
+        return (found, Int(index))
+    }
+
     /// Resolves a function type from a type use with an optional inline type
     mutating func resolve(use: WatParser.TypeUse) throws -> (type: WatParser.FunctionType, index: Int) {
         switch (use.index, use.inline) {
         case let (indexOrId?, inline):
-            let (found, index) = try resolve(use: indexOrId)
-            if let inline {
-                // If both index and inline type, then they must match
-                guard found.signature == inline.signature else {
-                    throw WatParserError("Type mismatch \(found) != \(inline)", location: indexOrId.location)
-                }
-            }
-            return (found, Int(index))
+            return try resolveAndCheck(use: indexOrId, inline: inline)
         case (nil, let inline):
             // If no index and no inline type, then it's a function type with no parameters or results
             let inline = inline ?? WatParser.FunctionType(signature: WasmTypes.FunctionType(parameters: [], results: []), parameterNames: [])

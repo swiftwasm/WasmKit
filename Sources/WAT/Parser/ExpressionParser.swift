@@ -352,7 +352,7 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
         if !results.isEmpty {
             return try wat.types.resolveBlockType(results: results)
         }
-        let typeUse = try withWatParser { try $0.typeUse() }
+        let typeUse = try withWatParser { try $0.typeUse(mayHaveName: false) }
         return try wat.types.resolveBlockType(use: typeUse)
     }
 
@@ -455,7 +455,7 @@ extension ExpressionParser {
         } else {
             tableIndex = 0
         }
-        let typeUse = try withWatParser { try $0.typeUse() }
+        let typeUse = try withWatParser { try $0.typeUse(mayHaveName: true) }
         let (_, typeIndex) = try wat.types.resolve(use: typeUse)
         return (UInt32(typeIndex), tableIndex)
     }
