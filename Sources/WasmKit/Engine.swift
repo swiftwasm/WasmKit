@@ -53,12 +53,28 @@ public struct EngineConfiguration {
     /// The threading model to use for the virtual machine interpreter.
     public var threadingModel: ThreadingModel
 
+    /// The compilation mode of WebAssembly modules to the internal virtual
+    /// machine instruction sequence.
+    public enum CompilationMode {
+        /// Eager compilation, where the module is compiled to the internal
+        /// instruction sequence immediately after instantiation.
+        case eager
+
+        /// Lazy compilation, where the module is compiled to the internal
+        /// instruction sequence only when the first function is called.
+        case lazy
+    }
+
+    /// The compilation mode to use for WebAssembly modules.
+    public var compilationMode: CompilationMode
+
     /// Initializes a new instance of `EngineConfiguration`.
     /// - Parameter threadingModel: The threading model to use for the virtual
     /// machine interpreter. If `nil`, the default threading model for the
     /// current platform will be used.
-    public init(threadingModel: ThreadingModel? = nil) {
+    public init(threadingModel: ThreadingModel? = nil, compilationMode: CompilationMode = .lazy) {
         self.threadingModel = threadingModel ?? .defaultForCurrentPlatform
+        self.compilationMode = compilationMode
     }
 }
 

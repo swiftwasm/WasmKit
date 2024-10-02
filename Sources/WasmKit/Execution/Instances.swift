@@ -93,6 +93,14 @@ struct InstanceEntity /* : ~Copyable */ {
             hasDataCount: false
         )
     }
+
+    internal func compileAllFunctions(store: Store) throws {
+        let store = StoreRef(store)
+        for function in functions {
+            guard function.isWasm else { continue }
+            try function.wasm.ensureCompiled(store: store)
+        }
+    }
 }
 
 typealias InternalInstance = EntityHandle<InstanceEntity>
@@ -209,7 +217,7 @@ public struct Instance {
             guard case .uncompiled(let code) = function.wasm.code else {
                 fatalError("Already compiled!?")
             }
-            try function.ensureCompiled(store: StoreRef(store))
+            try function.wasm.ensureCompiled(store: StoreRef(store))
             let (iseq, locals, _) = function.assumeCompiled()
 
             // Print slot space information
@@ -506,8 +514,16 @@ public struct Global: Equatable {
     /// Initializes a new global instance with the given type and initial value.
     /// The returned global instance may be used to instantiate a new
     /// WebAssembly module.
+    @available(*, deprecated, renamed: "init(store:type:value:)")
     public init(globalType: GlobalType, initialValue: Value, store: Store) {
-        let handle = store.allocator.allocate(globalType: globalType, initialValue: initialValue)
+        self.init(store: store, type: globalType, value: initialValue)
+    }
+
+    /// Initializes a new global instance with the given type and initial value.
+    /// The returned global instance may be used to instantiate a new
+    /// WebAssembly module.
+    public init(store: Store, type: GlobalType, value: Value) {
+        let handle = store.allocator.allocate(globalType: type, initialValue: value)
         self.init(handle: handle, allocator: store.allocator)
     }
 }
