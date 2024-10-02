@@ -121,7 +121,7 @@ public enum WastExecute {
             try wastParser.parser.consume()
             let module = try wastParser.parser.takeId()
             let globalName = try wastParser.parser.expectString()
-            execute = .get(module: module, globalName: globalName)
+            execute = .get(module: module?.value, globalName: globalName)
             try wastParser.parser.expect(.rightParen)
         case let keyword?:
             throw WatParserError(
@@ -146,7 +146,7 @@ public struct WastInvoke {
         let name = try wastParser.parser.expectString()
         let args = try wastParser.constExpression()
         try wastParser.parser.expect(.rightParen)
-        let invoke = WastInvoke(module: module, name: name, args: args)
+        let invoke = WastInvoke(module: module?.value, name: name, args: args)
         return invoke
     }
 }
@@ -238,7 +238,7 @@ public enum WastDirective {
             let name = try wastParser.parser.expectString()
             let module = try wastParser.parser.takeId()
             try wastParser.parser.expect(.rightParen)
-            return .register(name: name, moduleId: module)
+            return .register(name: name, moduleId: module?.value)
         case "invoke":
             let invoke = try WastInvoke.parse(wastParser: &wastParser)
             return .invoke(invoke)
@@ -265,9 +265,9 @@ public struct ModuleDirective {
     static func parse(wastParser: inout WastParser) throws -> ModuleDirective {
         let location = wastParser.parser.lexer.location()
         try wastParser.parser.expectKeyword("module")
-        let idToken = try wastParser.parser.takeId()
+        let id = try wastParser.parser.takeId()
         let source = try ModuleSource.parse(wastParser: &wastParser)
-        return ModuleDirective(source: source, id: idToken, location: location)
+        return ModuleDirective(source: source, id: id?.value, location: location)
     }
 }
 

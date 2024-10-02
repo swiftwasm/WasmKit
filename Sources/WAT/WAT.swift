@@ -188,9 +188,9 @@ func parseWAT(_ parser: inout Parser) throws -> Wat {
 
         switch decl.kind {
         case let .type(decl):
-            typesMap.add(decl)
+            try typesMap.add(decl)
         case let .function(decl):
-            let index = functionsMap.add(decl)
+            let index = try functionsMap.add(decl)
             addExports(decl.exports, index: index, kind: .function)
             switch decl.kind {
             case .definition: break
@@ -201,31 +201,31 @@ func parseWAT(_ parser: inout Parser) throws -> Wat {
                 }
             }
         case let .table(decl):
-            let index = tablesMap.add(decl)
+            let index = try tablesMap.add(decl)
             addExports(decl.exports, index: index, kind: .table)
             if var inlineElement = decl.inlineElement {
                 inlineElement.mode = .active(
                     table: .index(UInt32(index), location), offset: .synthesized(0)
                 )
-                elementSegmentsMap.add(inlineElement)
+                try elementSegmentsMap.add(inlineElement)
             }
             if let importNames = decl.importNames {
                 addImport(importNames) { .table(decl.type) }
             }
         case let .memory(decl):
-            let index = memoriesMap.add(decl)
+            let index = try memoriesMap.add(decl)
             if var inlineData = decl.inlineData {
                 // Associate the memory with the inline data
                 inlineData.memory = .index(UInt32(index), location)
                 inlineData.offset = .synthesized(0)
-                dataSegmentsMap.add(inlineData)
+                try dataSegmentsMap.add(inlineData)
             }
             addExports(decl.exports, index: index, kind: .memory)
             if let importNames = decl.importNames {
                 addImport(importNames) { .memory(decl.type) }
             }
         case let .global(decl):
-            let index = globalsMap.add(decl)
+            let index = try globalsMap.add(decl)
             addExports(decl.exports, index: index, kind: .global)
             switch decl.kind {
             case .definition: break
@@ -233,11 +233,11 @@ func parseWAT(_ parser: inout Parser) throws -> Wat {
                 addImport(importNames) { .global(decl.type) }
             }
         case let .element(decl):
-            elementSegmentsMap.add(decl)
+            try elementSegmentsMap.add(decl)
         case let .export(decl):
             exportDecls.append(decl)
         case let .data(decl):
-            dataSegmentsMap.add(decl)
+            try dataSegmentsMap.add(decl)
         case let .start(startIndex):
             start = startIndex
         }

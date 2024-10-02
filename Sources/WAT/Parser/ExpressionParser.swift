@@ -18,12 +18,12 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
             case .index(let index, _):
                 return Int(index)
             case .id(let name, _):
-                return self[name]
+                return self[name.value]
             }
         }
 
-        mutating func push(_ name: String?) {
-            stack.append(name)
+        mutating func push(_ name: Name?) {
+            stack.append(name?.value)
         }
 
         mutating func pop() {
@@ -55,10 +55,10 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
     static func computeLocals(type: WatParser.FunctionType, locals: [WatParser.LocalDecl]) throws -> LocalsMap {
         var localsMap = LocalsMap()
         for (name, type) in zip(type.parameterNames, type.signature.parameters) {
-            localsMap.add(WatParser.LocalDecl(id: name, type: type))
+            try localsMap.add(WatParser.LocalDecl(id: name, type: type))
         }
         for local in locals {
-            localsMap.add(local)
+            try localsMap.add(local)
         }
         return localsMap
     }
@@ -82,7 +82,7 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
         guard let lastLabel = maybeLastLabel else {
             throw WatParserError("unexpected label \(name)", location: location)
         }
-        guard lastLabel == name else {
+        guard lastLabel == name.value else {
             throw WatParserError("expected label \(lastLabel) but found \(name)", location: location)
         }
     }

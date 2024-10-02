@@ -140,7 +140,7 @@ class ParserTests: XCTestCase {
         let (evenType, _) = try wat.types.resolve(use: even.typeUse)
         XCTAssertEqual(evenType.signature.parameters, [.i32])
         XCTAssertEqual(evenType.signature.results.first, .i32)
-        XCTAssertEqual(evenType.parameterNames, ["$n"])
+        XCTAssertEqual(evenType.parameterNames.map(\.?.value), ["$n"])
     }
 
     func testFuncIdBinding() throws {

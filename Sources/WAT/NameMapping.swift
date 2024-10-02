@@ -1,10 +1,18 @@
 import WasmParser
 import WasmTypes
 
+/// A name with its location in the source file
+struct Name: Equatable {
+    /// The name of the module field declaration specified in $id form
+    let value: String
+    /// The location of the name in the source file
+    let location: Location
+}
+
 /// A module field declaration that may have its name
 protocol NamedModuleFieldDecl {
     /// The name of the module field declaration specified in $id form
-    var id: String? { get }
+    var id: Name? { get }
 }
 
 /// A module field declaration that may be imported from another module
@@ -22,11 +30,14 @@ struct NameMapping<Decl: NamedModuleFieldDecl> {
     /// - Parameter newDecl: The declaration to add
     /// - Returns: The index of the added declaration
     @discardableResult
-    mutating func add(_ newDecl: Decl) -> Int {
+    mutating func add(_ newDecl: Decl) throws -> Int {
         let index = decls.count
         decls.append(newDecl)
         if let name = newDecl.id {
-            nameToIndex[name] = index
+            guard nameToIndex[name.value] == nil else {
+                throw WatParserError("Duplicate \(name.value) identifier", location: name.location)
+            }
+            nameToIndex[name.value] = index
         }
         return index
     }
@@ -34,7 +45,7 @@ struct NameMapping<Decl: NamedModuleFieldDecl> {
     func resolveIndex(use: Parser.IndexOrId) throws -> Int {
         switch use {
         case .id(let id, _):
-            guard let byName = nameToIndex[id] else {
+            guard let byName = nameToIndex[id.value] else {
                 throw WatParserError("Unknown \(Decl.self) \(id)", location: use.location)
             }
             return byName
@@ -91,8 +102,8 @@ struct TypesMap {
 
     /// Adds a new function type to the mapping
     @discardableResult
-    mutating func add(_ decl: WatParser.FunctionTypeDecl) -> Int {
-        nameMapping.add(decl)
+    mutating func add(_ decl: WatParser.FunctionTypeDecl) throws -> Int {
+        try nameMapping.add(decl)
         // Normalize the function type signature without parameter names
         if let existing = indices[decl.type.signature] {
             return existing
@@ -104,11 +115,11 @@ struct TypesMap {
     }
 
     /// Adds a new function type to the mapping without parameter names
-    private mutating func addAnonymousSignature(_ signature: FunctionType) -> Int {
+    private mutating func addAnonymousSignature(_ signature: FunctionType) throws -> Int {
         if let existing = indices[signature] {
             return existing
         }
-        return add(
+        return try add(
             WatParser.FunctionTypeDecl(
                 id: nil,
                 type: WatParser.FunctionType(signature: signature, parameterNames: [])
@@ -118,22 +129,22 @@ struct TypesMap {
 
     private mutating func resolveBlockType(
         results: [ValueType],
-        resolveSignatureIndex: (inout TypesMap) -> Int
+        resolveSignatureIndex: (inout TypesMap) throws -> Int
     ) throws -> BlockType {
         if let result = results.first {
             guard results.count > 1 else { return .type(result) }
-            return .funcType(UInt32(resolveSignatureIndex(&self)))
+            return try .funcType(UInt32(resolveSignatureIndex(&self)))
         }
         return .empty
     }
     private mutating func resolveBlockType(
         signature: WasmTypes.FunctionType,
-        resolveSignatureIndex: (inout TypesMap) -> Int
+        resolveSignatureIndex: (inout TypesMap) throws -> Int
     ) throws -> BlockType {
         if signature.parameters.isEmpty {
             return try resolveBlockType(results: signature.results, resolveSignatureIndex: resolveSignatureIndex)
         }
-        return .funcType(UInt32(resolveSignatureIndex(&self)))
+        return try .funcType(UInt32(resolveSignatureIndex(&self)))
     }
 
     /// Resolves a block type from a list of result types
@@ -142,7 +153,7 @@ struct TypesMap {
             results: results,
             resolveSignatureIndex: {
                 let signature = FunctionType(parameters: [], results: results)
-                return $0.addAnonymousSignature(signature)
+                return try $0.addAnonymousSignature(signature)
             })
     }
 
@@ -151,7 +162,7 @@ struct TypesMap {
         return try resolveBlockType(
             signature: signature,
             resolveSignatureIndex: {
-                return $0.addAnonymousSignature(signature)
+                return try $0.addAnonymousSignature(signature)
             })
     }
 
@@ -173,7 +184,7 @@ struct TypesMap {
             return try nameMapping.resolveIndex(use: indexOrId)
         case (nil, let inline):
             let inline = inline?.signature ?? WasmTypes.FunctionType(parameters: [], results: [])
-            return addAnonymousSignature(inline)
+            return try addAnonymousSignature(inline)
         }
     }
 
@@ -203,7 +214,7 @@ struct TypesMap {
                 return (inline, index)
             }
             // Add inline type to the index space if it doesn't already exist
-            let index = add(WatParser.FunctionTypeDecl(id: nil, type: inline))
+            let index = try add(WatParser.FunctionTypeDecl(id: nil, type: inline))
             return (inline, index)
         }
     }
