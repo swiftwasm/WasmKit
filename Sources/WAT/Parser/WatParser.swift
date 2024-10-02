@@ -106,7 +106,8 @@ struct WatParser {
 
     struct ElementDecl: NamedModuleFieldDecl {
         enum Offset {
-            case source(Lexer)
+            case expression(Lexer)
+            case singleInstruction(Lexer)
             case synthesized(Int)
         }
         enum Mode {
@@ -350,12 +351,12 @@ struct WatParser {
             } else {
                 table = try tableUse()
                 if try parser.takeParenBlockStart("offset") {
-                    mode = .active(table: table, offset: .source(parser.lexer))
+                    mode = .active(table: table, offset: .expression(parser.lexer))
                     try parser.skipParenBlock()
                 } else {
                     if try parser.peek(.leftParen) != nil {
                         // abbreviated offset instruction
-                        mode = .active(table: table, offset: .source(parser.lexer))
+                        mode = .active(table: table, offset: .singleInstruction(parser.lexer))
                         try parser.consume()  // consume (
                         try parser.skipParenBlock()  // skip offset expr
                     } else {

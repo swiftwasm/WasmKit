@@ -95,6 +95,17 @@ struct Encoder {
         output.append(contentsOf: exprEncoder.encoder.output)
         lexer = parser.parser.lexer
     }
+
+    mutating func writeInstruction(lexer: inout Lexer, wat: inout Wat) throws {
+        var parser = ExpressionParser<ExpressionEncoder>(lexer: lexer, features: wat.features)
+        var exprEncoder = ExpressionEncoder()
+        guard try parser.instruction(visitor: &exprEncoder, wat: &wat) else {
+            throw WatParserError("unexpected end of instruction", location: lexer.location())
+        }
+        try exprEncoder.visitEnd()
+        output.append(contentsOf: exprEncoder.encoder.output)
+        lexer = parser.parser.lexer
+    }
 }
 
 protocol WasmEncodable {
@@ -235,8 +246,10 @@ extension WAT.WatParser.ElementDecl {
         }
         if case let .active(_, offset) = self.mode {
             switch offset {
-            case .source(var lexer):
+            case .expression(var lexer):
                 try encoder.writeExpression(lexer: &lexer, wat: &wat)
+            case .singleInstruction(var lexer):
+                try encoder.writeInstruction(lexer: &lexer, wat: &wat)
             case .synthesized(let offset):
                 var exprEncoder = ExpressionEncoder()
                 if isMemory64(tableIndex: Int(tableIndex ?? 0)) {

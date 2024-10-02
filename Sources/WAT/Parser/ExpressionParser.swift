@@ -91,17 +91,10 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
         }
     }
 
-    @discardableResult
-    mutating func parse(visitor: inout Visitor, wat: inout Wat) throws -> Int {
-        var numberOfInstructions = 0
-        while true {
-            guard try instruction(visitor: &visitor, wat: &wat) else {
-                numberOfInstructions += 1
-                break
-            }
+    mutating func parse(visitor: inout Visitor, wat: inout Wat) throws {
+        while try instruction(visitor: &visitor, wat: &wat) {
             // Parse more instructions
         }
-        return numberOfInstructions
     }
 
     mutating func parseElemExprList(visitor: inout Visitor, wat: inout Wat) throws {
@@ -170,7 +163,7 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
 
     /// Parse "(instr)" or "instr" and visit the instruction.
     /// - Returns: `true` if an instruction was parsed. Otherwise, `false`.
-    private mutating func instruction(visitor: inout Visitor, wat: inout Wat) throws -> Bool {
+    mutating func instruction(visitor: inout Visitor, wat: inout Wat) throws -> Bool {
         if try nonFoldedInstruction(visitor: &visitor, wat: &wat) {
             return true
         }
@@ -206,9 +199,7 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
             }
             try parser.expect(.leftParen)
             let keyword = try parser.expectKeyword()
-            guard let visit = try parseTextInstruction(keyword: keyword, wat: &wat) else {
-                return false
-            }
+            let visit = try parseTextInstruction(keyword: keyword, wat: &wat)
             let suspense: Suspense
             switch keyword {
             case "if":
@@ -265,7 +256,7 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
     }
 
     /// Parse a single instruction without consuming the surrounding parentheses and instruction keyword.
-    private mutating func parseTextInstruction(keyword: String, wat: inout Wat) throws -> ((inout Visitor) throws -> Visitor.Output)? {
+    private mutating func parseTextInstruction(keyword: String, wat: inout Wat) throws -> ((inout Visitor) throws -> Visitor.Output) {
         switch keyword {
         case "select":
             // Special handling for "select", which have two variants 1. with type, 2. without type
@@ -293,7 +284,10 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
             }
         default:
             // Other instructions are parsed by auto-generated code.
-            return try WAT.parseTextInstruction(keyword: keyword, expressionParser: &self, wat: &wat)
+            guard let visit = try WAT.parseTextInstruction(keyword: keyword, expressionParser: &self, wat: &wat) else {
+                throw WatParserError("unknown instruction \(keyword)", location: parser.lexer.location())
+            }
+            return visit
         }
     }
 
@@ -302,12 +296,8 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
         guard let keyword = try parser.peekKeyword() else {
             return false
         }
-        let originalParser = parser
         try parser.consume()
-        guard let visit = try parseTextInstruction(keyword: keyword, wat: &wat) else {
-            parser = originalParser
-            return false
-        }
+        let visit = try parseTextInstruction(keyword: keyword, wat: &wat)
         _ = try visit(&visitor)
         return true
     }
@@ -455,7 +445,7 @@ extension ExpressionParser {
         } else {
             tableIndex = 0
         }
-        let typeUse = try withWatParser { try $0.typeUse(mayHaveName: true) }
+        let typeUse = try withWatParser { try $0.typeUse(mayHaveName: false) }
         let (_, typeIndex) = try wat.types.resolve(use: typeUse)
         return (UInt32(typeIndex), tableIndex)
     }
