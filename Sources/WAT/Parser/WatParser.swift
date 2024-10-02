@@ -196,7 +196,7 @@ struct WatParser {
             let importNames = try importNames()
             if try parser.takeParenBlockStart("func") {
                 let id = try parser.takeId()
-                kind = .function(FunctionDecl(id: id, exports: [], typeUse: try typeUse(), kind: .imported(importNames)))
+                kind = .function(FunctionDecl(id: id, exports: [], typeUse: try typeUse(mayHaveName: true), kind: .imported(importNames)))
             } else if try parser.takeParenBlockStart("table") {
                 let id = try parser.takeId()
                 kind = .table(TableDecl(id: id, exports: [], type: try tableType(), importNames: importNames))
@@ -215,7 +215,7 @@ struct WatParser {
             let id = try parser.takeId()
             let exports = try inlineExports()
             let importNames = try inlineImport()
-            let typeUse = try typeUse()
+            let typeUse = try typeUse(mayHaveName: true)
             let functionKind: FunctionKind
             if let importNames = importNames {
                 functionKind = .imported(importNames)
@@ -441,14 +441,14 @@ struct WatParser {
         return ImportNames(module: module, name: name)
     }
 
-    mutating func typeUse() throws -> TypeUse {
+    mutating func typeUse(mayHaveName: Bool) throws -> TypeUse {
         let location = parser.lexer.location()
         var index: Parser.IndexOrId?
         if try parser.takeParenBlockStart("type") {
             index = try parser.expectIndexOrId()
             try parser.expect(.rightParen)
         }
-        let inline = try optionalFunctionType()
+        let inline = try optionalFunctionType(mayHaveName: mayHaveName)
         return TypeUse(index: index, inline: inline, location: location)
     }
 
@@ -552,14 +552,14 @@ struct WatParser {
     mutating func funcType() throws -> FunctionType {
         try parser.expect(.leftParen)
         try parser.expectKeyword("func")
-        let (params, names) = try params()
+        let (params, names) = try params(mayHaveName: true)
         let results = try results()
         try parser.expect(.rightParen)
         return FunctionType(signature: WasmTypes.FunctionType(parameters: params, results: results), parameterNames: names)
     }
 
-    mutating func optionalFunctionType() throws -> FunctionType? {
-        let (params, names) = try params()
+    mutating func optionalFunctionType(mayHaveName: Bool) throws -> FunctionType? {
+        let (params, names) = try params(mayHaveName: mayHaveName)
         let results = try results()
         if results.isEmpty, params.isEmpty {
             return nil
@@ -567,21 +567,23 @@ struct WatParser {
         return FunctionType(signature: WasmTypes.FunctionType(parameters: params, results: results), parameterNames: names)
     }
 
-    mutating func params() throws -> ([ValueType], [Name?]) {
+    mutating func params(mayHaveName: Bool) throws -> ([ValueType], [Name?]) {
         var types: [ValueType] = []
         var names: [Name?] = []
         while try parser.takeParenBlockStart("param") {
-            if let id = try parser.takeId() {
-                let valueType = try valueType()
-                types.append(valueType)
-                names.append(id)
-                try parser.expect(.rightParen)
-            } else {
-                while try !parser.take(.rightParen) {
+            if mayHaveName {
+                if let id = try parser.takeId() {
                     let valueType = try valueType()
                     types.append(valueType)
-                    names.append(nil)
+                    names.append(id)
+                    try parser.expect(.rightParen)
+                    continue
                 }
+            }
+            while try !parser.take(.rightParen) {
+                let valueType = try valueType()
+                types.append(valueType)
+                names.append(nil)
             }
         }
         return (types, names)
