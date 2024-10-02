@@ -44,6 +44,14 @@ enum TestSupport {
     }
 
     static func lookupExecutable(_ name: String) -> URL? {
+        let envName = "\(name.uppercased())_EXEC"
+        if let path = ProcessInfo.processInfo.environment[envName] {
+            let url = URL(fileURLWithPath: path).deletingLastPathComponent().appendingPathComponent(name)
+            if FileManager.default.isExecutableFile(atPath: url.path) {
+                return url
+            }
+            print("Executable path \(url.path) specified by \(envName) is not found or not executable, falling back to PATH lookup")
+        }
         #if os(Windows)
             let pathEnvVar = "Path"
             let pathSeparator: Character = ";"

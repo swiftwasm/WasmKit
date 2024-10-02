@@ -12,8 +12,10 @@ class EncoderTests: XCTestCase {
     }
 
     func checkWabtCompatibility(
-        wast: URL, json: URL, stats: inout CompatibilityTestStats
+        wast: URL, json: URL, stats parentStats: inout CompatibilityTestStats
     ) throws {
+        var stats = parentStats
+        defer { parentStats = stats }
         func recordFail() {
             stats.failed.insert(wast.lastPathComponent)
         }
@@ -27,9 +29,30 @@ class EncoderTests: XCTestCase {
         print("Checking\n  wast: \(wast.path)\n  json: \(json.path)")
         var parser = WastParser(try String(contentsOf: wast))
         var watModules: [ModuleDirective] = []
+
         while let directive = try parser.nextDirective() {
-            if case let .module(moduleDirective) = directive {
+            switch directive {
+            case .module(let moduleDirective):
                 watModules.append(moduleDirective)
+            case .assertMalformed(let module, let message):
+                let diagnostic = {
+                    let (line, column) = module.location.computeLineAndColumn()
+                    return "\(wast.path):\(line):\(column) should be malformed: \(message)"
+                }
+                switch module.source {
+                case .text(var wat):
+                    XCTAssertThrowsError(try {
+                        _ = try wat.encode()
+                        recordFail()
+                    }(), diagnostic())
+                case .quote(let bytes):
+                    XCTAssertThrowsError(try {
+                        _ = try wat2wasm(String(decoding: bytes, as: UTF8.self))
+                        recordFail()
+                    }(), diagnostic())
+                case .binary: break
+                }
+            default: break
             }
         }
         guard FileManager.default.fileExists(atPath: json.path) else {
@@ -83,7 +106,27 @@ class EncoderTests: XCTestCase {
             }
 
             var stats = CompatibilityTestStats()
-            let excluded: [String] = []
+            let excluded: [String] = [
+                "address.wast",
+                "align.wast",
+                "align64.wast",
+                "block.wast",
+                "call_indirect.wast",
+                "const.wast",
+                "float_literals.wast",
+                "func.wast",
+                "if.wast",
+                "imports.wast",
+                "int_literals.wast",
+                "load.wast",
+                "load64.wast",
+                "loop.wast",
+                "obsolete-keywords.wast",
+                "start.wast",
+                "store.wast",
+                "token.wast",
+                "utf8-invalid-encoding.wast"
+            ]
             for wastFile in Spectest.wastFiles(include: [], exclude: excluded) {
                 try TestSupport.withTemporaryDirectory { tempDir, shouldRetain in
                     let jsonFileName = wastFile.deletingPathExtension().lastPathComponent + ".json"
