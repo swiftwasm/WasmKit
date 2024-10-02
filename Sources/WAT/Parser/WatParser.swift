@@ -80,12 +80,12 @@ struct WatParser {
         /// This method may modify TypesMap of the given WATModule
         ///
         /// - Returns: Type index of this function
-        func parse<V: InstructionVisitor>(visitor: inout V, wat: inout Wat) throws -> Int {
+        func parse<V: InstructionVisitor>(visitor: inout V, wat: inout Wat, features: WasmFeatureSet) throws -> Int {
             guard case let .definition(locals, body) = kind else {
                 fatalError("Imported functions cannot be parsed")
             }
             let (type, typeIndex) = try wat.types.resolve(use: typeUse)
-            var parser = try ExpressionParser<V>(type: type, locals: locals, lexer: body)
+            var parser = try ExpressionParser<V>(type: type, locals: locals, lexer: body, features: features)
             try parser.parse(visitor: &visitor, wat: &wat)
             return typeIndex
         }

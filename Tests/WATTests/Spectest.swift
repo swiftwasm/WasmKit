@@ -1,4 +1,5 @@
 import Foundation
+import WasmParser
 
 enum Spectest {
     static let rootDirectory = URL(fileURLWithPath: #filePath)
@@ -35,6 +36,14 @@ enum Spectest {
             }
             return nil
         }
+    }
+
+    static func deriveFeatureSet(wast: URL) -> WasmFeatureSet {
+        var features = WasmFeatureSet.default
+        if wast.deletingLastPathComponent().path.hasSuffix("proposals/memory64") {
+            features.insert(.memory64)
+        }
+        return features
     }
 
     struct Command: Decodable {

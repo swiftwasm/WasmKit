@@ -5,8 +5,8 @@ import XCTest
 @testable import WAT
 
 class ParserTests: XCTestCase {
-    func parseWast(_ source: String) throws -> [WastDirective] {
-        var parser = WastParser(source)
+    func parseWast(_ source: String, features: WasmFeatureSet = .default) throws -> [WastDirective] {
+        var parser = WastParser(source, features: features)
         var directives: [WastDirective] = []
         while let directive = try parser.nextDirective() {
             directives.append(directive)
@@ -66,7 +66,7 @@ class ParserTests: XCTestCase {
                 (unknown expr)
               )
             )
-            """#)
+            """#, features: .default)
 
         while let directive = try parser.nextDirective() {
             switch directive {
@@ -185,7 +185,7 @@ class ParserTests: XCTestCase {
             totalCount += 1
             let source = try String(contentsOf: filePath)
             do {
-                _ = try parseWast(source)
+                _ = try parseWast(source, features: Spectest.deriveFeatureSet(wast: filePath))
             } catch {
                 failureCount += 1
                 XCTFail("Failed to parse \(filePath.path):\(error)")

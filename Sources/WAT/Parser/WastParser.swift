@@ -9,9 +9,11 @@ protocol WastConstInstructionVisitor: InstructionVisitor {
 /// You can find its grammar definition in the [WebAssembly spec repository](https://github.com/WebAssembly/spec/blob/wg-1.0/interpreter/README.md#scripts)
 struct WastParser {
     var parser: Parser
+    let features: WasmFeatureSet
 
-    init(_ input: String) {
+    init(_ input: String, features: WasmFeatureSet) {
         self.parser = Parser(input)
+        self.features = features
     }
 
     mutating func nextDirective() throws -> WastDirective? {
@@ -24,7 +26,7 @@ struct WastParser {
                 let location = originalParser.lexer.location()
                 return .module(
                     ModuleDirective(
-                        source: .text(try parseWAT(&originalParser)), id: nil, location: location
+                        source: .text(try parseWAT(&originalParser, features: features)), id: nil, location: location
                     ))
             }
             throw WatParserError("unexpected wast directive token", location: parser.lexer.location())
@@ -78,7 +80,7 @@ struct WastParser {
     mutating func constExpression() throws -> [Value] {
         var values: [Value] = []
         var collector = ConstExpressionCollector(addValue: { values.append($0) })
-        var exprParser = ExpressionParser<ConstExpressionCollector>(lexer: parser.lexer)
+        var exprParser = ExpressionParser<ConstExpressionCollector>(lexer: parser.lexer, features: features)
         while try exprParser.parseWastConstInstruction(visitor: &collector) {}
         parser = exprParser.parser
         return values
@@ -87,7 +89,7 @@ struct WastParser {
     mutating func expectationValues() throws -> [WastExpectValue] {
         var values: [WastExpectValue] = []
         var collector = ConstExpressionCollector(addValue: { values.append(.value($0)) })
-        var exprParser = ExpressionParser<ConstExpressionCollector>(lexer: parser.lexer)
+        var exprParser = ExpressionParser<ConstExpressionCollector>(lexer: parser.lexer, features: features)
         while true {
             if let expectValue = try exprParser.parseWastExpectValue() {
                 values.append(expectValue)
@@ -115,7 +117,7 @@ public enum WastExecute {
             execute = .invoke(try WastInvoke.parse(wastParser: &wastParser))
         case "module":
             try wastParser.parser.consume()
-            execute = .wat(try parseWAT(&wastParser.parser))
+            execute = .wat(try parseWAT(&wastParser.parser, features: wastParser.features))
             try wastParser.parser.skipParenBlock()
         case "get":
             try wastParser.parser.consume()
@@ -224,9 +226,10 @@ public enum WastDirective {
             return .assertExhaustion(call: call, message: message)
         case "assert_unlinkable":
             try wastParser.parser.consume()
+            let features = wastParser.features
             let module = try wastParser.parens {
                 try $0.parser.expectKeyword("module")
-                let wat = try parseWAT(&$0.parser)
+                let wat = try parseWAT(&$0.parser, features: features)
                 try $0.parser.skipParenBlock()
                 return wat
             }
@@ -293,7 +296,7 @@ public enum ModuleSource {
             }
         }
 
-        let watModule = try parseWAT(&wastParser.parser)
+        let watModule = try parseWAT(&wastParser.parser, features: wastParser.features)
         try wastParser.parser.skipParenBlock()
         return .text(watModule)
     }

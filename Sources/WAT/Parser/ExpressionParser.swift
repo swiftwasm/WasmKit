@@ -36,20 +36,24 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
     }
     var parser: Parser
     let locals: LocalsMap
+    let features: WasmFeatureSet
     private var labelStack = LabelStack()
 
     init(
         type: WatParser.FunctionType,
         locals: [WatParser.LocalDecl],
-        lexer: Lexer
+        lexer: Lexer,
+        features: WasmFeatureSet
     ) throws {
         self.parser = Parser(lexer)
         self.locals = try Self.computeLocals(type: type, locals: locals)
+        self.features = features
     }
 
-    init(lexer: Lexer) {
+    init(lexer: Lexer, features: WasmFeatureSet) {
         self.parser = Parser(lexer)
         self.locals = LocalsMap()
+        self.features = features
     }
 
     static func computeLocals(type: WatParser.FunctionType, locals: [WatParser.LocalDecl]) throws -> LocalsMap {
@@ -115,7 +119,7 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
     mutating func parseWastConstInstruction(
         visitor: inout Visitor
     ) throws -> Bool where Visitor: WastConstInstructionVisitor {
-        var wat = Wat.empty()
+        var wat = Wat.empty(features: features)
         // WAST allows extra const value instruction
         if try parser.takeParenBlockStart("ref.extern") {
             _ = try visitor.visitRefExtern(value: parser.expectUnsignedInt())
@@ -130,7 +134,7 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
     }
 
     mutating func parseConstInstruction(visitor: inout Visitor) throws -> Bool {
-        var wat = Wat.empty()
+        var wat = Wat.empty(features: features)
         if try foldedInstruction(visitor: &visitor, wat: &wat) {
             return true
         }
@@ -383,6 +387,10 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
             try parser.consume()
             var subParser = Parser(String(maybeOffset.dropFirst(offsetPrefix.count)))
             offset = try subParser.expectUnsignedInt(UInt64.self)
+
+            if !features.contains(.memory64), offset > UInt32.max {
+                throw WatParserError("memory offset must be less than or equal to \(UInt32.max)", location: subParser.lexer.location())
+            }
         }
         var align: UInt32 = defaultAlign
         let alignPrefix = "align="

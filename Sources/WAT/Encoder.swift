@@ -88,7 +88,7 @@ struct Encoder {
     }
 
     mutating func writeExpression(lexer: inout Lexer, wat: inout Wat) throws {
-        var parser = ExpressionParser<ExpressionEncoder>(lexer: lexer)
+        var parser = ExpressionParser<ExpressionEncoder>(lexer: lexer, features: wat.features)
         var exprEncoder = ExpressionEncoder()
         try parser.parse(visitor: &exprEncoder, wat: &wat)
         try exprEncoder.visitEnd()
@@ -156,7 +156,7 @@ struct ElementExprCollector: AnyInstructionVisitor {
     mutating func parse(indices: WatParser.ElementDecl.Indices, wat: inout Wat) throws {
         switch indices {
         case .elementExprList(let lexer):
-            var parser = ExpressionParser<ElementExprCollector>(lexer: lexer)
+            var parser = ExpressionParser<ElementExprCollector>(lexer: lexer, features: wat.features)
             try parser.parseElemExprList(visitor: &self, wat: &wat)
         case .functionList(let lexer):
             try self.parseFunctionList(lexer: lexer, wat: wat)
@@ -557,7 +557,7 @@ func encode(module: inout Wat) throws -> [UInt8] {
                         encoder.writeUnsignedLEB128(local.count)
                         local.type.encode(to: &encoder)
                     }
-                    let funcTypeIndex = try function.parse(visitor: &exprEncoder, wat: &module)
+                    let funcTypeIndex = try function.parse(visitor: &exprEncoder, wat: &module, features: module.features)
                     functionSection.append(UInt32(funcTypeIndex))
                     // TODO?
                     try exprEncoder.visitEnd()
