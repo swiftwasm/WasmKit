@@ -398,6 +398,10 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
             try parser.consume()
             var subParser = Parser(String(maybeAlign.dropFirst(alignPrefix.count)))
             align = try subParser.expectUnsignedInt(UInt32.self)
+
+            if align == 0 || align & (align - 1) != 0 {
+                throw WatParserError("alignment must be a power of 2", location: subParser.lexer.location())
+            }
         }
         return MemArg(offset: offset, align: align)
     }

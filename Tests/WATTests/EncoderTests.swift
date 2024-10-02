@@ -107,8 +107,6 @@ class EncoderTests: XCTestCase {
 
             var stats = CompatibilityTestStats()
             let excluded: [String] = [
-                "align.wast",
-                "align64.wast",
                 "block.wast",
                 "call_indirect.wast",
                 "const.wast",
