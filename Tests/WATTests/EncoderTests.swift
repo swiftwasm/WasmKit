@@ -107,9 +107,7 @@ class EncoderTests: XCTestCase {
 
             var stats = CompatibilityTestStats()
             let excluded: [String] = [
-                "float_literals.wast",
                 "imports.wast",
-                "int_literals.wast",
                 "start.wast",
                 "token.wast",
                 "utf8-invalid-encoding.wast"

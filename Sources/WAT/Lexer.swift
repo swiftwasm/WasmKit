@@ -480,18 +480,25 @@ extension Lexer.Cursor {
     /// - Returns: The parsed string without underscores
     mutating func parseUnderscoredChars(continueParsing: (Unicode.Scalar) -> Bool) throws -> String {
         var value = String.UnicodeScalarView()
-        var lastChar: Unicode.Scalar?
+        var lastParsedChar: Unicode.Scalar?
         while let char = try peek() {
-            lastChar = char
             if char == "_" {
+                guard let lastChar = lastParsedChar else {
+                    throw createError("Invalid hex number, leading underscore")
+                }
+                guard lastChar != "_" else {
+                    throw createError("Invalid hex number, consecutive underscores")
+                }
+                lastParsedChar = char
                 _ = try next()
                 continue
             }
             guard continueParsing(char) else { break }
+            lastParsedChar = char
             value.append(char)
             _ = try next()
         }
-        if lastChar == "_" {
+        if lastParsedChar == "_" {
             throw createError("Invalid hex number, trailing underscore")
         }
         return String(value)
