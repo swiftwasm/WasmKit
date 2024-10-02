@@ -14,8 +14,28 @@ final class FuzzTranslatorRegressionTests: XCTestCase {
 
             let data = try Data(contentsOf: URL(fileURLWithPath: path))
             do {
-                var module = try WasmKit.parseWasm(bytes: Array(data))
-                try module.materializeAll()
+                let module = try WasmKit.parseWasm(bytes: Array(data))
+                let engine = Engine(configuration: EngineConfiguration(compilationMode: .eager))
+                let store = Store(engine: engine)
+                var imports = Imports()
+                for importEntry in module.imports {
+                    let value: ExternalValueConvertible
+                    switch importEntry.descriptor {
+                    case .function(let typeIndex):
+                        let type = module.types[Int(typeIndex)]
+                        value = Function(store: store, type: type) { _, _ in
+                            fatalError("unreachable")
+                        }
+                    case .global(let globalType):
+                        value = Global(store: store, type: globalType, value: .i32(0))
+                    case .memory(let memoryType):
+                        value = try Memory(store: store, type: memoryType)
+                    case .table(let tableType):
+                        value = try Table(store: store, type: tableType)
+                    }
+                    imports.define(module: importEntry.module, name: importEntry.name, value.externalValue)
+                }
+                _ = try module.instantiate(store: store, imports: imports)
             } catch {
                 // Explicit errors are ok
             }

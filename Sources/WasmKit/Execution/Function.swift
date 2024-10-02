@@ -181,19 +181,6 @@ extension InternalFunction {
         }
     }
 
-    @inline(never)
-    func ensureCompiled(store: StoreRef) throws {
-        let entity = self.wasm
-        switch entity.code {
-        case .uncompiled(let code):
-            try entity.withValue {
-                let iseq = try $0.compile(store: store, code: code)
-                $0.code = .compiled(iseq)
-            }
-        case .compiled: break
-        }
-    }
-
     func assumeCompiled() -> (
         InstructionSequence,
         locals: Int,
@@ -221,10 +208,6 @@ struct WasmFunctionEntity {
         self.code = .uncompiled(code)
         self.numberOfNonParameterLocals = code.locals.count
         self.index = index
-    }
-
-    mutating func ensureCompiled(context: inout Execution) throws -> InstructionSequence {
-        try ensureCompiled(store: context.store)
     }
 
     mutating func ensureCompiled(store: StoreRef) throws -> InstructionSequence {
@@ -257,6 +240,22 @@ struct WasmFunctionEntity {
         }
         self.code = .compiled(iseq)
         return iseq
+    }
+}
+
+extension EntityHandle<WasmFunctionEntity> {
+    @inline(never)
+    @discardableResult
+    func ensureCompiled(store: StoreRef) throws -> InstructionSequence {
+        switch self.code {
+        case .uncompiled(let code):
+            return try self.withValue {
+                let iseq = try $0.compile(store: store, code: code)
+                $0.code = .compiled(iseq)
+                return iseq
+            }
+        case .compiled(let iseq): return iseq
+        }
     }
 }
 

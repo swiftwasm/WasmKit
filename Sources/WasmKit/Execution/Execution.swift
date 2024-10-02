@@ -435,9 +435,7 @@ extension Execution {
     ) throws -> (Pc, Sp) {
         if function.isWasm {
             let function = function.wasm
-            let iseq = try function.withValue {
-                try $0.ensureCompiled(context: &self)
-            }
+            let iseq = try function.ensureCompiled(store: store)
 
             let newSp = try pushFrame(
                 iseq: iseq,

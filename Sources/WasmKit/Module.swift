@@ -199,6 +199,13 @@ public struct Module {
             _ = try startFunction.invoke([], store: store)
         }
 
+        // Compile all functions eagerly if the engine is in eager compilation mode
+        if store.engine.configuration.compilationMode == .eager {
+            try instance.withValue {
+                try $0.compileAllFunctions(store: store)
+            }
+        }
+
         return instance
     }
 

@@ -102,7 +102,7 @@ extension Execution {
         // NOTE: `CompilingCallOperand` consumes 2 slots, discriminator is at -3
         let headSlotPc = pc.advanced(by: -3)
         let callee = immediate.callee
-        try callee.ensureCompiled(store: store)
+        try callee.wasm.ensureCompiled(store: store)
         let replaced = Instruction.internalCall(immediate)
         headSlotPc.pointee = replaced.headSlot(threadingModel: store.value.engine.configuration.threadingModel)
         try _internalCall(sp: &sp, pc: &pc, callee: callee, internalCallOperand: immediate)
