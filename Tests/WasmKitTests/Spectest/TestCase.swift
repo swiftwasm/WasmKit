@@ -225,10 +225,6 @@ extension WastRunContext {
 
         case .assertMalformed(let module, let message):
             currentInstance = nil
-            guard case .binary = module.source else {
-                return .skipped("assert_malformed is only supported for binary modules for now")
-            }
-
             do {
                 let module = try parseModule(rootPath: rootPath, moduleSource: module.source)
                 let instance = try instantiate(module: module)
