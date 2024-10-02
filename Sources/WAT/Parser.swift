@@ -94,7 +94,12 @@ internal struct Parser {
         }
         switch sign {
         case .plus, nil: return fromBitPattern(value)
-        case .minus: return fromBitPattern(~value &+ 1)
+        case .minus:
+            let casted = fromBitPattern(~value &+ 1)
+            guard casted <= 0 else {
+                throw WatParserError("invalid literal \(token.text(from: lexer))", location: token.location(in: lexer))
+            }
+            return casted
         }
     }
 
