@@ -143,8 +143,8 @@ extension TestCase {
                     if let result = try context.run(directive: directive) {
                         handler(self, location, result)
                     }
-                } catch let error as SpectestError {
-                    handler(self, location, .failed(error.description))
+                } catch let error {
+                    handler(self, location, .failed("\(error)"))
                 }
             }
         } catch let parseError as WatParserError {

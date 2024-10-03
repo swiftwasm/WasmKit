@@ -43,6 +43,7 @@
       ;; emit its own instruction.
       (local.get 1)
       (local.set 0)
+      (drop) ;; drop i32.add
       (local.get 0)
   )
 )

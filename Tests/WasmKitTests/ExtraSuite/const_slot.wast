@@ -17,6 +17,7 @@
       ;; emit its own instruction.
       (i32.const 0)
       (local.set 0)
+      (drop) ;; drop i32.add
       (local.get 0)
   )
 )
