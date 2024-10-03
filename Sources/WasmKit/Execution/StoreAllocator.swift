@@ -277,6 +277,9 @@ extension StoreAllocator {
             switch (importEntry.descriptor, external) {
             case let (.function(typeIndex), .function(externalFunc)):
                 let type = externalFunc.type
+                guard typeIndex < module.types.count else {
+                    throw ValidationError("Function type index out of bounds")
+                }
                 guard engine.internType(module.types[Int(typeIndex)]) == type else {
                     throw ImportError.incompatibleImportType
                 }
