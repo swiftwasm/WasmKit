@@ -53,7 +53,6 @@ while let payload = try parser.parseNext() {
 ### Visitor
 
 - ``InstructionVisitor``
-- ``VoidInstructionVisitor``
 - ``AnyInstructionVisitor``
 - ``InstructionTracingVisitor``
 
