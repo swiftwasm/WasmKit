@@ -22,9 +22,6 @@ final class SpectestTests: XCTestCase {
             path: Self.testPaths,
             include: [],
             exclude: [
-                "labels.wast",
-                "load.wast",
-                "local_get.wast",
                 "loop.wast",
                 "memory.wast",
                 "memory_grow.wast",

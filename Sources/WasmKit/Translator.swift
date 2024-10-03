@@ -989,7 +989,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     private mutating func visitReturnLike() throws {
         preserveOnStack(depth: self.type.results.count)
         for (index, resultType) in self.type.results.enumerated().reversed() {
-            let source = ensureOnVReg(try valueStack.pop(resultType))
+            guard let operand = try popOperand(resultType) else { continue }
+            let source = ensureOnVReg(operand)
             let dest = returnReg(index)
             emitCopyStack(from: source, to: dest)
         }
@@ -1170,9 +1171,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
 
     mutating func visitEnd() throws -> Output {
-        guard let poppedFrame = controlStack.popFrame() else {
-            throw TranslationError("Unexpected `end` instruction")
-        }
+        let toBePopped = try controlStack.currentFrame()
         // Reset the last emission to avoid relinking the result of the last instruction inside the block.
         // Relinking results across the block boundary is invalid because the producer instruction is not
         // statically known. Think about the following case:
@@ -1187,21 +1186,21 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         // ```
         //
         iseqBuilder.resetLastEmission()
-        if case .block(root: true) = poppedFrame.kind {
-            if poppedFrame.reachable {
+        if case .block(root: true) = toBePopped.kind {
+            if toBePopped.reachable {
                 try translateReturn()
                 // TODO: Merge logic with regular block frame
-                guard valueStack.height == poppedFrame.stackHeight else {
+                guard valueStack.height == toBePopped.stackHeight else {
                     throw ValidationError("values remaining on stack at end of block")
                 }
             }
-            try iseqBuilder.pinLabelHere(poppedFrame.continuation)
+            try iseqBuilder.pinLabelHere(toBePopped.continuation)
             return
         }
 
-        if case .if(_, _, isElse: false) = poppedFrame.kind {
+        if case .if(_, _, isElse: false) = toBePopped.kind {
             // `if` inst without `else` must have the same parameter and result types
-            let blockType = poppedFrame.blockType
+            let blockType = toBePopped.blockType
             guard blockType.parameters == blockType.results else {
                 throw TranslationError("Expected the same parameter and result types for `if` block but got \(blockType)")
             }
@@ -1209,24 +1208,25 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
         // NOTE: `valueStack.height - poppedFrame.stackHeight` is usually the same as `poppedFrame.copyCount`
         // but it's not always the case when this block is already unreachable.
-        preserveOnStack(depth: Int(valueStack.height - poppedFrame.stackHeight))
-        switch poppedFrame.kind {
+        preserveOnStack(depth: Int(valueStack.height - toBePopped.stackHeight))
+        switch toBePopped.kind {
         case .block:
-            try iseqBuilder.pinLabelHere(poppedFrame.continuation)
+            try iseqBuilder.pinLabelHere(toBePopped.continuation)
         case .loop: break
         case .if:
-            try iseqBuilder.pinLabelHere(poppedFrame.continuation)
+            try iseqBuilder.pinLabelHere(toBePopped.continuation)
         }
-        for result in poppedFrame.blockType.results.reversed() {
-            guard try checkBeforePop(typeHint: result, controlFrame: poppedFrame) else { continue }
+        for result in toBePopped.blockType.results.reversed() {
+            guard try checkBeforePop(typeHint: result, controlFrame: toBePopped) else { continue }
             _ = try valueStack.pop(result)
         }
-        guard valueStack.height == poppedFrame.stackHeight else {
+        guard valueStack.height == toBePopped.stackHeight else {
             throw ValidationError("values remaining on stack at end of block")
         }
-        for result in poppedFrame.blockType.results {
+        for result in toBePopped.blockType.results {
             _ = valueStack.push(result)
         }
+        _ = controlStack.popFrame()
     }
 
     private static func computePopCount(
@@ -1411,7 +1411,6 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
 
     mutating func visitReturn() throws -> Output {
-        guard try controlStack.currentFrame().reachable else { return }
         try translateReturn()
         try markUnreachable()
     }
