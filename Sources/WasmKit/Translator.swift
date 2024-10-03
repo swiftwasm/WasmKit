@@ -1313,7 +1313,13 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
         let defaultFrame = try controlStack.branchTarget(relativeDepth: targets.defaultIndex)
 
-        preserveOnStack(depth: Int(defaultFrame.copyCount))
+        // If this instruction is unreachable, copyCount might be greater than the actual stack height
+        try preserveOnStack(
+            depth: min(
+                Int(defaultFrame.copyCount),
+                valueStack.height - controlStack.currentFrame().stackHeight
+            )
+        )
         let allLabelIndices = targets.labelIndices + [targets.defaultIndex]
         let tableBuffer = allocator.allocateBrTable(capacity: allLabelIndices.count)
         let operand = Instruction.BrTableOperand(
