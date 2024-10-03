@@ -1983,7 +1983,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         // https://github.com/WebAssembly/memory64/blob/main/proposals/memory64/Overview.md
         let destIsMemory64 = try module.isMemory64(tableIndex: dstTable)
         let sourceIsMemory64 = try module.isMemory64(tableIndex: srcTable)
-        let lengthIsMemory64 = destIsMemory64 || sourceIsMemory64
+        let lengthIsMemory64 = destIsMemory64 && sourceIsMemory64
         try pop3Emit(
             (
                 .address(isMemory64: lengthIsMemory64),
