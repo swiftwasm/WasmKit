@@ -14,7 +14,7 @@ protocol ShiftedVReg {
 
 /// A larger (32-bit) version of `VReg`
 /// Used to utilize halfword loads instructions.
-struct LVReg: Equatable, ShiftedVReg {
+struct LVReg: Equatable, ShiftedVReg, CustomStringConvertible {
     let value: Int32
 
     init(_ value: VReg) {
@@ -26,11 +26,15 @@ struct LVReg: Equatable, ShiftedVReg {
     init(storage: Int32) {
         self.value = storage
     }
+
+    var description: String {
+        "\(value / Int32(MemoryLayout<StackSlot>.size))"
+    }
 }
 
 /// A larger (64-bit) version of `VReg`
 /// Used to utilize word loads instructions.
-struct LLVReg: Equatable, ShiftedVReg {
+struct LLVReg: Equatable, ShiftedVReg, CustomStringConvertible {
     let value: Int64
 
     init(_ value: VReg) {
@@ -41,6 +45,10 @@ struct LLVReg: Equatable, ShiftedVReg {
 
     init(storage: Int64) {
         self.value = storage
+    }
+
+    var description: String {
+        "\(value / Int64(MemoryLayout<StackSlot>.size))"
     }
 }
 
@@ -238,8 +246,7 @@ struct InstructionPrintingContext {
             return "reg:\(reg)"
         }
     }
-    func reg(_ x: LVReg) -> String { reg(x.value) }
-    func reg(_ x: LLVReg) -> String { reg(x.value) }
+    func reg<R: ShiftedVReg>(_ x: R) -> String { reg(Int(x.value) / MemoryLayout<StackSlot>.size) }
 
     func offset(_ offset: UInt64) -> String {
         "offset: \(offset)"
