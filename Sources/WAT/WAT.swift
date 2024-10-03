@@ -258,6 +258,9 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws -> Wat {
         case let .data(decl):
             try dataSegmentsMap.add(decl)
         case let .start(startIndex):
+            guard start == nil else {
+                throw WatParserError("Multiple start sections", location: location)
+            }
             start = startIndex
         }
     }
