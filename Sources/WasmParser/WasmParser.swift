@@ -89,7 +89,7 @@ extension Code {
     /// ```swift
     /// import WasmParser
     ///
-    /// struct MyVisitor: VoidInstructionVisitor {
+    /// struct MyVisitor: InstructionVisitor {
     ///     func visitLocalGet(localIndex: UInt32) {
     ///         print("local.get \(localIndex)")
     ///     }
@@ -118,7 +118,7 @@ extension Code {
         let parser = Parser(stream: StaticByteStream(bytes: self.expression), features: self.features, hasDataCount: self.hasDataCount)
         var lastCode: InstructionCode?
         while try !parser.stream.hasReachedEnd() {
-            (lastCode, _) = try parser.parseInstruction(visitor: &visitor)
+            lastCode = try parser.parseInstruction(visitor: &visitor)
         }
         guard lastCode == .end else {
             throw WasmParserError.endOpcodeExpected
@@ -480,16 +480,17 @@ extension Parser {
 /// <https://webassembly.github.io/spec/core/binary/instructions.html>
 extension Parser {
     @inlinable
-    func parseInstruction<V: InstructionVisitor>(visitor v: inout V) throws -> (InstructionCode, V.Output) {
+    func parseInstruction<V: InstructionVisitor>(visitor v: inout V) throws -> InstructionCode {
         let rawCode = try stream.consumeAny()
         guard let code = InstructionCode(rawValue: rawCode) else {
             throw WasmParserError.illegalOpcode(rawCode)
         }
-        return (code, try doParseInstruction(code: code, visitor: &v))
+        try doParseInstruction(code: code, visitor: &v)
+        return code
     }
 
     @inlinable
-    func doParseInstruction<V: InstructionVisitor>(code: InstructionCode, visitor v: inout V) throws -> V.Output {
+    func doParseInstruction<V: InstructionVisitor>(code: InstructionCode, visitor v: inout V) throws {
         switch code {
         case .unreachable: return try v.visitUnreachable()
         case .nop: return try v.visitNop()
@@ -815,22 +816,20 @@ extension Parser {
     }
 
     struct InstructionFactory: AnyInstructionVisitor {
-        typealias Output = Instruction
+        var insts: [Instruction] = []
 
-        func visit(_ instruction: Instruction) throws -> Instruction {
-            return instruction
+        mutating func visit(_ instruction: Instruction) throws {
+            insts.append(instruction)
         }
     }
 
     func parseConstExpression() throws -> ConstExpression {
         var factory = InstructionFactory()
-        var insts: [Instruction] = []
-        var inst: Instruction
+        var inst: InstructionCode
         repeat {
-            (_, inst) = try self.parseInstruction(visitor: &factory)
-            insts.append(inst)
+            inst = try self.parseInstruction(visitor: &factory)
         } while inst != .end
-        return insts
+        return factory.insts
     }
 }
 

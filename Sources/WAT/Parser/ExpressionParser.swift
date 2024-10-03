@@ -115,7 +115,7 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
         var wat = Wat.empty(features: features)
         // WAST allows extra const value instruction
         if try parser.takeParenBlockStart("ref.extern") {
-            _ = try visitor.visitRefExtern(value: parser.expectUnsignedInt())
+            try visitor.visitRefExtern(value: parser.expectUnsignedInt())
             try parser.expect(.rightParen)
             return true
         }
@@ -182,7 +182,7 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
     }
 
     private struct Suspense {
-        let visit: ((inout Visitor, inout ExpressionParser) throws -> Visitor.Output)?
+        let visit: ((inout Visitor, inout ExpressionParser) throws -> Void)?
     }
 
     private mutating func foldedInstruction(visitor: inout Visitor, wat: inout Wat) throws -> Bool {
@@ -256,7 +256,7 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
     }
 
     /// Parse a single instruction without consuming the surrounding parentheses and instruction keyword.
-    private mutating func parseTextInstruction(keyword: String, wat: inout Wat) throws -> ((inout Visitor) throws -> Visitor.Output) {
+    private mutating func parseTextInstruction(keyword: String, wat: inout Wat) throws -> ((inout Visitor) throws -> Void) {
         switch keyword {
         case "select":
             // Special handling for "select", which have two variants 1. with type, 2. without type

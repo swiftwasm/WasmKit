@@ -2,7 +2,7 @@ import WasmParser
 import WasmTypes
 
 protocol WastConstInstructionVisitor: InstructionVisitor {
-    mutating func visitRefExtern(value: UInt32) throws -> Output
+    mutating func visitRefExtern(value: UInt32) throws
 }
 
 /// A parser for WAST format.
@@ -53,7 +53,7 @@ struct WastParser {
         return result
     }
 
-    struct ConstExpressionCollector: VoidInstructionVisitor, WastConstInstructionVisitor {
+    struct ConstExpressionCollector: WastConstInstructionVisitor {
         let addValue: (Value) -> Void
 
         mutating func visitI32Const(value: Int32) throws { addValue(.i32(UInt32(bitPattern: value))) }

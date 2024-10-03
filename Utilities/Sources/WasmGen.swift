@@ -63,9 +63,6 @@ enum WasmGen {
             /// The visitor pattern is used while parsing WebAssembly expressions to allow for easy extensibility.
             /// See the expression parsing method ``Code/parseExpression(visitor:)``
             public protocol InstructionVisitor {
-
-                /// The return type of visitor methods.
-                associatedtype Output
             """
 
         for instruction in instructions {
@@ -75,7 +72,7 @@ enum WasmGen {
             code += instruction.immediates.map { i in
                 "\(i.label): \(i.type)"
             }.joined(separator: ", ")
-            code += ") throws -> Output"
+            code += ") throws"
         }
 
         code += """
@@ -88,7 +85,7 @@ enum WasmGen {
 
             extension InstructionVisitor {
                 /// Visits an instruction.
-                public mutating func visit(_ instruction: Instruction) throws -> Output {
+                public mutating func visit(_ instruction: Instruction) throws {
                     switch instruction {
 
             """
@@ -113,11 +110,8 @@ enum WasmGen {
 
         code += """
 
-
-            /// A visitor for WebAssembly instructions that returns `Void` with default implementations.
-            public protocol VoidInstructionVisitor: InstructionVisitor where Output == Void {}
-
-            extension VoidInstructionVisitor {
+            // MARK: - Placeholder implementations
+            extension InstructionVisitor {
 
             """
         for instruction in instructions {
@@ -125,7 +119,7 @@ enum WasmGen {
             code += instruction.immediates.map { i in
                 "\(i.label): \(i.type)"
             }.joined(separator: ", ")
-            code += ") throws -> Void {}\n"
+            code += ") throws {}\n"
         }
         code += "}\n"
 
@@ -176,7 +170,7 @@ enum WasmGen {
             /// A visitor that visits all instructions by a single visit method.
             public protocol AnyInstructionVisitor: InstructionVisitor {
                 /// Visiting any instruction.
-                mutating func visit(_ instruction: Instruction) throws -> Output
+                mutating func visit(_ instruction: Instruction) throws
             }
 
             extension AnyInstructionVisitor {
@@ -188,7 +182,7 @@ enum WasmGen {
             code += instruction.immediates.map { i in
                 "\(i.label): \(i.type)"
             }.joined(separator: ", ")
-            code += ") throws -> Output { "
+            code += ") throws { "
             code += "return try self.visit(" + buildInstructionInstanceFromContext(instruction) + ")"
             code += " }\n"
         }
@@ -224,7 +218,7 @@ enum WasmGen {
             code += instruction.immediates.map { i in
                 "\(i.label): \(i.type)"
             }.joined(separator: ", ")
-            code += ") throws -> V.Output {\n"
+            code += ") throws {\n"
             code += "       trace("
             code += buildInstructionInstanceFromContext(instruction)
             code += ")\n"
@@ -253,7 +247,7 @@ enum WasmGen {
             /// - Returns: A closure that invokes the corresponding visitor method. Nil if the keyword is not recognized.
             ///
             /// Note: The returned closure does not consume any tokens.
-            func parseTextInstruction<V: InstructionVisitor>(keyword: String, expressionParser: inout ExpressionParser<V>, wat: inout Wat) throws -> ((inout V) throws -> V.Output)? {
+            func parseTextInstruction<V: InstructionVisitor>(keyword: String, expressionParser: inout ExpressionParser<V>, wat: inout Wat) throws -> ((inout V) throws -> Void)? {
                 switch keyword {
 
             """

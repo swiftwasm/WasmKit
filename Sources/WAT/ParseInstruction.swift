@@ -12,7 +12,7 @@ import WasmTypes
 /// - Returns: A closure that invokes the corresponding visitor method. Nil if the keyword is not recognized.
 ///
 /// Note: The returned closure does not consume any tokens.
-func parseTextInstruction<V: InstructionVisitor>(keyword: String, expressionParser: inout ExpressionParser<V>, wat: inout Wat) throws -> ((inout V) throws -> V.Output)? {
+func parseTextInstruction<V: InstructionVisitor>(keyword: String, expressionParser: inout ExpressionParser<V>, wat: inout Wat) throws -> ((inout V) throws -> Void)? {
     switch keyword {
     case "unreachable": return { return try $0.visitUnreachable() }
     case "nop": return { return try $0.visitNop() }
