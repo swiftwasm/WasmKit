@@ -361,7 +361,7 @@ extension StoreAllocator {
         )
 
         // Step 5.
-        var constEvalContext = ConstEvaluationContext(
+        let constEvalContext = ConstEvaluationContext(
             functions: functions,
             globals: importedGlobals.map(\.value)
         )
@@ -369,8 +369,9 @@ extension StoreAllocator {
             imports: importedGlobals,
             internals: module.globals,
             allocateHandle: { global, i in
-                let initialValue = try global.initializer.evaluate(context: constEvalContext)
-                constEvalContext.globals.append(initialValue)
+                let initialValue = try global.initializer.evaluate(
+                    context: constEvalContext, expectedType: global.type.valueType
+                )
                 return allocate(globalType: global.type, initialValue: initialValue)
             }
         )
