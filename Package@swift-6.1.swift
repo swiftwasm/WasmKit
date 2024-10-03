@@ -33,7 +33,6 @@ let package = Package(
             dependencies: [
                 "WasmKit",
                 "WasmKitWASI",
-                "WAT",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "SystemPackage", package: "swift-system"),
             ],
