@@ -87,6 +87,10 @@ struct WatParser {
             let (type, typeIndex) = try wat.types.resolve(use: typeUse)
             var parser = try ExpressionParser<V>(type: type, locals: locals, lexer: body, features: features)
             try parser.parse(visitor: &visitor, wat: &wat)
+            // Check if the parser has reached the end of the function body
+            guard try parser.parser.isEndOfParen() else {
+                throw WatParserError("unexpected token", location: parser.parser.lexer.location())
+            }
             return typeIndex
         }
     }
