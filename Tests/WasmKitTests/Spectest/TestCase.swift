@@ -86,7 +86,6 @@ enum Result {
     case passed
     case failed(String)
     case skipped(String)
-//    case `internal`(Swift.Error)
 
     var banner: String {
         switch self {
@@ -96,8 +95,6 @@ enum Result {
             return "[FAILED]"
         case .skipped:
             return "[SKIPPED]"
-//        case .internal:
-//            return "[INTERNAL]"
         }
     }
 }
@@ -328,11 +325,7 @@ extension WastRunContext {
             return .skipped("validation is no implemented yet")
 
         case .invoke(let invoke):
-            do {
-                _ = try wastInvoke(call: invoke)
-            } catch {
-                return .failed("\(error)")
-            }
+            _ = try wastInvoke(call: invoke)
             return .passed
         }
     }
@@ -343,7 +336,6 @@ extension WastRunContext {
             return try wastInvoke(call: invoke)
         case .get(let module, let globalName):
             let instance = try deriveInstance(by: module)
-            let result: WasmKit.Value
             guard case let .global(global) = instance.export(globalName) else {
                 throw SpectestError("no global export with name \(globalName) in a module instance \(instance)")
             }
