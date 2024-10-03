@@ -804,6 +804,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     /// Whether a call to this function should be intercepted
     let intercepting: Bool
     var constantSlots: ConstSlots
+    let validator: InstructionValidator
 
     init(
         allocator: ISeqAllocator,
@@ -832,6 +833,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         self.functionIndex = functionIndex
         self.intercepting = intercepting
         self.constantSlots = ConstSlots(stackLayout: stackLayout)
+        self.validator = InstructionValidator()
 
         do {
             let endLabel = self.iseqBuilder.allocLabel()
@@ -1574,13 +1576,11 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     private mutating func visitLoad(
         _ memarg: MemArg,
         _ type: ValueType,
+        _ naturalAlignment: Int,
         _ instruction: @escaping (Instruction.LoadOperand) -> Instruction
     ) throws {
         let isMemory64 = try module.isMemory64(memoryIndex: 0)
-        let alignLog2Limit = isMemory64 ? 64 : 32
-        if memarg.align >= alignLog2Limit {
-            throw TranslationError("Alignment 2**\(memarg.align) is out of limit \(alignLog2Limit)")
-        }
+        try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
         try popPushEmit(.address(isMemory64: isMemory64), type) { value, result, stack in
             let loadOperand = Instruction.LoadOperand(
                 offset: memarg.offset,
@@ -1593,9 +1593,11 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     private mutating func visitStore(
         _ memarg: MemArg,
         _ type: ValueType,
+        _ naturalAlignment: Int,
         _ instruction: (Instruction.StoreOperand) -> Instruction
     ) throws {
         let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
         let value = try popVRegOperand(type)
         let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
         if let value = value, let pointer = pointer {
@@ -1607,29 +1609,29 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             emit(instruction(storeOperand))
         }
     }
-    mutating func visitI32Load(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i32, Instruction.i32Load) }
-    mutating func visitI64Load(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, Instruction.i64Load) }
-    mutating func visitF32Load(memarg: MemArg) throws -> Output { try visitLoad(memarg, .f32, Instruction.f32Load) }
-    mutating func visitF64Load(memarg: MemArg) throws -> Output { try visitLoad(memarg, .f64, Instruction.f64Load) }
-    mutating func visitI32Load8S(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i32, Instruction.i32Load8S) }
-    mutating func visitI32Load8U(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i32, Instruction.i32Load8U) }
-    mutating func visitI32Load16S(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i32, Instruction.i32Load16S) }
-    mutating func visitI32Load16U(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i32, Instruction.i32Load16U) }
-    mutating func visitI64Load8S(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, Instruction.i64Load8S) }
-    mutating func visitI64Load8U(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, Instruction.i64Load8U) }
-    mutating func visitI64Load16S(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, Instruction.i64Load16S) }
-    mutating func visitI64Load16U(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, Instruction.i64Load16U) }
-    mutating func visitI64Load32S(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, Instruction.i64Load32S) }
-    mutating func visitI64Load32U(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, Instruction.i64Load32U) }
-    mutating func visitI32Store(memarg: MemArg) throws -> Output { try visitStore(memarg, .i32, Instruction.i32Store) }
-    mutating func visitI64Store(memarg: MemArg) throws -> Output { try visitStore(memarg, .i64, Instruction.i64Store) }
-    mutating func visitF32Store(memarg: MemArg) throws -> Output { try visitStore(memarg, .f32, Instruction.f32Store) }
-    mutating func visitF64Store(memarg: MemArg) throws -> Output { try visitStore(memarg, .f64, Instruction.f64Store) }
-    mutating func visitI32Store8(memarg: MemArg) throws -> Output { try visitStore(memarg, .i32, Instruction.i32Store8) }
-    mutating func visitI32Store16(memarg: MemArg) throws -> Output { try visitStore(memarg, .i32, Instruction.i32Store16) }
-    mutating func visitI64Store8(memarg: MemArg) throws -> Output { try visitStore(memarg, .i64, Instruction.i64Store8) }
-    mutating func visitI64Store16(memarg: MemArg) throws -> Output { try visitStore(memarg, .i64, Instruction.i64Store16) }
-    mutating func visitI64Store32(memarg: MemArg) throws -> Output { try visitStore(memarg, .i64, Instruction.i64Store32) }
+    mutating func visitI32Load(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i32, 2, Instruction.i32Load) }
+    mutating func visitI64Load(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, 3, Instruction.i64Load) }
+    mutating func visitF32Load(memarg: MemArg) throws -> Output { try visitLoad(memarg, .f32, 2, Instruction.f32Load) }
+    mutating func visitF64Load(memarg: MemArg) throws -> Output { try visitLoad(memarg, .f64, 3, Instruction.f64Load) }
+    mutating func visitI32Load8S(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i32, 0, Instruction.i32Load8S) }
+    mutating func visitI32Load8U(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i32, 0, Instruction.i32Load8U) }
+    mutating func visitI32Load16S(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i32, 1, Instruction.i32Load16S) }
+    mutating func visitI32Load16U(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i32, 1, Instruction.i32Load16U) }
+    mutating func visitI64Load8S(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, 0, Instruction.i64Load8S) }
+    mutating func visitI64Load8U(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, 0, Instruction.i64Load8U) }
+    mutating func visitI64Load16S(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, 1, Instruction.i64Load16S) }
+    mutating func visitI64Load16U(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, 1, Instruction.i64Load16U) }
+    mutating func visitI64Load32S(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, 2, Instruction.i64Load32S) }
+    mutating func visitI64Load32U(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, 2, Instruction.i64Load32U) }
+    mutating func visitI32Store(memarg: MemArg) throws -> Output { try visitStore(memarg, .i32, 2, Instruction.i32Store) }
+    mutating func visitI64Store(memarg: MemArg) throws -> Output { try visitStore(memarg, .i64, 3, Instruction.i64Store) }
+    mutating func visitF32Store(memarg: MemArg) throws -> Output { try visitStore(memarg, .f32, 2, Instruction.f32Store) }
+    mutating func visitF64Store(memarg: MemArg) throws -> Output { try visitStore(memarg, .f64, 3, Instruction.f64Store) }
+    mutating func visitI32Store8(memarg: MemArg) throws -> Output { try visitStore(memarg, .i32, 0, Instruction.i32Store8) }
+    mutating func visitI32Store16(memarg: MemArg) throws -> Output { try visitStore(memarg, .i32, 1, Instruction.i32Store16) }
+    mutating func visitI64Store8(memarg: MemArg) throws -> Output { try visitStore(memarg, .i64, 0, Instruction.i64Store8) }
+    mutating func visitI64Store16(memarg: MemArg) throws -> Output { try visitStore(memarg, .i64, 1, Instruction.i64Store16) }
+    mutating func visitI64Store32(memarg: MemArg) throws -> Output { try visitStore(memarg, .i64, 2, Instruction.i64Store32) }
     mutating func visitMemorySize(memory: UInt32) throws -> Output {
         let sizeType: ValueType = try module.isMemory64(memoryIndex: memory) ? .i64 : .i32
         pushEmit(sizeType, { .memorySize(Instruction.MemorySizeOperand(memoryIndex: memory, result: LVReg($0))) })
