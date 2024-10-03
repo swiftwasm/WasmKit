@@ -282,21 +282,16 @@ extension WastRunContext {
             }
             return .passed
         case .assertTrap(let execute, let message):
-            switch execute {
-            case .invoke(let invoke):
-                do {
-                    _ = try wastInvoke(call: invoke)
-                    return .failed("trap expected: \(message)")
-                } catch let trap as Trap {
-                    guard trap.assertionText.contains(message) else {
-                        return .failed("assertion mismatch: expected: \(message), actual: \(trap.assertionText)")
-                    }
-                    return .passed
-                } catch {
-                    return .failed("\(error)")
+            do {
+                _ = try wastExecute(execute: execute)
+                return .failed("trap expected: \(message)")
+            } catch let trap as Trap {
+                guard trap.assertionText.contains(message) else {
+                    return .failed("assertion mismatch: expected: \(message), actual: \(trap.assertionText)")
                 }
-            default:
-                return .failed("assert_trap is not implemented non-invoke actions")
+                return .passed
+            } catch {
+                return .failed("\(error)")
             }
         case .assertExhaustion(let call, let message):
             do {
