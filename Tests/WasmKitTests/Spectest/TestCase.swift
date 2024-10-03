@@ -168,7 +168,19 @@ extension WastRunContext {
         }
         return instance
     }
-    func deriveModuleInstance(from execute: WastExecute) throws -> Instance? {
+    func deriveInstance(by name: String?) throws -> Instance {
+        let instance: Instance?
+        if let name {
+            instance = lookupInstance(name)
+        } else {
+            instance = currentInstance
+        }
+        guard let instance else {
+            throw SpectestError("no module to execute")
+        }
+        return instance
+    }
+    func deriveInstance(from execute: WastExecute) throws -> Instance? {
         switch execute {
         case .invoke(let invoke):
             if let module = invoke.module {
@@ -263,54 +275,17 @@ extension WastRunContext {
             return .passed
 
         case .assertReturn(let execute, let results):
-            let instance: Instance?
-            do {
-                instance = try deriveModuleInstance(from: execute)
-            } catch {
-                return .failed("failed to derive module instance: \(error)")
-            }
-            guard let instance else {
-                return .failed("no module to execute")
-            }
-
             let expected = parseValues(args: results)
-
-            switch execute {
-            case .invoke(let invoke):
-                let result: [WasmKit.Value]
-                do {
-                    result = try wastInvoke(call: invoke)
-                } catch {
-                    return .failed("\(error)")
-                }
-                guard result.isTestEquivalent(to: expected) else {
-                    return .failed("invoke result mismatch: expected: \(expected), actual: \(result)")
-                }
-                return .passed
-
-            case .get(_, let globalName):
-                let result: WasmKit.Value
-                do {
-                    guard case let .global(global) = instance.export(globalName) else {
-                        throw Trap._raw("no global export with name \(globalName) in a module instance \(instance)")
-                    }
-                    result = global.value
-                } catch {
-                    return .failed("\(error)")
-                }
-                guard result.isTestEquivalent(to: expected[0]) else {
-                    return .failed("get result mismatch: expected: \(expected), actual: \(result)")
-                }
-                return .passed
-            case .wat: return .skipped("TBD")
+            let actual = try wastExecute(execute: execute)
+            guard actual.isTestEquivalent(to: expected) else {
+                return .failed("invoke result mismatch: expected: \(expected), actual: \(actual)")
             }
-
+            return .passed
         case .assertTrap(let execute, let message):
             switch execute {
             case .invoke(let invoke):
                 do {
                     _ = try wastInvoke(call: invoke)
-                    // XXX: This is wrong but just keep it as is
                     return .failed("trap expected: \(message)")
                 } catch let trap as Trap {
                     guard trap.assertionText.contains(message) else {
@@ -367,16 +342,26 @@ extension WastRunContext {
         }
     }
 
+    private func wastExecute(execute: WastExecute) throws -> [Value] {
+        switch execute {
+        case .invoke(let invoke):
+            return try wastInvoke(call: invoke)
+        case .get(let module, let globalName):
+            let instance = try deriveInstance(by: module)
+            let result: WasmKit.Value
+            guard case let .global(global) = instance.export(globalName) else {
+                throw SpectestError("no global export with name \(globalName) in a module instance \(instance)")
+            }
+            return [global.value]
+        case .wat(var wat):
+            let module = try parseModule(rootPath: rootPath, moduleSource: .binary(wat.encode()))
+            _ = try instantiate(module: module)
+            return []
+        }
+    }
+
     private func wastInvoke(call: WastInvoke) throws -> [Value] {
-        let instance: Instance?
-        do {
-            instance = try deriveModuleInstance(from: .invoke(call))
-        } catch {
-            throw SpectestError("failed to derive module instance: \(error)")
-        }
-        guard let instance else {
-            throw SpectestError("no module to execute")
-        }
+        let instance = try deriveInstance(by: call.module)
         guard let function = instance.exportedFunction(name: call.name) else {
             throw SpectestError("function \(call.name) not exported")
         }
