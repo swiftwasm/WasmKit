@@ -3,11 +3,15 @@ import SystemPackage
 import WAT
 import WasmKit
 
+private func loadStringArrayFromEnvironment(_ key: String) -> [String] {
+    ProcessInfo.processInfo.environment[key]?.split(separator: ",").map(String.init) ?? []
+}
+
 @available(macOS 11, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 public func spectest(
     path: [String],
-    include: String?,
-    exclude: String?,
+    include: [String]? = nil,
+    exclude: [String]? = nil,
     verbose: Bool = false,
     parallel: Bool = true,
     configuration: EngineConfiguration = .init()
@@ -28,8 +32,8 @@ public func spectest(
         "\(Int(Double(numerator) / Double(denominator) * 100))%"
     }
 
-    let include = include.flatMap { $0.split(separator: ",").map(String.init) } ?? []
-    let exclude = exclude.flatMap { $0.split(separator: ",").map(String.init) } ?? []
+    let include = include ?? loadStringArrayFromEnvironment("WASMKIT_SPECTEST_INCLUDE")
+    let exclude = exclude ?? loadStringArrayFromEnvironment("WASMKIT_SPECTEST_EXCLUDE")
 
     let testCases: [TestCase]
     do {

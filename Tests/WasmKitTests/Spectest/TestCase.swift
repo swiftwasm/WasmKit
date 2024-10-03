@@ -51,10 +51,10 @@ struct TestCase {
             // FIXME: Skip SIMD proposal tests for now
             guard !fileName.starts(with: "simd_") else { return false }
 
-            let toCheck = fileName.hasSuffix(".wast") ? String(fileName.dropLast(".wast".count)) : fileName
-            guard !exclude.contains(toCheck) else { return false }
+            let patternPredicate = { pattern in filePath.path.hasSuffix(pattern) }
+            guard !exclude.contains(where: patternPredicate) else { return false }
             guard !include.isEmpty else { return true }
-            return include.contains(toCheck)
+            return include.contains(where: patternPredicate)
         }
 
         var testCases: [TestCase] = []

@@ -18,11 +18,8 @@ final class SpectestTests: XCTestCase {
     /// Run all the tests in the spectest suite.
     func testRunAll() async throws {
         let defaultConfig = EngineConfiguration()
-        let environment = ProcessInfo.processInfo.environment
         let ok = try await spectest(
             path: Self.testPaths,
-            include: environment["WASMKIT_SPECTEST_INCLUDE"],
-            exclude: environment["WASMKIT_SPECTEST_EXCLUDE"],
             parallel: true,
             configuration: defaultConfig
         )
@@ -34,12 +31,9 @@ final class SpectestTests: XCTestCase {
         guard defaultConfig.threadingModel != .token else { return }
         // Sanity check that non-default threading models work.
         var config = defaultConfig
-        let environment = ProcessInfo.processInfo.environment
         config.threadingModel = .token
         let ok = try await spectest(
             path: Self.testPaths,
-            include: environment["WASMKIT_SPECTEST_INCLUDE"],
-            exclude: environment["WASMKIT_SPECTEST_EXCLUDE"],
             parallel: true,
             configuration: config
         )
