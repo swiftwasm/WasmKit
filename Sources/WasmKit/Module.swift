@@ -129,7 +129,7 @@ public struct Module {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#instantiation>
     private func instantiateHandle(store: Store, imports: Imports) throws -> InternalInstance {
-        try ModuleValidator().validate(self)
+        try ModuleValidator(module: self).validate()
 
         // Steps 5-8.
 

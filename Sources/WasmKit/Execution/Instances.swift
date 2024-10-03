@@ -418,6 +418,10 @@ public struct Table: Equatable {
 struct MemoryEntity /* : ~Copyable */ {
     static let pageSize = 64 * 1024
 
+    static func maxPageCount(isMemory64: Bool) -> UInt64 {
+        isMemory64 ? UInt64.max : UInt64(1 << 32) / UInt64(pageSize)
+    }
+
     var data: [UInt8]
     let maxPageCount: UInt64
     let limit: Limits
@@ -428,7 +432,7 @@ struct MemoryEntity /* : ~Copyable */ {
             throw Trap._raw("Initial memory size exceeds the resource limit: \(byteSize) bytes")
         }
         data = Array(repeating: 0, count: byteSize)
-        let defaultMaxPageCount = (memoryType.isMemory64 ? UInt64.max : UInt64(UInt32.max)) / UInt64(Self.pageSize)
+        let defaultMaxPageCount = Self.maxPageCount(isMemory64: memoryType.isMemory64)
         maxPageCount = memoryType.max ?? defaultMaxPageCount
         limit = memoryType
     }

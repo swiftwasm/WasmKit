@@ -22,8 +22,6 @@ final class SpectestTests: XCTestCase {
             path: Self.testPaths,
             include: [],
             exclude: [
-                "loop.wast",
-                "memory.wast",
                 "memory_grow.wast",
                 "memory_size.wast",
                 "proposals/memory64/align64.wast",
