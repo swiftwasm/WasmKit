@@ -234,7 +234,7 @@ extension WastRunContext {
             importsSpace.define(module: name, instance.exports)
             return nil
 
-        case .assertMalformed(let module, let message):
+        case .assertMalformed(let module, let message), .assertInvalid(let module, let message):
             currentInstance = nil
             do {
                 let module = try parseModule(rootPath: rootPath, moduleSource: module.source)
@@ -244,7 +244,7 @@ extension WastRunContext {
             } catch {
                 return .passed
             }
-            return .failed("module should not be parsed: expected \"\(message)\"")
+            return .failed("module should not be parsed nor valid: expected \"\(message)\"")
 
         case .assertTrap(execute: .wat(var wat), let message):
             currentInstance = nil
@@ -320,9 +320,6 @@ extension WastRunContext {
                 return .failed("\(error)")
             }
             return .passed
-
-        case .assertInvalid:
-            return .skipped("validation is no implemented yet")
 
         case .invoke(let invoke):
             _ = try wastInvoke(call: invoke)
