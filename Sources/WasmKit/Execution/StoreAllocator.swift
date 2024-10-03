@@ -429,6 +429,9 @@ extension StoreAllocator {
         }
 
         let exports: [String: InternalExternalValue] = try module.exports.reduce(into: [:]) { result, export in
+            guard result[export.name] == nil else {
+                throw ValidationError("Duplicate export name: \(export.name)")
+            }
             result[export.name] = try createExportValue(export)
         }
 

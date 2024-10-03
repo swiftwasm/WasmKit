@@ -22,7 +22,6 @@ final class SpectestTests: XCTestCase {
             path: Self.testPaths,
             include: [],
             exclude: [
-                "exports.wast",
                 "func.wast",
                 "func_ptrs.wast",
                 "global.wast",
