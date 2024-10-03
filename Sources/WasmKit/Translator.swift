@@ -1537,6 +1537,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             // Skip actual code emission if validation-only mode
             return
         }
+        try validator.validateGlobalSet(global.globalType)
         emit(.globalSet(Instruction.GlobalAndVRegOperand(reg: LLVReg(value), global: global)))
     }
 

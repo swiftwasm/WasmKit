@@ -154,8 +154,11 @@ public struct Module {
         do {
             for element in elements {
                 guard case let .active(tableIndex, offset) = element.mode else { continue }
-                let offsetValue = try offset.evaluate(context: constEvalContext)
                 let table = try instance.tables[validating: Int(tableIndex)]
+                let offsetValue = try offset.evaluate(
+                    context: constEvalContext,
+                    expectedType: .addressType(isMemory64: table.limits.isMemory64)
+                )
                 try table.withValue { table in
                     guard let offset = offsetValue.maybeAddressOffset(table.limits.isMemory64) else {
                         throw InstantiationError.unsupported(
@@ -182,8 +185,11 @@ public struct Module {
         // Step 16.
         do {
             for case let .active(data) in data {
-                let offsetValue = try data.offset.evaluate(context: constEvalContext)
                 let memory = try instance.memories[validating: Int(data.index)]
+                let offsetValue = try data.offset.evaluate(
+                    context: constEvalContext,
+                    expectedType: .addressType(isMemory64: memory.limit.isMemory64)
+                )
                 try memory.withValue { memory in
                     guard let offset = offsetValue.maybeAddressOffset(memory.limit.isMemory64) else {
                         throw InstantiationError.unsupported(

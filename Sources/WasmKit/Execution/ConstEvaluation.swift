@@ -34,7 +34,13 @@ struct ConstEvaluationContext: ConstEvaluationContextProtocol {
 }
 
 extension ConstExpression {
-    func evaluate<C: ConstEvaluationContextProtocol>(context: C) throws -> Value {
+    func evaluate<C: ConstEvaluationContextProtocol>(context: C, expectedType: WasmTypes.ValueType) throws -> Value {
+        let result = try self._evaluate(context: context)
+        try result.checkType(expectedType)
+        return result
+    }
+
+    private func _evaluate<C: ConstEvaluationContextProtocol>(context: C) throws -> Value {
         guard self.last == .end, self.count == 2 else {
             throw InstantiationError.unsupported("Expect `end` at the end of offset expression")
         }
@@ -96,6 +102,21 @@ fileprivate extension WasmTypes.Reference {
         switch (self, type) {
         case (.function, .funcRef): return
         case (.extern, .externRef): return
+        default:
+            throw ValidationError("Expect \(type) but got \(self)")
+        }
+    }
+}
+
+fileprivate extension Value {
+    func checkType(_ type: WasmTypes.ValueType) throws {
+        switch (self, type) {
+        case (.i32, .i32): return
+        case (.i64, .i64): return
+        case (.f32, .f32): return
+        case (.f64, .f64): return
+        case (.ref(let ref), .ref(let refType)):
+            try ref.checkType(refType)
         default:
             throw ValidationError("Expect \(type) but got \(self)")
         }
