@@ -306,9 +306,15 @@ enum WasmGen {
 
     static func generateInstructionEncoder(_ instructions: InstructionSet) -> String {
         var code = """
+            import WasmParser
+            import WasmTypes
 
+            /// An instruction encoder that is responsible for encoding opcodes and immediates.
             protocol InstructionEncoder: InstructionVisitor {
+                /// Encodes an instruction opcode.
                 mutating func encodeInstruction(_ opcode: UInt8, _ prefix: UInt8?) throws
+
+                // MARK: - Immediates encoding
 
             """
 
@@ -342,6 +348,7 @@ enum WasmGen {
         code += """
             }
 
+            // InstructionEncoder implements the InstructionVisitor protocol to call the corresponding encode method.
             extension InstructionEncoder {
 
             """
@@ -481,8 +488,10 @@ enum WasmGen {
             GeneratedFile(
                 projectSources + ["WAT", "ParseInstruction.swift"],
                 header + generateTextParser(instructions)
-                    + "\n"
-                    + generateInstructionEncoder(instructions)
+            ),
+            GeneratedFile(
+                projectSources + ["WAT", "InstructionEncoder.swift"],
+                header + generateInstructionEncoder(instructions)
             ),
         ]
 
