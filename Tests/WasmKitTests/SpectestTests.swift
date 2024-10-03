@@ -22,10 +22,6 @@ final class SpectestTests: XCTestCase {
             path: Self.testPaths,
             include: [],
             exclude: [
-                "br_if.wast",
-                "call.wast",
-                "call_indirect.wast",
-                "data.wast",
                 "elem.wast",
                 "exports.wast",
                 "func.wast",
