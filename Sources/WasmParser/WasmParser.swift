@@ -126,6 +126,39 @@ extension Code {
     }
 }
 
+// TODO: Move `doParseInstruction` under `ExpressionParser` struct
+@_documentation(visibility: internal)
+public struct ExpressionParser {
+    @usableFromInline
+    let parser: Parser<StaticByteStream>
+    @usableFromInline
+    var lastCode: InstructionCode?
+
+    public var offset: Int {
+        self.parser.currentIndex
+    }
+
+    public init(code: Code) {
+        self.parser = Parser(
+            stream: StaticByteStream(bytes: code.expression),
+            features: code.features,
+            hasDataCount: code.hasDataCount
+        )
+    }
+
+    @inlinable
+    public mutating func visit<V: InstructionVisitor>(visitor: inout V) throws -> Bool {
+        lastCode = try parser.parseInstruction(visitor: &visitor)
+        let shouldContinue = try !parser.stream.hasReachedEnd()
+        if !shouldContinue {
+            guard lastCode == .end else {
+                throw WasmParserError.endOpcodeExpected
+            }
+        }
+        return shouldContinue
+    }
+}
+
 /// Flags for enabling/disabling WebAssembly features
 public struct WasmFeatureSet: OptionSet {
     /// The raw value of the feature set

@@ -1,10 +1,19 @@
 import WasmParser
 
 struct ValidationError: Error, CustomStringConvertible {
-    let description: String
+    let message: String
+    var offset: Int?
 
-    init(_ description: String) {
-        self.description = description
+    var description: String {
+        if let offset = offset {
+            return "\(message) at offset 0x\(String(offset, radix: 16))"
+        } else {
+            return message
+        }
+    }
+
+    init(_ message: String) {
+        self.message = message
     }
 }
 

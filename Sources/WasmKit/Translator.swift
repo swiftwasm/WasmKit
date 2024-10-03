@@ -344,14 +344,14 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
         private mutating func setReachability(_ value: Bool) throws {
             guard !self.frames.isEmpty else {
-                throw TranslationError("Control stack is empty. Instruction cannot be appeared after \"end\" of function")
+                throw ValidationError("Control stack is empty. Instruction cannot be appeared after \"end\" of function")
             }
             self.frames[self.frames.count - 1].reachable = value
         }
 
         func currentFrame() throws -> ControlFrame {
             guard let frame = self.frames.last else {
-                throw TranslationError("Control stack is empty. Instruction cannot be appeared after \"end\" of function")
+                throw ValidationError("Control stack is empty. Instruction cannot be appeared after \"end\" of function")
             }
             return frame
         }
@@ -359,7 +359,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         func branchTarget(relativeDepth: UInt32) throws -> ControlFrame {
             let index = frames.count - 1 - Int(relativeDepth)
             guard frames.indices.contains(index) else {
-                throw TranslationError("Relative depth \(relativeDepth) is out of range")
+                throw ValidationError("Relative depth \(relativeDepth) is out of range")
             }
             return frames[index]
         }
@@ -1062,7 +1062,16 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             // Emit `onEnter` instruction at the beginning of the function
             emit(.onEnter(functionIndex))
         }
-        try code.parseExpression(visitor: &self)
+        var parser = ExpressionParser(code: code)
+        var offset = parser.offset
+        do {
+            while try parser.visit(visitor: &self) {
+                offset = parser.offset
+            }
+        } catch var error as ValidationError {
+            error.offset = offset
+            throw error
+        }
         return try finalize()
     }
 
