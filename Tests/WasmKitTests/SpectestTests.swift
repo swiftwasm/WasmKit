@@ -21,9 +21,7 @@ final class SpectestTests: XCTestCase {
         let ok = try await spectest(
             path: Self.testPaths,
             include: [],
-            exclude: [
-                "table_fill.wast",
-            ],
+            exclude: [],
             parallel: true,
             configuration: defaultConfig
         )

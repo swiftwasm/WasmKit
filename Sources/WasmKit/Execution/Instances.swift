@@ -319,6 +319,15 @@ struct TableEntity /* : ~Copyable */ {
         }
     }
 
+    mutating func fill(repeating value: Reference, from index: Int, count: Int) throws {
+        let (end, overflow) = index.addingReportingOverflow(count)
+        guard !overflow, end <= elements.count else { throw Trap.tableSizeOverflow }
+
+        elements.withUnsafeMutableBufferPointer {
+            $0[index..<index + count].initialize(repeating: value)
+        }
+    }
+
     static func copy(
         _ sourceTable: UnsafeBufferPointer<Reference>,
         _ destinationTable: UnsafeMutableBufferPointer<Reference>,
