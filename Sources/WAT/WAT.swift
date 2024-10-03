@@ -170,6 +170,7 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws -> Wat {
 
     var exportDecls: [WatParser.ExportDecl] = []
 
+    var hasNonImport = false
     func visitDecl(decl: WatParser.ModuleField) throws {
         let location = decl.location
 
@@ -188,10 +189,23 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws -> Wat {
             }
         }
 
+        // Verify that imports precede all non-import module fields
+        func checkImportOrder(_ importNames: WatParser.ImportNames?) throws {
+            if importNames != nil {
+                if hasNonImport {
+                    throw WatParserError("Imports must precede all non-import module fields", location: location)
+                }
+            } else {
+                hasNonImport = true
+            }
+        }
+
+
         switch decl.kind {
         case let .type(decl):
             try typesMap.add(decl)
         case let .function(decl):
+            try checkImportOrder(decl.importNames)
             let index = try functionsMap.add(decl)
             addExports(decl.exports, index: index, kind: .function)
             switch decl.kind {
@@ -203,6 +217,7 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws -> Wat {
                 }
             }
         case let .table(decl):
+            try checkImportOrder(decl.importNames)
             let index = try tablesMap.add(decl)
             addExports(decl.exports, index: index, kind: .table)
             if var inlineElement = decl.inlineElement {
@@ -215,6 +230,7 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws -> Wat {
                 addImport(importNames) { .table(decl.type) }
             }
         case let .memory(decl):
+            try checkImportOrder(decl.importNames)
             let index = try memoriesMap.add(decl)
             if var inlineData = decl.inlineData {
                 // Associate the memory with the inline data
@@ -227,6 +243,7 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws -> Wat {
                 addImport(importNames) { .memory(decl.type) }
             }
         case let .global(decl):
+            try checkImportOrder(decl.importNames)
             let index = try globalsMap.add(decl)
             addExports(decl.exports, index: index, kind: .global)
             switch decl.kind {
