@@ -162,6 +162,11 @@ public struct Module {
                             "Expect \(ValueType.addressType(isMemory64: table.limits.isMemory64)) offset of active element segment but got \(offsetValue)"
                         )
                     }
+                    guard table.tableType.elementType == element.type else {
+                        throw ValidationError(
+                            "Element segment type \(element.type) does not match table element type \(table.tableType.elementType)"
+                        )
+                    }
                     let references = try element.evaluateInits(context: constEvalContext)
                     try table.initialize(
                         references, from: 0, to: Int(offset), count: references.count

@@ -61,25 +61,43 @@ extension ConstExpression {
 
 extension WasmParser.ElementSegment {
     func evaluateInits<C: ConstEvaluationContextProtocol>(context: C) throws -> [Reference] {
-        try self.initializer.map { expression -> Reference in
-            switch expression[0] {
-            case let .refFunc(index):
-                return try context.functionRef(index)
-            case .refNull(.funcRef):
-                return .function(nil)
-            case .refNull(.externRef):
-                return .extern(nil)
-            case .globalGet(let index):
-                let value = try context.globalValue(index)
-                switch value {
-                case .ref(.function(let addr)):
-                    return .function(addr)
-                default:
-                    throw Trap._raw("Unexpected global value type for element initializer expression")
-                }
+        return try self.initializer.map { expression -> Reference in
+            let result = try Self._evaluateInits(context: context, expression: expression)
+            try result.checkType(self.type)
+            return result
+        }
+    }
+    static func _evaluateInits<C: ConstEvaluationContextProtocol>(
+        context: C, expression: ConstExpression
+    ) throws -> Reference {
+        switch expression[0] {
+        case let .refFunc(index):
+            return try context.functionRef(index)
+        case .refNull(.funcRef):
+            return .function(nil)
+        case .refNull(.externRef):
+            return .extern(nil)
+        case .globalGet(let index):
+            let value = try context.globalValue(index)
+            switch value {
+            case .ref(.function(let addr)):
+                return .function(addr)
             default:
-                throw Trap._raw("Unexpected element initializer expression: \(expression)")
+                throw Trap._raw("Unexpected global value type for element initializer expression")
             }
+        default:
+            throw Trap._raw("Unexpected element initializer expression: \(expression)")
+        }
+    }
+}
+
+fileprivate extension WasmTypes.Reference {
+    func checkType(_ type: WasmTypes.ReferenceType) throws {
+        switch (self, type) {
+        case (.function, .funcRef): return
+        case (.extern, .externRef): return
+        default:
+            throw ValidationError("Expect \(type) but got \(self)")
         }
     }
 }
