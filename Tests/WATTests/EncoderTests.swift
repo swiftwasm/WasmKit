@@ -106,9 +106,7 @@ class EncoderTests: XCTestCase {
             }
 
             var stats = CompatibilityTestStats()
-            let excluded: [String] = [
-                "utf8-invalid-encoding.wast"
-            ]
+            let excluded: [String] = []
             for wastFile in Spectest.wastFiles(include: [], exclude: excluded) {
                 try TestSupport.withTemporaryDirectory { tempDir, shouldRetain in
                     let jsonFileName = wastFile.deletingPathExtension().lastPathComponent + ".json"
