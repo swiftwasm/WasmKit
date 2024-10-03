@@ -298,7 +298,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             enum Kind {
                 case block(root: Bool)
                 case loop
-                case `if`(elseLabel: LabelRef, endLabel: LabelRef)
+                case `if`(elseLabel: LabelRef, endLabel: LabelRef, isElse: Bool)
 
                 static var block: Kind { .block(root: false) }
             }
@@ -1113,7 +1113,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         controlStack.pushFrame(
             ControlStack.ControlFrame(
                 blockType: blockType, stackHeight: stackHeight, continuation: endLabel,
-                kind: .if(elseLabel: elseLabel, endLabel: endLabel)
+                kind: .if(elseLabel: elseLabel, endLabel: endLabel, isElse: false)
             )
         )
         guard let condition = condition else { return }
@@ -1130,8 +1130,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
 
     mutating func visitElse() throws -> Output {
-        let frame = try controlStack.currentFrame()
-        guard case let .if(elseLabel, endLabel) = frame.kind else {
+        var frame = try controlStack.currentFrame()
+        guard case let .if(elseLabel, endLabel, _) = frame.kind else {
             throw TranslationError("Expected `if` control frame on top of the stack for `else` but got \(frame)")
         }
         preserveOnStack(depth: valueStack.height - frame.stackHeight)
@@ -1141,7 +1141,18 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             let offset = endPC.offsetFromHead - selfPC.offsetFromHead
             return Int32(offset)
         }
-        try valueStack.truncate(height: frame.stackHeight)
+        for result in frame.blockType.results.reversed() {
+            guard try checkBeforePop(typeHint: result, controlFrame: frame) else { continue }
+            _ = try valueStack.pop(result)
+        }
+        guard valueStack.height == frame.stackHeight else {
+            throw ValidationError("values remaining on stack at end of block")
+        }
+        _ = controlStack.popFrame()
+        frame.kind = .if(elseLabel: elseLabel, endLabel: endLabel, isElse: true)
+        frame.reachable = true
+        controlStack.pushFrame(frame)
+
         // Re-push parameters
         for parameter in frame.blockType.parameters {
             _ = valueStack.push(parameter)
@@ -1177,6 +1188,14 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             }
             try iseqBuilder.pinLabelHere(poppedFrame.continuation)
             return
+        }
+
+        if case .if(_, _, isElse: false) = poppedFrame.kind {
+            // `if` inst without `else` must have the same parameter and result types
+            let blockType = poppedFrame.blockType
+            guard blockType.parameters == blockType.results else {
+                throw TranslationError("Expected the same parameter and result types for `if` block but got \(blockType)")
+            }
         }
 
         // NOTE: `valueStack.height - poppedFrame.stackHeight` is usually the same as `poppedFrame.copyCount`
