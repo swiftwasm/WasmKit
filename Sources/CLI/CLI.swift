@@ -6,6 +6,6 @@ struct CLI: AsyncParsableCommand {
         commandName: "wasmkit",
         abstract: "WebAssembly Runtime written in Swift.",
         version: "0.0.8",
-        subcommands: [Run.self, Explore.self]
+        subcommands: [Run.self, Explore.self, Wat2wasm.self]
     )
 }
