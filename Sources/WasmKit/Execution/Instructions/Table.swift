@@ -61,36 +61,13 @@ extension Execution {
         let sourceTable = getTable(sourceTableIndex, sp: sp, store: store)
         let destinationTable = getTable(destinationTableIndex, sp: sp, store: store)
 
-        let copyCounter = sp[immediate.size].asAddressOffset(
+        let size = sp[immediate.size].asAddressOffset(
             sourceTable.limits.isMemory64 || destinationTable.limits.isMemory64
         )
         let sourceIndex = sp[immediate.sourceOffset].asAddressOffset(sourceTable.limits.isMemory64)
         let destinationIndex = sp[immediate.destOffset].asAddressOffset(destinationTable.limits.isMemory64)
 
-        guard copyCounter > 0 else {
-            return
-        }
-
-        guard
-            !sourceIndex.addingReportingOverflow(copyCounter).overflow && !destinationIndex.addingReportingOverflow(copyCounter).overflow
-        else {
-            throw Trap.tableSizeOverflow
-        }
-        guard destinationIndex + copyCounter <= sourceTable.elements.count else {
-            throw Trap.outOfBoundsTableAccess(Int(destinationIndex + copyCounter))
-        }
-        guard destinationIndex + copyCounter <= sourceTable.elements.count && sourceIndex + copyCounter <= destinationTable.elements.count else {
-            throw Trap.outOfBoundsTableAccess(Int(destinationIndex + copyCounter))
-        }
-
-        let valuesToCopy = Array(sourceTable.elements[Int(sourceIndex)..<Int(sourceIndex + copyCounter)])
-        for (i, value) in valuesToCopy.enumerated() {
-            setTableElement(
-                table: destinationTable,
-                Int(destinationIndex) + i,
-                value
-            )
-        }
+        try destinationTable.copy(sourceTable, from: Int(sourceIndex), to: Int(destinationIndex), count: Int(size))
     }
     mutating func tableInit(sp: Sp, immediate: Instruction.TableInitOperand) throws {
         let tableIndex = immediate.tableIndex
@@ -104,7 +81,7 @@ extension Execution {
 
         try destinationTable.withValue {
             try $0.initialize(
-                elements: sourceElement.references,
+                sourceElement,
                 from: Int(sourceIndex), to: Int(destinationIndex),
                 count: Int(copyCounter)
             )

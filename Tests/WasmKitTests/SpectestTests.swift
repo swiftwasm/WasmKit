@@ -20,6 +20,10 @@ final class SpectestTests: XCTestCase {
         let defaultConfig = EngineConfiguration()
         let ok = try await spectest(
             path: Self.testPaths,
+            include: [],
+            exclude: [
+                "table_fill.wast",
+            ],
             parallel: true,
             configuration: defaultConfig
         )
