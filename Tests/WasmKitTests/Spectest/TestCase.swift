@@ -52,9 +52,11 @@ struct TestCase {
             guard !fileName.starts(with: "simd_") else { return false }
 
             let patternPredicate = { pattern in filePath.path.hasSuffix(pattern) }
+            if !include.isEmpty {
+                return include.contains(where: patternPredicate)
+            }
             guard !exclude.contains(where: patternPredicate) else { return false }
-            guard !include.isEmpty else { return true }
-            return include.contains(where: patternPredicate)
+            return true
         }
 
         var testCases: [TestCase] = []
@@ -309,8 +311,7 @@ extension WastRunContext {
                 do {
                     _ = try wastInvoke(call: invoke)
                     // XXX: This is wrong but just keep it as is
-                    // return .failed("trap expected: \(message)")
-                    return .passed
+                    return .failed("trap expected: \(message)")
                 } catch let trap as Trap {
                     guard trap.assertionText.contains(message) else {
                         return .failed("assertion mismatch: expected: \(message), actual: \(trap.assertionText)")
@@ -357,7 +358,11 @@ extension WastRunContext {
             return .skipped("validation is no implemented yet")
 
         case .invoke(let invoke):
-            _ = try wastInvoke(call: invoke)
+            do {
+                _ = try wastInvoke(call: invoke)
+            } catch {
+                return .failed("\(error)")
+            }
             return .passed
         }
     }

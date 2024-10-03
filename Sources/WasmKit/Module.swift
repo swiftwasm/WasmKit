@@ -163,7 +163,7 @@ public struct Module {
                     }
                     let references = try element.evaluateInits(context: instance)
                     try table.initialize(
-                        elements: references, from: 0, to: Int(offset), count: references.count
+                        references, from: 0, to: Int(offset), count: references.count
                     )
                 }
             }

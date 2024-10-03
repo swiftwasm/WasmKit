@@ -300,22 +300,45 @@ struct TableEntity /* : ~Copyable */ {
         return true
     }
 
-    mutating func initialize(elements source: [Reference], from fromIndex: Int, to toIndex: Int, count: Int) throws {
-        guard count > 0 else { return }
+    mutating func initialize(_ segment: InternalElementSegment, from source: Int, to destination: Int, count: Int) throws {
+        try self.initialize(segment.references, from: source, to: destination, count: count)
+    }
 
-        guard !fromIndex.addingReportingOverflow(count).overflow,
-              !toIndex.addingReportingOverflow(count).overflow
-        else {
-            throw Trap.tableSizeOverflow
-        }
+    mutating func initialize(_ references: [Reference], from source: Int, to destination: Int, count: Int) throws {
+        let (destinationEnd, destinationOverflow) = destination.addingReportingOverflow(count)
+        let (sourceEnd, sourceOverflow) = source.addingReportingOverflow(count)
 
-        guard fromIndex + count <= source.count else {
-            throw Trap.outOfBoundsTableAccess(fromIndex + count)
+        guard !destinationOverflow, !sourceOverflow else { throw Trap.tableSizeOverflow }
+        guard destinationEnd <= elements.count else { throw Trap.outOfBoundsTableAccess(destinationEnd) }
+        guard sourceEnd <= references.count else { throw Trap.outOfBoundsTableAccess(sourceEnd) }
+
+        elements.withUnsafeMutableBufferPointer { table in
+            references.withUnsafeBufferPointer { segment in
+                _ = table[destination..<destination + count].initialize(from: segment[source..<source + count])
+            }
         }
-        guard toIndex + count <= self.elements.count else {
-            throw Trap.outOfBoundsTableAccess(toIndex + count)
-        }
-        elements[toIndex..<(toIndex + count)] = source[fromIndex..<fromIndex + count]
+    }
+
+    static func copy(
+        _ sourceTable: UnsafeBufferPointer<Reference>,
+        _ destinationTable: UnsafeMutableBufferPointer<Reference>,
+        from source: Int, to destination: Int, count: Int
+    ) throws {
+        let (destinationEnd, destinationOverflow) = destination.addingReportingOverflow(count)
+        let (sourceEnd, sourceOverflow) = source.addingReportingOverflow(count)
+
+        guard !destinationOverflow, !sourceOverflow else { throw Trap.tableSizeOverflow }
+        guard destinationEnd <= destinationTable.count else { throw Trap.outOfBoundsTableAccess(Int(destinationEnd)) }
+        guard sourceEnd <= sourceTable.count else { throw Trap.outOfBoundsTableAccess(Int(sourceEnd)) }
+
+        let source = UnsafeBufferPointer(rebasing: sourceTable[source..<source + count])
+        let destination = UnsafeMutableBufferPointer(rebasing: destinationTable[destination..<destination + count])
+
+        // Note: Do not use `UnsafeMutableBufferPointer.update(from:)` overload here because it does not
+        // provide the same semantics as `memmove` for overlapping memory regions.
+        // TODO: We can optimize this to use `memcpy` if the source and destination tables are known to be different
+        // at translation time.
+        _ = destination.update(fromContentsOf: source)
     }
 }
 
@@ -326,6 +349,30 @@ extension TableEntity: ValidatableEntity {
 }
 
 typealias InternalTable = EntityHandle<TableEntity>
+
+extension InternalTable {
+    func copy(_ sourceTable: InternalTable, from source: Int, to destination: Int, count: Int) throws {
+        // Check if the source and destination tables are the same for dynamic exclusive
+        // access enforcement
+        if self == sourceTable {
+            try withValue {
+                try $0.elements.withUnsafeMutableBufferPointer {
+                    try TableEntity.copy(UnsafeBufferPointer($0), $0, from: source, to: destination, count: count)
+                }
+            }
+        } else {
+            try withValue { destinationTable in
+                try sourceTable.withValue { sourceTable in
+                    try destinationTable.elements.withUnsafeMutableBufferPointer { dest in
+                        try sourceTable.elements.withUnsafeBufferPointer { src in
+                            try TableEntity.copy(src, dest, from: source, to: destination, count: count)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 /// A WebAssembly `table` instance.
 /// > Note:
@@ -393,6 +440,42 @@ struct MemoryEntity /* : ~Copyable */ {
         data.append(contentsOf: Array(repeating: 0, count: Int(pageCount) * MemoryEntity.pageSize))
 
         return limit.isMemory64 ? .i64(UInt64(result)) : .i32(result)
+    }
+
+    mutating func copy(from source: UInt64, to destination: UInt64, count: UInt64) throws {
+        let (destinationEnd, destinationOverflow) = destination.addingReportingOverflow(count)
+        let (sourceEnd, sourceOverflow) = source.addingReportingOverflow(count)
+
+        guard !destinationOverflow, destinationEnd <= data.count,
+              !sourceOverflow, sourceEnd <= data.count else {
+            throw Trap.outOfBoundsMemoryAccess
+        }
+        data.withUnsafeMutableBufferPointer {
+            guard let base = UnsafeMutableRawPointer($0.baseAddress) else { return }
+            let dest = base.advanced(by: Int(destination))
+            let src = base.advanced(by: Int(source))
+            dest.copyMemory(from: src, byteCount: Int(count))
+        }
+    }
+
+    mutating func initialize(_ segment: InternalDataSegment, from source: UInt32, to destination: UInt64, count: UInt32) throws {
+        let (destinationEnd, destinationOverflow) = destination.addingReportingOverflow(UInt64(count))
+        let (sourceEnd, sourceOverflow) = source.addingReportingOverflow(count)
+
+        guard !destinationOverflow, destinationEnd <= data.count,
+              !sourceOverflow, sourceEnd <= segment.data.count else {
+            throw Trap.outOfBoundsMemoryAccess
+        }
+        data.withUnsafeMutableBufferPointer { memory in
+            segment.data.withUnsafeBufferPointer { segment in
+                guard
+                    let memory = UnsafeMutableRawPointer(memory.baseAddress),
+                    let segment = UnsafeRawPointer(segment.baseAddress) else { return }
+                let dest = memory.advanced(by: Int(destination))
+                let src = segment.advanced(by: Int(source))
+                dest.copyMemory(from: src, byteCount: Int(count))
+            }
+        }
     }
 
     mutating func write(offset: Int, bytes: ArraySlice<UInt8>) throws {

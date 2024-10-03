@@ -58,29 +58,13 @@ extension Execution {
     mutating func memoryInit(sp: Sp, immediate: Instruction.MemoryInitOperand) throws {
         let instance = currentInstance(sp: sp)
         let memory = instance.memories[0]
-        try memory.withValue { memoryInstance in
-            let dataInstance = instance.dataSegments[Int(immediate.segmentIndex)]
+        try memory.withValue { memory in
+            let segment = instance.dataSegments[Int(immediate.segmentIndex)]
 
-            let copyCounter = sp[immediate.size].i32
-            let sourceIndex = sp[immediate.sourceOffset].i32
-            let destinationIndex = sp[immediate.destOffset].asAddressOffset(memoryInstance.limit.isMemory64)
-
-            guard copyCounter > 0 else { return }
-
-            guard
-                !sourceIndex.addingReportingOverflow(copyCounter).overflow
-                    && !destinationIndex.addingReportingOverflow(UInt64(copyCounter)).overflow
-                    && memoryInstance.data.count >= destinationIndex + UInt64(copyCounter)
-                    && dataInstance.data.count >= sourceIndex + copyCounter
-            else {
-                throw Trap.outOfBoundsMemoryAccess
-            }
-
-            // FIXME: benchmark if using `replaceSubrange` is faster than this loop
-            for i in 0..<copyCounter {
-                memoryInstance.data[Int(destinationIndex + UInt64(i))] =
-                    dataInstance.data[dataInstance.data.startIndex + Int(sourceIndex + i)]
-            }
+            let size = sp[immediate.size].i32
+            let source = sp[immediate.sourceOffset].i32
+            let destination = sp[immediate.destOffset].asAddressOffset(memory.limit.isMemory64)
+            try memory.initialize(segment, from: source, to: destination, count: size)
         }
     }
     mutating func memoryDataDrop(sp: Sp, immediate: Instruction.MemoryDataDropOperand) {
@@ -91,30 +75,10 @@ extension Execution {
         let memory = currentInstance(sp: sp).memories[0]
         try memory.withValue { memory in
             let isMemory64 = memory.limit.isMemory64
-            let copyCounter = sp[immediate.size].asAddressOffset(isMemory64)
-            let sourceIndex = sp[immediate.sourceOffset].asAddressOffset(isMemory64)
-            let destinationIndex = sp[immediate.destOffset].asAddressOffset(isMemory64)
-
-            guard copyCounter > 0 else { return }
-
-            guard
-                !sourceIndex.addingReportingOverflow(copyCounter).overflow
-                    && !destinationIndex.addingReportingOverflow(copyCounter).overflow
-                    && memory.data.count >= destinationIndex + copyCounter
-                    && memory.data.count >= sourceIndex + copyCounter
-            else {
-                throw Trap.outOfBoundsMemoryAccess
-            }
-
-            if destinationIndex <= sourceIndex {
-                for i in 0..<copyCounter {
-                    memory.data[Int(destinationIndex + i)] = memory.data[Int(sourceIndex + i)]
-                }
-            } else {
-                for i in 1...copyCounter {
-                    memory.data[Int(destinationIndex + copyCounter - i)] = memory.data[Int(sourceIndex + copyCounter - i)]
-                }
-            }
+            let size = sp[immediate.size].asAddressOffset(isMemory64)
+            let source = sp[immediate.sourceOffset].asAddressOffset(isMemory64)
+            let destination = sp[immediate.destOffset].asAddressOffset(isMemory64)
+            try memory.copy(from: source, to: destination, count: size)
         }
     }
     mutating func memoryFill(sp: Sp, immediate: Instruction.MemoryFillOperand) throws {
