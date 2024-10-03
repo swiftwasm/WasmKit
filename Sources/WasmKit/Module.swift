@@ -147,13 +147,14 @@ public struct Module {
             try? store.nameRegistry.register(instance: instance, nameSection: nameSection)
         }
 
+        let constEvalContext = ConstEvaluationContext(instance: instance, moduleImports: moduleImports)
         // Step 12-13.
 
         // Steps 14-15.
         do {
             for element in elements {
                 guard case let .active(tableIndex, offset) = element.mode else { continue }
-                let offsetValue = try offset.evaluate(context: instance)
+                let offsetValue = try offset.evaluate(context: constEvalContext)
                 let table = try instance.tables[validating: Int(tableIndex)]
                 try table.withValue { table in
                     guard let offset = offsetValue.maybeAddressOffset(table.limits.isMemory64) else {
@@ -161,7 +162,7 @@ public struct Module {
                             "Expect \(ValueType.addressType(isMemory64: table.limits.isMemory64)) offset of active element segment but got \(offsetValue)"
                         )
                     }
-                    let references = try element.evaluateInits(context: instance)
+                    let references = try element.evaluateInits(context: constEvalContext)
                     try table.initialize(
                         references, from: 0, to: Int(offset), count: references.count
                     )
@@ -176,7 +177,7 @@ public struct Module {
         // Step 16.
         do {
             for case let .active(data) in data {
-                let offsetValue = try data.offset.evaluate(context: instance)
+                let offsetValue = try data.offset.evaluate(context: constEvalContext)
                 let memory = try instance.memories[validating: Int(data.index)]
                 try memory.withValue { memory in
                     guard let offset = offsetValue.maybeAddressOffset(memory.limit.isMemory64) else {

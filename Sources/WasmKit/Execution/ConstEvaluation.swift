@@ -5,18 +5,23 @@ protocol ConstEvaluationContextProtocol {
     func globalValue(_ index: GlobalIndex) throws -> Value
 }
 
-extension InternalInstance: ConstEvaluationContextProtocol {
-    func functionRef(_ index: FunctionIndex) throws -> Reference {
-        return try .function(from: self.functions[validating: Int(index)])
-    }
-    func globalValue(_ index: GlobalIndex) throws -> Value {
-        return try self.globals[validating: Int(index)].value
-    }
-}
-
 struct ConstEvaluationContext: ConstEvaluationContextProtocol {
     let functions: ImmutableArray<InternalFunction>
     var globals: [Value]
+
+    init(functions: ImmutableArray<InternalFunction>, globals: [Value]) {
+        self.functions = functions
+        self.globals = globals
+    }
+
+    init(instance: InternalInstance, moduleImports: ModuleImports) {
+        // Constant expressions can only reference imported globals
+        let externalGlobals = instance.globals
+            .prefix(moduleImports.numberOfGlobals)
+            .map { $0.value }
+        self.init(functions: instance.functions, globals: Array(externalGlobals))
+    }
+
     func functionRef(_ index: FunctionIndex) throws -> Reference {
         return try .function(from: self.functions[validating: Int(index)])
     }
