@@ -42,17 +42,7 @@ extension Execution {
         let fillValue = sp.getReference(immediate.value, type: table.tableType)
         let startIndex = sp[immediate.destOffset].asAddressOffset(table.limits.isMemory64)
 
-        guard fillCounter > 0 else {
-            return
-        }
-
-        guard Int(startIndex + fillCounter) <= table.elements.count else {
-            throw Trap.outOfBoundsTableAccess(Int(startIndex + fillCounter))
-        }
-
-        for i in 0..<fillCounter {
-            setTableElement(table: table, Int(startIndex + i), fillValue)
-        }
+        try table.withValue { try $0.fill(repeating: fillValue, from: Int(startIndex), count: Int(fillCounter)) }
     }
     mutating func tableCopy(sp: Sp, immediate: Instruction.TableCopyOperand) throws {
         let sourceTableIndex = immediate.sourceIndex
