@@ -24,3 +24,11 @@ struct InstructionValidator {
         }
     }
 }
+
+struct ModuleValidator {
+    func validate(_ module: Module) throws {
+        if module.memoryTypes.count > 1 {
+            throw ValidationError("Multiple memories are not permitted")
+        }
+    }
+}
