@@ -154,7 +154,14 @@ internal struct Parser {
         return text
     }
     mutating func expectString() throws -> String {
-        String(decoding: try expectStringBytes(), as: UTF8.self)
+        // TODO: Use SE-0405 once we can upgrade minimum-supported Swift version to 6.0
+        let bytes = try expectStringBytes()
+        return try bytes.withUnsafeBufferPointer {
+            guard let value = String._tryFromUTF8($0) else {
+                throw WatParserError("invalid UTF-8 string", location: lexer.location())
+            }
+            return value
+        }
     }
 
     mutating func expectStringList() throws -> [UInt8] {
