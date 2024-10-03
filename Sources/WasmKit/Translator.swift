@@ -310,13 +310,16 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             var kind: Kind
             var reachable: Bool = true
 
-            var copyCount: UInt16 {
+            var copyTypes: [ValueType] {
                 switch self.kind {
                 case .block, .if:
-                    return UInt16(blockType.results.count)
+                    return blockType.results
                 case .loop:
-                    return UInt16(blockType.parameters.count)
+                    return blockType.parameters
                 }
+            }
+            var copyCount: UInt16 {
+                return UInt16(copyTypes.count)
             }
         }
 
@@ -893,8 +896,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     ///
     /// - Parameter typeHint: A type expected to be popped. Only used for diagnostic purpose.
     /// - Returns: `true` if check succeed. `false` if the pop operation is going to be performed in unreachable code path.
-    private func checkBeforePop(typeHint: ValueType?) throws -> Bool {
-        let controlFrame = try controlStack.currentFrame()
+    private func checkBeforePop(typeHint: ValueType?, controlFrame: ControlStack.ControlFrame) throws -> Bool {
         if _slowPath(valueStack.height <= controlFrame.stackHeight) {
             if controlFrame.reachable {
                 let message: String
@@ -909,6 +911,10 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             return false
         }
         return true
+    }
+    private func checkBeforePop(typeHint: ValueType?) throws -> Bool {
+        let controlFrame = try controlStack.currentFrame()
+        return try self.checkBeforePop(typeHint: typeHint, controlFrame: controlFrame)
     }
     private mutating func ensureOnVReg(_ source: ValueSource) -> VReg {
         // TODO: Copy to stack if source is on preg
@@ -957,6 +963,27 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             return (.unknown, nil)
         }
         return try valueStack.pop()
+    }
+
+    @discardableResult
+    private mutating func popPushValues(_ valueTypes: [ValueType]) throws -> Int {
+        var values: [ValueSource?] = []
+        for type in valueTypes.reversed() {
+            values.append(try popOperand(type))
+        }
+        let stackHeight = self.valueStack.height
+        for (type, value) in zip(valueTypes, values.reversed()) {
+            switch value {
+            case .local(let localIndex):
+                // Re-push local variables to the stack
+                _ = try valueStack.pushLocal(localIndex, locals: &locals)
+            case .vreg, nil:
+                _ = valueStack.push(type)
+            case .const(let index, let type):
+                valueStack.pushConst(index, type: type)
+            }
+        }
+        return stackHeight
     }
 
     private mutating func visitReturnLike() throws {
@@ -1050,22 +1077,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     mutating func visitBlock(blockType: WasmParser.BlockType) throws -> Output {
         let blockType = try module.resolveBlockType(blockType)
         let endLabel = iseqBuilder.allocLabel()
-        var parameters: [ValueSource?] = []
-        for param in blockType.parameters.reversed() {
-            parameters.append(try popOperand(param))
-        }
-        let stackHeight = self.valueStack.height
-        for (param, value) in zip(blockType.parameters, parameters.reversed()) {
-            switch value {
-            case .local(let localIndex):
-                // Re-push local variables to the stack
-                _ = try valueStack.pushLocal(localIndex, locals: &locals)
-            case .vreg, nil:
-                _ = valueStack.push(param)
-            case .const(let index, let type):
-                valueStack.pushConst(index, type: type)
-            }
-        }
+        let stackHeight = try popPushValues(blockType.parameters)
         controlStack.pushFrame(ControlStack.ControlFrame(blockType: blockType, stackHeight: stackHeight, continuation: endLabel, kind: .block))
     }
 
@@ -1158,6 +1170,10 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         if case .block(root: true) = poppedFrame.kind {
             if poppedFrame.reachable {
                 try translateReturn()
+                // TODO: Merge logic with regular block frame
+                guard valueStack.height == poppedFrame.stackHeight else {
+                    throw ValidationError("values remaining on stack at end of block")
+                }
             }
             try iseqBuilder.pinLabelHere(poppedFrame.continuation)
             return
@@ -1173,7 +1189,13 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         case .if:
             try iseqBuilder.pinLabelHere(poppedFrame.continuation)
         }
-        try valueStack.truncate(height: poppedFrame.stackHeight)
+        for result in poppedFrame.blockType.results.reversed() {
+            guard try checkBeforePop(typeHint: result, controlFrame: poppedFrame) else { continue }
+            _ = try valueStack.pop(result)
+        }
+        guard valueStack.height == poppedFrame.stackHeight else {
+            throw ValidationError("values remaining on stack at end of block")
+        }
         for result in poppedFrame.blockType.results {
             _ = valueStack.push(result)
         }
@@ -1231,6 +1253,9 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         try emitBranch(Instruction.br, relativeDepth: relativeDepth) { offset, copyCount, popCount in
             return offset
         }
+        for type in frame.copyTypes.reversed() {
+            _ = try popOperand(type)
+        }
         try markUnreachable()
     }
 
@@ -1279,12 +1304,12 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         try emitBranch(Instruction.br, relativeDepth: relativeDepth) { offset, copyCount, popCount in
             return offset
         }
+        try popPushValues(frame.copyTypes)
         try iseqBuilder.pinLabelHere(onBranchNotTaken)
     }
 
     mutating func visitBrTable(targets: WasmParser.BrTable) throws -> Output {
         guard let index = try popVRegOperand(.i32) else { return }
-        guard try controlStack.currentFrame().reachable else { return }
 
         let defaultFrame = try controlStack.branchTarget(relativeDepth: targets.defaultIndex)
 
