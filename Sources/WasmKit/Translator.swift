@@ -40,12 +40,12 @@ protocol TranslatorContext {
     func globalType(_ index: GlobalIndex) throws -> ValueType
     func isMemory64(memoryIndex index: MemoryIndex) throws -> Bool
     func isMemory64(tableIndex index: TableIndex) throws -> Bool
-    func elementType(_ index: TableIndex) throws -> ReferenceType
+    func tableType(_ index: TableIndex) throws -> TableType
+    func elementType(_ index: ElementIndex) throws -> ReferenceType
     func resolveCallee(_ index: FunctionIndex) -> InternalFunction?
     func isSameInstance(_ instance: InternalInstance) -> Bool
     func resolveGlobal(_ index: GlobalIndex) -> InternalGlobal?
     func validateDataSegment(_ index: DataIndex) throws
-    func validateElementSegment(_ index: ElementIndex) throws
     func validateFunctionIndex(_ index: FunctionIndex) throws
 }
 
@@ -55,6 +55,9 @@ extension TranslatorContext {
     }
     func addressType(tableIndex: TableIndex) throws -> ValueType {
         return ValueType.addressType(isMemory64: try isMemory64(tableIndex: tableIndex))
+    }
+    func validateElementSegment(_ index: ElementIndex) throws {
+        _ = try elementType(index)
     }
 }
 
@@ -92,11 +95,14 @@ extension InternalInstance: TranslatorContext {
         }
         return self.tables[Int(index)].limits.isMemory64
     }
-    func elementType(_ index: TableIndex) throws -> ReferenceType {
+    func tableType(_ index: TableIndex) throws -> TableType {
         guard Int(index) < self.tables.count else {
             throw TranslationError("Table index \(index) is out of range")
         }
-        return self.tables[Int(index)].tableType.elementType
+        return self.tables[Int(index)].tableType
+    }
+    func elementType(_ index: ElementIndex) throws -> ReferenceType {
+        try self.elementSegments[validating: Int(index)].type
     }
 
     func resolveCallee(_ index: FunctionIndex) -> InternalFunction? {
@@ -110,9 +116,6 @@ extension InternalInstance: TranslatorContext {
     }
     func validateDataSegment(_ index: DataIndex) throws {
         _ = try self.dataSegments[validating: Int(index)]
-    }
-    func validateElementSegment(_ index: ElementIndex) throws {
-        _ = try self.elementSegments[validating: Int(index)]
     }
     func validateFunctionIndex(_ index: FunctionIndex) throws {
         _ = try self.functions[validating: Int(index)]
@@ -807,7 +810,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     /// Whether a call to this function should be intercepted
     let intercepting: Bool
     var constantSlots: ConstSlots
-    let validator: InstructionValidator
+    let validator: InstructionValidator<Context>
 
     init(
         allocator: ISeqAllocator,
@@ -836,7 +839,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         self.functionIndex = functionIndex
         self.intercepting = intercepting
         self.constantSlots = ConstSlots(stackLayout: stackLayout)
-        self.validator = InstructionValidator()
+        self.validator = InstructionValidator(context: module)
 
         do {
             let endLabel = self.iseqBuilder.allocLabel()
@@ -1958,7 +1961,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
     }
     mutating func visitTableInit(elemIndex: UInt32, table: UInt32) throws -> Output {
-        try self.module.validateElementSegment(elemIndex)
+        try validator.validateTableInit(elemIndex: elemIndex, table: table)
+
         try pop3Emit((.i32, .i32, module.addressType(tableIndex: table))) { values, stack in
             let (size, sourceOffset, destOffset) = values
             return .tableInit(
@@ -2005,7 +2009,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
     mutating func visitTableFill(table: UInt32) throws -> Output {
         let address = try module.addressType(tableIndex: table)
-        try pop3Emit((address, .ref(module.elementType(table)), address)) { values, stack in
+        let type = try module.tableType(table)
+        try pop3Emit((address, .ref(type.elementType), address)) { values, stack in
             let (size, value, destOffset) = values
             return .tableFill(
                 Instruction.TableFillOperand(
@@ -2018,9 +2023,10 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
     }
     mutating func visitTableGet(table: UInt32) throws -> Output {
+        let type = try module.tableType(table)
         try popPushEmit(
             module.addressType(tableIndex: table),
-            .ref(module.elementType(table))
+            .ref(type.elementType)
         ) { index, result, stack in
             return .tableGet(
                 Instruction.TableGetOperand(
@@ -2032,7 +2038,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
     }
     mutating func visitTableSet(table: UInt32) throws -> Output {
-        try pop2Emit((.ref(module.elementType(table)), module.addressType(tableIndex: table))) { values, stack in
+        let type = try module.tableType(table)
+        try pop2Emit((.ref(type.elementType), module.addressType(tableIndex: table))) { values, stack in
             let (value, index) = values
             return .tableSet(
                 Instruction.TableSetOperand(
@@ -2045,7 +2052,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
     mutating func visitTableGrow(table: UInt32) throws -> Output {
         let address = try module.addressType(tableIndex: table)
-        try pop2PushEmit((address, .ref(module.elementType(table))), address) { values, result in
+        let type = try module.tableType(table)
+        try pop2PushEmit((address, .ref(type.elementType)), address) { values, result in
             let (delta, value) = values
             return .tableGrow(
                 Instruction.TableGrowOperand(

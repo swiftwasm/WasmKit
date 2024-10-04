@@ -17,7 +17,9 @@ struct ValidationError: Error, CustomStringConvertible {
     }
 }
 
-struct InstructionValidator {
+struct InstructionValidator<Context: TranslatorContext> {
+    let context: Context
+
     func validateMemArg(_ memarg: MemArg, naturalAlignment: Int) throws {
         if memarg.align > naturalAlignment {
             throw ValidationError("Alignment 2**\(memarg.align) is out of limit \(naturalAlignment)")
@@ -30,6 +32,14 @@ struct InstructionValidator {
             throw ValidationError("Cannot set a constant global")
         case .variable:
             break
+        }
+    }
+
+    func validateTableInit(elemIndex: UInt32, table: UInt32) throws {
+        let tableType = try context.tableType(table)
+        let elementType = try context.elementType(elemIndex)
+        guard tableType.elementType == elementType else {
+            throw ValidationError("Table element type mismatch in table.init: \(tableType.elementType) != \(elementType)")
         }
     }
 }
