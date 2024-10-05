@@ -68,13 +68,31 @@ public struct EngineConfiguration {
     /// The compilation mode to use for WebAssembly modules.
     public var compilationMode: CompilationMode
 
+    /// The stack size for the virtual machine interpreter. (Default: 64KB)
+    ///
+    /// Note: Typically, there are three kinds of stacks in a WebAssembly execution:
+    /// 1. The native stack, which is used for native function calls.
+    /// 2. The interpreter stack, which is used for allocating "local"
+    ///    variables in the WebAssembly function and call frames of the
+    ///    WebAssembly-level function calls.
+    /// 3. The shadow stack, which is used by WebAssembly programs compiled
+    ///    by LLVM-based compilers to implement pointers to local variables.
+    ///    This stack is allocated in the WebAssembly memory space by
+    ///    wasm-ld, so the interpreter does not care about it.
+    ///
+    /// The stack size here refers to the second stack, the interpreter stack
+    /// size, so you may need to increase this value if you see
+    /// "call stack exhausted" ``Trap`` errors thrown by the interpreter.
+    public var stackSize: Int
+
     /// Initializes a new instance of `EngineConfiguration`.
     /// - Parameter threadingModel: The threading model to use for the virtual
     /// machine interpreter. If `nil`, the default threading model for the
     /// current platform will be used.
-    public init(threadingModel: ThreadingModel? = nil, compilationMode: CompilationMode = .lazy) {
+    public init(threadingModel: ThreadingModel? = nil, compilationMode: CompilationMode = .lazy, stackSize: Int? = nil) {
         self.threadingModel = threadingModel ?? .defaultForCurrentPlatform
         self.compilationMode = compilationMode
+        self.stackSize = stackSize ?? (1 << 16)
     }
 }
 
