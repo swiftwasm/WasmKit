@@ -20,7 +20,7 @@ struct Execution {
         store: StoreRef,
         body: (inout Execution, Sp) throws -> T
     ) rethrows -> T {
-        let limit = Int(UInt16.max)
+        let limit = store.value.engine.configuration.stackSize
         let valueStack = UnsafeMutablePointer<StackSlot>.allocate(capacity: limit)
         defer {
             valueStack.deallocate()

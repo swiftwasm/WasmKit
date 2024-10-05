@@ -55,6 +55,14 @@ struct Run: ParsableCommand {
     @Option(help: ArgumentHelp("The execution threading model to use", visibility: .hidden))
     var threadingModel: ThreadingModel?
 
+    @Option(
+        help: ArgumentHelp(
+            "The size of the interpreter stack in bytes",
+            valueName: "bytes"
+        )
+    ) 
+    var stackSize: Int?
+
     @Argument
     var path: String
 
@@ -149,7 +157,7 @@ struct Run: ParsableCommand {
         case .token: threadingModel = .token
         case nil: threadingModel = nil
         }
-        return EngineConfiguration(threadingModel: threadingModel)
+        return EngineConfiguration(threadingModel: threadingModel, stackSize: self.stackSize)
     }
 
     func instantiateWASI(module: Module, interceptor: EngineInterceptor?) throws -> () throws -> Void {
