@@ -1209,12 +1209,10 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         //
         iseqBuilder.resetLastEmission()
         if case .block(root: true) = toBePopped.kind {
-            if toBePopped.reachable {
-                try translateReturn()
-                // TODO: Merge logic with regular block frame
-                guard valueStack.height == toBePopped.stackHeight else {
-                    throw ValidationError("values remaining on stack at end of block")
-                }
+            try translateReturn()
+            // TODO: Merge logic with regular block frame
+            guard valueStack.height == toBePopped.stackHeight else {
+                throw ValidationError("values remaining on stack at end of block")
             }
             try iseqBuilder.pinLabelHere(toBePopped.continuation)
             return
