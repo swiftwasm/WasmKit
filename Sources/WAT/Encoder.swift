@@ -158,10 +158,6 @@ struct ElementExprCollector: AnyInstructionVisitor {
     typealias Output = Void
 
     var isAllRefFunc: Bool = true
-    var useExpression: Bool {
-        // if all instructions are ref.func, use function indices representation
-        return !isAllRefFunc
-    }
     var instructions: [Instruction] = []
 
     mutating func parse(indices: WatParser.ElementDecl.Indices, wat: inout Wat) throws {
@@ -234,8 +230,11 @@ extension WAT.WatParser.ElementDecl {
 
         var collector = ElementExprCollector()
         try collector.parse(indices: indices, wat: &wat)
-
-        if collector.useExpression {
+        var useExpression: Bool {
+            // if all instructions are ref.func, use function indices representation
+            return !collector.isAllRefFunc || self.type != .funcRef
+        }
+        if useExpression {
             // use expression
             flags |= 0b0100
         }
@@ -262,7 +261,7 @@ extension WAT.WatParser.ElementDecl {
             }
         }
         if isPassive || hasTableIndex {
-            if collector.useExpression {
+            if useExpression {
                 encoder.encode(type)
             } else {
                 // Write ExternKind.func
@@ -270,7 +269,7 @@ extension WAT.WatParser.ElementDecl {
             }
         }
 
-        if collector.useExpression {
+        if useExpression {
             try encoder.encodeVector(collector.instructions) { instruction, encoder in
                 var exprEncoder = ExpressionEncoder()
                 switch instruction {
