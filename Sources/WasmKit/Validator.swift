@@ -61,6 +61,16 @@ struct ModuleValidator {
         for memoryType in module.memoryTypes {
             try Self.checkMemoryType(memoryType, features: module.features)
         }
+        try checkStartFunction()
+    }
+
+    func checkStartFunction() throws {
+        if let startFunction = module.start {
+            let type = try module.resolveFunctionType(startFunction)
+            guard type.parameters.isEmpty, type.results.isEmpty else {
+                throw ValidationError("Start function must have no parameters and no results")
+            }
+        }
     }
 
     static func checkMemoryType(_ type: MemoryType, features: WasmFeatureSet) throws {

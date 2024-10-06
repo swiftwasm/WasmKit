@@ -58,6 +58,7 @@ public struct Module {
     public let types: [FunctionType]
 
     let moduleImports: ModuleImports
+    let importedFunctionTypes: [TypeIndex]
     let memoryTypes: [MemoryType]
     let tableTypes: [TableType]
     let allocator: ISeqAllocator
@@ -92,19 +93,20 @@ public struct Module {
         self.features = features
         self.hasDataCount = hasDataCount
 
-        var functionTypeIndices: [TypeIndex] = []
+        var importedFunctionTypes: [TypeIndex] = []
         var globalTypes: [GlobalType] = []
         var memoryTypes: [MemoryType] = []
         var tableTypes: [TableType] = []
 
         self.moduleImports = ModuleImports.build(
             from: imports,
-            functionTypeIndices: &functionTypeIndices,
+            functionTypeIndices: &importedFunctionTypes,
             globalTypes: &globalTypes,
             memoryTypes: &memoryTypes,
             tableTypes: &tableTypes
         )
         self.types = types
+        self.importedFunctionTypes = importedFunctionTypes
         self.memoryTypes = memoryTypes + memories
         self.tableTypes = tableTypes + tables
     }
@@ -114,6 +116,19 @@ public struct Module {
             throw TranslationError("Type index \(index) is out of range")
         }
         return typeSection[Int(index)]
+    }
+
+    internal func resolveFunctionType(_ index: FunctionIndex) throws -> FunctionType {
+        guard Int(index) < functions.count + self.moduleImports.numberOfFunctions else {
+            throw TranslationError("Function index \(index) is out of range")
+        }
+        if Int(index) < self.moduleImports.numberOfFunctions {
+            return try Self.resolveType(
+                importedFunctionTypes[Int(index)],
+                typeSection: types
+            )
+        }
+        return functions[Int(index) - self.moduleImports.numberOfFunctions].type
     }
 
     /// Instantiate this module in the given imports.
