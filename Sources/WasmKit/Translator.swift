@@ -470,6 +470,10 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             return makeValueSource(self.values[height - 1 - depth])
         }
 
+        func peekType(depth: Int) -> MetaValue {
+            return self.values[height - 1 - depth].type
+        }
+
         private func makeValueSource(_ value: MetaValueOnStack) -> ValueSource {
             let source: ValueSource
             switch value {
@@ -987,15 +991,27 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             case .local(let localIndex):
                 // Re-push local variables to the stack
                 _ = try valueStack.pushLocal(localIndex, locals: &locals)
-            case .vreg:
+            case .vreg, nil:
                 _ = valueStack.push(type)
-            case nil:
-                _ = valueStack.push(.unknown)
             case .const(let index, let type):
                 valueStack.pushConst(index, type: type)
             }
         }
         return stackHeight
+    }
+
+    private func checkStackTop(_ valueTypes: [ValueType]) throws {
+        for (stackDepth, type) in valueTypes.reversed().enumerated() {
+            guard try checkBeforePop(typeHint: type) else { return }
+            let actual = valueStack.peekType(depth: stackDepth)
+            switch actual {
+            case .some(let actualType):
+                guard actualType == type else {
+                    throw ValidationError("Expected \(type) on the stack top but got \(actualType)")
+                }
+            case .unknown: break
+            }
+        }
     }
 
     private mutating func visitReturnLike() throws {
@@ -1308,10 +1324,11 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
 
     mutating func visitBrIf(relativeDepth: UInt32) throws -> Output {
-        guard let condition = try popVRegOperand(.i32) else { return }
-
         let frame = try controlStack.branchTarget(relativeDepth: relativeDepth)
+        let condition = try popVRegOperand(.i32)
+
         if frame.copyCount == 0 {
+            guard let condition else { return }
             // Optimization where we don't need copying values when the branch taken
             iseqBuilder.emitWithLabel(Instruction.brIf, frame.continuation) { _, selfPC, continuation in
                 let relativeOffset = continuation.offsetFromHead - selfPC.offsetFromHead
@@ -1323,37 +1340,39 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
         preserveOnStack(depth: valueStack.height - frame.stackHeight)
 
-        // If branch taken, fallthrough to landing pad, copy stack values
-        // then branch to the actual place
-        // If branch not taken, branch to the next of the landing pad
-        //
-        // (block (result i32)
-        //   (i32.const 42)
-        //   (i32.const 24)
-        //   (local.get 0)
-        //   (br_if 0) ------+
-        //   (local.get 1)   |
-        // )         <-------+
-        //
-        // [0x00] (i32.const 42 reg:0)
-        // [0x01] (i32.const 24 reg:1)
-        // [0x02] (local.get 0 result=reg:2)
-        // [0x03] (br_if_z offset=+0x3 cond=reg:2) --+
-        // [0x04] (stack.copy reg:1 -> reg:0)        |
-        // [0x05] (br offset=+0x2) --------+         |
-        // [0x06] (local.get 1 reg:2) <----|---------+
-        // [0x07] ...              <-------+
-        let onBranchNotTaken = iseqBuilder.allocLabel()
-        iseqBuilder.emitWithLabel(Instruction.brIfNot, onBranchNotTaken) { _, conditionCheckAt, continuation in
-            let relativeOffset = continuation.offsetFromHead - conditionCheckAt.offsetFromHead
-            return Instruction.BrIfOperand(condition: LVReg(condition), offset: Int32(relativeOffset))
-        }
-        try copyOnBranch(targetFrame: frame)
-        try emitBranch(Instruction.br, relativeDepth: relativeDepth) { offset, copyCount, popCount in
-            return offset
+        if let condition {
+            // If branch taken, fallthrough to landing pad, copy stack values
+            // then branch to the actual place
+            // If branch not taken, branch to the next of the landing pad
+            //
+            // (block (result i32)
+            //   (i32.const 42)
+            //   (i32.const 24)
+            //   (local.get 0)
+            //   (br_if 0) ------+
+            //   (local.get 1)   |
+            // )         <-------+
+            //
+            // [0x00] (i32.const 42 reg:0)
+            // [0x01] (i32.const 24 reg:1)
+            // [0x02] (local.get 0 result=reg:2)
+            // [0x03] (br_if_z offset=+0x3 cond=reg:2) --+
+            // [0x04] (stack.copy reg:1 -> reg:0)        |
+            // [0x05] (br offset=+0x2) --------+         |
+            // [0x06] (local.get 1 reg:2) <----|---------+
+            // [0x07] ...              <-------+
+            let onBranchNotTaken = iseqBuilder.allocLabel()
+            iseqBuilder.emitWithLabel(Instruction.brIfNot, onBranchNotTaken) { _, conditionCheckAt, continuation in
+                let relativeOffset = continuation.offsetFromHead - conditionCheckAt.offsetFromHead
+                return Instruction.BrIfOperand(condition: LVReg(condition), offset: Int32(relativeOffset))
+            }
+            try copyOnBranch(targetFrame: frame)
+            try emitBranch(Instruction.br, relativeDepth: relativeDepth) { offset, copyCount, popCount in
+                return offset
+            }
+            try iseqBuilder.pinLabelHere(onBranchNotTaken)
         }
         try popPushValues(frame.copyTypes)
-        try iseqBuilder.pinLabelHere(onBranchNotTaken)
     }
 
     mutating func visitBrTable(targets: WasmParser.BrTable) throws -> Output {
@@ -1413,7 +1432,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             guard frame.copyTypes.count == defaultFrame.copyTypes.count else {
                 throw ValidationError("Expected the same copy types for all branches in `br_table` but got \(frame.copyTypes) and \(defaultFrame.copyTypes)")
             }
-            try popPushValues(frame.copyTypes)
+            try checkStackTop(frame.copyTypes)
 
             do {
                 let relativeOffset = iseqBuilder.insertingPC.offsetFromHead - brTableAt.offsetFromHead
