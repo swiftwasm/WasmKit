@@ -42,6 +42,10 @@ struct InstructionValidator<Context: TranslatorContext> {
             throw ValidationError("Table element type mismatch in table.init: \(tableType.elementType) != \(elementType)")
         }
     }
+
+    func validateRefFunc(functionIndex: UInt32) throws {
+        try context.validateFunctionIndex(functionIndex)
+    }
 }
 
 struct ModuleValidator {

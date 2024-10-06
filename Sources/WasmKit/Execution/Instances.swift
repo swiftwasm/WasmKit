@@ -76,6 +76,7 @@ struct InstanceEntity /* : ~Copyable */ {
     var elementSegments: ImmutableArray<InternalElementSegment>
     var dataSegments: ImmutableArray<InternalDataSegment>
     var exports: [String: InternalExternalValue]
+    var functionRefs: Set<InternalFunction>
     var features: WasmFeatureSet
     var hasDataCount: Bool
 
@@ -89,6 +90,7 @@ struct InstanceEntity /* : ~Copyable */ {
             elementSegments: ImmutableArray(),
             dataSegments: ImmutableArray(),
             exports: [:],
+            functionRefs: [],
             features: [],
             hasDataCount: false
         )

@@ -118,7 +118,10 @@ extension InternalInstance: TranslatorContext {
         _ = try self.dataSegments[validating: Int(index)]
     }
     func validateFunctionIndex(_ index: FunctionIndex) throws {
-        _ = try self.functions[validating: Int(index)]
+        let function = try self.functions[validating: Int(index)]
+        guard self.functionRefs.contains(function) else {
+            throw ValidationError("Function index \(index) is not declared but referenced as a function reference")
+        }
     }
 }
 
@@ -1752,7 +1755,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         emit(.refIsNull(Instruction.RefIsNullOperand(value: LVReg(ensureOnVReg(value)), result: LVReg(result))))
     }
     mutating func visitRefFunc(functionIndex: UInt32) throws -> Output {
-        try self.module.validateFunctionIndex(functionIndex)
+        try validator.validateRefFunc(functionIndex: functionIndex)
         pushEmit(.ref(.funcRef), { .refFunc(Instruction.RefFuncOperand(index: functionIndex, result: LVReg($0))) })
     }
 

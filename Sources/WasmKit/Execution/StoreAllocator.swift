@@ -360,11 +360,16 @@ extension StoreAllocator {
             allocateHandle: { m, _ in try allocate(memoryType: m, resourceLimiter: resourceLimiter) }
         )
 
+        var functionRefs: Set<InternalFunction> = []
         // Step 5.
         let constEvalContext = ConstEvaluationContext(
             functions: functions,
-            globals: importedGlobals.map(\.value)
+            globals: importedGlobals.map(\.value),
+            onFunctionReferenced: { function in
+                functionRefs.insert(function)
+            }
         )
+
         let globals = try allocateEntities(
             imports: importedGlobals,
             internals: module.globals,
@@ -379,13 +384,13 @@ extension StoreAllocator {
         // Step 6.
         let elements = try ImmutableArray<InternalElementSegment>(allocator: arrayAllocator, count: module.elements.count) { buffer in
             for (index, element) in module.elements.enumerated() {
-                let references: [Reference]
+                // TODO: Avoid evaluating element expr twice in `Module.instantiate` and here.
+                var references = try element.evaluateInits(context: constEvalContext)
                 switch element.mode {
                 case .active, .declarative:
                     // active & declarative segments are unavailable at runtime
                     references = []
-                case .passive:
-                    references = try element.evaluateInits(context: constEvalContext)
+                case .passive: break
                 }
                 let handle = allocate(elementType: element.type, references: references)
                 buffer.initializeElement(at: index, to: handle)
@@ -449,6 +454,7 @@ extension StoreAllocator {
             elementSegments: elements,
             dataSegments: dataSegments,
             exports: exports,
+            functionRefs: functionRefs,
             features: module.features,
             hasDataCount: module.hasDataCount
         )
