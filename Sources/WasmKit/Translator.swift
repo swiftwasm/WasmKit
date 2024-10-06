@@ -1489,6 +1489,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         let (value1Type, value1) = try popAnyOperand()
         let (value2Type, value2) = try popAnyOperand()
         switch (value1Type, value2Type) {
+        case (.some(.ref(_)), _), (_, .some(.ref(_))):
+            throw TranslationError("Cannot `select` on reference types")
         case let (.some(type1), .some(type2)):
             guard type1 == type2 else {
                 throw TranslationError("Type mismatch on `select`. Expected \(value1Type) and \(value2Type) to be same")
