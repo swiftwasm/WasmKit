@@ -264,6 +264,10 @@ struct TableEntity /* : ~Copyable */ {
     let tableType: TableType
     var limits: Limits { tableType.limits }
 
+    static func maxSize(isMemory64: Bool) -> UInt64 {
+        return UInt64(UInt32.max)
+    }
+
     init(_ tableType: TableType, resourceLimiter: any ResourceLimiter) throws {
         let emptyElement: Reference
         switch tableType.elementType {
