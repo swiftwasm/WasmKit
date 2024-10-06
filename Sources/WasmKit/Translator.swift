@@ -987,8 +987,10 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             case .local(let localIndex):
                 // Re-push local variables to the stack
                 _ = try valueStack.pushLocal(localIndex, locals: &locals)
-            case .vreg, nil:
+            case .vreg:
                 _ = valueStack.push(type)
+            case nil:
+                _ = valueStack.push(.unknown)
             case .const(let index, let type):
                 valueStack.pushConst(index, type: type)
             }
@@ -1408,6 +1410,13 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         //     +---> [0x0b] ...
         for (entryIndex, labelIndex) in allLabelIndices.enumerated() {
             let frame = try controlStack.branchTarget(relativeDepth: labelIndex)
+
+            // Check copyTypes consistency
+            guard frame.copyTypes.count == defaultFrame.copyTypes.count else {
+                throw ValidationError("Expected the same copy types for all branches in `br_table` but got \(frame.copyTypes) and \(defaultFrame.copyTypes)")
+            }
+            try popPushValues(frame.copyTypes)
+
             do {
                 let relativeOffset = iseqBuilder.insertingPC.offsetFromHead - brTableAt.offsetFromHead
                 tableBuffer[entryIndex] = Instruction.BrTableOperand.Entry(
@@ -1426,6 +1435,10 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
                     return Instruction.BrTableOperand.Entry(offset: Int32(continuation.offsetFromHead - brTableAt.offsetFromHead))
                 }
             }
+        }
+        // Pop branch copy values for type checking
+        for type in defaultFrame.copyTypes.reversed() {
+            _ = try popOperand(type)
         }
         try markUnreachable()
     }
