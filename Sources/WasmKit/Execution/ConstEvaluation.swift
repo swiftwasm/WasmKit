@@ -8,10 +8,16 @@ protocol ConstEvaluationContextProtocol {
 struct ConstEvaluationContext: ConstEvaluationContextProtocol {
     let functions: ImmutableArray<InternalFunction>
     var globals: [Value]
+    let onFunctionReferenced: ((InternalFunction) -> Void)?
 
-    init(functions: ImmutableArray<InternalFunction>, globals: [Value]) {
+    init(
+        functions: ImmutableArray<InternalFunction>,
+        globals: [Value],
+        onFunctionReferenced: ((InternalFunction) -> Void)? = nil
+    ) {
         self.functions = functions
         self.globals = globals
+        self.onFunctionReferenced = onFunctionReferenced
     }
 
     init(instance: InternalInstance, moduleImports: ModuleImports) {
@@ -23,7 +29,9 @@ struct ConstEvaluationContext: ConstEvaluationContextProtocol {
     }
 
     func functionRef(_ index: FunctionIndex) throws -> Reference {
-        return try .function(from: self.functions[validating: Int(index)])
+        let function = try self.functions[validating: Int(index)]
+        self.onFunctionReferenced?(function)
+        return .function(from: function)
     }
     func globalValue(_ index: GlobalIndex) throws -> Value {
         guard index < globals.count else {
