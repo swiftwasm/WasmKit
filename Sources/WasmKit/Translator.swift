@@ -169,7 +169,7 @@ fileprivate struct MetaProgramCounter {
 /// ```
 /// | Offset                             | Description          |
 /// |------------------------------------|----------------------|
-/// | 0 ~ max(params, results)-1         | Frame header         |
+/// | SP-3 ~ SP-(max(params, results)+3) | Frame header         |
 /// | SP-3                               |   * Saved Instance   |
 /// | SP-2                               |   * Saved PC         |
 /// | SP-1                               |   * Saved SP         |
@@ -190,19 +190,19 @@ fileprivate struct MetaProgramCounter {
 
 struct FrameHeaderLayout {
     let type: FunctionType
-    let paramResultBase: VReg
+    let size: VReg
     
     init(type: FunctionType) {
         self.type = type
-        self.paramResultBase = Self.size(of: type)
+        self.size = Self.size(of: type)
     }
 
     func paramReg(_ index: Int) -> VReg {
-        VReg(index) - paramResultBase
+        VReg(index) - size
     }
 
     func returnReg(_ index: Int) -> VReg {
-        return VReg(index) - paramResultBase
+        return VReg(index) - size
     }
 
     internal static func size(of: FunctionType) -> VReg {
@@ -236,11 +236,15 @@ struct StackLayout {
     }
 
     func localReg(_ index: LocalIndex) -> VReg {
-        if index < frameHeader.type.parameters.count {
+        if isParameter(index) {
             return frameHeader.paramReg(Int(index))
         } else {
             return VReg(index) - VReg(frameHeader.type.parameters.count)
         }
+    }
+
+    func isParameter(_ index: LocalIndex) -> Bool {
+        index < frameHeader.type.parameters.count
     }
 
     func constReg(_ index: Int) -> VReg {
@@ -990,11 +994,21 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
 
     private mutating func visitReturnLike() throws {
-        preserveOnStack(depth: self.type.results.count)
+        var copies: [(source: VReg, dest: VReg)] = []
         for (index, resultType) in self.type.results.enumerated().reversed() {
             guard let operand = try popOperand(resultType) else { continue }
-            let source = ensureOnVReg(operand)
+            var source = ensureOnVReg(operand)
+            if case .local(let localIndex) = operand, stackLayout.isParameter(localIndex) {
+                // Parameter space is shared with return values, so we need to copy it to the stack
+                // before copying to the return slot to avoid overwriting the parameter value.
+                let copyTo = valueStack.stackRegBase + VReg(valueStack.height)
+                emitCopyStack(from: localReg(localIndex), to: copyTo)
+                source = copyTo
+            }
             let dest = returnReg(index)
+            copies.append((source, dest))
+        }
+        for (source, dest) in copies {
             emitCopyStack(from: source, to: dest)
         }
     }
