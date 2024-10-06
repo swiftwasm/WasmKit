@@ -43,6 +43,14 @@ struct InstructionValidator<Context: TranslatorContext> {
         }
     }
 
+    func validateTableCopy(dest: UInt32, source: UInt32) throws {
+        let tableType1 = try context.tableType(source)
+        let tableType2 = try context.tableType(dest)
+        guard tableType1.elementType == tableType2.elementType else {
+            throw ValidationError("Table element type mismatch in table.copy: \(tableType1.elementType) != \(tableType2.elementType)")
+        }
+    }
+
     func validateRefFunc(functionIndex: UInt32) throws {
         try context.validateFunctionIndex(functionIndex)
     }

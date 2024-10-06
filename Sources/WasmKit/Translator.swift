@@ -2004,6 +2004,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         // -----------------------------------------------------------------------------
         // C ⊦ table.copy d s : [iN iM iK] → []
         // https://github.com/WebAssembly/memory64/blob/main/proposals/memory64/Overview.md
+        try validator.validateTableCopy(dest: dstTable, source: srcTable)
         let destIsMemory64 = try module.isMemory64(tableIndex: dstTable)
         let sourceIsMemory64 = try module.isMemory64(tableIndex: srcTable)
         let lengthIsMemory64 = destIsMemory64 && sourceIsMemory64
