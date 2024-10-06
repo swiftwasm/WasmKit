@@ -69,6 +69,9 @@ struct ModuleValidator {
         for memoryType in module.memoryTypes {
             try Self.checkMemoryType(memoryType, features: module.features)
         }
+        for tableType in module.tableTypes {
+            try Self.checkTableType(tableType, features: module.features)
+        }
         try checkStartFunction()
     }
 
@@ -104,6 +107,29 @@ struct ModuleValidator {
             guard features.contains(.threads) else {
                 throw ValidationError("reference-types feature is required for shared memories")
             }
+        }
+    }
+
+    static func checkTableType(_ type: TableType, features: WasmFeatureSet) throws {
+        if type.elementType != .funcRef, !features.contains(.referenceTypes) {
+            throw ValidationError("reference-types feature is required for non-funcref tables")
+        }
+        try checkLimit(type.limits)
+
+        if type.limits.isMemory64 {
+            guard features.contains(.memory64) else {
+                throw ValidationError("memory64 feature is required for 64-bit tables")
+            }
+        }
+
+        let hardMax = TableEntity.maxSize(isMemory64: type.limits.isMemory64)
+
+        if type.limits.min > hardMax {
+            throw ValidationError("size minimum must not be greater than \(hardMax)")
+        }
+
+        if let max = type.limits.max, max > hardMax {
+            throw ValidationError("size maximum must not be greater than \(hardMax)")
         }
     }
 
