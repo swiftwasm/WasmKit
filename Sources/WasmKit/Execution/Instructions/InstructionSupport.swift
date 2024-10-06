@@ -226,7 +226,11 @@ extension InstructionSequence {
             }
             target.write("0x\(hexOffset): ")
             let instruction = Instruction.load(from: &cursor)
-            context.print(instruction: instruction, to: &target)
+            context.print(
+                instruction: instruction,
+                instructionOffset: cursor - cursorStart,
+                to: &target
+            )
             target.write("\n")
         }
     }
@@ -271,6 +275,7 @@ struct InstructionPrintingContext {
 
     mutating func print<Target>(
         instruction: Instruction,
+        instructionOffset: Int,
         to target: inout Target
     ) where Target : TextOutputStream {
         switch instruction {
@@ -317,7 +322,8 @@ struct InstructionPrintingContext {
         case .brIf(let op):
             target.write("br_if \(reg(op.condition)), +\(op.offset)")
         case .br(let offset):
-            target.write("br \(offset > 0 ? "+" : "")\(offset)")
+            let iseqOffset = instructionOffset + Int(offset)
+            target.write("br \(offset > 0 ? "+" : "")\(offset) ; 0x\(String(iseqOffset, radix: 16))")
         case .brTable(let table):
             target.write("br_table \(reg(table.index)), \(table.count) cases")
             for i in 0..<table.count {
