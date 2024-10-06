@@ -1577,7 +1577,6 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         try visitLocalSetOrTee(localIndex: localIndex, isTee: false)
     }
     mutating func visitLocalTee(localIndex: UInt32) throws -> Output {
-        guard try controlStack.currentFrame().reachable else { return }
         try visitLocalSetOrTee(localIndex: localIndex, isTee: true)
         _ = try valueStack.pushLocal(localIndex, locals: &locals)
     }
