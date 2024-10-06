@@ -22,7 +22,6 @@ final class SpectestTests: XCTestCase {
             path: Self.testPaths,
             include: [],
             exclude: [
-                "/br_table.wast",
                 "table_get.wast",
                 "table_grow.wast",
                 "table_size.wast",
