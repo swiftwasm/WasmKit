@@ -68,7 +68,7 @@ public struct EngineConfiguration {
     /// The compilation mode to use for WebAssembly modules.
     public var compilationMode: CompilationMode
 
-    /// The stack size in bytes for the virtual machine interpreter. (Default: 64KB)
+    /// The stack size in bytes for the virtual machine interpreter. (Default: 512KB)
     ///
     /// Note: Typically, there are three kinds of stacks in a WebAssembly execution:
     /// 1. The native stack, which is used for native function calls.
@@ -92,7 +92,7 @@ public struct EngineConfiguration {
     public init(threadingModel: ThreadingModel? = nil, compilationMode: CompilationMode = .lazy, stackSize: Int? = nil) {
         self.threadingModel = threadingModel ?? .defaultForCurrentPlatform
         self.compilationMode = compilationMode
-        self.stackSize = stackSize ?? (1 << 16)
+        self.stackSize = stackSize ?? (1 << 19)
     }
 }
 
