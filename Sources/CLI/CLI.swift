@@ -1,7 +1,7 @@
 import ArgumentParser
 
 @main
-struct CLI: AsyncParsableCommand {
+struct CLI: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "wasmkit",
         abstract: "WebAssembly Runtime written in Swift.",
