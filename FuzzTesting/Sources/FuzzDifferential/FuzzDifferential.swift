@@ -5,7 +5,14 @@ import SystemPackage
 import Foundation
 
 protocol Engine {
+    var name: String { get }
     func run(moduleBytes: [UInt8]) throws -> ExecResult
+}
+
+extension Engine {
+    var name: String {
+        return String(describing: type(of: self))
+    }
 }
 
 struct ExecResult {
@@ -17,30 +24,32 @@ struct ExecResult {
         return trap != nil
     }
 
-    static func check(_ lhs: ExecResult, _ rhs: ExecResult) -> Bool {
+    static func check(_ lhs: (result: ExecResult, name: String), _ rhs: (result: ExecResult, name: String)) -> Bool {
+        let (lhsName, rhsName) = (lhs.name, rhs.name)
+        let (lhs, rhs) = (lhs.result, rhs.result)
         guard lhs.hasTrap == rhs.hasTrap else {
-            print("Traps do not match: \(lhs.trap ?? "nil") vs \(rhs.trap ?? "nil")")
+            print("Traps do not match: \(lhsName):\(lhs.trap ?? "nil") vs \(rhsName):\(rhs.trap ?? "nil")")
             return false
         }
         guard lhs.memory == rhs.memory else {
             guard lhs.memory?.count == rhs.memory?.count else {
-                print("Memory sizes do not match: \(lhs.memory?.count ?? 0) vs \(rhs.memory?.count ?? 0)")
+                print("Memory sizes do not match: \(lhsName):\(lhs.memory?.count ?? 0) vs \(rhsName):\(rhs.memory?.count ?? 0)")
                 return false
             }
             for (i, (lhsByte, rhsByte)) in zip(lhs.memory ?? [], rhs.memory ?? []).enumerated() {
                 if lhsByte != rhsByte {
-                    print("Memory byte \(i) does not match: \(lhsByte) vs \(rhsByte)")
+                    print("Memory byte \(i) does not match: \(lhsName):\(lhsByte) vs \(rhsName):\(rhsByte)")
                 }
             }
             return false
         }
         guard lhs.values?.count == rhs.values?.count else {
-            print("Value counts do not match: \(lhs.values?.count ?? 0) vs \(rhs.values?.count ?? 0)")
+            print("Value counts do not match: \(lhsName):\(lhs.values?.count ?? 0) vs \(rhsName):\(rhs.values?.count ?? 0)")
             return false
         }
         for (i, (lhsValue, rhsValue)) in zip(lhs.values ?? [], rhs.values ?? []).enumerated() {
             if !Value.bitwiseEqual(lhsValue, rhsValue) {
-                print("Value \(i) does not match: \(lhsValue) vs \(rhsValue)")
+                print("Value \(i) does not match: \(lhsName):\(lhsValue) vs \(rhsName):\(rhsValue)")
                 return false
             }
         }
@@ -90,6 +99,7 @@ extension wasm_name_t {
 }
 
 struct WasmKitEngine: Engine {
+    var name: String { return "wasmkit" }
     func run(moduleBytes: [UInt8]) throws -> ExecResult {
         let module = try WasmKit.parseWasm(bytes: moduleBytes)
         let engine = WasmKit.Engine()
@@ -127,6 +137,7 @@ struct WasmKitEngine: Engine {
 }
 
 struct ReferenceEngine: Engine {
+    var name: String { return "reference" }
     func run(moduleBytes: [UInt8]) throws -> ExecResult {
         return try moduleBytes.withUnsafeBytes { (module: UnsafeRawBufferPointer) -> ExecResult in
             try run(module: module)
@@ -275,7 +286,7 @@ struct ReferenceEngine: Engine {
         } else {
             moduleBytes = try Array(Data(contentsOf: URL(fileURLWithPath: moduleFile)))
         }
-        let results = try engines.map { try $0.run(moduleBytes: moduleBytes) }
+        let results = try engines.map { try ($0.run(moduleBytes: moduleBytes), $0.name) }
         guard results.count > 1 else {
             throw ExecError("Expected at least two engines")
         }
