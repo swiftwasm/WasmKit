@@ -22,7 +22,7 @@ def dump_crash_wasm(file, prefix):
 
 async def run_single(lane, i, program):
     # Generate a WebAssembly file using wasm-smith
-    wasm_file = os.path.join(tmp_dir, "t.wasm")
+    wasm_file = os.path.join(tmp_dir, f"t{lane}.wasm")
     cmd = [
         "wasm-tools", "smith",
         "-o", wasm_file,
