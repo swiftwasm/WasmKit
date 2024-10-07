@@ -959,6 +959,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         guard try checkBeforePop(typeHint: type) else {
             return nil
         }
+        iseqBuilder.resetLastEmission()
         return try valueStack.pop(type)
     }
 
@@ -976,6 +977,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         guard try checkBeforePop(typeHint: nil) else {
             return (.unknown, nil)
         }
+        iseqBuilder.resetLastEmission()
         return try valueStack.pop()
     }
 
