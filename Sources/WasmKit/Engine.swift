@@ -89,9 +89,9 @@ public struct EngineConfiguration {
     /// - Parameter threadingModel: The threading model to use for the virtual
     /// machine interpreter. If `nil`, the default threading model for the
     /// current platform will be used.
-    public init(threadingModel: ThreadingModel? = nil, compilationMode: CompilationMode = .lazy, stackSize: Int? = nil) {
+    public init(threadingModel: ThreadingModel? = nil, compilationMode: CompilationMode? = nil, stackSize: Int? = nil) {
         self.threadingModel = threadingModel ?? .defaultForCurrentPlatform
-        self.compilationMode = compilationMode
+        self.compilationMode = compilationMode ?? .lazy
         self.stackSize = stackSize ?? (1 << 19)
     }
 }
