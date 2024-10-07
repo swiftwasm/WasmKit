@@ -42,6 +42,7 @@ async def run_single(lane, i, program):
         "-o", wasm_file,
         "--ensure-termination",
         "--bulk-memory-enabled=true",
+        "--canonicalize-nans=true",
         "--saturating-float-to-int-enabled=true",
         "--sign-extension-ops-enabled=true",
         "--min-funcs=1",
