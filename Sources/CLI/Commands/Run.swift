@@ -7,7 +7,17 @@ import os.signpost
 #endif
 
 struct Run: ParsableCommand {
-    @Flag
+    static let configuration = CommandConfiguration(
+        abstract: "Run a WebAssembly module",
+        discussion: """
+        This command will parse a WebAssembly module and run it.
+        """
+    )
+
+    @Flag(
+        name: .shortAndLong,
+        help: "Enable verbose logging"
+    )
     var verbose = false
 
     @Option(
@@ -47,13 +57,40 @@ struct Run: ParsableCommand {
     @Option(name: .customLong("dir"), help: "Grant access to the given host directory")
     var directories: [String] = []
 
-    enum ThreadingModel: String, ExpressibleByArgument {
+    enum ThreadingModel: String, ExpressibleByArgument, CaseIterable {
         case direct
         case token
+
+        func resolve() -> EngineConfiguration.ThreadingModel {
+            switch self {
+            case .direct: return .direct
+            case .token: return .token
+            }
+        }
     }
 
     @Option(help: ArgumentHelp("The execution threading model to use", visibility: .hidden))
     var threadingModel: ThreadingModel?
+
+    enum CompilationMode: String, ExpressibleByArgument, CaseIterable {
+        case eager
+        case lazy
+
+        func resolve() -> EngineConfiguration.CompilationMode {
+            switch self {
+            case .eager: return .eager
+            case .lazy: return .lazy
+            }
+        }
+    }
+
+    @Option(
+        help: ArgumentHelp(
+            "The compilation mode to use for WebAssembly modules",
+            valueName: "mode", visibility: .hidden
+        )
+    )
+    var compilationMode: CompilationMode?
 
     @Option(
         help: ArgumentHelp(
@@ -151,13 +188,11 @@ struct Run: ParsableCommand {
     }
 
     private func deriveRuntimeConfiguration() -> EngineConfiguration {
-        let threadingModel: EngineConfiguration.ThreadingModel?
-        switch self.threadingModel {
-        case .direct: threadingModel = .direct
-        case .token: threadingModel = .token
-        case nil: threadingModel = nil
-        }
-        return EngineConfiguration(threadingModel: threadingModel, stackSize: self.stackSize)
+        return EngineConfiguration(
+            threadingModel: threadingModel?.resolve(),
+            compilationMode: compilationMode?.resolve(),
+            stackSize: self.stackSize
+        )
     }
 
     func instantiateWASI(module: Module, interceptor: EngineInterceptor?) throws -> () throws -> Void {
