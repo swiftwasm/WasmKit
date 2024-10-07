@@ -20,6 +20,20 @@ def dump_crash_wasm(file, prefix):
     return crash_file
 
 
+async def shrink_testcase(wasm_file, program, output):
+    # The fuzzer executable behaves as a predicate script
+    # when SHRINKING env variable is set to 1
+    cmd = ["wasm-tools", "shrink", program, wasm_file, "-o", output]
+    env = os.environ.copy()
+    env["SHRINKING"] = "1"
+
+    proc = await asyncio.create_subprocess_exec(
+        *cmd, env=env,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.DEVNULL)
+    await proc.wait()
+
+
 async def run_single(lane, i, program):
     # Generate a WebAssembly file using wasm-smith
     wasm_file = os.path.join(tmp_dir, f"t{lane}.wasm")
@@ -39,19 +53,30 @@ async def run_single(lane, i, program):
         "--memory-max-size-required=true"
     ]
     random_seed = os.urandom(100)
-    subprocess.run(cmd, input=random_seed)
+
+    proc = await asyncio.create_subprocess_exec(
+        *cmd, stdin=asyncio.subprocess.PIPE)
+    proc.stdin.write(random_seed)
+    proc.stdin.close()
+    await proc.wait()
 
     # Run the target program with a timeout of 60 seconds
     found = False
+    crash_file = None
     try:
         proc = await asyncio.create_subprocess_exec(program, wasm_file)
         await asyncio.wait_for(proc.wait(), timeout=60)
         if proc.returncode != 0:
-            # If the target program fails, save the wasm file
-            crash_file = dump_crash_wasm(wasm_file, "diff")
-            print(f"Found crash in iteration {i};"
-                  f" reproduce with {program} {crash_file}")
             found = True
+            # If the target program fails, try to shrink the testcase
+            try:
+                shrinked = f"{wasm_file}.shrink"
+                await shrink_testcase(wasm_file, program, shrinked)
+                crash_file = dump_crash_wasm(shrinked, "diff")
+            except subprocess.CalledProcessError:
+                # If shrinking fails, just dump the original testcase
+                crash_file = dump_crash_wasm(wasm_file, "diff")
+
     except TimeoutError:
         timeout_file = os.path.join(fail_dir, f"timeout-{i}.wasm")
         shutil.copy(wasm_file, timeout_file)
@@ -61,7 +86,7 @@ async def run_single(lane, i, program):
         print("Interrupted by user")
         exit(0)
 
-    return (lane, i, found)
+    return (lane, i, found, crash_file)
 
 
 class Progress:
@@ -73,7 +98,7 @@ class Progress:
         self.i += 1
         return new
 
-    def complete(self, i, lane, found):
+    def complete(self, i, lane, found, repro):
         pass
 
     def finalize(self):
@@ -85,7 +110,7 @@ class StdoutProgress(Progress):
         super().__init__()
         self.start_time = time.time()
 
-    def complete(self, i, lane, found):
+    def complete(self, i, lane, found, repro):
         if self.i % 100 == 0:
             elapsed_time = time.time() - self.start_time
             iter_per_sec = self.i / elapsed_time
@@ -93,13 +118,15 @@ class StdoutProgress(Progress):
 
 
 class CursesProgress(Progress):
-    def __init__(self, max_lanes, curses):
+    def __init__(self, max_lanes, program, curses):
         super().__init__()
         self.curses = curses
         self.stdscr = curses.initscr()
         self.start_time = time.time()
         self.completed_by_lane = {i: 0 for i in range(max_lanes)}
         self.max_lanes = max_lanes
+        # For printing help for reproducing the last crash
+        self.program = program
         self.found_diffs = 0
         self.show_overview()
 
@@ -120,20 +147,21 @@ class CursesProgress(Progress):
             f" Running task {new_task_id} ({throughput:.2f} iter/s)"
         )
         try:
-            self.stdscr.addstr(1 + lane, 0, status)
+            self.stdscr.addstr(self.overview_lines + lane, 0, status)
             # Move the cursor to the bottom of the screen
-            self.stdscr.move(1 + self.max_lanes, 0)
+            self.stdscr.move(self.overview_lines + self.max_lanes, 0)
             self.stdscr.refresh()
         except self.curses.error:
             pass
 
-    def complete(self, i, lane, found):
+    def complete(self, i, lane, found, repro):
         # Update overview line if a new diff is found
         if found:
             self.found_diffs += 1
             self.show_overview()
 
     def show_overview(self):
+        self.overview_lines = 1
         self.stdscr.addstr(0, 0, f"Found {self.found_diffs} diffs")
         self.stdscr.refresh()
 
@@ -159,8 +187,8 @@ async def run(args, progress, num_lanes):
                 done, pending = await asyncio.wait(
                     lanes, return_when=asyncio.FIRST_COMPLETED)
                 for result in done:
-                    lane, task_id, found = result.result()
-                    progress.complete(task_id, lane, found)
+                    lane, task_id, found, repro = result.result()
+                    progress.complete(task_id, lane, found, repro)
                     lanes[lane] = asyncio.create_task(
                         run_single(lane, progress.start_new(lane),
                                    args.program)
@@ -181,7 +209,7 @@ def derive_progress(args):
     elif args.progress == "curses" and os.isatty(1):
         try:
             import curses
-            return CursesProgress(args.jobs, curses)
+            return CursesProgress(args.jobs, args.program, curses)
         except ImportError:
             print("Curses is not available; falling back to stdout")
     return StdoutProgress()

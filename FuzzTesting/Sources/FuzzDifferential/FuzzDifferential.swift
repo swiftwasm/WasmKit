@@ -246,11 +246,21 @@ struct ReferenceEngine: Engine {
 
 @main struct Main {
     static func main() {
+        let shrinking = ProcessInfo.processInfo.environment["SHRINKING"] == "1"
+        let ok = _main()
+        if shrinking {
+            // While shrinking, failure is "interesting" and reducer expects non-zero exit code
+            // for interesting cases.
+            exit(ok ? 1 : 0)
+        }
+        exit(ok ? 0 : 1)
+    }
+    static func _main() -> Bool {
         do {
-            let ok = try run(moduleFile: CommandLine.arguments[1])
-            exit(ok ? 0 : 1)
+            return try run(moduleFile: CommandLine.arguments[1])
         } catch {
             // Ignore errors
+            return true
         }
     }
 
