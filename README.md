@@ -60,7 +60,7 @@ and should work on the following platforms:
 | WebAssembly MVP | Parsing binary format | ✅ Implemented |
 |                 | Parsing text format (WAT) | ✅ Implemented |
 |                 | Execution | ✅ Implemented |
-|                 | Validation | 🚧 Partially implemented |
+|                 | Validation | ✅ Implemented  |
 | WebAssembly Proposal | [Reference types](https://github.com/WebAssembly/reference-types/blob/master/proposals/reference-types/Overview.md) | ✅ Implemented |
 |                      | [Bulk memory operations](https://github.com/WebAssembly/bulk-memory-operations/blob/master/proposals/bulk-memory-operations/Overview.md) | ✅ Implemented |
 |                      | [Mutable globals](https://github.com/WebAssembly/mutable-global/blob/master/proposals/mutable-global/Overview.md) | ✅ Implemented |
