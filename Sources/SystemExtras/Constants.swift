@@ -1,8 +1,11 @@
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(Android)
-import CSystem
+#elseif canImport(Glibc)
+@_implementationOnly import CSystem
 import Glibc
+#elseif canImport(Musl)
+@_implementationOnly import CSystem
+import Musl
 #elseif os(Windows)
 import CSystem
 import ucrt
