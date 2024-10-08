@@ -1154,6 +1154,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         // Pop condition value
         let condition = try popVRegOperand(.i32)
         let blockType = try module.resolveBlockType(blockType)
+        self.preserveLocalsOnStack(depth: self.valueStack.height)
         preserveOnStack(depth: blockType.parameters.count)
         let endLabel = iseqBuilder.allocLabel()
         let elseLabel = iseqBuilder.allocLabel()
