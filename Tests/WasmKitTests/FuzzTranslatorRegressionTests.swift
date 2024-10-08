@@ -5,7 +5,8 @@ final class FuzzTranslatorRegressionTests: XCTestCase {
     func testRunAll() async throws {
         let sourceRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        let failCasesDir = sourceRoot
+        let failCasesDir =
+            sourceRoot
             .appendingPathComponent("FuzzTesting/FailCases/FuzzTranslator")
 
         for file in try FileManager.default.contentsOfDirectory(atPath: failCasesDir.path) {

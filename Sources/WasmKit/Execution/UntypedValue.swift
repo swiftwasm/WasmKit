@@ -81,7 +81,7 @@ struct UntypedValue: Equatable, Hashable {
     // MARK: - Value Accessors
 
     var i32: UInt32 {
-        return UInt32(truncatingIfNeeded: storage & 0x00000000ffffffff)
+        return UInt32(truncatingIfNeeded: storage & 0x0000_0000_ffff_ffff)
     }
 
     var i64: UInt64 {

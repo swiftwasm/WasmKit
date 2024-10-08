@@ -1,4 +1,5 @@
 import WasmParser
+
 import struct WasmTypes.FunctionType
 
 /// A WebAssembly guest function or host function.
@@ -193,7 +194,6 @@ extension InternalFunction {
         return (iseq, entity.numberOfNonParameterLocals, entity.instance)
     }
 }
-
 
 struct WasmFunctionEntity {
     let type: InternedFuncType

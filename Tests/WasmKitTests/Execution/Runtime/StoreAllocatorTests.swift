@@ -1,7 +1,8 @@
-@testable import WasmKit
+import WAT
 import WasmParser
 import XCTest
-import WAT
+
+@testable import WasmKit
 
 final class StoreAllocatorTests: XCTestCase {
     func testBumpAllocatorDeallocates() {
@@ -29,11 +30,13 @@ final class StoreAllocatorTests: XCTestCase {
     func testStoreAllocatorLeak() throws {
         weak var weakAllocator: StoreAllocator?
         do {
-            let module = try parseWasm(bytes: wat2wasm("""
-              (module
-                (memory (;0;) 0)
-                (export "a" (memory 0)))
-            """))
+            let module = try parseWasm(
+                bytes: wat2wasm(
+                    """
+                      (module
+                        (memory (;0;) 0)
+                        (export "a" (memory 0)))
+                    """))
             let engine = Engine()
             let store = Store(engine: engine)
             _ = try module.instantiate(store: store)

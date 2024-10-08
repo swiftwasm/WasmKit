@@ -4,7 +4,6 @@ import enum WasmTypes.ValueType
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#value-types>
 
-
 public typealias ReferenceType = WasmTypes.ReferenceType
 
 extension Value {

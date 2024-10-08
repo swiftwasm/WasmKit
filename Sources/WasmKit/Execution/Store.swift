@@ -5,7 +5,7 @@ import WasmParser
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#store>
 public final class Store {
     var nameRegistry = NameRegistry()
-    @_spi(Fuzzing) // Consider making this public
+    @_spi(Fuzzing)  // Consider making this public
     public var resourceLimiter: ResourceLimiter = DefaultResourceLimiter()
 
     @available(*, unavailable)

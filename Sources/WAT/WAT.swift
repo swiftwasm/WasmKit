@@ -200,7 +200,6 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws -> Wat {
             }
         }
 
-
         switch decl.kind {
         case let .type(decl):
             try typesMap.add(decl)

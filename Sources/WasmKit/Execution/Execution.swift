@@ -123,7 +123,8 @@ extension Sp {
             return UntypedValue(storage: self[Int(index)])
         }
         nonmutating set {
-            return self[Int(index)] = newValue.storage
+            self[Int(index)] = newValue.storage
+            return
         }
     }
 
@@ -302,7 +303,10 @@ extension Execution {
         handle: InternalFunction,
         type: FunctionType
     ) throws {
-        var sp: Sp = sp, md: Md = nil, ms: Ms = 0, pc = pc
+        var sp: Sp = sp
+        var md: Md = nil
+        var ms: Ms = 0
+        var pc = pc
         (pc, sp) = try invoke(
             function: handle,
             callerInstance: nil,
@@ -334,82 +338,82 @@ extension Execution {
         }
     }
 
-#if EngineStats
-    /// A helper structure for collecting instruction statistics.
-    /// - Note: This is used only when the `EngineStats` flag is enabled.
-    struct StatsCollector {
-        struct Trigram: Hashable {
-            var a: UInt64
-            var b: UInt64
-            var c: UInt64
-        }
-
-        struct CircularBuffer<T> {
-            private var buffer: [T?]
-            private var index: Int = 0
-
-            init(capacity: Int) {
-                buffer = Array(repeating: nil, count: capacity)
+    #if EngineStats
+        /// A helper structure for collecting instruction statistics.
+        /// - Note: This is used only when the `EngineStats` flag is enabled.
+        struct StatsCollector {
+            struct Trigram: Hashable {
+                var a: UInt64
+                var b: UInt64
+                var c: UInt64
             }
 
-            /// Accesses the element at the specified position counted from the oldest element.
-            subscript(_ index: Int) -> T? {
-                get {
-                    return buffer[(self.index + index) % buffer.count]
+            struct CircularBuffer<T> {
+                private var buffer: [T?]
+                private var index: Int = 0
+
+                init(capacity: Int) {
+                    buffer = Array(repeating: nil, count: capacity)
                 }
-                set {
-                    buffer[(self.index + index) % buffer.count] = newValue
+
+                /// Accesses the element at the specified position counted from the oldest element.
+                subscript(_ index: Int) -> T? {
+                    get {
+                        return buffer[(self.index + index) % buffer.count]
+                    }
+                    set {
+                        buffer[(self.index + index) % buffer.count] = newValue
+                    }
+                }
+
+                mutating func append(_ value: T) {
+                    buffer[index] = value
+                    index = (index + 1) % buffer.count
                 }
             }
 
-            mutating func append(_ value: T) {
-                buffer[index] = value
-                index = (index + 1) % buffer.count
+            /// A dictionary that stores the count of each trigram pattern.
+            private var countByTrigram: [Trigram: Int] = [:]
+            /// A circular buffer that stores the last three instructions.
+            private var buffer = CircularBuffer<UInt64>(capacity: 3)
+
+            /// Tracks the given instruction index. This function is called for each instruction execution.
+            mutating func track(_ opcode: UInt64) {
+                buffer.append(opcode)
+                if let a = buffer[0], let b = buffer[1], let c = buffer[2] {
+                    let trigram = Trigram(a: a, b: b, c: c)
+                    countByTrigram[trigram, default: 0] += 1
+                }
+            }
+
+            func dump<TargetStream: TextOutputStream>(target: inout TargetStream, limit: Int) {
+                print("Instruction statistics:", to: &target)
+                for (trigram, count) in countByTrigram.sorted(by: { $0.value > $1.value }).prefix(limit) {
+                    print("  \(Instruction.name(opcode: trigram.a)) -> \(Instruction.name(opcode: trigram.b)) -> \(Instruction.name(opcode: trigram.c)) = \(count)", to: &target)
+                }
+            }
+
+            /// Dumps the instruction statistics to the standard error output stream.
+            func dump(limit: Int = 10) {
+                var target = _Stderr()
+                dump(target: &target, limit: limit)
             }
         }
-
-        /// A dictionary that stores the count of each trigram pattern.
-        private var countByTrigram: [Trigram: Int] = [:]
-        /// A circular buffer that stores the last three instructions.
-        private var buffer = CircularBuffer<UInt64>(capacity: 3)
-
-        /// Tracks the given instruction index. This function is called for each instruction execution.
-        mutating func track(_ opcode: UInt64) {
-            buffer.append(opcode)
-            if let a = buffer[0], let b = buffer[1], let c = buffer[2] {
-                let trigram = Trigram(a: a, b: b, c: c)
-                countByTrigram[trigram, default: 0] += 1
-            }
-        }
-
-        func dump<TargetStream: TextOutputStream>(target: inout TargetStream, limit: Int) {
-            print("Instruction statistics:", to: &target)
-            for (trigram, count) in countByTrigram.sorted(by: { $0.value > $1.value }).prefix(limit) {
-                print("  \(Instruction.name(opcode: trigram.a)) -> \(Instruction.name(opcode: trigram.b)) -> \(Instruction.name(opcode: trigram.c)) = \(count)", to: &target)
-            }
-        }
-
-        /// Dumps the instruction statistics to the standard error output stream.
-        func dump(limit: Int = 10) {
-            var target = _Stderr()
-            dump(target: &target, limit: limit)
-        }
-    }
-#endif
+    #endif
 
     /// Starts the main execution loop using the token threading model.
     /// Be careful when modifying this function as it is performance-critical.
     @inline(__always)
     mutating func runTokenThreaded(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
-#if EngineStats
-        var stats = StatsCollector()
-        defer { stats.dump() }
-#endif
+        #if EngineStats
+            var stats = StatsCollector()
+            defer { stats.dump() }
+        #endif
         var opcode = pc.read(OpcodeID.self)
         while true {
-#if EngineStats
-            stats.track(inst)
-#endif
+            #if EngineStats
+                stats.track(inst)
+            #endif
             opcode = try doExecute(opcode, sp: &sp, pc: &pc, md: &md, ms: &ms)
         }
     }

@@ -210,7 +210,7 @@ extension Instruction {
 // MARK: - Instruction printing support
 
 extension InstructionSequence {
-    func write<Target>(to target: inout Target, context: inout InstructionPrintingContext) where Target : TextOutputStream {
+    func write<Target>(to target: inout Target, context: inout InstructionPrintingContext) where Target: TextOutputStream {
         var hexOffsetWidth = String(instructions.count - 1, radix: 16).count
         hexOffsetWidth = (hexOffsetWidth + 1) & ~1
 
@@ -277,7 +277,7 @@ struct InstructionPrintingContext {
         instruction: Instruction,
         instructionOffset: Int,
         to target: inout Target
-    ) where Target : TextOutputStream {
+    ) where Target: TextOutputStream {
         switch instruction {
         case .unreachable:
             target.write("unreachable")

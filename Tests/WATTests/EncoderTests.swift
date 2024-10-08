@@ -41,15 +41,17 @@ class EncoderTests: XCTestCase {
                 }
                 switch module.source {
                 case .text(var wat):
-                    XCTAssertThrowsError(try {
-                        _ = try wat.encode()
-                        recordFail()
-                    }(), diagnostic())
+                    XCTAssertThrowsError(
+                        try {
+                            _ = try wat.encode()
+                            recordFail()
+                        }(), diagnostic())
                 case .quote(let bytes):
-                    XCTAssertThrowsError(try {
-                        _ = try wat2wasm(String(decoding: bytes, as: UTF8.self))
-                        recordFail()
-                    }(), diagnostic())
+                    XCTAssertThrowsError(
+                        try {
+                            _ = try wat2wasm(String(decoding: bytes, as: UTF8.self))
+                            recordFail()
+                        }(), diagnostic())
                 case .binary: break
                 }
             default: break

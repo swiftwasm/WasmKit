@@ -1,11 +1,12 @@
-import XCTest
 import WasmKit
+import XCTest
 
 @available(macOS 11, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
 final class SpectestTests: XCTestCase {
     static let projectDir = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-    static let testsuite = projectDir
+    static let testsuite =
+        projectDir
         .appendingPathComponent("Vendor/testsuite")
     static var testPaths: [String] {
         [
@@ -20,10 +21,8 @@ final class SpectestTests: XCTestCase {
         let defaultConfig = EngineConfiguration()
         let ok = try await spectest(
             path: Self.testPaths,
-            include: [
-            ],
-            exclude: [
-            ],
+            include: [],
+            exclude: [],
             parallel: true,
             configuration: defaultConfig
         )

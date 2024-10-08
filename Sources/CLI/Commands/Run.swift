@@ -2,16 +2,17 @@ import ArgumentParser
 import SystemPackage
 import WasmKit
 import WasmKitWASI
+
 #if canImport(os.signpost)
-import os.signpost
+    import os.signpost
 #endif
 
 struct Run: ParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "Run a WebAssembly module",
         discussion: """
-        This command will parse a WebAssembly module and run it.
-        """
+            This command will parse a WebAssembly module and run it.
+            """
     )
 
     @Flag(
@@ -97,7 +98,7 @@ struct Run: ParsableCommand {
             "The size of the interpreter stack in bytes",
             valueName: "bytes"
         )
-    ) 
+    )
     var stackSize: Int?
 
     @Argument
@@ -178,10 +179,10 @@ struct Run: ParsableCommand {
 
     private func deriveSignpostTracer() -> EngineInterceptor? {
         #if canImport(os.signpost)
-        if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
-            let signposter = SignpostTracer(signposter: OSSignposter())
-            return signposter
-        }
+            if #available(macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0, *) {
+                let signposter = SignpostTracer(signposter: OSSignposter())
+                return signposter
+            }
         #endif
         log("warning: Signpost logging is not supported on this platform. Ignoring --enable-signpost")
         return nil

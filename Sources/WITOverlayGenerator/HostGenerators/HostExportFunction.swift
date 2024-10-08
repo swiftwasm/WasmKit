@@ -266,11 +266,12 @@ struct HostExportFunction {
                 typeResolver: typeResolver, printer: printer
             )
             let functionVar = builder.variable("function")
-            printer.write(multiline: """
-            guard let \(functionVar) = instance.exports[function: \"\(name.abiName)\"] else {
-                throw CanonicalABIError(description: "Function \\"\(name.abiName)\\" not found in the instance")
-            }
-            """)
+            printer.write(
+                multiline: """
+                    guard let \(functionVar) = instance.exports[function: \"\(name.abiName)\"] else {
+                        throw CanonicalABIError(description: "Function \\"\(name.abiName)\\" not found in the instance")
+                    }
+                    """)
             var call = "try \(functionVar)("
             if !arguments.isEmpty {
                 call += "[\(arguments.map(\.description).joined(separator: ", "))]"

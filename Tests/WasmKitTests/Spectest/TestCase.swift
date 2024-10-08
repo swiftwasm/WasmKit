@@ -1,8 +1,9 @@
 import Foundation
 import SystemPackage
 import WAT
-@testable import WasmKit
 import WasmParser
+
+@testable import WasmKit
 
 struct TestCase {
     enum Error: Swift.Error {
