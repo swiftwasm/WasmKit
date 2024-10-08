@@ -14,6 +14,6 @@ jobs:
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git diff --exit-code || {
-            echo "::error::The formatting changed some files. Please run \`./Utilities/format.sh\` and commit the changes."
+            echo "::error::The formatting changed some files. Please run \`./Utilities/format.py\` and commit the changes."
             exit 1
           }
