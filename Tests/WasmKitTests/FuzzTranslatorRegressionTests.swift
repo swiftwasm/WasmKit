@@ -28,7 +28,7 @@ final class FuzzTranslatorRegressionTests: XCTestCase {
                             fatalError("unreachable")
                         }
                     case .global(let globalType):
-                        value = Global(store: store, type: globalType, value: .i32(0))
+                        value = try Global(store: store, type: globalType, value: .i32(0))
                     case .memory(let memoryType):
                         value = try Memory(store: store, type: memoryType)
                     case .table(let tableType):

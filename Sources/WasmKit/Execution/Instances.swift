@@ -1,4 +1,8 @@
 import WasmParser
+@_exported import struct WasmParser.GlobalType
+@_exported import struct WasmParser.MemoryType
+@_exported import struct WasmParser.TableType
+@_exported import struct WasmParser.Limits
 
 // This file defines the internal representation of WebAssembly entities and
 // their public API.
@@ -400,7 +404,25 @@ public struct Table: Equatable {
         self.allocator = allocator
     }
 
-    /// Creates a new table instance with the given type.
+    /// Creates a new WebAssembly `table` instance with the given type.
+    ///
+    /// - Parameters:
+    ///   - store: The store that to allocate the global instance in.
+    ///   - type: The type of the table instance.
+    /// - Throws: `Trap` if the initial and maximum table size exceeds the resource limit.
+    ///
+    /// ```swift
+    /// let engine = Engine()
+    /// let store = Store(engine: engine)
+    /// let tableType = TableType(elementType: .funcRef, limits: Limits(min: 1))
+    /// let table = try Table(store: store, type: tableType)
+    ///
+    /// let module = try parseWasm(
+    ///     bytes: try wat2wasm(#"(module (table (import "env" "table") 1 funcref))"#)
+    /// )
+    /// let imports: Imports = ["env": ["table": table]]
+    /// let instance = try module.instantiate(store: store, imports: imports)
+    /// ```
     public init(store: Store, type: TableType) throws {
         self.init(
             handle: try store.allocator.allocate(tableType: type, resourceLimiter: store.resourceLimiter),
@@ -528,7 +550,28 @@ public struct Memory: Equatable {
         self.allocator = allocator
     }
 
-    /// Creates a new memory instance with the given type.
+    /// Creates a new WebAssembly `memory` instance with the given type.
+    ///
+    /// - Parameters:
+    ///   - store: The store that to allocate the global instance in.
+    ///   - type: The type of the memory instance.
+    /// - Throws: `Trap` if the initial and maximum memory size exceeds the resource limit.
+    ///
+    /// ```swift
+    /// import WasmKit
+    /// import WAT
+    ///
+    /// let engine = Engine()
+    /// let store = Store(engine: engine)
+    /// let memoryType = MemoryType(min: 1, max: nil)
+    /// let memory = try Memory(store: store, type: memoryType)
+    ///
+    /// let module = try parseWasm(
+    ///     bytes: try wat2wasm(#"(module (memory (import "env" "memory") 1))"#)
+    /// )
+    /// let imports: Imports = ["env": ["memory": memory]]
+    /// let instance = try module.instantiate(store: store, imports: imports)
+    /// ```
     public init(store: Store, type: MemoryType) throws {
         self.init(
             handle: try store.allocator.allocate(memoryType: type, resourceLimiter: store.resourceLimiter),
@@ -624,9 +667,29 @@ public struct Global: Equatable {
         try! self.init(store: store, type: globalType, value: initialValue)
     }
 
-    /// Initializes a new global instance with the given type and initial value.
-    /// The returned global instance may be used to instantiate a new
-    /// WebAssembly module.
+    /// Create a new WebAssembly `global` instance.
+    ///
+    /// - Parameters:
+    ///   - store: The store that to allocate the global instance in.
+    ///   - type: The type of the global instance.
+    ///   - value: Initial value of the global instance.
+    /// - Throws: `Trap` if the initial value does not match the global type.
+    ///
+    /// ```swift
+    /// import WasmKit
+    /// import WAT
+    ///
+    /// let engine = Engine()
+    /// let store = Store(engine: engine)
+    /// let globalType = GlobalType(mutability: .constant, valueType: .i32)
+    /// let i32Global = try Global(store: store, type: globalType, value: .i32(42))
+    ///
+    /// let module = try parseWasm(
+    ///     bytes: try wat2wasm(#"(module (global (import "env" "i32-global") i32))"#)
+    /// )
+    /// let imports: Imports = ["env": ["i32-global": i32Global]]
+    /// let instance = try module.instantiate(store: store, imports: imports)
+    /// ```
     public init(store: Store, type: GlobalType, value: Value) throws {
         let handle = try store.allocator.allocate(globalType: type, initialValue: value)
         self.init(handle: handle, allocator: store.allocator)
