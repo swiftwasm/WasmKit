@@ -1,7 +1,7 @@
 /*
  This source file is part of the Swift System open source project
 
- Copyright (c) 2020 Apple Inc. and the Swift System project authors
+ Copyright (c) 2020 - 2024 Apple Inc. and the Swift System project authors
  Licensed under Apache License v2.0 with Runtime Library Exception
 
  See https://swift.org/LICENSE.txt for license information
@@ -14,12 +14,20 @@
 
 #if SYSTEM_PACKAGE_DARWIN
 import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(Android)
-import CSystem
-import Glibc
 #elseif os(Windows)
 import CSystem
 import ucrt
+#elseif canImport(Glibc)
+@_implementationOnly import CSystem
+import Glibc
+#elseif canImport(Musl)
+@_implementationOnly import CSystem
+import Musl
+#elseif canImport(WASILibc)
+import WASILibc
+#elseif canImport(Android)
+@_implementationOnly import CSystem
+import Android
 #else
 #error("Unsupported Platform")
 #endif
@@ -47,10 +55,25 @@ internal var system_errno: CInt {
     _ = ucrt._set_errno(newValue)
   }
 }
-#else
+#elseif canImport(Glibc)
 internal var system_errno: CInt {
   get { Glibc.errno }
   set { Glibc.errno = newValue }
+}
+#elseif canImport(Musl)
+internal var system_errno: CInt {
+  get { Musl.errno }
+  set { Musl.errno = newValue }
+}
+#elseif canImport(WASILibc)
+internal var system_errno: CInt {
+  get { WASILibc.errno }
+  set { WASILibc.errno = newValue }
+}
+#elseif canImport(Android)
+internal var system_errno: CInt {
+  get { Android.errno }
+  set { Android.errno = newValue }
 }
 #endif
 
@@ -62,7 +85,10 @@ internal func system_strerror(_ __errnum: Int32) -> UnsafeMutablePointer<Int8>! 
   strerror(__errnum)
 }
 
-internal func system_strlen(_ s: UnsafePointer<Int8>) -> Int {
+internal func system_strlen(_ s: UnsafePointer<CChar>) -> Int {
+  strlen(s)
+}
+internal func system_strlen(_ s: UnsafeMutablePointer<CChar>) -> Int {
   strlen(s)
 }
 
@@ -80,7 +106,17 @@ internal func system_platform_strlen(_ s: UnsafePointer<CInterop.PlatformChar>) 
   #endif
 }
 
-// Interop between String and platform string
+// memset for raw buffers
+// FIXME: Do we really not have something like this in the stdlib already?
+internal func system_memset(
+  _ buffer: UnsafeMutableRawBufferPointer,
+  to byte: UInt8
+) {
+  guard buffer.count > 0 else { return }
+  memset(buffer.baseAddress!, CInt(byte), buffer.count)
+}
+
+// Interop between String and platfrom string
 extension String {
   internal func _withPlatformString<Result>(
     _ body: (UnsafePointer<CInterop.PlatformChar>) throws -> Result
@@ -130,6 +166,24 @@ extension String {
 // TLS
 #if os(Windows)
 internal typealias _PlatformTLSKey = DWORD
+#elseif os(WASI) && (swift(<6.1) || !_runtime(_multithreaded))
+// Mock TLS storage for single-threaded WASI
+internal final class _PlatformTLSKey {
+    fileprivate init() {}
+}
+private final class TLSStorage: @unchecked Sendable {
+    var storage = [ObjectIdentifier: UnsafeMutableRawPointer]()
+}
+private let sharedTLSStorage = TLSStorage()
+
+func pthread_setspecific(_ key: _PlatformTLSKey, _ p: UnsafeMutableRawPointer?) -> Int {
+    sharedTLSStorage.storage[ObjectIdentifier(key)] = p
+    return 0
+}
+
+func pthread_getspecific(_ key: _PlatformTLSKey) -> UnsafeMutableRawPointer? {
+    sharedTLSStorage.storage[ObjectIdentifier(key)]
+}
 #else
 internal typealias _PlatformTLSKey = pthread_key_t
 #endif
@@ -141,6 +195,8 @@ internal func makeTLSKey() -> _PlatformTLSKey {
     fatalError("Unable to create key")
   }
   return raw
+  #elseif os(WASI) && (swift(<6.1) || !_runtime(_multithreaded))
+  return _PlatformTLSKey()
   #else
   var raw = pthread_key_t()
   guard 0 == pthread_key_create(&raw, nil) else {
