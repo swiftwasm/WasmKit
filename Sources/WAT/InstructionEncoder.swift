@@ -34,7 +34,7 @@ protocol InstructionEncoder: InstructionVisitor {
     mutating func encodeImmediates(typeIndex: UInt32, tableIndex: UInt32) throws
 }
 
-/// NOTE: InstructionEncoder implements the InstructionVisitor protocol to call the corresponding encode method.
+// InstructionEncoder implements the InstructionVisitor protocol to call the corresponding encode method.
 extension InstructionEncoder {
     mutating func visitUnreachable() throws { try encodeInstruction(0x00, nil) }
     mutating func visitNop() throws { try encodeInstruction(0x01, nil) }

@@ -125,7 +125,7 @@ public final class Runtime {
                 result.define(i, external)
 
             case let (.global(globalType), .global(global))
-                where globalType == global.handle.globalType:
+            where globalType == global.handle.globalType:
                 result.define(i, external)
 
             default:

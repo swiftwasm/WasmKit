@@ -7,8 +7,8 @@ struct Explore: ParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "Explore the compiled functions of a WebAssembly module",
         discussion: """
-        This command will parse a WebAssembly module and dump the compiled functions.
-        """,
+            This command will parse a WebAssembly module and dump the compiled functions.
+            """,
         // This command is just for debugging purposes, so it should be hidden by default
         shouldDisplay: false
     )

@@ -29,7 +29,6 @@ import WasmParser
 // |                                                              |
 // +--------------------------------------------------------------+
 
-
 /// Internal representation of a reference to a WebAssembly entity.
 ///
 /// This type is designed to eliminate ARC retain/release for entities
@@ -466,7 +465,8 @@ struct MemoryEntity /* : ~Copyable */ {
         let (sourceEnd, sourceOverflow) = source.addingReportingOverflow(count)
 
         guard !destinationOverflow, destinationEnd <= data.count,
-              !sourceOverflow, sourceEnd <= data.count else {
+            !sourceOverflow, sourceEnd <= data.count
+        else {
             throw Trap.outOfBoundsMemoryAccess
         }
         data.withUnsafeMutableBufferPointer {
@@ -482,14 +482,16 @@ struct MemoryEntity /* : ~Copyable */ {
         let (sourceEnd, sourceOverflow) = source.addingReportingOverflow(count)
 
         guard !destinationOverflow, destinationEnd <= data.count,
-              !sourceOverflow, sourceEnd <= segment.data.count else {
+            !sourceOverflow, sourceEnd <= segment.data.count
+        else {
             throw Trap.outOfBoundsMemoryAccess
         }
         data.withUnsafeMutableBufferPointer { memory in
             segment.data.withUnsafeBufferPointer { segment in
                 guard
                     let memory = UnsafeMutableRawPointer(memory.baseAddress),
-                    let segment = UnsafeRawPointer(segment.baseAddress) else { return }
+                    let segment = UnsafeRawPointer(segment.baseAddress)
+                else { return }
                 let dest = memory.advanced(by: Int(destination))
                 let src = segment.advanced(by: Int(source))
                 dest.copyMemory(from: src, byteCount: Int(count))

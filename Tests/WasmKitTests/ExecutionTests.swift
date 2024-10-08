@@ -1,23 +1,24 @@
-@testable import WasmKit
-import XCTest
 import WAT
+import XCTest
+
+@testable import WasmKit
 
 final class ExecutionTests: XCTestCase {
     func testDropWithRelinkingOptimization() throws {
         let module = try parseWasm(
             bytes: wat2wasm(
-            """
-            (module
-                (func (export "_start") (result i32) (local $x i32)
-                    (i32.const 42)
-                    (i32.const 0)
-                    (i32.eqz)
-                    (drop)
-                    (local.set $x)
-                    (local.get $x)
+                """
+                (module
+                    (func (export "_start") (result i32) (local $x i32)
+                        (i32.const 42)
+                        (i32.const 0)
+                        (i32.eqz)
+                        (drop)
+                        (local.set $x)
+                        (local.get $x)
+                    )
                 )
-            )
-            """
+                """
             )
         )
         let engine = Engine()
@@ -31,16 +32,16 @@ final class ExecutionTests: XCTestCase {
     func testUpdateCurrentMemoryCacheOnGrow() throws {
         let module = try parseWasm(
             bytes: wat2wasm(
-            """
-            (module
-                (memory 0)
-                (func (export "_start") (result i32)
-                    (drop (memory.grow (i32.const 1)))
-                    (i32.store (i32.const 1) (i32.const 42))
-                    (i32.load (i32.const 1))
+                """
+                (module
+                    (memory 0)
+                    (func (export "_start") (result i32)
+                        (drop (memory.grow (i32.const 1)))
+                        (i32.store (i32.const 1) (i32.const 42))
+                        (i32.load (i32.const 1))
+                    )
                 )
-            )
-            """
+                """
             )
         )
         let engine = Engine()

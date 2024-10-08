@@ -63,9 +63,8 @@ protocol ValidatableEntity {
     static func createOutOfBoundsError(index: Int, count: Int) -> any Error
 }
 
-
 /// A simple bump allocator for immutable arrays with various element types.
-fileprivate class ImmutableArrayAllocator {
+private class ImmutableArrayAllocator {
     private var arrayBuffers: [UnsafeMutableRawPointer] = []
 
     /// Allocates a buffer for an immutable array of `T` with the given `count`.
@@ -153,7 +152,6 @@ extension ImmutableArray: Sequence {
         buffer.makeIterator()
     }
 }
-
 
 /// A type that can be interned into a unique identifier.
 /// Used for efficient equality comparison.
@@ -245,7 +243,6 @@ extension StoreAllocator: Equatable {
         return lhs === rhs
     }
 }
-
 
 extension StoreAllocator {
     /// > Note:
@@ -413,7 +410,6 @@ extension StoreAllocator {
                 buffer.initializeElement(at: index, to: segment)
             }
         }
-
 
         func createExportValue(_ export: WasmParser.Export) throws -> InternalExternalValue {
             func createErrorFactory(_ kind: String) -> (_ index: Int, _ count: Int) -> any Error {

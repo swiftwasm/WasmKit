@@ -2,6 +2,7 @@
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#table-instructions>
 
 import WasmParser
+
 extension Execution {
     mutating func tableGet(sp: Sp, immediate: Instruction.TableGetOperand) throws {
         let table = getTable(immediate.tableIndex, sp: sp, store: store.value)

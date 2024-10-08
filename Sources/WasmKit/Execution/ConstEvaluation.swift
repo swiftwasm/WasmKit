@@ -105,8 +105,8 @@ extension WasmParser.ElementSegment {
     }
 }
 
-fileprivate extension WasmTypes.Reference {
-    func checkType(_ type: WasmTypes.ReferenceType) throws {
+extension WasmTypes.Reference {
+    fileprivate func checkType(_ type: WasmTypes.ReferenceType) throws {
         switch (self, type) {
         case (.function, .funcRef): return
         case (.extern, .externRef): return
@@ -116,8 +116,8 @@ fileprivate extension WasmTypes.Reference {
     }
 }
 
-fileprivate extension Value {
-    func checkType(_ type: WasmTypes.ValueType) throws {
+extension Value {
+    fileprivate func checkType(_ type: WasmTypes.ValueType) throws {
         switch (self, type) {
         case (.i32, .i32): return
         case (.i64, .i64): return

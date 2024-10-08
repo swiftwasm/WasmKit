@@ -125,7 +125,7 @@ extension InternalInstance: TranslatorContext {
     }
 }
 
-fileprivate struct MetaProgramCounter {
+private struct MetaProgramCounter {
     let offsetFromHead: Int
 }
 
@@ -194,7 +194,7 @@ fileprivate struct MetaProgramCounter {
 struct FrameHeaderLayout {
     let type: FunctionType
     let size: VReg
-    
+
     init(type: FunctionType) {
         self.type = type
         self.size = Self.size(of: type)
@@ -271,7 +271,7 @@ struct StackLayout {
         }
 
         let savedItems: [String] = ["Instance", "Pc", "Sp"]
-        for i in 0..<frameHeaderSize-VReg(savedItems.count) {
+        for i in 0..<frameHeaderSize - VReg(savedItems.count) {
             var descriptions: [String] = []
             if i < frameHeader.type.parameters.count {
                 descriptions.append("Param \(i)")
@@ -589,14 +589,14 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
                 case .unpinned(let users):
                     guard !users.isEmpty else { continue }
                     throw TranslationError("Internal consistency error: Label (#\(ref)) is used but not pinned at finalization-time: \(users)")
-                case .pinned: break // unreachable in theory
+                case .pinned: break  // unreachable in theory
                 }
             }
         }
 
         func trace(_ message: @autoclosure () -> String) {
             #if WASMKIT_TRANSLATOR_TRACE
-            print(message())
+                print(message())
             #endif
         }
 
@@ -622,7 +622,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
         mutating func relinkLastInstructionResult(_ newResult: VReg) -> Bool {
             guard let lastEmission = self.lastEmission,
-                  let resultRelink = lastEmission.resultRelink else { return false }
+                let resultRelink = lastEmission.resultRelink
+            else { return false }
             let newInstruction = resultRelink(newResult)
             assign(at: lastEmission.position.offsetFromHead, newInstruction)
             resetLastEmission()
@@ -723,9 +724,11 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             for _ in 0..<immediateSlots { emitSlot(0) }
 
             // Schedule actual emission
-            emitWithLabel(ref, insertAt: insertAt, line: line, make: {
-                makeInstruction(make($0, $1, $2))
-            })
+            emitWithLabel(
+                ref, insertAt: insertAt, line: line,
+                make: {
+                    makeInstruction(make($0, $1, $2))
+                })
         }
 
         /// Emit an instruction at the specified position with resolved label position
@@ -1470,10 +1473,11 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
     private mutating func visitCallLike(calleeType: FunctionType) throws -> VReg? {
         for parameter in calleeType.parameters.reversed() {
-            guard let _ = try popOnStackOperand(parameter) else { return nil }
+            guard (try popOnStackOperand(parameter)) != nil else { return nil }
         }
 
-        let spAddend = valueStack.stackRegBase + VReg(valueStack.height)
+        let spAddend =
+            valueStack.stackRegBase + VReg(valueStack.height)
             + FrameHeaderLayout.size(of: calleeType)
 
         for result in calleeType.results {
@@ -1627,9 +1631,11 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         _ instruction: @escaping (VReg) -> Instruction
     ) {
         let register = valueStack.push(type)
-        emit(instruction(register), resultRelink: { newResult in
-            instruction(newResult)
-        })
+        emit(
+            instruction(register),
+            resultRelink: { newResult in
+                instruction(newResult)
+            })
     }
     private mutating func popPushEmit(
         _ pop: ValueType,
@@ -1639,9 +1645,11 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         let value = try popVRegOperand(pop)
         let result = valueStack.push(push)
         if let value = value {
-            emit(instruction(value, result, valueStack), resultRelink: { [valueStack] newResult in
-                instruction(value, newResult, valueStack)
-            })
+            emit(
+                instruction(value, result, valueStack),
+                resultRelink: { [valueStack] newResult in
+                    instruction(value, newResult, valueStack)
+                })
         }
     }
 
@@ -1653,8 +1661,9 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         ) -> Instruction
     ) throws {
         guard let pop1 = try popVRegOperand(pops.0),
-              let pop2 = try popVRegOperand(pops.1),
-              let pop3 = try popVRegOperand(pops.2) else { return }
+            let pop2 = try popVRegOperand(pops.1),
+            let pop3 = try popVRegOperand(pops.2)
+        else { return }
         emit(instruction((pop1, pop2, pop3), &valueStack))
     }
 
@@ -1666,7 +1675,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         ) -> Instruction
     ) throws {
         guard let pop1 = try popVRegOperand(pops.0),
-              let pop2 = try popVRegOperand(pops.1) else { return }
+            let pop2 = try popVRegOperand(pops.1)
+        else { return }
         emit(instruction((pop1, pop2), &valueStack))
     }
 
@@ -1679,11 +1689,14 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         ) -> Instruction
     ) throws {
         guard let pop1 = try popVRegOperand(pops.0),
-              let pop2 = try popVRegOperand(pops.1) else { return }
+            let pop2 = try popVRegOperand(pops.1)
+        else { return }
         let result = valueStack.push(push)
-        emit(instruction((pop1, pop2), result), resultRelink: { result in
-            instruction((pop1, pop2), result)
-        })
+        emit(
+            instruction((pop1, pop2), result),
+            resultRelink: { result in
+                instruction((pop1, pop2), result)
+            })
     }
 
     private mutating func visitLoad(
@@ -1754,9 +1767,10 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         let sizeType = ValueType.address(isMemory64: isMemory64)
         // Just pop/push the same type (i64 or i32) value
         try popPushEmit(sizeType, sizeType) { value, result, stack in
-            .memoryGrow(Instruction.MemoryGrowOperand(
-                result: result, delta: value, memory: memory
-            ))
+            .memoryGrow(
+                Instruction.MemoryGrowOperand(
+                    result: result, delta: value, memory: memory
+                ))
         }
     }
 
@@ -1769,9 +1783,11 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         let value = UntypedValue(value)
         let is32Bit = type == .i32 || type == .f32
         if is32Bit {
-            pushEmit(type, {
-                .const32(Instruction.Const32Operand(value: UInt32(value.storage), result: LVReg($0)))
-            })
+            pushEmit(
+                type,
+                {
+                    .const32(Instruction.Const32Operand(value: UInt32(value.storage), result: LVReg($0)))
+                })
         } else {
             pushEmit(type, { .const64(Instruction.Const64Operand(value: value, result: LLVReg($0))) })
         }
@@ -1824,7 +1840,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
     mutating func visitI32Eqz() throws -> Output {
         try popPushEmit(.i32, .i32) { value, result, stack in
-                .i32Eqz(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
+            .i32Eqz(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
     }
     mutating func visitI32Eq() throws -> Output { try visitCmp(.i32, Instruction.i32Eq) }
@@ -1839,7 +1855,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     mutating func visitI32GeU() throws -> Output { try visitCmp(.i32, Instruction.i32GeU) }
     mutating func visitI64Eqz() throws -> Output {
         try popPushEmit(.i64, .i32) { value, result, stack in
-                .i64Eqz(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
+            .i64Eqz(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
     }
     mutating func visitI64Eq() throws -> Output { try visitCmp(.i64, Instruction.i64Eq) }
