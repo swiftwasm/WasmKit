@@ -54,13 +54,13 @@ while let (directive, location) = try wast.nextDirective() {
 
 ### Parsing
 
-- ``parseWAT(_:)``
-- ``parseWAST(_:)``
+- ``parseWAT(_:features:)``
+- ``parseWAST(_:features:)``
 
 
 ### Encode to binary format
 
-- ``wat2wasm(_:)``
+- ``wat2wasm(_:features:)``
 
 ### WAST structures
 
