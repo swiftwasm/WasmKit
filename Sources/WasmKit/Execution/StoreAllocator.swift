@@ -374,7 +374,7 @@ extension StoreAllocator {
                 let initialValue = try global.initializer.evaluate(
                     context: constEvalContext, expectedType: global.type.valueType
                 )
-                return allocate(globalType: global.type, initialValue: initialValue)
+                return try allocate(globalType: global.type, initialValue: initialValue)
             }
         )
 
@@ -507,8 +507,8 @@ extension StoreAllocator {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-global>
-    func allocate(globalType: GlobalType, initialValue: Value) -> InternalGlobal {
-        let pointer = globals.allocate(initializing: GlobalEntity(globalType: globalType, initialValue: initialValue))
+    func allocate(globalType: GlobalType, initialValue: Value) throws -> InternalGlobal {
+        let pointer = try globals.allocate(initializing: GlobalEntity(globalType: globalType, initialValue: initialValue))
         return InternalGlobal(unsafe: pointer)
     }
 

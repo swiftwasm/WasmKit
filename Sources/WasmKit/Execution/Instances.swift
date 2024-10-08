@@ -571,7 +571,8 @@ struct GlobalEntity /* : ~Copyable */ {
     }
     let globalType: GlobalType
 
-    init(globalType: GlobalType, initialValue: Value) {
+    init(globalType: GlobalType, initialValue: Value) throws {
+        try initialValue.checkType(globalType.valueType)
         rawValue = UntypedValue(initialValue)
         self.globalType = globalType
     }
@@ -620,14 +621,14 @@ public struct Global: Equatable {
     /// WebAssembly module.
     @available(*, deprecated, renamed: "init(store:type:value:)")
     public init(globalType: GlobalType, initialValue: Value, store: Store) {
-        self.init(store: store, type: globalType, value: initialValue)
+        try! self.init(store: store, type: globalType, value: initialValue)
     }
 
     /// Initializes a new global instance with the given type and initial value.
     /// The returned global instance may be used to instantiate a new
     /// WebAssembly module.
-    public init(store: Store, type: GlobalType, value: Value) {
-        let handle = store.allocator.allocate(globalType: type, initialValue: value)
+    public init(store: Store, type: GlobalType, value: Value) throws {
+        let handle = try store.allocator.allocate(globalType: type, initialValue: value)
         self.init(handle: handle, allocator: store.allocator)
     }
 }
