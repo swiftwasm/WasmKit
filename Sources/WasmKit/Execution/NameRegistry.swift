@@ -48,7 +48,7 @@ struct NameRegistry {
         }
         // Fallback
         if function.isWasm {
-            return "unknown function[\(function.wasm.index)]"
+            return "function[\(function.wasm.index)]"
         } else {
             return "unknown host function"
         }
