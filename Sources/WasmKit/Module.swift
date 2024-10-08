@@ -281,8 +281,6 @@ typealias LabelIndex = UInt32
 
 // MARK: - Module Entities
 
-/// TODO: Rename to `GuestFunctionEntity`
-///
 /// An executable function representation in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#functions>
