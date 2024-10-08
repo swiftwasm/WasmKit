@@ -1578,7 +1578,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         let type = try locals.type(of: localIndex)
         let result = localReg(localIndex)
 
-        guard let op = try popOperand(type) else { return }
+        guard try checkBeforePop(typeHint: type) else { return }
+        let op = try valueStack.pop(type)
 
         if case .const(let slotIndex, _) = op {
             // Optimize (local.set $x (i32.const $c)) to reg:$x = 42 rather than through const slot
