@@ -49,3 +49,21 @@
 )
 
 (assert_return (invoke "invalidate-relink" (i32.const 1) (i32.const 2)) (i32.const 2))
+
+(module
+  (global (mut i32) (i32.const 4))
+  (func (export "check") (result i32)
+    (local i32)
+    global.get 0
+    drop
+    local.get 0
+    block
+      i32.const 1
+      br_if 0
+      i32.const 0
+      local.set 0
+    end
+  )
+)
+
+(assert_return (invoke "check") (i32.const 0))

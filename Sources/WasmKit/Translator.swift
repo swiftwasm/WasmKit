@@ -1127,6 +1127,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     mutating func visitBlock(blockType: WasmParser.BlockType) throws -> Output {
         let blockType = try module.resolveBlockType(blockType)
         let endLabel = iseqBuilder.allocLabel()
+        self.preserveLocalsOnStack(depth: self.valueStack.height)
         let stackHeight = try popPushValues(blockType.parameters)
         controlStack.pushFrame(ControlStack.ControlFrame(blockType: blockType, stackHeight: stackHeight, continuation: endLabel, kind: .block))
     }
