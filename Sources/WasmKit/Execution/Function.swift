@@ -6,6 +6,33 @@ import struct WasmTypes.FunctionType
 ///
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#function-instances>
+///
+/// ## Examples
+///
+/// This example section shows how to interact with WebAssembly process with ``Function``.
+///
+/// ### Print Int32 given by WebAssembly process
+///
+/// ```swift
+/// Function(store: store, parameters: [.i32]) { _, args in
+///     print(args[0])
+///     return []
+/// }
+/// ```
+///
+/// ### Print a UTF-8 string passed by a WebAssembly module instance
+///
+/// ```swift
+/// Function(store: store, parameters: [.i32, .i32]) { caller, args in
+///     let (stringPtr, stringLength) = (Int(args[0].i32), Int(args[1].i32))
+///     guard let memory = caller.instance?.exports[memory: "memory"] else {
+///         fatalError("Missing \"memory\" export")
+///     }
+///     let bytesRange = stringPtr..<(stringPtr + stringLength)
+///     print(String(decoding: memory.data[bytesRange], as: UTF8.self))
+///     return []
+/// }
+/// ```
 public struct Function: Equatable {
     internal let handle: InternalFunction
     let store: Store
