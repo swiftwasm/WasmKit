@@ -12,5 +12,6 @@
 Tests/WITExtractorPluginTests/Fixtures/*/Package.resolved
 
 !**/.gitkeep
+FuzzTesting/FailCases/FuzzExecute/timeout-*
 
 Package.resolved
