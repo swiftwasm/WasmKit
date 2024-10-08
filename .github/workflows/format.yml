@@ -1,0 +1,18 @@
+name: Format
+on:
+  pull_request:
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    container:
+      image: swift:6.0.1-jammy
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for formatting changes
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git diff --exit-code || {
+            echo "::error::The formatting changed some files. Please run \`./Utilities/format.sh\` and commit the changes."
+            exit 1
+          }
