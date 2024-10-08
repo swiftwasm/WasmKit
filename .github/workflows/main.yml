@@ -120,6 +120,30 @@ jobs:
       - run: ./Vendor/checkout-dependency
       - run: ./build-exec swift test
 
+  build-musl:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        include:
+          - swift: 6.0.1-jammy
+            musl-swift-sdk-download: "https://download.swift.org/swift-6.0.1-release/static-sdk/swift-6.0.1-RELEASE/swift-6.0.1-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz"
+            musl-swift-sdk-checksum: "d4f46ba40e11e697387468e18987ee622908bc350310d8af54eb5e17c2ff5481"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure container
+        run: |
+          docker run -dit --name build-container -v $PWD:/workspace -w /workspace swift:${{ matrix.swift }}
+          echo 'docker exec -i build-container "$@"' > ./build-exec
+          chmod +x ./build-exec
+
+      - name: Install Static Linux SDK
+        run: ./build-exec swift sdk install "${{ matrix.musl-swift-sdk-download }}" --checksum "${{ matrix.musl-swift-sdk-checksum }}"
+
+      - name: Build (x86_64-swift-linux-musl)
+        run: ./build-exec swift build --swift-sdk x86_64-swift-linux-musl
+      - name: Build (aarch64-swift-linux-musl)
+        run: ./build-exec swift build --swift-sdk aarch64-swift-linux-musl
+
   build-windows:
     runs-on: windows-latest
     steps:
