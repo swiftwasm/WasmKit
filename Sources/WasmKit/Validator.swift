@@ -140,3 +140,29 @@ struct ModuleValidator {
         }
     }
 }
+
+extension WasmTypes.Reference {
+    func checkType(_ type: WasmTypes.ReferenceType) throws {
+        switch (self, type) {
+        case (.function, .funcRef): return
+        case (.extern, .externRef): return
+        default:
+            throw ValidationError("Expect \(type) but got \(self)")
+        }
+    }
+}
+
+extension Value {
+    func checkType(_ type: WasmTypes.ValueType) throws {
+        switch (self, type) {
+        case (.i32, .i32): return
+        case (.i64, .i64): return
+        case (.f32, .f32): return
+        case (.f64, .f64): return
+        case (.ref(let ref), .ref(let refType)):
+            try ref.checkType(refType)
+        default:
+            throw ValidationError("Expect \(type) but got \(self)")
+        }
+    }
+}
