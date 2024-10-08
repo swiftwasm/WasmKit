@@ -13,11 +13,11 @@ $ swift run WasmKitDevUtils
 Re-generates only the internal VM instruction related files
 
 ```console
-$ swift run WasmKitDevUtils generate-internal-instruction
+$ swift run WasmKitDevUtils vmgen
 ```
 
 Re-generates only the Core Wasm instruction related files based on `Instructions.json`.
 
 ```console
-$ swift run WasmKitDevUtils generate-wasm-instruction
+$ swift run WasmKitDevUtils wasmgen
 ```
