@@ -35,6 +35,7 @@ You can find API documentation on the [Swift Package Index](https://swiftpackage
 
 ## Features
 
+- [Reasonably fast](./Documentation/RegisterMachine.md#performance-evaluation)
 - Minimal dependencies
     - The core runtime engine depends only on [swift-system](https://github.com/apple/swift-system).
     - No Foundation dependency
@@ -89,6 +90,5 @@ $ swift test
 ## Acknowledgement
 
 This project was originally developed by [@akkyie](https://github.com/akkyie), and is now maintained by the community.
-
 
 [^1]: On a 2020 Mac mini (M1, 16GB RAM) with Swift 5.10. Measured by `swift package resolve && swift package clean && time swift build --product PrintAdd`.
