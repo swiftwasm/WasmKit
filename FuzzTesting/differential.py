@@ -77,6 +77,14 @@ async def run_single(lane, i, program):
             except subprocess.CalledProcessError:
                 # If shrinking fails, just dump the original testcase
                 crash_file = dump_crash_wasm(wasm_file, "diff")
+    except OSError as e:
+        import errno
+        if e.errno == errno.ETXTBSY:
+            # Skip this iteration if the target program is busy
+            # (e.g., being rebuilt by another process)
+            pass
+        else:
+            raise e
 
     except TimeoutError:
         timeout_file = os.path.join(fail_dir, f"timeout-{i}.wasm")
