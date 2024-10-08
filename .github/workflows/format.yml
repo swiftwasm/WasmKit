@@ -9,6 +9,7 @@ jobs:
       image: swift:6.0.1-jammy
     steps:
       - uses: actions/checkout@v4
+      - run: ./Utilities/format.py
       - name: Check for formatting changes
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
