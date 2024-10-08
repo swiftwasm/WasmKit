@@ -1,8 +1,9 @@
 import WasmParser
+
 @_exported import struct WasmParser.GlobalType
+@_exported import struct WasmParser.Limits
 @_exported import struct WasmParser.MemoryType
 @_exported import struct WasmParser.TableType
-@_exported import struct WasmParser.Limits
 
 // This file defines the internal representation of WebAssembly entities and
 // their public API.
