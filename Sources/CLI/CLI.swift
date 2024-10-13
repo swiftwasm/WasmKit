@@ -5,7 +5,7 @@ struct CLI: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "wasmkit",
         abstract: "WasmKit WebAssembly Runtime",
-        version: "0.1.0",
+        version: "0.1.1",
         subcommands: [Run.self, Explore.self]
     )
 }
