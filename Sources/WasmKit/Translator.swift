@@ -2213,7 +2213,7 @@ extension FunctionType {
         case let .funcType(typeIndex):
             let typeIndex = Int(typeIndex)
             guard typeIndex < typeSection.count else {
-                throw WasmParserError.invalidTypeSectionReference
+                throw ValidationError("type index out of bounds: accessed \(typeIndex), but only \(typeSection.count) types are defined")
             }
             let funcType = typeSection[typeIndex]
             self.init(
