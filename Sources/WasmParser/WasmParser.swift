@@ -33,6 +33,11 @@ public struct Parser<Stream: ByteStream> {
         self.nextParseTarget = .header
         self.limits = .default
     }
+
+    @usableFromInline
+    internal func makeError(_ message: WasmParserError.Message) -> WasmParserError {
+        return WasmParserError(message, offset: currentIndex)
+    }
 }
 
 extension Parser where Stream == StaticByteStream {
@@ -121,7 +126,7 @@ extension Code {
             lastCode = try parser.parseInstruction(visitor: &visitor)
         }
         guard lastCode == .end else {
-            throw WasmParserError.endOpcodeExpected
+            throw parser.makeError(.endOpcodeExpected)
         }
     }
 }
@@ -160,12 +165,14 @@ public struct ExpressionParser {
         let shouldContinue = try !parser.stream.hasReachedEnd()
         if !shouldContinue {
             guard lastCode == .end else {
-                throw WasmParserError.endOpcodeExpected
+                throw parser.makeError(.endOpcodeExpected)
             }
         }
         return shouldContinue
     }
 }
+
+let WASM_MAGIC: [UInt8] = [0x00, 0x61, 0x73, 0x6D]
 
 /// Flags for enabling/disabling WebAssembly features
 public struct WasmFeatureSet: OptionSet {
@@ -190,62 +197,144 @@ public struct WasmFeatureSet: OptionSet {
     public static let all: WasmFeatureSet = [.memory64, .referenceTypes, .threads]
 }
 
-public enum WasmParserError: Swift.Error {
-    /// The magic number is not found or invalid
-    case invalidMagicNumber([UInt8])
-    /// The version is not recognized
-    case unknownVersion([UInt8])
-    /// The bytes are not valid UTF-8
-    case invalidUTF8([UInt8])
-    /// The section has an invalid size
-    case invalidSectionSize(UInt32)
-    /// The section ID is malformed
-    case malformedSectionID(UInt8)
-    /// The byte is expected to be zero, but it's not
-    case zeroExpected(actual: UInt8, index: Int)
-    /// The function and code length are inconsistent
-    case inconsistentFunctionAndCodeLength(functionCount: Int, codeCount: Int)
-    /// The data count and data section length are inconsistent
-    case inconsistentDataCountAndDataSectionLength(dataCount: UInt32, dataSection: Int)
-    /// The local count is too large
-    case tooManyLocals(UInt64, limit: UInt64)
-    /// The type is expected to be a reference type, but it's not
-    case expectedRefType(actual: ValueType)
-    /// The instruction is not implemented
-    case unimplementedInstruction(UInt8, suffix: UInt32? = nil)
-    /// The element kind is unexpected
-    case unexpectedElementKind(expected: UInt32, actual: UInt32)
-    /// The element kind is not recognized
-    case integerRepresentationTooLong
-    /// `end` opcode is expected but not found
-    case endOpcodeExpected
-    /// Unexpected end of the stream
-    case unexpectedEnd
-    /// The byte is not expected
-    case sectionSizeMismatch(expected: Int, actual: Int)
-    /// Illegal opcode is found
-    case illegalOpcode(UInt8)
-    /// Malformed mutability byte
-    case malformedMutability(UInt8)
-    /// Malformed function type byte
-    case malformedFunctionType(UInt8)
-    /// Sections in the module are out of order
-    case sectionOutOfOrder
-    /// The data count section is required but not found
-    case dataCountSectionRequired
-    /// Malformed limit byte
-    case malformedLimit(UInt8)
-    /// Malformed indirect call
-    case malformedIndirectCall
-    /// Invalid reference to a type section entry
-    case invalidTypeSectionReference
-    /// The data segment kind is malformed
-    case malformedDataSegmentKind(UInt32)
-    case raw(String)
+/// An error that occurs during parsing of a WebAssembly binary
+public struct WasmParserError: Swift.Error {
+    @usableFromInline
+    struct Message {
+        let text: String
+
+        init(_ text: String) {
+            self.text = text
+        }
+    }
+
+    let message: Message
+    let offset: Int
+
+    init(_ message: Message, offset: Int) {
+        self.message = message
+        self.offset = offset
+    }
+}
+
+extension WasmParserError: CustomStringConvertible {
+    public var description: String {
+        return "\"\(message)\" at offset 0x\(String(offset, radix: 16))"
+    }
+}
+
+extension WasmParserError.Message {
+    static func invalidMagicNumber(_ bytes: [UInt8]) -> Self {
+        Self("magic header not detected: expected \(WASM_MAGIC) but got \(bytes)")
+    }
+
+    static func unknownVersion(_ bytes: [UInt8]) -> Self {
+        Self("unknown binary version: \(bytes)")
+    }
+
+    static func invalidUTF8(_ bytes: [UInt8]) -> Self {
+        Self("malformed UTF-8 encoding: \(bytes)")
+    }
+
+    static func invalidSectionSize(_ size: UInt32) -> Self {
+        // TODO: Remove size parameter
+        Self("unexpected end-of-file")
+    }
+
+    static func malformedSectionID(_ id: UInt8) -> Self {
+        Self("malformed section id: \(id)")
+    }
+
+    @usableFromInline static func zeroExpected(actual: UInt8) -> Self {
+        Self("Zero expected but got \(actual)")
+    }
+
+    static func inconsistentFunctionAndCodeLength(functionCount: Int, codeCount: Int) -> Self {
+        Self("Inconsistent function and code length: \(functionCount) vs \(codeCount)")
+    }
+
+    static func inconsistentDataCountAndDataSectionLength(dataCount: UInt32, dataSection: Int) -> Self {
+        Self("Inconsistent data count and data section length: \(dataCount) vs \(dataSection)")
+    }
+
+    static func tooManyLocals(_ count: UInt64, limit: UInt64) -> Self {
+        Self("Too many locals: \(count) vs \(limit)")
+    }
+
+    @usableFromInline static func expectedRefType(actual: ValueType) -> Self {
+        Self("Expected reference type but got \(actual)")
+    }
+
+    @usableFromInline static func unimplementedInstruction(_ opcode: UInt8, suffix: UInt32? = nil) -> Self {
+        let suffixText = suffix.map { " with suffix \($0)" } ?? ""
+        return Self("Unimplemented instruction: \(opcode)\(suffixText)")
+    }
+
+    static func unexpectedElementKind(expected: UInt32, actual: UInt32) -> Self {
+        Self("Unexpected element kind: expected \(expected) but got \(actual)")
+    }
+
+    static let integerRepresentationTooLong = Self("Integer representation is too long")
 
     @usableFromInline
-    init(_ message: String) {
-        self = .raw(message)
+    static let endOpcodeExpected = Self("`end` opcode expected but not found")
+
+    static let unexpectedEnd = Self("Unexpected end of the stream")
+
+    static func sectionSizeMismatch(expected: Int, actual: Int) -> Self {
+        Self("Section size mismatch: expected \(expected) but got \(actual)")
+    }
+
+    @usableFromInline static func illegalOpcode(_ opcode: UInt8) -> Self {
+        Self("Illegal opcode: \(opcode)")
+    }
+
+    static func malformedMutability(_ byte: UInt8) -> Self {
+        Self("Malformed mutability: \(byte)")
+    }
+
+    static func malformedFunctionType(_ byte: UInt8) -> Self {
+        Self("Malformed function type: \(byte)")
+    }
+
+    static let sectionOutOfOrder = Self("Sections in the module are out of order")
+
+    @usableFromInline static let dataCountSectionRequired = Self("Data count section is required but not found")
+
+    static func malformedLimit(_ byte: UInt8) -> Self {
+        Self("Malformed limit: \(byte)")
+    }
+
+    @usableFromInline static let malformedIndirectCall = Self("Malformed indirect call")
+
+    static let invalidTypeSectionReference = Self("Invalid reference to a type section entry")
+
+    static func malformedDataSegmentKind(_ kind: UInt32) -> Self {
+        Self("Malformed data segment kind: \(kind)")
+    }
+
+    @usableFromInline static func invalidResultArity(expected: Int, actual: Int) -> Self {
+        Self("invalid result arity: expected \(expected) but got \(actual)")
+    }
+
+    static func raw(_ message: String) -> Self {
+        Self(message)
+    }
+}
+
+extension WasmParserError {
+    // TODO: Remove
+    public static var sectionOutOfOrder: Self {
+        Self(.sectionOutOfOrder, offset: 0)
+    }
+    public static var invalidTypeSectionReference: Self {
+        Self(.invalidTypeSectionReference, offset: 0)
+    }
+    public static func inconsistentFunctionAndCodeLength(functionCount: Int, codeCount: Int) -> Self {
+        Self(.inconsistentFunctionAndCodeLength(functionCount: functionCount, codeCount: codeCount), offset: 0)
+    }
+    public static func inconsistentDataCountAndDataSectionLength(dataCount: UInt32, dataSection: Int) -> Self {
+        Self(.inconsistentDataCountAndDataSectionLength(dataCount: dataCount, dataSection: dataSection), offset: 0)
     }
 }
 
@@ -293,6 +382,7 @@ extension ByteStream {
             try consumeAny()
         }
 
+        // TODO(optimize): Utilize ASCII fast path in UTF8 decoder
         var name = ""
 
         var iterator = bytes.makeIterator()
@@ -301,7 +391,7 @@ extension ByteStream {
             switch decoder.decode(&iterator) {
             case let .scalarValue(scalar): name.append(Character(scalar))
             case .emptyInput: break Decode
-            case .error: throw WasmParserError.invalidUTF8(bytes)
+            case .error: throw WasmParserError(.invalidUTF8(bytes), offset: currentIndex)
             }
         }
 
@@ -386,7 +476,7 @@ extension Parser {
     @usableFromInline
     func parseResultType() throws -> BlockType {
         guard let nextByte = try stream.peek() else {
-            throw WasmParserError.unexpectedEnd
+            throw makeError(.unexpectedEnd)
         }
         switch nextByte {
         case 0x40:
@@ -407,10 +497,10 @@ extension Parser {
         // XXX: spectest expects the first byte should be parsed as a LEB128 with 1 byte limit
         // but the spec itself doesn't require it, so just check the continue bit of LEB128 here.
         guard opcode & 0b10000000 == 0 else {
-            throw WasmParserError.integerRepresentationTooLong
+            throw makeError(.integerRepresentationTooLong)
         }
         guard opcode == 0x60 else {
-            throw WasmParserError.malformedFunctionType(opcode)
+            throw makeError(.malformedFunctionType(opcode))
         }
 
         let parameters = try parseVector { try parseValueType() }
@@ -437,7 +527,7 @@ extension Parser {
             flagMask |= isMemory64Mask
         }
         guard (b & ~flagMask) == 0 else {
-            throw WasmParserError.malformedLimit(b)
+            throw makeError(.malformedLimit(b))
         }
 
         let min: UInt64
@@ -498,7 +588,7 @@ extension Parser {
         case 0x01:
             return .variable
         default:
-            throw WasmParserError.malformedMutability(b)
+            throw makeError(.malformedMutability(b))
         }
     }
 
@@ -524,7 +614,7 @@ extension Parser {
     func parseInstruction<V: InstructionVisitor>(visitor v: inout V) throws -> InstructionCode {
         let rawCode = try stream.consumeAny()
         guard let code = InstructionCode(rawValue: rawCode) else {
-            throw WasmParserError.illegalOpcode(rawCode)
+            throw makeError(.illegalOpcode(rawCode))
         }
         try doParseInstruction(code: code, visitor: &v)
         return code
@@ -559,7 +649,7 @@ extension Parser {
             let typeIndex: TypeIndex = try parseUnsigned()
             if try !features.contains(.referenceTypes) && stream.peek() != 0 {
                 // Check that reserved byte is zero when reference-types is disabled
-                throw WasmParserError.malformedIndirectCall
+                throw makeError(.malformedIndirectCall)
             }
             let tableIndex: TableIndex = try parseUnsigned()
             return try v.visitCallIndirect(typeIndex: typeIndex, tableIndex: tableIndex)
@@ -568,7 +658,7 @@ extension Parser {
         case .typed_select:
             let results = try parseVector { try parseValueType() }
             guard results.count == 1 else {
-                throw WasmParserError("Only single result type is allowed but got \(results)")
+                throw makeError(.invalidResultArity(expected: 1, actual: results.count))
             }
             return try v.visitTypedSelect(type: results[0])
 
@@ -614,13 +704,13 @@ extension Parser {
         case .memory_size:
             let zero = try stream.consumeAny()
             guard zero == 0x00 else {
-                throw WasmParserError.zeroExpected(actual: zero, index: currentIndex)
+                throw makeError(.zeroExpected(actual: zero))
             }
             return try v.visitMemorySize(memory: UInt32(zero))
         case .memory_grow:
             let zero = try stream.consumeAny()
             guard zero == 0x00 else {
-                throw WasmParserError.zeroExpected(actual: zero, index: currentIndex)
+                throw makeError(.zeroExpected(actual: zero))
             }
             return try v.visitMemoryGrow(memory: UInt32(zero))
 
@@ -780,7 +870,7 @@ extension Parser {
             let type = try parseValueType()
 
             guard case let .ref(refType) = type else {
-                throw WasmParserError.expectedRefType(actual: type)
+                throw makeError(.expectedRefType(actual: type))
             }
 
             return try v.visitRefNull(type: refType)
@@ -809,12 +899,12 @@ extension Parser {
                 // memory.init requires data count section
                 // https://webassembly.github.io/spec/core/binary/modules.html#data-count-section
                 guard hasDataCount else {
-                    throw WasmParserError.dataCountSectionRequired
+                    throw makeError(.dataCountSectionRequired)
                 }
 
                 let zero = try stream.consumeAny()
                 guard zero == 0x00 else {
-                    throw WasmParserError.zeroExpected(actual: zero, index: currentIndex)
+                    throw makeError(.zeroExpected(actual: zero))
                 }
 
                 return try v.visitMemoryInit(dataIndex: dataIndex)
@@ -822,19 +912,22 @@ extension Parser {
                 // memory.drop requires data count section
                 // https://webassembly.github.io/spec/core/binary/modules.html#data-count-section
                 guard hasDataCount else {
-                    throw WasmParserError.dataCountSectionRequired
+                    throw makeError(.dataCountSectionRequired)
                 }
                 return try v.visitDataDrop(dataIndex: try parseUnsigned())
             case 10:
                 let (zero1, zero2) = try (stream.consumeAny(), stream.consumeAny())
-                guard zero1 == 0x00 && zero2 == 0x00 else {
-                    throw WasmParserError.zeroExpected(actual: zero2, index: currentIndex)
+                guard zero1 == 0x00 else {
+                    throw makeError(.zeroExpected(actual: zero1))
+                }
+                guard zero2 == 0x00 else {
+                    throw makeError(.zeroExpected(actual: zero2))
                 }
                 return try v.visitMemoryCopy(dstMem: 0, srcMem: 0)
             case 11:
                 let zero = try stream.consumeAny()
                 guard zero == 0x00 else {
-                    throw WasmParserError.zeroExpected(actual: zero, index: currentIndex)
+                    throw makeError(.zeroExpected(actual: zero))
                 }
 
                 return try v.visitMemoryFill(memory: 0)
@@ -851,7 +944,7 @@ extension Parser {
             case 16: return try v.visitTableSize(table: try parseUnsigned())
             case 17: return try v.visitTableFill(table: try parseUnsigned())
             default:
-                throw WasmParserError.unimplementedInstruction(code.rawValue, suffix: codeSuffix)
+                throw makeError(.unimplementedInstruction(code.rawValue, suffix: codeSuffix))
             }
         }
     }
@@ -886,7 +979,7 @@ extension Parser {
         let contentSize = Int(size) - nameSize
 
         guard contentSize >= 0 else {
-            throw WasmParserError.invalidSectionSize(size)
+            throw makeError(.invalidSectionSize(size))
         }
 
         let bytes = try stream.consume(count: contentSize)
@@ -1016,7 +1109,7 @@ extension Parser {
                 let valueType = try parseValueType()
 
                 guard case let .ref(refType) = valueType else {
-                    throw WasmParserError.expectedRefType(actual: valueType)
+                    throw makeError(.expectedRefType(actual: valueType))
                 }
 
                 type = refType
@@ -1028,7 +1121,7 @@ extension Parser {
                 // `elemkind` parsing as defined in the spec
                 let elemKind = try parseUnsigned() as UInt32
                 guard elemKind == 0x00 else {
-                    throw WasmParserError.unexpectedElementKind(expected: 0x00, actual: elemKind)
+                    throw makeError(.unexpectedElementKind(expected: 0x00, actual: elemKind))
                 }
             }
 
@@ -1057,7 +1150,7 @@ extension Parser {
             }
             let totalLocals = localTypes.reduce(UInt64(0)) { $0 + UInt64($1.n) }
             guard totalLocals < limits.maxFunctionLocals else {
-                throw WasmParserError.tooManyLocals(totalLocals, limit: limits.maxFunctionLocals)
+                throw makeError(.tooManyLocals(totalLocals, limit: limits.maxFunctionLocals))
             }
 
             let locals = localTypes.flatMap { (n: UInt32, type: ValueType) in
@@ -1094,7 +1187,7 @@ extension Parser {
                 let initializer = try parseVectorBytes()
                 return .active(.init(index: index, offset: offset, initializer: initializer))
             default:
-                throw WasmParserError.malformedDataSegmentKind(kind)
+                throw makeError(.malformedDataSegmentKind(kind))
             }
         }
     }
@@ -1130,8 +1223,8 @@ extension Parser {
     /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-magic>
     func parseMagicNumber() throws {
         let magicNumber = try stream.consume(count: 4)
-        guard magicNumber == [0x00, 0x61, 0x73, 0x6D] else {
-            throw WasmParserError.invalidMagicNumber(.init(magicNumber))
+        guard magicNumber.elementsEqual(WASM_MAGIC) else {
+            throw makeError(.invalidMagicNumber(.init(magicNumber)))
         }
     }
 
@@ -1140,7 +1233,7 @@ extension Parser {
     func parseVersion() throws -> [UInt8] {
         let version = try Array(stream.consume(count: 4))
         guard version == [0x01, 0x00, 0x00, 0x00] else {
-            throw WasmParserError.unknownVersion(.init(version))
+            throw makeError(.unknownVersion(.init(version)))
         }
         return version
     }
@@ -1206,13 +1299,11 @@ extension Parser {
                 hasDataCount = true
                 payload = .dataCount(try parseDataCountSection())
             default:
-                throw WasmParserError.malformedSectionID(sectionID)
+                throw makeError(.malformedSectionID(sectionID))
             }
             let expectedSectionEnd = sectionStart + Int(sectionSize)
             guard expectedSectionEnd == stream.currentIndex else {
-                throw WasmParserError.sectionSizeMismatch(
-                    expected: expectedSectionEnd, actual: stream.currentIndex
-                )
+                throw makeError(.sectionSizeMismatch(expected: expectedSectionEnd, actual: currentIndex))
             }
             return payload
         }

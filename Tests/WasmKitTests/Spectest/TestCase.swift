@@ -440,48 +440,7 @@ extension Array where Element == Value {
 extension Swift.Error {
     var text: String {
         if let error = self as? WasmParserError {
-            switch error {
-            case .invalidMagicNumber:
-                return "magic header not detected"
-            case .unknownVersion:
-                return "unknown binary version"
-            case .invalidUTF8:
-                return "malformed UTF-8 encoding"
-            case .zeroExpected:
-                return "zero byte expected"
-            case .inconsistentFunctionAndCodeLength:
-                return "function and code section have inconsistent lengths"
-            case .tooManyLocals:
-                return "too many locals"
-            case .invalidSectionSize:
-                // XXX: trailing "unexpected end" is just for making spectest happy
-                // The reference interpreter raises EOF error when the custom content
-                // size is negative[^1], and custom.wast contains a test case that depends
-                // on the behavior[^2].
-                // [^1]: https://github.com/WebAssembly/spec/blob/653938a88c6f40eb886d5980ca315136eb861d03/interpreter/binary/decode.ml#L20
-                // [^2]: https://github.com/WebAssembly/spec/blob/653938a88c6f40eb886d5980ca315136eb861d03/test/core/custom.wast#L76-L82
-                return "invalid section size, unexpected end"
-            case .malformedSectionID:
-                return "malformed section id"
-            case .endOpcodeExpected:
-                return "END opcode expected"
-            case .unexpectedEnd:
-                return "unexpected end of section or function"
-            case .inconsistentDataCountAndDataSectionLength:
-                return "data count and data section have inconsistent lengths"
-            case .expectedRefType:
-                return "malformed reference type"
-            case .sectionSizeMismatch:
-                return "section size mismatch"
-            case .illegalOpcode:
-                return "illegal opcode"
-            case .malformedMutability:
-                return "malformed mutability"
-            case .integerRepresentationTooLong:
-                return "integer representation too long"
-            default:
-                return String(describing: error)
-            }
+            return error.description
         }
 
         return "unknown error: \(self)"
