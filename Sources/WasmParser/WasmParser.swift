@@ -307,8 +307,6 @@ extension WasmParserError.Message {
 
     @usableFromInline static let malformedIndirectCall = Self("Malformed indirect call")
 
-    static let invalidTypeSectionReference = Self("Invalid reference to a type section entry")
-
     static func malformedDataSegmentKind(_ kind: UInt32) -> Self {
         Self("Malformed data segment kind: \(kind)")
     }
@@ -326,9 +324,6 @@ extension WasmParserError {
     // TODO: Remove
     public static var sectionOutOfOrder: Self {
         Self(.sectionOutOfOrder, offset: 0)
-    }
-    public static var invalidTypeSectionReference: Self {
-        Self(.invalidTypeSectionReference, offset: 0)
     }
     public static func inconsistentFunctionAndCodeLength(functionCount: Int, codeCount: Int) -> Self {
         Self(.inconsistentFunctionAndCodeLength(functionCount: functionCount, codeCount: codeCount), offset: 0)
