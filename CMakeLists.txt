@@ -7,6 +7,13 @@ project(WasmKit LANGUAGES C Swift)
 set(SWIFT_VERSION 5)
 set(CMAKE_Swift_LANGUAGE_VERSION ${SWIFT_VERSION})
 
+# Enable whole module optimization for Release or RelWithDebInfo builds.
+if(POLICY CMP0157)
+  set(CMAKE_Swift_COMPILATION_MODE $<IF:$<CONFIG:Release,RelWithDebInfo>,wholemodule,incremental>)
+else()
+  add_compile_options($<$<AND:$<COMPILE_LANGUAGE:Swift>,$<CONFIG:Release,RelWithDebInfo>>:-wmo>)
+endif()
+
 if(CMAKE_VERSION VERSION_LESS 3.21)
   get_property(parent_dir DIRECTORY PROPERTY PARENT_DIRECTORY)
   if(NOT parent_dir)
