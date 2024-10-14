@@ -205,5 +205,6 @@ enum InstructionCode: UInt8 {
     case ref_is_null = 0xD1
     case ref_func = 0xD2
 
-    case wasm2InstructionPrefix = 0xFC
+    case _0xfc = 0xFC
+    case _0xfe = 0xFE
 }
