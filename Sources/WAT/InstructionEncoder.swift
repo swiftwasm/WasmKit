@@ -408,4 +408,269 @@ extension InstructionEncoder {
     mutating func visitI64TruncSatF32U() throws { try encodeInstruction(0x05, 0xFC) }
     mutating func visitI64TruncSatF64S() throws { try encodeInstruction(0x06, 0xFC) }
     mutating func visitI64TruncSatF64U() throws { try encodeInstruction(0x07, 0xFC) }
+    mutating func visitMemoryAtomicNotify(memarg: MemArg) throws {
+        try encodeInstruction(0x00, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitMemoryAtomicWait32(memarg: MemArg) throws {
+        try encodeInstruction(0x01, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitMemoryAtomicWait64(memarg: MemArg) throws {
+        try encodeInstruction(0x02, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitAtomicFence() throws { try encodeInstruction(0x03, 0xFE) }
+    mutating func visitI32AtomicLoad(memarg: MemArg) throws {
+        try encodeInstruction(0x10, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicLoad(memarg: MemArg) throws {
+        try encodeInstruction(0x11, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI32AtomicLoad8U(memarg: MemArg) throws {
+        try encodeInstruction(0x12, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI32AtomicLoad16U(memarg: MemArg) throws {
+        try encodeInstruction(0x13, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicLoad8U(memarg: MemArg) throws {
+        try encodeInstruction(0x14, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicLoad16U(memarg: MemArg) throws {
+        try encodeInstruction(0x15, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicLoad32U(memarg: MemArg) throws {
+        try encodeInstruction(0x16, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI32AtomicStore(memarg: MemArg) throws {
+        try encodeInstruction(0x17, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicStore(memarg: MemArg) throws {
+        try encodeInstruction(0x18, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI32AtomicStore8(memarg: MemArg) throws {
+        try encodeInstruction(0x19, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI32AtomicStore16(memarg: MemArg) throws {
+        try encodeInstruction(0x1A, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicStore8(memarg: MemArg) throws {
+        try encodeInstruction(0x1B, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicStore16(memarg: MemArg) throws {
+        try encodeInstruction(0x1C, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicStore32(memarg: MemArg) throws {
+        try encodeInstruction(0x1D, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI32AtomicRmwAdd(memarg: MemArg) throws {
+        try encodeInstruction(0x1E, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicRmwAdd(memarg: MemArg) throws {
+        try encodeInstruction(0x1F, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI32AtomicRmw8AddU(memarg: MemArg) throws {
+        try encodeInstruction(0x20, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI32AtomicRmw16AddU(memarg: MemArg) throws {
+        try encodeInstruction(0x21, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicRmw8AddU(memarg: MemArg) throws {
+        try encodeInstruction(0x22, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicRmw16AddU(memarg: MemArg) throws {
+        try encodeInstruction(0x23, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicRmw32AddU(memarg: MemArg) throws {
+        try encodeInstruction(0x24, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI32AtomicRmwSub(memarg: MemArg) throws {
+        try encodeInstruction(0x25, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicRmwSub(memarg: MemArg) throws {
+        try encodeInstruction(0x26, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI32AtomicRmw8SubU(memarg: MemArg) throws {
+        try encodeInstruction(0x27, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI32AtomicRmw16SubU(memarg: MemArg) throws {
+        try encodeInstruction(0x28, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicRmw8SubU(memarg: MemArg) throws {
+        try encodeInstruction(0x29, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicRmw16SubU(memarg: MemArg) throws {
+        try encodeInstruction(0x2A, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicRmw32SubU(memarg: MemArg) throws {
+        try encodeInstruction(0x2B, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI32AtomicRmwAnd(memarg: MemArg) throws {
+        try encodeInstruction(0x2C, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicRmwAnd(memarg: MemArg) throws {
+        try encodeInstruction(0x2D, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI32AtomicRmw8AndU(memarg: MemArg) throws {
+        try encodeInstruction(0x2E, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI32AtomicRmw16AndU(memarg: MemArg) throws {
+        try encodeInstruction(0x2F, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicRmw8AndU(memarg: MemArg) throws {
+        try encodeInstruction(0x30, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicRmw16AndU(memarg: MemArg) throws {
+        try encodeInstruction(0x31, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicRmw32AndU(memarg: MemArg) throws {
+        try encodeInstruction(0x32, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI32AtomicRmwOr(memarg: MemArg) throws {
+        try encodeInstruction(0x33, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicRmwOr(memarg: MemArg) throws {
+        try encodeInstruction(0x34, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI32AtomicRmw8OrU(memarg: MemArg) throws {
+        try encodeInstruction(0x35, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI32AtomicRmw16OrU(memarg: MemArg) throws {
+        try encodeInstruction(0x36, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicRmw8OrU(memarg: MemArg) throws {
+        try encodeInstruction(0x37, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicRmw16OrU(memarg: MemArg) throws {
+        try encodeInstruction(0x38, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicRmw32OrU(memarg: MemArg) throws {
+        try encodeInstruction(0x39, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI32AtomicRmwXor(memarg: MemArg) throws {
+        try encodeInstruction(0x3A, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicRmwXor(memarg: MemArg) throws {
+        try encodeInstruction(0x3B, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI32AtomicRmw8XorU(memarg: MemArg) throws {
+        try encodeInstruction(0x3C, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI32AtomicRmw16XorU(memarg: MemArg) throws {
+        try encodeInstruction(0x3D, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicRmw8XorU(memarg: MemArg) throws {
+        try encodeInstruction(0x3E, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicRmw16XorU(memarg: MemArg) throws {
+        try encodeInstruction(0x3F, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicRmw32XorU(memarg: MemArg) throws {
+        try encodeInstruction(0x40, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI32AtomicRmwXchg(memarg: MemArg) throws {
+        try encodeInstruction(0x41, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicRmwXchg(memarg: MemArg) throws {
+        try encodeInstruction(0x42, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI32AtomicRmw8XchgU(memarg: MemArg) throws {
+        try encodeInstruction(0x43, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI32AtomicRmw16XchgU(memarg: MemArg) throws {
+        try encodeInstruction(0x44, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicRmw8XchgU(memarg: MemArg) throws {
+        try encodeInstruction(0x45, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicRmw16XchgU(memarg: MemArg) throws {
+        try encodeInstruction(0x46, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicRmw32XchgU(memarg: MemArg) throws {
+        try encodeInstruction(0x47, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI32AtomicRmwCmpxchg(memarg: MemArg) throws {
+        try encodeInstruction(0x48, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicRmwCmpxchg(memarg: MemArg) throws {
+        try encodeInstruction(0x49, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI32AtomicRmw8CmpxchgU(memarg: MemArg) throws {
+        try encodeInstruction(0x4A, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI32AtomicRmw16CmpxchgU(memarg: MemArg) throws {
+        try encodeInstruction(0x4B, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicRmw8CmpxchgU(memarg: MemArg) throws {
+        try encodeInstruction(0x4C, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicRmw16CmpxchgU(memarg: MemArg) throws {
+        try encodeInstruction(0x4D, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitI64AtomicRmw32CmpxchgU(memarg: MemArg) throws {
+        try encodeInstruction(0x4E, 0xFE)
+        try encodeImmediates(memarg: memarg)
+    }
 }
