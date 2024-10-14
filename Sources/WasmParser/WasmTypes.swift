@@ -324,12 +324,6 @@ extension RawUnsignedInteger {
     }
 }
 
-extension RawSignedInteger {
-    var unsigned: Unsigned {
-        .init(bitPattern: self)
-    }
-}
-
 extension Instruction.Load {
     /// The alignment to the storage size of the memory access
     /// in log2 form.

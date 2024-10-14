@@ -1,4 +1,5 @@
-import SystemPackage
+import struct SystemPackage.FilePath
+import struct SystemPackage.FileDescriptor
 import WasmTypes
 
 #if os(Windows)
@@ -352,20 +353,12 @@ extension ByteStream {
     @inline(__always)
     @usableFromInline
     func parseUnsigned<T: RawUnsignedInteger>(_: T.Type = T.self) throws -> T {
-        return try T(LEB: self)
+        try decodeLEB128(stream: self)
     }
 
-    @inline(__always)
     @usableFromInline
-    func parseSigned<T: FixedWidthInteger & SignedInteger>() throws -> T {
-        return try T(LEB: self)
-    }
-
-    @inline(__always)
-    @usableFromInline
-    func parseInteger<T: RawUnsignedInteger>() throws -> T {
-        let signed: T.Signed = try parseSigned()
-        return signed.unsigned
+    func parseSigned<T: FixedWidthInteger & RawSignedInteger>() throws -> T {
+        try decodeLEB128(stream: self)
     }
 }
 
@@ -406,16 +399,10 @@ extension Parser {
         try stream.parseUnsigned(T.self)
     }
 
-    @inline(__always)
-    @inlinable
-    func parseSigned<T: FixedWidthInteger & SignedInteger>() throws -> T {
-        try stream.parseSigned()
-    }
-
-    @inline(__always)
     @inlinable
     func parseInteger<T: RawUnsignedInteger>() throws -> T {
-        try stream.parseInteger()
+        let signed: T.Signed = try stream.parseSigned()
+        return T(bitPattern: signed)
     }
 
     func parseName() throws -> String {
