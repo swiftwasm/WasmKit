@@ -129,13 +129,19 @@ extension Code {
 // TODO: Move `doParseInstruction` under `ExpressionParser` struct
 @_documentation(visibility: internal)
 public struct ExpressionParser {
+    /// The byte offset of the code in the module
+    let codeOffset: Int
+    /// The initial byte offset of the code buffer stream
+    /// NOTE: This might be different from `codeOffset` if the code buffer
+    /// is not a part of the initial `FileHandleStream` buffer
+    let initialStreamOffset: Int
     @usableFromInline
     let parser: Parser<StaticByteStream>
     @usableFromInline
     var lastCode: InstructionCode?
 
     public var offset: Int {
-        self.parser.currentIndex
+        self.codeOffset + self.parser.currentIndex - self.initialStreamOffset
     }
 
     public init(code: Code) {
@@ -144,6 +150,8 @@ public struct ExpressionParser {
             features: code.features,
             hasDataCount: code.hasDataCount
         )
+        self.codeOffset = code.offset
+        self.initialStreamOffset = self.parser.currentIndex
     }
 
     @inlinable
@@ -1055,10 +1063,14 @@ extension Parser {
             let locals = localTypes.flatMap { (n: UInt32, type: ValueType) in
                 return Array(repeating: type, count: Int(n))
             }
+            let expressionStart = stream.currentIndex
             let expressionBytes = try stream.consume(
-                count: Int(size) - (stream.currentIndex - bodyStart)
+                count: Int(size) - (expressionStart - bodyStart)
             )
-            return Code(locals: locals, expression: expressionBytes, hasDataCount: hasDataCount, features: features)
+            return Code(
+                locals: locals, expression: expressionBytes,
+                offset: expressionStart, hasDataCount: hasDataCount, features: features
+            )
         }
     }
 

@@ -11,6 +11,8 @@ public struct Code {
 
     // Parser state used to parse the expression body lazily
     @usableFromInline
+    internal let offset: Int
+    @usableFromInline
     internal let hasDataCount: Bool
     @usableFromInline
     internal let features: WasmFeatureSet
