@@ -27,7 +27,7 @@ You can use WasmKit as a [Swift Package Manager](https://www.swift.org/documenta
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/swiftwasm/WasmKit.git", from: "0.0.5"),
+    .package(url: "https://github.com/swiftwasm/WasmKit.git", from: "0.1.0"),
 ],
 ```
 
