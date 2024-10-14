@@ -64,13 +64,13 @@ final class LEBTest: XCTestCase {
 extension FixedWidthInteger where Self: UnsignedInteger {
     fileprivate init(LEB bytes: [UInt8]) throws {
         let stream = StaticByteStream(bytes: bytes)
-        try self.init(LEB: stream)
+        self = try decodeLEB128(stream: stream)
     }
 }
 
-extension FixedWidthInteger where Self: SignedInteger {
+extension FixedWidthInteger where Self: RawSignedInteger {
     fileprivate init(LEB bytes: [UInt8]) throws {
         let stream = StaticByteStream(bytes: bytes)
-        try self.init(LEB: stream)
+        self = try decodeLEB128(stream: stream)
     }
 }

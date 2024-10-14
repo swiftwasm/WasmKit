@@ -1,4 +1,4 @@
-import SystemPackage
+import struct SystemPackage.FileDescriptor
 
 public final class FileHandleStream: ByteStream {
     private(set) public var currentIndex: Int = 0
