@@ -8,7 +8,6 @@ enum WasmGen {
         let name: Name
         let prefix: UInt8?
         let opcode: UInt8
-        let visitMethodName: String
         let immediates: [Immediate]
 
         enum Name: Decodable {
@@ -39,7 +38,7 @@ enum WasmGen {
                 }
             }
 
-            var visitMethodName: String {
+            var visitMethod: String {
                 "visit" + enumCase.prefix(1).uppercased() + enumCase.dropFirst()
             }
 
@@ -79,7 +78,6 @@ enum WasmGen {
                 prefix = try decodeHex()
             }
             opcode = try decodeHex()
-            visitMethodName = try container.decode(String.self)
             let rawImmediates: [[String]]
             if container.isAtEnd {
                 rawImmediates = []
@@ -104,7 +102,7 @@ enum WasmGen {
         for instruction in instructions {
             code += "\n"
             code += "    /// Visiting `\(instruction.name.text ?? instruction.name.enumCase)` instruction.\n"
-            code += "    mutating func \(instruction.visitMethodName)("
+            code += "    mutating func \(instruction.name.visitMethod)("
             code += instruction.immediates.map { i in
                 "\(i.label): \(i.type)"
             }.joined(separator: ", ")
@@ -128,11 +126,11 @@ enum WasmGen {
 
         for instruction in instructions {
             if instruction.immediates.isEmpty {
-                code += "        case .\(instruction.name.enumCase): return try \(instruction.visitMethodName)()\n"
+                code += "        case .\(instruction.name.enumCase): return try \(instruction.name.visitMethod)()\n"
             } else {
                 code += "        case let .\(instruction.name.enumCase)("
                 code += instruction.immediates.map(\.label).joined(separator: ", ")
-                code += "): return try \(instruction.visitMethodName)("
+                code += "): return try \(instruction.name.visitMethod)("
                 code += instruction.immediates.map {
                     "\($0.label): \($0.label)"
                 }.joined(separator: ", ")
@@ -151,7 +149,7 @@ enum WasmGen {
 
             """
         for instruction in instructions {
-            code += "    public mutating func \(instruction.visitMethodName)("
+            code += "    public mutating func \(instruction.name.visitMethod)("
             code += instruction.immediates.map { i in
                 "\(i.label): \(i.type)"
             }.joined(separator: ", ")
@@ -214,7 +212,7 @@ enum WasmGen {
             """
 
         for instruction in instructions {
-            code += "    public mutating func \(instruction.visitMethodName)("
+            code += "    public mutating func \(instruction.name.visitMethod)("
             code += instruction.immediates.map { i in
                 "\(i.label): \(i.type)"
             }.joined(separator: ", ")
@@ -250,7 +248,7 @@ enum WasmGen {
             """
 
         for instruction in instructions {
-            code += "    public mutating func \(instruction.visitMethodName)("
+            code += "    public mutating func \(instruction.name.visitMethod)("
             code += instruction.immediates.map { i in
                 "\(i.label): \(i.type)"
             }.joined(separator: ", ")
@@ -258,7 +256,7 @@ enum WasmGen {
             code += "       trace("
             code += buildInstructionInstanceFromContext(instruction)
             code += ")\n"
-            code += "       return try visitor.\(instruction.visitMethodName)("
+            code += "       return try visitor.\(instruction.name.visitMethod)("
             code += instruction.immediates.map { i in
                 "\(i.label): \(i.label)"
             }.joined(separator: ", ")
@@ -297,12 +295,12 @@ enum WasmGen {
                 code += "\n"
                 code += "        let ("
                 code += instruction.immediates.map(\.label).joined(separator: ", ")
-                code += ") = try expressionParser.\(instruction.visitMethodName)(wat: &wat)\n"
+                code += ") = try expressionParser.\(instruction.name.visitMethod)(wat: &wat)\n"
                 code += "        "
             } else {
                 code += " "
             }
-            code += "return { return try $0.\(instruction.visitMethodName)("
+            code += "return { return try $0.\(instruction.name.visitMethod)("
             code += instruction.immediates.map { i in
                 "\(i.label): \(i.label)"
             }.joined(separator: ", ")
@@ -323,7 +321,7 @@ enum WasmGen {
          guard !instruction.immediates.isEmpty else {
          continue
          }
-         code += "    mutating func \(instruction.visitMethodName)() throws -> "
+         code += "    mutating func \(instruction.name.visitMethod)() throws -> "
          if instruction.immediates.count == 1 {
          code += instruction.immediates[0].type
          } else {
@@ -397,7 +395,7 @@ enum WasmGen {
             ].joined(separator: ", ")
             encodeInstrCall += ")"
 
-            code += "    mutating func \(instruction.visitMethodName)("
+            code += "    mutating func \(instruction.name.visitMethod)("
             code += instruction.immediates.map { i in
                 "\(i.label): \(i.type)"
             }.joined(separator: ", ")
@@ -451,7 +449,6 @@ enum WasmGen {
                     }
                 }),
             ColumnInfo(header: "Opcode", maxWidth: 0, value: { "\"" + String(format: "0x%02X", $0.opcode) + "\"" }),
-            ColumnInfo(header: "Visit Method", maxWidth: 0, value: { "\"" + $0.visitMethodName + "\"" }),
             ColumnInfo(
                 header: "Immediates", maxWidth: 0,
                 value: { i in
