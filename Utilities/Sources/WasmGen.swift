@@ -5,12 +5,53 @@ enum WasmGen {
 
     struct Instruction: Decodable {
         let feature: String
-        let name: String?
+        let name: Name
         let prefix: UInt8?
         let opcode: UInt8
-        let enumCaseName: String
         let visitMethodName: String
         let immediates: [Immediate]
+
+        enum Name: Decodable {
+            struct WithEnumCase: Decodable {
+                let enumCase: String
+            }
+            /// The instruction name in the Wasm text format.
+            case textual(String)
+            /// The instruction name in Swift enum case.
+            case withEnumCase(WithEnumCase)
+
+            var text: String? {
+                switch self {
+                case let .textual(text): return text
+                case .withEnumCase: return nil
+                }
+            }
+
+            var enumCase: String {
+                switch self {
+                case .textual(let name):
+                    // e.g. i32.load -> i32Load, br_table -> brTable
+                    let components = name.split(separator: ".").flatMap {
+                        $0.split(separator: "_")
+                    }
+                    return components.first! + components.dropFirst().map(\.capitalized).joined()
+                case let .withEnumCase(name): return name.enumCase
+                }
+            }
+
+            var visitMethodName: String {
+                "visit" + enumCase.prefix(1).uppercased() + enumCase.dropFirst()
+            }
+
+            init(from decoder: Decoder) throws {
+                let container = try decoder.singleValueContainer()
+                if let withEnumCase = try? container.decode(WithEnumCase.self) {
+                    self = .withEnumCase(withEnumCase)
+                } else {
+                    self = .textual(try container.decode(String.self))
+                }
+            }
+        }
 
         struct Immediate: Comparable, Hashable {
             let label: String
@@ -31,18 +72,13 @@ enum WasmGen {
                 return UInt8(hexString.dropFirst(2), radix: 16)!
             }
             feature = try container.decode(String.self)
-            if (try? container.decodeNil()) == true {
-                name = nil
-            } else {
-                name = try container.decode(String.self)
-            }
+            name = try container.decode(Name.self)
             if (try? container.decodeNil()) == true {
                 prefix = nil
             } else {
                 prefix = try decodeHex()
             }
             opcode = try decodeHex()
-            enumCaseName = try container.decode(String.self)
             visitMethodName = try container.decode(String.self)
             let rawImmediates: [[String]]
             if container.isAtEnd {
@@ -67,7 +103,7 @@ enum WasmGen {
 
         for instruction in instructions {
             code += "\n"
-            code += "    /// Visiting `\(instruction.name ?? instruction.enumCaseName)` instruction.\n"
+            code += "    /// Visiting `\(instruction.name.text ?? instruction.name.enumCase)` instruction.\n"
             code += "    mutating func \(instruction.visitMethodName)("
             code += instruction.immediates.map { i in
                 "\(i.label): \(i.type)"
@@ -92,9 +128,9 @@ enum WasmGen {
 
         for instruction in instructions {
             if instruction.immediates.isEmpty {
-                code += "        case .\(instruction.enumCaseName): return try \(instruction.visitMethodName)()\n"
+                code += "        case .\(instruction.name.enumCase): return try \(instruction.visitMethodName)()\n"
             } else {
-                code += "        case let .\(instruction.enumCaseName)("
+                code += "        case let .\(instruction.name.enumCase)("
                 code += instruction.immediates.map(\.label).joined(separator: ", ")
                 code += "): return try \(instruction.visitMethodName)("
                 code += instruction.immediates.map {
@@ -135,7 +171,7 @@ enum WasmGen {
             """
 
         for instruction in instructions {
-            code += "    case `\(instruction.enumCaseName)`"
+            code += "    case `\(instruction.name.enumCase)`"
             if !instruction.immediates.isEmpty {
                 code +=
                     "("
@@ -154,9 +190,9 @@ enum WasmGen {
     static func buildInstructionInstanceFromContext(_ instruction: Instruction) -> String {
         var code = ""
         if instruction.immediates.isEmpty {
-            code += ".\(instruction.enumCaseName)"
+            code += ".\(instruction.name.enumCase)"
         } else {
-            code += ".\(instruction.enumCaseName)("
+            code += ".\(instruction.name.enumCase)("
             code += instruction.immediates.map { i in
                 "\(i.label): \(i.label)"
             }.joined(separator: ", ")
@@ -253,7 +289,7 @@ enum WasmGen {
             """
 
         for instruction in instructions {
-            guard let name = instruction.name else {
+            guard let name = instruction.name.text else {
                 continue
             }
             code += "    case \"\(name)\":"
@@ -400,7 +436,10 @@ enum WasmGen {
             ColumnInfo(
                 header: "Name", maxWidth: 0,
                 value: {
-                    $0.name.map { "\"" + $0 + "\"" } ?? "null"
+                    switch $0.name {
+                    case .textual(let name): return "\"" + name + "\""
+                    case .withEnumCase(let name): return "{\"enumCase\": \"\(name.enumCase)\"}"
+                    }
                 }),
             ColumnInfo(
                 header: "Prefix", maxWidth: 0,
@@ -412,7 +451,6 @@ enum WasmGen {
                     }
                 }),
             ColumnInfo(header: "Opcode", maxWidth: 0, value: { "\"" + String(format: "0x%02X", $0.opcode) + "\"" }),
-            ColumnInfo(header: "Enum Case", maxWidth: 0, value: { "\"" + $0.enumCaseName + "\"" }),
             ColumnInfo(header: "Visit Method", maxWidth: 0, value: { "\"" + $0.visitMethodName + "\"" }),
             ColumnInfo(
                 header: "Immediates", maxWidth: 0,
@@ -433,7 +471,7 @@ enum WasmGen {
         }
 
         for (index, instruction) in instructions.enumerated() {
-            json += "    ["
+            json += "  ["
             for (columnIndex, column) in columns.enumerated() {
                 let value = column.value(instruction)
                 json += value.padding(toLength: column.maxWidth, withPad: " ", startingAt: 0)
@@ -448,7 +486,7 @@ enum WasmGen {
                 json += "],\n"
             }
         }
-        json += "]\n"
+        json += "]"
         return json
     }
 
