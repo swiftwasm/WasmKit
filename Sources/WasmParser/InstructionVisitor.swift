@@ -32,6 +32,40 @@ public enum Instruction: Equatable {
         case i64Store16
         case i64Store32
     }
+    public enum Cmp: Equatable {
+        case i32Eq
+        case i32Ne
+        case i32LtS
+        case i32LtU
+        case i32GtS
+        case i32GtU
+        case i32LeS
+        case i32LeU
+        case i32GeS
+        case i32GeU
+        case i64Eq
+        case i64Ne
+        case i64LtS
+        case i64LtU
+        case i64GtS
+        case i64GtU
+        case i64LeS
+        case i64LeU
+        case i64GeS
+        case i64GeU
+        case f32Eq
+        case f32Ne
+        case f32Lt
+        case f32Gt
+        case f32Le
+        case f32Ge
+        case f64Eq
+        case f64Ne
+        case f64Lt
+        case f64Gt
+        case f64Le
+        case f64Ge
+    }
     case `unreachable`
     case `nop`
     case `block`(blockType: BlockType)
@@ -65,39 +99,8 @@ public enum Instruction: Equatable {
     case `refIsNull`
     case `refFunc`(functionIndex: UInt32)
     case `i32Eqz`
-    case `i32Eq`
-    case `i32Ne`
-    case `i32LtS`
-    case `i32LtU`
-    case `i32GtS`
-    case `i32GtU`
-    case `i32LeS`
-    case `i32LeU`
-    case `i32GeS`
-    case `i32GeU`
+    case `cmp`(Instruction.Cmp)
     case `i64Eqz`
-    case `i64Eq`
-    case `i64Ne`
-    case `i64LtS`
-    case `i64LtU`
-    case `i64GtS`
-    case `i64GtU`
-    case `i64LeS`
-    case `i64LeU`
-    case `i64GeS`
-    case `i64GeU`
-    case `f32Eq`
-    case `f32Ne`
-    case `f32Lt`
-    case `f32Gt`
-    case `f32Le`
-    case `f32Ge`
-    case `f64Eq`
-    case `f64Ne`
-    case `f64Lt`
-    case `f64Gt`
-    case `f64Le`
-    case `f64Ge`
     case `i32Clz`
     case `i32Ctz`
     case `i32Popcnt`
@@ -254,39 +257,8 @@ extension AnyInstructionVisitor {
     public mutating func visitRefIsNull() throws { return try self.visit(.refIsNull) }
     public mutating func visitRefFunc(functionIndex: UInt32) throws { return try self.visit(.refFunc(functionIndex: functionIndex)) }
     public mutating func visitI32Eqz() throws { return try self.visit(.i32Eqz) }
-    public mutating func visitI32Eq() throws { return try self.visit(.i32Eq) }
-    public mutating func visitI32Ne() throws { return try self.visit(.i32Ne) }
-    public mutating func visitI32LtS() throws { return try self.visit(.i32LtS) }
-    public mutating func visitI32LtU() throws { return try self.visit(.i32LtU) }
-    public mutating func visitI32GtS() throws { return try self.visit(.i32GtS) }
-    public mutating func visitI32GtU() throws { return try self.visit(.i32GtU) }
-    public mutating func visitI32LeS() throws { return try self.visit(.i32LeS) }
-    public mutating func visitI32LeU() throws { return try self.visit(.i32LeU) }
-    public mutating func visitI32GeS() throws { return try self.visit(.i32GeS) }
-    public mutating func visitI32GeU() throws { return try self.visit(.i32GeU) }
+    public mutating func visitCmp(_ cmp: Instruction.Cmp) throws { return try self.visit(.cmp(cmp)) }
     public mutating func visitI64Eqz() throws { return try self.visit(.i64Eqz) }
-    public mutating func visitI64Eq() throws { return try self.visit(.i64Eq) }
-    public mutating func visitI64Ne() throws { return try self.visit(.i64Ne) }
-    public mutating func visitI64LtS() throws { return try self.visit(.i64LtS) }
-    public mutating func visitI64LtU() throws { return try self.visit(.i64LtU) }
-    public mutating func visitI64GtS() throws { return try self.visit(.i64GtS) }
-    public mutating func visitI64GtU() throws { return try self.visit(.i64GtU) }
-    public mutating func visitI64LeS() throws { return try self.visit(.i64LeS) }
-    public mutating func visitI64LeU() throws { return try self.visit(.i64LeU) }
-    public mutating func visitI64GeS() throws { return try self.visit(.i64GeS) }
-    public mutating func visitI64GeU() throws { return try self.visit(.i64GeU) }
-    public mutating func visitF32Eq() throws { return try self.visit(.f32Eq) }
-    public mutating func visitF32Ne() throws { return try self.visit(.f32Ne) }
-    public mutating func visitF32Lt() throws { return try self.visit(.f32Lt) }
-    public mutating func visitF32Gt() throws { return try self.visit(.f32Gt) }
-    public mutating func visitF32Le() throws { return try self.visit(.f32Le) }
-    public mutating func visitF32Ge() throws { return try self.visit(.f32Ge) }
-    public mutating func visitF64Eq() throws { return try self.visit(.f64Eq) }
-    public mutating func visitF64Ne() throws { return try self.visit(.f64Ne) }
-    public mutating func visitF64Lt() throws { return try self.visit(.f64Lt) }
-    public mutating func visitF64Gt() throws { return try self.visit(.f64Gt) }
-    public mutating func visitF64Le() throws { return try self.visit(.f64Le) }
-    public mutating func visitF64Ge() throws { return try self.visit(.f64Ge) }
     public mutating func visitI32Clz() throws { return try self.visit(.i32Clz) }
     public mutating func visitI32Ctz() throws { return try self.visit(.i32Ctz) }
     public mutating func visitI32Popcnt() throws { return try self.visit(.i32Popcnt) }
@@ -551,137 +523,13 @@ public struct InstructionTracingVisitor<V: InstructionVisitor>: InstructionVisit
        trace(.i32Eqz)
        return try visitor.visitI32Eqz()
     }
-    public mutating func visitI32Eq() throws {
-       trace(.i32Eq)
-       return try visitor.visitI32Eq()
-    }
-    public mutating func visitI32Ne() throws {
-       trace(.i32Ne)
-       return try visitor.visitI32Ne()
-    }
-    public mutating func visitI32LtS() throws {
-       trace(.i32LtS)
-       return try visitor.visitI32LtS()
-    }
-    public mutating func visitI32LtU() throws {
-       trace(.i32LtU)
-       return try visitor.visitI32LtU()
-    }
-    public mutating func visitI32GtS() throws {
-       trace(.i32GtS)
-       return try visitor.visitI32GtS()
-    }
-    public mutating func visitI32GtU() throws {
-       trace(.i32GtU)
-       return try visitor.visitI32GtU()
-    }
-    public mutating func visitI32LeS() throws {
-       trace(.i32LeS)
-       return try visitor.visitI32LeS()
-    }
-    public mutating func visitI32LeU() throws {
-       trace(.i32LeU)
-       return try visitor.visitI32LeU()
-    }
-    public mutating func visitI32GeS() throws {
-       trace(.i32GeS)
-       return try visitor.visitI32GeS()
-    }
-    public mutating func visitI32GeU() throws {
-       trace(.i32GeU)
-       return try visitor.visitI32GeU()
+    public mutating func visitCmp(_ cmp: Instruction.Cmp) throws {
+       trace(.cmp(cmp))
+       return try visitor.visitCmp(cmp)
     }
     public mutating func visitI64Eqz() throws {
        trace(.i64Eqz)
        return try visitor.visitI64Eqz()
-    }
-    public mutating func visitI64Eq() throws {
-       trace(.i64Eq)
-       return try visitor.visitI64Eq()
-    }
-    public mutating func visitI64Ne() throws {
-       trace(.i64Ne)
-       return try visitor.visitI64Ne()
-    }
-    public mutating func visitI64LtS() throws {
-       trace(.i64LtS)
-       return try visitor.visitI64LtS()
-    }
-    public mutating func visitI64LtU() throws {
-       trace(.i64LtU)
-       return try visitor.visitI64LtU()
-    }
-    public mutating func visitI64GtS() throws {
-       trace(.i64GtS)
-       return try visitor.visitI64GtS()
-    }
-    public mutating func visitI64GtU() throws {
-       trace(.i64GtU)
-       return try visitor.visitI64GtU()
-    }
-    public mutating func visitI64LeS() throws {
-       trace(.i64LeS)
-       return try visitor.visitI64LeS()
-    }
-    public mutating func visitI64LeU() throws {
-       trace(.i64LeU)
-       return try visitor.visitI64LeU()
-    }
-    public mutating func visitI64GeS() throws {
-       trace(.i64GeS)
-       return try visitor.visitI64GeS()
-    }
-    public mutating func visitI64GeU() throws {
-       trace(.i64GeU)
-       return try visitor.visitI64GeU()
-    }
-    public mutating func visitF32Eq() throws {
-       trace(.f32Eq)
-       return try visitor.visitF32Eq()
-    }
-    public mutating func visitF32Ne() throws {
-       trace(.f32Ne)
-       return try visitor.visitF32Ne()
-    }
-    public mutating func visitF32Lt() throws {
-       trace(.f32Lt)
-       return try visitor.visitF32Lt()
-    }
-    public mutating func visitF32Gt() throws {
-       trace(.f32Gt)
-       return try visitor.visitF32Gt()
-    }
-    public mutating func visitF32Le() throws {
-       trace(.f32Le)
-       return try visitor.visitF32Le()
-    }
-    public mutating func visitF32Ge() throws {
-       trace(.f32Ge)
-       return try visitor.visitF32Ge()
-    }
-    public mutating func visitF64Eq() throws {
-       trace(.f64Eq)
-       return try visitor.visitF64Eq()
-    }
-    public mutating func visitF64Ne() throws {
-       trace(.f64Ne)
-       return try visitor.visitF64Ne()
-    }
-    public mutating func visitF64Lt() throws {
-       trace(.f64Lt)
-       return try visitor.visitF64Lt()
-    }
-    public mutating func visitF64Gt() throws {
-       trace(.f64Gt)
-       return try visitor.visitF64Gt()
-    }
-    public mutating func visitF64Le() throws {
-       trace(.f64Le)
-       return try visitor.visitF64Le()
-    }
-    public mutating func visitF64Ge() throws {
-       trace(.f64Ge)
-       return try visitor.visitF64Ge()
     }
     public mutating func visitI32Clz() throws {
        trace(.i32Clz)
@@ -1212,72 +1060,10 @@ public protocol InstructionVisitor {
     mutating func visitRefFunc(functionIndex: UInt32) throws
     /// Visiting `i32.eqz` instruction.
     mutating func visitI32Eqz() throws
-    /// Visiting `i32.eq` instruction.
-    mutating func visitI32Eq() throws
-    /// Visiting `i32.ne` instruction.
-    mutating func visitI32Ne() throws
-    /// Visiting `i32.lt_s` instruction.
-    mutating func visitI32LtS() throws
-    /// Visiting `i32.lt_u` instruction.
-    mutating func visitI32LtU() throws
-    /// Visiting `i32.gt_s` instruction.
-    mutating func visitI32GtS() throws
-    /// Visiting `i32.gt_u` instruction.
-    mutating func visitI32GtU() throws
-    /// Visiting `i32.le_s` instruction.
-    mutating func visitI32LeS() throws
-    /// Visiting `i32.le_u` instruction.
-    mutating func visitI32LeU() throws
-    /// Visiting `i32.ge_s` instruction.
-    mutating func visitI32GeS() throws
-    /// Visiting `i32.ge_u` instruction.
-    mutating func visitI32GeU() throws
+    /// Visiting `cmp` category instruction.
+    mutating func visitCmp(_: Instruction.Cmp) throws
     /// Visiting `i64.eqz` instruction.
     mutating func visitI64Eqz() throws
-    /// Visiting `i64.eq` instruction.
-    mutating func visitI64Eq() throws
-    /// Visiting `i64.ne` instruction.
-    mutating func visitI64Ne() throws
-    /// Visiting `i64.lt_s` instruction.
-    mutating func visitI64LtS() throws
-    /// Visiting `i64.lt_u` instruction.
-    mutating func visitI64LtU() throws
-    /// Visiting `i64.gt_s` instruction.
-    mutating func visitI64GtS() throws
-    /// Visiting `i64.gt_u` instruction.
-    mutating func visitI64GtU() throws
-    /// Visiting `i64.le_s` instruction.
-    mutating func visitI64LeS() throws
-    /// Visiting `i64.le_u` instruction.
-    mutating func visitI64LeU() throws
-    /// Visiting `i64.ge_s` instruction.
-    mutating func visitI64GeS() throws
-    /// Visiting `i64.ge_u` instruction.
-    mutating func visitI64GeU() throws
-    /// Visiting `f32.eq` instruction.
-    mutating func visitF32Eq() throws
-    /// Visiting `f32.ne` instruction.
-    mutating func visitF32Ne() throws
-    /// Visiting `f32.lt` instruction.
-    mutating func visitF32Lt() throws
-    /// Visiting `f32.gt` instruction.
-    mutating func visitF32Gt() throws
-    /// Visiting `f32.le` instruction.
-    mutating func visitF32Le() throws
-    /// Visiting `f32.ge` instruction.
-    mutating func visitF32Ge() throws
-    /// Visiting `f64.eq` instruction.
-    mutating func visitF64Eq() throws
-    /// Visiting `f64.ne` instruction.
-    mutating func visitF64Ne() throws
-    /// Visiting `f64.lt` instruction.
-    mutating func visitF64Lt() throws
-    /// Visiting `f64.gt` instruction.
-    mutating func visitF64Gt() throws
-    /// Visiting `f64.le` instruction.
-    mutating func visitF64Le() throws
-    /// Visiting `f64.ge` instruction.
-    mutating func visitF64Ge() throws
     /// Visiting `i32.clz` instruction.
     mutating func visitI32Clz() throws
     /// Visiting `i32.ctz` instruction.
@@ -1545,39 +1331,8 @@ extension InstructionVisitor {
         case .refIsNull: return try visitRefIsNull()
         case let .refFunc(functionIndex): return try visitRefFunc(functionIndex: functionIndex)
         case .i32Eqz: return try visitI32Eqz()
-        case .i32Eq: return try visitI32Eq()
-        case .i32Ne: return try visitI32Ne()
-        case .i32LtS: return try visitI32LtS()
-        case .i32LtU: return try visitI32LtU()
-        case .i32GtS: return try visitI32GtS()
-        case .i32GtU: return try visitI32GtU()
-        case .i32LeS: return try visitI32LeS()
-        case .i32LeU: return try visitI32LeU()
-        case .i32GeS: return try visitI32GeS()
-        case .i32GeU: return try visitI32GeU()
+        case let .cmp(cmp): return try visitCmp(cmp)
         case .i64Eqz: return try visitI64Eqz()
-        case .i64Eq: return try visitI64Eq()
-        case .i64Ne: return try visitI64Ne()
-        case .i64LtS: return try visitI64LtS()
-        case .i64LtU: return try visitI64LtU()
-        case .i64GtS: return try visitI64GtS()
-        case .i64GtU: return try visitI64GtU()
-        case .i64LeS: return try visitI64LeS()
-        case .i64LeU: return try visitI64LeU()
-        case .i64GeS: return try visitI64GeS()
-        case .i64GeU: return try visitI64GeU()
-        case .f32Eq: return try visitF32Eq()
-        case .f32Ne: return try visitF32Ne()
-        case .f32Lt: return try visitF32Lt()
-        case .f32Gt: return try visitF32Gt()
-        case .f32Le: return try visitF32Le()
-        case .f32Ge: return try visitF32Ge()
-        case .f64Eq: return try visitF64Eq()
-        case .f64Ne: return try visitF64Ne()
-        case .f64Lt: return try visitF64Lt()
-        case .f64Gt: return try visitF64Gt()
-        case .f64Le: return try visitF64Le()
-        case .f64Ge: return try visitF64Ge()
         case .i32Clz: return try visitI32Clz()
         case .i32Ctz: return try visitI32Ctz()
         case .i32Popcnt: return try visitI32Popcnt()
@@ -1731,39 +1486,8 @@ extension InstructionVisitor {
     public mutating func visitRefIsNull() throws {}
     public mutating func visitRefFunc(functionIndex: UInt32) throws {}
     public mutating func visitI32Eqz() throws {}
-    public mutating func visitI32Eq() throws {}
-    public mutating func visitI32Ne() throws {}
-    public mutating func visitI32LtS() throws {}
-    public mutating func visitI32LtU() throws {}
-    public mutating func visitI32GtS() throws {}
-    public mutating func visitI32GtU() throws {}
-    public mutating func visitI32LeS() throws {}
-    public mutating func visitI32LeU() throws {}
-    public mutating func visitI32GeS() throws {}
-    public mutating func visitI32GeU() throws {}
+    public mutating func visitCmp(_ cmp: Instruction.Cmp) throws {}
     public mutating func visitI64Eqz() throws {}
-    public mutating func visitI64Eq() throws {}
-    public mutating func visitI64Ne() throws {}
-    public mutating func visitI64LtS() throws {}
-    public mutating func visitI64LtU() throws {}
-    public mutating func visitI64GtS() throws {}
-    public mutating func visitI64GtU() throws {}
-    public mutating func visitI64LeS() throws {}
-    public mutating func visitI64LeU() throws {}
-    public mutating func visitI64GeS() throws {}
-    public mutating func visitI64GeU() throws {}
-    public mutating func visitF32Eq() throws {}
-    public mutating func visitF32Ne() throws {}
-    public mutating func visitF32Lt() throws {}
-    public mutating func visitF32Gt() throws {}
-    public mutating func visitF32Le() throws {}
-    public mutating func visitF32Ge() throws {}
-    public mutating func visitF64Eq() throws {}
-    public mutating func visitF64Ne() throws {}
-    public mutating func visitF64Lt() throws {}
-    public mutating func visitF64Gt() throws {}
-    public mutating func visitF64Le() throws {}
-    public mutating func visitF64Ge() throws {}
     public mutating func visitI32Clz() throws {}
     public mutating func visitI32Ctz() throws {}
     public mutating func visitI32Popcnt() throws {}

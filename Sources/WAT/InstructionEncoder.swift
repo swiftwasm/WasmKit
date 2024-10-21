@@ -172,39 +172,46 @@ extension InstructionEncoder {
         try encodeImmediates(functionIndex: functionIndex)
     }
     mutating func visitI32Eqz() throws { try encodeInstruction(0x45, nil) }
-    mutating func visitI32Eq() throws { try encodeInstruction(0x46, nil) }
-    mutating func visitI32Ne() throws { try encodeInstruction(0x47, nil) }
-    mutating func visitI32LtS() throws { try encodeInstruction(0x48, nil) }
-    mutating func visitI32LtU() throws { try encodeInstruction(0x49, nil) }
-    mutating func visitI32GtS() throws { try encodeInstruction(0x4A, nil) }
-    mutating func visitI32GtU() throws { try encodeInstruction(0x4B, nil) }
-    mutating func visitI32LeS() throws { try encodeInstruction(0x4C, nil) }
-    mutating func visitI32LeU() throws { try encodeInstruction(0x4D, nil) }
-    mutating func visitI32GeS() throws { try encodeInstruction(0x4E, nil) }
-    mutating func visitI32GeU() throws { try encodeInstruction(0x4F, nil) }
+    mutating func visitCmp(_ cmp: Instruction.Cmp) throws {
+        let (prefix, opcode): (UInt8?, UInt8)
+        switch cmp {
+        case .i32Eq: (prefix, opcode) = (nil, 0x46)
+        case .i32Ne: (prefix, opcode) = (nil, 0x47)
+        case .i32LtS: (prefix, opcode) = (nil, 0x48)
+        case .i32LtU: (prefix, opcode) = (nil, 0x49)
+        case .i32GtS: (prefix, opcode) = (nil, 0x4A)
+        case .i32GtU: (prefix, opcode) = (nil, 0x4B)
+        case .i32LeS: (prefix, opcode) = (nil, 0x4C)
+        case .i32LeU: (prefix, opcode) = (nil, 0x4D)
+        case .i32GeS: (prefix, opcode) = (nil, 0x4E)
+        case .i32GeU: (prefix, opcode) = (nil, 0x4F)
+        case .i64Eq: (prefix, opcode) = (nil, 0x51)
+        case .i64Ne: (prefix, opcode) = (nil, 0x52)
+        case .i64LtS: (prefix, opcode) = (nil, 0x53)
+        case .i64LtU: (prefix, opcode) = (nil, 0x54)
+        case .i64GtS: (prefix, opcode) = (nil, 0x55)
+        case .i64GtU: (prefix, opcode) = (nil, 0x56)
+        case .i64LeS: (prefix, opcode) = (nil, 0x57)
+        case .i64LeU: (prefix, opcode) = (nil, 0x58)
+        case .i64GeS: (prefix, opcode) = (nil, 0x59)
+        case .i64GeU: (prefix, opcode) = (nil, 0x5A)
+        case .f32Eq: (prefix, opcode) = (nil, 0x5B)
+        case .f32Ne: (prefix, opcode) = (nil, 0x5C)
+        case .f32Lt: (prefix, opcode) = (nil, 0x5D)
+        case .f32Gt: (prefix, opcode) = (nil, 0x5E)
+        case .f32Le: (prefix, opcode) = (nil, 0x5F)
+        case .f32Ge: (prefix, opcode) = (nil, 0x60)
+        case .f64Eq: (prefix, opcode) = (nil, 0x61)
+        case .f64Ne: (prefix, opcode) = (nil, 0x62)
+        case .f64Lt: (prefix, opcode) = (nil, 0x63)
+        case .f64Gt: (prefix, opcode) = (nil, 0x64)
+        case .f64Le: (prefix, opcode) = (nil, 0x65)
+        case .f64Ge: (prefix, opcode) = (nil, 0x66)
+        }
+
+        try encodeInstruction(opcode, prefix)
+    }
     mutating func visitI64Eqz() throws { try encodeInstruction(0x50, nil) }
-    mutating func visitI64Eq() throws { try encodeInstruction(0x51, nil) }
-    mutating func visitI64Ne() throws { try encodeInstruction(0x52, nil) }
-    mutating func visitI64LtS() throws { try encodeInstruction(0x53, nil) }
-    mutating func visitI64LtU() throws { try encodeInstruction(0x54, nil) }
-    mutating func visitI64GtS() throws { try encodeInstruction(0x55, nil) }
-    mutating func visitI64GtU() throws { try encodeInstruction(0x56, nil) }
-    mutating func visitI64LeS() throws { try encodeInstruction(0x57, nil) }
-    mutating func visitI64LeU() throws { try encodeInstruction(0x58, nil) }
-    mutating func visitI64GeS() throws { try encodeInstruction(0x59, nil) }
-    mutating func visitI64GeU() throws { try encodeInstruction(0x5A, nil) }
-    mutating func visitF32Eq() throws { try encodeInstruction(0x5B, nil) }
-    mutating func visitF32Ne() throws { try encodeInstruction(0x5C, nil) }
-    mutating func visitF32Lt() throws { try encodeInstruction(0x5D, nil) }
-    mutating func visitF32Gt() throws { try encodeInstruction(0x5E, nil) }
-    mutating func visitF32Le() throws { try encodeInstruction(0x5F, nil) }
-    mutating func visitF32Ge() throws { try encodeInstruction(0x60, nil) }
-    mutating func visitF64Eq() throws { try encodeInstruction(0x61, nil) }
-    mutating func visitF64Ne() throws { try encodeInstruction(0x62, nil) }
-    mutating func visitF64Lt() throws { try encodeInstruction(0x63, nil) }
-    mutating func visitF64Gt() throws { try encodeInstruction(0x64, nil) }
-    mutating func visitF64Le() throws { try encodeInstruction(0x65, nil) }
-    mutating func visitF64Ge() throws { try encodeInstruction(0x66, nil) }
     mutating func visitI32Clz() throws { try encodeInstruction(0x67, nil) }
     mutating func visitI32Ctz() throws { try encodeInstruction(0x68, nil) }
     mutating func visitI32Popcnt() throws { try encodeInstruction(0x69, nil) }

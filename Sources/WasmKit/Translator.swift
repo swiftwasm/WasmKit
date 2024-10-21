@@ -1859,43 +1859,49 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             .i32Eqz(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
     }
-    mutating func visitI32Eq() throws -> Output { try visitCmp(.i32, Instruction.i32Eq) }
-    mutating func visitI32Ne() throws -> Output { try visitCmp(.i32, Instruction.i32Ne) }
-    mutating func visitI32LtS() throws -> Output { try visitCmp(.i32, Instruction.i32LtS) }
-    mutating func visitI32LtU() throws -> Output { try visitCmp(.i32, Instruction.i32LtU) }
-    mutating func visitI32GtS() throws -> Output { try visitCmp(.i32, Instruction.i32GtS) }
-    mutating func visitI32GtU() throws -> Output { try visitCmp(.i32, Instruction.i32GtU) }
-    mutating func visitI32LeS() throws -> Output { try visitCmp(.i32, Instruction.i32LeS) }
-    mutating func visitI32LeU() throws -> Output { try visitCmp(.i32, Instruction.i32LeU) }
-    mutating func visitI32GeS() throws -> Output { try visitCmp(.i32, Instruction.i32GeS) }
-    mutating func visitI32GeU() throws -> Output { try visitCmp(.i32, Instruction.i32GeU) }
+    mutating func visitCmp(_ cmp: WasmParser.Instruction.Cmp) throws {
+        let operand: ValueType, instruction: (Instruction.BinaryOperand) -> Instruction
+        switch cmp {
+        case .i32Eq: (operand, instruction) = (.i32, Instruction.i32Eq)
+        case .i32Ne: (operand, instruction) = (.i32, Instruction.i32Ne)
+        case .i32LtS: (operand, instruction) = (.i32, Instruction.i32LtS)
+        case .i32LtU: (operand, instruction) = (.i32, Instruction.i32LtU)
+        case .i32GtS: (operand, instruction) = (.i32, Instruction.i32GtS)
+        case .i32GtU: (operand, instruction) = (.i32, Instruction.i32GtU)
+        case .i32LeS: (operand, instruction) = (.i32, Instruction.i32LeS)
+        case .i32LeU: (operand, instruction) = (.i32, Instruction.i32LeU)
+        case .i32GeS: (operand, instruction) = (.i32, Instruction.i32GeS)
+        case .i32GeU: (operand, instruction) = (.i32, Instruction.i32GeU)
+        case .i64Eq: (operand, instruction) = (.i64, Instruction.i64Eq)
+        case .i64Ne: (operand, instruction) = (.i64, Instruction.i64Ne)
+        case .i64LtS: (operand, instruction) = (.i64, Instruction.i64LtS)
+        case .i64LtU: (operand, instruction) = (.i64, Instruction.i64LtU)
+        case .i64GtS: (operand, instruction) = (.i64, Instruction.i64GtS)
+        case .i64GtU: (operand, instruction) = (.i64, Instruction.i64GtU)
+        case .i64LeS: (operand, instruction) = (.i64, Instruction.i64LeS)
+        case .i64LeU: (operand, instruction) = (.i64, Instruction.i64LeU)
+        case .i64GeS: (operand, instruction) = (.i64, Instruction.i64GeS)
+        case .i64GeU: (operand, instruction) = (.i64, Instruction.i64GeU)
+        case .f32Eq: (operand, instruction) = (.f32, Instruction.f32Eq)
+        case .f32Ne: (operand, instruction) = (.f32, Instruction.f32Ne)
+        case .f32Lt: (operand, instruction) = (.f32, Instruction.f32Lt)
+        case .f32Gt: (operand, instruction) = (.f32, Instruction.f32Gt)
+        case .f32Le: (operand, instruction) = (.f32, Instruction.f32Le)
+        case .f32Ge: (operand, instruction) = (.f32, Instruction.f32Ge)
+        case .f64Eq: (operand, instruction) = (.f64, Instruction.f64Eq)
+        case .f64Ne: (operand, instruction) = (.f64, Instruction.f64Ne)
+        case .f64Lt: (operand, instruction) = (.f64, Instruction.f64Lt)
+        case .f64Gt: (operand, instruction) = (.f64, Instruction.f64Gt)
+        case .f64Le: (operand, instruction) = (.f64, Instruction.f64Le)
+        case .f64Ge: (operand, instruction) = (.f64, Instruction.f64Ge)
+        }
+        try visitCmp(operand, instruction)
+    }
     mutating func visitI64Eqz() throws -> Output {
         try popPushEmit(.i64, .i32) { value, result, stack in
             .i64Eqz(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
     }
-    mutating func visitI64Eq() throws -> Output { try visitCmp(.i64, Instruction.i64Eq) }
-    mutating func visitI64Ne() throws -> Output { try visitCmp(.i64, Instruction.i64Ne) }
-    mutating func visitI64LtS() throws -> Output { try visitCmp(.i64, Instruction.i64LtS) }
-    mutating func visitI64LtU() throws -> Output { try visitCmp(.i64, Instruction.i64LtU) }
-    mutating func visitI64GtS() throws -> Output { try visitCmp(.i64, Instruction.i64GtS) }
-    mutating func visitI64GtU() throws -> Output { try visitCmp(.i64, Instruction.i64GtU) }
-    mutating func visitI64LeS() throws -> Output { try visitCmp(.i64, Instruction.i64LeS) }
-    mutating func visitI64LeU() throws -> Output { try visitCmp(.i64, Instruction.i64LeU) }
-    mutating func visitI64GeS() throws -> Output { try visitCmp(.i64, Instruction.i64GeS) }
-    mutating func visitI64GeU() throws -> Output { try visitCmp(.i64, Instruction.i64GeU) }
-    mutating func visitF32Eq() throws -> Output { try visitCmp(.f32, Instruction.f32Eq) }
-    mutating func visitF32Ne() throws -> Output { try visitCmp(.f32, Instruction.f32Ne) }
-    mutating func visitF32Lt() throws -> Output { try visitCmp(.f32, Instruction.f32Lt) }
-    mutating func visitF32Gt() throws -> Output { try visitCmp(.f32, Instruction.f32Gt) }
-    mutating func visitF32Le() throws -> Output { try visitCmp(.f32, Instruction.f32Le) }
-    mutating func visitF32Ge() throws -> Output { try visitCmp(.f32, Instruction.f32Ge) }
-    mutating func visitF64Eq() throws -> Output { try visitCmp(.f64, Instruction.f64Eq) }
-    mutating func visitF64Ne() throws -> Output { try visitCmp(.f64, Instruction.f64Ne) }
-    mutating func visitF64Lt() throws -> Output { try visitCmp(.f64, Instruction.f64Lt) }
-    mutating func visitF64Gt() throws -> Output { try visitCmp(.f64, Instruction.f64Gt) }
-    mutating func visitF64Le() throws -> Output { try visitCmp(.f64, Instruction.f64Le) }
-    mutating func visitF64Ge() throws -> Output { try visitCmp(.f64, Instruction.f64Ge) }
     mutating func visitI32Clz() throws -> Output { try visitUnary(.i32, Instruction.i32Clz) }
     mutating func visitI32Ctz() throws -> Output { try visitUnary(.i32, Instruction.i32Ctz) }
     mutating func visitI32Popcnt() throws -> Output { try visitUnary(.i32, Instruction.i32Popcnt) }

@@ -155,39 +155,39 @@ func parseTextInstruction<V: InstructionVisitor>(keyword: String, expressionPars
         let (functionIndex) = try expressionParser.visitRefFunc(wat: &wat)
         return { return try $0.visitRefFunc(functionIndex: functionIndex) }
     case "i32.eqz": return { return try $0.visitI32Eqz() }
-    case "i32.eq": return { return try $0.visitI32Eq() }
-    case "i32.ne": return { return try $0.visitI32Ne() }
-    case "i32.lt_s": return { return try $0.visitI32LtS() }
-    case "i32.lt_u": return { return try $0.visitI32LtU() }
-    case "i32.gt_s": return { return try $0.visitI32GtS() }
-    case "i32.gt_u": return { return try $0.visitI32GtU() }
-    case "i32.le_s": return { return try $0.visitI32LeS() }
-    case "i32.le_u": return { return try $0.visitI32LeU() }
-    case "i32.ge_s": return { return try $0.visitI32GeS() }
-    case "i32.ge_u": return { return try $0.visitI32GeU() }
+    case "i32.eq": return { return try $0.visitCmp(.i32Eq) }
+    case "i32.ne": return { return try $0.visitCmp(.i32Ne) }
+    case "i32.lt_s": return { return try $0.visitCmp(.i32LtS) }
+    case "i32.lt_u": return { return try $0.visitCmp(.i32LtU) }
+    case "i32.gt_s": return { return try $0.visitCmp(.i32GtS) }
+    case "i32.gt_u": return { return try $0.visitCmp(.i32GtU) }
+    case "i32.le_s": return { return try $0.visitCmp(.i32LeS) }
+    case "i32.le_u": return { return try $0.visitCmp(.i32LeU) }
+    case "i32.ge_s": return { return try $0.visitCmp(.i32GeS) }
+    case "i32.ge_u": return { return try $0.visitCmp(.i32GeU) }
     case "i64.eqz": return { return try $0.visitI64Eqz() }
-    case "i64.eq": return { return try $0.visitI64Eq() }
-    case "i64.ne": return { return try $0.visitI64Ne() }
-    case "i64.lt_s": return { return try $0.visitI64LtS() }
-    case "i64.lt_u": return { return try $0.visitI64LtU() }
-    case "i64.gt_s": return { return try $0.visitI64GtS() }
-    case "i64.gt_u": return { return try $0.visitI64GtU() }
-    case "i64.le_s": return { return try $0.visitI64LeS() }
-    case "i64.le_u": return { return try $0.visitI64LeU() }
-    case "i64.ge_s": return { return try $0.visitI64GeS() }
-    case "i64.ge_u": return { return try $0.visitI64GeU() }
-    case "f32.eq": return { return try $0.visitF32Eq() }
-    case "f32.ne": return { return try $0.visitF32Ne() }
-    case "f32.lt": return { return try $0.visitF32Lt() }
-    case "f32.gt": return { return try $0.visitF32Gt() }
-    case "f32.le": return { return try $0.visitF32Le() }
-    case "f32.ge": return { return try $0.visitF32Ge() }
-    case "f64.eq": return { return try $0.visitF64Eq() }
-    case "f64.ne": return { return try $0.visitF64Ne() }
-    case "f64.lt": return { return try $0.visitF64Lt() }
-    case "f64.gt": return { return try $0.visitF64Gt() }
-    case "f64.le": return { return try $0.visitF64Le() }
-    case "f64.ge": return { return try $0.visitF64Ge() }
+    case "i64.eq": return { return try $0.visitCmp(.i64Eq) }
+    case "i64.ne": return { return try $0.visitCmp(.i64Ne) }
+    case "i64.lt_s": return { return try $0.visitCmp(.i64LtS) }
+    case "i64.lt_u": return { return try $0.visitCmp(.i64LtU) }
+    case "i64.gt_s": return { return try $0.visitCmp(.i64GtS) }
+    case "i64.gt_u": return { return try $0.visitCmp(.i64GtU) }
+    case "i64.le_s": return { return try $0.visitCmp(.i64LeS) }
+    case "i64.le_u": return { return try $0.visitCmp(.i64LeU) }
+    case "i64.ge_s": return { return try $0.visitCmp(.i64GeS) }
+    case "i64.ge_u": return { return try $0.visitCmp(.i64GeU) }
+    case "f32.eq": return { return try $0.visitCmp(.f32Eq) }
+    case "f32.ne": return { return try $0.visitCmp(.f32Ne) }
+    case "f32.lt": return { return try $0.visitCmp(.f32Lt) }
+    case "f32.gt": return { return try $0.visitCmp(.f32Gt) }
+    case "f32.le": return { return try $0.visitCmp(.f32Le) }
+    case "f32.ge": return { return try $0.visitCmp(.f32Ge) }
+    case "f64.eq": return { return try $0.visitCmp(.f64Eq) }
+    case "f64.ne": return { return try $0.visitCmp(.f64Ne) }
+    case "f64.lt": return { return try $0.visitCmp(.f64Lt) }
+    case "f64.gt": return { return try $0.visitCmp(.f64Gt) }
+    case "f64.le": return { return try $0.visitCmp(.f64Le) }
+    case "f64.ge": return { return try $0.visitCmp(.f64Ge) }
     case "i32.clz": return { return try $0.visitI32Clz() }
     case "i32.ctz": return { return try $0.visitI32Ctz() }
     case "i32.popcnt": return { return try $0.visitI32Popcnt() }

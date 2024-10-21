@@ -130,7 +130,7 @@ enum WasmGen {
             """
 
         for instruction in instructions.categorized {
-            if instruction.immediates.isEmpty {
+            if instruction.associatedValues.isEmpty {
                 code += "        case .\(instruction.enumCaseName): return try \(instruction.visitMethodName)()\n"
             } else {
                 code += "        case let .\(instruction.enumCaseName)("
@@ -216,7 +216,7 @@ enum WasmGen {
 
     static func buildInstructionInstanceFromContext(_ instruction: CategorizedInstruction) -> String {
         var code = ""
-        if instruction.immediates.isEmpty {
+        if instruction.associatedValues.isEmpty {
             code += ".\(instruction.enumCaseName)"
         } else {
             code += ".\(instruction.enumCaseName)("
@@ -488,9 +488,11 @@ enum WasmGen {
             } else {
                 code += "\n"
                 code += "        \(encodeInstrCall)\n"
-                code += "        try encodeImmediates("
-                code += instruction.immediates.map { "\($0.label): \($0.label)" }.joined(separator: ", ")
-                code += ")\n"
+                if !instruction.immediates.isEmpty {
+                    code += "        try encodeImmediates("
+                    code += instruction.immediates.map { "\($0.label): \($0.label)" }.joined(separator: ", ")
+                    code += ")\n"
+                }
                 code += "    "
             }
 
