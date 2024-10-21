@@ -249,14 +249,6 @@ extension WasmParserError.Message {
         Self("Zero expected but got \(actual)")
     }
 
-    static func inconsistentFunctionAndCodeLength(functionCount: Int, codeCount: Int) -> Self {
-        Self("Inconsistent function and code length: \(functionCount) vs \(codeCount)")
-    }
-
-    static func inconsistentDataCountAndDataSectionLength(dataCount: UInt32, dataSection: Int) -> Self {
-        Self("Inconsistent data count and data section length: \(dataCount) vs \(dataSection)")
-    }
-
     static func tooManyLocals(_ count: UInt64, limit: UInt64) -> Self {
         Self("Too many locals: \(count) vs \(limit)")
     }
@@ -311,19 +303,6 @@ extension WasmParserError.Message {
 
     @usableFromInline static func invalidResultArity(expected: Int, actual: Int) -> Self {
         Self("invalid result arity: expected \(expected) but got \(actual)")
-    }
-
-    static func raw(_ message: String) -> Self {
-        Self(message)
-    }
-}
-
-extension WasmParserError {
-    public static func inconsistentFunctionAndCodeLength(functionCount: Int, codeCount: Int) -> Self {
-        Self(.inconsistentFunctionAndCodeLength(functionCount: functionCount, codeCount: codeCount), offset: 0)
-    }
-    public static func inconsistentDataCountAndDataSectionLength(dataCount: UInt32, dataSection: Int) -> Self {
-        Self(.inconsistentDataCountAndDataSectionLength(dataCount: dataCount, dataSection: dataSection), offset: 0)
     }
 }
 

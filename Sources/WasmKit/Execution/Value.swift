@@ -146,27 +146,27 @@ extension RawUnsignedInteger {
     }
 
     func divS(_ other: Self) throws -> Self {
-        if _slowPath(other == 0) { throw Trap.integerDividedByZero }
+        if _slowPath(other == 0) { throw Trap(.integerDividedByZero) }
         let (signed, overflow) = signed.dividedReportingOverflow(by: other.signed)
-        guard !overflow else { throw Trap.integerOverflowed }
+        guard !overflow else { throw Trap(.integerOverflow) }
         return signed.unsigned
     }
     func divU(_ other: Self) throws -> Self {
-        if _slowPath(other == 0) { throw Trap.integerDividedByZero }
+        if _slowPath(other == 0) { throw Trap(.integerDividedByZero) }
         let (unsigned, overflow) = dividedReportingOverflow(by: other)
-        guard !overflow else { throw Trap.integerOverflowed }
+        guard !overflow else { throw Trap(.integerOverflow) }
         return unsigned
     }
     func remS(_ other: Self) throws -> Self {
-        if _slowPath(other == 0) { throw Trap.integerDividedByZero }
+        if _slowPath(other == 0) { throw Trap(.integerDividedByZero) }
         let (signed, overflow) = signed.remainderReportingOverflow(dividingBy: other.signed)
         guard !overflow else { return 0 }
         return signed.unsigned
     }
     func remU(_ other: Self) throws -> Self {
-        if _slowPath(other == 0) { throw Trap.integerDividedByZero }
+        if _slowPath(other == 0) { throw Trap(.integerDividedByZero) }
         let (unsigned, overflow) = remainderReportingOverflow(dividingBy: other)
-        guard !overflow else { throw Trap.integerOverflowed }
+        guard !overflow else { throw Trap(.integerOverflow) }
         return unsigned
     }
 }
@@ -263,9 +263,9 @@ extension FloatingPoint {
         rounding: (Self) -> T,
         max: Self, min: Self
     ) throws -> T {
-        guard !self.isNaN else { throw Trap.invalidConversionToInteger }
+        guard !self.isNaN else { throw Trap(.invalidConversionToInteger) }
         if self <= min || self >= max {
-            throw Trap.integerOverflowed
+            throw Trap(.integerOverflow)
         }
         return rounding(self)
     }

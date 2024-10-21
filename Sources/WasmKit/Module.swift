@@ -61,7 +61,6 @@ public struct Module {
     let importedFunctionTypes: [TypeIndex]
     let memoryTypes: [MemoryType]
     let tableTypes: [TableType]
-    let allocator: ISeqAllocator
     let features: WasmFeatureSet
     let dataCount: UInt32?
 
@@ -77,7 +76,6 @@ public struct Module {
         memories: [MemoryType],
         tables: [TableType],
         customSections: [CustomSection],
-        allocator: ISeqAllocator,
         features: WasmFeatureSet,
         dataCount: UInt32?
     ) {
@@ -89,7 +87,6 @@ public struct Module {
         self.exports = exports
         self.globals = globals
         self.customSections = customSections
-        self.allocator = allocator
         self.features = features
         self.dataCount = dataCount
 
@@ -168,61 +165,49 @@ public struct Module {
         // Step 12-13.
 
         // Steps 14-15.
-        do {
-            for element in elements {
-                guard case let .active(tableIndex, offset) = element.mode else { continue }
-                let table = try instance.tables[validating: Int(tableIndex)]
-                let offsetValue = try offset.evaluate(
-                    context: constEvalContext,
-                    expectedType: .addressType(isMemory64: table.limits.isMemory64)
-                )
-                try table.withValue { table in
-                    guard let offset = offsetValue.maybeAddressOffset(table.limits.isMemory64) else {
-                        throw InstantiationError.unsupported(
-                            "Expect \(ValueType.addressType(isMemory64: table.limits.isMemory64)) offset of active element segment but got \(offsetValue)"
-                        )
-                    }
-                    guard table.tableType.elementType == element.type else {
-                        throw ValidationError(
-                            .elementSegmentTypeMismatch(
-                                elementType: element.type,
-                                tableElementType: table.tableType.elementType
-                            )
-                        )
-                    }
-                    let references = try element.evaluateInits(context: constEvalContext)
-                    try table.initialize(
-                        references, from: 0, to: Int(offset), count: references.count
+        for element in elements {
+            guard case let .active(tableIndex, offset) = element.mode else { continue }
+            let table = try instance.tables[validating: Int(tableIndex)]
+            let offsetValue = try offset.evaluate(
+                context: constEvalContext,
+                expectedType: .addressType(isMemory64: table.limits.isMemory64)
+            )
+            try table.withValue { table in
+                guard let offset = offsetValue.maybeAddressOffset(table.limits.isMemory64) else {
+                    throw ValidationError(
+                        .unexpectedOffsetInitializer(expected: .addressType(isMemory64: table.limits.isMemory64), got: offsetValue)
                     )
                 }
+                guard table.tableType.elementType == element.type else {
+                    throw ValidationError(
+                        .elementSegmentTypeMismatch(
+                            elementType: element.type,
+                            tableElementType: table.tableType.elementType
+                        )
+                    )
+                }
+                let references = try element.evaluateInits(context: constEvalContext)
+                try table.initialize(
+                    references, from: 0, to: Int(offset), count: references.count
+                )
             }
-        } catch Trap.undefinedElement, Trap.tableSizeOverflow, Trap.outOfBoundsTableAccess {
-            throw InstantiationError.outOfBoundsTableAccess
-        } catch {
-            throw error
         }
 
         // Step 16.
-        do {
-            for case let .active(data) in data {
-                let memory = try instance.memories[validating: Int(data.index)]
-                let offsetValue = try data.offset.evaluate(
-                    context: constEvalContext,
-                    expectedType: .addressType(isMemory64: memory.limit.isMemory64)
-                )
-                try memory.withValue { memory in
-                    guard let offset = offsetValue.maybeAddressOffset(memory.limit.isMemory64) else {
-                        throw InstantiationError.unsupported(
-                            "Expect \(ValueType.addressType(isMemory64: memory.limit.isMemory64)) offset of active data segment but got \(offsetValue)"
-                        )
-                    }
-                    try memory.write(offset: Int(offset), bytes: data.initializer)
+        for case let .active(data) in data {
+            let memory = try instance.memories[validating: Int(data.index)]
+            let offsetValue = try data.offset.evaluate(
+                context: constEvalContext,
+                expectedType: .addressType(isMemory64: memory.limit.isMemory64)
+            )
+            try memory.withValue { memory in
+                guard let offset = offsetValue.maybeAddressOffset(memory.limit.isMemory64) else {
+                    throw ValidationError(
+                        .unexpectedOffsetInitializer(expected: .addressType(isMemory64: memory.limit.isMemory64), got: offsetValue)
+                    )
                 }
+                try memory.write(offset: Int(offset), bytes: data.initializer)
             }
-        } catch Trap.outOfBoundsMemoryAccess {
-            throw InstantiationError.outOfBoundsMemoryAccess
-        } catch {
-            throw error
         }
 
         // Step 17.

@@ -53,7 +53,7 @@ struct Execution {
     ) throws -> Sp {
         let newSp = sp.advanced(by: Int(spAddend))
         guard newSp.advanced(by: iseq.maxStackHeight) < stackEnd else {
-            throw Trap.callStackExhausted
+            throw Trap(.callStackExhausted)
         }
         // Initialize the locals with zeros (all types of value have the same representation)
         newSp.initialize(repeating: UntypedValue.default.storage, count: numberOfNonParameterLocals)

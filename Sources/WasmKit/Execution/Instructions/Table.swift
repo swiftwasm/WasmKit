@@ -106,7 +106,7 @@ extension Execution {
         let elementIndex = sp[register].asAddressOffset(table.limits.isMemory64)
 
         guard elementIndex < table.elements.count else {
-            throw Trap.outOfBoundsTableAccess(Int(elementIndex))
+            throw Trap(.tableOutOfBounds(Int(elementIndex)))
         }
 
         return ElementIndex(elementIndex)

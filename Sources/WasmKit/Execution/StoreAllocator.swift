@@ -265,10 +265,10 @@ extension StoreAllocator {
         // local to to the module are added.
         for importEntry in module.imports {
             guard let (external, allocator) = imports.lookup(module: importEntry.module, name: importEntry.name) else {
-                throw ImportError.unknownImport(moduleName: importEntry.module, externalName: importEntry.name)
+                throw ImportError(.missing(moduleName: importEntry.module, externalName: importEntry.name))
             }
             guard allocator === self else {
-                throw ImportError.importedEntityFromDifferentStore
+                throw ImportError(.importedEntityFromDifferentStore(importEntry))
             }
 
             switch (importEntry.descriptor, external) {
@@ -277,31 +277,33 @@ extension StoreAllocator {
                 guard typeIndex < module.types.count else {
                     throw ValidationError(.indexOutOfBounds("type", typeIndex, max: module.types.count))
                 }
-                guard engine.internType(module.types[Int(typeIndex)]) == type else {
-                    throw ImportError.incompatibleImportType
+                let expected = module.types[Int(typeIndex)]
+                guard engine.internType(expected) == type else {
+                    let actual = engine.resolveType(type)
+                    throw ImportError(.incompatibleFunctionType(importEntry, actual: actual, expected: expected))
                 }
                 importedFunctions.append(externalFunc)
 
             case let (.table(tableType), .table(table)):
                 if let max = table.limits.max, max < tableType.limits.min {
-                    throw ImportError.incompatibleImportType
+                    throw ImportError(.incompatibleTableType(importEntry, actual: tableType, expected: table.tableType))
                 }
                 importedTables.append(table)
 
             case let (.memory(memoryType), .memory(memory)):
                 if let max = memory.limit.max, max < memoryType.min {
-                    throw ImportError.incompatibleImportType
+                    throw ImportError(.incompatibleMemoryType(importEntry, actual: memoryType, expected: memory.limit))
                 }
                 importedMemories.append(memory)
 
             case let (.global(globalType), .global(global)):
                 guard globalType == global.globalType else {
-                    throw ImportError.incompatibleImportType
+                    throw ImportError(.incompatibleGlobalType(importEntry, actual: global.globalType, expected: globalType))
                 }
                 importedGlobals.append(global)
 
             default:
-                throw ImportError.incompatibleImportType
+                throw ImportError(.incompatibleType(importEntry, entity: external))
             }
         }
 
@@ -412,23 +414,18 @@ extension StoreAllocator {
         }
 
         func createExportValue(_ export: WasmParser.Export) throws -> InternalExternalValue {
-            func createErrorFactory(_ kind: String) -> (_ index: Int, _ count: Int) -> any Error {
-                return { index, count in
-                    InstantiationError.exportIndexOutOfBounds(kind: kind, index: index, count: count)
-                }
-            }
             switch export.descriptor {
             case let .function(index):
-                let handle = try functions[validating: Int(index), createErrorFactory("function")]
+                let handle = try functions[validating: Int(index)]
                 return .function(handle)
             case let .table(index):
-                let handle = try tables[validating: Int(index), createErrorFactory("table")]
+                let handle = try tables[validating: Int(index)]
                 return .table(handle)
             case let .memory(index):
-                let handle = try memories[validating: Int(index), createErrorFactory("memory")]
+                let handle = try memories[validating: Int(index)]
                 return .memory(handle)
             case let .global(index):
-                let handle = try globals[validating: Int(index), createErrorFactory("global")]
+                let handle = try globals[validating: Int(index)]
                 return .global(handle)
             }
         }
