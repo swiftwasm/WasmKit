@@ -471,32 +471,8 @@ extension ExpressionParser {
     mutating func visitLoad(_ load: Instruction.Load, wat: inout Wat) throws -> MemArg {
         return try visitLoad(defaultAlign: UInt32(load.naturalAlignment))
     }
-    mutating func visitI32Store(wat: inout Wat) throws -> MemArg {
-        return try visitStore(defaultAlign: 2)
-    }
-    mutating func visitI64Store(wat: inout Wat) throws -> MemArg {
-        return try visitStore(defaultAlign: 3)
-    }
-    mutating func visitF32Store(wat: inout Wat) throws -> MemArg {
-        return try visitStore(defaultAlign: 2)
-    }
-    mutating func visitF64Store(wat: inout Wat) throws -> MemArg {
-        return try visitStore(defaultAlign: 3)
-    }
-    mutating func visitI32Store8(wat: inout Wat) throws -> MemArg {
-        return try visitStore(defaultAlign: 0)
-    }
-    mutating func visitI32Store16(wat: inout Wat) throws -> MemArg {
-        return try visitStore(defaultAlign: 1)
-    }
-    mutating func visitI64Store8(wat: inout Wat) throws -> MemArg {
-        return try visitStore(defaultAlign: 0)
-    }
-    mutating func visitI64Store16(wat: inout Wat) throws -> MemArg {
-        return try visitStore(defaultAlign: 1)
-    }
-    mutating func visitI64Store32(wat: inout Wat) throws -> MemArg {
-        return try visitStore(defaultAlign: 2)
+    mutating func visitStore(_ store: Instruction.Store, wat: inout Wat) throws -> MemArg {
+        return try visitStore(defaultAlign: UInt32(store.naturalAlignment))
     }
     mutating func visitMemorySize(wat: inout Wat) throws -> UInt32 {
         return try memoryIndex(wat: &wat)

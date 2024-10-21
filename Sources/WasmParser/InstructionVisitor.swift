@@ -21,6 +21,17 @@ public enum Instruction: Equatable {
         case i64Load32S
         case i64Load32U
     }
+    public enum Store: Equatable {
+        case i32Store
+        case i64Store
+        case f32Store
+        case f64Store
+        case i32Store8
+        case i32Store16
+        case i64Store8
+        case i64Store16
+        case i64Store32
+    }
     case `unreachable`
     case `nop`
     case `block`(blockType: BlockType)
@@ -43,15 +54,7 @@ public enum Instruction: Equatable {
     case `globalGet`(globalIndex: UInt32)
     case `globalSet`(globalIndex: UInt32)
     case `load`(Instruction.Load, memarg: MemArg)
-    case `i32Store`(memarg: MemArg)
-    case `i64Store`(memarg: MemArg)
-    case `f32Store`(memarg: MemArg)
-    case `f64Store`(memarg: MemArg)
-    case `i32Store8`(memarg: MemArg)
-    case `i32Store16`(memarg: MemArg)
-    case `i64Store8`(memarg: MemArg)
-    case `i64Store16`(memarg: MemArg)
-    case `i64Store32`(memarg: MemArg)
+    case `store`(Instruction.Store, memarg: MemArg)
     case `memorySize`(memory: UInt32)
     case `memoryGrow`(memory: UInt32)
     case `i32Const`(value: Int32)
@@ -240,15 +243,7 @@ extension AnyInstructionVisitor {
     public mutating func visitGlobalGet(globalIndex: UInt32) throws { return try self.visit(.globalGet(globalIndex: globalIndex)) }
     public mutating func visitGlobalSet(globalIndex: UInt32) throws { return try self.visit(.globalSet(globalIndex: globalIndex)) }
     public mutating func visitLoad(_ load: Instruction.Load, memarg: MemArg) throws { return try self.visit(.load(load, memarg: memarg)) }
-    public mutating func visitI32Store(memarg: MemArg) throws { return try self.visit(.i32Store(memarg: memarg)) }
-    public mutating func visitI64Store(memarg: MemArg) throws { return try self.visit(.i64Store(memarg: memarg)) }
-    public mutating func visitF32Store(memarg: MemArg) throws { return try self.visit(.f32Store(memarg: memarg)) }
-    public mutating func visitF64Store(memarg: MemArg) throws { return try self.visit(.f64Store(memarg: memarg)) }
-    public mutating func visitI32Store8(memarg: MemArg) throws { return try self.visit(.i32Store8(memarg: memarg)) }
-    public mutating func visitI32Store16(memarg: MemArg) throws { return try self.visit(.i32Store16(memarg: memarg)) }
-    public mutating func visitI64Store8(memarg: MemArg) throws { return try self.visit(.i64Store8(memarg: memarg)) }
-    public mutating func visitI64Store16(memarg: MemArg) throws { return try self.visit(.i64Store16(memarg: memarg)) }
-    public mutating func visitI64Store32(memarg: MemArg) throws { return try self.visit(.i64Store32(memarg: memarg)) }
+    public mutating func visitStore(_ store: Instruction.Store, memarg: MemArg) throws { return try self.visit(.store(store, memarg: memarg)) }
     public mutating func visitMemorySize(memory: UInt32) throws { return try self.visit(.memorySize(memory: memory)) }
     public mutating func visitMemoryGrow(memory: UInt32) throws { return try self.visit(.memoryGrow(memory: memory)) }
     public mutating func visitI32Const(value: Int32) throws { return try self.visit(.i32Const(value: value)) }
@@ -512,41 +507,9 @@ public struct InstructionTracingVisitor<V: InstructionVisitor>: InstructionVisit
        trace(.load(load, memarg: memarg))
        return try visitor.visitLoad(load, memarg: memarg)
     }
-    public mutating func visitI32Store(memarg: MemArg) throws {
-       trace(.i32Store(memarg: memarg))
-       return try visitor.visitI32Store(memarg: memarg)
-    }
-    public mutating func visitI64Store(memarg: MemArg) throws {
-       trace(.i64Store(memarg: memarg))
-       return try visitor.visitI64Store(memarg: memarg)
-    }
-    public mutating func visitF32Store(memarg: MemArg) throws {
-       trace(.f32Store(memarg: memarg))
-       return try visitor.visitF32Store(memarg: memarg)
-    }
-    public mutating func visitF64Store(memarg: MemArg) throws {
-       trace(.f64Store(memarg: memarg))
-       return try visitor.visitF64Store(memarg: memarg)
-    }
-    public mutating func visitI32Store8(memarg: MemArg) throws {
-       trace(.i32Store8(memarg: memarg))
-       return try visitor.visitI32Store8(memarg: memarg)
-    }
-    public mutating func visitI32Store16(memarg: MemArg) throws {
-       trace(.i32Store16(memarg: memarg))
-       return try visitor.visitI32Store16(memarg: memarg)
-    }
-    public mutating func visitI64Store8(memarg: MemArg) throws {
-       trace(.i64Store8(memarg: memarg))
-       return try visitor.visitI64Store8(memarg: memarg)
-    }
-    public mutating func visitI64Store16(memarg: MemArg) throws {
-       trace(.i64Store16(memarg: memarg))
-       return try visitor.visitI64Store16(memarg: memarg)
-    }
-    public mutating func visitI64Store32(memarg: MemArg) throws {
-       trace(.i64Store32(memarg: memarg))
-       return try visitor.visitI64Store32(memarg: memarg)
+    public mutating func visitStore(_ store: Instruction.Store, memarg: MemArg) throws {
+       trace(.store(store, memarg: memarg))
+       return try visitor.visitStore(store, memarg: memarg)
     }
     public mutating func visitMemorySize(memory: UInt32) throws {
        trace(.memorySize(memory: memory))
@@ -1227,24 +1190,8 @@ public protocol InstructionVisitor {
     mutating func visitGlobalSet(globalIndex: UInt32) throws
     /// Visiting `load` category instruction.
     mutating func visitLoad(_: Instruction.Load, memarg: MemArg) throws
-    /// Visiting `i32.store` instruction.
-    mutating func visitI32Store(memarg: MemArg) throws
-    /// Visiting `i64.store` instruction.
-    mutating func visitI64Store(memarg: MemArg) throws
-    /// Visiting `f32.store` instruction.
-    mutating func visitF32Store(memarg: MemArg) throws
-    /// Visiting `f64.store` instruction.
-    mutating func visitF64Store(memarg: MemArg) throws
-    /// Visiting `i32.store8` instruction.
-    mutating func visitI32Store8(memarg: MemArg) throws
-    /// Visiting `i32.store16` instruction.
-    mutating func visitI32Store16(memarg: MemArg) throws
-    /// Visiting `i64.store8` instruction.
-    mutating func visitI64Store8(memarg: MemArg) throws
-    /// Visiting `i64.store16` instruction.
-    mutating func visitI64Store16(memarg: MemArg) throws
-    /// Visiting `i64.store32` instruction.
-    mutating func visitI64Store32(memarg: MemArg) throws
+    /// Visiting `store` category instruction.
+    mutating func visitStore(_: Instruction.Store, memarg: MemArg) throws
     /// Visiting `memory.size` instruction.
     mutating func visitMemorySize(memory: UInt32) throws
     /// Visiting `memory.grow` instruction.
@@ -1587,15 +1534,7 @@ extension InstructionVisitor {
         case let .globalGet(globalIndex): return try visitGlobalGet(globalIndex: globalIndex)
         case let .globalSet(globalIndex): return try visitGlobalSet(globalIndex: globalIndex)
         case let .load(load, memarg): return try visitLoad(load, memarg: memarg)
-        case let .i32Store(memarg): return try visitI32Store(memarg: memarg)
-        case let .i64Store(memarg): return try visitI64Store(memarg: memarg)
-        case let .f32Store(memarg): return try visitF32Store(memarg: memarg)
-        case let .f64Store(memarg): return try visitF64Store(memarg: memarg)
-        case let .i32Store8(memarg): return try visitI32Store8(memarg: memarg)
-        case let .i32Store16(memarg): return try visitI32Store16(memarg: memarg)
-        case let .i64Store8(memarg): return try visitI64Store8(memarg: memarg)
-        case let .i64Store16(memarg): return try visitI64Store16(memarg: memarg)
-        case let .i64Store32(memarg): return try visitI64Store32(memarg: memarg)
+        case let .store(store, memarg): return try visitStore(store, memarg: memarg)
         case let .memorySize(memory): return try visitMemorySize(memory: memory)
         case let .memoryGrow(memory): return try visitMemoryGrow(memory: memory)
         case let .i32Const(value): return try visitI32Const(value: value)
@@ -1781,15 +1720,7 @@ extension InstructionVisitor {
     public mutating func visitGlobalGet(globalIndex: UInt32) throws {}
     public mutating func visitGlobalSet(globalIndex: UInt32) throws {}
     public mutating func visitLoad(_ load: Instruction.Load, memarg: MemArg) throws {}
-    public mutating func visitI32Store(memarg: MemArg) throws {}
-    public mutating func visitI64Store(memarg: MemArg) throws {}
-    public mutating func visitF32Store(memarg: MemArg) throws {}
-    public mutating func visitF64Store(memarg: MemArg) throws {}
-    public mutating func visitI32Store8(memarg: MemArg) throws {}
-    public mutating func visitI32Store16(memarg: MemArg) throws {}
-    public mutating func visitI64Store8(memarg: MemArg) throws {}
-    public mutating func visitI64Store16(memarg: MemArg) throws {}
-    public mutating func visitI64Store32(memarg: MemArg) throws {}
+    public mutating func visitStore(_ store: Instruction.Store, memarg: MemArg) throws {}
     public mutating func visitMemorySize(memory: UInt32) throws {}
     public mutating func visitMemoryGrow(memory: UInt32) throws {}
     public mutating func visitI32Const(value: Int32) throws {}
