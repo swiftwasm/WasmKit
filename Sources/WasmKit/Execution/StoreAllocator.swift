@@ -275,7 +275,7 @@ extension StoreAllocator {
             case let (.function(typeIndex), .function(externalFunc)):
                 let type = externalFunc.type
                 guard typeIndex < module.types.count else {
-                    throw ValidationError("Function type index out of bounds")
+                    throw ValidationError(.indexOutOfBounds("type", typeIndex, max: module.types.count))
                 }
                 guard engine.internType(module.types[Int(typeIndex)]) == type else {
                     throw ImportError.incompatibleImportType
@@ -435,7 +435,7 @@ extension StoreAllocator {
 
         let exports: [String: InternalExternalValue] = try module.exports.reduce(into: [:]) { result, export in
             guard result[export.name] == nil else {
-                throw ValidationError("Duplicate export name: \(export.name)")
+                throw ValidationError(.duplicateExportName(name: export.name))
             }
             result[export.name] = try createExportValue(export)
         }

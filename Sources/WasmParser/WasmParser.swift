@@ -1,6 +1,7 @@
-import struct SystemPackage.FilePath
-import struct SystemPackage.FileDescriptor
 import WasmTypes
+
+import struct SystemPackage.FileDescriptor
+import struct SystemPackage.FilePath
 
 #if os(Windows)
     import ucrt
