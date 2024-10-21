@@ -387,11 +387,12 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
         if let maybeAlign = try parser.peekKeyword(), maybeAlign.starts(with: alignPrefix) {
             try parser.consume()
             var subParser = Parser(String(maybeAlign.dropFirst(alignPrefix.count)))
-            align = try subParser.expectUnsignedInt(UInt32.self)
+            let rawAlign = try subParser.expectUnsignedInt(UInt32.self)
 
-            if align == 0 || align & (align - 1) != 0 {
+            if rawAlign == 0 || rawAlign & (rawAlign - 1) != 0 {
                 throw WatParserError("alignment must be a power of 2", location: subParser.lexer.location())
             }
+            align = UInt32(rawAlign.trailingZeroBitCount)
         }
         return MemArg(offset: offset, align: align)
     }
@@ -467,74 +468,35 @@ extension ExpressionParser {
     mutating func visitGlobalSet(wat: inout Wat) throws -> UInt32 {
         return try globalIndex(wat: &wat)
     }
-    mutating func visitI32Load(wat: inout Wat) throws -> MemArg {
-        return try visitLoad(defaultAlign: 4)
-    }
-    mutating func visitI64Load(wat: inout Wat) throws -> MemArg {
-        return try visitLoad(defaultAlign: 8)
-    }
-    mutating func visitF32Load(wat: inout Wat) throws -> MemArg {
-        return try visitLoad(defaultAlign: 4)
-    }
-    mutating func visitF64Load(wat: inout Wat) throws -> MemArg {
-        return try visitLoad(defaultAlign: 8)
-    }
-    mutating func visitI32Load8S(wat: inout Wat) throws -> MemArg {
-        return try visitLoad(defaultAlign: 1)
-    }
-    mutating func visitI32Load8U(wat: inout Wat) throws -> MemArg {
-        return try visitLoad(defaultAlign: 1)
-    }
-    mutating func visitI32Load16S(wat: inout Wat) throws -> MemArg {
-        return try visitLoad(defaultAlign: 2)
-    }
-    mutating func visitI32Load16U(wat: inout Wat) throws -> MemArg {
-        return try visitLoad(defaultAlign: 2)
-    }
-    mutating func visitI64Load8S(wat: inout Wat) throws -> MemArg {
-        return try visitLoad(defaultAlign: 1)
-    }
-    mutating func visitI64Load8U(wat: inout Wat) throws -> MemArg {
-        return try visitLoad(defaultAlign: 1)
-    }
-    mutating func visitI64Load16S(wat: inout Wat) throws -> MemArg {
-        return try visitLoad(defaultAlign: 2)
-    }
-    mutating func visitI64Load16U(wat: inout Wat) throws -> MemArg {
-        return try visitLoad(defaultAlign: 2)
-    }
-    mutating func visitI64Load32S(wat: inout Wat) throws -> MemArg {
-        return try visitLoad(defaultAlign: 4)
-    }
-    mutating func visitI64Load32U(wat: inout Wat) throws -> MemArg {
-        return try visitLoad(defaultAlign: 4)
+    mutating func visitLoad(_ load: Instruction.Load, wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: UInt32(load.naturalAlignment))
     }
     mutating func visitI32Store(wat: inout Wat) throws -> MemArg {
-        return try visitStore(defaultAlign: 4)
+        return try visitStore(defaultAlign: 2)
     }
     mutating func visitI64Store(wat: inout Wat) throws -> MemArg {
-        return try visitStore(defaultAlign: 8)
+        return try visitStore(defaultAlign: 3)
     }
     mutating func visitF32Store(wat: inout Wat) throws -> MemArg {
-        return try visitStore(defaultAlign: 4)
+        return try visitStore(defaultAlign: 2)
     }
     mutating func visitF64Store(wat: inout Wat) throws -> MemArg {
-        return try visitStore(defaultAlign: 8)
+        return try visitStore(defaultAlign: 3)
     }
     mutating func visitI32Store8(wat: inout Wat) throws -> MemArg {
-        return try visitStore(defaultAlign: 1)
+        return try visitStore(defaultAlign: 0)
     }
     mutating func visitI32Store16(wat: inout Wat) throws -> MemArg {
-        return try visitStore(defaultAlign: 2)
-    }
-    mutating func visitI64Store8(wat: inout Wat) throws -> MemArg {
         return try visitStore(defaultAlign: 1)
     }
+    mutating func visitI64Store8(wat: inout Wat) throws -> MemArg {
+        return try visitStore(defaultAlign: 0)
+    }
     mutating func visitI64Store16(wat: inout Wat) throws -> MemArg {
-        return try visitStore(defaultAlign: 2)
+        return try visitStore(defaultAlign: 1)
     }
     mutating func visitI64Store32(wat: inout Wat) throws -> MemArg {
-        return try visitStore(defaultAlign: 4)
+        return try visitStore(defaultAlign: 2)
     }
     mutating func visitMemorySize(wat: inout Wat) throws -> UInt32 {
         return try memoryIndex(wat: &wat)

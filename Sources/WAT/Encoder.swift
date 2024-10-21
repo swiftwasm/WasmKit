@@ -499,7 +499,7 @@ struct ExpressionEncoder: InstructionEncoder {
     mutating func encodeImmediates(globalIndex: UInt32) throws { encodeUnsigned(globalIndex) }
     mutating func encodeImmediates(localIndex: UInt32) throws { encodeUnsigned(localIndex) }
     mutating func encodeImmediates(memarg: WasmParser.MemArg) throws {
-        encodeUnsigned(UInt(memarg.align.trailingZeroBitCount))
+        encodeUnsigned(UInt(memarg.align))
         encodeUnsigned(memarg.offset)
     }
     mutating func encodeImmediates(memory: UInt32) throws { encodeUnsigned(memory) }

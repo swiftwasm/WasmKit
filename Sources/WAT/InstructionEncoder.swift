@@ -99,60 +99,26 @@ extension InstructionEncoder {
         try encodeInstruction(0x24, nil)
         try encodeImmediates(globalIndex: globalIndex)
     }
-    mutating func visitI32Load(memarg: MemArg) throws {
-        try encodeInstruction(0x28, nil)
-        try encodeImmediates(memarg: memarg)
-    }
-    mutating func visitI64Load(memarg: MemArg) throws {
-        try encodeInstruction(0x29, nil)
-        try encodeImmediates(memarg: memarg)
-    }
-    mutating func visitF32Load(memarg: MemArg) throws {
-        try encodeInstruction(0x2A, nil)
-        try encodeImmediates(memarg: memarg)
-    }
-    mutating func visitF64Load(memarg: MemArg) throws {
-        try encodeInstruction(0x2B, nil)
-        try encodeImmediates(memarg: memarg)
-    }
-    mutating func visitI32Load8S(memarg: MemArg) throws {
-        try encodeInstruction(0x2C, nil)
-        try encodeImmediates(memarg: memarg)
-    }
-    mutating func visitI32Load8U(memarg: MemArg) throws {
-        try encodeInstruction(0x2D, nil)
-        try encodeImmediates(memarg: memarg)
-    }
-    mutating func visitI32Load16S(memarg: MemArg) throws {
-        try encodeInstruction(0x2E, nil)
-        try encodeImmediates(memarg: memarg)
-    }
-    mutating func visitI32Load16U(memarg: MemArg) throws {
-        try encodeInstruction(0x2F, nil)
-        try encodeImmediates(memarg: memarg)
-    }
-    mutating func visitI64Load8S(memarg: MemArg) throws {
-        try encodeInstruction(0x30, nil)
-        try encodeImmediates(memarg: memarg)
-    }
-    mutating func visitI64Load8U(memarg: MemArg) throws {
-        try encodeInstruction(0x31, nil)
-        try encodeImmediates(memarg: memarg)
-    }
-    mutating func visitI64Load16S(memarg: MemArg) throws {
-        try encodeInstruction(0x32, nil)
-        try encodeImmediates(memarg: memarg)
-    }
-    mutating func visitI64Load16U(memarg: MemArg) throws {
-        try encodeInstruction(0x33, nil)
-        try encodeImmediates(memarg: memarg)
-    }
-    mutating func visitI64Load32S(memarg: MemArg) throws {
-        try encodeInstruction(0x34, nil)
-        try encodeImmediates(memarg: memarg)
-    }
-    mutating func visitI64Load32U(memarg: MemArg) throws {
-        try encodeInstruction(0x35, nil)
+    mutating func visitLoad(_ load: Instruction.Load, memarg: MemArg) throws {
+        let (prefix, opcode): (UInt8?, UInt8)
+        switch load {
+        case .i32Load: (prefix, opcode) = (nil, 0x28)
+        case .i64Load: (prefix, opcode) = (nil, 0x29)
+        case .f32Load: (prefix, opcode) = (nil, 0x2A)
+        case .f64Load: (prefix, opcode) = (nil, 0x2B)
+        case .i32Load8S: (prefix, opcode) = (nil, 0x2C)
+        case .i32Load8U: (prefix, opcode) = (nil, 0x2D)
+        case .i32Load16S: (prefix, opcode) = (nil, 0x2E)
+        case .i32Load16U: (prefix, opcode) = (nil, 0x2F)
+        case .i64Load8S: (prefix, opcode) = (nil, 0x30)
+        case .i64Load8U: (prefix, opcode) = (nil, 0x31)
+        case .i64Load16S: (prefix, opcode) = (nil, 0x32)
+        case .i64Load16U: (prefix, opcode) = (nil, 0x33)
+        case .i64Load32S: (prefix, opcode) = (nil, 0x34)
+        case .i64Load32U: (prefix, opcode) = (nil, 0x35)
+        }
+
+        try encodeInstruction(opcode, prefix)
         try encodeImmediates(memarg: memarg)
     }
     mutating func visitI32Store(memarg: MemArg) throws {

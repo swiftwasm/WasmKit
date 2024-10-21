@@ -1737,20 +1737,27 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             emit(instruction(storeOperand))
         }
     }
-    mutating func visitI32Load(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i32, 2, Instruction.i32Load) }
-    mutating func visitI64Load(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, 3, Instruction.i64Load) }
-    mutating func visitF32Load(memarg: MemArg) throws -> Output { try visitLoad(memarg, .f32, 2, Instruction.f32Load) }
-    mutating func visitF64Load(memarg: MemArg) throws -> Output { try visitLoad(memarg, .f64, 3, Instruction.f64Load) }
-    mutating func visitI32Load8S(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i32, 0, Instruction.i32Load8S) }
-    mutating func visitI32Load8U(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i32, 0, Instruction.i32Load8U) }
-    mutating func visitI32Load16S(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i32, 1, Instruction.i32Load16S) }
-    mutating func visitI32Load16U(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i32, 1, Instruction.i32Load16U) }
-    mutating func visitI64Load8S(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, 0, Instruction.i64Load8S) }
-    mutating func visitI64Load8U(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, 0, Instruction.i64Load8U) }
-    mutating func visitI64Load16S(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, 1, Instruction.i64Load16S) }
-    mutating func visitI64Load16U(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, 1, Instruction.i64Load16U) }
-    mutating func visitI64Load32S(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, 2, Instruction.i64Load32S) }
-    mutating func visitI64Load32U(memarg: MemArg) throws -> Output { try visitLoad(memarg, .i64, 2, Instruction.i64Load32U) }
+    
+    mutating func visitLoad(_ load: WasmParser.Instruction.Load, memarg: MemArg) throws {
+        let instruction: (Instruction.LoadOperand) -> Instruction
+        switch load {
+        case .i32Load: instruction = Instruction.i32Load
+        case .i64Load: instruction = Instruction.i64Load
+        case .f32Load: instruction = Instruction.f32Load
+        case .f64Load: instruction = Instruction.f64Load
+        case .i32Load8S: instruction = Instruction.i32Load8S
+        case .i32Load8U: instruction = Instruction.i32Load8U
+        case .i32Load16S: instruction = Instruction.i32Load16S
+        case .i32Load16U: instruction = Instruction.i32Load16U
+        case .i64Load8S: instruction = Instruction.i64Load8S
+        case .i64Load8U: instruction = Instruction.i64Load8U
+        case .i64Load16S: instruction = Instruction.i64Load16S
+        case .i64Load16U: instruction = Instruction.i64Load16U
+        case .i64Load32S: instruction = Instruction.i64Load32S
+        case .i64Load32U: instruction = Instruction.i64Load32U
+        }
+        try visitLoad(memarg, load.type, load.naturalAlignment, instruction)
+    }
     mutating func visitI32Store(memarg: MemArg) throws -> Output { try visitStore(memarg, .i32, 2, Instruction.i32Store) }
     mutating func visitI64Store(memarg: MemArg) throws -> Output { try visitStore(memarg, .i64, 3, Instruction.i64Store) }
     mutating func visitF32Store(memarg: MemArg) throws -> Output { try visitStore(memarg, .f32, 2, Instruction.f32Store) }
