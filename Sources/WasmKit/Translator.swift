@@ -1897,6 +1897,56 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
         try visitCmp(operand, instruction)
     }
+    public mutating func visitBinary(_ binary: WasmParser.Instruction.Binary) throws {
+        let operand: ValueType, result: ValueType, instruction: (Instruction.BinaryOperand) -> Instruction
+        switch binary {
+        case .i32Add: (operand, result, instruction) = (.i32, .i32, Instruction.i32Add)
+        case .i32Sub: (operand, result, instruction) = (.i32, .i32, Instruction.i32Sub)
+        case .i32Mul: (operand, result, instruction) = (.i32, .i32, Instruction.i32Mul)
+        case .i32DivS: (operand, result, instruction) = (.i32, .i32, Instruction.i32DivS)
+        case .i32DivU: (operand, result, instruction) = (.i32, .i32, Instruction.i32DivU)
+        case .i32RemS: (operand, result, instruction) = (.i32, .i32, Instruction.i32RemS)
+        case .i32RemU: (operand, result, instruction) = (.i32, .i32, Instruction.i32RemU)
+        case .i32And: (operand, result, instruction) = (.i32, .i32, Instruction.i32And)
+        case .i32Or: (operand, result, instruction) = (.i32, .i32, Instruction.i32Or)
+        case .i32Xor: (operand, result, instruction) = (.i32, .i32, Instruction.i32Xor)
+        case .i32Shl: (operand, result, instruction) = (.i32, .i32, Instruction.i32Shl)
+        case .i32ShrS: (operand, result, instruction) = (.i32, .i32, Instruction.i32ShrS)
+        case .i32ShrU: (operand, result, instruction) = (.i32, .i32, Instruction.i32ShrU)
+        case .i32Rotl: (operand, result, instruction) = (.i32, .i32, Instruction.i32Rotl)
+        case .i32Rotr: (operand, result, instruction) = (.i32, .i32, Instruction.i32Rotr)
+        case .i64Add: (operand, result, instruction) = (.i64, .i64, Instruction.i64Add)
+        case .i64Sub: (operand, result, instruction) = (.i64, .i64, Instruction.i64Sub)
+        case .i64Mul: (operand, result, instruction) = (.i64, .i64, Instruction.i64Mul)
+        case .i64DivS: (operand, result, instruction) = (.i64, .i64, Instruction.i64DivS)
+        case .i64DivU: (operand, result, instruction) = (.i64, .i64, Instruction.i64DivU)
+        case .i64RemS: (operand, result, instruction) = (.i64, .i64, Instruction.i64RemS)
+        case .i64RemU: (operand, result, instruction) = (.i64, .i64, Instruction.i64RemU)
+        case .i64And: (operand, result, instruction) = (.i64, .i64, Instruction.i64And)
+        case .i64Or: (operand, result, instruction) = (.i64, .i64, Instruction.i64Or)
+        case .i64Xor: (operand, result, instruction) = (.i64, .i64, Instruction.i64Xor)
+        case .i64Shl: (operand, result, instruction) = (.i64, .i64, Instruction.i64Shl)
+        case .i64ShrS: (operand, result, instruction) = (.i64, .i64, Instruction.i64ShrS)
+        case .i64ShrU: (operand, result, instruction) = (.i64, .i64, Instruction.i64ShrU)
+        case .i64Rotl: (operand, result, instruction) = (.i64, .i64, Instruction.i64Rotl)
+        case .i64Rotr: (operand, result, instruction) = (.i64, .i64, Instruction.i64Rotr)
+        case .f32Add: (operand, result, instruction) = (.f32, .f32, Instruction.f32Add)
+        case .f32Sub: (operand, result, instruction) = (.f32, .f32, Instruction.f32Sub)
+        case .f32Mul: (operand, result, instruction) = (.f32, .f32, Instruction.f32Mul)
+        case .f32Div: (operand, result, instruction) = (.f32, .f32, Instruction.f32Div)
+        case .f32Min: (operand, result, instruction) = (.f32, .f32, Instruction.f32Min)
+        case .f32Max: (operand, result, instruction) = (.f32, .f32, Instruction.f32Max)
+        case .f32Copysign: (operand, result, instruction) = (.f32, .f32, Instruction.f32CopySign)
+        case .f64Add: (operand, result, instruction) = (.f64, .f64, Instruction.f64Add)
+        case .f64Sub: (operand, result, instruction) = (.f64, .f64, Instruction.f64Sub)
+        case .f64Mul: (operand, result, instruction) = (.f64, .f64, Instruction.f64Mul)
+        case .f64Div: (operand, result, instruction) = (.f64, .f64, Instruction.f64Div)
+        case .f64Min: (operand, result, instruction) = (.f64, .f64, Instruction.f64Min)
+        case .f64Max: (operand, result, instruction) = (.f64, .f64, Instruction.f64Max)
+        case .f64Copysign: (operand, result, instruction) = (.f64, .f64, Instruction.f64CopySign)
+        }
+         try visitBinary(operand, result, instruction)
+    }
     mutating func visitI64Eqz() throws -> Output {
         try popPushEmit(.i64, .i32) { value, result, stack in
             .i64Eqz(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
@@ -1905,39 +1955,9 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     mutating func visitI32Clz() throws -> Output { try visitUnary(.i32, Instruction.i32Clz) }
     mutating func visitI32Ctz() throws -> Output { try visitUnary(.i32, Instruction.i32Ctz) }
     mutating func visitI32Popcnt() throws -> Output { try visitUnary(.i32, Instruction.i32Popcnt) }
-    mutating func visitI32Add() throws -> Output { try visitBinary(.i32, .i32, Instruction.i32Add) }
-    mutating func visitI32Sub() throws -> Output { try visitBinary(.i32, .i32, Instruction.i32Sub) }
-    mutating func visitI32Mul() throws -> Output { try visitBinary(.i32, .i32, Instruction.i32Mul) }
-    mutating func visitI32DivS() throws -> Output { try visitBinary(.i32, .i32, Instruction.i32DivS) }
-    mutating func visitI32DivU() throws -> Output { try visitBinary(.i32, .i32, Instruction.i32DivU) }
-    mutating func visitI32RemS() throws -> Output { try visitBinary(.i32, .i32, Instruction.i32RemS) }
-    mutating func visitI32RemU() throws -> Output { try visitBinary(.i32, .i32, Instruction.i32RemU) }
-    mutating func visitI32And() throws -> Output { try visitBinary(.i32, .i32, Instruction.i32And) }
-    mutating func visitI32Or() throws -> Output { try visitBinary(.i32, .i32, Instruction.i32Or) }
-    mutating func visitI32Xor() throws -> Output { try visitBinary(.i32, .i32, Instruction.i32Xor) }
-    mutating func visitI32Shl() throws -> Output { try visitBinary(.i32, .i32, Instruction.i32Shl) }
-    mutating func visitI32ShrS() throws -> Output { try visitBinary(.i32, .i32, Instruction.i32ShrS) }
-    mutating func visitI32ShrU() throws -> Output { try visitBinary(.i32, .i32, Instruction.i32ShrU) }
-    mutating func visitI32Rotl() throws -> Output { try visitBinary(.i32, .i32, Instruction.i32Rotl) }
-    mutating func visitI32Rotr() throws -> Output { try visitBinary(.i32, .i32, Instruction.i32Rotr) }
     mutating func visitI64Clz() throws -> Output { try visitUnary(.i64, Instruction.i64Clz) }
     mutating func visitI64Ctz() throws -> Output { try visitUnary(.i64, Instruction.i64Ctz) }
     mutating func visitI64Popcnt() throws -> Output { try visitUnary(.i64, Instruction.i64Popcnt) }
-    mutating func visitI64Add() throws -> Output { try visitBinary(.i64, .i64, Instruction.i64Add) }
-    mutating func visitI64Sub() throws -> Output { try visitBinary(.i64, .i64, Instruction.i64Sub) }
-    mutating func visitI64Mul() throws -> Output { try visitBinary(.i64, .i64, Instruction.i64Mul) }
-    mutating func visitI64DivS() throws -> Output { try visitBinary(.i64, .i64, Instruction.i64DivS) }
-    mutating func visitI64DivU() throws -> Output { try visitBinary(.i64, .i64, Instruction.i64DivU) }
-    mutating func visitI64RemS() throws -> Output { try visitBinary(.i64, .i64, Instruction.i64RemS) }
-    mutating func visitI64RemU() throws -> Output { try visitBinary(.i64, .i64, Instruction.i64RemU) }
-    mutating func visitI64And() throws -> Output { try visitBinary(.i64, .i64, Instruction.i64And) }
-    mutating func visitI64Or() throws -> Output { try visitBinary(.i64, .i64, Instruction.i64Or) }
-    mutating func visitI64Xor() throws -> Output { try visitBinary(.i64, .i64, Instruction.i64Xor) }
-    mutating func visitI64Shl() throws -> Output { try visitBinary(.i64, .i64, Instruction.i64Shl) }
-    mutating func visitI64ShrS() throws -> Output { try visitBinary(.i64, .i64, Instruction.i64ShrS) }
-    mutating func visitI64ShrU() throws -> Output { try visitBinary(.i64, .i64, Instruction.i64ShrU) }
-    mutating func visitI64Rotl() throws -> Output { try visitBinary(.i64, .i64, Instruction.i64Rotl) }
-    mutating func visitI64Rotr() throws -> Output { try visitBinary(.i64, .i64, Instruction.i64Rotr) }
     mutating func visitF32Abs() throws -> Output { try visitUnary(.f32, Instruction.f32Abs) }
     mutating func visitF32Neg() throws -> Output { try visitUnary(.f32, Instruction.f32Neg) }
     mutating func visitF32Ceil() throws -> Output { try visitUnary(.f32, Instruction.f32Ceil) }
@@ -1945,13 +1965,6 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     mutating func visitF32Trunc() throws -> Output { try visitUnary(.f32, Instruction.f32Trunc) }
     mutating func visitF32Nearest() throws -> Output { try visitUnary(.f32, Instruction.f32Nearest) }
     mutating func visitF32Sqrt() throws -> Output { try visitUnary(.f32, Instruction.f32Sqrt) }
-    mutating func visitF32Add() throws -> Output { try visitBinary(.f32, .f32, Instruction.f32Add) }
-    mutating func visitF32Sub() throws -> Output { try visitBinary(.f32, .f32, Instruction.f32Sub) }
-    mutating func visitF32Mul() throws -> Output { try visitBinary(.f32, .f32, Instruction.f32Mul) }
-    mutating func visitF32Div() throws -> Output { try visitBinary(.f32, .f32, Instruction.f32Div) }
-    mutating func visitF32Min() throws -> Output { try visitBinary(.f32, .f32, Instruction.f32Min) }
-    mutating func visitF32Max() throws -> Output { try visitBinary(.f32, .f32, Instruction.f32Max) }
-    mutating func visitF32Copysign() throws -> Output { try visitBinary(.f32, .f32, Instruction.f32CopySign) }
     mutating func visitF64Abs() throws -> Output { try visitUnary(.f64, Instruction.f64Abs) }
     mutating func visitF64Neg() throws -> Output { try visitUnary(.f64, Instruction.f64Neg) }
     mutating func visitF64Ceil() throws -> Output { try visitUnary(.f64, Instruction.f64Ceil) }
@@ -1959,13 +1972,6 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     mutating func visitF64Trunc() throws -> Output { try visitUnary(.f64, Instruction.f64Trunc) }
     mutating func visitF64Nearest() throws -> Output { try visitUnary(.f64, Instruction.f64Nearest) }
     mutating func visitF64Sqrt() throws -> Output { try visitUnary(.f64, Instruction.f64Sqrt) }
-    mutating func visitF64Add() throws -> Output { try visitBinary(.f64, .f64, Instruction.f64Add) }
-    mutating func visitF64Sub() throws -> Output { try visitBinary(.f64, .f64, Instruction.f64Sub) }
-    mutating func visitF64Mul() throws -> Output { try visitBinary(.f64, .f64, Instruction.f64Mul) }
-    mutating func visitF64Div() throws -> Output { try visitBinary(.f64, .f64, Instruction.f64Div) }
-    mutating func visitF64Min() throws -> Output { try visitBinary(.f64, .f64, Instruction.f64Min) }
-    mutating func visitF64Max() throws -> Output { try visitBinary(.f64, .f64, Instruction.f64Max) }
-    mutating func visitF64Copysign() throws -> Output { try visitBinary(.f64, .f64, Instruction.f64CopySign) }
     mutating func visitI32WrapI64() throws -> Output { try visitConversion(.i64, .i32, Instruction.i32WrapI64) }
     mutating func visitI32TruncF32S() throws -> Output { try visitConversion(.f32, .i32, Instruction.i32TruncF32S) }
     mutating func visitI32TruncF32U() throws -> Output { try visitConversion(.f32, .i32, Instruction.i32TruncF32U) }

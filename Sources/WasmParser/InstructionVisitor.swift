@@ -66,6 +66,52 @@ public enum Instruction: Equatable {
         case f64Le
         case f64Ge
     }
+    public enum Binary: Equatable {
+        case i32Add
+        case i32Sub
+        case i32Mul
+        case i32DivS
+        case i32DivU
+        case i32RemS
+        case i32RemU
+        case i32And
+        case i32Or
+        case i32Xor
+        case i32Shl
+        case i32ShrS
+        case i32ShrU
+        case i32Rotl
+        case i32Rotr
+        case i64Add
+        case i64Sub
+        case i64Mul
+        case i64DivS
+        case i64DivU
+        case i64RemS
+        case i64RemU
+        case i64And
+        case i64Or
+        case i64Xor
+        case i64Shl
+        case i64ShrS
+        case i64ShrU
+        case i64Rotl
+        case i64Rotr
+        case f32Add
+        case f32Sub
+        case f32Mul
+        case f32Div
+        case f32Min
+        case f32Max
+        case f32Copysign
+        case f64Add
+        case f64Sub
+        case f64Mul
+        case f64Div
+        case f64Min
+        case f64Max
+        case f64Copysign
+    }
     case `unreachable`
     case `nop`
     case `block`(blockType: BlockType)
@@ -104,39 +150,10 @@ public enum Instruction: Equatable {
     case `i32Clz`
     case `i32Ctz`
     case `i32Popcnt`
-    case `i32Add`
-    case `i32Sub`
-    case `i32Mul`
-    case `i32DivS`
-    case `i32DivU`
-    case `i32RemS`
-    case `i32RemU`
-    case `i32And`
-    case `i32Or`
-    case `i32Xor`
-    case `i32Shl`
-    case `i32ShrS`
-    case `i32ShrU`
-    case `i32Rotl`
-    case `i32Rotr`
+    case `binary`(Instruction.Binary)
     case `i64Clz`
     case `i64Ctz`
     case `i64Popcnt`
-    case `i64Add`
-    case `i64Sub`
-    case `i64Mul`
-    case `i64DivS`
-    case `i64DivU`
-    case `i64RemS`
-    case `i64RemU`
-    case `i64And`
-    case `i64Or`
-    case `i64Xor`
-    case `i64Shl`
-    case `i64ShrS`
-    case `i64ShrU`
-    case `i64Rotl`
-    case `i64Rotr`
     case `f32Abs`
     case `f32Neg`
     case `f32Ceil`
@@ -144,13 +161,6 @@ public enum Instruction: Equatable {
     case `f32Trunc`
     case `f32Nearest`
     case `f32Sqrt`
-    case `f32Add`
-    case `f32Sub`
-    case `f32Mul`
-    case `f32Div`
-    case `f32Min`
-    case `f32Max`
-    case `f32Copysign`
     case `f64Abs`
     case `f64Neg`
     case `f64Ceil`
@@ -158,13 +168,6 @@ public enum Instruction: Equatable {
     case `f64Trunc`
     case `f64Nearest`
     case `f64Sqrt`
-    case `f64Add`
-    case `f64Sub`
-    case `f64Mul`
-    case `f64Div`
-    case `f64Min`
-    case `f64Max`
-    case `f64Copysign`
     case `i32WrapI64`
     case `i32TruncF32S`
     case `i32TruncF32U`
@@ -262,39 +265,10 @@ extension AnyInstructionVisitor {
     public mutating func visitI32Clz() throws { return try self.visit(.i32Clz) }
     public mutating func visitI32Ctz() throws { return try self.visit(.i32Ctz) }
     public mutating func visitI32Popcnt() throws { return try self.visit(.i32Popcnt) }
-    public mutating func visitI32Add() throws { return try self.visit(.i32Add) }
-    public mutating func visitI32Sub() throws { return try self.visit(.i32Sub) }
-    public mutating func visitI32Mul() throws { return try self.visit(.i32Mul) }
-    public mutating func visitI32DivS() throws { return try self.visit(.i32DivS) }
-    public mutating func visitI32DivU() throws { return try self.visit(.i32DivU) }
-    public mutating func visitI32RemS() throws { return try self.visit(.i32RemS) }
-    public mutating func visitI32RemU() throws { return try self.visit(.i32RemU) }
-    public mutating func visitI32And() throws { return try self.visit(.i32And) }
-    public mutating func visitI32Or() throws { return try self.visit(.i32Or) }
-    public mutating func visitI32Xor() throws { return try self.visit(.i32Xor) }
-    public mutating func visitI32Shl() throws { return try self.visit(.i32Shl) }
-    public mutating func visitI32ShrS() throws { return try self.visit(.i32ShrS) }
-    public mutating func visitI32ShrU() throws { return try self.visit(.i32ShrU) }
-    public mutating func visitI32Rotl() throws { return try self.visit(.i32Rotl) }
-    public mutating func visitI32Rotr() throws { return try self.visit(.i32Rotr) }
+    public mutating func visitBinary(_ binary: Instruction.Binary) throws { return try self.visit(.binary(binary)) }
     public mutating func visitI64Clz() throws { return try self.visit(.i64Clz) }
     public mutating func visitI64Ctz() throws { return try self.visit(.i64Ctz) }
     public mutating func visitI64Popcnt() throws { return try self.visit(.i64Popcnt) }
-    public mutating func visitI64Add() throws { return try self.visit(.i64Add) }
-    public mutating func visitI64Sub() throws { return try self.visit(.i64Sub) }
-    public mutating func visitI64Mul() throws { return try self.visit(.i64Mul) }
-    public mutating func visitI64DivS() throws { return try self.visit(.i64DivS) }
-    public mutating func visitI64DivU() throws { return try self.visit(.i64DivU) }
-    public mutating func visitI64RemS() throws { return try self.visit(.i64RemS) }
-    public mutating func visitI64RemU() throws { return try self.visit(.i64RemU) }
-    public mutating func visitI64And() throws { return try self.visit(.i64And) }
-    public mutating func visitI64Or() throws { return try self.visit(.i64Or) }
-    public mutating func visitI64Xor() throws { return try self.visit(.i64Xor) }
-    public mutating func visitI64Shl() throws { return try self.visit(.i64Shl) }
-    public mutating func visitI64ShrS() throws { return try self.visit(.i64ShrS) }
-    public mutating func visitI64ShrU() throws { return try self.visit(.i64ShrU) }
-    public mutating func visitI64Rotl() throws { return try self.visit(.i64Rotl) }
-    public mutating func visitI64Rotr() throws { return try self.visit(.i64Rotr) }
     public mutating func visitF32Abs() throws { return try self.visit(.f32Abs) }
     public mutating func visitF32Neg() throws { return try self.visit(.f32Neg) }
     public mutating func visitF32Ceil() throws { return try self.visit(.f32Ceil) }
@@ -302,13 +276,6 @@ extension AnyInstructionVisitor {
     public mutating func visitF32Trunc() throws { return try self.visit(.f32Trunc) }
     public mutating func visitF32Nearest() throws { return try self.visit(.f32Nearest) }
     public mutating func visitF32Sqrt() throws { return try self.visit(.f32Sqrt) }
-    public mutating func visitF32Add() throws { return try self.visit(.f32Add) }
-    public mutating func visitF32Sub() throws { return try self.visit(.f32Sub) }
-    public mutating func visitF32Mul() throws { return try self.visit(.f32Mul) }
-    public mutating func visitF32Div() throws { return try self.visit(.f32Div) }
-    public mutating func visitF32Min() throws { return try self.visit(.f32Min) }
-    public mutating func visitF32Max() throws { return try self.visit(.f32Max) }
-    public mutating func visitF32Copysign() throws { return try self.visit(.f32Copysign) }
     public mutating func visitF64Abs() throws { return try self.visit(.f64Abs) }
     public mutating func visitF64Neg() throws { return try self.visit(.f64Neg) }
     public mutating func visitF64Ceil() throws { return try self.visit(.f64Ceil) }
@@ -316,13 +283,6 @@ extension AnyInstructionVisitor {
     public mutating func visitF64Trunc() throws { return try self.visit(.f64Trunc) }
     public mutating func visitF64Nearest() throws { return try self.visit(.f64Nearest) }
     public mutating func visitF64Sqrt() throws { return try self.visit(.f64Sqrt) }
-    public mutating func visitF64Add() throws { return try self.visit(.f64Add) }
-    public mutating func visitF64Sub() throws { return try self.visit(.f64Sub) }
-    public mutating func visitF64Mul() throws { return try self.visit(.f64Mul) }
-    public mutating func visitF64Div() throws { return try self.visit(.f64Div) }
-    public mutating func visitF64Min() throws { return try self.visit(.f64Min) }
-    public mutating func visitF64Max() throws { return try self.visit(.f64Max) }
-    public mutating func visitF64Copysign() throws { return try self.visit(.f64Copysign) }
     public mutating func visitI32WrapI64() throws { return try self.visit(.i32WrapI64) }
     public mutating func visitI32TruncF32S() throws { return try self.visit(.i32TruncF32S) }
     public mutating func visitI32TruncF32U() throws { return try self.visit(.i32TruncF32U) }
@@ -543,65 +503,9 @@ public struct InstructionTracingVisitor<V: InstructionVisitor>: InstructionVisit
        trace(.i32Popcnt)
        return try visitor.visitI32Popcnt()
     }
-    public mutating func visitI32Add() throws {
-       trace(.i32Add)
-       return try visitor.visitI32Add()
-    }
-    public mutating func visitI32Sub() throws {
-       trace(.i32Sub)
-       return try visitor.visitI32Sub()
-    }
-    public mutating func visitI32Mul() throws {
-       trace(.i32Mul)
-       return try visitor.visitI32Mul()
-    }
-    public mutating func visitI32DivS() throws {
-       trace(.i32DivS)
-       return try visitor.visitI32DivS()
-    }
-    public mutating func visitI32DivU() throws {
-       trace(.i32DivU)
-       return try visitor.visitI32DivU()
-    }
-    public mutating func visitI32RemS() throws {
-       trace(.i32RemS)
-       return try visitor.visitI32RemS()
-    }
-    public mutating func visitI32RemU() throws {
-       trace(.i32RemU)
-       return try visitor.visitI32RemU()
-    }
-    public mutating func visitI32And() throws {
-       trace(.i32And)
-       return try visitor.visitI32And()
-    }
-    public mutating func visitI32Or() throws {
-       trace(.i32Or)
-       return try visitor.visitI32Or()
-    }
-    public mutating func visitI32Xor() throws {
-       trace(.i32Xor)
-       return try visitor.visitI32Xor()
-    }
-    public mutating func visitI32Shl() throws {
-       trace(.i32Shl)
-       return try visitor.visitI32Shl()
-    }
-    public mutating func visitI32ShrS() throws {
-       trace(.i32ShrS)
-       return try visitor.visitI32ShrS()
-    }
-    public mutating func visitI32ShrU() throws {
-       trace(.i32ShrU)
-       return try visitor.visitI32ShrU()
-    }
-    public mutating func visitI32Rotl() throws {
-       trace(.i32Rotl)
-       return try visitor.visitI32Rotl()
-    }
-    public mutating func visitI32Rotr() throws {
-       trace(.i32Rotr)
-       return try visitor.visitI32Rotr()
+    public mutating func visitBinary(_ binary: Instruction.Binary) throws {
+       trace(.binary(binary))
+       return try visitor.visitBinary(binary)
     }
     public mutating func visitI64Clz() throws {
        trace(.i64Clz)
@@ -614,66 +518,6 @@ public struct InstructionTracingVisitor<V: InstructionVisitor>: InstructionVisit
     public mutating func visitI64Popcnt() throws {
        trace(.i64Popcnt)
        return try visitor.visitI64Popcnt()
-    }
-    public mutating func visitI64Add() throws {
-       trace(.i64Add)
-       return try visitor.visitI64Add()
-    }
-    public mutating func visitI64Sub() throws {
-       trace(.i64Sub)
-       return try visitor.visitI64Sub()
-    }
-    public mutating func visitI64Mul() throws {
-       trace(.i64Mul)
-       return try visitor.visitI64Mul()
-    }
-    public mutating func visitI64DivS() throws {
-       trace(.i64DivS)
-       return try visitor.visitI64DivS()
-    }
-    public mutating func visitI64DivU() throws {
-       trace(.i64DivU)
-       return try visitor.visitI64DivU()
-    }
-    public mutating func visitI64RemS() throws {
-       trace(.i64RemS)
-       return try visitor.visitI64RemS()
-    }
-    public mutating func visitI64RemU() throws {
-       trace(.i64RemU)
-       return try visitor.visitI64RemU()
-    }
-    public mutating func visitI64And() throws {
-       trace(.i64And)
-       return try visitor.visitI64And()
-    }
-    public mutating func visitI64Or() throws {
-       trace(.i64Or)
-       return try visitor.visitI64Or()
-    }
-    public mutating func visitI64Xor() throws {
-       trace(.i64Xor)
-       return try visitor.visitI64Xor()
-    }
-    public mutating func visitI64Shl() throws {
-       trace(.i64Shl)
-       return try visitor.visitI64Shl()
-    }
-    public mutating func visitI64ShrS() throws {
-       trace(.i64ShrS)
-       return try visitor.visitI64ShrS()
-    }
-    public mutating func visitI64ShrU() throws {
-       trace(.i64ShrU)
-       return try visitor.visitI64ShrU()
-    }
-    public mutating func visitI64Rotl() throws {
-       trace(.i64Rotl)
-       return try visitor.visitI64Rotl()
-    }
-    public mutating func visitI64Rotr() throws {
-       trace(.i64Rotr)
-       return try visitor.visitI64Rotr()
     }
     public mutating func visitF32Abs() throws {
        trace(.f32Abs)
@@ -703,34 +547,6 @@ public struct InstructionTracingVisitor<V: InstructionVisitor>: InstructionVisit
        trace(.f32Sqrt)
        return try visitor.visitF32Sqrt()
     }
-    public mutating func visitF32Add() throws {
-       trace(.f32Add)
-       return try visitor.visitF32Add()
-    }
-    public mutating func visitF32Sub() throws {
-       trace(.f32Sub)
-       return try visitor.visitF32Sub()
-    }
-    public mutating func visitF32Mul() throws {
-       trace(.f32Mul)
-       return try visitor.visitF32Mul()
-    }
-    public mutating func visitF32Div() throws {
-       trace(.f32Div)
-       return try visitor.visitF32Div()
-    }
-    public mutating func visitF32Min() throws {
-       trace(.f32Min)
-       return try visitor.visitF32Min()
-    }
-    public mutating func visitF32Max() throws {
-       trace(.f32Max)
-       return try visitor.visitF32Max()
-    }
-    public mutating func visitF32Copysign() throws {
-       trace(.f32Copysign)
-       return try visitor.visitF32Copysign()
-    }
     public mutating func visitF64Abs() throws {
        trace(.f64Abs)
        return try visitor.visitF64Abs()
@@ -758,34 +574,6 @@ public struct InstructionTracingVisitor<V: InstructionVisitor>: InstructionVisit
     public mutating func visitF64Sqrt() throws {
        trace(.f64Sqrt)
        return try visitor.visitF64Sqrt()
-    }
-    public mutating func visitF64Add() throws {
-       trace(.f64Add)
-       return try visitor.visitF64Add()
-    }
-    public mutating func visitF64Sub() throws {
-       trace(.f64Sub)
-       return try visitor.visitF64Sub()
-    }
-    public mutating func visitF64Mul() throws {
-       trace(.f64Mul)
-       return try visitor.visitF64Mul()
-    }
-    public mutating func visitF64Div() throws {
-       trace(.f64Div)
-       return try visitor.visitF64Div()
-    }
-    public mutating func visitF64Min() throws {
-       trace(.f64Min)
-       return try visitor.visitF64Min()
-    }
-    public mutating func visitF64Max() throws {
-       trace(.f64Max)
-       return try visitor.visitF64Max()
-    }
-    public mutating func visitF64Copysign() throws {
-       trace(.f64Copysign)
-       return try visitor.visitF64Copysign()
     }
     public mutating func visitI32WrapI64() throws {
        trace(.i32WrapI64)
@@ -1070,72 +858,14 @@ public protocol InstructionVisitor {
     mutating func visitI32Ctz() throws
     /// Visiting `i32.popcnt` instruction.
     mutating func visitI32Popcnt() throws
-    /// Visiting `i32.add` instruction.
-    mutating func visitI32Add() throws
-    /// Visiting `i32.sub` instruction.
-    mutating func visitI32Sub() throws
-    /// Visiting `i32.mul` instruction.
-    mutating func visitI32Mul() throws
-    /// Visiting `i32.div_s` instruction.
-    mutating func visitI32DivS() throws
-    /// Visiting `i32.div_u` instruction.
-    mutating func visitI32DivU() throws
-    /// Visiting `i32.rem_s` instruction.
-    mutating func visitI32RemS() throws
-    /// Visiting `i32.rem_u` instruction.
-    mutating func visitI32RemU() throws
-    /// Visiting `i32.and` instruction.
-    mutating func visitI32And() throws
-    /// Visiting `i32.or` instruction.
-    mutating func visitI32Or() throws
-    /// Visiting `i32.xor` instruction.
-    mutating func visitI32Xor() throws
-    /// Visiting `i32.shl` instruction.
-    mutating func visitI32Shl() throws
-    /// Visiting `i32.shr_s` instruction.
-    mutating func visitI32ShrS() throws
-    /// Visiting `i32.shr_u` instruction.
-    mutating func visitI32ShrU() throws
-    /// Visiting `i32.rotl` instruction.
-    mutating func visitI32Rotl() throws
-    /// Visiting `i32.rotr` instruction.
-    mutating func visitI32Rotr() throws
+    /// Visiting `binary` category instruction.
+    mutating func visitBinary(_: Instruction.Binary) throws
     /// Visiting `i64.clz` instruction.
     mutating func visitI64Clz() throws
     /// Visiting `i64.ctz` instruction.
     mutating func visitI64Ctz() throws
     /// Visiting `i64.popcnt` instruction.
     mutating func visitI64Popcnt() throws
-    /// Visiting `i64.add` instruction.
-    mutating func visitI64Add() throws
-    /// Visiting `i64.sub` instruction.
-    mutating func visitI64Sub() throws
-    /// Visiting `i64.mul` instruction.
-    mutating func visitI64Mul() throws
-    /// Visiting `i64.div_s` instruction.
-    mutating func visitI64DivS() throws
-    /// Visiting `i64.div_u` instruction.
-    mutating func visitI64DivU() throws
-    /// Visiting `i64.rem_s` instruction.
-    mutating func visitI64RemS() throws
-    /// Visiting `i64.rem_u` instruction.
-    mutating func visitI64RemU() throws
-    /// Visiting `i64.and` instruction.
-    mutating func visitI64And() throws
-    /// Visiting `i64.or` instruction.
-    mutating func visitI64Or() throws
-    /// Visiting `i64.xor` instruction.
-    mutating func visitI64Xor() throws
-    /// Visiting `i64.shl` instruction.
-    mutating func visitI64Shl() throws
-    /// Visiting `i64.shr_s` instruction.
-    mutating func visitI64ShrS() throws
-    /// Visiting `i64.shr_u` instruction.
-    mutating func visitI64ShrU() throws
-    /// Visiting `i64.rotl` instruction.
-    mutating func visitI64Rotl() throws
-    /// Visiting `i64.rotr` instruction.
-    mutating func visitI64Rotr() throws
     /// Visiting `f32.abs` instruction.
     mutating func visitF32Abs() throws
     /// Visiting `f32.neg` instruction.
@@ -1150,20 +880,6 @@ public protocol InstructionVisitor {
     mutating func visitF32Nearest() throws
     /// Visiting `f32.sqrt` instruction.
     mutating func visitF32Sqrt() throws
-    /// Visiting `f32.add` instruction.
-    mutating func visitF32Add() throws
-    /// Visiting `f32.sub` instruction.
-    mutating func visitF32Sub() throws
-    /// Visiting `f32.mul` instruction.
-    mutating func visitF32Mul() throws
-    /// Visiting `f32.div` instruction.
-    mutating func visitF32Div() throws
-    /// Visiting `f32.min` instruction.
-    mutating func visitF32Min() throws
-    /// Visiting `f32.max` instruction.
-    mutating func visitF32Max() throws
-    /// Visiting `f32.copysign` instruction.
-    mutating func visitF32Copysign() throws
     /// Visiting `f64.abs` instruction.
     mutating func visitF64Abs() throws
     /// Visiting `f64.neg` instruction.
@@ -1178,20 +894,6 @@ public protocol InstructionVisitor {
     mutating func visitF64Nearest() throws
     /// Visiting `f64.sqrt` instruction.
     mutating func visitF64Sqrt() throws
-    /// Visiting `f64.add` instruction.
-    mutating func visitF64Add() throws
-    /// Visiting `f64.sub` instruction.
-    mutating func visitF64Sub() throws
-    /// Visiting `f64.mul` instruction.
-    mutating func visitF64Mul() throws
-    /// Visiting `f64.div` instruction.
-    mutating func visitF64Div() throws
-    /// Visiting `f64.min` instruction.
-    mutating func visitF64Min() throws
-    /// Visiting `f64.max` instruction.
-    mutating func visitF64Max() throws
-    /// Visiting `f64.copysign` instruction.
-    mutating func visitF64Copysign() throws
     /// Visiting `i32.wrap_i64` instruction.
     mutating func visitI32WrapI64() throws
     /// Visiting `i32.trunc_f32_s` instruction.
@@ -1336,39 +1038,10 @@ extension InstructionVisitor {
         case .i32Clz: return try visitI32Clz()
         case .i32Ctz: return try visitI32Ctz()
         case .i32Popcnt: return try visitI32Popcnt()
-        case .i32Add: return try visitI32Add()
-        case .i32Sub: return try visitI32Sub()
-        case .i32Mul: return try visitI32Mul()
-        case .i32DivS: return try visitI32DivS()
-        case .i32DivU: return try visitI32DivU()
-        case .i32RemS: return try visitI32RemS()
-        case .i32RemU: return try visitI32RemU()
-        case .i32And: return try visitI32And()
-        case .i32Or: return try visitI32Or()
-        case .i32Xor: return try visitI32Xor()
-        case .i32Shl: return try visitI32Shl()
-        case .i32ShrS: return try visitI32ShrS()
-        case .i32ShrU: return try visitI32ShrU()
-        case .i32Rotl: return try visitI32Rotl()
-        case .i32Rotr: return try visitI32Rotr()
+        case let .binary(binary): return try visitBinary(binary)
         case .i64Clz: return try visitI64Clz()
         case .i64Ctz: return try visitI64Ctz()
         case .i64Popcnt: return try visitI64Popcnt()
-        case .i64Add: return try visitI64Add()
-        case .i64Sub: return try visitI64Sub()
-        case .i64Mul: return try visitI64Mul()
-        case .i64DivS: return try visitI64DivS()
-        case .i64DivU: return try visitI64DivU()
-        case .i64RemS: return try visitI64RemS()
-        case .i64RemU: return try visitI64RemU()
-        case .i64And: return try visitI64And()
-        case .i64Or: return try visitI64Or()
-        case .i64Xor: return try visitI64Xor()
-        case .i64Shl: return try visitI64Shl()
-        case .i64ShrS: return try visitI64ShrS()
-        case .i64ShrU: return try visitI64ShrU()
-        case .i64Rotl: return try visitI64Rotl()
-        case .i64Rotr: return try visitI64Rotr()
         case .f32Abs: return try visitF32Abs()
         case .f32Neg: return try visitF32Neg()
         case .f32Ceil: return try visitF32Ceil()
@@ -1376,13 +1049,6 @@ extension InstructionVisitor {
         case .f32Trunc: return try visitF32Trunc()
         case .f32Nearest: return try visitF32Nearest()
         case .f32Sqrt: return try visitF32Sqrt()
-        case .f32Add: return try visitF32Add()
-        case .f32Sub: return try visitF32Sub()
-        case .f32Mul: return try visitF32Mul()
-        case .f32Div: return try visitF32Div()
-        case .f32Min: return try visitF32Min()
-        case .f32Max: return try visitF32Max()
-        case .f32Copysign: return try visitF32Copysign()
         case .f64Abs: return try visitF64Abs()
         case .f64Neg: return try visitF64Neg()
         case .f64Ceil: return try visitF64Ceil()
@@ -1390,13 +1056,6 @@ extension InstructionVisitor {
         case .f64Trunc: return try visitF64Trunc()
         case .f64Nearest: return try visitF64Nearest()
         case .f64Sqrt: return try visitF64Sqrt()
-        case .f64Add: return try visitF64Add()
-        case .f64Sub: return try visitF64Sub()
-        case .f64Mul: return try visitF64Mul()
-        case .f64Div: return try visitF64Div()
-        case .f64Min: return try visitF64Min()
-        case .f64Max: return try visitF64Max()
-        case .f64Copysign: return try visitF64Copysign()
         case .i32WrapI64: return try visitI32WrapI64()
         case .i32TruncF32S: return try visitI32TruncF32S()
         case .i32TruncF32U: return try visitI32TruncF32U()
@@ -1491,39 +1150,10 @@ extension InstructionVisitor {
     public mutating func visitI32Clz() throws {}
     public mutating func visitI32Ctz() throws {}
     public mutating func visitI32Popcnt() throws {}
-    public mutating func visitI32Add() throws {}
-    public mutating func visitI32Sub() throws {}
-    public mutating func visitI32Mul() throws {}
-    public mutating func visitI32DivS() throws {}
-    public mutating func visitI32DivU() throws {}
-    public mutating func visitI32RemS() throws {}
-    public mutating func visitI32RemU() throws {}
-    public mutating func visitI32And() throws {}
-    public mutating func visitI32Or() throws {}
-    public mutating func visitI32Xor() throws {}
-    public mutating func visitI32Shl() throws {}
-    public mutating func visitI32ShrS() throws {}
-    public mutating func visitI32ShrU() throws {}
-    public mutating func visitI32Rotl() throws {}
-    public mutating func visitI32Rotr() throws {}
+    public mutating func visitBinary(_ binary: Instruction.Binary) throws {}
     public mutating func visitI64Clz() throws {}
     public mutating func visitI64Ctz() throws {}
     public mutating func visitI64Popcnt() throws {}
-    public mutating func visitI64Add() throws {}
-    public mutating func visitI64Sub() throws {}
-    public mutating func visitI64Mul() throws {}
-    public mutating func visitI64DivS() throws {}
-    public mutating func visitI64DivU() throws {}
-    public mutating func visitI64RemS() throws {}
-    public mutating func visitI64RemU() throws {}
-    public mutating func visitI64And() throws {}
-    public mutating func visitI64Or() throws {}
-    public mutating func visitI64Xor() throws {}
-    public mutating func visitI64Shl() throws {}
-    public mutating func visitI64ShrS() throws {}
-    public mutating func visitI64ShrU() throws {}
-    public mutating func visitI64Rotl() throws {}
-    public mutating func visitI64Rotr() throws {}
     public mutating func visitF32Abs() throws {}
     public mutating func visitF32Neg() throws {}
     public mutating func visitF32Ceil() throws {}
@@ -1531,13 +1161,6 @@ extension InstructionVisitor {
     public mutating func visitF32Trunc() throws {}
     public mutating func visitF32Nearest() throws {}
     public mutating func visitF32Sqrt() throws {}
-    public mutating func visitF32Add() throws {}
-    public mutating func visitF32Sub() throws {}
-    public mutating func visitF32Mul() throws {}
-    public mutating func visitF32Div() throws {}
-    public mutating func visitF32Min() throws {}
-    public mutating func visitF32Max() throws {}
-    public mutating func visitF32Copysign() throws {}
     public mutating func visitF64Abs() throws {}
     public mutating func visitF64Neg() throws {}
     public mutating func visitF64Ceil() throws {}
@@ -1545,13 +1168,6 @@ extension InstructionVisitor {
     public mutating func visitF64Trunc() throws {}
     public mutating func visitF64Nearest() throws {}
     public mutating func visitF64Sqrt() throws {}
-    public mutating func visitF64Add() throws {}
-    public mutating func visitF64Sub() throws {}
-    public mutating func visitF64Mul() throws {}
-    public mutating func visitF64Div() throws {}
-    public mutating func visitF64Min() throws {}
-    public mutating func visitF64Max() throws {}
-    public mutating func visitF64Copysign() throws {}
     public mutating func visitI32WrapI64() throws {}
     public mutating func visitI32TruncF32S() throws {}
     public mutating func visitI32TruncF32U() throws {}
