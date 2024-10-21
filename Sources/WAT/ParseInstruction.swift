@@ -188,9 +188,9 @@ func parseTextInstruction<V: InstructionVisitor>(keyword: String, expressionPars
     case "f64.gt": return { return try $0.visitCmp(.f64Gt) }
     case "f64.le": return { return try $0.visitCmp(.f64Le) }
     case "f64.ge": return { return try $0.visitCmp(.f64Ge) }
-    case "i32.clz": return { return try $0.visitI32Clz() }
-    case "i32.ctz": return { return try $0.visitI32Ctz() }
-    case "i32.popcnt": return { return try $0.visitI32Popcnt() }
+    case "i32.clz": return { return try $0.visitUnary(.i32Clz) }
+    case "i32.ctz": return { return try $0.visitUnary(.i32Ctz) }
+    case "i32.popcnt": return { return try $0.visitUnary(.i32Popcnt) }
     case "i32.add": return { return try $0.visitBinary(.i32Add) }
     case "i32.sub": return { return try $0.visitBinary(.i32Sub) }
     case "i32.mul": return { return try $0.visitBinary(.i32Mul) }
@@ -206,9 +206,9 @@ func parseTextInstruction<V: InstructionVisitor>(keyword: String, expressionPars
     case "i32.shr_u": return { return try $0.visitBinary(.i32ShrU) }
     case "i32.rotl": return { return try $0.visitBinary(.i32Rotl) }
     case "i32.rotr": return { return try $0.visitBinary(.i32Rotr) }
-    case "i64.clz": return { return try $0.visitI64Clz() }
-    case "i64.ctz": return { return try $0.visitI64Ctz() }
-    case "i64.popcnt": return { return try $0.visitI64Popcnt() }
+    case "i64.clz": return { return try $0.visitUnary(.i64Clz) }
+    case "i64.ctz": return { return try $0.visitUnary(.i64Ctz) }
+    case "i64.popcnt": return { return try $0.visitUnary(.i64Popcnt) }
     case "i64.add": return { return try $0.visitBinary(.i64Add) }
     case "i64.sub": return { return try $0.visitBinary(.i64Sub) }
     case "i64.mul": return { return try $0.visitBinary(.i64Mul) }
@@ -224,13 +224,13 @@ func parseTextInstruction<V: InstructionVisitor>(keyword: String, expressionPars
     case "i64.shr_u": return { return try $0.visitBinary(.i64ShrU) }
     case "i64.rotl": return { return try $0.visitBinary(.i64Rotl) }
     case "i64.rotr": return { return try $0.visitBinary(.i64Rotr) }
-    case "f32.abs": return { return try $0.visitF32Abs() }
-    case "f32.neg": return { return try $0.visitF32Neg() }
-    case "f32.ceil": return { return try $0.visitF32Ceil() }
-    case "f32.floor": return { return try $0.visitF32Floor() }
-    case "f32.trunc": return { return try $0.visitF32Trunc() }
-    case "f32.nearest": return { return try $0.visitF32Nearest() }
-    case "f32.sqrt": return { return try $0.visitF32Sqrt() }
+    case "f32.abs": return { return try $0.visitUnary(.f32Abs) }
+    case "f32.neg": return { return try $0.visitUnary(.f32Neg) }
+    case "f32.ceil": return { return try $0.visitUnary(.f32Ceil) }
+    case "f32.floor": return { return try $0.visitUnary(.f32Floor) }
+    case "f32.trunc": return { return try $0.visitUnary(.f32Trunc) }
+    case "f32.nearest": return { return try $0.visitUnary(.f32Nearest) }
+    case "f32.sqrt": return { return try $0.visitUnary(.f32Sqrt) }
     case "f32.add": return { return try $0.visitBinary(.f32Add) }
     case "f32.sub": return { return try $0.visitBinary(.f32Sub) }
     case "f32.mul": return { return try $0.visitBinary(.f32Mul) }
@@ -238,13 +238,13 @@ func parseTextInstruction<V: InstructionVisitor>(keyword: String, expressionPars
     case "f32.min": return { return try $0.visitBinary(.f32Min) }
     case "f32.max": return { return try $0.visitBinary(.f32Max) }
     case "f32.copysign": return { return try $0.visitBinary(.f32Copysign) }
-    case "f64.abs": return { return try $0.visitF64Abs() }
-    case "f64.neg": return { return try $0.visitF64Neg() }
-    case "f64.ceil": return { return try $0.visitF64Ceil() }
-    case "f64.floor": return { return try $0.visitF64Floor() }
-    case "f64.trunc": return { return try $0.visitF64Trunc() }
-    case "f64.nearest": return { return try $0.visitF64Nearest() }
-    case "f64.sqrt": return { return try $0.visitF64Sqrt() }
+    case "f64.abs": return { return try $0.visitUnary(.f64Abs) }
+    case "f64.neg": return { return try $0.visitUnary(.f64Neg) }
+    case "f64.ceil": return { return try $0.visitUnary(.f64Ceil) }
+    case "f64.floor": return { return try $0.visitUnary(.f64Floor) }
+    case "f64.trunc": return { return try $0.visitUnary(.f64Trunc) }
+    case "f64.nearest": return { return try $0.visitUnary(.f64Nearest) }
+    case "f64.sqrt": return { return try $0.visitUnary(.f64Sqrt) }
     case "f64.add": return { return try $0.visitBinary(.f64Add) }
     case "f64.sub": return { return try $0.visitBinary(.f64Sub) }
     case "f64.mul": return { return try $0.visitBinary(.f64Mul) }
@@ -277,11 +277,11 @@ func parseTextInstruction<V: InstructionVisitor>(keyword: String, expressionPars
     case "i64.reinterpret_f64": return { return try $0.visitI64ReinterpretF64() }
     case "f32.reinterpret_i32": return { return try $0.visitF32ReinterpretI32() }
     case "f64.reinterpret_i64": return { return try $0.visitF64ReinterpretI64() }
-    case "i32.extend8_s": return { return try $0.visitI32Extend8S() }
-    case "i32.extend16_s": return { return try $0.visitI32Extend16S() }
-    case "i64.extend8_s": return { return try $0.visitI64Extend8S() }
-    case "i64.extend16_s": return { return try $0.visitI64Extend16S() }
-    case "i64.extend32_s": return { return try $0.visitI64Extend32S() }
+    case "i32.extend8_s": return { return try $0.visitUnary(.i32Extend8S) }
+    case "i32.extend16_s": return { return try $0.visitUnary(.i32Extend16S) }
+    case "i64.extend8_s": return { return try $0.visitUnary(.i64Extend8S) }
+    case "i64.extend16_s": return { return try $0.visitUnary(.i64Extend16S) }
+    case "i64.extend32_s": return { return try $0.visitUnary(.i64Extend32S) }
     case "memory.init":
         let (dataIndex) = try expressionParser.visitMemoryInit(wat: &wat)
         return { return try $0.visitMemoryInit(dataIndex: dataIndex) }

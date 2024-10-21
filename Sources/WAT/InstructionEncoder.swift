@@ -212,9 +212,38 @@ extension InstructionEncoder {
         try encodeInstruction(opcode, prefix)
     }
     mutating func visitI64Eqz() throws { try encodeInstruction(0x50, nil) }
-    mutating func visitI32Clz() throws { try encodeInstruction(0x67, nil) }
-    mutating func visitI32Ctz() throws { try encodeInstruction(0x68, nil) }
-    mutating func visitI32Popcnt() throws { try encodeInstruction(0x69, nil) }
+    mutating func visitUnary(_ unary: Instruction.Unary) throws {
+        let (prefix, opcode): (UInt8?, UInt8)
+        switch unary {
+        case .i32Clz: (prefix, opcode) = (nil, 0x67)
+        case .i32Ctz: (prefix, opcode) = (nil, 0x68)
+        case .i32Popcnt: (prefix, opcode) = (nil, 0x69)
+        case .i64Clz: (prefix, opcode) = (nil, 0x79)
+        case .i64Ctz: (prefix, opcode) = (nil, 0x7A)
+        case .i64Popcnt: (prefix, opcode) = (nil, 0x7B)
+        case .f32Abs: (prefix, opcode) = (nil, 0x8B)
+        case .f32Neg: (prefix, opcode) = (nil, 0x8C)
+        case .f32Ceil: (prefix, opcode) = (nil, 0x8D)
+        case .f32Floor: (prefix, opcode) = (nil, 0x8E)
+        case .f32Trunc: (prefix, opcode) = (nil, 0x8F)
+        case .f32Nearest: (prefix, opcode) = (nil, 0x90)
+        case .f32Sqrt: (prefix, opcode) = (nil, 0x91)
+        case .f64Abs: (prefix, opcode) = (nil, 0x99)
+        case .f64Neg: (prefix, opcode) = (nil, 0x9A)
+        case .f64Ceil: (prefix, opcode) = (nil, 0x9B)
+        case .f64Floor: (prefix, opcode) = (nil, 0x9C)
+        case .f64Trunc: (prefix, opcode) = (nil, 0x9D)
+        case .f64Nearest: (prefix, opcode) = (nil, 0x9E)
+        case .f64Sqrt: (prefix, opcode) = (nil, 0x9F)
+        case .i32Extend8S: (prefix, opcode) = (nil, 0xC0)
+        case .i32Extend16S: (prefix, opcode) = (nil, 0xC1)
+        case .i64Extend8S: (prefix, opcode) = (nil, 0xC2)
+        case .i64Extend16S: (prefix, opcode) = (nil, 0xC3)
+        case .i64Extend32S: (prefix, opcode) = (nil, 0xC4)
+        }
+
+        try encodeInstruction(opcode, prefix)
+    }
     mutating func visitBinary(_ binary: Instruction.Binary) throws {
         let (prefix, opcode): (UInt8?, UInt8)
         switch binary {
@@ -266,23 +295,6 @@ extension InstructionEncoder {
 
         try encodeInstruction(opcode, prefix)
     }
-    mutating func visitI64Clz() throws { try encodeInstruction(0x79, nil) }
-    mutating func visitI64Ctz() throws { try encodeInstruction(0x7A, nil) }
-    mutating func visitI64Popcnt() throws { try encodeInstruction(0x7B, nil) }
-    mutating func visitF32Abs() throws { try encodeInstruction(0x8B, nil) }
-    mutating func visitF32Neg() throws { try encodeInstruction(0x8C, nil) }
-    mutating func visitF32Ceil() throws { try encodeInstruction(0x8D, nil) }
-    mutating func visitF32Floor() throws { try encodeInstruction(0x8E, nil) }
-    mutating func visitF32Trunc() throws { try encodeInstruction(0x8F, nil) }
-    mutating func visitF32Nearest() throws { try encodeInstruction(0x90, nil) }
-    mutating func visitF32Sqrt() throws { try encodeInstruction(0x91, nil) }
-    mutating func visitF64Abs() throws { try encodeInstruction(0x99, nil) }
-    mutating func visitF64Neg() throws { try encodeInstruction(0x9A, nil) }
-    mutating func visitF64Ceil() throws { try encodeInstruction(0x9B, nil) }
-    mutating func visitF64Floor() throws { try encodeInstruction(0x9C, nil) }
-    mutating func visitF64Trunc() throws { try encodeInstruction(0x9D, nil) }
-    mutating func visitF64Nearest() throws { try encodeInstruction(0x9E, nil) }
-    mutating func visitF64Sqrt() throws { try encodeInstruction(0x9F, nil) }
     mutating func visitI32WrapI64() throws { try encodeInstruction(0xA7, nil) }
     mutating func visitI32TruncF32S() throws { try encodeInstruction(0xA8, nil) }
     mutating func visitI32TruncF32U() throws { try encodeInstruction(0xA9, nil) }
@@ -308,11 +320,6 @@ extension InstructionEncoder {
     mutating func visitI64ReinterpretF64() throws { try encodeInstruction(0xBD, nil) }
     mutating func visitF32ReinterpretI32() throws { try encodeInstruction(0xBE, nil) }
     mutating func visitF64ReinterpretI64() throws { try encodeInstruction(0xBF, nil) }
-    mutating func visitI32Extend8S() throws { try encodeInstruction(0xC0, nil) }
-    mutating func visitI32Extend16S() throws { try encodeInstruction(0xC1, nil) }
-    mutating func visitI64Extend8S() throws { try encodeInstruction(0xC2, nil) }
-    mutating func visitI64Extend16S() throws { try encodeInstruction(0xC3, nil) }
-    mutating func visitI64Extend32S() throws { try encodeInstruction(0xC4, nil) }
     mutating func visitMemoryInit(dataIndex: UInt32) throws {
         try encodeInstruction(0x08, 0xFC)
         try encodeImmediates(dataIndex: dataIndex)
