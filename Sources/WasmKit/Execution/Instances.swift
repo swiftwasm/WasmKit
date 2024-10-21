@@ -533,7 +533,7 @@ struct MemoryEntity /* : ~Copyable */ {
 
 extension MemoryEntity: ValidatableEntity {
     static func createOutOfBoundsError(index: Int, count: Int) -> Error {
-        Trap._raw("Memory index out of bounds: \(index) (max: \(count))")
+        ValidationError(.indexOutOfBounds("memory", index, max: count))
     }
 }
 

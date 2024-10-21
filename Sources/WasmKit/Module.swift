@@ -184,7 +184,10 @@ public struct Module {
                     }
                     guard table.tableType.elementType == element.type else {
                         throw ValidationError(
-                            "Element segment type \(element.type) does not match table element type \(table.tableType.elementType)"
+                            .elementSegmentTypeMismatch(
+                                elementType: element.type,
+                                tableElementType: table.tableType.elementType
+                            )
                         )
                     }
                     let references = try element.evaluateInits(context: constEvalContext)

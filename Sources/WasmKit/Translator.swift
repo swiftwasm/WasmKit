@@ -64,7 +64,7 @@ extension TranslatorContext {
 extension InternalInstance: TranslatorContext {
     func resolveType(_ index: TypeIndex) throws -> FunctionType {
         guard Int(index) < self.types.count else {
-            throw TranslationError("Type index \(index) is out of range")
+            throw ValidationError(.indexOutOfBounds("type", index, max: UInt32(self.types.count)))
         }
         return self.types[Int(index)]
     }
@@ -72,34 +72,19 @@ extension InternalInstance: TranslatorContext {
         try FunctionType(blockType: blockType, typeSection: self.types)
     }
     func functionType(_ index: FunctionIndex, interner: Interner<FunctionType>) throws -> FunctionType {
-        guard Int(index) < self.functions.count else {
-            throw TranslationError("Function index \(index) is out of range")
-        }
-        return interner.resolve(self.functions[Int(index)].type)
+        return try interner.resolve(self.functions[validating: Int(index)].type)
     }
     func globalType(_ index: GlobalIndex) throws -> ValueType {
-        guard Int(index) < self.globals.count else {
-            throw TranslationError("Global index \(index) is out of range")
-        }
-        return self.globals[Int(index)].globalType.valueType
+        return try self.globals[validating: Int(index)].globalType.valueType
     }
     func isMemory64(memoryIndex index: MemoryIndex) throws -> Bool {
-        guard Int(index) < self.memories.count else {
-            throw TranslationError("Memory index \(index) is out of range")
-        }
-        return self.memories[Int(index)].limit.isMemory64
+        return try self.memories[validating: Int(index)].limit.isMemory64
     }
     func isMemory64(tableIndex index: TableIndex) throws -> Bool {
-        guard Int(index) < self.tables.count else {
-            throw TranslationError("Table index \(index) is out of range")
-        }
-        return self.tables[Int(index)].limits.isMemory64
+        return try self.tables[validating: Int(index)].limits.isMemory64
     }
     func tableType(_ index: TableIndex) throws -> TableType {
-        guard Int(index) < self.tables.count else {
-            throw TranslationError("Table index \(index) is out of range")
-        }
-        return self.tables[Int(index)].tableType
+        return try self.tables[validating: Int(index)].tableType
     }
     func elementType(_ index: ElementIndex) throws -> ReferenceType {
         try self.elementSegments[validating: Int(index)].type
@@ -117,7 +102,7 @@ extension InternalInstance: TranslatorContext {
     func validateFunctionIndex(_ index: FunctionIndex) throws {
         let function = try self.functions[validating: Int(index)]
         guard self.functionRefs.contains(function) else {
-            throw ValidationError("Function index \(index) is not declared but referenced as a function reference")
+            throw ValidationError(.functionIndexNotDeclared(index: index))
         }
     }
     var dataCount: UInt32? {
@@ -354,14 +339,14 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
         private mutating func setReachability(_ value: Bool) throws {
             guard !self.frames.isEmpty else {
-                throw ValidationError("Control stack is empty. Instruction cannot be appeared after \"end\" of function")
+                throw ValidationError(.controlStackEmpty)
             }
             self.frames[self.frames.count - 1].reachable = value
         }
 
         func currentFrame() throws -> ControlFrame {
             guard let frame = self.frames.last else {
-                throw ValidationError("Control stack is empty. Instruction cannot be appeared after \"end\" of function")
+                throw ValidationError(.controlStackEmpty)
             }
             return frame
         }
@@ -369,7 +354,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         func branchTarget(relativeDepth: UInt32) throws -> ControlFrame {
             let index = frames.count - 1 - Int(relativeDepth)
             guard frames.indices.contains(index) else {
-                throw ValidationError("Relative depth \(relativeDepth) is out of range")
+                throw ValidationError(.relativeDepthOutOfRange(relativeDepth: relativeDepth))
             }
             return frames[index]
         }
@@ -1012,7 +997,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             switch actual {
             case .some(let actualType):
                 guard actualType == type else {
-                    throw ValidationError("Expected \(type) on the stack top but got \(actualType)")
+                    throw ValidationError(.expectedTypeOnStack(expected: type, actual: actualType))
                 }
             case .unknown: break
             }
@@ -1075,7 +1060,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
     private mutating func finalize() throws -> InstructionSequence {
         if controlStack.numberOfFrames > 1 {
-            throw TranslationError("Expect \(controlStack.numberOfFrames - 1) more `end` instructions")
+            throw ValidationError(.expectedMoreEndInstructions(count: controlStack.numberOfFrames - 1))
         }
         // Check dangling labels
         try iseqBuilder.assertDanglingLabels()
@@ -1187,7 +1172,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     mutating func visitElse() throws -> Output {
         var frame = try controlStack.currentFrame()
         guard case let .if(elseLabel, endLabel, _) = frame.kind else {
-            throw TranslationError("Expected `if` control frame on top of the stack for `else` but got \(frame)")
+            throw ValidationError(.expectedIfControlFrame)
         }
         preserveOnStack(depth: valueStack.height - frame.stackHeight)
         try controlStack.resetReachability()
@@ -1201,7 +1186,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             _ = try valueStack.pop(result)
         }
         guard valueStack.height == frame.stackHeight else {
-            throw ValidationError("values remaining on stack at end of block")
+            throw ValidationError(.valuesRemainingAtEndOfBlock)
         }
         _ = controlStack.popFrame()
         frame.kind = .if(elseLabel: elseLabel, endLabel: endLabel, isElse: true)
@@ -1217,40 +1202,23 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
     mutating func visitEnd() throws -> Output {
         let toBePopped = try controlStack.currentFrame()
-        // Reset the last emission to avoid relinking the result of the last instruction inside the block.
-        // Relinking results across the block boundary is invalid because the producer instruction is not
-        // statically known. Think about the following case:
-        // ```
-        // local.get 0
-        // if
-        //   i32.const 2
-        // else
-        //   i32.const 3
-        // end
-        // local.set 0
-        // ```
-        //
         iseqBuilder.resetLastEmission()
         if case .block(root: true) = toBePopped.kind {
             try translateReturn()
-            // TODO: Merge logic with regular block frame
             guard valueStack.height == toBePopped.stackHeight else {
-                throw ValidationError("values remaining on stack at end of block")
+                throw ValidationError(.valuesRemainingAtEndOfBlock)
             }
             try iseqBuilder.pinLabelHere(toBePopped.continuation)
             return
         }
 
         if case .if(_, _, isElse: false) = toBePopped.kind {
-            // `if` inst without `else` must have the same parameter and result types
             let blockType = toBePopped.blockType
             guard blockType.parameters == blockType.results else {
-                throw TranslationError("Expected the same parameter and result types for `if` block but got \(blockType)")
+                throw ValidationError(.parameterResultTypeMismatch(blockType: blockType))
             }
         }
 
-        // NOTE: `valueStack.height - poppedFrame.stackHeight` is usually the same as `poppedFrame.copyCount`
-        // but it's not always the case when this block is already unreachable.
         preserveOnStack(depth: Int(valueStack.height - toBePopped.stackHeight))
         switch toBePopped.kind {
         case .block:
@@ -1264,7 +1232,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             _ = try valueStack.pop(result)
         }
         guard valueStack.height == toBePopped.stackHeight else {
-            throw ValidationError("values remaining on stack at end of block")
+            throw ValidationError(.valuesRemainingAtEndOfBlock)
         }
         for result in toBePopped.blockType.results {
             _ = valueStack.push(result)
@@ -1281,7 +1249,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         if _fastPath(currentFrame.reachable) {
             let count = currentHeight - Int(destination.copyCount) - destination.stackHeight
             guard count >= 0 else {
-                throw TranslationError("Stack height underflow: available \(currentHeight), required \(destination.stackHeight + Int(destination.copyCount))")
+                throw ValidationError(.stackHeightUnderflow(available: currentHeight, required: destination.stackHeight + Int(destination.copyCount)))
             }
             popCount = UInt32(count)
         } else {
@@ -1437,7 +1405,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
             // Check copyTypes consistency
             guard frame.copyTypes.count == defaultFrame.copyTypes.count else {
-                throw ValidationError("Expected the same copy types for all branches in `br_table` but got \(frame.copyTypes) and \(defaultFrame.copyTypes)")
+                throw ValidationError(.expectedSameCopyTypes(frameCopyTypes: frame.copyTypes, defaultFrameCopyTypes: defaultFrame.copyTypes))
             }
             try checkStackTop(frame.copyTypes)
 
@@ -1528,10 +1496,10 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         let (value2Type, value2) = try popAnyOperand()
         switch (value1Type, value2Type) {
         case (.some(.ref(_)), _), (_, .some(.ref(_))):
-            throw TranslationError("Cannot `select` on reference types")
+            throw ValidationError(.cannotSelectOnReferenceTypes)
         case let (.some(type1), .some(type2)):
             guard type1 == type2 else {
-                throw TranslationError("Type mismatch on `select`. Expected \(value1Type) and \(value2Type) to be same")
+                throw ValidationError(.typeMismatchOnSelect(expected: type1, actual: type2))
             }
         case (.unknown, _), (_, .unknown):
             break
@@ -2213,7 +2181,7 @@ extension FunctionType {
         case let .funcType(typeIndex):
             let typeIndex = Int(typeIndex)
             guard typeIndex < typeSection.count else {
-                throw ValidationError("type index out of bounds: accessed \(typeIndex), but only \(typeSection.count) types are defined")
+                throw ValidationError(.indexOutOfBounds("type", typeIndex, max: typeSection.count))
             }
             let funcType = typeSection[typeIndex]
             self.init(
