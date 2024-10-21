@@ -452,7 +452,7 @@ extension StoreAllocator {
             exports: exports,
             functionRefs: functionRefs,
             features: module.features,
-            hasDataCount: module.hasDataCount
+            dataCount: module.dataCount
         )
         instancePointer.initialize(to: instanceEntity)
         instanceInitialized = true

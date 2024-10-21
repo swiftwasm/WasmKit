@@ -12,8 +12,6 @@ import WasmTypes
 public struct Parser<Stream: ByteStream> {
     @usableFromInline
     let stream: Stream
-    public private(set) var hasDataCount: Bool = false
-    public let features: WasmFeatureSet
     let limits: ParsingLimits
     var orderTracking = OrderTracking()
 
@@ -23,14 +21,14 @@ public struct Parser<Stream: ByteStream> {
     }
     private var nextParseTarget: NextParseTarget
 
+    public let features: WasmFeatureSet
     public var offset: Int {
         return stream.currentIndex
     }
 
-    public init(stream: Stream, features: WasmFeatureSet = .default, hasDataCount: Bool = false) {
+    public init(stream: Stream, features: WasmFeatureSet = .default) {
         self.stream = stream
         self.features = features
-        self.hasDataCount = hasDataCount
         self.nextParseTarget = .header
         self.limits = .default
     }
@@ -121,7 +119,7 @@ extension Code {
     /// ````
     @inlinable
     public func parseExpression<V: InstructionVisitor>(visitor: inout V) throws {
-        let parser = Parser(stream: StaticByteStream(bytes: self.expression), features: self.features, hasDataCount: self.hasDataCount)
+        let parser = Parser(stream: StaticByteStream(bytes: self.expression), features: self.features)
         var lastCode: InstructionCode?
         while try !parser.stream.hasReachedEnd() {
             lastCode = try parser.parseInstruction(visitor: &visitor)
@@ -153,8 +151,7 @@ public struct ExpressionParser {
     public init(code: Code) {
         self.parser = Parser(
             stream: StaticByteStream(bytes: code.expression),
-            features: code.features,
-            hasDataCount: code.hasDataCount
+            features: code.features
         )
         self.codeOffset = code.offset
         self.initialStreamOffset = self.parser.offset
@@ -166,7 +163,7 @@ public struct ExpressionParser {
         let shouldContinue = try !parser.stream.hasReachedEnd()
         if !shouldContinue {
             guard lastCode == .end else {
-                throw parser.makeError(.endOpcodeExpected)
+                throw WasmParserError(.endOpcodeExpected, offset: offset)
             }
         }
         return shouldContinue
@@ -212,6 +209,7 @@ public struct WasmParserError: Swift.Error {
     let message: Message
     let offset: Int
 
+    @usableFromInline
     init(_ message: Message, offset: Int) {
         self.message = message
         self.offset = offset
@@ -299,8 +297,6 @@ extension WasmParserError.Message {
     }
 
     static let sectionOutOfOrder = Self("Sections in the module are out of order")
-
-    @usableFromInline static let dataCountSectionRequired = Self("Data count section is required but not found")
 
     static func malformedLimit(_ byte: UInt8) -> Self {
         Self("Malformed limit: \(byte)")
@@ -874,12 +870,6 @@ extension Parser {
             case 7: return try v.visitConversion(.i64TruncSatF64U)
             case 8:
                 let dataIndex: DataIndex = try parseUnsigned()
-                // memory.init requires data count section
-                // https://webassembly.github.io/spec/core/binary/modules.html#data-count-section
-                guard hasDataCount else {
-                    throw makeError(.dataCountSectionRequired)
-                }
-
                 let zero = try stream.consumeAny()
                 guard zero == 0x00 else {
                     throw makeError(.zeroExpected(actual: zero))
@@ -887,11 +877,6 @@ extension Parser {
 
                 return try v.visitMemoryInit(dataIndex: dataIndex)
             case 9:
-                // memory.drop requires data count section
-                // https://webassembly.github.io/spec/core/binary/modules.html#data-count-section
-                guard hasDataCount else {
-                    throw makeError(.dataCountSectionRequired)
-                }
                 return try v.visitDataDrop(dataIndex: try parseUnsigned())
             case 10:
                 let (zero1, zero2) = try (stream.consumeAny(), stream.consumeAny())
@@ -1140,7 +1125,7 @@ extension Parser {
             )
             return Code(
                 locals: locals, expression: expressionBytes,
-                offset: expressionStart, hasDataCount: hasDataCount, features: features
+                offset: expressionStart, features: features
             )
         }
     }
@@ -1327,7 +1312,6 @@ extension Parser {
                 payload = .dataSection(try parseDataSection())
             case 12:
                 order = .dataCount
-                hasDataCount = true
                 payload = .dataCount(try parseDataCountSection())
             default:
                 throw makeError(.malformedSectionID(sectionID))

@@ -45,8 +45,8 @@ protocol TranslatorContext {
     func resolveCallee(_ index: FunctionIndex) -> InternalFunction?
     func isSameInstance(_ instance: InternalInstance) -> Bool
     func resolveGlobal(_ index: GlobalIndex) -> InternalGlobal?
-    func validateDataSegment(_ index: DataIndex) throws
     func validateFunctionIndex(_ index: FunctionIndex) throws
+    var dataCount: UInt32? { get }
 }
 
 extension TranslatorContext {
@@ -114,14 +114,14 @@ extension InternalInstance: TranslatorContext {
     func isSameInstance(_ instance: InternalInstance) -> Bool {
         return instance == self
     }
-    func validateDataSegment(_ index: DataIndex) throws {
-        _ = try self.dataSegments[validating: Int(index)]
-    }
     func validateFunctionIndex(_ index: FunctionIndex) throws {
         let function = try self.functions[validating: Int(index)]
         guard self.functionRefs.contains(function) else {
             throw ValidationError("Function index \(index) is not declared but referenced as a function reference")
         }
+    }
+    var dataCount: UInt32? {
+        self.withValue { $0.dataCount }
     }
 }
 
@@ -2030,7 +2030,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
 
     mutating func visitMemoryInit(dataIndex: UInt32) throws -> Output {
-        try self.module.validateDataSegment(dataIndex)
+        try self.validator.validateDataSegment(dataIndex)
         let addressType = try module.addressType(memoryIndex: 0)
         try pop3Emit((.i32, .i32, addressType)) { values, stack in
             let (size, sourceOffset, destOffset) = values
@@ -2045,7 +2045,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
     }
     mutating func visitDataDrop(dataIndex: UInt32) throws -> Output {
-        try self.module.validateDataSegment(dataIndex)
+        try self.validator.validateDataSegment(dataIndex)
         emit(.memoryDataDrop(Instruction.MemoryDataDropOperand(segmentIndex: dataIndex)))
     }
     mutating func visitMemoryCopy(dstMem: UInt32, srcMem: UInt32) throws -> Output {
