@@ -150,6 +150,34 @@ extension ValidationError.Message {
     static func typeMismatchOnSelect(expected: ValueType, actual: ValueType) -> Self {
         Self("type mismatch on `select`. Expected \(expected) and \(actual) to be same")
     }
+
+    static var unexpectedGlobalValueType: Self {
+        Self("unexpected global value type for element initializer expression")
+    }
+
+    static func unexpectedElementInitializer(expression: String) -> Self {
+        Self("unexpected element initializer expression: \(expression)")
+    }
+
+    static func unexpectedOffsetInitializer(expected: ValueType, got: Value) -> Self {
+        Self("expect \(expected) offset but got \(got)")
+    }
+
+    static var expectedEndAtOffsetExpression: Self {
+        Self("expect `end` at the end of offset expression")
+    }
+
+    static func illegalConstExpressionInstruction(_ constInst: WasmParser.Instruction) -> Self {
+        Self("illegal const expression instruction: \(constInst)")
+    }
+
+    static func inconsistentFunctionAndCodeLength(functionCount: Int, codeCount: Int) -> Self {
+        Self("Inconsistent function and code length: \(functionCount) vs \(codeCount)")
+    }
+
+    static func inconsistentDataCountAndDataSectionLength(dataCount: UInt32, dataSection: Int) -> Self {
+        Self("Inconsistent data count and data section length: \(dataCount) vs \(dataSection)")
+    }
 }
 
 /// Validates instructions within a given context.

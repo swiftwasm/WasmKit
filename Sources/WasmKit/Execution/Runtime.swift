@@ -55,7 +55,7 @@ public final class Runtime {
     /// Legacy compatibility method to register a module instance with a name.
     public func register(_ instance: Instance, as name: String) throws {
         guard availableExports[name] == nil else {
-            throw ImportError.moduleInstanceAlreadyRegistered(name)
+            throw ImportError(.moduleInstanceAlreadyRegistered(name))
         }
 
         availableExports[name] = Dictionary(uniqueKeysWithValues: instance.exports.map { ($0, $1) })
@@ -64,7 +64,7 @@ public final class Runtime {
     /// Legacy compatibility method to register a host module with a name.
     public func register(_ hostModule: HostModule, as name: String) throws {
         guard availableExports[name] == nil else {
-            throw ImportError.moduleInstanceAlreadyRegistered(name)
+            throw ImportError(.moduleInstanceAlreadyRegistered(name))
         }
 
         registerUniqueHostModule(hostModule, as: name, engine: engine)
@@ -101,36 +101,9 @@ public final class Runtime {
 
         for i in module.imports {
             guard let moduleExports = availableExports[i.module], let external = moduleExports[i.name] else {
-                throw ImportError.unknownImport(moduleName: i.module, externalName: i.name)
+                throw ImportError(.missing(moduleName: i.module, externalName: i.name))
             }
-
-            switch (i.descriptor, external) {
-            case let (.function(typeIndex), .function(externalFunc)):
-                let type = externalFunc.handle.type
-                guard runtime.internType(module.types[Int(typeIndex)]) == type else {
-                    throw ImportError.incompatibleImportType
-                }
-                result.define(i, external)
-
-            case let (.table(tableType), .table(table)):
-                if let max = table.handle.limits.max, max < tableType.limits.min {
-                    throw ImportError.incompatibleImportType
-                }
-                result.define(i, external)
-
-            case let (.memory(memoryType), .memory(memory)):
-                if let max = memory.handle.limit.max, max < memoryType.min {
-                    throw ImportError.incompatibleImportType
-                }
-                result.define(i, external)
-
-            case let (.global(globalType), .global(global))
-            where globalType == global.handle.globalType:
-                result.define(i, external)
-
-            default:
-                throw ImportError.incompatibleImportType
-            }
+            result.define(i, external)
         }
 
         return result
@@ -157,7 +130,7 @@ public final class Runtime {
     @available(*, deprecated, message: "Use `Instance.export` and `Global.value` instead")
     public func getGlobal(_ instance: Instance, globalName: String) throws -> Value {
         guard case let .global(global) = instance.export(globalName) else {
-            throw Trap._raw("no global export with name \(globalName) in a module instance \(instance)")
+            throw Trap(.noGlobalExportWithName(globalName: globalName, instance: instance))
         }
         return global.value
     }
@@ -165,7 +138,7 @@ public final class Runtime {
     /// Invokes a function in a given module instance.
     public func invoke(_ instance: Instance, function: String, with arguments: [Value] = []) throws -> [Value] {
         guard case let .function(function)? = instance.export(function) else {
-            throw Trap.exportedFunctionNotFound(instance, name: function)
+            throw Trap(.exportedFunctionNotFound(name: function, instance: instance))
         }
         return try function.invoke(arguments)
     }

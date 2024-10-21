@@ -2,7 +2,7 @@
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#control-instructions>
 extension Execution {
     func unreachable(sp: Sp, pc: Pc) throws -> (Pc, CodeSlot) {
-        throw Trap.unreachable
+        throw Trap(.unreachable)
     }
     mutating func nop(sp: Sp) {
     }
@@ -119,18 +119,19 @@ extension Execution {
         let value = sp[callIndirectOperand.index].asAddressOffset(table.limits.isMemory64)
         let elementIndex = Int(value)
         guard elementIndex < table.elements.count else {
-            throw Trap.undefinedElement
+            throw Trap(.tableOutOfBounds(elementIndex))
         }
         guard case let .function(rawBitPattern?) = table.elements[elementIndex]
         else {
-            throw Trap.tableUninitialized(elementIndex)
+            throw Trap(.indirectCallToNull(elementIndex))
         }
         let function = InternalFunction(bitPattern: rawBitPattern)
         guard function.type == expectedType else {
-            throw Trap.callIndirectFunctionTypeMismatch(
-                actual: store.value.engine.resolveType(function.type),
-                expected: store.value.engine.resolveType(expectedType)
-            )
+            throw Trap(
+                .typeMismatchCall(
+                    actual: store.value.engine.resolveType(function.type),
+                    expected: store.value.engine.resolveType(expectedType)
+                ))
         }
         return (function, callerInstance)
     }

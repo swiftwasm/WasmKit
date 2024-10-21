@@ -259,13 +259,9 @@ extension WastRunContext {
 
             do {
                 _ = try instantiate(module: module)
-            } catch let error as InstantiationError {
-                guard error.assertionText.contains(message) else {
-                    return .failed("assertion mismatch: expected: \(message), actual: \(error.assertionText)")
-                }
             } catch let error as Trap {
-                guard error.assertionText.contains(message) else {
-                    return .failed("assertion mismatch: expected: \(message), actual: \(error.assertionText)")
+                guard error.reason.description.contains(message) else {
+                    return .failed("assertion mismatch: expected: \(message), actual: \(error.reason.description)")
                 }
             } catch {
                 return .failed("\(error)")
@@ -284,8 +280,8 @@ extension WastRunContext {
                 _ = try wastExecute(execute: execute)
                 return .failed("trap expected: \(message)")
             } catch let trap as Trap {
-                guard trap.assertionText.contains(message) else {
-                    return .failed("assertion mismatch: expected: \(message), actual: \(trap.assertionText)")
+                guard trap.reason.description.contains(message) else {
+                    return .failed("assertion mismatch: expected: \(message), actual: \(trap.reason.description)")
                 }
                 return .passed
             } catch {
@@ -296,8 +292,8 @@ extension WastRunContext {
                 _ = try wastInvoke(call: call)
                 return .failed("trap expected: \(message)")
             } catch let trap as Trap {
-                guard trap.assertionText.contains(message) else {
-                    return .failed("assertion mismatch: expected: \(message), actual: \(trap.assertionText)")
+                guard trap.reason.description.contains(message) else {
+                    return .failed("assertion mismatch: expected: \(message), actual: \(trap.reason.description)")
                 }
                 return .passed
             }
@@ -314,8 +310,8 @@ extension WastRunContext {
             do {
                 _ = try instantiate(module: module)
             } catch let error as ImportError {
-                guard error.assertionText.contains(message) else {
-                    return .failed("assertion mismatch: expected: \(message), actual: \(error.assertionText)")
+                guard error.message.text.contains(message) else {
+                    return .failed("assertion mismatch: expected: \(message), actual: \(error.message.text)")
                 }
             } catch {
                 return .failed("\(error)")

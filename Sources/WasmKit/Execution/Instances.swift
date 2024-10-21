@@ -283,7 +283,7 @@ struct TableEntity /* : ~Copyable */ {
 
         let numberOfElements = Int(tableType.limits.min)
         guard try resourceLimiter.limitTableGrowth(to: numberOfElements) else {
-            throw Trap._raw("Initial table size exceeds the resource limit: \(numberOfElements) elements")
+            throw Trap(.initialTableSizeExceedsLimit(numberOfElements: numberOfElements))
         }
         elements = Array(repeating: emptyElement, count: numberOfElements)
         self.tableType = tableType
@@ -318,9 +318,12 @@ struct TableEntity /* : ~Copyable */ {
         let (destinationEnd, destinationOverflow) = destination.addingReportingOverflow(count)
         let (sourceEnd, sourceOverflow) = source.addingReportingOverflow(count)
 
-        guard !destinationOverflow, !sourceOverflow else { throw Trap.tableSizeOverflow }
-        guard destinationEnd <= elements.count else { throw Trap.outOfBoundsTableAccess(destinationEnd) }
-        guard sourceEnd <= references.count else { throw Trap.outOfBoundsTableAccess(sourceEnd) }
+        guard !destinationOverflow, destinationEnd <= elements.count else {
+            throw Trap(.tableOutOfBounds(destinationEnd))
+        }
+        guard !sourceOverflow, sourceEnd <= references.count else {
+            throw Trap(.tableOutOfBounds(sourceEnd))
+        }
 
         elements.withUnsafeMutableBufferPointer { table in
             references.withUnsafeBufferPointer { segment in
@@ -331,7 +334,7 @@ struct TableEntity /* : ~Copyable */ {
 
     mutating func fill(repeating value: Reference, from index: Int, count: Int) throws {
         let (end, overflow) = index.addingReportingOverflow(count)
-        guard !overflow, end <= elements.count else { throw Trap.tableSizeOverflow }
+        guard !overflow, end <= elements.count else { throw Trap(.tableOutOfBounds(end)) }
 
         elements.withUnsafeMutableBufferPointer {
             $0[index..<index + count].initialize(repeating: value)
@@ -346,9 +349,12 @@ struct TableEntity /* : ~Copyable */ {
         let (destinationEnd, destinationOverflow) = destination.addingReportingOverflow(count)
         let (sourceEnd, sourceOverflow) = source.addingReportingOverflow(count)
 
-        guard !destinationOverflow, !sourceOverflow else { throw Trap.tableSizeOverflow }
-        guard destinationEnd <= destinationTable.count else { throw Trap.outOfBoundsTableAccess(Int(destinationEnd)) }
-        guard sourceEnd <= sourceTable.count else { throw Trap.outOfBoundsTableAccess(Int(sourceEnd)) }
+        guard !destinationOverflow, destinationEnd <= destinationTable.count else {
+            throw Trap(.tableOutOfBounds(Int(destinationEnd)))
+        }
+        guard !sourceOverflow, sourceEnd <= sourceTable.count else {
+            throw Trap(.tableOutOfBounds(Int(sourceEnd)))
+        }
 
         let source = UnsafeBufferPointer(rebasing: sourceTable[source..<source + count])
         let destination = UnsafeMutableBufferPointer(rebasing: destinationTable[destination..<destination + count])
@@ -363,7 +369,7 @@ struct TableEntity /* : ~Copyable */ {
 
 extension TableEntity: ValidatableEntity {
     static func createOutOfBoundsError(index: Int, count: Int) -> Error {
-        Trap._raw("Table index out of bounds: \(index) (max: \(count))")
+        ValidationError(.indexOutOfBounds("table", index, max: count))
     }
 }
 
@@ -457,7 +463,7 @@ struct MemoryEntity /* : ~Copyable */ {
     init(_ memoryType: MemoryType, resourceLimiter: any ResourceLimiter) throws {
         let byteSize = Int(memoryType.min) * Self.pageSize
         guard try resourceLimiter.limitMemoryGrowth(to: byteSize) else {
-            throw Trap._raw("Initial memory size exceeds the resource limit: \(byteSize) bytes")
+            throw Trap(.initialMemorySizeExceedsLimit(byteSize: byteSize))
         }
         data = Array(repeating: 0, count: byteSize)
         let defaultMaxPageCount = Self.maxPageCount(isMemory64: memoryType.isMemory64)
@@ -490,7 +496,7 @@ struct MemoryEntity /* : ~Copyable */ {
         guard !destinationOverflow, destinationEnd <= data.count,
             !sourceOverflow, sourceEnd <= data.count
         else {
-            throw Trap.outOfBoundsMemoryAccess
+            throw Trap(.memoryOutOfBounds)
         }
         data.withUnsafeMutableBufferPointer {
             guard let base = UnsafeMutableRawPointer($0.baseAddress) else { return }
@@ -507,7 +513,7 @@ struct MemoryEntity /* : ~Copyable */ {
         guard !destinationOverflow, destinationEnd <= data.count,
             !sourceOverflow, sourceEnd <= segment.data.count
         else {
-            throw Trap.outOfBoundsMemoryAccess
+            throw Trap(.memoryOutOfBounds)
         }
         data.withUnsafeMutableBufferPointer { memory in
             segment.data.withUnsafeBufferPointer { segment in
@@ -525,7 +531,7 @@ struct MemoryEntity /* : ~Copyable */ {
     mutating func write(offset: Int, bytes: ArraySlice<UInt8>) throws {
         let endOffset = offset + bytes.count
         guard endOffset <= data.count else {
-            throw Trap.outOfBoundsMemoryAccess
+            throw Trap(.memoryOutOfBounds)
         }
         data[offset..<endOffset] = bytes
     }
@@ -624,7 +630,7 @@ struct GlobalEntity /* : ~Copyable */ {
 
 extension GlobalEntity: ValidatableEntity {
     static func createOutOfBoundsError(index: Int, count: Int) -> Error {
-        Trap._raw("Global index out of bounds: \(index) (max: \(count))")
+        ValidationError(.indexOutOfBounds("global", index, max: count))
     }
 }
 
@@ -649,7 +655,7 @@ public struct Global: Equatable {
     public func assign(_ value: Value) throws {
         try handle.withValue { global in
             guard global.globalType.mutability == .variable else {
-                throw Trap._raw("Cannot assign to an immutable global")
+                throw Trap(.cannotAssignToImmutableGlobal)
             }
             global.value = value
         }
@@ -710,7 +716,7 @@ struct ElementSegmentEntity {
 
 extension ElementSegmentEntity: ValidatableEntity {
     static func createOutOfBoundsError(index: Int, count: Int) -> Error {
-        Trap._raw("Element index out of bounds: \(index) (max: \(count))")
+        ValidationError(.indexOutOfBounds("element", index, max: count))
     }
 }
 

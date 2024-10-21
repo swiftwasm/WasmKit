@@ -85,20 +85,21 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
     }
 
     guard typeIndices.count == codes.count else {
-        throw WasmParserError.inconsistentFunctionAndCodeLength(
-            functionCount: typeIndices.count,
-            codeCount: codes.count
-        )
+        throw ValidationError(
+            .inconsistentFunctionAndCodeLength(
+                functionCount: typeIndices.count,
+                codeCount: codes.count
+            ))
     }
 
     if let dataCount = dataCount, dataCount != UInt32(data.count) {
-        throw WasmParserError.inconsistentDataCountAndDataSectionLength(
-            dataCount: dataCount,
-            dataSection: data.count
-        )
+        throw ValidationError(
+            .inconsistentDataCountAndDataSectionLength(
+                dataCount: dataCount,
+                dataSection: data.count
+            ))
     }
 
-    let allocator = ISeqAllocator()
     let functions = try codes.enumerated().map { index, code in
         // SAFETY: The number of typeIndices is guaranteed to be the same as the number of codes
         let funcTypeIndex = typeIndices[index]
@@ -121,7 +122,6 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
         memories: memories,
         tables: tables,
         customSections: customSections,
-        allocator: allocator,
         features: features,
         dataCount: dataCount
     )

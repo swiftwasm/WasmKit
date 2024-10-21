@@ -156,7 +156,7 @@ struct InternalFunction: Equatable, Hashable {
 
 extension InternalFunction: ValidatableEntity {
     static func createOutOfBoundsError(index: Int, count: Int) -> any Error {
-        Trap.invalidFunctionIndex(index)
+        ValidationError(.indexOutOfBounds("function", index, max: count))
     }
 }
 
@@ -199,13 +199,13 @@ extension InternalFunction {
 
     private func check(functionType: FunctionType, parameters: [Value]) throws {
         guard check(expectedTypes: functionType.parameters, values: parameters) else {
-            throw Trap._raw("parameters types don't match, expected \(functionType.parameters), got \(parameters)")
+            throw Trap(.parameterTypesMismatch(expected: functionType.parameters, got: parameters))
         }
     }
 
     private func check(functionType: FunctionType, results: [Value]) throws {
         guard check(expectedTypes: functionType.results, values: results) else {
-            throw Trap._raw("result types don't match, expected \(functionType.results), got \(results)")
+            throw Trap(.resultTypesMismatch(expected: functionType.results, got: results))
         }
     }
 

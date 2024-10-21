@@ -2,7 +2,7 @@
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#memory-instructions>
 extension Execution {
     @inline(never) func throwOutOfBoundsMemoryAccess() throws -> Never {
-        throw Trap.outOfBoundsMemoryAccess
+        throw Trap(.memoryOutOfBounds)
     }
     mutating func memoryLoad<T: FixedWidthInteger>(
         sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand, loadAs _: T.Type = T.self, castToValue: (T) -> UntypedValue
@@ -93,7 +93,7 @@ extension Execution {
                 !destinationIndex.addingReportingOverflow(copyCounter).overflow
                     && memoryInstance.data.count >= destinationIndex + copyCounter
             else {
-                throw Trap.outOfBoundsMemoryAccess
+                throw Trap(.memoryOutOfBounds)
             }
 
             memoryInstance.data.replaceSubrange(
