@@ -139,6 +139,41 @@ public enum Instruction: Equatable {
         case f64Max
         case f64Copysign
     }
+    public enum Conversion: Equatable {
+        case i32WrapI64
+        case i32TruncF32S
+        case i32TruncF32U
+        case i32TruncF64S
+        case i32TruncF64U
+        case i64ExtendI32S
+        case i64ExtendI32U
+        case i64TruncF32S
+        case i64TruncF32U
+        case i64TruncF64S
+        case i64TruncF64U
+        case f32ConvertI32S
+        case f32ConvertI32U
+        case f32ConvertI64S
+        case f32ConvertI64U
+        case f32DemoteF64
+        case f64ConvertI32S
+        case f64ConvertI32U
+        case f64ConvertI64S
+        case f64ConvertI64U
+        case f64PromoteF32
+        case i32ReinterpretF32
+        case i64ReinterpretF64
+        case f32ReinterpretI32
+        case f64ReinterpretI64
+        case i32TruncSatF32S
+        case i32TruncSatF32U
+        case i32TruncSatF64S
+        case i32TruncSatF64U
+        case i64TruncSatF32S
+        case i64TruncSatF32U
+        case i64TruncSatF64S
+        case i64TruncSatF64U
+    }
     case `unreachable`
     case `nop`
     case `block`(blockType: BlockType)
@@ -176,31 +211,7 @@ public enum Instruction: Equatable {
     case `i64Eqz`
     case `unary`(Instruction.Unary)
     case `binary`(Instruction.Binary)
-    case `i32WrapI64`
-    case `i32TruncF32S`
-    case `i32TruncF32U`
-    case `i32TruncF64S`
-    case `i32TruncF64U`
-    case `i64ExtendI32S`
-    case `i64ExtendI32U`
-    case `i64TruncF32S`
-    case `i64TruncF32U`
-    case `i64TruncF64S`
-    case `i64TruncF64U`
-    case `f32ConvertI32S`
-    case `f32ConvertI32U`
-    case `f32ConvertI64S`
-    case `f32ConvertI64U`
-    case `f32DemoteF64`
-    case `f64ConvertI32S`
-    case `f64ConvertI32U`
-    case `f64ConvertI64S`
-    case `f64ConvertI64U`
-    case `f64PromoteF32`
-    case `i32ReinterpretF32`
-    case `i64ReinterpretF64`
-    case `f32ReinterpretI32`
-    case `f64ReinterpretI64`
+    case `conversion`(Instruction.Conversion)
     case `memoryInit`(dataIndex: UInt32)
     case `dataDrop`(dataIndex: UInt32)
     case `memoryCopy`(dstMem: UInt32, srcMem: UInt32)
@@ -213,14 +224,6 @@ public enum Instruction: Equatable {
     case `tableSet`(table: UInt32)
     case `tableGrow`(table: UInt32)
     case `tableSize`(table: UInt32)
-    case `i32TruncSatF32S`
-    case `i32TruncSatF32U`
-    case `i32TruncSatF64S`
-    case `i32TruncSatF64U`
-    case `i64TruncSatF32S`
-    case `i64TruncSatF32U`
-    case `i64TruncSatF64S`
-    case `i64TruncSatF64U`
 }
 
 /// A visitor that visits all instructions by a single visit method.
@@ -267,31 +270,7 @@ extension AnyInstructionVisitor {
     public mutating func visitI64Eqz() throws { return try self.visit(.i64Eqz) }
     public mutating func visitUnary(_ unary: Instruction.Unary) throws { return try self.visit(.unary(unary)) }
     public mutating func visitBinary(_ binary: Instruction.Binary) throws { return try self.visit(.binary(binary)) }
-    public mutating func visitI32WrapI64() throws { return try self.visit(.i32WrapI64) }
-    public mutating func visitI32TruncF32S() throws { return try self.visit(.i32TruncF32S) }
-    public mutating func visitI32TruncF32U() throws { return try self.visit(.i32TruncF32U) }
-    public mutating func visitI32TruncF64S() throws { return try self.visit(.i32TruncF64S) }
-    public mutating func visitI32TruncF64U() throws { return try self.visit(.i32TruncF64U) }
-    public mutating func visitI64ExtendI32S() throws { return try self.visit(.i64ExtendI32S) }
-    public mutating func visitI64ExtendI32U() throws { return try self.visit(.i64ExtendI32U) }
-    public mutating func visitI64TruncF32S() throws { return try self.visit(.i64TruncF32S) }
-    public mutating func visitI64TruncF32U() throws { return try self.visit(.i64TruncF32U) }
-    public mutating func visitI64TruncF64S() throws { return try self.visit(.i64TruncF64S) }
-    public mutating func visitI64TruncF64U() throws { return try self.visit(.i64TruncF64U) }
-    public mutating func visitF32ConvertI32S() throws { return try self.visit(.f32ConvertI32S) }
-    public mutating func visitF32ConvertI32U() throws { return try self.visit(.f32ConvertI32U) }
-    public mutating func visitF32ConvertI64S() throws { return try self.visit(.f32ConvertI64S) }
-    public mutating func visitF32ConvertI64U() throws { return try self.visit(.f32ConvertI64U) }
-    public mutating func visitF32DemoteF64() throws { return try self.visit(.f32DemoteF64) }
-    public mutating func visitF64ConvertI32S() throws { return try self.visit(.f64ConvertI32S) }
-    public mutating func visitF64ConvertI32U() throws { return try self.visit(.f64ConvertI32U) }
-    public mutating func visitF64ConvertI64S() throws { return try self.visit(.f64ConvertI64S) }
-    public mutating func visitF64ConvertI64U() throws { return try self.visit(.f64ConvertI64U) }
-    public mutating func visitF64PromoteF32() throws { return try self.visit(.f64PromoteF32) }
-    public mutating func visitI32ReinterpretF32() throws { return try self.visit(.i32ReinterpretF32) }
-    public mutating func visitI64ReinterpretF64() throws { return try self.visit(.i64ReinterpretF64) }
-    public mutating func visitF32ReinterpretI32() throws { return try self.visit(.f32ReinterpretI32) }
-    public mutating func visitF64ReinterpretI64() throws { return try self.visit(.f64ReinterpretI64) }
+    public mutating func visitConversion(_ conversion: Instruction.Conversion) throws { return try self.visit(.conversion(conversion)) }
     public mutating func visitMemoryInit(dataIndex: UInt32) throws { return try self.visit(.memoryInit(dataIndex: dataIndex)) }
     public mutating func visitDataDrop(dataIndex: UInt32) throws { return try self.visit(.dataDrop(dataIndex: dataIndex)) }
     public mutating func visitMemoryCopy(dstMem: UInt32, srcMem: UInt32) throws { return try self.visit(.memoryCopy(dstMem: dstMem, srcMem: srcMem)) }
@@ -304,14 +283,6 @@ extension AnyInstructionVisitor {
     public mutating func visitTableSet(table: UInt32) throws { return try self.visit(.tableSet(table: table)) }
     public mutating func visitTableGrow(table: UInt32) throws { return try self.visit(.tableGrow(table: table)) }
     public mutating func visitTableSize(table: UInt32) throws { return try self.visit(.tableSize(table: table)) }
-    public mutating func visitI32TruncSatF32S() throws { return try self.visit(.i32TruncSatF32S) }
-    public mutating func visitI32TruncSatF32U() throws { return try self.visit(.i32TruncSatF32U) }
-    public mutating func visitI32TruncSatF64S() throws { return try self.visit(.i32TruncSatF64S) }
-    public mutating func visitI32TruncSatF64U() throws { return try self.visit(.i32TruncSatF64U) }
-    public mutating func visitI64TruncSatF32S() throws { return try self.visit(.i64TruncSatF32S) }
-    public mutating func visitI64TruncSatF32U() throws { return try self.visit(.i64TruncSatF32U) }
-    public mutating func visitI64TruncSatF64S() throws { return try self.visit(.i64TruncSatF64S) }
-    public mutating func visitI64TruncSatF64U() throws { return try self.visit(.i64TruncSatF64U) }
 }
 
 /// A visitor that traces the instructions visited.
@@ -478,105 +449,9 @@ public struct InstructionTracingVisitor<V: InstructionVisitor>: InstructionVisit
        trace(.binary(binary))
        return try visitor.visitBinary(binary)
     }
-    public mutating func visitI32WrapI64() throws {
-       trace(.i32WrapI64)
-       return try visitor.visitI32WrapI64()
-    }
-    public mutating func visitI32TruncF32S() throws {
-       trace(.i32TruncF32S)
-       return try visitor.visitI32TruncF32S()
-    }
-    public mutating func visitI32TruncF32U() throws {
-       trace(.i32TruncF32U)
-       return try visitor.visitI32TruncF32U()
-    }
-    public mutating func visitI32TruncF64S() throws {
-       trace(.i32TruncF64S)
-       return try visitor.visitI32TruncF64S()
-    }
-    public mutating func visitI32TruncF64U() throws {
-       trace(.i32TruncF64U)
-       return try visitor.visitI32TruncF64U()
-    }
-    public mutating func visitI64ExtendI32S() throws {
-       trace(.i64ExtendI32S)
-       return try visitor.visitI64ExtendI32S()
-    }
-    public mutating func visitI64ExtendI32U() throws {
-       trace(.i64ExtendI32U)
-       return try visitor.visitI64ExtendI32U()
-    }
-    public mutating func visitI64TruncF32S() throws {
-       trace(.i64TruncF32S)
-       return try visitor.visitI64TruncF32S()
-    }
-    public mutating func visitI64TruncF32U() throws {
-       trace(.i64TruncF32U)
-       return try visitor.visitI64TruncF32U()
-    }
-    public mutating func visitI64TruncF64S() throws {
-       trace(.i64TruncF64S)
-       return try visitor.visitI64TruncF64S()
-    }
-    public mutating func visitI64TruncF64U() throws {
-       trace(.i64TruncF64U)
-       return try visitor.visitI64TruncF64U()
-    }
-    public mutating func visitF32ConvertI32S() throws {
-       trace(.f32ConvertI32S)
-       return try visitor.visitF32ConvertI32S()
-    }
-    public mutating func visitF32ConvertI32U() throws {
-       trace(.f32ConvertI32U)
-       return try visitor.visitF32ConvertI32U()
-    }
-    public mutating func visitF32ConvertI64S() throws {
-       trace(.f32ConvertI64S)
-       return try visitor.visitF32ConvertI64S()
-    }
-    public mutating func visitF32ConvertI64U() throws {
-       trace(.f32ConvertI64U)
-       return try visitor.visitF32ConvertI64U()
-    }
-    public mutating func visitF32DemoteF64() throws {
-       trace(.f32DemoteF64)
-       return try visitor.visitF32DemoteF64()
-    }
-    public mutating func visitF64ConvertI32S() throws {
-       trace(.f64ConvertI32S)
-       return try visitor.visitF64ConvertI32S()
-    }
-    public mutating func visitF64ConvertI32U() throws {
-       trace(.f64ConvertI32U)
-       return try visitor.visitF64ConvertI32U()
-    }
-    public mutating func visitF64ConvertI64S() throws {
-       trace(.f64ConvertI64S)
-       return try visitor.visitF64ConvertI64S()
-    }
-    public mutating func visitF64ConvertI64U() throws {
-       trace(.f64ConvertI64U)
-       return try visitor.visitF64ConvertI64U()
-    }
-    public mutating func visitF64PromoteF32() throws {
-       trace(.f64PromoteF32)
-       return try visitor.visitF64PromoteF32()
-    }
-    public mutating func visitI32ReinterpretF32() throws {
-       trace(.i32ReinterpretF32)
-       return try visitor.visitI32ReinterpretF32()
-    }
-    public mutating func visitI64ReinterpretF64() throws {
-       trace(.i64ReinterpretF64)
-       return try visitor.visitI64ReinterpretF64()
-    }
-    public mutating func visitF32ReinterpretI32() throws {
-       trace(.f32ReinterpretI32)
-       return try visitor.visitF32ReinterpretI32()
-    }
-    public mutating func visitF64ReinterpretI64() throws {
-       trace(.f64ReinterpretI64)
-       return try visitor.visitF64ReinterpretI64()
+    public mutating func visitConversion(_ conversion: Instruction.Conversion) throws {
+       trace(.conversion(conversion))
+       return try visitor.visitConversion(conversion)
     }
     public mutating func visitMemoryInit(dataIndex: UInt32) throws {
        trace(.memoryInit(dataIndex: dataIndex))
@@ -625,38 +500,6 @@ public struct InstructionTracingVisitor<V: InstructionVisitor>: InstructionVisit
     public mutating func visitTableSize(table: UInt32) throws {
        trace(.tableSize(table: table))
        return try visitor.visitTableSize(table: table)
-    }
-    public mutating func visitI32TruncSatF32S() throws {
-       trace(.i32TruncSatF32S)
-       return try visitor.visitI32TruncSatF32S()
-    }
-    public mutating func visitI32TruncSatF32U() throws {
-       trace(.i32TruncSatF32U)
-       return try visitor.visitI32TruncSatF32U()
-    }
-    public mutating func visitI32TruncSatF64S() throws {
-       trace(.i32TruncSatF64S)
-       return try visitor.visitI32TruncSatF64S()
-    }
-    public mutating func visitI32TruncSatF64U() throws {
-       trace(.i32TruncSatF64U)
-       return try visitor.visitI32TruncSatF64U()
-    }
-    public mutating func visitI64TruncSatF32S() throws {
-       trace(.i64TruncSatF32S)
-       return try visitor.visitI64TruncSatF32S()
-    }
-    public mutating func visitI64TruncSatF32U() throws {
-       trace(.i64TruncSatF32U)
-       return try visitor.visitI64TruncSatF32U()
-    }
-    public mutating func visitI64TruncSatF64S() throws {
-       trace(.i64TruncSatF64S)
-       return try visitor.visitI64TruncSatF64S()
-    }
-    public mutating func visitI64TruncSatF64U() throws {
-       trace(.i64TruncSatF64U)
-       return try visitor.visitI64TruncSatF64U()
     }
 }
 
@@ -739,56 +582,8 @@ public protocol InstructionVisitor {
     mutating func visitUnary(_: Instruction.Unary) throws
     /// Visiting `binary` category instruction.
     mutating func visitBinary(_: Instruction.Binary) throws
-    /// Visiting `i32.wrap_i64` instruction.
-    mutating func visitI32WrapI64() throws
-    /// Visiting `i32.trunc_f32_s` instruction.
-    mutating func visitI32TruncF32S() throws
-    /// Visiting `i32.trunc_f32_u` instruction.
-    mutating func visitI32TruncF32U() throws
-    /// Visiting `i32.trunc_f64_s` instruction.
-    mutating func visitI32TruncF64S() throws
-    /// Visiting `i32.trunc_f64_u` instruction.
-    mutating func visitI32TruncF64U() throws
-    /// Visiting `i64.extend_i32_s` instruction.
-    mutating func visitI64ExtendI32S() throws
-    /// Visiting `i64.extend_i32_u` instruction.
-    mutating func visitI64ExtendI32U() throws
-    /// Visiting `i64.trunc_f32_s` instruction.
-    mutating func visitI64TruncF32S() throws
-    /// Visiting `i64.trunc_f32_u` instruction.
-    mutating func visitI64TruncF32U() throws
-    /// Visiting `i64.trunc_f64_s` instruction.
-    mutating func visitI64TruncF64S() throws
-    /// Visiting `i64.trunc_f64_u` instruction.
-    mutating func visitI64TruncF64U() throws
-    /// Visiting `f32.convert_i32_s` instruction.
-    mutating func visitF32ConvertI32S() throws
-    /// Visiting `f32.convert_i32_u` instruction.
-    mutating func visitF32ConvertI32U() throws
-    /// Visiting `f32.convert_i64_s` instruction.
-    mutating func visitF32ConvertI64S() throws
-    /// Visiting `f32.convert_i64_u` instruction.
-    mutating func visitF32ConvertI64U() throws
-    /// Visiting `f32.demote_f64` instruction.
-    mutating func visitF32DemoteF64() throws
-    /// Visiting `f64.convert_i32_s` instruction.
-    mutating func visitF64ConvertI32S() throws
-    /// Visiting `f64.convert_i32_u` instruction.
-    mutating func visitF64ConvertI32U() throws
-    /// Visiting `f64.convert_i64_s` instruction.
-    mutating func visitF64ConvertI64S() throws
-    /// Visiting `f64.convert_i64_u` instruction.
-    mutating func visitF64ConvertI64U() throws
-    /// Visiting `f64.promote_f32` instruction.
-    mutating func visitF64PromoteF32() throws
-    /// Visiting `i32.reinterpret_f32` instruction.
-    mutating func visitI32ReinterpretF32() throws
-    /// Visiting `i64.reinterpret_f64` instruction.
-    mutating func visitI64ReinterpretF64() throws
-    /// Visiting `f32.reinterpret_i32` instruction.
-    mutating func visitF32ReinterpretI32() throws
-    /// Visiting `f64.reinterpret_i64` instruction.
-    mutating func visitF64ReinterpretI64() throws
+    /// Visiting `conversion` category instruction.
+    mutating func visitConversion(_: Instruction.Conversion) throws
     /// Visiting `memory.init` instruction.
     mutating func visitMemoryInit(dataIndex: UInt32) throws
     /// Visiting `data.drop` instruction.
@@ -813,22 +608,6 @@ public protocol InstructionVisitor {
     mutating func visitTableGrow(table: UInt32) throws
     /// Visiting `table.size` instruction.
     mutating func visitTableSize(table: UInt32) throws
-    /// Visiting `i32.trunc_sat_f32_s` instruction.
-    mutating func visitI32TruncSatF32S() throws
-    /// Visiting `i32.trunc_sat_f32_u` instruction.
-    mutating func visitI32TruncSatF32U() throws
-    /// Visiting `i32.trunc_sat_f64_s` instruction.
-    mutating func visitI32TruncSatF64S() throws
-    /// Visiting `i32.trunc_sat_f64_u` instruction.
-    mutating func visitI32TruncSatF64U() throws
-    /// Visiting `i64.trunc_sat_f32_s` instruction.
-    mutating func visitI64TruncSatF32S() throws
-    /// Visiting `i64.trunc_sat_f32_u` instruction.
-    mutating func visitI64TruncSatF32U() throws
-    /// Visiting `i64.trunc_sat_f64_s` instruction.
-    mutating func visitI64TruncSatF64S() throws
-    /// Visiting `i64.trunc_sat_f64_u` instruction.
-    mutating func visitI64TruncSatF64U() throws
 }
 
 extension InstructionVisitor {
@@ -872,31 +651,7 @@ extension InstructionVisitor {
         case .i64Eqz: return try visitI64Eqz()
         case let .unary(unary): return try visitUnary(unary)
         case let .binary(binary): return try visitBinary(binary)
-        case .i32WrapI64: return try visitI32WrapI64()
-        case .i32TruncF32S: return try visitI32TruncF32S()
-        case .i32TruncF32U: return try visitI32TruncF32U()
-        case .i32TruncF64S: return try visitI32TruncF64S()
-        case .i32TruncF64U: return try visitI32TruncF64U()
-        case .i64ExtendI32S: return try visitI64ExtendI32S()
-        case .i64ExtendI32U: return try visitI64ExtendI32U()
-        case .i64TruncF32S: return try visitI64TruncF32S()
-        case .i64TruncF32U: return try visitI64TruncF32U()
-        case .i64TruncF64S: return try visitI64TruncF64S()
-        case .i64TruncF64U: return try visitI64TruncF64U()
-        case .f32ConvertI32S: return try visitF32ConvertI32S()
-        case .f32ConvertI32U: return try visitF32ConvertI32U()
-        case .f32ConvertI64S: return try visitF32ConvertI64S()
-        case .f32ConvertI64U: return try visitF32ConvertI64U()
-        case .f32DemoteF64: return try visitF32DemoteF64()
-        case .f64ConvertI32S: return try visitF64ConvertI32S()
-        case .f64ConvertI32U: return try visitF64ConvertI32U()
-        case .f64ConvertI64S: return try visitF64ConvertI64S()
-        case .f64ConvertI64U: return try visitF64ConvertI64U()
-        case .f64PromoteF32: return try visitF64PromoteF32()
-        case .i32ReinterpretF32: return try visitI32ReinterpretF32()
-        case .i64ReinterpretF64: return try visitI64ReinterpretF64()
-        case .f32ReinterpretI32: return try visitF32ReinterpretI32()
-        case .f64ReinterpretI64: return try visitF64ReinterpretI64()
+        case let .conversion(conversion): return try visitConversion(conversion)
         case let .memoryInit(dataIndex): return try visitMemoryInit(dataIndex: dataIndex)
         case let .dataDrop(dataIndex): return try visitDataDrop(dataIndex: dataIndex)
         case let .memoryCopy(dstMem, srcMem): return try visitMemoryCopy(dstMem: dstMem, srcMem: srcMem)
@@ -909,14 +664,6 @@ extension InstructionVisitor {
         case let .tableSet(table): return try visitTableSet(table: table)
         case let .tableGrow(table): return try visitTableGrow(table: table)
         case let .tableSize(table): return try visitTableSize(table: table)
-        case .i32TruncSatF32S: return try visitI32TruncSatF32S()
-        case .i32TruncSatF32U: return try visitI32TruncSatF32U()
-        case .i32TruncSatF64S: return try visitI32TruncSatF64S()
-        case .i32TruncSatF64U: return try visitI32TruncSatF64U()
-        case .i64TruncSatF32S: return try visitI64TruncSatF32S()
-        case .i64TruncSatF32U: return try visitI64TruncSatF32U()
-        case .i64TruncSatF64S: return try visitI64TruncSatF64S()
-        case .i64TruncSatF64U: return try visitI64TruncSatF64U()
         }
     }
 }
@@ -960,31 +707,7 @@ extension InstructionVisitor {
     public mutating func visitI64Eqz() throws {}
     public mutating func visitUnary(_ unary: Instruction.Unary) throws {}
     public mutating func visitBinary(_ binary: Instruction.Binary) throws {}
-    public mutating func visitI32WrapI64() throws {}
-    public mutating func visitI32TruncF32S() throws {}
-    public mutating func visitI32TruncF32U() throws {}
-    public mutating func visitI32TruncF64S() throws {}
-    public mutating func visitI32TruncF64U() throws {}
-    public mutating func visitI64ExtendI32S() throws {}
-    public mutating func visitI64ExtendI32U() throws {}
-    public mutating func visitI64TruncF32S() throws {}
-    public mutating func visitI64TruncF32U() throws {}
-    public mutating func visitI64TruncF64S() throws {}
-    public mutating func visitI64TruncF64U() throws {}
-    public mutating func visitF32ConvertI32S() throws {}
-    public mutating func visitF32ConvertI32U() throws {}
-    public mutating func visitF32ConvertI64S() throws {}
-    public mutating func visitF32ConvertI64U() throws {}
-    public mutating func visitF32DemoteF64() throws {}
-    public mutating func visitF64ConvertI32S() throws {}
-    public mutating func visitF64ConvertI32U() throws {}
-    public mutating func visitF64ConvertI64S() throws {}
-    public mutating func visitF64ConvertI64U() throws {}
-    public mutating func visitF64PromoteF32() throws {}
-    public mutating func visitI32ReinterpretF32() throws {}
-    public mutating func visitI64ReinterpretF64() throws {}
-    public mutating func visitF32ReinterpretI32() throws {}
-    public mutating func visitF64ReinterpretI64() throws {}
+    public mutating func visitConversion(_ conversion: Instruction.Conversion) throws {}
     public mutating func visitMemoryInit(dataIndex: UInt32) throws {}
     public mutating func visitDataDrop(dataIndex: UInt32) throws {}
     public mutating func visitMemoryCopy(dstMem: UInt32, srcMem: UInt32) throws {}
@@ -997,13 +720,5 @@ extension InstructionVisitor {
     public mutating func visitTableSet(table: UInt32) throws {}
     public mutating func visitTableGrow(table: UInt32) throws {}
     public mutating func visitTableSize(table: UInt32) throws {}
-    public mutating func visitI32TruncSatF32S() throws {}
-    public mutating func visitI32TruncSatF32U() throws {}
-    public mutating func visitI32TruncSatF64S() throws {}
-    public mutating func visitI32TruncSatF64U() throws {}
-    public mutating func visitI64TruncSatF32S() throws {}
-    public mutating func visitI64TruncSatF32U() throws {}
-    public mutating func visitI64TruncSatF64S() throws {}
-    public mutating func visitI64TruncSatF64U() throws {}
 }
 

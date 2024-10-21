@@ -1983,31 +1983,45 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
         try visitUnary(operand, instruction)
     }
-    mutating func visitI32WrapI64() throws -> Output { try visitConversion(.i64, .i32, Instruction.i32WrapI64) }
-    mutating func visitI32TruncF32S() throws -> Output { try visitConversion(.f32, .i32, Instruction.i32TruncF32S) }
-    mutating func visitI32TruncF32U() throws -> Output { try visitConversion(.f32, .i32, Instruction.i32TruncF32U) }
-    mutating func visitI32TruncF64S() throws -> Output { try visitConversion(.f64, .i32, Instruction.i32TruncF64S) }
-    mutating func visitI32TruncF64U() throws -> Output { try visitConversion(.f64, .i32, Instruction.i32TruncF64U) }
-    mutating func visitI64ExtendI32S() throws -> Output { try visitConversion(.i32, .i64, Instruction.i64ExtendI32S) }
-    mutating func visitI64ExtendI32U() throws -> Output { try visitConversion(.i32, .i64, Instruction.i64ExtendI32U) }
-    mutating func visitI64TruncF32S() throws -> Output { try visitConversion(.f32, .i64, Instruction.i64TruncF32S) }
-    mutating func visitI64TruncF32U() throws -> Output { try visitConversion(.f32, .i64, Instruction.i64TruncF32U) }
-    mutating func visitI64TruncF64S() throws -> Output { try visitConversion(.f64, .i64, Instruction.i64TruncF64S) }
-    mutating func visitI64TruncF64U() throws -> Output { try visitConversion(.f64, .i64, Instruction.i64TruncF64U) }
-    mutating func visitF32ConvertI32S() throws -> Output { try visitConversion(.i32, .f32, Instruction.f32ConvertI32S) }
-    mutating func visitF32ConvertI32U() throws -> Output { try visitConversion(.i32, .f32, Instruction.f32ConvertI32U) }
-    mutating func visitF32ConvertI64S() throws -> Output { try visitConversion(.i64, .f32, Instruction.f32ConvertI64S) }
-    mutating func visitF32ConvertI64U() throws -> Output { try visitConversion(.i64, .f32, Instruction.f32ConvertI64U) }
-    mutating func visitF32DemoteF64() throws -> Output { try visitConversion(.f64, .f32, Instruction.f32DemoteF64) }
-    mutating func visitF64ConvertI32S() throws -> Output { try visitConversion(.i32, .f64, Instruction.f64ConvertI32S) }
-    mutating func visitF64ConvertI32U() throws -> Output { try visitConversion(.i32, .f64, Instruction.f64ConvertI32U) }
-    mutating func visitF64ConvertI64S() throws -> Output { try visitConversion(.i64, .f64, Instruction.f64ConvertI64S) }
-    mutating func visitF64ConvertI64U() throws -> Output { try visitConversion(.i64, .f64, Instruction.f64ConvertI64U) }
-    mutating func visitF64PromoteF32() throws -> Output { try visitConversion(.f32, .f64, Instruction.f64PromoteF32) }
-    mutating func visitI32ReinterpretF32() throws -> Output { try visitConversion(.f32, .i32, Instruction.i32ReinterpretF32) }
-    mutating func visitI64ReinterpretF64() throws -> Output { try visitConversion(.f64, .i64, Instruction.i64ReinterpretF64) }
-    mutating func visitF32ReinterpretI32() throws -> Output { try visitConversion(.i32, .f32, Instruction.f32ReinterpretI32) }
-    mutating func visitF64ReinterpretI64() throws -> Output { try visitConversion(.i64, .f64, Instruction.f64ReinterpretI64) }
+    mutating func visitConversion(_ conversion: WasmParser.Instruction.Conversion) throws {
+        let from: ValueType, to: ValueType, instruction: (Instruction.UnaryOperand) -> Instruction
+        switch conversion {
+        case .i32WrapI64: (from, to, instruction) = (.i64, .i32, Instruction.i32WrapI64)
+        case .i32TruncF32S: (from, to, instruction) = (.f32, .i32, Instruction.i32TruncF32S)
+        case .i32TruncF32U: (from, to, instruction) = (.f32, .i32, Instruction.i32TruncF32U)
+        case .i32TruncF64S: (from, to, instruction) = (.f64, .i32, Instruction.i32TruncF64S)
+        case .i32TruncF64U: (from, to, instruction) = (.f64, .i32, Instruction.i32TruncF64U)
+        case .i64ExtendI32S: (from, to, instruction) = (.i32, .i64, Instruction.i64ExtendI32S)
+        case .i64ExtendI32U: (from, to, instruction) = (.i32, .i64, Instruction.i64ExtendI32U)
+        case .i64TruncF32S: (from, to, instruction) = (.f32, .i64, Instruction.i64TruncF32S)
+        case .i64TruncF32U: (from, to, instruction) = (.f32, .i64, Instruction.i64TruncF32U)
+        case .i64TruncF64S: (from, to, instruction) = (.f64, .i64, Instruction.i64TruncF64S)
+        case .i64TruncF64U: (from, to, instruction) = (.f64, .i64, Instruction.i64TruncF64U)
+        case .f32ConvertI32S: (from, to, instruction) = (.i32, .f32, Instruction.f32ConvertI32S)
+        case .f32ConvertI32U: (from, to, instruction) = (.i32, .f32, Instruction.f32ConvertI32U)
+        case .f32ConvertI64S: (from, to, instruction) = (.i64, .f32, Instruction.f32ConvertI64S)
+        case .f32ConvertI64U: (from, to, instruction) = (.i64, .f32, Instruction.f32ConvertI64U)
+        case .f32DemoteF64: (from, to, instruction) = (.f64, .f32, Instruction.f32DemoteF64)
+        case .f64ConvertI32S: (from, to, instruction) = (.i32, .f64, Instruction.f64ConvertI32S)
+        case .f64ConvertI32U: (from, to, instruction) = (.i32, .f64, Instruction.f64ConvertI32U)
+        case .f64ConvertI64S: (from, to, instruction) = (.i64, .f64, Instruction.f64ConvertI64S)
+        case .f64ConvertI64U: (from, to, instruction) = (.i64, .f64, Instruction.f64ConvertI64U)
+        case .f64PromoteF32: (from, to, instruction) = (.f32, .f64, Instruction.f64PromoteF32)
+        case .i32ReinterpretF32: (from, to, instruction) = (.f32, .i32, Instruction.i32ReinterpretF32)
+        case .i64ReinterpretF64: (from, to, instruction) = (.f64, .i64, Instruction.i64ReinterpretF64)
+        case .f32ReinterpretI32: (from, to, instruction) = (.i32, .f32, Instruction.f32ReinterpretI32)
+        case .f64ReinterpretI64: (from, to, instruction) = (.i64, .f64, Instruction.f64ReinterpretI64)
+        case .i32TruncSatF32S: (from, to, instruction) = (.f32, .i32, Instruction.i32TruncSatF32S)
+        case .i32TruncSatF32U: (from, to, instruction) = (.f32, .i32, Instruction.i32TruncSatF32U)
+        case .i32TruncSatF64S: (from, to, instruction) = (.f64, .i32, Instruction.i32TruncSatF64S)
+        case .i32TruncSatF64U: (from, to, instruction) = (.f64, .i32, Instruction.i32TruncSatF64U)
+        case .i64TruncSatF32S: (from, to, instruction) = (.f32, .i64, Instruction.i64TruncSatF32S)
+        case .i64TruncSatF32U: (from, to, instruction) = (.f32, .i64, Instruction.i64TruncSatF32U)
+        case .i64TruncSatF64S: (from, to, instruction) = (.f64, .i64, Instruction.i64TruncSatF64S)
+        case .i64TruncSatF64U: (from, to, instruction) = (.f64, .i64, Instruction.i64TruncSatF64U)
+        }
+        try visitConversion(from, to, instruction)
+    }
 
     mutating func visitMemoryInit(dataIndex: UInt32) throws -> Output {
         try self.module.validateDataSegment(dataIndex)
@@ -2173,14 +2187,6 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             return .tableSize(Instruction.TableSizeOperand(tableIndex: table, result: LVReg(result)))
         }
     }
-    mutating func visitI32TruncSatF32S() throws -> Output { try visitConversion(.f32, .i32, Instruction.i32TruncSatF32S) }
-    mutating func visitI32TruncSatF32U() throws -> Output { try visitConversion(.f32, .i32, Instruction.i32TruncSatF32U) }
-    mutating func visitI32TruncSatF64S() throws -> Output { try visitConversion(.f64, .i32, Instruction.i32TruncSatF64S) }
-    mutating func visitI32TruncSatF64U() throws -> Output { try visitConversion(.f64, .i32, Instruction.i32TruncSatF64U) }
-    mutating func visitI64TruncSatF32S() throws -> Output { try visitConversion(.f32, .i64, Instruction.i64TruncSatF32S) }
-    mutating func visitI64TruncSatF32U() throws -> Output { try visitConversion(.f32, .i64, Instruction.i64TruncSatF32U) }
-    mutating func visitI64TruncSatF64S() throws -> Output { try visitConversion(.f64, .i64, Instruction.i64TruncSatF64S) }
-    mutating func visitI64TruncSatF64U() throws -> Output { try visitConversion(.f64, .i64, Instruction.i64TruncSatF64U) }
 }
 
 struct TranslationError: Error, CustomStringConvertible {
