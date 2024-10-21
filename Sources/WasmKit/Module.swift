@@ -63,7 +63,7 @@ public struct Module {
     let tableTypes: [TableType]
     let allocator: ISeqAllocator
     let features: WasmFeatureSet
-    let hasDataCount: Bool
+    let dataCount: UInt32?
 
     init(
         types: [FunctionType],
@@ -79,7 +79,7 @@ public struct Module {
         customSections: [CustomSection],
         allocator: ISeqAllocator,
         features: WasmFeatureSet,
-        hasDataCount: Bool
+        dataCount: UInt32?
     ) {
         self.functions = functions
         self.elements = elements
@@ -91,7 +91,7 @@ public struct Module {
         self.customSections = customSections
         self.allocator = allocator
         self.features = features
-        self.hasDataCount = hasDataCount
+        self.dataCount = dataCount
 
         var importedFunctionTypes: [TypeIndex] = []
         var globalTypes: [GlobalType] = []

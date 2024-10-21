@@ -123,6 +123,6 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
         customSections: customSections,
         allocator: allocator,
         features: features,
-        hasDataCount: dataCount != nil
+        dataCount: dataCount
     )
 }

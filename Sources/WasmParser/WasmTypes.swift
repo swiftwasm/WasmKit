@@ -13,8 +13,6 @@ public struct Code {
     @usableFromInline
     internal let offset: Int
     @usableFromInline
-    internal let hasDataCount: Bool
-    @usableFromInline
     internal let features: WasmFeatureSet
 }
 

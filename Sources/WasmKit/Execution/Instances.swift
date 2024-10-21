@@ -82,7 +82,7 @@ struct InstanceEntity /* : ~Copyable */ {
     var exports: [String: InternalExternalValue]
     var functionRefs: Set<InternalFunction>
     var features: WasmFeatureSet
-    var hasDataCount: Bool
+    var dataCount: UInt32?
 
     static var empty: InstanceEntity {
         InstanceEntity(
@@ -96,7 +96,7 @@ struct InstanceEntity /* : ~Copyable */ {
             exports: [:],
             functionRefs: [],
             features: [],
-            hasDataCount: false
+            dataCount: nil
         )
     }
 
@@ -724,12 +724,6 @@ struct DataSegmentEntity {
 
     mutating func drop() {
         self = DataSegmentEntity(data: [])
-    }
-}
-
-extension DataSegmentEntity: ValidatableEntity {
-    static func createOutOfBoundsError(index: Int, count: Int) -> Error {
-        Trap._raw("Data index out of bounds: \(index) (max: \(count))")
     }
 }
 

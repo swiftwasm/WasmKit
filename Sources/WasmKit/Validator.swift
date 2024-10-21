@@ -54,6 +54,17 @@ struct InstructionValidator<Context: TranslatorContext> {
     func validateRefFunc(functionIndex: UInt32) throws {
         try context.validateFunctionIndex(functionIndex)
     }
+
+    func validateDataSegment(_ dataIndex: DataIndex) throws {
+        // instruction referring data segment requires data count section
+        // https://webassembly.github.io/spec/core/binary/modules.html#data-count-section
+        guard let dataCount = context.dataCount else {
+            throw ValidationError("Data count section is required but not found")
+        }
+        guard dataIndex < dataCount else {
+            throw ValidationError("Data index out of bounds: \(dataIndex) (max: \(dataCount))")
+        }
+    }
 }
 
 struct ModuleValidator {
