@@ -1758,15 +1758,22 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
         try visitLoad(memarg, load.type, load.naturalAlignment, instruction)
     }
-    mutating func visitI32Store(memarg: MemArg) throws -> Output { try visitStore(memarg, .i32, 2, Instruction.i32Store) }
-    mutating func visitI64Store(memarg: MemArg) throws -> Output { try visitStore(memarg, .i64, 3, Instruction.i64Store) }
-    mutating func visitF32Store(memarg: MemArg) throws -> Output { try visitStore(memarg, .f32, 2, Instruction.f32Store) }
-    mutating func visitF64Store(memarg: MemArg) throws -> Output { try visitStore(memarg, .f64, 3, Instruction.f64Store) }
-    mutating func visitI32Store8(memarg: MemArg) throws -> Output { try visitStore(memarg, .i32, 0, Instruction.i32Store8) }
-    mutating func visitI32Store16(memarg: MemArg) throws -> Output { try visitStore(memarg, .i32, 1, Instruction.i32Store16) }
-    mutating func visitI64Store8(memarg: MemArg) throws -> Output { try visitStore(memarg, .i64, 0, Instruction.i64Store8) }
-    mutating func visitI64Store16(memarg: MemArg) throws -> Output { try visitStore(memarg, .i64, 1, Instruction.i64Store16) }
-    mutating func visitI64Store32(memarg: MemArg) throws -> Output { try visitStore(memarg, .i64, 2, Instruction.i64Store32) }
+    
+    mutating func visitStore(_ store: WasmParser.Instruction.Store, memarg: MemArg) throws {
+        let instruction: (Instruction.StoreOperand) -> Instruction
+        switch store {
+        case .i32Store: instruction = Instruction.i32Store
+        case .i64Store: instruction = Instruction.i64Store
+        case .f32Store: instruction = Instruction.f32Store
+        case .f64Store: instruction = Instruction.f64Store
+        case .i32Store8: instruction = Instruction.i32Store8
+        case .i32Store16: instruction = Instruction.i32Store16
+        case .i64Store8: instruction = Instruction.i64Store8
+        case .i64Store16: instruction = Instruction.i64Store16
+        case .i64Store32: instruction = Instruction.i64Store32
+        }
+        try visitStore(memarg, store.type, store.naturalAlignment, instruction)
+    }
     mutating func visitMemorySize(memory: UInt32) throws -> Output {
         let sizeType: ValueType = try module.isMemory64(memoryIndex: memory) ? .i64 : .i32
         pushEmit(sizeType, { .memorySize(Instruction.MemorySizeOperand(memoryIndex: memory, result: LVReg($0))) })

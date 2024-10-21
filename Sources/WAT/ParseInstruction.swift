@@ -103,32 +103,32 @@ func parseTextInstruction<V: InstructionVisitor>(keyword: String, expressionPars
         let (memarg) = try expressionParser.visitLoad(.i64Load32U, wat: &wat)
         return { return try $0.visitLoad(.i64Load32U, memarg: memarg) }
     case "i32.store":
-        let (memarg) = try expressionParser.visitI32Store(wat: &wat)
-        return { return try $0.visitI32Store(memarg: memarg) }
+        let (memarg) = try expressionParser.visitStore(.i32Store, wat: &wat)
+        return { return try $0.visitStore(.i32Store, memarg: memarg) }
     case "i64.store":
-        let (memarg) = try expressionParser.visitI64Store(wat: &wat)
-        return { return try $0.visitI64Store(memarg: memarg) }
+        let (memarg) = try expressionParser.visitStore(.i64Store, wat: &wat)
+        return { return try $0.visitStore(.i64Store, memarg: memarg) }
     case "f32.store":
-        let (memarg) = try expressionParser.visitF32Store(wat: &wat)
-        return { return try $0.visitF32Store(memarg: memarg) }
+        let (memarg) = try expressionParser.visitStore(.f32Store, wat: &wat)
+        return { return try $0.visitStore(.f32Store, memarg: memarg) }
     case "f64.store":
-        let (memarg) = try expressionParser.visitF64Store(wat: &wat)
-        return { return try $0.visitF64Store(memarg: memarg) }
+        let (memarg) = try expressionParser.visitStore(.f64Store, wat: &wat)
+        return { return try $0.visitStore(.f64Store, memarg: memarg) }
     case "i32.store8":
-        let (memarg) = try expressionParser.visitI32Store8(wat: &wat)
-        return { return try $0.visitI32Store8(memarg: memarg) }
+        let (memarg) = try expressionParser.visitStore(.i32Store8, wat: &wat)
+        return { return try $0.visitStore(.i32Store8, memarg: memarg) }
     case "i32.store16":
-        let (memarg) = try expressionParser.visitI32Store16(wat: &wat)
-        return { return try $0.visitI32Store16(memarg: memarg) }
+        let (memarg) = try expressionParser.visitStore(.i32Store16, wat: &wat)
+        return { return try $0.visitStore(.i32Store16, memarg: memarg) }
     case "i64.store8":
-        let (memarg) = try expressionParser.visitI64Store8(wat: &wat)
-        return { return try $0.visitI64Store8(memarg: memarg) }
+        let (memarg) = try expressionParser.visitStore(.i64Store8, wat: &wat)
+        return { return try $0.visitStore(.i64Store8, memarg: memarg) }
     case "i64.store16":
-        let (memarg) = try expressionParser.visitI64Store16(wat: &wat)
-        return { return try $0.visitI64Store16(memarg: memarg) }
+        let (memarg) = try expressionParser.visitStore(.i64Store16, wat: &wat)
+        return { return try $0.visitStore(.i64Store16, memarg: memarg) }
     case "i64.store32":
-        let (memarg) = try expressionParser.visitI64Store32(wat: &wat)
-        return { return try $0.visitI64Store32(memarg: memarg) }
+        let (memarg) = try expressionParser.visitStore(.i64Store32, wat: &wat)
+        return { return try $0.visitStore(.i64Store32, memarg: memarg) }
     case "memory.size":
         let (memory) = try expressionParser.visitMemorySize(wat: &wat)
         return { return try $0.visitMemorySize(memory: memory) }

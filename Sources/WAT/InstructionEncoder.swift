@@ -121,40 +121,21 @@ extension InstructionEncoder {
         try encodeInstruction(opcode, prefix)
         try encodeImmediates(memarg: memarg)
     }
-    mutating func visitI32Store(memarg: MemArg) throws {
-        try encodeInstruction(0x36, nil)
-        try encodeImmediates(memarg: memarg)
-    }
-    mutating func visitI64Store(memarg: MemArg) throws {
-        try encodeInstruction(0x37, nil)
-        try encodeImmediates(memarg: memarg)
-    }
-    mutating func visitF32Store(memarg: MemArg) throws {
-        try encodeInstruction(0x38, nil)
-        try encodeImmediates(memarg: memarg)
-    }
-    mutating func visitF64Store(memarg: MemArg) throws {
-        try encodeInstruction(0x39, nil)
-        try encodeImmediates(memarg: memarg)
-    }
-    mutating func visitI32Store8(memarg: MemArg) throws {
-        try encodeInstruction(0x3A, nil)
-        try encodeImmediates(memarg: memarg)
-    }
-    mutating func visitI32Store16(memarg: MemArg) throws {
-        try encodeInstruction(0x3B, nil)
-        try encodeImmediates(memarg: memarg)
-    }
-    mutating func visitI64Store8(memarg: MemArg) throws {
-        try encodeInstruction(0x3C, nil)
-        try encodeImmediates(memarg: memarg)
-    }
-    mutating func visitI64Store16(memarg: MemArg) throws {
-        try encodeInstruction(0x3D, nil)
-        try encodeImmediates(memarg: memarg)
-    }
-    mutating func visitI64Store32(memarg: MemArg) throws {
-        try encodeInstruction(0x3E, nil)
+    mutating func visitStore(_ store: Instruction.Store, memarg: MemArg) throws {
+        let (prefix, opcode): (UInt8?, UInt8)
+        switch store {
+        case .i32Store: (prefix, opcode) = (nil, 0x36)
+        case .i64Store: (prefix, opcode) = (nil, 0x37)
+        case .f32Store: (prefix, opcode) = (nil, 0x38)
+        case .f64Store: (prefix, opcode) = (nil, 0x39)
+        case .i32Store8: (prefix, opcode) = (nil, 0x3A)
+        case .i32Store16: (prefix, opcode) = (nil, 0x3B)
+        case .i64Store8: (prefix, opcode) = (nil, 0x3C)
+        case .i64Store16: (prefix, opcode) = (nil, 0x3D)
+        case .i64Store32: (prefix, opcode) = (nil, 0x3E)
+        }
+
+        try encodeInstruction(opcode, prefix)
         try encodeImmediates(memarg: memarg)
     }
     mutating func visitMemorySize(memory: UInt32) throws {

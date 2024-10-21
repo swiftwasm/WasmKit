@@ -331,6 +331,9 @@ extension RawSignedInteger {
 }
 
 extension Instruction.Load {
+    /// The alignment to the storage size of the memory access
+    /// in log2 form.
+    @_alwaysEmitIntoClient
     public var naturalAlignment: Int {
         switch self {
         case .i32Load: return 2
@@ -350,6 +353,8 @@ extension Instruction.Load {
         }
     }
 
+    /// The type of the value loaded from memory
+    @_alwaysEmitIntoClient
     public var type: ValueType {
         switch self {
         case .i32Load: return .i32
@@ -366,6 +371,41 @@ extension Instruction.Load {
         case .i64Load16U: return .i64
         case .i64Load32S: return .i64
         case .i64Load32U: return .i64
+        }
+    }
+}
+
+extension Instruction.Store {
+    /// The alignment to the storage size of the memory access
+    /// in log2 form.
+    @_alwaysEmitIntoClient
+    public var naturalAlignment: Int {
+        switch self {
+        case .i32Store: return 2
+        case .i64Store: return 3
+        case .f32Store: return 2
+        case .f64Store: return 3
+        case .i32Store8: return 0
+        case .i32Store16: return 1
+        case .i64Store8: return 0
+        case .i64Store16: return 1
+        case .i64Store32: return 2
+        }
+    }
+
+    /// The type of the value stored to memory
+    @_alwaysEmitIntoClient
+    public var type: ValueType {
+        switch self {
+        case .i32Store: return .i32
+        case .i64Store: return .i64
+        case .f32Store: return .f32
+        case .f64Store: return .f64
+        case .i32Store8: return .i32
+        case .i32Store16: return .i32
+        case .i64Store8: return .i64
+        case .i64Store16: return .i64
+        case .i64Store32: return .i64
         }
     }
 }
