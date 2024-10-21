@@ -216,7 +216,9 @@ struct StackLayout {
         self.frameHeader = FrameHeaderLayout(type: type)
         self.numberOfLocals = numberOfLocals
         // The number of constant slots is determined by the code size
-        self.constantSlotSize = max(codeSize / 20, 4)
+        // This is a heuristic value to balance the fast access to constants
+        // and the size of stack frame. Cap the slot size to avoid size explosion.
+        self.constantSlotSize = min(max(codeSize / 20, 4), 128)
         let (maxSlots, overflow) = self.constantSlotSize.addingReportingOverflow(numberOfLocals)
         guard !overflow, maxSlots < VReg.max else {
             throw TranslationError("The number of constant slots overflows")
