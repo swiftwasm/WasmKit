@@ -191,39 +191,39 @@ func parseTextInstruction<V: InstructionVisitor>(keyword: String, expressionPars
     case "i32.clz": return { return try $0.visitI32Clz() }
     case "i32.ctz": return { return try $0.visitI32Ctz() }
     case "i32.popcnt": return { return try $0.visitI32Popcnt() }
-    case "i32.add": return { return try $0.visitI32Add() }
-    case "i32.sub": return { return try $0.visitI32Sub() }
-    case "i32.mul": return { return try $0.visitI32Mul() }
-    case "i32.div_s": return { return try $0.visitI32DivS() }
-    case "i32.div_u": return { return try $0.visitI32DivU() }
-    case "i32.rem_s": return { return try $0.visitI32RemS() }
-    case "i32.rem_u": return { return try $0.visitI32RemU() }
-    case "i32.and": return { return try $0.visitI32And() }
-    case "i32.or": return { return try $0.visitI32Or() }
-    case "i32.xor": return { return try $0.visitI32Xor() }
-    case "i32.shl": return { return try $0.visitI32Shl() }
-    case "i32.shr_s": return { return try $0.visitI32ShrS() }
-    case "i32.shr_u": return { return try $0.visitI32ShrU() }
-    case "i32.rotl": return { return try $0.visitI32Rotl() }
-    case "i32.rotr": return { return try $0.visitI32Rotr() }
+    case "i32.add": return { return try $0.visitBinary(.i32Add) }
+    case "i32.sub": return { return try $0.visitBinary(.i32Sub) }
+    case "i32.mul": return { return try $0.visitBinary(.i32Mul) }
+    case "i32.div_s": return { return try $0.visitBinary(.i32DivS) }
+    case "i32.div_u": return { return try $0.visitBinary(.i32DivU) }
+    case "i32.rem_s": return { return try $0.visitBinary(.i32RemS) }
+    case "i32.rem_u": return { return try $0.visitBinary(.i32RemU) }
+    case "i32.and": return { return try $0.visitBinary(.i32And) }
+    case "i32.or": return { return try $0.visitBinary(.i32Or) }
+    case "i32.xor": return { return try $0.visitBinary(.i32Xor) }
+    case "i32.shl": return { return try $0.visitBinary(.i32Shl) }
+    case "i32.shr_s": return { return try $0.visitBinary(.i32ShrS) }
+    case "i32.shr_u": return { return try $0.visitBinary(.i32ShrU) }
+    case "i32.rotl": return { return try $0.visitBinary(.i32Rotl) }
+    case "i32.rotr": return { return try $0.visitBinary(.i32Rotr) }
     case "i64.clz": return { return try $0.visitI64Clz() }
     case "i64.ctz": return { return try $0.visitI64Ctz() }
     case "i64.popcnt": return { return try $0.visitI64Popcnt() }
-    case "i64.add": return { return try $0.visitI64Add() }
-    case "i64.sub": return { return try $0.visitI64Sub() }
-    case "i64.mul": return { return try $0.visitI64Mul() }
-    case "i64.div_s": return { return try $0.visitI64DivS() }
-    case "i64.div_u": return { return try $0.visitI64DivU() }
-    case "i64.rem_s": return { return try $0.visitI64RemS() }
-    case "i64.rem_u": return { return try $0.visitI64RemU() }
-    case "i64.and": return { return try $0.visitI64And() }
-    case "i64.or": return { return try $0.visitI64Or() }
-    case "i64.xor": return { return try $0.visitI64Xor() }
-    case "i64.shl": return { return try $0.visitI64Shl() }
-    case "i64.shr_s": return { return try $0.visitI64ShrS() }
-    case "i64.shr_u": return { return try $0.visitI64ShrU() }
-    case "i64.rotl": return { return try $0.visitI64Rotl() }
-    case "i64.rotr": return { return try $0.visitI64Rotr() }
+    case "i64.add": return { return try $0.visitBinary(.i64Add) }
+    case "i64.sub": return { return try $0.visitBinary(.i64Sub) }
+    case "i64.mul": return { return try $0.visitBinary(.i64Mul) }
+    case "i64.div_s": return { return try $0.visitBinary(.i64DivS) }
+    case "i64.div_u": return { return try $0.visitBinary(.i64DivU) }
+    case "i64.rem_s": return { return try $0.visitBinary(.i64RemS) }
+    case "i64.rem_u": return { return try $0.visitBinary(.i64RemU) }
+    case "i64.and": return { return try $0.visitBinary(.i64And) }
+    case "i64.or": return { return try $0.visitBinary(.i64Or) }
+    case "i64.xor": return { return try $0.visitBinary(.i64Xor) }
+    case "i64.shl": return { return try $0.visitBinary(.i64Shl) }
+    case "i64.shr_s": return { return try $0.visitBinary(.i64ShrS) }
+    case "i64.shr_u": return { return try $0.visitBinary(.i64ShrU) }
+    case "i64.rotl": return { return try $0.visitBinary(.i64Rotl) }
+    case "i64.rotr": return { return try $0.visitBinary(.i64Rotr) }
     case "f32.abs": return { return try $0.visitF32Abs() }
     case "f32.neg": return { return try $0.visitF32Neg() }
     case "f32.ceil": return { return try $0.visitF32Ceil() }
@@ -231,13 +231,13 @@ func parseTextInstruction<V: InstructionVisitor>(keyword: String, expressionPars
     case "f32.trunc": return { return try $0.visitF32Trunc() }
     case "f32.nearest": return { return try $0.visitF32Nearest() }
     case "f32.sqrt": return { return try $0.visitF32Sqrt() }
-    case "f32.add": return { return try $0.visitF32Add() }
-    case "f32.sub": return { return try $0.visitF32Sub() }
-    case "f32.mul": return { return try $0.visitF32Mul() }
-    case "f32.div": return { return try $0.visitF32Div() }
-    case "f32.min": return { return try $0.visitF32Min() }
-    case "f32.max": return { return try $0.visitF32Max() }
-    case "f32.copysign": return { return try $0.visitF32Copysign() }
+    case "f32.add": return { return try $0.visitBinary(.f32Add) }
+    case "f32.sub": return { return try $0.visitBinary(.f32Sub) }
+    case "f32.mul": return { return try $0.visitBinary(.f32Mul) }
+    case "f32.div": return { return try $0.visitBinary(.f32Div) }
+    case "f32.min": return { return try $0.visitBinary(.f32Min) }
+    case "f32.max": return { return try $0.visitBinary(.f32Max) }
+    case "f32.copysign": return { return try $0.visitBinary(.f32Copysign) }
     case "f64.abs": return { return try $0.visitF64Abs() }
     case "f64.neg": return { return try $0.visitF64Neg() }
     case "f64.ceil": return { return try $0.visitF64Ceil() }
@@ -245,13 +245,13 @@ func parseTextInstruction<V: InstructionVisitor>(keyword: String, expressionPars
     case "f64.trunc": return { return try $0.visitF64Trunc() }
     case "f64.nearest": return { return try $0.visitF64Nearest() }
     case "f64.sqrt": return { return try $0.visitF64Sqrt() }
-    case "f64.add": return { return try $0.visitF64Add() }
-    case "f64.sub": return { return try $0.visitF64Sub() }
-    case "f64.mul": return { return try $0.visitF64Mul() }
-    case "f64.div": return { return try $0.visitF64Div() }
-    case "f64.min": return { return try $0.visitF64Min() }
-    case "f64.max": return { return try $0.visitF64Max() }
-    case "f64.copysign": return { return try $0.visitF64Copysign() }
+    case "f64.add": return { return try $0.visitBinary(.f64Add) }
+    case "f64.sub": return { return try $0.visitBinary(.f64Sub) }
+    case "f64.mul": return { return try $0.visitBinary(.f64Mul) }
+    case "f64.div": return { return try $0.visitBinary(.f64Div) }
+    case "f64.min": return { return try $0.visitBinary(.f64Min) }
+    case "f64.max": return { return try $0.visitBinary(.f64Max) }
+    case "f64.copysign": return { return try $0.visitBinary(.f64Copysign) }
     case "i32.wrap_i64": return { return try $0.visitI32WrapI64() }
     case "i32.trunc_f32_s": return { return try $0.visitI32TruncF32S() }
     case "i32.trunc_f32_u": return { return try $0.visitI32TruncF32U() }
