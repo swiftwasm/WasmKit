@@ -315,9 +315,10 @@ extension StoreAllocator {
                 for (index, importedEntity) in imports.enumerated() {
                     buffer.initializeElement(at: index, to: importedEntity)
                 }
-                for (index, internalEntity) in internals.enumerated() {
+                for (internalIndex, internalEntity) in internals.enumerated() {
+                    let index = imports.count + internalIndex
                     let allocated = try allocateHandle(internalEntity, index)
-                    buffer.initializeElement(at: imports.count + index, to: allocated)
+                    buffer.initializeElement(at: index, to: allocated)
                 }
             }
         }
@@ -372,7 +373,7 @@ extension StoreAllocator {
         let globals = try allocateEntities(
             imports: importedGlobals,
             internals: module.globals,
-            allocateHandle: { global, i in
+            allocateHandle: { global, _ in
                 let initialValue = try global.initializer.evaluate(
                     context: constEvalContext, expectedType: global.type.valueType
                 )

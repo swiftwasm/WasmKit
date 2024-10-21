@@ -52,31 +52,26 @@ final class ExecutionTests: XCTestCase {
         XCTAssertEqual(results, [.i32(42)])
     }
 
-    func testBacktrace() throws {
+    func expectTrap(_ wat: String, assertTrap: (Trap) throws -> Void) throws {
         let module = try parseWasm(
-            bytes: wat2wasm(
-                """
-                (module
-                  (memory (export "memory") 1)
-                  (func $foo (result i32)
-                    unreachable
-                  )
-                  (func $bar (result i32)
-                    (call $foo)
-                  )
-                  (func (export "_start")
-                    (call $bar)
-                    (drop)
-                  )
-                )
-                """,
-                options: EncodeOptions(nameSection: true)
-            )
+            bytes: wat2wasm(wat, options: EncodeOptions(nameSection: true))
         )
 
         let engine = Engine()
         let store = Store(engine: engine)
-        let instance = try module.instantiate(store: store)
+        var imports = Imports()
+        for importEntry in module.imports {
+            guard case .function(let type) = importEntry.descriptor else { continue }
+            let function = try Function(
+                store: store,
+                type: module.resolveFunctionType(type),
+                body: { _, _ in
+                    return []
+                }
+            )
+            imports.define(importEntry, .function(function))
+        }
+        let instance = try module.instantiate(store: store, imports: imports)
         let _start = try XCTUnwrap(instance.exports[function: "_start"])
 
         let trap: Trap
@@ -87,13 +82,59 @@ final class ExecutionTests: XCTestCase {
         } catch let error {
             trap = try XCTUnwrap(error as? Trap)
         }
+        try assertTrap(trap)
+    }
 
-        XCTAssertEqual(
-            trap.backtrace?.symbols.compactMap(\.?.name),
-            [
-                "foo",
-                "bar",
-                "_start",
-            ])
+    func testBacktraceBasic() throws {
+        try expectTrap(
+            """
+            (module
+                (func $foo
+                    unreachable
+                )
+                (func $bar
+                    (call $foo)
+                )
+                (func (export "_start")
+                    (call $bar)
+                )
+            )
+            """
+        ) { trap in
+            XCTAssertEqual(
+                trap.backtrace?.symbols.compactMap(\.?.name),
+                [
+                    "foo",
+                    "bar",
+                    "_start",
+                ])
+        }
+    }
+
+    func testBacktraceWithImports() throws {
+        try expectTrap(
+            """
+            (module
+                (func (import "env" "bar"))
+                (func
+                    unreachable
+                )
+                (func $bar
+                    (call 1)
+                )
+                (func (export "_start")
+                    (call $bar)
+                )
+            )
+            """
+        ) { trap in
+            XCTAssertEqual(
+                trap.backtrace?.symbols.compactMap(\.?.name),
+                [
+                    "wasm function[1]",
+                    "bar",
+                    "_start",
+                ])
+        }
     }
 }
