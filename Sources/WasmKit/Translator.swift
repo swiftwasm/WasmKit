@@ -1737,7 +1737,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             emit(instruction(storeOperand))
         }
     }
-    
+
     mutating func visitLoad(_ load: WasmParser.Instruction.Load, memarg: MemArg) throws {
         let instruction: (Instruction.LoadOperand) -> Instruction
         switch load {
@@ -1758,7 +1758,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
         try visitLoad(memarg, load.type, load.naturalAlignment, instruction)
     }
-    
+
     mutating func visitStore(_ store: WasmParser.Instruction.Store, memarg: MemArg) throws {
         let instruction: (Instruction.StoreOperand) -> Instruction
         switch store {
@@ -1860,7 +1860,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
     }
     mutating func visitCmp(_ cmp: WasmParser.Instruction.Cmp) throws {
-        let operand: ValueType, instruction: (Instruction.BinaryOperand) -> Instruction
+        let operand: ValueType
+        let instruction: (Instruction.BinaryOperand) -> Instruction
         switch cmp {
         case .i32Eq: (operand, instruction) = (.i32, Instruction.i32Eq)
         case .i32Ne: (operand, instruction) = (.i32, Instruction.i32Ne)
@@ -1898,7 +1899,9 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         try visitCmp(operand, instruction)
     }
     public mutating func visitBinary(_ binary: WasmParser.Instruction.Binary) throws {
-        let operand: ValueType, result: ValueType, instruction: (Instruction.BinaryOperand) -> Instruction
+        let operand: ValueType
+        let result: ValueType
+        let instruction: (Instruction.BinaryOperand) -> Instruction
         switch binary {
         case .i32Add: (operand, result, instruction) = (.i32, .i32, Instruction.i32Add)
         case .i32Sub: (operand, result, instruction) = (.i32, .i32, Instruction.i32Sub)
@@ -1945,7 +1948,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         case .f64Max: (operand, result, instruction) = (.f64, .f64, Instruction.f64Max)
         case .f64Copysign: (operand, result, instruction) = (.f64, .f64, Instruction.f64CopySign)
         }
-         try visitBinary(operand, result, instruction)
+        try visitBinary(operand, result, instruction)
     }
     mutating func visitI64Eqz() throws -> Output {
         try popPushEmit(.i64, .i32) { value, result, stack in
@@ -1953,7 +1956,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
     }
     mutating func visitUnary(_ unary: WasmParser.Instruction.Unary) throws {
-        let operand: ValueType, instruction: (Instruction.UnaryOperand) -> Instruction
+        let operand: ValueType
+        let instruction: (Instruction.UnaryOperand) -> Instruction
         switch unary {
         case .i32Clz: (operand, instruction) = (.i32, Instruction.i32Clz)
         case .i32Ctz: (operand, instruction) = (.i32, Instruction.i32Ctz)
@@ -1984,7 +1988,9 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         try visitUnary(operand, instruction)
     }
     mutating func visitConversion(_ conversion: WasmParser.Instruction.Conversion) throws {
-        let from: ValueType, to: ValueType, instruction: (Instruction.UnaryOperand) -> Instruction
+        let from: ValueType
+        let to: ValueType
+        let instruction: (Instruction.UnaryOperand) -> Instruction
         switch conversion {
         case .i32WrapI64: (from, to, instruction) = (.i64, .i32, Instruction.i32WrapI64)
         case .i32TruncF32S: (from, to, instruction) = (.f32, .i32, Instruction.i32TruncF32S)
