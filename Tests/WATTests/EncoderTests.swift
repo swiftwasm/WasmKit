@@ -147,7 +147,7 @@ class EncoderTests: XCTestCase {
             """,
             options: EncodeOptions(nameSection: true)
         )
-        
+
         var parser = WasmParser.Parser(bytes: bytes)
         var customSections: [CustomSection] = []
         while let payload = try parser.parseNext() {

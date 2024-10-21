@@ -19,6 +19,13 @@ struct NameRegistry {
                     registry.register(instance: instance, nameMap: nameMap)
                 }
             }
+
+            for (name, entry) in instance.exports {
+                // Use exported name if the function doesn't have name in name section.
+                guard case .function(let function) = entry else { continue }
+                guard registry.functionNames[function] == nil else { continue }
+                registry.functionNames[function] = name
+            }
         }
     }
 
@@ -48,7 +55,7 @@ struct NameRegistry {
         }
         // Fallback
         if function.isWasm {
-            return "function[\(function.wasm.index)]"
+            return "wasm function[\(function.wasm.index)]"
         } else {
             return "unknown host function"
         }
