@@ -2,14 +2,33 @@ import WasmTypes
 
 import struct WasmParser.Import
 
+/// The backtrace of the trap.
+struct Backtrace: CustomStringConvertible {
+    /// A symbol in the backtrace.
+    struct Symbol {
+        /// The function that the symbol represents.
+        let function: Function
+
+        /// The name of the symbol.
+        let name: String?
+    }
+
+    /// The symbols in the backtrace.
+    let symbols: [Symbol?]
+
+    /// Textual description of the backtrace.
+    var description: String {
+        symbols.enumerated().map { (index, symbol) in
+            let name = symbol?.name ?? "unknown"
+            return "    \(index): \(name)"
+        }.joined(separator: "\n")
+    }
+}
+
 /// An error that occurs during execution of a WebAssembly module.
 public struct Trap: Error, CustomStringConvertible {
     /// The reason for the trap.
     var reason: TrapReason
-
-    /// The backtrace of the trap.
-    struct Backtrace {
-    }
 
     /// The backtrace of the trap.
     private(set) var backtrace: Backtrace?

@@ -80,7 +80,7 @@ extension Execution {
         let (iseq, locals, instance) = internalCallOperand.callee.assumeCompiled()
         sp = try pushFrame(
             iseq: iseq,
-            instance: instance,
+            function: instance,
             numberOfNonParameterLocals: locals,
             sp: sp, returnPC: pc,
             spAddend: internalCallOperand.spAddend
