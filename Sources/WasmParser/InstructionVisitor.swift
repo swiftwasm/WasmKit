@@ -66,6 +66,33 @@ public enum Instruction: Equatable {
         case f64Le
         case f64Ge
     }
+    public enum Unary: Equatable {
+        case i32Clz
+        case i32Ctz
+        case i32Popcnt
+        case i64Clz
+        case i64Ctz
+        case i64Popcnt
+        case f32Abs
+        case f32Neg
+        case f32Ceil
+        case f32Floor
+        case f32Trunc
+        case f32Nearest
+        case f32Sqrt
+        case f64Abs
+        case f64Neg
+        case f64Ceil
+        case f64Floor
+        case f64Trunc
+        case f64Nearest
+        case f64Sqrt
+        case i32Extend8S
+        case i32Extend16S
+        case i64Extend8S
+        case i64Extend16S
+        case i64Extend32S
+    }
     public enum Binary: Equatable {
         case i32Add
         case i32Sub
@@ -147,27 +174,8 @@ public enum Instruction: Equatable {
     case `i32Eqz`
     case `cmp`(Instruction.Cmp)
     case `i64Eqz`
-    case `i32Clz`
-    case `i32Ctz`
-    case `i32Popcnt`
+    case `unary`(Instruction.Unary)
     case `binary`(Instruction.Binary)
-    case `i64Clz`
-    case `i64Ctz`
-    case `i64Popcnt`
-    case `f32Abs`
-    case `f32Neg`
-    case `f32Ceil`
-    case `f32Floor`
-    case `f32Trunc`
-    case `f32Nearest`
-    case `f32Sqrt`
-    case `f64Abs`
-    case `f64Neg`
-    case `f64Ceil`
-    case `f64Floor`
-    case `f64Trunc`
-    case `f64Nearest`
-    case `f64Sqrt`
     case `i32WrapI64`
     case `i32TruncF32S`
     case `i32TruncF32U`
@@ -193,11 +201,6 @@ public enum Instruction: Equatable {
     case `i64ReinterpretF64`
     case `f32ReinterpretI32`
     case `f64ReinterpretI64`
-    case `i32Extend8S`
-    case `i32Extend16S`
-    case `i64Extend8S`
-    case `i64Extend16S`
-    case `i64Extend32S`
     case `memoryInit`(dataIndex: UInt32)
     case `dataDrop`(dataIndex: UInt32)
     case `memoryCopy`(dstMem: UInt32, srcMem: UInt32)
@@ -262,27 +265,8 @@ extension AnyInstructionVisitor {
     public mutating func visitI32Eqz() throws { return try self.visit(.i32Eqz) }
     public mutating func visitCmp(_ cmp: Instruction.Cmp) throws { return try self.visit(.cmp(cmp)) }
     public mutating func visitI64Eqz() throws { return try self.visit(.i64Eqz) }
-    public mutating func visitI32Clz() throws { return try self.visit(.i32Clz) }
-    public mutating func visitI32Ctz() throws { return try self.visit(.i32Ctz) }
-    public mutating func visitI32Popcnt() throws { return try self.visit(.i32Popcnt) }
+    public mutating func visitUnary(_ unary: Instruction.Unary) throws { return try self.visit(.unary(unary)) }
     public mutating func visitBinary(_ binary: Instruction.Binary) throws { return try self.visit(.binary(binary)) }
-    public mutating func visitI64Clz() throws { return try self.visit(.i64Clz) }
-    public mutating func visitI64Ctz() throws { return try self.visit(.i64Ctz) }
-    public mutating func visitI64Popcnt() throws { return try self.visit(.i64Popcnt) }
-    public mutating func visitF32Abs() throws { return try self.visit(.f32Abs) }
-    public mutating func visitF32Neg() throws { return try self.visit(.f32Neg) }
-    public mutating func visitF32Ceil() throws { return try self.visit(.f32Ceil) }
-    public mutating func visitF32Floor() throws { return try self.visit(.f32Floor) }
-    public mutating func visitF32Trunc() throws { return try self.visit(.f32Trunc) }
-    public mutating func visitF32Nearest() throws { return try self.visit(.f32Nearest) }
-    public mutating func visitF32Sqrt() throws { return try self.visit(.f32Sqrt) }
-    public mutating func visitF64Abs() throws { return try self.visit(.f64Abs) }
-    public mutating func visitF64Neg() throws { return try self.visit(.f64Neg) }
-    public mutating func visitF64Ceil() throws { return try self.visit(.f64Ceil) }
-    public mutating func visitF64Floor() throws { return try self.visit(.f64Floor) }
-    public mutating func visitF64Trunc() throws { return try self.visit(.f64Trunc) }
-    public mutating func visitF64Nearest() throws { return try self.visit(.f64Nearest) }
-    public mutating func visitF64Sqrt() throws { return try self.visit(.f64Sqrt) }
     public mutating func visitI32WrapI64() throws { return try self.visit(.i32WrapI64) }
     public mutating func visitI32TruncF32S() throws { return try self.visit(.i32TruncF32S) }
     public mutating func visitI32TruncF32U() throws { return try self.visit(.i32TruncF32U) }
@@ -308,11 +292,6 @@ extension AnyInstructionVisitor {
     public mutating func visitI64ReinterpretF64() throws { return try self.visit(.i64ReinterpretF64) }
     public mutating func visitF32ReinterpretI32() throws { return try self.visit(.f32ReinterpretI32) }
     public mutating func visitF64ReinterpretI64() throws { return try self.visit(.f64ReinterpretI64) }
-    public mutating func visitI32Extend8S() throws { return try self.visit(.i32Extend8S) }
-    public mutating func visitI32Extend16S() throws { return try self.visit(.i32Extend16S) }
-    public mutating func visitI64Extend8S() throws { return try self.visit(.i64Extend8S) }
-    public mutating func visitI64Extend16S() throws { return try self.visit(.i64Extend16S) }
-    public mutating func visitI64Extend32S() throws { return try self.visit(.i64Extend32S) }
     public mutating func visitMemoryInit(dataIndex: UInt32) throws { return try self.visit(.memoryInit(dataIndex: dataIndex)) }
     public mutating func visitDataDrop(dataIndex: UInt32) throws { return try self.visit(.dataDrop(dataIndex: dataIndex)) }
     public mutating func visitMemoryCopy(dstMem: UInt32, srcMem: UInt32) throws { return try self.visit(.memoryCopy(dstMem: dstMem, srcMem: srcMem)) }
@@ -491,89 +470,13 @@ public struct InstructionTracingVisitor<V: InstructionVisitor>: InstructionVisit
        trace(.i64Eqz)
        return try visitor.visitI64Eqz()
     }
-    public mutating func visitI32Clz() throws {
-       trace(.i32Clz)
-       return try visitor.visitI32Clz()
-    }
-    public mutating func visitI32Ctz() throws {
-       trace(.i32Ctz)
-       return try visitor.visitI32Ctz()
-    }
-    public mutating func visitI32Popcnt() throws {
-       trace(.i32Popcnt)
-       return try visitor.visitI32Popcnt()
+    public mutating func visitUnary(_ unary: Instruction.Unary) throws {
+       trace(.unary(unary))
+       return try visitor.visitUnary(unary)
     }
     public mutating func visitBinary(_ binary: Instruction.Binary) throws {
        trace(.binary(binary))
        return try visitor.visitBinary(binary)
-    }
-    public mutating func visitI64Clz() throws {
-       trace(.i64Clz)
-       return try visitor.visitI64Clz()
-    }
-    public mutating func visitI64Ctz() throws {
-       trace(.i64Ctz)
-       return try visitor.visitI64Ctz()
-    }
-    public mutating func visitI64Popcnt() throws {
-       trace(.i64Popcnt)
-       return try visitor.visitI64Popcnt()
-    }
-    public mutating func visitF32Abs() throws {
-       trace(.f32Abs)
-       return try visitor.visitF32Abs()
-    }
-    public mutating func visitF32Neg() throws {
-       trace(.f32Neg)
-       return try visitor.visitF32Neg()
-    }
-    public mutating func visitF32Ceil() throws {
-       trace(.f32Ceil)
-       return try visitor.visitF32Ceil()
-    }
-    public mutating func visitF32Floor() throws {
-       trace(.f32Floor)
-       return try visitor.visitF32Floor()
-    }
-    public mutating func visitF32Trunc() throws {
-       trace(.f32Trunc)
-       return try visitor.visitF32Trunc()
-    }
-    public mutating func visitF32Nearest() throws {
-       trace(.f32Nearest)
-       return try visitor.visitF32Nearest()
-    }
-    public mutating func visitF32Sqrt() throws {
-       trace(.f32Sqrt)
-       return try visitor.visitF32Sqrt()
-    }
-    public mutating func visitF64Abs() throws {
-       trace(.f64Abs)
-       return try visitor.visitF64Abs()
-    }
-    public mutating func visitF64Neg() throws {
-       trace(.f64Neg)
-       return try visitor.visitF64Neg()
-    }
-    public mutating func visitF64Ceil() throws {
-       trace(.f64Ceil)
-       return try visitor.visitF64Ceil()
-    }
-    public mutating func visitF64Floor() throws {
-       trace(.f64Floor)
-       return try visitor.visitF64Floor()
-    }
-    public mutating func visitF64Trunc() throws {
-       trace(.f64Trunc)
-       return try visitor.visitF64Trunc()
-    }
-    public mutating func visitF64Nearest() throws {
-       trace(.f64Nearest)
-       return try visitor.visitF64Nearest()
-    }
-    public mutating func visitF64Sqrt() throws {
-       trace(.f64Sqrt)
-       return try visitor.visitF64Sqrt()
     }
     public mutating func visitI32WrapI64() throws {
        trace(.i32WrapI64)
@@ -674,26 +577,6 @@ public struct InstructionTracingVisitor<V: InstructionVisitor>: InstructionVisit
     public mutating func visitF64ReinterpretI64() throws {
        trace(.f64ReinterpretI64)
        return try visitor.visitF64ReinterpretI64()
-    }
-    public mutating func visitI32Extend8S() throws {
-       trace(.i32Extend8S)
-       return try visitor.visitI32Extend8S()
-    }
-    public mutating func visitI32Extend16S() throws {
-       trace(.i32Extend16S)
-       return try visitor.visitI32Extend16S()
-    }
-    public mutating func visitI64Extend8S() throws {
-       trace(.i64Extend8S)
-       return try visitor.visitI64Extend8S()
-    }
-    public mutating func visitI64Extend16S() throws {
-       trace(.i64Extend16S)
-       return try visitor.visitI64Extend16S()
-    }
-    public mutating func visitI64Extend32S() throws {
-       trace(.i64Extend32S)
-       return try visitor.visitI64Extend32S()
     }
     public mutating func visitMemoryInit(dataIndex: UInt32) throws {
        trace(.memoryInit(dataIndex: dataIndex))
@@ -852,48 +735,10 @@ public protocol InstructionVisitor {
     mutating func visitCmp(_: Instruction.Cmp) throws
     /// Visiting `i64.eqz` instruction.
     mutating func visitI64Eqz() throws
-    /// Visiting `i32.clz` instruction.
-    mutating func visitI32Clz() throws
-    /// Visiting `i32.ctz` instruction.
-    mutating func visitI32Ctz() throws
-    /// Visiting `i32.popcnt` instruction.
-    mutating func visitI32Popcnt() throws
+    /// Visiting `unary` category instruction.
+    mutating func visitUnary(_: Instruction.Unary) throws
     /// Visiting `binary` category instruction.
     mutating func visitBinary(_: Instruction.Binary) throws
-    /// Visiting `i64.clz` instruction.
-    mutating func visitI64Clz() throws
-    /// Visiting `i64.ctz` instruction.
-    mutating func visitI64Ctz() throws
-    /// Visiting `i64.popcnt` instruction.
-    mutating func visitI64Popcnt() throws
-    /// Visiting `f32.abs` instruction.
-    mutating func visitF32Abs() throws
-    /// Visiting `f32.neg` instruction.
-    mutating func visitF32Neg() throws
-    /// Visiting `f32.ceil` instruction.
-    mutating func visitF32Ceil() throws
-    /// Visiting `f32.floor` instruction.
-    mutating func visitF32Floor() throws
-    /// Visiting `f32.trunc` instruction.
-    mutating func visitF32Trunc() throws
-    /// Visiting `f32.nearest` instruction.
-    mutating func visitF32Nearest() throws
-    /// Visiting `f32.sqrt` instruction.
-    mutating func visitF32Sqrt() throws
-    /// Visiting `f64.abs` instruction.
-    mutating func visitF64Abs() throws
-    /// Visiting `f64.neg` instruction.
-    mutating func visitF64Neg() throws
-    /// Visiting `f64.ceil` instruction.
-    mutating func visitF64Ceil() throws
-    /// Visiting `f64.floor` instruction.
-    mutating func visitF64Floor() throws
-    /// Visiting `f64.trunc` instruction.
-    mutating func visitF64Trunc() throws
-    /// Visiting `f64.nearest` instruction.
-    mutating func visitF64Nearest() throws
-    /// Visiting `f64.sqrt` instruction.
-    mutating func visitF64Sqrt() throws
     /// Visiting `i32.wrap_i64` instruction.
     mutating func visitI32WrapI64() throws
     /// Visiting `i32.trunc_f32_s` instruction.
@@ -944,16 +789,6 @@ public protocol InstructionVisitor {
     mutating func visitF32ReinterpretI32() throws
     /// Visiting `f64.reinterpret_i64` instruction.
     mutating func visitF64ReinterpretI64() throws
-    /// Visiting `i32.extend8_s` instruction.
-    mutating func visitI32Extend8S() throws
-    /// Visiting `i32.extend16_s` instruction.
-    mutating func visitI32Extend16S() throws
-    /// Visiting `i64.extend8_s` instruction.
-    mutating func visitI64Extend8S() throws
-    /// Visiting `i64.extend16_s` instruction.
-    mutating func visitI64Extend16S() throws
-    /// Visiting `i64.extend32_s` instruction.
-    mutating func visitI64Extend32S() throws
     /// Visiting `memory.init` instruction.
     mutating func visitMemoryInit(dataIndex: UInt32) throws
     /// Visiting `data.drop` instruction.
@@ -1035,27 +870,8 @@ extension InstructionVisitor {
         case .i32Eqz: return try visitI32Eqz()
         case let .cmp(cmp): return try visitCmp(cmp)
         case .i64Eqz: return try visitI64Eqz()
-        case .i32Clz: return try visitI32Clz()
-        case .i32Ctz: return try visitI32Ctz()
-        case .i32Popcnt: return try visitI32Popcnt()
+        case let .unary(unary): return try visitUnary(unary)
         case let .binary(binary): return try visitBinary(binary)
-        case .i64Clz: return try visitI64Clz()
-        case .i64Ctz: return try visitI64Ctz()
-        case .i64Popcnt: return try visitI64Popcnt()
-        case .f32Abs: return try visitF32Abs()
-        case .f32Neg: return try visitF32Neg()
-        case .f32Ceil: return try visitF32Ceil()
-        case .f32Floor: return try visitF32Floor()
-        case .f32Trunc: return try visitF32Trunc()
-        case .f32Nearest: return try visitF32Nearest()
-        case .f32Sqrt: return try visitF32Sqrt()
-        case .f64Abs: return try visitF64Abs()
-        case .f64Neg: return try visitF64Neg()
-        case .f64Ceil: return try visitF64Ceil()
-        case .f64Floor: return try visitF64Floor()
-        case .f64Trunc: return try visitF64Trunc()
-        case .f64Nearest: return try visitF64Nearest()
-        case .f64Sqrt: return try visitF64Sqrt()
         case .i32WrapI64: return try visitI32WrapI64()
         case .i32TruncF32S: return try visitI32TruncF32S()
         case .i32TruncF32U: return try visitI32TruncF32U()
@@ -1081,11 +897,6 @@ extension InstructionVisitor {
         case .i64ReinterpretF64: return try visitI64ReinterpretF64()
         case .f32ReinterpretI32: return try visitF32ReinterpretI32()
         case .f64ReinterpretI64: return try visitF64ReinterpretI64()
-        case .i32Extend8S: return try visitI32Extend8S()
-        case .i32Extend16S: return try visitI32Extend16S()
-        case .i64Extend8S: return try visitI64Extend8S()
-        case .i64Extend16S: return try visitI64Extend16S()
-        case .i64Extend32S: return try visitI64Extend32S()
         case let .memoryInit(dataIndex): return try visitMemoryInit(dataIndex: dataIndex)
         case let .dataDrop(dataIndex): return try visitDataDrop(dataIndex: dataIndex)
         case let .memoryCopy(dstMem, srcMem): return try visitMemoryCopy(dstMem: dstMem, srcMem: srcMem)
@@ -1147,27 +958,8 @@ extension InstructionVisitor {
     public mutating func visitI32Eqz() throws {}
     public mutating func visitCmp(_ cmp: Instruction.Cmp) throws {}
     public mutating func visitI64Eqz() throws {}
-    public mutating func visitI32Clz() throws {}
-    public mutating func visitI32Ctz() throws {}
-    public mutating func visitI32Popcnt() throws {}
+    public mutating func visitUnary(_ unary: Instruction.Unary) throws {}
     public mutating func visitBinary(_ binary: Instruction.Binary) throws {}
-    public mutating func visitI64Clz() throws {}
-    public mutating func visitI64Ctz() throws {}
-    public mutating func visitI64Popcnt() throws {}
-    public mutating func visitF32Abs() throws {}
-    public mutating func visitF32Neg() throws {}
-    public mutating func visitF32Ceil() throws {}
-    public mutating func visitF32Floor() throws {}
-    public mutating func visitF32Trunc() throws {}
-    public mutating func visitF32Nearest() throws {}
-    public mutating func visitF32Sqrt() throws {}
-    public mutating func visitF64Abs() throws {}
-    public mutating func visitF64Neg() throws {}
-    public mutating func visitF64Ceil() throws {}
-    public mutating func visitF64Floor() throws {}
-    public mutating func visitF64Trunc() throws {}
-    public mutating func visitF64Nearest() throws {}
-    public mutating func visitF64Sqrt() throws {}
     public mutating func visitI32WrapI64() throws {}
     public mutating func visitI32TruncF32S() throws {}
     public mutating func visitI32TruncF32U() throws {}
@@ -1193,11 +985,6 @@ extension InstructionVisitor {
     public mutating func visitI64ReinterpretF64() throws {}
     public mutating func visitF32ReinterpretI32() throws {}
     public mutating func visitF64ReinterpretI64() throws {}
-    public mutating func visitI32Extend8S() throws {}
-    public mutating func visitI32Extend16S() throws {}
-    public mutating func visitI64Extend8S() throws {}
-    public mutating func visitI64Extend16S() throws {}
-    public mutating func visitI64Extend32S() throws {}
     public mutating func visitMemoryInit(dataIndex: UInt32) throws {}
     public mutating func visitDataDrop(dataIndex: UInt32) throws {}
     public mutating func visitMemoryCopy(dstMem: UInt32, srcMem: UInt32) throws {}

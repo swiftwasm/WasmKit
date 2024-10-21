@@ -1952,26 +1952,37 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             .i64Eqz(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
     }
-    mutating func visitI32Clz() throws -> Output { try visitUnary(.i32, Instruction.i32Clz) }
-    mutating func visitI32Ctz() throws -> Output { try visitUnary(.i32, Instruction.i32Ctz) }
-    mutating func visitI32Popcnt() throws -> Output { try visitUnary(.i32, Instruction.i32Popcnt) }
-    mutating func visitI64Clz() throws -> Output { try visitUnary(.i64, Instruction.i64Clz) }
-    mutating func visitI64Ctz() throws -> Output { try visitUnary(.i64, Instruction.i64Ctz) }
-    mutating func visitI64Popcnt() throws -> Output { try visitUnary(.i64, Instruction.i64Popcnt) }
-    mutating func visitF32Abs() throws -> Output { try visitUnary(.f32, Instruction.f32Abs) }
-    mutating func visitF32Neg() throws -> Output { try visitUnary(.f32, Instruction.f32Neg) }
-    mutating func visitF32Ceil() throws -> Output { try visitUnary(.f32, Instruction.f32Ceil) }
-    mutating func visitF32Floor() throws -> Output { try visitUnary(.f32, Instruction.f32Floor) }
-    mutating func visitF32Trunc() throws -> Output { try visitUnary(.f32, Instruction.f32Trunc) }
-    mutating func visitF32Nearest() throws -> Output { try visitUnary(.f32, Instruction.f32Nearest) }
-    mutating func visitF32Sqrt() throws -> Output { try visitUnary(.f32, Instruction.f32Sqrt) }
-    mutating func visitF64Abs() throws -> Output { try visitUnary(.f64, Instruction.f64Abs) }
-    mutating func visitF64Neg() throws -> Output { try visitUnary(.f64, Instruction.f64Neg) }
-    mutating func visitF64Ceil() throws -> Output { try visitUnary(.f64, Instruction.f64Ceil) }
-    mutating func visitF64Floor() throws -> Output { try visitUnary(.f64, Instruction.f64Floor) }
-    mutating func visitF64Trunc() throws -> Output { try visitUnary(.f64, Instruction.f64Trunc) }
-    mutating func visitF64Nearest() throws -> Output { try visitUnary(.f64, Instruction.f64Nearest) }
-    mutating func visitF64Sqrt() throws -> Output { try visitUnary(.f64, Instruction.f64Sqrt) }
+    mutating func visitUnary(_ unary: WasmParser.Instruction.Unary) throws {
+        let operand: ValueType, instruction: (Instruction.UnaryOperand) -> Instruction
+        switch unary {
+        case .i32Clz: (operand, instruction) = (.i32, Instruction.i32Clz)
+        case .i32Ctz: (operand, instruction) = (.i32, Instruction.i32Ctz)
+        case .i32Popcnt: (operand, instruction) = (.i32, Instruction.i32Popcnt)
+        case .i64Clz: (operand, instruction) = (.i64, Instruction.i64Clz)
+        case .i64Ctz: (operand, instruction) = (.i64, Instruction.i64Ctz)
+        case .i64Popcnt: (operand, instruction) = (.i64, Instruction.i64Popcnt)
+        case .f32Abs: (operand, instruction) = (.f32, Instruction.f32Abs)
+        case .f32Neg: (operand, instruction) = (.f32, Instruction.f32Neg)
+        case .f32Ceil: (operand, instruction) = (.f32, Instruction.f32Ceil)
+        case .f32Floor: (operand, instruction) = (.f32, Instruction.f32Floor)
+        case .f32Trunc: (operand, instruction) = (.f32, Instruction.f32Trunc)
+        case .f32Nearest: (operand, instruction) = (.f32, Instruction.f32Nearest)
+        case .f32Sqrt: (operand, instruction) = (.f32, Instruction.f32Sqrt)
+        case .f64Abs: (operand, instruction) = (.f64, Instruction.f64Abs)
+        case .f64Neg: (operand, instruction) = (.f64, Instruction.f64Neg)
+        case .f64Ceil: (operand, instruction) = (.f64, Instruction.f64Ceil)
+        case .f64Floor: (operand, instruction) = (.f64, Instruction.f64Floor)
+        case .f64Trunc: (operand, instruction) = (.f64, Instruction.f64Trunc)
+        case .f64Nearest: (operand, instruction) = (.f64, Instruction.f64Nearest)
+        case .f64Sqrt: (operand, instruction) = (.f64, Instruction.f64Sqrt)
+        case .i32Extend8S: (operand, instruction) = (.i32, Instruction.i32Extend8S)
+        case .i32Extend16S: (operand, instruction) = (.i32, Instruction.i32Extend16S)
+        case .i64Extend8S: (operand, instruction) = (.i64, Instruction.i64Extend8S)
+        case .i64Extend16S: (operand, instruction) = (.i64, Instruction.i64Extend16S)
+        case .i64Extend32S: (operand, instruction) = (.i64, Instruction.i64Extend32S)
+        }
+        try visitUnary(operand, instruction)
+    }
     mutating func visitI32WrapI64() throws -> Output { try visitConversion(.i64, .i32, Instruction.i32WrapI64) }
     mutating func visitI32TruncF32S() throws -> Output { try visitConversion(.f32, .i32, Instruction.i32TruncF32S) }
     mutating func visitI32TruncF32U() throws -> Output { try visitConversion(.f32, .i32, Instruction.i32TruncF32U) }
@@ -1997,11 +2008,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     mutating func visitI64ReinterpretF64() throws -> Output { try visitConversion(.f64, .i64, Instruction.i64ReinterpretF64) }
     mutating func visitF32ReinterpretI32() throws -> Output { try visitConversion(.i32, .f32, Instruction.f32ReinterpretI32) }
     mutating func visitF64ReinterpretI64() throws -> Output { try visitConversion(.i64, .f64, Instruction.f64ReinterpretI64) }
-    mutating func visitI32Extend8S() throws -> Output { try visitUnary(.i32, Instruction.i32Extend8S) }
-    mutating func visitI32Extend16S() throws -> Output { try visitUnary(.i32, Instruction.i32Extend16S) }
-    mutating func visitI64Extend8S() throws -> Output { try visitUnary(.i64, Instruction.i64Extend8S) }
-    mutating func visitI64Extend16S() throws -> Output { try visitUnary(.i64, Instruction.i64Extend16S) }
-    mutating func visitI64Extend32S() throws -> Output { try visitUnary(.i64, Instruction.i64Extend32S) }
+
     mutating func visitMemoryInit(dataIndex: UInt32) throws -> Output {
         try self.module.validateDataSegment(dataIndex)
         let addressType = try module.addressType(memoryIndex: 0)
