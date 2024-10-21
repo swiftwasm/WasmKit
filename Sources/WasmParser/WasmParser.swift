@@ -15,6 +15,7 @@ public struct Parser<Stream: ByteStream> {
     public private(set) var hasDataCount: Bool = false
     public let features: WasmFeatureSet
     let limits: ParsingLimits
+    var orderTracking = OrderTracking()
 
     enum NextParseTarget {
         case header
@@ -22,8 +23,7 @@ public struct Parser<Stream: ByteStream> {
     }
     private var nextParseTarget: NextParseTarget
 
-    @usableFromInline
-    var currentIndex: Int {
+    public var offset: Int {
         return stream.currentIndex
     }
 
@@ -37,7 +37,7 @@ public struct Parser<Stream: ByteStream> {
 
     @usableFromInline
     internal func makeError(_ message: WasmParserError.Message) -> WasmParserError {
-        return WasmParserError(message, offset: currentIndex)
+        return WasmParserError(message, offset: offset)
     }
 }
 
@@ -147,7 +147,7 @@ public struct ExpressionParser {
     var lastCode: InstructionCode?
 
     public var offset: Int {
-        self.codeOffset + self.parser.currentIndex - self.initialStreamOffset
+        self.codeOffset + self.parser.offset - self.initialStreamOffset
     }
 
     public init(code: Code) {
@@ -157,7 +157,7 @@ public struct ExpressionParser {
             hasDataCount: code.hasDataCount
         )
         self.codeOffset = code.offset
-        self.initialStreamOffset = self.parser.currentIndex
+        self.initialStreamOffset = self.parser.offset
     }
 
     @inlinable
@@ -322,10 +322,6 @@ extension WasmParserError.Message {
 }
 
 extension WasmParserError {
-    // TODO: Remove
-    public static var sectionOutOfOrder: Self {
-        Self(.sectionOutOfOrder, offset: 0)
-    }
     public static func inconsistentFunctionAndCodeLength(functionCount: Int, codeCount: Int) -> Self {
         Self(.inconsistentFunctionAndCodeLength(functionCount: functionCount, codeCount: codeCount), offset: 0)
     }
@@ -449,7 +445,7 @@ extension Parser {
         case 0x70: return .ref(.funcRef)
         case 0x6F: return .ref(.externRef)
         default:
-            throw StreamError<Stream.Element>.unexpected(b, index: currentIndex, expected: Set(0x7C...0x7F))
+            throw StreamError<Stream.Element>.unexpected(b, index: offset, expected: Set(0x7C...0x7F))
         }
     }
 
@@ -547,7 +543,7 @@ extension Parser {
         case 0x6F:
             elementType = .externRef
         default:
-            throw StreamError.unexpected(b, index: currentIndex, expected: [0x6F, 0x70])
+            throw StreamError.unexpected(b, index: offset, expected: [0x6F, 0x70])
         }
 
         let limits = try parseLimits()
@@ -1220,6 +1216,33 @@ extension Parser {
         return version
     }
 
+    struct OrderTracking {
+        enum Order: UInt8 {
+            case initial = 0
+            case type
+            case _import
+            case function
+            case table
+            case memory
+            case tag
+            case global
+            case export
+            case start
+            case element
+            case dataCount
+            case code
+            case data
+        }
+
+        private var last: Order = .initial
+        mutating func track(order: Order, parser: Parser) throws {
+            guard last.rawValue < order.rawValue else {
+                throw parser.makeError(.sectionOutOfOrder)
+            }
+            last = order
+        }
+    }
+
     /// Attempts to parse a chunk of the Wasm binary stream.
     ///
     /// - Returns: A `ParsingPayload` if the parsing was successful, otherwise `nil`.
@@ -1264,28 +1287,57 @@ extension Parser {
             let sectionStart = stream.currentIndex
 
             let payload: ParsingPayload
+            let order: OrderTracking.Order?
             switch sectionID {
-            case 0: payload = .customSection(try parseCustomSection(size: sectionSize))
-            case 1: payload = .typeSection(try parseTypeSection())
-            case 2: payload = .importSection(try parseImportSection())
-            case 3: payload = .functionSection(try parseFunctionSection())
-            case 4: payload = .tableSection(try parseTableSection())
-            case 5: payload = .memorySection(try parseMemorySection())
-            case 6: payload = .globalSection(try parseGlobalSection())
-            case 7: payload = .exportSection(try parseExportSection())
-            case 8: payload = .startSection(try parseStartSection())
-            case 9: payload = .elementSection(try parseElementSection())
-            case 10: payload = .codeSection(try parseCodeSection())
-            case 11: payload = .dataSection(try parseDataSection())
+            case 0:
+                order = nil
+                payload = .customSection(try parseCustomSection(size: sectionSize))
+            case 1:
+                order = .type
+                payload = .typeSection(try parseTypeSection())
+            case 2:
+                order = ._import
+                payload = .importSection(try parseImportSection())
+            case 3:
+                order = .function
+                payload = .functionSection(try parseFunctionSection())
+            case 4:
+                order = .table
+                payload = .tableSection(try parseTableSection())
+            case 5:
+                order = .memory
+                payload = .memorySection(try parseMemorySection())
+            case 6:
+                order = .global
+                payload = .globalSection(try parseGlobalSection())
+            case 7:
+                order = .export
+                payload = .exportSection(try parseExportSection())
+            case 8:
+                order = .start
+                payload = .startSection(try parseStartSection())
+            case 9:
+                order = .element
+                payload = .elementSection(try parseElementSection())
+            case 10:
+                order = .code
+                payload = .codeSection(try parseCodeSection())
+            case 11:
+                order = .data
+                payload = .dataSection(try parseDataSection())
             case 12:
+                order = .dataCount
                 hasDataCount = true
                 payload = .dataCount(try parseDataCountSection())
             default:
                 throw makeError(.malformedSectionID(sectionID))
             }
+            if let order = order {
+                try orderTracking.track(order: order, parser: self)
+            }
             let expectedSectionEnd = sectionStart + Int(sectionSize)
             guard expectedSectionEnd == stream.currentIndex else {
-                throw makeError(.sectionSizeMismatch(expected: expectedSectionEnd, actual: currentIndex))
+                throw makeError(.sectionSizeMismatch(expected: expectedSectionEnd, actual: offset))
             }
             return payload
         }

@@ -31,37 +31,9 @@ public func parseWasm(bytes: [UInt8], features: WasmFeatureSet = .default) throw
     return module
 }
 
-private struct OrderTracking {
-    enum Order: UInt8 {
-        case initial = 0
-        case type
-        case _import
-        case function
-        case table
-        case memory
-        case tag
-        case global
-        case export
-        case start
-        case element
-        case dataCount
-        case code
-        case data
-    }
-
-    private var last: Order = .initial
-    mutating func track(order: Order) throws {
-        guard last.rawValue < order.rawValue else {
-            throw WasmParserError.sectionOutOfOrder
-        }
-        last = order
-    }
-}
-
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-module>
 func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = .default) throws -> Module {
-    var orderTracking = OrderTracking()
     var types: [FunctionType] = []
     var typeIndices: [TypeIndex] = []
     var codes: [Code] = []
@@ -86,40 +58,28 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
         case .customSection(let customSection):
             customSections.append(customSection)
         case .typeSection(let typeSection):
-            try orderTracking.track(order: .type)
             types = typeSection
         case .importSection(let importSection):
-            try orderTracking.track(order: ._import)
             imports = importSection
         case .functionSection(let types):
-            try orderTracking.track(order: .function)
             typeIndices = types
         case .tableSection(let tableSection):
-            try orderTracking.track(order: .table)
             tables = tableSection.map(\.type)
         case .memorySection(let memorySection):
-            try orderTracking.track(order: .memory)
             memories = memorySection.map(\.type)
         case .globalSection(let globalSection):
-            try orderTracking.track(order: .global)
             globals = globalSection
         case .exportSection(let exportSection):
-            try orderTracking.track(order: .export)
             exports = exportSection
         case .startSection(let functionIndex):
-            try orderTracking.track(order: .start)
             start = functionIndex
         case .elementSection(let elementSection):
-            try orderTracking.track(order: .element)
             elements = elementSection
         case .codeSection(let codeSection):
-            try orderTracking.track(order: .code)
             codes = codeSection
         case .dataSection(let dataSection):
-            try orderTracking.track(order: .data)
             data = dataSection
         case .dataCount(let count):
-            try orderTracking.track(order: .dataCount)
             dataCount = count
         }
     }
