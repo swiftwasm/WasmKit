@@ -78,7 +78,7 @@ class EncoderTests: XCTestCase {
                 assertEqual(watModule.id, expectedName)
                 switch watModule.source {
                 case .text(var watModule):
-                    moduleBytes = try encode(module: &watModule)
+                    moduleBytes = try encode(module: &watModule, options: .default)
                 case .binary(let bytes):
                     moduleBytes = bytes
                 case .quote(let watText):
@@ -134,5 +134,38 @@ class EncoderTests: XCTestCase {
                 print("Failed test cases: \(stats.failed.sorted())")
             }
         #endif
+    }
+
+    func testEncodeNameSection() throws {
+        let bytes = try wat2wasm(
+            """
+            (module
+                (func $foo)
+                (func)
+                (func $bar)
+            )
+            """,
+            options: EncodeOptions(nameSection: true)
+        )
+        
+        var parser = WasmParser.Parser(bytes: bytes)
+        var customSections: [CustomSection] = []
+        while let payload = try parser.parseNext() {
+            guard case .customSection(let section) = payload else {
+                continue
+            }
+            customSections.append(section)
+        }
+        let nameSection = customSections.first(where: { $0.name == "name" })
+        let nameParser = NameSectionParser(
+            stream: StaticByteStream(bytes: nameSection?.bytes ?? [])
+        )
+        let names = try nameParser.parseAll()
+        XCTAssertEqual(names.count, 1)
+        guard case .functions(let functionNames) = try XCTUnwrap(names.first) else {
+            XCTFail()
+            return
+        }
+        XCTAssertEqual(functionNames, [0: "foo", 2: "bar"])
     }
 }
