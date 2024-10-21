@@ -378,7 +378,7 @@ enum VMGen {
                 INLINE_CALL next = wasmkit_execute_\(inst.name)(\(params.map { "&\($0.label)" }.joined(separator: ", ")), state, &error);\n
             """
             if inst.mayThrow {
-                output += "    if (error) return wasmkit_execution_state_set_error(error, state);\n"
+                output += "    if (error) return wasmkit_execution_state_set_error(error, sp, state);\n"
             }
             output += """
                 return ((wasmkit_tc_exec)next)(sp, pc, md, ms, state);

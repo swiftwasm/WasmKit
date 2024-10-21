@@ -12,7 +12,7 @@ struct Execution {
     /// The error trap thrown during execution.
     /// This property must not be assigned to be non-nil more than once.
     /// - Note: If the trap is set, it must be released manually.
-    private var trap: UnsafeRawPointer? = nil
+    private var trap: (error: UnsafeRawPointer, sp: Sp)? = nil
 
     /// Executes the given closure with a new execution state associated with
     /// the given ``Store`` instance.
@@ -26,13 +26,6 @@ struct Execution {
             valueStack.deallocate()
         }
         var context = Execution(store: store, stackEnd: valueStack.advanced(by: limit))
-        defer {
-            if let trap = context.trap {
-                // Manually release the error object because the trap is caught in C and
-                // held as a raw pointer.
-                wasmkit_swift_errorRelease(trap)
-            }
-        }
         return try body(&context, valueStack)
     }
 
@@ -46,6 +39,7 @@ struct Execution {
     struct FrameIterator: IteratorProtocol {
         struct Element {
             let pc: Pc
+            let function: EntityHandle<WasmFunctionEntity>?
         }
 
         /// The stack pointer currently traversed.
@@ -56,29 +50,39 @@ struct Execution {
         }
 
         mutating func next() -> Element? {
-            guard let sp = self.sp else {
+            guard let sp = self.sp, let pc = sp.returnPC else {
                 // Reached the root frame, whose stack pointer is nil.
                 return nil
             }
-            let pc = sp.returnPC
             self.sp = sp.previousSP
-            return Element(pc: pc)
+            return Element(pc: pc, function: sp.currentFunction)
         }
     }
 
-    /// Returns an iterator for the call frames in the VM stack.
-    ///
-    /// - Parameter sp: The stack pointer of the current frame.
-    /// - Returns: An iterator for the call frames in the VM stack.
-    static func frames(sp: Sp) -> FrameIterator {
-        return FrameIterator(sp: sp)
+    static func captureBacktrace(sp: Sp, store: Store) -> Backtrace {
+        var frames = FrameIterator(sp: sp)
+        var symbols: [Backtrace.Symbol?] = []
+        while let frame = frames.next() {
+            guard let function = frame.function else {
+                symbols.append(nil)
+                continue
+            }
+            let symbolName = store.nameRegistry.symbolicate(.wasm(function))
+            symbols.append(
+                Backtrace.Symbol(
+                    function: Function(handle: .wasm(function), store: store),
+                    name: symbolName
+                )
+            )
+        }
+        return Backtrace(symbols: symbols)
     }
 
     /// Pushes a new call frame to the VM stack.
     @inline(__always)
     mutating func pushFrame(
         iseq: InstructionSequence,
-        instance: InternalInstance,
+        function: EntityHandle<WasmFunctionEntity>,
         numberOfNonParameterLocals: Int,
         sp: Sp, returnPC: Pc,
         spAddend: VReg
@@ -97,7 +101,7 @@ struct Execution {
         }
         newSp.previousSP = sp
         newSp.returnPC = returnPC
-        newSp.currentInstance = instance
+        newSp.currentFunction = function
         return newSp
     }
 
@@ -106,7 +110,7 @@ struct Execution {
     mutating func popFrame(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) {
         let oldSp = sp
         sp = oldSp.previousSP.unsafelyUnwrapped
-        pc = oldSp.returnPC
+        pc = oldSp.returnPC.unsafelyUnwrapped
         let toInstance = oldSp.currentInstance.unsafelyUnwrapped
         let fromInstance = sp.currentInstance
         CurrentMemory.mayUpdateCurrentInstance(instance: toInstance, from: fromInstance, md: &md, ms: &ms)
@@ -222,15 +226,15 @@ extension Sp {
 
     // MARK: - Special slots
 
-    /// The current instance of the execution context.
-    fileprivate var currentInstance: InternalInstance? {
-        get { return InternalInstance(bitPattern: UInt(self[-3].i64)) }
+    /// The current executing function.
+    fileprivate var currentFunction: EntityHandle<WasmFunctionEntity>? {
+        get { return EntityHandle<WasmFunctionEntity>(bitPattern: UInt(self[-3].i64)) }
         nonmutating set { self[-3] = UInt64(UInt(bitPattern: newValue?.bitPattern ?? 0)) }
     }
 
     /// The return program counter of the current frame.
-    fileprivate var returnPC: Pc {
-        get { return Pc(bitPattern: UInt(self[-2]))! }
+    fileprivate var returnPC: Pc? {
+        get { return Pc(bitPattern: UInt(self[-2])) }
         nonmutating set { self[-2] = UInt64(UInt(bitPattern: newValue)) }
     }
 
@@ -238,6 +242,10 @@ extension Sp {
     fileprivate var previousSP: Sp? {
         get { return Sp(bitPattern: UInt(self[-1])) }
         nonmutating set { self[-1] = UInt64(UInt(bitPattern: newValue)) }
+    }
+
+    fileprivate var currentInstance: InternalInstance? {
+        currentFunction?.instance
     }
 }
 
@@ -278,7 +286,9 @@ func executeWasm(
         // Advance the stack pointer to be able to reference negative indices
         // for saving slots.
         let sp = sp.advanced(by: FrameHeaderLayout.numberOfSavingSlots)
-        sp.previousSP = nil  // Mark root stack pointer as nil.
+        // Mark root stack pointer and current function as nil.
+        sp.previousSP = nil
+        sp.currentFunction = nil
         for (index, argument) in arguments.enumerated() {
             sp[VReg(index)] = UntypedValue(argument)
         }
@@ -386,8 +396,17 @@ extension Execution {
         var pc = pc
         let handler = pc.read(wasmkit_tc_exec.self)
         wasmkit_tc_start(handler, sp, pc, md, ms, &self)
-        if let error = self.trap {
-            throw unsafeBitCast(error, to: Error.self)
+        if let (rawError, trappingSp) = self.trap {
+            let error = unsafeBitCast(rawError, to: Error.self)
+            // Manually release the error object because the trap is caught in C and
+            // held as a raw pointer.
+            wasmkit_swift_errorRelease(rawError)
+
+            guard let trap = error as? Trap else {
+                throw error
+            }
+            // Attach backtrace if the thrown error is a trap
+            throw trap.withBacktrace(Self.captureBacktrace(sp: trappingSp, store: store.value))
         }
     }
 
@@ -463,11 +482,15 @@ extension Execution {
             defer { stats.dump() }
         #endif
         var opcode = pc.read(OpcodeID.self)
-        while true {
-            #if EngineStats
-                stats.track(inst)
-            #endif
-            opcode = try doExecute(opcode, sp: &sp, pc: &pc, md: &md, ms: &ms)
+        do {
+            while true {
+                #if EngineStats
+                    stats.track(inst)
+                #endif
+                opcode = try doExecute(opcode, sp: &sp, pc: &pc, md: &md, ms: &ms)
+            }
+        } catch let trap as Trap {
+            throw trap.withBacktrace(Self.captureBacktrace(sp: sp, store: store.value))
         }
     }
 
@@ -477,9 +500,9 @@ extension Execution {
     /// It's used only when direct threading is enabled.
     /// - Parameter trap: The error trap thrown during execution.
     @_silgen_name("wasmkit_execution_state_set_error")
-    mutating func setError(_ trap: UnsafeRawPointer) {
+    mutating func setError(_ rawError: UnsafeRawPointer, sp: Sp) {
         precondition(self.trap == nil)
-        self.trap = trap
+        self.trap = (rawError, sp)
     }
 
     /// Returns the new program counter and stack pointer.
@@ -496,7 +519,7 @@ extension Execution {
 
             let newSp = try pushFrame(
                 iseq: iseq,
-                instance: function.instance,
+                function: function,
                 numberOfNonParameterLocals: function.numberOfNonParameterLocals,
                 sp: sp,
                 returnPC: pc,

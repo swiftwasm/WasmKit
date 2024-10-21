@@ -212,13 +212,13 @@ extension InternalFunction {
     func assumeCompiled() -> (
         InstructionSequence,
         locals: Int,
-        instance: InternalInstance
+        function: EntityHandle<WasmFunctionEntity>
     ) {
         let entity = self.wasm
         guard case let .compiled(iseq) = entity.code else {
             preconditionFailure()
         }
-        return (iseq, entity.numberOfNonParameterLocals, entity.instance)
+        return (iseq, entity.numberOfNonParameterLocals, entity)
     }
 }
 
