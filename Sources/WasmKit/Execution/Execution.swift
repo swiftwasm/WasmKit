@@ -39,7 +39,39 @@ struct Execution {
     /// Gets the current instance from the stack pointer.
     @inline(__always)
     func currentInstance(sp: Sp) -> InternalInstance {
-        InternalInstance(bitPattern: UInt(sp[-3].i64)).unsafelyUnwrapped
+        sp.currentInstance.unsafelyUnwrapped
+    }
+
+    /// An iterator for the call frames in the VM stack.
+    struct FrameIterator: IteratorProtocol {
+        struct Element {
+            let pc: Pc
+        }
+
+        /// The stack pointer currently traversed.
+        private var sp: Sp?
+
+        init(sp: Sp) {
+            self.sp = sp
+        }
+
+        mutating func next() -> Element? {
+            guard let sp = self.sp else {
+                // Reached the root frame, whose stack pointer is nil.
+                return nil
+            }
+            let pc = sp.returnPC
+            self.sp = sp.previousSP
+            return Element(pc: pc)
+        }
+    }
+
+    /// Returns an iterator for the call frames in the VM stack.
+    ///
+    /// - Parameter sp: The stack pointer of the current frame.
+    /// - Returns: An iterator for the call frames in the VM stack.
+    static func frames(sp: Sp) -> FrameIterator {
+        return FrameIterator(sp: sp)
     }
 
     /// Pushes a new call frame to the VM stack.
@@ -63,9 +95,9 @@ struct Execution {
                 $0.initialize(from: constants, count: count)
             }
         }
-        newSp[-1] = UInt64(UInt(bitPattern: sp))
-        newSp[-2] = UInt64(UInt(bitPattern: returnPC))
-        newSp[-3] = UInt64(UInt(bitPattern: instance.bitPattern))
+        newSp.previousSP = sp
+        newSp.returnPC = returnPC
+        newSp.currentInstance = instance
         return newSp
     }
 
@@ -73,10 +105,10 @@ struct Execution {
     @inline(__always)
     mutating func popFrame(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) {
         let oldSp = sp
-        sp = Sp(bitPattern: UInt(oldSp[-1])).unsafelyUnwrapped
-        pc = Pc(bitPattern: UInt(oldSp[-2])).unsafelyUnwrapped
-        let toInstance = InternalInstance(bitPattern: UInt(oldSp[-3])).unsafelyUnwrapped
-        let fromInstance = InternalInstance(bitPattern: UInt(sp[-3]))
+        sp = oldSp.previousSP.unsafelyUnwrapped
+        pc = oldSp.returnPC
+        let toInstance = oldSp.currentInstance.unsafelyUnwrapped
+        let fromInstance = sp.currentInstance
         CurrentMemory.mayUpdateCurrentInstance(instance: toInstance, from: fromInstance, md: &md, ms: &ms)
     }
 }
@@ -187,6 +219,26 @@ extension Sp {
         get { return Float64(bitPattern: read(index)) }
         nonmutating set { write(index, .f64(newValue)) }
     }
+
+    // MARK: - Special slots
+
+    /// The current instance of the execution context.
+    fileprivate var currentInstance: InternalInstance? {
+        get { return InternalInstance(bitPattern: UInt(self[-3].i64)) }
+        nonmutating set { self[-3] = UInt64(UInt(bitPattern: newValue?.bitPattern ?? 0)) }
+    }
+
+    /// The return program counter of the current frame.
+    fileprivate var returnPC: Pc {
+        get { return Pc(bitPattern: UInt(self[-2]))! }
+        nonmutating set { self[-2] = UInt64(UInt(bitPattern: newValue)) }
+    }
+
+    /// The previous stack pointer of the current frame.
+    fileprivate var previousSP: Sp? {
+        get { return Sp(bitPattern: UInt(self[-1])) }
+        nonmutating set { self[-1] = UInt64(UInt(bitPattern: newValue)) }
+    }
 }
 
 extension Pc {
@@ -226,6 +278,7 @@ func executeWasm(
         // Advance the stack pointer to be able to reference negative indices
         // for saving slots.
         let sp = sp.advanced(by: FrameHeaderLayout.numberOfSavingSlots)
+        sp.previousSP = nil  // Mark root stack pointer as nil.
         for (index, argument) in arguments.enumerated() {
             sp[VReg(index)] = UntypedValue(argument)
         }
