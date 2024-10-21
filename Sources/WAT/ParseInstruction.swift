@@ -252,31 +252,31 @@ func parseTextInstruction<V: InstructionVisitor>(keyword: String, expressionPars
     case "f64.min": return { return try $0.visitBinary(.f64Min) }
     case "f64.max": return { return try $0.visitBinary(.f64Max) }
     case "f64.copysign": return { return try $0.visitBinary(.f64Copysign) }
-    case "i32.wrap_i64": return { return try $0.visitI32WrapI64() }
-    case "i32.trunc_f32_s": return { return try $0.visitI32TruncF32S() }
-    case "i32.trunc_f32_u": return { return try $0.visitI32TruncF32U() }
-    case "i32.trunc_f64_s": return { return try $0.visitI32TruncF64S() }
-    case "i32.trunc_f64_u": return { return try $0.visitI32TruncF64U() }
-    case "i64.extend_i32_s": return { return try $0.visitI64ExtendI32S() }
-    case "i64.extend_i32_u": return { return try $0.visitI64ExtendI32U() }
-    case "i64.trunc_f32_s": return { return try $0.visitI64TruncF32S() }
-    case "i64.trunc_f32_u": return { return try $0.visitI64TruncF32U() }
-    case "i64.trunc_f64_s": return { return try $0.visitI64TruncF64S() }
-    case "i64.trunc_f64_u": return { return try $0.visitI64TruncF64U() }
-    case "f32.convert_i32_s": return { return try $0.visitF32ConvertI32S() }
-    case "f32.convert_i32_u": return { return try $0.visitF32ConvertI32U() }
-    case "f32.convert_i64_s": return { return try $0.visitF32ConvertI64S() }
-    case "f32.convert_i64_u": return { return try $0.visitF32ConvertI64U() }
-    case "f32.demote_f64": return { return try $0.visitF32DemoteF64() }
-    case "f64.convert_i32_s": return { return try $0.visitF64ConvertI32S() }
-    case "f64.convert_i32_u": return { return try $0.visitF64ConvertI32U() }
-    case "f64.convert_i64_s": return { return try $0.visitF64ConvertI64S() }
-    case "f64.convert_i64_u": return { return try $0.visitF64ConvertI64U() }
-    case "f64.promote_f32": return { return try $0.visitF64PromoteF32() }
-    case "i32.reinterpret_f32": return { return try $0.visitI32ReinterpretF32() }
-    case "i64.reinterpret_f64": return { return try $0.visitI64ReinterpretF64() }
-    case "f32.reinterpret_i32": return { return try $0.visitF32ReinterpretI32() }
-    case "f64.reinterpret_i64": return { return try $0.visitF64ReinterpretI64() }
+    case "i32.wrap_i64": return { return try $0.visitConversion(.i32WrapI64) }
+    case "i32.trunc_f32_s": return { return try $0.visitConversion(.i32TruncF32S) }
+    case "i32.trunc_f32_u": return { return try $0.visitConversion(.i32TruncF32U) }
+    case "i32.trunc_f64_s": return { return try $0.visitConversion(.i32TruncF64S) }
+    case "i32.trunc_f64_u": return { return try $0.visitConversion(.i32TruncF64U) }
+    case "i64.extend_i32_s": return { return try $0.visitConversion(.i64ExtendI32S) }
+    case "i64.extend_i32_u": return { return try $0.visitConversion(.i64ExtendI32U) }
+    case "i64.trunc_f32_s": return { return try $0.visitConversion(.i64TruncF32S) }
+    case "i64.trunc_f32_u": return { return try $0.visitConversion(.i64TruncF32U) }
+    case "i64.trunc_f64_s": return { return try $0.visitConversion(.i64TruncF64S) }
+    case "i64.trunc_f64_u": return { return try $0.visitConversion(.i64TruncF64U) }
+    case "f32.convert_i32_s": return { return try $0.visitConversion(.f32ConvertI32S) }
+    case "f32.convert_i32_u": return { return try $0.visitConversion(.f32ConvertI32U) }
+    case "f32.convert_i64_s": return { return try $0.visitConversion(.f32ConvertI64S) }
+    case "f32.convert_i64_u": return { return try $0.visitConversion(.f32ConvertI64U) }
+    case "f32.demote_f64": return { return try $0.visitConversion(.f32DemoteF64) }
+    case "f64.convert_i32_s": return { return try $0.visitConversion(.f64ConvertI32S) }
+    case "f64.convert_i32_u": return { return try $0.visitConversion(.f64ConvertI32U) }
+    case "f64.convert_i64_s": return { return try $0.visitConversion(.f64ConvertI64S) }
+    case "f64.convert_i64_u": return { return try $0.visitConversion(.f64ConvertI64U) }
+    case "f64.promote_f32": return { return try $0.visitConversion(.f64PromoteF32) }
+    case "i32.reinterpret_f32": return { return try $0.visitConversion(.i32ReinterpretF32) }
+    case "i64.reinterpret_f64": return { return try $0.visitConversion(.i64ReinterpretF64) }
+    case "f32.reinterpret_i32": return { return try $0.visitConversion(.f32ReinterpretI32) }
+    case "f64.reinterpret_i64": return { return try $0.visitConversion(.f64ReinterpretI64) }
     case "i32.extend8_s": return { return try $0.visitUnary(.i32Extend8S) }
     case "i32.extend16_s": return { return try $0.visitUnary(.i32Extend16S) }
     case "i64.extend8_s": return { return try $0.visitUnary(.i64Extend8S) }
@@ -318,14 +318,14 @@ func parseTextInstruction<V: InstructionVisitor>(keyword: String, expressionPars
     case "table.size":
         let (table) = try expressionParser.visitTableSize(wat: &wat)
         return { return try $0.visitTableSize(table: table) }
-    case "i32.trunc_sat_f32_s": return { return try $0.visitI32TruncSatF32S() }
-    case "i32.trunc_sat_f32_u": return { return try $0.visitI32TruncSatF32U() }
-    case "i32.trunc_sat_f64_s": return { return try $0.visitI32TruncSatF64S() }
-    case "i32.trunc_sat_f64_u": return { return try $0.visitI32TruncSatF64U() }
-    case "i64.trunc_sat_f32_s": return { return try $0.visitI64TruncSatF32S() }
-    case "i64.trunc_sat_f32_u": return { return try $0.visitI64TruncSatF32U() }
-    case "i64.trunc_sat_f64_s": return { return try $0.visitI64TruncSatF64S() }
-    case "i64.trunc_sat_f64_u": return { return try $0.visitI64TruncSatF64U() }
+    case "i32.trunc_sat_f32_s": return { return try $0.visitConversion(.i32TruncSatF32S) }
+    case "i32.trunc_sat_f32_u": return { return try $0.visitConversion(.i32TruncSatF32U) }
+    case "i32.trunc_sat_f64_s": return { return try $0.visitConversion(.i32TruncSatF64S) }
+    case "i32.trunc_sat_f64_u": return { return try $0.visitConversion(.i32TruncSatF64U) }
+    case "i64.trunc_sat_f32_s": return { return try $0.visitConversion(.i64TruncSatF32S) }
+    case "i64.trunc_sat_f32_u": return { return try $0.visitConversion(.i64TruncSatF32U) }
+    case "i64.trunc_sat_f64_s": return { return try $0.visitConversion(.i64TruncSatF64S) }
+    case "i64.trunc_sat_f64_u": return { return try $0.visitConversion(.i64TruncSatF64U) }
     default: return nil
     }
 }

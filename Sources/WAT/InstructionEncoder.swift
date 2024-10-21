@@ -295,31 +295,46 @@ extension InstructionEncoder {
 
         try encodeInstruction(opcode, prefix)
     }
-    mutating func visitI32WrapI64() throws { try encodeInstruction(0xA7, nil) }
-    mutating func visitI32TruncF32S() throws { try encodeInstruction(0xA8, nil) }
-    mutating func visitI32TruncF32U() throws { try encodeInstruction(0xA9, nil) }
-    mutating func visitI32TruncF64S() throws { try encodeInstruction(0xAA, nil) }
-    mutating func visitI32TruncF64U() throws { try encodeInstruction(0xAB, nil) }
-    mutating func visitI64ExtendI32S() throws { try encodeInstruction(0xAC, nil) }
-    mutating func visitI64ExtendI32U() throws { try encodeInstruction(0xAD, nil) }
-    mutating func visitI64TruncF32S() throws { try encodeInstruction(0xAE, nil) }
-    mutating func visitI64TruncF32U() throws { try encodeInstruction(0xAF, nil) }
-    mutating func visitI64TruncF64S() throws { try encodeInstruction(0xB0, nil) }
-    mutating func visitI64TruncF64U() throws { try encodeInstruction(0xB1, nil) }
-    mutating func visitF32ConvertI32S() throws { try encodeInstruction(0xB2, nil) }
-    mutating func visitF32ConvertI32U() throws { try encodeInstruction(0xB3, nil) }
-    mutating func visitF32ConvertI64S() throws { try encodeInstruction(0xB4, nil) }
-    mutating func visitF32ConvertI64U() throws { try encodeInstruction(0xB5, nil) }
-    mutating func visitF32DemoteF64() throws { try encodeInstruction(0xB6, nil) }
-    mutating func visitF64ConvertI32S() throws { try encodeInstruction(0xB7, nil) }
-    mutating func visitF64ConvertI32U() throws { try encodeInstruction(0xB8, nil) }
-    mutating func visitF64ConvertI64S() throws { try encodeInstruction(0xB9, nil) }
-    mutating func visitF64ConvertI64U() throws { try encodeInstruction(0xBA, nil) }
-    mutating func visitF64PromoteF32() throws { try encodeInstruction(0xBB, nil) }
-    mutating func visitI32ReinterpretF32() throws { try encodeInstruction(0xBC, nil) }
-    mutating func visitI64ReinterpretF64() throws { try encodeInstruction(0xBD, nil) }
-    mutating func visitF32ReinterpretI32() throws { try encodeInstruction(0xBE, nil) }
-    mutating func visitF64ReinterpretI64() throws { try encodeInstruction(0xBF, nil) }
+    mutating func visitConversion(_ conversion: Instruction.Conversion) throws {
+        let (prefix, opcode): (UInt8?, UInt8)
+        switch conversion {
+        case .i32WrapI64: (prefix, opcode) = (nil, 0xA7)
+        case .i32TruncF32S: (prefix, opcode) = (nil, 0xA8)
+        case .i32TruncF32U: (prefix, opcode) = (nil, 0xA9)
+        case .i32TruncF64S: (prefix, opcode) = (nil, 0xAA)
+        case .i32TruncF64U: (prefix, opcode) = (nil, 0xAB)
+        case .i64ExtendI32S: (prefix, opcode) = (nil, 0xAC)
+        case .i64ExtendI32U: (prefix, opcode) = (nil, 0xAD)
+        case .i64TruncF32S: (prefix, opcode) = (nil, 0xAE)
+        case .i64TruncF32U: (prefix, opcode) = (nil, 0xAF)
+        case .i64TruncF64S: (prefix, opcode) = (nil, 0xB0)
+        case .i64TruncF64U: (prefix, opcode) = (nil, 0xB1)
+        case .f32ConvertI32S: (prefix, opcode) = (nil, 0xB2)
+        case .f32ConvertI32U: (prefix, opcode) = (nil, 0xB3)
+        case .f32ConvertI64S: (prefix, opcode) = (nil, 0xB4)
+        case .f32ConvertI64U: (prefix, opcode) = (nil, 0xB5)
+        case .f32DemoteF64: (prefix, opcode) = (nil, 0xB6)
+        case .f64ConvertI32S: (prefix, opcode) = (nil, 0xB7)
+        case .f64ConvertI32U: (prefix, opcode) = (nil, 0xB8)
+        case .f64ConvertI64S: (prefix, opcode) = (nil, 0xB9)
+        case .f64ConvertI64U: (prefix, opcode) = (nil, 0xBA)
+        case .f64PromoteF32: (prefix, opcode) = (nil, 0xBB)
+        case .i32ReinterpretF32: (prefix, opcode) = (nil, 0xBC)
+        case .i64ReinterpretF64: (prefix, opcode) = (nil, 0xBD)
+        case .f32ReinterpretI32: (prefix, opcode) = (nil, 0xBE)
+        case .f64ReinterpretI64: (prefix, opcode) = (nil, 0xBF)
+        case .i32TruncSatF32S: (prefix, opcode) = (0xFC, 0x00)
+        case .i32TruncSatF32U: (prefix, opcode) = (0xFC, 0x01)
+        case .i32TruncSatF64S: (prefix, opcode) = (0xFC, 0x02)
+        case .i32TruncSatF64U: (prefix, opcode) = (0xFC, 0x03)
+        case .i64TruncSatF32S: (prefix, opcode) = (0xFC, 0x04)
+        case .i64TruncSatF32U: (prefix, opcode) = (0xFC, 0x05)
+        case .i64TruncSatF64S: (prefix, opcode) = (0xFC, 0x06)
+        case .i64TruncSatF64U: (prefix, opcode) = (0xFC, 0x07)
+        }
+
+        try encodeInstruction(opcode, prefix)
+    }
     mutating func visitMemoryInit(dataIndex: UInt32) throws {
         try encodeInstruction(0x08, 0xFC)
         try encodeImmediates(dataIndex: dataIndex)
@@ -368,12 +383,4 @@ extension InstructionEncoder {
         try encodeInstruction(0x10, 0xFC)
         try encodeImmediates(table: table)
     }
-    mutating func visitI32TruncSatF32S() throws { try encodeInstruction(0x00, 0xFC) }
-    mutating func visitI32TruncSatF32U() throws { try encodeInstruction(0x01, 0xFC) }
-    mutating func visitI32TruncSatF64S() throws { try encodeInstruction(0x02, 0xFC) }
-    mutating func visitI32TruncSatF64U() throws { try encodeInstruction(0x03, 0xFC) }
-    mutating func visitI64TruncSatF32S() throws { try encodeInstruction(0x04, 0xFC) }
-    mutating func visitI64TruncSatF32U() throws { try encodeInstruction(0x05, 0xFC) }
-    mutating func visitI64TruncSatF64S() throws { try encodeInstruction(0x06, 0xFC) }
-    mutating func visitI64TruncSatF64U() throws { try encodeInstruction(0x07, 0xFC) }
 }
