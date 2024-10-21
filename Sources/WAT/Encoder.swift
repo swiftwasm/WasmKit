@@ -535,7 +535,7 @@ struct ExpressionEncoder: InstructionEncoder {
     }
 }
 
-func encode(module: inout Wat) throws -> [UInt8] {
+func encode(module: inout Wat, options: EncodeOptions) throws -> [UInt8] {
     var encoder = Encoder()
     encoder.writeHeader()
 
@@ -671,6 +671,26 @@ func encode(module: inout Wat) throws -> [UInt8] {
         try encoder.section(id: 0x0B) { encoder in
             try encoder.encodeVector(module.data) { data, encoder in
                 try data.encode(to: &encoder, wat: &module)
+            }
+        }
+    }
+
+    // (Optional) Name Section
+    if !module.functionsMap.isEmpty, options.nameSection {
+        encoder.section(id: 0) { encoder in
+            encoder.encode("name")
+            // Subsection 1: Function names
+            encoder.section(id: 1) { encoder in
+                let functionNames = module.functionsMap.enumerated().compactMap { i, decl -> (Int, String)? in
+                    guard let name = decl.id else { return nil }
+                    return (i, name.value)
+                }
+                encoder.encodeVector(functionNames) { entry, encoder in
+                    let (index, name) = entry
+                    encoder.writeUnsignedLEB128(UInt(index))
+                    // Drop initial "$"
+                    encoder.encode(String(name.dropFirst()))
+                }
             }
         }
     }

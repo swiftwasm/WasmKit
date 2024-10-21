@@ -1,5 +1,19 @@
 import WasmParser
 
+/// Options for encoding a WebAssembly module into a binary format.
+public struct EncodeOptions {
+    /// Whether to include the name section.
+    public var nameSection: Bool
+
+    /// The default encoding options.
+    public static let `default` = EncodeOptions()
+
+    /// Creates a new encoding options instance.
+    public init(nameSection: Bool = false) {
+        self.nameSection = nameSection
+    }
+}
+
 /// Transforms a WebAssembly text format (WAT) string into a WebAssembly binary format byte array.
 /// - Parameter input: The WAT string to transform
 /// - Returns: The WebAssembly binary format byte array
@@ -17,9 +31,13 @@ import WasmParser
 /// )
 /// """)
 /// ```
-public func wat2wasm(_ input: String, features: WasmFeatureSet = .default) throws -> [UInt8] {
+public func wat2wasm(
+    _ input: String,
+    features: WasmFeatureSet = .default,
+    options: EncodeOptions = .default
+) throws -> [UInt8] {
     var wat = try parseWAT(input, features: features)
-    return try encode(module: &wat)
+    return try encode(module: &wat, options: options)
 }
 
 /// A WAT module representation.
@@ -65,8 +83,8 @@ public struct Wat {
     /// This method effectively consumes the module value, encoding it into a
     /// binary format byte array. If you need to encode the module multiple times,
     /// you should create a copy of the module value before encoding it.
-    public mutating func encode() throws -> [UInt8] {
-        try WAT.encode(module: &self)
+    public mutating func encode(options: EncodeOptions = .default) throws -> [UInt8] {
+        try WAT.encode(module: &self, options: options)
     }
 }
 
