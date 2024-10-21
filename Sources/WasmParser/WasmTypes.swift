@@ -329,3 +329,43 @@ extension RawSignedInteger {
         .init(bitPattern: self)
     }
 }
+
+extension Instruction.Load {
+    public var naturalAlignment: Int {
+        switch self {
+        case .i32Load: return 2
+        case .i64Load: return 3
+        case .f32Load: return 2
+        case .f64Load: return 3
+        case .i32Load8S: return 0
+        case .i32Load8U: return 0
+        case .i32Load16S: return 1
+        case .i32Load16U: return 1
+        case .i64Load8S: return 0
+        case .i64Load8U: return 0
+        case .i64Load16S: return 1
+        case .i64Load16U: return 1
+        case .i64Load32S: return 2
+        case .i64Load32U: return 2
+        }
+    }
+
+    public var type: ValueType {
+        switch self {
+        case .i32Load: return .i32
+        case .i64Load: return .i64
+        case .f32Load: return .f32
+        case .f64Load: return .f64
+        case .i32Load8S: return .i32
+        case .i32Load8U: return .i32
+        case .i32Load16S: return .i32
+        case .i32Load16U: return .i32
+        case .i64Load8S: return .i64
+        case .i64Load8U: return .i64
+        case .i64Load16S: return .i64
+        case .i64Load16U: return .i64
+        case .i64Load32S: return .i64
+        case .i64Load32U: return .i64
+        }
+    }
+}

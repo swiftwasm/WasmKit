@@ -61,47 +61,47 @@ func parseTextInstruction<V: InstructionVisitor>(keyword: String, expressionPars
         let (globalIndex) = try expressionParser.visitGlobalSet(wat: &wat)
         return { return try $0.visitGlobalSet(globalIndex: globalIndex) }
     case "i32.load":
-        let (memarg) = try expressionParser.visitI32Load(wat: &wat)
-        return { return try $0.visitI32Load(memarg: memarg) }
+        let (memarg) = try expressionParser.visitLoad(.i32Load, wat: &wat)
+        return { return try $0.visitLoad(.i32Load, memarg: memarg) }
     case "i64.load":
-        let (memarg) = try expressionParser.visitI64Load(wat: &wat)
-        return { return try $0.visitI64Load(memarg: memarg) }
+        let (memarg) = try expressionParser.visitLoad(.i64Load, wat: &wat)
+        return { return try $0.visitLoad(.i64Load, memarg: memarg) }
     case "f32.load":
-        let (memarg) = try expressionParser.visitF32Load(wat: &wat)
-        return { return try $0.visitF32Load(memarg: memarg) }
+        let (memarg) = try expressionParser.visitLoad(.f32Load, wat: &wat)
+        return { return try $0.visitLoad(.f32Load, memarg: memarg) }
     case "f64.load":
-        let (memarg) = try expressionParser.visitF64Load(wat: &wat)
-        return { return try $0.visitF64Load(memarg: memarg) }
+        let (memarg) = try expressionParser.visitLoad(.f64Load, wat: &wat)
+        return { return try $0.visitLoad(.f64Load, memarg: memarg) }
     case "i32.load8_s":
-        let (memarg) = try expressionParser.visitI32Load8S(wat: &wat)
-        return { return try $0.visitI32Load8S(memarg: memarg) }
+        let (memarg) = try expressionParser.visitLoad(.i32Load8S, wat: &wat)
+        return { return try $0.visitLoad(.i32Load8S, memarg: memarg) }
     case "i32.load8_u":
-        let (memarg) = try expressionParser.visitI32Load8U(wat: &wat)
-        return { return try $0.visitI32Load8U(memarg: memarg) }
+        let (memarg) = try expressionParser.visitLoad(.i32Load8U, wat: &wat)
+        return { return try $0.visitLoad(.i32Load8U, memarg: memarg) }
     case "i32.load16_s":
-        let (memarg) = try expressionParser.visitI32Load16S(wat: &wat)
-        return { return try $0.visitI32Load16S(memarg: memarg) }
+        let (memarg) = try expressionParser.visitLoad(.i32Load16S, wat: &wat)
+        return { return try $0.visitLoad(.i32Load16S, memarg: memarg) }
     case "i32.load16_u":
-        let (memarg) = try expressionParser.visitI32Load16U(wat: &wat)
-        return { return try $0.visitI32Load16U(memarg: memarg) }
+        let (memarg) = try expressionParser.visitLoad(.i32Load16U, wat: &wat)
+        return { return try $0.visitLoad(.i32Load16U, memarg: memarg) }
     case "i64.load8_s":
-        let (memarg) = try expressionParser.visitI64Load8S(wat: &wat)
-        return { return try $0.visitI64Load8S(memarg: memarg) }
+        let (memarg) = try expressionParser.visitLoad(.i64Load8S, wat: &wat)
+        return { return try $0.visitLoad(.i64Load8S, memarg: memarg) }
     case "i64.load8_u":
-        let (memarg) = try expressionParser.visitI64Load8U(wat: &wat)
-        return { return try $0.visitI64Load8U(memarg: memarg) }
+        let (memarg) = try expressionParser.visitLoad(.i64Load8U, wat: &wat)
+        return { return try $0.visitLoad(.i64Load8U, memarg: memarg) }
     case "i64.load16_s":
-        let (memarg) = try expressionParser.visitI64Load16S(wat: &wat)
-        return { return try $0.visitI64Load16S(memarg: memarg) }
+        let (memarg) = try expressionParser.visitLoad(.i64Load16S, wat: &wat)
+        return { return try $0.visitLoad(.i64Load16S, memarg: memarg) }
     case "i64.load16_u":
-        let (memarg) = try expressionParser.visitI64Load16U(wat: &wat)
-        return { return try $0.visitI64Load16U(memarg: memarg) }
+        let (memarg) = try expressionParser.visitLoad(.i64Load16U, wat: &wat)
+        return { return try $0.visitLoad(.i64Load16U, memarg: memarg) }
     case "i64.load32_s":
-        let (memarg) = try expressionParser.visitI64Load32S(wat: &wat)
-        return { return try $0.visitI64Load32S(memarg: memarg) }
+        let (memarg) = try expressionParser.visitLoad(.i64Load32S, wat: &wat)
+        return { return try $0.visitLoad(.i64Load32S, memarg: memarg) }
     case "i64.load32_u":
-        let (memarg) = try expressionParser.visitI64Load32U(wat: &wat)
-        return { return try $0.visitI64Load32U(memarg: memarg) }
+        let (memarg) = try expressionParser.visitLoad(.i64Load32U, wat: &wat)
+        return { return try $0.visitLoad(.i64Load32U, memarg: memarg) }
     case "i32.store":
         let (memarg) = try expressionParser.visitI32Store(wat: &wat)
         return { return try $0.visitI32Store(memarg: memarg) }

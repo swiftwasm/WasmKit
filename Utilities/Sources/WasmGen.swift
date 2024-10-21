@@ -3,12 +3,25 @@ import Foundation
 /// A utility for generating Core Wasm instruction related code based on the `Instructions.json` file.
 enum WasmGen {
 
+    static func pascalCase(camelCase: String) -> String {
+        camelCase.prefix(1).uppercased() + camelCase.dropFirst()
+    }
+
     struct Instruction: Decodable {
         let feature: String
         let name: Name
         let prefix: UInt8?
         let opcode: UInt8
         let immediates: [Immediate]
+        let category: String?
+
+        var visitMethodName: String {
+            if let explicitCategory = category {
+                return "visit" + WasmGen.pascalCase(camelCase: explicitCategory)
+            } else {
+                return "visit" + WasmGen.pascalCase(camelCase: name.enumCase)
+            }
+        }
 
         enum Name: Decodable {
             struct WithEnumCase: Decodable {
@@ -36,10 +49,6 @@ enum WasmGen {
                     return components.first! + components.dropFirst().map(\.capitalized).joined()
                 case let .withEnumCase(name): return name.enumCase
                 }
-            }
-
-            var visitMethod: String {
-                "visit" + enumCase.prefix(1).uppercased() + enumCase.dropFirst()
             }
 
             init(from decoder: Decoder) throws {
@@ -78,13 +87,9 @@ enum WasmGen {
                 prefix = try decodeHex()
             }
             opcode = try decodeHex()
-            let rawImmediates: [[String]]
-            if container.isAtEnd {
-                rawImmediates = []
-            } else {
-                rawImmediates = try container.decode([[String]].self)
-            }
+            let rawImmediates = try container.decode([[String]].self)
             immediates = rawImmediates.map { Immediate(label: $0[0], type: $0[1]) }
+            category = try? container.decode(String.self)
         }
     }
 
@@ -99,12 +104,12 @@ enum WasmGen {
             public protocol InstructionVisitor {
             """
 
-        for instruction in instructions {
+        for instruction in instructions.categorized {
             code += "\n"
-            code += "    /// Visiting `\(instruction.name.text ?? instruction.name.enumCase)` instruction.\n"
-            code += "    mutating func \(instruction.name.visitMethod)("
-            code += instruction.immediates.map { i in
-                "\(i.label): \(i.type)"
+            code += "    /// Visiting \(instruction.description) instruction.\n"
+            code += "    mutating func \(instruction.visitMethodName)("
+            code += instruction.associatedValues.map { i in
+                "\(i.argumentName ?? "_"): \(i.type)"
             }.joined(separator: ", ")
             code += ") throws"
         }
@@ -124,15 +129,19 @@ enum WasmGen {
 
             """
 
-        for instruction in instructions {
+        for instruction in instructions.categorized {
             if instruction.immediates.isEmpty {
-                code += "        case .\(instruction.name.enumCase): return try \(instruction.name.visitMethod)()\n"
+                code += "        case .\(instruction.enumCaseName): return try \(instruction.visitMethodName)()\n"
             } else {
-                code += "        case let .\(instruction.name.enumCase)("
-                code += instruction.immediates.map(\.label).joined(separator: ", ")
-                code += "): return try \(instruction.name.visitMethod)("
-                code += instruction.immediates.map {
-                    "\($0.label): \($0.label)"
+                code += "        case let .\(instruction.enumCaseName)("
+                code += instruction.associatedValues.map(\.parameterName).joined(separator: ", ")
+                code += "): return try \(instruction.visitMethodName)("
+                code += instruction.associatedValues.map {
+                    if let label = $0.argumentName {
+                        return "\(label): \(label)"
+                    } else {
+                        return $0.parameterName
+                    }
                 }.joined(separator: ", ")
                 code += ")\n"
             }
@@ -148,10 +157,14 @@ enum WasmGen {
             extension InstructionVisitor {
 
             """
-        for instruction in instructions {
-            code += "    public mutating func \(instruction.name.visitMethod)("
-            code += instruction.immediates.map { i in
-                "\(i.label): \(i.type)"
+        for instruction in instructions.categorized {
+            code += "    public mutating func \(instruction.visitMethodName)("
+            code += instruction.associatedValues.map { i in
+                if i.argumentName == i.parameterName {
+                    return "\(i.parameterName): \(i.type)"
+                } else {
+                    return "\(i.argumentName ?? "_") \(i.parameterName): \(i.type)"
+                }
             }.joined(separator: ", ")
             code += ") throws {}\n"
         }
@@ -168,13 +181,29 @@ enum WasmGen {
 
             """
 
-        for instruction in instructions {
-            code += "    case `\(instruction.name.enumCase)`"
-            if !instruction.immediates.isEmpty {
+        let categorized = instructions.categorized
+
+        for instruction in categorized {
+            guard let categoryTypeName = instruction.categoryTypeName else { continue }
+            code += "    public enum \(categoryTypeName): Equatable {\n"
+            for sourceInstruction in instruction.sourceInstructions {
+                code += "        case \(sourceInstruction.name.enumCase)\n"
+            }
+            code += "    }\n"
+        }
+
+        for instruction in categorized {
+            code += "    case `\(instruction.enumCaseName)`"
+            let associatedValues = instruction.associatedValues
+            if !associatedValues.isEmpty {
                 code +=
                     "("
-                    + instruction.immediates.map {
-                        "\($0.label): \($0.type)"
+                    + associatedValues.map {
+                        if let label = $0.argumentName {
+                            return "\(label): \($0.type)"
+                        } else {
+                            return $0.type
+                        }
                     }.joined(separator: ", ") + ")"
             }
             code += "\n"
@@ -185,14 +214,18 @@ enum WasmGen {
         return code
     }
 
-    static func buildInstructionInstanceFromContext(_ instruction: Instruction) -> String {
+    static func buildInstructionInstanceFromContext(_ instruction: CategorizedInstruction) -> String {
         var code = ""
         if instruction.immediates.isEmpty {
-            code += ".\(instruction.name.enumCase)"
+            code += ".\(instruction.enumCaseName)"
         } else {
-            code += ".\(instruction.name.enumCase)("
-            code += instruction.immediates.map { i in
-                "\(i.label): \(i.label)"
+            code += ".\(instruction.enumCaseName)("
+            code += instruction.associatedValues.map { i in
+                if let label = i.argumentName {
+                    return "\(label): \(label)"
+                } else {
+                    return i.parameterName
+                }
             }.joined(separator: ", ")
             code += ")"
         }
@@ -211,10 +244,14 @@ enum WasmGen {
 
             """
 
-        for instruction in instructions {
-            code += "    public mutating func \(instruction.name.visitMethod)("
-            code += instruction.immediates.map { i in
-                "\(i.label): \(i.type)"
+        for instruction in instructions.categorized {
+            code += "    public mutating func \(instruction.visitMethodName)("
+            code += instruction.associatedValues.map { i in
+                if i.argumentName == i.parameterName {
+                    return "\(i.parameterName): \(i.type)"
+                } else {
+                    return "\(i.argumentName ?? "_") \(i.parameterName): \(i.type)"
+                }
             }.joined(separator: ", ")
             code += ") throws { "
             code += "return try self.visit(" + buildInstructionInstanceFromContext(instruction) + ")"
@@ -247,18 +284,26 @@ enum WasmGen {
 
             """
 
-        for instruction in instructions {
-            code += "    public mutating func \(instruction.name.visitMethod)("
-            code += instruction.immediates.map { i in
-                "\(i.label): \(i.type)"
+        for instruction in instructions.categorized {
+            code += "    public mutating func \(instruction.visitMethodName)("
+            code += instruction.associatedValues.map { i in
+                if i.argumentName == i.parameterName {
+                    return "\(i.parameterName): \(i.type)"
+                } else {
+                    return "\(i.argumentName ?? "_") \(i.parameterName): \(i.type)"
+                }
             }.joined(separator: ", ")
             code += ") throws {\n"
             code += "       trace("
             code += buildInstructionInstanceFromContext(instruction)
             code += ")\n"
-            code += "       return try visitor.\(instruction.name.visitMethod)("
-            code += instruction.immediates.map { i in
-                "\(i.label): \(i.label)"
+            code += "       return try visitor.\(instruction.visitMethodName)("
+            code += instruction.associatedValues.map { i in
+                if let label = i.argumentName {
+                    "\(label): \(i.parameterName)"
+                } else {
+                    i.parameterName
+                }
             }.joined(separator: ", ")
             code += ")\n"
             code += "    }\n"
@@ -295,14 +340,30 @@ enum WasmGen {
                 code += "\n"
                 code += "        let ("
                 code += instruction.immediates.map(\.label).joined(separator: ", ")
-                code += ") = try expressionParser.\(instruction.name.visitMethod)(wat: &wat)\n"
+                code += ") = try expressionParser.\(instruction.visitMethodName)("
+                if instruction.category != nil {
+                    code += ".\(instruction.name.enumCase), "
+                }
+                code += "wat: &wat"
+                code += ")\n"
                 code += "        "
             } else {
                 code += " "
             }
-            code += "return { return try $0.\(instruction.name.visitMethod)("
-            code += instruction.immediates.map { i in
-                "\(i.label): \(i.label)"
+            code += "return { return try $0.\(instruction.visitMethodName)("
+            var arguments: [(label: String?, value: String)] = []
+            if instruction.category != nil {
+                arguments.append((label: nil, value: ".\(instruction.name.enumCase)"))
+            }
+            for immediate in instruction.immediates {
+                arguments.append((label: immediate.label, value: immediate.label))
+            }
+            code += arguments.map { i in
+                if let label = i.label {
+                    return "\(label): \(i.value)"
+                } else {
+                    return i.value
+                }
             }.joined(separator: ", ")
             code += ") }\n"
         }
@@ -387,20 +448,42 @@ enum WasmGen {
 
             """
 
-        for instruction in instructions {
-            var encodeInstrCall = "try encodeInstruction("
-            encodeInstrCall += [
-                String(format: "0x%02X", instruction.opcode),
-                instruction.prefix.map { String(format: "0x%02X", $0) } ?? "nil",
-            ].joined(separator: ", ")
-            encodeInstrCall += ")"
-
-            code += "    mutating func \(instruction.name.visitMethod)("
-            code += instruction.immediates.map { i in
-                "\(i.label): \(i.type)"
+        for instruction in instructions.categorized {
+            code += "    mutating func \(instruction.visitMethodName)("
+            code += instruction.associatedValues.map { i in
+                if i.argumentName == i.parameterName {
+                    return "\(i.parameterName): \(i.type)"
+                } else {
+                    return "\(i.argumentName ?? "_") \(i.parameterName): \(i.type)"
+                }
             }.joined(separator: ", ")
             code += ") throws {"
-            if instruction.immediates.isEmpty {
+
+            var encodeInstrCall: String
+            if let category = instruction.explicitCategory {
+                code += "\n"
+                code += "        let (prefix, opcode): (UInt8?, UInt8)\n"
+                code += "        switch \(category) {\n"
+                for sourceInstruction in instruction.sourceInstructions {
+                    code += "        case .\(sourceInstruction.name.enumCase): (prefix, opcode) = ("
+                    code += sourceInstruction.prefix.map { String(format: "0x%02X", $0) } ?? "nil"
+                    code += ", "
+                    code += String(format: "0x%02X", sourceInstruction.opcode)
+                    code += ")\n"
+                }
+                code += "        }\n"
+                encodeInstrCall = "try encodeInstruction(opcode, prefix)"
+            } else {
+                let instruction = instruction.sourceInstructions[0]
+                encodeInstrCall = "try encodeInstruction("
+                encodeInstrCall += [
+                    String(format: "0x%02X", instruction.opcode),
+                    instruction.prefix.map { String(format: "0x%02X", $0) } ?? "nil",
+                ].joined(separator: ", ")
+                encodeInstrCall += ")"
+            }
+
+            if instruction.immediates.isEmpty, instruction.explicitCategory == nil {
                 code += " \(encodeInstrCall) "
             } else {
                 code += "\n"
@@ -425,14 +508,14 @@ enum WasmGen {
 
         struct ColumnInfo {
             var header: String
-            var maxWidth: Int
+            var maxWidth: Int = 0
             var value: (Instruction) -> String
         }
 
         var columns: [ColumnInfo] = [
-            ColumnInfo(header: "Feature", maxWidth: 0, value: { "\"" + $0.feature + "\"" }),
+            ColumnInfo(header: "Feature", value: { "\"" + $0.feature + "\"" }),
             ColumnInfo(
-                header: "Name", maxWidth: 0,
+                header: "Name",
                 value: {
                     switch $0.name {
                     case .textual(let name): return "\"" + name + "\""
@@ -440,7 +523,7 @@ enum WasmGen {
                     }
                 }),
             ColumnInfo(
-                header: "Prefix", maxWidth: 0,
+                header: "Prefix",
                 value: { i in
                     if let prefix = i.prefix {
                         return "\"" + String(format: "0x%02X", prefix) + "\""
@@ -448,14 +531,23 @@ enum WasmGen {
                         return "null"
                     }
                 }),
-            ColumnInfo(header: "Opcode", maxWidth: 0, value: { "\"" + String(format: "0x%02X", $0.opcode) + "\"" }),
+            ColumnInfo(header: "Opcode", value: { "\"" + String(format: "0x%02X", $0.opcode) + "\"" }),
             ColumnInfo(
-                header: "Immediates", maxWidth: 0,
+                header: "Immediates",
                 value: { i in
                     return "["
                         + i.immediates.map { i in
                             "[\"\(i.label)\", \"\(i.type)\"]"
                         }.joined(separator: ", ") + "]"
+                }),
+            ColumnInfo(
+                header: "Category",
+                value: { i in
+                    if let category = i.category {
+                        return "\"" + category + "\""
+                    } else {
+                        return "null"
+                    }
                 }),
         ]
         for instruction in instructions {
@@ -533,5 +625,74 @@ enum WasmGen {
         for file in generatedFiles {
             try file.writeIfChanged(sourceRoot: sourceRoot)
         }
+    }
+}
+
+extension WasmGen {
+    struct CategorizedInstruction {
+        let enumCaseName: String
+        let visitMethodName: String
+        let description: String
+        let immediates: [Instruction.Immediate]
+        let explicitCategory: String?
+        var sourceInstructions: [Instruction] = []
+
+        private var categoryValue: (argumentName: String?, parameterName: String, type: String)? {
+            guard let explicitCategory = explicitCategory else {
+                return nil
+            }
+            return (argumentName: nil, parameterName: explicitCategory, type: WasmGen.pascalCase(camelCase: explicitCategory))
+        }
+
+        var categoryTypeName: String? {
+            categoryValue?.type
+        }
+
+        var associatedValues: [(argumentName: String?, parameterName: String, type: String)] {
+            var results: [(argumentName: String?, parameterName: String, type: String)] = []
+            if var categoryValue = categoryValue {
+                categoryValue.type = "Instruction.\(categoryValue.type)"
+                results.append(categoryValue)
+            }
+            results += immediates.map { ($0.label, $0.label, $0.type) }
+            return results
+        }
+    }
+}
+
+extension WasmGen.InstructionSet {
+    var categorized: [WasmGen.CategorizedInstruction] {
+        var categoryOrder: [String] = []
+        var categories: [String: WasmGen.CategorizedInstruction] = [:]
+
+        for instruction in self {
+            let category = instruction.category ?? instruction.name.enumCase
+            var categorized: WasmGen.CategorizedInstruction
+            if let existing = categories[category] {
+                categorized = existing
+                assert(categorized.immediates == instruction.immediates, "Inconsistent immediates for instruction \(instruction.name.text ?? instruction.name.enumCase) in category \(category)")
+            } else {
+                let enumCaseName: String
+                let description: String
+                if let explicitCategory = instruction.category {
+                    enumCaseName = explicitCategory
+                    description = "`\(explicitCategory)` category"
+                } else {
+                    enumCaseName = instruction.name.enumCase
+                    description = "`\(instruction.name.text ?? instruction.name.enumCase)`"
+                }
+                categorized = WasmGen.CategorizedInstruction(
+                    enumCaseName: enumCaseName,
+                    visitMethodName: instruction.visitMethodName, description: description,
+                    immediates: instruction.immediates,
+                    explicitCategory: instruction.category
+                )
+                categoryOrder.append(category)
+            }
+            categorized.sourceInstructions.append(instruction)
+            categories[category] = categorized
+        }
+
+        return categoryOrder.map { categories[$0]! }
     }
 }
