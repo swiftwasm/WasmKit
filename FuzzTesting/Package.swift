@@ -44,10 +44,3 @@ let package = Package(
         .target(name: "WasmCAPI"),
     ]
 )
-
-let libFuzzerTargets = ["FuzzTranslator", "FuzzExecute"]
-
-for target in package.targets {
-    guard libFuzzerTargets.contains(target.name) else { continue }
-    target.swiftSettings = [.unsafeFlags(["-Xfrontend", "-sanitize=fuzzer,address"])]
-}
