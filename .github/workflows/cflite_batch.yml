@@ -2,6 +2,13 @@ name: ClusterFuzzLite batch fuzzing
 on:
   schedule:
     - cron: '0 0/6 * * *'
+  workflow_dispatch:
+    inputs:
+      fuzz-seconds:
+        description: 'The total time allotted for fuzzing in seconds.'
+        required: true
+        default: 3600
+
 permissions: read-all
 jobs:
   BatchFuzzing:
@@ -23,7 +30,7 @@ jobs:
       uses: google/clusterfuzzlite/actions/run_fuzzers@v1
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
-        fuzz-seconds: 3600
+        fuzz-seconds: ${{ github.event.inputs.fuzz-seconds || 3600 }}
         mode: 'batch'
         sanitizer: ${{ matrix.sanitizer }}
         output-sarif: true

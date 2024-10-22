@@ -2,6 +2,8 @@ name: ClusterFuzzLite cron tasks
 on:
   schedule:
     - cron: '0 0 * * *'
+  workflow_dispatch: {}
+
 permissions: read-all
 jobs:
   Pruning:
