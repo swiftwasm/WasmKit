@@ -101,6 +101,8 @@ def build(args, runner: CommandRunner):
     ], check=True)
 
     print('Building fuzzer executable')
+    # See "Discussion" in Package.swift for why we need to manually link
+    # the library product.
     output = executable_path(args.target_name)
     runner.run([
         'swiftc', f'./.build/debug/lib{args.target_name}.a', '-g',
