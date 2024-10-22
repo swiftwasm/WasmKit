@@ -46,6 +46,8 @@ def main():
     build_parser = subparsers.add_parser('build', help='Build the fuzzer')
     build_parser.add_argument(
         'target_name', type=str, help='Name of the target', choices=available_targets)
+    build_parser.add_argument(
+        '--sanitizer', type=str, default='address')
     build_parser.set_defaults(func=build)
 
     run_parser = subparsers.add_parser('run', help='Run the fuzzer')
@@ -96,16 +98,35 @@ def executable_path(target_name: str) -> str:
 def build(args, runner: CommandRunner):
     print(f'Building fuzzer for {args.target_name}')
 
-    runner.run([
-        'swift', 'build', '--product', args.target_name
-    ], check=True)
+    driver_flags = []
+    if args.sanitizer == 'coverage':
+        driver_flags += [
+            '-profile-generate', '-profile-coverage-mapping',
+            '-sanitize=fuzzer'
+        ]
+    else:
+        driver_flags += [f'-sanitize=fuzzer,{args.sanitizer}']
+
+    build_args = [
+        'swift', 'build', '--product', args.target_name,
+    ]
+    for driver_flag in driver_flags:
+        build_args += ['-Xswiftc', driver_flag]
+
+    runner.run(build_args, check=True)
 
     print('Building fuzzer executable')
+    # See "Discussion" in Package.swift for why we need to manually link
+    # the library product.
     output = executable_path(args.target_name)
-    runner.run([
+    link_args = [
         'swiftc', f'./.build/debug/lib{args.target_name}.a', '-g',
-        '-sanitize=fuzzer,address', '-o', output
-    ], check=True)
+        # Link Swift runtime statically to allow copying fuzzers to other
+        # machines (oss-fuzz does this)
+        '-static-stdlib', '-o', output
+    ]
+    link_args += driver_flags
+    runner.run(link_args, check=True)
 
     print('Fuzzer built successfully: ', output)
 

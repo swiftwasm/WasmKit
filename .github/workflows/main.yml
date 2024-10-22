@@ -5,6 +5,10 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build-macos:
     strategy:
@@ -16,12 +20,14 @@ jobs:
             development-toolchain-tag: swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a
             wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi.artifactbundle.zip"
             wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi
+            test-args: ""
           # Swift 5.9.0
           - os: macos-13
             xcode: Xcode_15.0.1
             development-toolchain-tag: swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a
             wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi.artifactbundle.zip"
             wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi
+            test-args: "--sanitize address"
 
     runs-on: ${{ matrix.os }}
     name: "build-macos (${{ matrix.xcode }})"
@@ -52,7 +58,7 @@ jobs:
           }
           EOS
       - run: ./Vendor/checkout-dependency
-      - run: swift test --sanitize address
+      - run: swift test ${{ matrix.test-args }}
 
   build-xcode:
     runs-on: macos-15

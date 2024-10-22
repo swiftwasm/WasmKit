@@ -1,0 +1,41 @@
+name: ClusterFuzzLite PR fuzzing
+on:
+  pull_request:
+    paths:
+      - '**'
+permissions: read-all
+jobs:
+  PR:
+    name: PR Fuzzing (${{ matrix.sanitizer }} sanitizer)
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.workflow }}-${{ matrix.sanitizer }}-${{ github.ref }}
+      cancel-in-progress: true
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizer:
+        - address
+    steps:
+    - name: Build Fuzzers (${{ matrix.sanitizer }})
+      id: build
+      uses: google/clusterfuzzlite/actions/build_fuzzers@v1
+      with:
+        language: swift
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        sanitizer: ${{ matrix.sanitizer }}
+        storage-repo: https://${{ secrets.SWIFTWASM_BOT_GITHUB_TOKEN }}@github.com/swiftwasm/wasmkit-fuzz-corpora.git
+        storage-repo-branch: main
+        storage-repo-branch-coverage: gh-pages
+    - name: Run Fuzzers (${{ matrix.sanitizer }})
+      id: run
+      uses: google/clusterfuzzlite/actions/run_fuzzers@v1
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        fuzz-seconds: 300
+        mode: 'code-change'
+        sanitizer: ${{ matrix.sanitizer }}
+        output-sarif: true
+        storage-repo: https://${{ secrets.SWIFTWASM_BOT_GITHUB_TOKEN }}@github.com/swiftwasm/wasmkit-fuzz-corpora.git
+        storage-repo-branch: main
+        storage-repo-branch-coverage: gh-pages
