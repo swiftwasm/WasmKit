@@ -1,41 +1,45 @@
-name: ClusterFuzzLite PR fuzzing
+name: ClusterFuzzLite cron tasks
 on:
-  pull_request:
-    paths:
-      - '**'
+  schedule:
+    - cron: '0 0 * * *'
 permissions: read-all
 jobs:
-  PR:
-    name: PR Fuzzing (${{ matrix.sanitizer }} sanitizer)
+  Pruning:
     runs-on: ubuntu-latest
-    concurrency:
-      group: ${{ github.workflow }}-${{ matrix.sanitizer }}-${{ github.ref }}
-      cancel-in-progress: true
-    strategy:
-      fail-fast: false
-      matrix:
-        sanitizer:
-        - address
     steps:
-    - name: Build Fuzzers (${{ matrix.sanitizer }})
+    - name: Build Fuzzers
       id: build
       uses: google/clusterfuzzlite/actions/build_fuzzers@v1
       with:
         language: swift
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        sanitizer: ${{ matrix.sanitizer }}
-        storage-repo: https://${{ secrets.SWIFTWASM_BOT_GITHUB_TOKEN }}@github.com/swiftwasm/wasmkit-fuzz-corpora.git
-        storage-repo-branch: main
-        storage-repo-branch-coverage: gh-pages
-    - name: Run Fuzzers (${{ matrix.sanitizer }})
+    - name: Run Fuzzers
       id: run
       uses: google/clusterfuzzlite/actions/run_fuzzers@v1
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
-        fuzz-seconds: 300
-        mode: 'code-change'
-        sanitizer: ${{ matrix.sanitizer }}
+        fuzz-seconds: 600
+        mode: 'prune'
         output-sarif: true
+        storage-repo: https://${{ secrets.SWIFTWASM_BOT_GITHUB_TOKEN }}@github.com/swiftwasm/wasmkit-fuzz-corpora.git
+        storage-repo-branch: main
+        storage-repo-branch-coverage: gh-pages
+  Coverage:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Build Fuzzers
+      id: build
+      uses: google/clusterfuzzlite/actions/build_fuzzers@v1
+      with:
+        language: swift
+        sanitizer: coverage
+    - name: Run Fuzzers
+      id: run
+      uses: google/clusterfuzzlite/actions/run_fuzzers@v1
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        fuzz-seconds: 600
+        mode: 'coverage'
+        sanitizer: 'coverage'
         storage-repo: https://${{ secrets.SWIFTWASM_BOT_GITHUB_TOKEN }}@github.com/swiftwasm/wasmkit-fuzz-corpora.git
         storage-repo-branch: main
         storage-repo-branch-coverage: gh-pages
