@@ -5,6 +5,9 @@ on:
 jobs:
   format:
     runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
     container:
       image: swift:6.0.1-jammy
     steps:
