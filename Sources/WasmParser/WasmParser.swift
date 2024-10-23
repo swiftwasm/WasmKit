@@ -322,13 +322,12 @@ extension ByteStream {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/values.html#integers>
 extension ByteStream {
-    @inline(__always)
-    @usableFromInline
+    @inlinable
     func parseUnsigned<T: RawUnsignedInteger>(_: T.Type = T.self) throws -> T {
         try decodeLEB128(stream: self)
     }
 
-    @usableFromInline
+    @inlinable
     func parseSigned<T: FixedWidthInteger & RawSignedInteger>() throws -> T {
         try decodeLEB128(stream: self)
     }
