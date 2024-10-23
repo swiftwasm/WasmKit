@@ -1,10 +1,11 @@
+@usableFromInline
 enum LEBError: Swift.Error, Equatable {
     case overflow
     case integerRepresentationTooLong
     case insufficientBytes
 }
 
-@inline(__always)
+@inlinable
 func decodeLEB128<IntType, Stream>(
     stream: Stream
 ) throws -> IntType where IntType: FixedWidthInteger, IntType: UnsignedInteger, Stream: ByteStream {
@@ -32,6 +33,7 @@ func decodeLEB128<IntType, Stream>(
     return result
 }
 
+@inlinable
 func decodeLEB128<IntType, Stream>(
     stream: Stream
 ) throws -> IntType where IntType: FixedWidthInteger, IntType: RawSignedInteger, Stream: ByteStream {

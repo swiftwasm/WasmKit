@@ -13,14 +13,16 @@ import struct SystemPackage.FilePath
 public struct Parser<Stream: ByteStream> {
     @usableFromInline
     let stream: Stream
-    let limits: ParsingLimits
-    var orderTracking = OrderTracking()
+    @usableFromInline let limits: ParsingLimits
+    @usableFromInline var orderTracking = OrderTracking()
 
+    @usableFromInline
     enum NextParseTarget {
         case header
         case section
     }
-    private var nextParseTarget: NextParseTarget
+    @usableFromInline
+    var nextParseTarget: NextParseTarget
 
     public let features: WasmFeatureSet
     public var offset: Int {
@@ -184,11 +186,14 @@ public struct WasmFeatureSet: OptionSet {
     }
 
     /// The WebAssembly memory64 proposal
-    public static let memory64 = WasmFeatureSet(rawValue: 1 << 0)
+    @_alwaysEmitIntoClient
+    public static var memory64: WasmFeatureSet { WasmFeatureSet(rawValue: 1 << 0) }
     /// The WebAssembly reference types proposal
-    public static let referenceTypes = WasmFeatureSet(rawValue: 1 << 1)
+    @_alwaysEmitIntoClient
+    public static var referenceTypes: WasmFeatureSet { WasmFeatureSet(rawValue: 1 << 1) }
     /// The WebAssembly threads proposal
-    public static let threads = WasmFeatureSet(rawValue: 1 << 2)
+    @_alwaysEmitIntoClient
+    public static var threads: WasmFeatureSet { WasmFeatureSet(rawValue: 1 << 2) }
 
     /// The default feature set
     public static let `default`: WasmFeatureSet = [.referenceTypes]
@@ -224,10 +229,12 @@ extension WasmParserError: CustomStringConvertible {
 }
 
 extension WasmParserError.Message {
+    @usableFromInline
     static func invalidMagicNumber(_ bytes: [UInt8]) -> Self {
         Self("magic header not detected: expected \(WASM_MAGIC) but got \(bytes)")
     }
 
+    @usableFromInline
     static func unknownVersion(_ bytes: [UInt8]) -> Self {
         Self("unknown binary version: \(bytes)")
     }
@@ -236,11 +243,13 @@ extension WasmParserError.Message {
         Self("malformed UTF-8 encoding: \(bytes)")
     }
 
+    @usableFromInline
     static func invalidSectionSize(_ size: UInt32) -> Self {
         // TODO: Remove size parameter
         Self("unexpected end-of-file")
     }
 
+    @usableFromInline
     static func malformedSectionID(_ id: UInt8) -> Self {
         Self("malformed section id: \(id)")
     }
@@ -249,6 +258,7 @@ extension WasmParserError.Message {
         Self("Zero expected but got \(actual)")
     }
 
+    @usableFromInline
     static func tooManyLocals(_ count: UInt64, limit: UInt64) -> Self {
         Self("Too many locals: \(count) vs \(limit)")
     }
@@ -262,17 +272,21 @@ extension WasmParserError.Message {
         return Self("Unimplemented instruction: \(opcode)\(suffixText)")
     }
 
+    @usableFromInline
     static func unexpectedElementKind(expected: UInt32, actual: UInt32) -> Self {
         Self("Unexpected element kind: expected \(expected) but got \(actual)")
     }
 
+    @usableFromInline
     static let integerRepresentationTooLong = Self("Integer representation is too long")
 
     @usableFromInline
     static let endOpcodeExpected = Self("`end` opcode expected but not found")
 
+    @usableFromInline
     static let unexpectedEnd = Self("Unexpected end of the stream")
 
+    @usableFromInline
     static func sectionSizeMismatch(expected: Int, actual: Int) -> Self {
         Self("Section size mismatch: expected \(expected) but got \(actual)")
     }
@@ -281,23 +295,27 @@ extension WasmParserError.Message {
         Self("Illegal opcode: \(opcode)")
     }
 
+    @usableFromInline
     static func malformedMutability(_ byte: UInt8) -> Self {
         Self("Malformed mutability: \(byte)")
     }
 
+    @usableFromInline
     static func malformedFunctionType(_ byte: UInt8) -> Self {
         Self("Malformed function type: \(byte)")
     }
 
+    @usableFromInline
     static let sectionOutOfOrder = Self("Sections in the module are out of order")
 
+    @usableFromInline
     static func malformedLimit(_ byte: UInt8) -> Self {
         Self("Malformed limit: \(byte)")
     }
 
     @usableFromInline static let malformedIndirectCall = Self("Malformed indirect call")
 
-    static func malformedDataSegmentKind(_ kind: UInt32) -> Self {
+    @usableFromInline static func malformedDataSegmentKind(_ kind: UInt32) -> Self {
         Self("Malformed data segment kind: \(kind)")
     }
 
@@ -309,7 +327,8 @@ extension WasmParserError.Message {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/conventions.html#vectors>
 extension ByteStream {
-    fileprivate func parseVector<Content>(content parser: () throws -> Content) throws -> [Content] {
+    @inlinable
+    func parseVector<Content>(content parser: () throws -> Content) throws -> [Content] {
         var contents = [Content]()
         let count: UInt32 = try parseUnsigned()
         for _ in 0..<count {
@@ -322,13 +341,12 @@ extension ByteStream {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/values.html#integers>
 extension ByteStream {
-    @inline(__always)
-    @usableFromInline
+    @inlinable
     func parseUnsigned<T: RawUnsignedInteger>(_: T.Type = T.self) throws -> T {
         try decodeLEB128(stream: self)
     }
 
-    @usableFromInline
+    @inlinable
     func parseSigned<T: FixedWidthInteger & RawSignedInteger>() throws -> T {
         try decodeLEB128(stream: self)
     }
@@ -360,7 +378,7 @@ extension ByteStream {
 }
 
 extension Parser {
-    @usableFromInline
+    @inlinable
     func parseVector<Content>(content parser: () throws -> Content) throws -> [Content] {
         try stream.parseVector(content: parser)
     }
@@ -427,7 +445,7 @@ extension Parser {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/types.html#result-types>
-    @usableFromInline
+    @inlinable
     func parseResultType() throws -> BlockType {
         guard let nextByte = try stream.peek() else {
             throw makeError(.unexpectedEnd)
@@ -445,6 +463,7 @@ extension Parser {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/types.html#function-types>
+    @inlinable
     func parseFunctionType() throws -> FunctionType {
         let opcode = try stream.consumeAny()
 
@@ -464,6 +483,7 @@ extension Parser {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/types.html#limits>
+    @usableFromInline
     func parseLimits() throws -> Limits {
         let b = try stream.consumeAny()
         let sharedMask: UInt8 = 0b0010
@@ -509,6 +529,7 @@ extension Parser {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/types.html#table-types>
+    @inlinable
     func parseTableType() throws -> TableType {
         let elementType: ReferenceType
         let b = try stream.consumeAny()
@@ -528,12 +549,14 @@ extension Parser {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/types.html#global-types>
+    @inlinable
     func parseGlobalType() throws -> GlobalType {
         let valueType = try parseValueType()
         let mutability = try parseMutability()
         return GlobalType(mutability: mutability, valueType: valueType)
     }
 
+    @inlinable
     func parseMutability() throws -> Mutability {
         let b = try stream.consumeAny()
         switch b {
@@ -548,14 +571,14 @@ extension Parser {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/instructions.html#memory-instructions>
-    @usableFromInline
+    @inlinable
     func parseMemarg() throws -> MemArg {
         let align: UInt32 = try parseUnsigned()
         let offset: UInt64 = try features.contains(.memory64) ? parseUnsigned(UInt64.self) : UInt64(parseUnsigned(UInt32.self))
         return MemArg(offset: offset, align: align)
     }
 
-    func parseVectorBytes() throws -> ArraySlice<UInt8> {
+    @inlinable func parseVectorBytes() throws -> ArraySlice<UInt8> {
         let count: UInt32 = try parseUnsigned()
         return try stream.consume(count: Int(count))
     }
@@ -892,14 +915,19 @@ extension Parser {
         }
     }
 
+    @usableFromInline
     struct InstructionFactory: AnyInstructionVisitor {
-        var insts: [Instruction] = []
+        @usableFromInline var insts: [Instruction] = []
 
+        @inlinable init() {}
+
+        @inlinable
         mutating func visit(_ instruction: Instruction) throws {
             insts.append(instruction)
         }
     }
 
+    @usableFromInline
     func parseConstExpression() throws -> ConstExpression {
         var factory = InstructionFactory()
         var inst: InstructionCode
@@ -915,6 +943,7 @@ extension Parser {
 extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#custom-section>
+    @usableFromInline
     func parseCustomSection(size: UInt32) throws -> CustomSection {
         let preNameIndex = stream.currentIndex
         let name = try parseName()
@@ -932,12 +961,14 @@ extension Parser {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#type-section>
+    @inlinable
     func parseTypeSection() throws -> [FunctionType] {
         return try parseVector { try parseFunctionType() }
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#import-section>
+    @usableFromInline
     func parseImportSection() throws -> [Import] {
         return try parseVector {
             let module = try parseName()
@@ -963,24 +994,28 @@ extension Parser {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#function-section>
+    @inlinable
     func parseFunctionSection() throws -> [TypeIndex] {
         return try parseVector { try parseUnsigned() }
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#table-section>
+    @usableFromInline
     func parseTableSection() throws -> [Table] {
         return try parseVector { try Table(type: parseTableType()) }
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#memory-section>
+    @usableFromInline
     func parseMemorySection() throws -> [Memory] {
         return try parseVector { try Memory(type: parseLimits()) }
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#global-section>
+    @usableFromInline
     func parseGlobalSection() throws -> [Global] {
         return try parseVector {
             let type = try parseGlobalType()
@@ -991,6 +1026,7 @@ extension Parser {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#export-section>
+    @usableFromInline
     func parseExportSection() throws -> [Export] {
         return try parseVector {
             let name = try parseName()
@@ -1015,12 +1051,14 @@ extension Parser {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#start-section>
+    @usableFromInline
     func parseStartSection() throws -> FunctionIndex {
         return try parseUnsigned()
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#element-section>
+    @inlinable
     func parseElementSection() throws -> [ElementSegment] {
         return try parseVector {
             let flag = try ElementSegment.Flag(rawValue: parseUnsigned())
@@ -1082,6 +1120,7 @@ extension Parser {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#code-section>
+    @inlinable
     func parseCodeSection() throws -> [Code] {
         return try parseVector {
             let size = try parseUnsigned() as UInt32
@@ -1112,6 +1151,7 @@ extension Parser {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#data-section>
+    @inlinable
     func parseDataSection() throws -> [DataSegment] {
         return try parseVector {
             let kind: UInt32 = try parseUnsigned()
@@ -1137,6 +1177,7 @@ extension Parser {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#data-count-section>
+    @usableFromInline
     func parseDataCountSection() throws -> UInt32 {
         return try parseUnsigned()
     }
@@ -1164,6 +1205,7 @@ public enum ParsingPayload {
 extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-magic>
+    @usableFromInline
     func parseMagicNumber() throws {
         let magicNumber = try stream.consume(count: 4)
         guard magicNumber.elementsEqual(WASM_MAGIC) else {
@@ -1173,6 +1215,7 @@ extension Parser {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-version>
+    @usableFromInline
     func parseVersion() throws -> [UInt8] {
         let version = try Array(stream.consume(count: 4))
         guard version == [0x01, 0x00, 0x00, 0x00] else {
@@ -1181,7 +1224,9 @@ extension Parser {
         return version
     }
 
+    @usableFromInline
     struct OrderTracking {
+        @usableFromInline
         enum Order: UInt8 {
             case initial = 0
             case type
@@ -1199,7 +1244,10 @@ extension Parser {
             case data
         }
 
-        private var last: Order = .initial
+        @usableFromInline
+        var last: Order = .initial
+
+        @inlinable
         mutating func track(order: Order, parser: Parser) throws {
             guard last.rawValue < order.rawValue else {
                 throw parser.makeError(.sectionOutOfOrder)
@@ -1236,6 +1284,7 @@ extension Parser {
     ///     }
     /// }
     /// ```
+    @inlinable
     public mutating func parseNext() throws -> ParsingPayload? {
         switch nextParseTarget {
         case .header:
