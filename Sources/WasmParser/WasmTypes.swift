@@ -14,6 +14,14 @@ public struct Code {
     internal let offset: Int
     @usableFromInline
     internal let features: WasmFeatureSet
+
+    @inlinable
+    init(locals: [ValueType], expression: ArraySlice<UInt8>, offset: Int, features: WasmFeatureSet) {
+        self.locals = locals
+        self.expression = expression
+        self.offset = offset
+        self.features = features
+    }
 }
 
 extension Code: Equatable {
@@ -180,25 +188,27 @@ public struct Global: Equatable {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#element-segments>
 public struct ElementSegment: Equatable {
+    @usableFromInline
     struct Flag: OptionSet {
-        let rawValue: UInt32
+        @usableFromInline let rawValue: UInt32
 
+        @inlinable
         init(rawValue: UInt32) {
             self.rawValue = rawValue
         }
 
-        var segmentHasElemKind: Bool {
+        @inlinable var segmentHasElemKind: Bool {
             !contains(.usesExpressions) && rawValue != 0
         }
 
-        var segmentHasRefType: Bool {
+        @inlinable var segmentHasRefType: Bool {
             contains(.usesExpressions) && rawValue != 4
         }
 
-        static let isPassiveOrDeclarative = Flag(rawValue: 1 << 0)
-        static let isDeclarative = Flag(rawValue: 1 << 1)
-        static let hasTableIndex = Flag(rawValue: 1 << 1)
-        static let usesExpressions = Flag(rawValue: 1 << 2)
+        @usableFromInline static let isPassiveOrDeclarative = Flag(rawValue: 1 << 0)
+        @usableFromInline static let isDeclarative = Flag(rawValue: 1 << 1)
+        @usableFromInline static let hasTableIndex = Flag(rawValue: 1 << 1)
+        @usableFromInline static let usesExpressions = Flag(rawValue: 1 << 2)
     }
 
     public enum Mode: Equatable {
@@ -210,6 +220,12 @@ public struct ElementSegment: Equatable {
     public let type: ReferenceType
     public let initializer: [ConstExpression]
     public let mode: Mode
+
+    public init(type: ReferenceType, initializer: [ConstExpression], mode: Mode) {
+        self.type = type
+        self.initializer = initializer
+        self.mode = mode
+    }
 }
 
 /// Data segment in a module
@@ -220,6 +236,12 @@ public enum DataSegment: Equatable {
         public let index: UInt32
         public let offset: ConstExpression
         public let initializer: ArraySlice<UInt8>
+
+        @inlinable init(index: UInt32, offset: ConstExpression, initializer: ArraySlice<UInt8>) {
+            self.index = index
+            self.offset = offset
+            self.initializer = initializer
+        }
     }
 
     case passive(ArraySlice<UInt8>)
