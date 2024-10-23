@@ -1,5 +1,7 @@
 import _CWasmKit.Platform
 
+import struct WasmParser.WasmFeatureSet
+
 /// A WebAssembly execution engine.
 ///
 /// An engine is responsible storing the configuration for the execution of
@@ -85,14 +87,30 @@ public struct EngineConfiguration {
     /// "call stack exhausted" ``Trap`` errors thrown by the interpreter.
     public var stackSize: Int
 
+    /// The WebAssembly features that can be used by Wasm modules running on this engine.
+    public var features: WasmFeatureSet
+
     /// Initializes a new instance of `EngineConfiguration`.
+    ///
     /// - Parameter threadingModel: The threading model to use for the virtual
     /// machine interpreter. If `nil`, the default threading model for the
     /// current platform will be used.
-    public init(threadingModel: ThreadingModel? = nil, compilationMode: CompilationMode? = nil, stackSize: Int? = nil) {
+    /// - Parameter compilationMode: The compilation mode to use for WebAssembly
+    /// modules. If `nil`, the default compilation mode (lazy) will be used.
+    /// - Parameter stackSize: The stack size in bytes for the virtual machine
+    /// interpreter. If `nil`, the default stack size (512KB) will be used.
+    /// - Parameter features: The WebAssembly features that can be used by Wasm
+    /// modules running on this engine.
+    public init(
+        threadingModel: ThreadingModel? = nil,
+        compilationMode: CompilationMode? = nil,
+        stackSize: Int? = nil,
+        features: WasmFeatureSet = .default
+    ) {
         self.threadingModel = threadingModel ?? .defaultForCurrentPlatform
         self.compilationMode = compilationMode ?? .lazy
         self.stackSize = stackSize ?? (1 << 19)
+        self.features = features
     }
 }
 

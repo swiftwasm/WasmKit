@@ -580,6 +580,9 @@ public struct Memory: Equatable {
     /// let instance = try module.instantiate(store: store, imports: imports)
     /// ```
     public init(store: Store, type: MemoryType) throws {
+        // Validate the memory type because the type is not validated at instantiation time.
+        try ModuleValidator.checkMemoryType(type, features: store.engine.configuration.features)
+
         self.init(
             handle: try store.allocator.allocate(memoryType: type, resourceLimiter: store.resourceLimiter),
             allocator: store.allocator

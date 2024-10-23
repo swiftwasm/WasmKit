@@ -1,6 +1,18 @@
 // This module defines utilities for fuzzing WasmKit.
 
-import WasmKit
+@_spi(Fuzzing) import WasmKit
+
+/// A resource limiter that restricts allocations to fuzzer limits.
+public struct FuzzerResourceLimiter: ResourceLimiter {
+    public init() {}
+
+    public func limitMemoryGrowth(to desired: Int) throws -> Bool {
+        return desired < 1024 * 1024 * 1024
+    }
+    public func limitTableGrowth(to desired: Int) throws -> Bool {
+        return desired < 1024 * 1024
+    }
+}
 
 /// Check if a Wasm module can be instantiated without crashing.
 ///
@@ -9,6 +21,7 @@ public func fuzzInstantiation(bytes: [UInt8]) throws {
     let module = try WasmKit.parseWasm(bytes: bytes)
     let engine = Engine(configuration: EngineConfiguration(compilationMode: .eager))
     let store = Store(engine: engine)
+    store.resourceLimiter = FuzzerResourceLimiter()
 
     // Prepare dummy imports
     var imports = Imports()

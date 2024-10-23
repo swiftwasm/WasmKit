@@ -1,13 +1,5 @@
 @_spi(Fuzzing) import WasmKit
-
-struct FuzzerResourceLimiter: ResourceLimiter {
-    func limitMemoryGrowth(to desired: Int) throws -> Bool {
-        return desired < 1024 * 1024 * 1024
-    }
-    func limitTableGrowth(to desired: Int) throws -> Bool {
-        return desired < 1024 * 1024
-    }
-}
+import WasmKitFuzzing
 
 @_cdecl("LLVMFuzzerTestOneInput")
 public func FuzzCheck(_ start: UnsafePointer<UInt8>, _ count: Int) -> CInt {
