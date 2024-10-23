@@ -31,6 +31,7 @@ let package = Package(
     ],
     targets: [
         .target(name: "FuzzTranslator", dependencies: [
+            "WasmKitFuzzing",
             .product(name: "WasmKit", package: "WasmKit")
         ]),
         .target(name: "FuzzExecute", dependencies: [
@@ -42,5 +43,8 @@ let package = Package(
             "WasmCAPI",
         ]),
         .target(name: "WasmCAPI"),
+        .target(name: "WasmKitFuzzing", dependencies: [
+            .product(name: "WasmKit", package: "WasmKit"),
+        ])
     ]
 )

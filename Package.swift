@@ -48,9 +48,14 @@ let package = Package(
             exclude: ["CMakeLists.txt"]
         ),
         .target(name: "_CWasmKit"),
+        .target(
+            name: "WasmKitFuzzing",
+            dependencies: ["WasmKit"],
+            path: "FuzzTesting/Sources/WasmKitFuzzing"
+        ),
         .testTarget(
             name: "WasmKitTests",
-            dependencies: ["WasmKit", "WAT"],
+            dependencies: ["WasmKit", "WAT", "WasmKitFuzzing"],
             exclude: ["ExtraSuite"]
         ),
 
