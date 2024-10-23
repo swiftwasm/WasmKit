@@ -227,13 +227,8 @@ public struct Module {
     }
 
     /// Materialize lazily-computed elements in this module
-    public mutating func materializeAll() throws {
-        let allocator = ISeqAllocator()
-        let funcTypeInterner = Interner<FunctionType>()
-        for function in functions {
-            _ = try function.compile(module: self, funcTypeInterner: funcTypeInterner, allocator: allocator)
-        }
-    }
+    @available(*, deprecated, message: "Module materialization is no longer supported. Instantiate the module explicitly instead.")
+    public mutating func materializeAll() throws {}
 }
 
 extension Module {
@@ -275,8 +270,4 @@ typealias LabelIndex = UInt32
 struct GuestFunction {
     let type: FunctionType
     let code: Code
-
-    func compile(module: Module, funcTypeInterner: Interner<FunctionType>, allocator: ISeqAllocator) throws -> InstructionSequence {
-        throw TranslationError("Compile without instantiation is no longer supported")
-    }
 }
