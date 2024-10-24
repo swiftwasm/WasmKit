@@ -16,7 +16,7 @@ public final class StaticByteStream: ByteStream {
 
     @discardableResult
     public func consumeAny() throws -> UInt8 {
-        guard bytes.indices.contains(currentIndex) else {
+        guard currentIndex < self.bytes.endIndex else {
             throw StreamError<Element>.unexpectedEnd(expected: nil)
         }
 
@@ -27,7 +27,7 @@ public final class StaticByteStream: ByteStream {
 
     @discardableResult
     public func consume(_ expected: Set<UInt8>) throws -> UInt8 {
-        guard bytes.indices.contains(currentIndex) else {
+        guard currentIndex < self.bytes.endIndex else {
             throw StreamError<Element>.unexpectedEnd(expected: Set(expected))
         }
 
@@ -44,7 +44,7 @@ public final class StaticByteStream: ByteStream {
         guard count > 0 else { return [] }
         let updatedIndex = currentIndex + count
 
-        guard bytes.indices.contains(updatedIndex - 1) else {
+        guard updatedIndex - 1 < bytes.endIndex else {
             throw StreamError<Element>.unexpectedEnd(expected: nil)
         }
 
@@ -54,7 +54,7 @@ public final class StaticByteStream: ByteStream {
     }
 
     public func peek() -> UInt8? {
-        guard bytes.indices.contains(currentIndex) else {
+        guard currentIndex < self.bytes.endIndex else {
             return nil
         }
         return bytes[currentIndex]
