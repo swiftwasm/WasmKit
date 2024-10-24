@@ -146,6 +146,9 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     needs: build-linux
+    permissions:
+      id-token: write
+      pages: write
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
