@@ -27,7 +27,8 @@ jobs:
             development-toolchain-tag: swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a
             wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi.artifactbundle.zip"
             wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi
-            test-args: "--sanitize address"
+            test-args: "--sanitize address --enable-code-coverage"
+            build-dev-dashboard: true
 
     runs-on: ${{ matrix.os }}
     name: "build-macos (${{ matrix.xcode }})"
@@ -59,6 +60,25 @@ jobs:
           EOS
       - run: ./Vendor/checkout-dependency
       - run: swift test ${{ matrix.test-args }}
+
+      - if: matrix.build-dev-dashboard
+        run: ./CI/build-dev-dashboard.sh
+      - if: matrix.build-dev-dashboard
+        id: deployment
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .build/html
+
+  deploy-dev-dashboard:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs: build-macos
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
 
   build-xcode:
     runs-on: macos-15
