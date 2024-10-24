@@ -78,20 +78,20 @@ jobs:
             development-toolchain-download: "https://download.swift.org/development/ubuntu2004/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a-ubuntu20.04.tar.gz"
             wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi.artifactbundle.zip"
             wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi
-          - swift: "5.8-amazonlinux2"
+          - swift: "5.9-focal"
+            development-toolchain-download: "https://download.swift.org/development/ubuntu2004/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a-ubuntu20.04.tar.gz"
+            wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi.artifactbundle.zip"
+            wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi
+          - swift: "5.9-amazonlinux2"
             development-toolchain-download: "https://download.swift.org/development/amazonlinux2/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a-amazonlinux2.tar.gz"
             wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi.artifactbundle.zip"
             wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi
-          - swift: "5.9-focal"
+          - swift: "6.0-focal"
             development-toolchain-download: "https://download.swift.org/development/ubuntu2004/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a-ubuntu20.04.tar.gz"
             wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi.artifactbundle.zip"
             wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi
             test-args: "--enable-code-coverage"
             build-dev-dashboard: true
-          - swift: "5.9-amazonlinux2"
-            development-toolchain-download: "https://download.swift.org/development/amazonlinux2/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a-amazonlinux2.tar.gz"
-            wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi.artifactbundle.zip"
-            wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi
 
     runs-on: ubuntu-20.04
     name: "build-linux (${{ matrix.swift }})"
