@@ -1,26 +1,37 @@
 {
   "testsuite": {
     "repository": "https://github.com/WebAssembly/testsuite.git",
-    "revision": "53da17c0936a23f68f97cde4f9346a0a374dc35f"
+    "revision": "53da17c0936a23f68f97cde4f9346a0a374dc35f",
+    "categories": ["default"]
   },
   "wasi-testsuite": {
     "repository": "https://github.com/WebAssembly/wasi-testsuite.git",
-    "revision": "c9c751586fd86b321d595bbef13f2c7403cfdbc5"
+    "revision": "c9c751586fd86b321d595bbef13f2c7403cfdbc5",
+    "categories": ["default"]
   },
   "wasm-c-api": {
     "repository": "https://github.com/WebAssembly/wasm-c-api.git",
-    "revision": "2ce1367c9d1271c83fb63bef26d896a2f290cd23"
+    "revision": "2ce1367c9d1271c83fb63bef26d896a2f290cd23",
+    "categories": ["default"]
   },
   "swift-format": {
     "repository": "https://github.com/swiftlang/swift-format.git",
-    "revision": "b268009b0d1182f9a573311c1a69eee9a7fd3d3f"
+    "revision": "b268009b0d1182f9a573311c1a69eee9a7fd3d3f",
+    "categories": ["default"]
   },
   "wish-you-were-fast": {
     "repository": "https://github.com/composablesys/wish-you-were-fast.git",
-    "revision": "65c968685d66eea3ae88ef747df95210690c6b46"
+    "revision": "65c968685d66eea3ae88ef747df95210690c6b46",
+    "categories": ["benchmark"]
+  },
+  "swift-stringify-macro.wasm": {
+    "repository": "https://github.com/kateinoigakukun/swift-stringify-macro.wasm.git",
+    "revision": "93c35d1e00ece83a69ee7f318589c8b98b95adf5",
+    "categories": ["benchmark"]
   },
   "coremark": {
     "repository": "https://github.com/eembc/coremark.git",
-    "revision": "d5fad6bd094899101a4e5fd53af7298160ced6ab"
+    "revision": "d5fad6bd094899101a4e5fd53af7298160ced6ab",
+    "categories": ["benchmark"]
   }
 }

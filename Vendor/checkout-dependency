@@ -34,9 +34,15 @@ class CheckoutDependency:
         print(f"Checking out '{dependency_name}' to {dependency['revision']}")
         subprocess.run(["git", "-C", dependency_path, "checkout", dependency["revision"]], check=True)
 
+    def checkout_category(self, category):
+        for dependency_name, dependency in self.dependencies.items():
+            if category in dependency.get("categories", []):
+                self.checkout(dependency_name)
+
     def checkout_all(self):
         for dependency_name in self.dependencies.keys():
             self.checkout(dependency_name)
+
 
 def main():
     import argparse
@@ -46,13 +52,22 @@ def main():
     parser = argparse.ArgumentParser(description="Checkout dependency repositories")
     available_dependencies = ", ".join(checkout_dependency.dependencies.keys())
     parser.add_argument("names", nargs="*", help=f"Available dependencies: {available_dependencies}")
+    parser.add_argument("--all", action="store_true", help="Checkout all dependencies")
+    parser.add_argument("--category", action="append", dest="categories",
+                        default=["default"],
+                        help="Checkout dependencies by category")
+
     args = parser.parse_args()
 
     if args.names:
         for dependency_name in args.names:
             checkout_dependency.checkout(dependency_name)
-    else:
+    elif args.all:
         checkout_dependency.checkout_all()
+    elif args.categories:
+        for category in args.categories:
+            checkout_dependency.checkout_category(category)
+
 
 if __name__ == "__main__":
     main()
