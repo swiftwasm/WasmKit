@@ -3,7 +3,7 @@ import XCTest
 class PluginSmokeTests: XCTestCase {
     func testExtractPlugin() throws {
         #if compiler(>=6.0)
-        throw XCTSkip("XFAIL: Swift compiler path inference is broken in Swift 6.0")
+            throw XCTSkip("XFAIL: Swift compiler path inference is broken in Swift 6.0")
         #endif
         guard ProcessInfo.processInfo.environment["__XCODE_BUILT_PRODUCTS_DIR_PATHS"] == nil else {
             throw XCTSkip(
