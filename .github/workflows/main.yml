@@ -131,6 +131,9 @@ jobs:
       - if: matrix.build-dev-dashboard
         run: ./build-exec ./CI/build-dev-dashboard.sh
       - if: matrix.build-dev-dashboard
+        name: Relax artifact permissions
+        run: sudo chown -R $USER .build/html
+      - if: matrix.build-dev-dashboard
         id: deployment
         uses: actions/upload-pages-artifact@v3
         with:
