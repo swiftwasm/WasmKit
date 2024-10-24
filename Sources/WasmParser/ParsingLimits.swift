@@ -7,6 +7,6 @@ struct ParsingLimits {
 
     /// The default limits for parsing.
     static var `default`: ParsingLimits {
-        return ParsingLimits(maxFunctionLocals: 50000)
+        return ParsingLimits(maxFunctionLocals: 100000)
     }
 }
