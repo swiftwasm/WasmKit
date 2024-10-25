@@ -609,8 +609,6 @@ enum WasmGen {
                     + "\n\n"
                     + generateAnyInstructionVisitor(instructions)
                     + "\n\n"
-                    + generateTracingVisitor(instructions)
-                    + "\n\n"
                     + generateVisitorProtocol(instructions)
                     + "\n"
             ),

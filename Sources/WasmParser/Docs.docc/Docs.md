@@ -54,8 +54,6 @@ while let payload = try parser.parseNext() {
 
 - ``InstructionVisitor``
 - ``AnyInstructionVisitor``
-- ``InstructionTracingVisitor``
-
 
 ### Core Module Elements
 
