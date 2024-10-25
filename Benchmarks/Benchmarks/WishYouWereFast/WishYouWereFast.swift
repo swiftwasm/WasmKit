@@ -22,7 +22,9 @@ let benchmarks = {
         atPath: wishYouWereFast.path
     ) {
         guard file.hasSuffix(".wasm") else { continue }
-        Benchmark("\(file)") { benchmark in
+        Benchmark("\(file)", configuration: .init(thresholds: [
+            .peakMemoryResident: .relaxed,
+        ])) { benchmark in
             let engine = Engine()
             let store = Store(engine: engine)
             let module = try parseWasm(
