@@ -48,7 +48,10 @@ struct Plugin: CommandPlugin {
             "--package-name", context.package.displayName,
             "--wit-output-path", witOutputPath.string,
             "--swift-output-path", swiftOutputPath.string,
-            "-I", buildPath.string
+            "-I", buildPath.string,
+            // SwiftPM 6.0 and later emits swiftmodule files into a separate directory
+            // https://github.com/swiftlang/swift-package-manager/pull/7212
+            "-I", buildPath.appending(["Modules"]).string,
         ]
         if let sdk {
             arguments += ["-sdk", sdk]
@@ -74,12 +77,28 @@ struct Plugin: CommandPlugin {
             return nil
         }
         for line in contents.split(separator: "\n") {
-            let prefix = "    executable: \""
-            if line.hasPrefix(prefix), line.hasSuffix("/swiftc\"") {
-                let pathStart = line.index(line.startIndex, offsetBy: prefix.count)
-                let pathEnd = line.index(before: line.endIndex)
-                let executablePath = line[pathStart..<pathEnd]
-                return String(executablePath)
+            do {
+                let prefix = "    executable: \""
+                if line.hasPrefix(prefix), line.hasSuffix("/swiftc\"") {
+                    let pathStart = line.index(line.startIndex, offsetBy: prefix.count)
+                    let pathEnd = line.index(before: line.endIndex)
+                    let executablePath = line[pathStart..<pathEnd]
+                    return String(executablePath)
+                }
+            }
+            do {
+                // Swift 6.0 no longer uses llbuild's built-in swift tool. Instead,
+                // it uses the generic shell tool with full arguments.
+                // https://github.com/swiftlang/swift-package-manager/pull/6585
+                let prefix = "    args: "
+                if line.hasPrefix(prefix) {
+                    let argsString = line[line.index(line.startIndex, offsetBy: prefix.count)...]
+                    guard let args = try? JSONDecoder().decode([String].self, from: Data(argsString.utf8)),
+                      let swiftc = args.first(where: { $0.hasSuffix("/swiftc") }) else {
+                        continue
+                    }
+                    return swiftc
+                }
             }
         }
         return nil
