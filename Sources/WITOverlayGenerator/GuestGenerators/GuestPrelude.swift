@@ -7,7 +7,11 @@ let guestPrelude = """
     #if canImport(WASILibc)
     import WASILibc
     #endif
+    #if compiler(>=6.0)
+    private import _CabiShims
+    #else
     @_implementationOnly import _CabiShims
+    #endif
 
     fileprivate enum Prelude {
         class LeakBox<Wrapped> {

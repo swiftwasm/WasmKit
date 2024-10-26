@@ -165,6 +165,7 @@ struct RuntimeTestHarness {
             arguments: [
                 "-target", "wasm32-unknown-none-wasm",
                 "-enable-experimental-feature", "Embedded",
+                "-enable-experimental-feature", "Extern",
                 "-wmo", "-Xcc", "-fdeclspec",
                 "-Xfrontend", "-disable-stack-protector",
                 "-Xlinker", "--no-entry", "-Xclang-linker", "-nostdlib",
@@ -176,6 +177,7 @@ struct RuntimeTestHarness {
             inputFiles: inputFiles,
             arguments: [
                 "-target", "wasm32-unknown-wasi",
+                "-enable-experimental-feature", "Extern",
                 "-static-stdlib",
                 "-Xclang-linker", "-mexec-model=reactor",
                 "-resource-dir", configuration.wasiSwiftSDKPath.appendingPathComponent("/swift.xctoolchain/usr/lib/swift_static").path,
