@@ -39,6 +39,9 @@ jobs:
         storage-repo: https://${{ secrets.SWIFTWASM_BOT_GITHUB_TOKEN }}@github.com/swiftwasm/wasmkit-fuzz-corpora.git
         storage-repo-branch: main
         storage-repo-branch-coverage: gh-pages
+        # NOTE: Disable parallel-fuzzing due to https://github.com/google/clusterfuzzlite/issues/142
+        #       Set to empty string, not false, to avoid https://github.com/google/oss-fuzz/pull/12655
+        parallel-fuzzing: ''
     - name: Upload Sarif
       if: always() && steps.build.outcome == 'success'
       uses: github/codeql-action/upload-sarif@v3
