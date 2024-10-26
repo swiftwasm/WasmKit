@@ -138,6 +138,9 @@ struct SwiftAPIDigester {
                 throw SwiftAPIDigesterError.unexpectedEmptyOutput
             }
             process.waitUntilExit()
+            guard process.terminationStatus == 0 else {
+                throw SwiftAPIDigesterError.nonZeroExitCode(process.terminationStatus, arguments: args)
+            }
             return try Output.parse(output)
         #endif
     }
@@ -145,4 +148,5 @@ struct SwiftAPIDigester {
 
 enum SwiftAPIDigesterError: Error {
     case unexpectedEmptyOutput
+    case nonZeroExitCode(Int32, arguments: [String])
 }
