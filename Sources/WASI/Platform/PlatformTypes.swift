@@ -156,15 +156,23 @@ extension WASIAbi.Errno {
         do {
             return try body()
         } catch let errno as Errno {
-            guard let error = WASIAbi.Errno(platformErrno: errno) else {
-                throw WASIError(description: "Unknown underlying OS error: \(errno)")
-            }
-            throw error
+            throw try WASIAbi.Errno(platformErrno: errno)
         }
     }
 
-    init?(platformErrno: SystemPackage.Errno) {
-        switch platformErrno {
+    init(platformErrno: CInt) throws {
+        try self.init(platformErrno: SystemPackage.Errno(rawValue: platformErrno))
+    }
+
+    init(platformErrno: Errno) throws {
+        guard let error = WASIAbi.Errno(_platformErrno: platformErrno) else {
+            throw WASIError(description: "Unknown underlying OS error: \(platformErrno)")
+        }
+        self = error
+    }
+
+    private init?(_platformErrno: SystemPackage.Errno) {
+        switch _platformErrno {
         case .permissionDenied: self = .EPERM
         case .notPermitted: self = .EPERM
         case .noSuchFileOrDirectory: self = .ENOENT
