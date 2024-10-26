@@ -900,8 +900,8 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     ///
     /// - Parameter typeHint: A type expected to be popped. Only used for diagnostic purpose.
     /// - Returns: `true` if check succeed. `false` if the pop operation is going to be performed in unreachable code path.
-    private func checkBeforePop(typeHint: ValueType?, controlFrame: ControlStack.ControlFrame) throws -> Bool {
-        if _slowPath(valueStack.height <= controlFrame.stackHeight) {
+    private func checkBeforePop(typeHint: ValueType?, depth: Int = 0, controlFrame: ControlStack.ControlFrame) throws -> Bool {
+        if _slowPath(valueStack.height - depth <= controlFrame.stackHeight) {
             if controlFrame.reachable {
                 let message: String
                 if let typeHint {
@@ -916,9 +916,9 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         }
         return true
     }
-    private func checkBeforePop(typeHint: ValueType?) throws -> Bool {
+    private func checkBeforePop(typeHint: ValueType?, depth: Int = 0) throws -> Bool {
         let controlFrame = try controlStack.currentFrame()
-        return try self.checkBeforePop(typeHint: typeHint, controlFrame: controlFrame)
+        return try self.checkBeforePop(typeHint: typeHint, depth: depth, controlFrame: controlFrame)
     }
     private mutating func ensureOnVReg(_ source: ValueSource) -> VReg {
         // TODO: Copy to stack if source is on preg
@@ -994,7 +994,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
     private func checkStackTop(_ valueTypes: [ValueType]) throws {
         for (stackDepth, type) in valueTypes.reversed().enumerated() {
-            guard try checkBeforePop(typeHint: type) else { return }
+            guard try checkBeforePop(typeHint: type, depth: stackDepth) else { return }
             let actual = valueStack.peekType(depth: stackDepth)
             switch actual {
             case .some(let actualType):
