@@ -178,6 +178,12 @@ class ParserTests: XCTestCase {
     }
 
     func testParseSpectest() throws {
+        // NOTE: We do the same check as a part of the EncoderTests, so it's
+        // usually redundant and time-wasting to run this test every time.
+        // Keeping it here just for local unit testing purposes.
+        try XCTSkipIf(
+            ProcessInfo.processInfo.environment["WASMKIT_PARSER_SPECTEST"] != "1"
+        )
         var failureCount = 0
         var totalCount = 0
         for filePath in Spectest.wastFiles(include: []) {
