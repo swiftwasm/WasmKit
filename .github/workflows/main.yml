@@ -74,24 +74,28 @@ jobs:
     strategy:
       matrix:
         include:
-          - swift: "5.8-focal"
+          - swift: "swift:5.8-focal"
             development-toolchain-download: "https://download.swift.org/development/ubuntu2004/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a-ubuntu20.04.tar.gz"
             wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi.artifactbundle.zip"
             wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi
-          - swift: "5.9-focal"
+          - swift: "swift:5.9-focal"
             development-toolchain-download: "https://download.swift.org/development/ubuntu2004/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a-ubuntu20.04.tar.gz"
             wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi.artifactbundle.zip"
             wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi
-          - swift: "5.9-amazonlinux2"
+          - swift: "swift:5.9-amazonlinux2"
             development-toolchain-download: "https://download.swift.org/development/amazonlinux2/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a-amazonlinux2.tar.gz"
             wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi.artifactbundle.zip"
             wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi
-          - swift: "6.0-focal"
+          - swift: "swift:6.0-focal"
             development-toolchain-download: "https://download.swift.org/development/ubuntu2004/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a-ubuntu20.04.tar.gz"
             wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi.artifactbundle.zip"
             wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi
             test-args: "--enable-code-coverage"
             build-dev-dashboard: true
+          - swift: "swiftlang/swift:nightly-main-jammy"
+            development-toolchain-download: "https://download.swift.org/development/ubuntu2204/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a-ubuntu22.04.tar.gz"
+            wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi.artifactbundle.zip"
+            wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi
 
     runs-on: ubuntu-20.04
     name: "build-linux (${{ matrix.swift }})"
@@ -100,7 +104,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Configure container
         run: |
-          docker run -dit --name build-container -v $PWD:/workspace -w /workspace swift:${{ matrix.swift }}
+          docker run -dit --name build-container -v $PWD:/workspace -w /workspace ${{ matrix.swift }}
           echo 'docker exec -i build-container "$@"' > ./build-exec
           chmod +x ./build-exec
 
