@@ -102,9 +102,45 @@ let benchmarks = {
               }
            }
         }
+        """,
+        "MMIOMacros.wasm": """
+        {
+          "expandAttachedMacro": {
+            "attributeSyntax": {
+              "kind": "attribute",
+              "location": {
+                "column": 12,
+                "fileID": "MMIOMacrosExample/main.swift",
+                "fileName": "swift-mmio/Sources/MMIOMacrosExample/main.swift",
+                "line": 1,
+                "offset": 11
+              },
+              "source": "\n@RegisterBlock "
+            },
+            "declSyntax": {
+              "kind": "declaration",
+              "location": {
+                "column": 12,
+                "fileID": "MMIOMacrosExample/main.swift",
+                "fileName": "swift-mmio/Sources/MMIOMacrosExample/main.swift",
+                "line": 1,
+                "offset": 11
+              },
+              "source": "\n@RegisterBlock struct Example0 {}"
+            },
+            "discriminator": "$s17MMIOMacrosExample8Example013RegisterBlockfMm_",
+            "lexicalContext": [],
+            "macro": {
+              "moduleName": "MMIOMacros",
+              "name": "RegisterBlock ",
+              "typeName": "RegisterBlockMacro"
+            },
+            "macroRole": "member"
+          }
+        }
         """
     ]
-    
+
     for file in try! FileManager.default.contentsOfDirectory(
         atPath: macrosDir.string
     ) {

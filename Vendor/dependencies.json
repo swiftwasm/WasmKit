@@ -26,7 +26,7 @@
   },
   "swift-stringify-macro.wasm": {
     "repository": "https://github.com/kateinoigakukun/swift-stringify-macro.wasm.git",
-    "revision": "93c35d1e00ece83a69ee7f318589c8b98b95adf5",
+    "revision": "576ef7ff3b9713d75519eab0cb1f2b738220b636",
     "categories": ["benchmark"]
   },
   "coremark": {
