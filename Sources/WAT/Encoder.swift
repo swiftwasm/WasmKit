@@ -441,7 +441,7 @@ extension WatParser.DataSegmentDecl {
     }
 }
 
-struct ExpressionEncoder: InstructionEncoder {
+struct ExpressionEncoder: BinaryInstructionEncoder {
     var encoder = Encoder()
     var hasDataSegmentInstruction: Bool = false
 
