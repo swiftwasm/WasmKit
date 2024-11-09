@@ -5,8 +5,9 @@
 import WasmParser
 import WasmTypes
 
-/// An instruction encoder that is responsible for encoding opcodes and immediates.
-protocol InstructionEncoder: InstructionVisitor {
+/// An instruction encoder that is responsible for encoding opcodes and immediates
+/// in Wasm binary format.
+protocol BinaryInstructionEncoder: InstructionVisitor {
     /// Encodes an instruction opcode.
     mutating func encodeInstruction(_ opcode: UInt8, _ prefix: UInt8?) throws
 
@@ -34,8 +35,8 @@ protocol InstructionEncoder: InstructionVisitor {
     mutating func encodeImmediates(typeIndex: UInt32, tableIndex: UInt32) throws
 }
 
-// InstructionEncoder implements the InstructionVisitor protocol to call the corresponding encode method.
-extension InstructionEncoder {
+// BinaryInstructionEncoder implements the InstructionVisitor protocol to call the corresponding encode method.
+extension BinaryInstructionEncoder {
     mutating func visitUnreachable() throws { try encodeInstruction(0x00, nil) }
     mutating func visitNop() throws { try encodeInstruction(0x01, nil) }
     mutating func visitBlock(blockType: BlockType) throws {

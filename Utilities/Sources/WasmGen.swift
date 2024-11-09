@@ -314,7 +314,7 @@ enum WasmGen {
         return code
     }
 
-    static func generateTextParser(_ instructions: InstructionSet) -> String {
+    static func generateTextInstructionParser(_ instructions: InstructionSet) -> String {
         var code = """
             import WasmParser
             import WasmTypes
@@ -399,13 +399,14 @@ enum WasmGen {
         return code
     }
 
-    static func generateInstructionEncoder(_ instructions: InstructionSet) -> String {
+    static func generateBinaryInstructionEncoder(_ instructions: InstructionSet) -> String {
         var code = """
             import WasmParser
             import WasmTypes
 
-            /// An instruction encoder that is responsible for encoding opcodes and immediates.
-            protocol InstructionEncoder: InstructionVisitor {
+            /// An instruction encoder that is responsible for encoding opcodes and immediates
+            /// in Wasm binary format.
+            protocol BinaryInstructionEncoder: InstructionVisitor {
                 /// Encodes an instruction opcode.
                 mutating func encodeInstruction(_ opcode: UInt8, _ prefix: UInt8?) throws
 
@@ -443,8 +444,8 @@ enum WasmGen {
         code += """
             }
 
-            // InstructionEncoder implements the InstructionVisitor protocol to call the corresponding encode method.
-            extension InstructionEncoder {
+            // BinaryInstructionEncoder implements the InstructionVisitor protocol to call the corresponding encode method.
+            extension BinaryInstructionEncoder {
 
             """
 
@@ -613,12 +614,12 @@ enum WasmGen {
                     + "\n"
             ),
             GeneratedFile(
-                projectSources + ["WAT", "ParseInstruction.swift"],
-                header + generateTextParser(instructions)
+                projectSources + ["WAT", "ParseTextInstruction.swift"],
+                header + generateTextInstructionParser(instructions)
             ),
             GeneratedFile(
-                projectSources + ["WAT", "InstructionEncoder.swift"],
-                header + generateInstructionEncoder(instructions)
+                projectSources + ["WAT", "BinaryInstructionEncoder.swift"],
+                header + generateBinaryInstructionEncoder(instructions)
             ),
         ]
 
