@@ -463,24 +463,21 @@ struct ExpressionEncoder: BinaryInstructionEncoder {
 
     // MARK: Special instructions
     mutating func visitMemoryInit(dataIndex: UInt32) throws {
-        try encodeInstruction(0x08, 0xFC)
+        try encodeInstruction([0xFC, 0x08])
         try encodeImmediates(dataIndex: dataIndex)
         encodeByte(0x00)  // reserved value
     }
 
     mutating func visitTypedSelect(type: ValueType) throws {
-        try encodeInstruction(0x1C, nil)
+        try encodeInstruction([0x1C])
         encodeByte(0x01)  // number of result types
         try encodeImmediates(type: type)
     }
 
     // MARK: InstructionEncoder conformance
 
-    mutating func encodeInstruction(_ opcode: UInt8, _ prefix: UInt8?) throws {
-        if let prefix {
-            encoder.output.append(prefix)
-        }
-        encoder.output.append(opcode)
+    mutating func encodeInstruction(_ opcode: [UInt8]) throws {
+        encoder.output.append(contentsOf: opcode)
     }
     mutating func encodeImmediates(blockType: WasmParser.BlockType) throws {
         switch blockType {

@@ -10,8 +10,7 @@ enum WasmGen {
     struct Instruction: Decodable {
         let feature: String
         let name: Name
-        let prefix: UInt8?
-        let opcode: UInt8
+        let opcode: [UInt8]
         let immediates: [Immediate]
         let category: String?
 
@@ -75,18 +74,13 @@ enum WasmGen {
 
         init(from decoder: Decoder) throws {
             var container = try decoder.unkeyedContainer()
-            func decodeHex() throws -> UInt8 {
-                let hexString = try container.decode(String.self)
-                return UInt8(hexString.dropFirst(2), radix: 16)!
+            func decodeHexArray() throws -> [UInt8] {
+                let hexStrings = try container.decode([String].self)
+                return hexStrings.map { UInt8($0.dropFirst(2), radix: 16)! }
             }
             feature = try container.decode(String.self)
             name = try container.decode(Name.self)
-            if (try? container.decodeNil()) == true {
-                prefix = nil
-            } else {
-                prefix = try decodeHex()
-            }
-            opcode = try decodeHex()
+            opcode = try decodeHexArray()
             let rawImmediates = try container.decode([[String]].self)
             immediates = rawImmediates.map { Immediate(label: $0[0], type: $0[1]) }
             category = try? container.decode(String.self)
@@ -408,7 +402,7 @@ enum WasmGen {
             /// in Wasm binary format.
             protocol BinaryInstructionEncoder: InstructionVisitor {
                 /// Encodes an instruction opcode.
-                mutating func encodeInstruction(_ opcode: UInt8, _ prefix: UInt8?) throws
+                mutating func encodeInstruction(_ opcode: [UInt8]) throws
 
                 // MARK: - Immediates encoding
 
@@ -463,25 +457,20 @@ enum WasmGen {
             var encodeInstrCall: String
             if let category = instruction.explicitCategory {
                 code += "\n"
-                code += "        let (prefix, opcode): (UInt8?, UInt8)\n"
+                code += "        let opcode: [UInt8]\n"
                 code += "        switch \(category) {\n"
                 for sourceInstruction in instruction.sourceInstructions {
-                    code += "        case .\(sourceInstruction.name.enumCase): (prefix, opcode) = ("
-                    code += sourceInstruction.prefix.map { String(format: "0x%02X", $0) } ?? "nil"
-                    code += ", "
-                    code += String(format: "0x%02X", sourceInstruction.opcode)
-                    code += ")\n"
+                    code += "        case .\(sourceInstruction.name.enumCase): opcode = ["
+                    code += sourceInstruction.opcode.map { String(format: "0x%02X", $0) }.joined(separator: ", ")
+                    code += "]\n"
                 }
                 code += "        }\n"
-                encodeInstrCall = "try encodeInstruction(opcode, prefix)"
+                encodeInstrCall = "try encodeInstruction(opcode)"
             } else {
                 let instruction = instruction.sourceInstructions[0]
-                encodeInstrCall = "try encodeInstruction("
-                encodeInstrCall += [
-                    String(format: "0x%02X", instruction.opcode),
-                    instruction.prefix.map { String(format: "0x%02X", $0) } ?? "nil",
-                ].joined(separator: ", ")
-                encodeInstrCall += ")"
+                encodeInstrCall = "try encodeInstruction(["
+                encodeInstrCall += instruction.opcode.map { String(format: "0x%02X", $0) }.joined(separator: ", ")
+                encodeInstrCall += "])"
             }
 
             if instruction.immediates.isEmpty, instruction.explicitCategory == nil {
@@ -525,16 +514,9 @@ enum WasmGen {
                     case .withEnumCase(let name): return "{\"enumCase\": \"\(name.enumCase)\"}"
                     }
                 }),
-            ColumnInfo(
-                header: "Prefix",
-                value: { i in
-                    if let prefix = i.prefix {
-                        return "\"" + String(format: "0x%02X", prefix) + "\""
-                    } else {
-                        return "null"
-                    }
-                }),
-            ColumnInfo(header: "Opcode", value: { "\"" + String(format: "0x%02X", $0.opcode) + "\"" }),
+            ColumnInfo(header: "Opcode", value: {
+                "[" + $0.opcode.map { "\"" + String(format: "0x%02X", $0) + "\"" }.joined(separator: ", ") + "]"
+            }),
             ColumnInfo(
                 header: "Immediates",
                 value: { i in
