@@ -9,7 +9,7 @@ import WasmTypes
 /// in Wasm binary format.
 protocol BinaryInstructionEncoder: InstructionVisitor {
     /// Encodes an instruction opcode.
-    mutating func encodeInstruction(_ opcode: UInt8, _ prefix: UInt8?) throws
+    mutating func encodeInstruction(_ opcode: [UInt8]) throws
 
     // MARK: - Immediates encoding
     mutating func encodeImmediates(blockType: BlockType) throws
@@ -37,351 +37,351 @@ protocol BinaryInstructionEncoder: InstructionVisitor {
 
 // BinaryInstructionEncoder implements the InstructionVisitor protocol to call the corresponding encode method.
 extension BinaryInstructionEncoder {
-    mutating func visitUnreachable() throws { try encodeInstruction(0x00, nil) }
-    mutating func visitNop() throws { try encodeInstruction(0x01, nil) }
+    mutating func visitUnreachable() throws { try encodeInstruction([0x00]) }
+    mutating func visitNop() throws { try encodeInstruction([0x01]) }
     mutating func visitBlock(blockType: BlockType) throws {
-        try encodeInstruction(0x02, nil)
+        try encodeInstruction([0x02])
         try encodeImmediates(blockType: blockType)
     }
     mutating func visitLoop(blockType: BlockType) throws {
-        try encodeInstruction(0x03, nil)
+        try encodeInstruction([0x03])
         try encodeImmediates(blockType: blockType)
     }
     mutating func visitIf(blockType: BlockType) throws {
-        try encodeInstruction(0x04, nil)
+        try encodeInstruction([0x04])
         try encodeImmediates(blockType: blockType)
     }
-    mutating func visitElse() throws { try encodeInstruction(0x05, nil) }
-    mutating func visitEnd() throws { try encodeInstruction(0x0B, nil) }
+    mutating func visitElse() throws { try encodeInstruction([0x05]) }
+    mutating func visitEnd() throws { try encodeInstruction([0x0B]) }
     mutating func visitBr(relativeDepth: UInt32) throws {
-        try encodeInstruction(0x0C, nil)
+        try encodeInstruction([0x0C])
         try encodeImmediates(relativeDepth: relativeDepth)
     }
     mutating func visitBrIf(relativeDepth: UInt32) throws {
-        try encodeInstruction(0x0D, nil)
+        try encodeInstruction([0x0D])
         try encodeImmediates(relativeDepth: relativeDepth)
     }
     mutating func visitBrTable(targets: BrTable) throws {
-        try encodeInstruction(0x0E, nil)
+        try encodeInstruction([0x0E])
         try encodeImmediates(targets: targets)
     }
-    mutating func visitReturn() throws { try encodeInstruction(0x0F, nil) }
+    mutating func visitReturn() throws { try encodeInstruction([0x0F]) }
     mutating func visitCall(functionIndex: UInt32) throws {
-        try encodeInstruction(0x10, nil)
+        try encodeInstruction([0x10])
         try encodeImmediates(functionIndex: functionIndex)
     }
     mutating func visitCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws {
-        try encodeInstruction(0x11, nil)
+        try encodeInstruction([0x11])
         try encodeImmediates(typeIndex: typeIndex, tableIndex: tableIndex)
     }
-    mutating func visitDrop() throws { try encodeInstruction(0x1A, nil) }
-    mutating func visitSelect() throws { try encodeInstruction(0x1B, nil) }
+    mutating func visitDrop() throws { try encodeInstruction([0x1A]) }
+    mutating func visitSelect() throws { try encodeInstruction([0x1B]) }
     mutating func visitTypedSelect(type: ValueType) throws {
-        try encodeInstruction(0x1C, nil)
+        try encodeInstruction([0x1C])
         try encodeImmediates(type: type)
     }
     mutating func visitLocalGet(localIndex: UInt32) throws {
-        try encodeInstruction(0x20, nil)
+        try encodeInstruction([0x20])
         try encodeImmediates(localIndex: localIndex)
     }
     mutating func visitLocalSet(localIndex: UInt32) throws {
-        try encodeInstruction(0x21, nil)
+        try encodeInstruction([0x21])
         try encodeImmediates(localIndex: localIndex)
     }
     mutating func visitLocalTee(localIndex: UInt32) throws {
-        try encodeInstruction(0x22, nil)
+        try encodeInstruction([0x22])
         try encodeImmediates(localIndex: localIndex)
     }
     mutating func visitGlobalGet(globalIndex: UInt32) throws {
-        try encodeInstruction(0x23, nil)
+        try encodeInstruction([0x23])
         try encodeImmediates(globalIndex: globalIndex)
     }
     mutating func visitGlobalSet(globalIndex: UInt32) throws {
-        try encodeInstruction(0x24, nil)
+        try encodeInstruction([0x24])
         try encodeImmediates(globalIndex: globalIndex)
     }
     mutating func visitLoad(_ load: Instruction.Load, memarg: MemArg) throws {
-        let (prefix, opcode): (UInt8?, UInt8)
+        let opcode: [UInt8]
         switch load {
-        case .i32Load: (prefix, opcode) = (nil, 0x28)
-        case .i64Load: (prefix, opcode) = (nil, 0x29)
-        case .f32Load: (prefix, opcode) = (nil, 0x2A)
-        case .f64Load: (prefix, opcode) = (nil, 0x2B)
-        case .i32Load8S: (prefix, opcode) = (nil, 0x2C)
-        case .i32Load8U: (prefix, opcode) = (nil, 0x2D)
-        case .i32Load16S: (prefix, opcode) = (nil, 0x2E)
-        case .i32Load16U: (prefix, opcode) = (nil, 0x2F)
-        case .i64Load8S: (prefix, opcode) = (nil, 0x30)
-        case .i64Load8U: (prefix, opcode) = (nil, 0x31)
-        case .i64Load16S: (prefix, opcode) = (nil, 0x32)
-        case .i64Load16U: (prefix, opcode) = (nil, 0x33)
-        case .i64Load32S: (prefix, opcode) = (nil, 0x34)
-        case .i64Load32U: (prefix, opcode) = (nil, 0x35)
+        case .i32Load: opcode = [0x28]
+        case .i64Load: opcode = [0x29]
+        case .f32Load: opcode = [0x2A]
+        case .f64Load: opcode = [0x2B]
+        case .i32Load8S: opcode = [0x2C]
+        case .i32Load8U: opcode = [0x2D]
+        case .i32Load16S: opcode = [0x2E]
+        case .i32Load16U: opcode = [0x2F]
+        case .i64Load8S: opcode = [0x30]
+        case .i64Load8U: opcode = [0x31]
+        case .i64Load16S: opcode = [0x32]
+        case .i64Load16U: opcode = [0x33]
+        case .i64Load32S: opcode = [0x34]
+        case .i64Load32U: opcode = [0x35]
         }
 
-        try encodeInstruction(opcode, prefix)
+        try encodeInstruction(opcode)
         try encodeImmediates(memarg: memarg)
     }
     mutating func visitStore(_ store: Instruction.Store, memarg: MemArg) throws {
-        let (prefix, opcode): (UInt8?, UInt8)
+        let opcode: [UInt8]
         switch store {
-        case .i32Store: (prefix, opcode) = (nil, 0x36)
-        case .i64Store: (prefix, opcode) = (nil, 0x37)
-        case .f32Store: (prefix, opcode) = (nil, 0x38)
-        case .f64Store: (prefix, opcode) = (nil, 0x39)
-        case .i32Store8: (prefix, opcode) = (nil, 0x3A)
-        case .i32Store16: (prefix, opcode) = (nil, 0x3B)
-        case .i64Store8: (prefix, opcode) = (nil, 0x3C)
-        case .i64Store16: (prefix, opcode) = (nil, 0x3D)
-        case .i64Store32: (prefix, opcode) = (nil, 0x3E)
+        case .i32Store: opcode = [0x36]
+        case .i64Store: opcode = [0x37]
+        case .f32Store: opcode = [0x38]
+        case .f64Store: opcode = [0x39]
+        case .i32Store8: opcode = [0x3A]
+        case .i32Store16: opcode = [0x3B]
+        case .i64Store8: opcode = [0x3C]
+        case .i64Store16: opcode = [0x3D]
+        case .i64Store32: opcode = [0x3E]
         }
 
-        try encodeInstruction(opcode, prefix)
+        try encodeInstruction(opcode)
         try encodeImmediates(memarg: memarg)
     }
     mutating func visitMemorySize(memory: UInt32) throws {
-        try encodeInstruction(0x3F, nil)
+        try encodeInstruction([0x3F])
         try encodeImmediates(memory: memory)
     }
     mutating func visitMemoryGrow(memory: UInt32) throws {
-        try encodeInstruction(0x40, nil)
+        try encodeInstruction([0x40])
         try encodeImmediates(memory: memory)
     }
     mutating func visitI32Const(value: Int32) throws {
-        try encodeInstruction(0x41, nil)
+        try encodeInstruction([0x41])
         try encodeImmediates(value: value)
     }
     mutating func visitI64Const(value: Int64) throws {
-        try encodeInstruction(0x42, nil)
+        try encodeInstruction([0x42])
         try encodeImmediates(value: value)
     }
     mutating func visitF32Const(value: IEEE754.Float32) throws {
-        try encodeInstruction(0x43, nil)
+        try encodeInstruction([0x43])
         try encodeImmediates(value: value)
     }
     mutating func visitF64Const(value: IEEE754.Float64) throws {
-        try encodeInstruction(0x44, nil)
+        try encodeInstruction([0x44])
         try encodeImmediates(value: value)
     }
     mutating func visitRefNull(type: ReferenceType) throws {
-        try encodeInstruction(0xD0, nil)
+        try encodeInstruction([0xD0])
         try encodeImmediates(type: type)
     }
-    mutating func visitRefIsNull() throws { try encodeInstruction(0xD1, nil) }
+    mutating func visitRefIsNull() throws { try encodeInstruction([0xD1]) }
     mutating func visitRefFunc(functionIndex: UInt32) throws {
-        try encodeInstruction(0xD2, nil)
+        try encodeInstruction([0xD2])
         try encodeImmediates(functionIndex: functionIndex)
     }
-    mutating func visitI32Eqz() throws { try encodeInstruction(0x45, nil) }
+    mutating func visitI32Eqz() throws { try encodeInstruction([0x45]) }
     mutating func visitCmp(_ cmp: Instruction.Cmp) throws {
-        let (prefix, opcode): (UInt8?, UInt8)
+        let opcode: [UInt8]
         switch cmp {
-        case .i32Eq: (prefix, opcode) = (nil, 0x46)
-        case .i32Ne: (prefix, opcode) = (nil, 0x47)
-        case .i32LtS: (prefix, opcode) = (nil, 0x48)
-        case .i32LtU: (prefix, opcode) = (nil, 0x49)
-        case .i32GtS: (prefix, opcode) = (nil, 0x4A)
-        case .i32GtU: (prefix, opcode) = (nil, 0x4B)
-        case .i32LeS: (prefix, opcode) = (nil, 0x4C)
-        case .i32LeU: (prefix, opcode) = (nil, 0x4D)
-        case .i32GeS: (prefix, opcode) = (nil, 0x4E)
-        case .i32GeU: (prefix, opcode) = (nil, 0x4F)
-        case .i64Eq: (prefix, opcode) = (nil, 0x51)
-        case .i64Ne: (prefix, opcode) = (nil, 0x52)
-        case .i64LtS: (prefix, opcode) = (nil, 0x53)
-        case .i64LtU: (prefix, opcode) = (nil, 0x54)
-        case .i64GtS: (prefix, opcode) = (nil, 0x55)
-        case .i64GtU: (prefix, opcode) = (nil, 0x56)
-        case .i64LeS: (prefix, opcode) = (nil, 0x57)
-        case .i64LeU: (prefix, opcode) = (nil, 0x58)
-        case .i64GeS: (prefix, opcode) = (nil, 0x59)
-        case .i64GeU: (prefix, opcode) = (nil, 0x5A)
-        case .f32Eq: (prefix, opcode) = (nil, 0x5B)
-        case .f32Ne: (prefix, opcode) = (nil, 0x5C)
-        case .f32Lt: (prefix, opcode) = (nil, 0x5D)
-        case .f32Gt: (prefix, opcode) = (nil, 0x5E)
-        case .f32Le: (prefix, opcode) = (nil, 0x5F)
-        case .f32Ge: (prefix, opcode) = (nil, 0x60)
-        case .f64Eq: (prefix, opcode) = (nil, 0x61)
-        case .f64Ne: (prefix, opcode) = (nil, 0x62)
-        case .f64Lt: (prefix, opcode) = (nil, 0x63)
-        case .f64Gt: (prefix, opcode) = (nil, 0x64)
-        case .f64Le: (prefix, opcode) = (nil, 0x65)
-        case .f64Ge: (prefix, opcode) = (nil, 0x66)
+        case .i32Eq: opcode = [0x46]
+        case .i32Ne: opcode = [0x47]
+        case .i32LtS: opcode = [0x48]
+        case .i32LtU: opcode = [0x49]
+        case .i32GtS: opcode = [0x4A]
+        case .i32GtU: opcode = [0x4B]
+        case .i32LeS: opcode = [0x4C]
+        case .i32LeU: opcode = [0x4D]
+        case .i32GeS: opcode = [0x4E]
+        case .i32GeU: opcode = [0x4F]
+        case .i64Eq: opcode = [0x51]
+        case .i64Ne: opcode = [0x52]
+        case .i64LtS: opcode = [0x53]
+        case .i64LtU: opcode = [0x54]
+        case .i64GtS: opcode = [0x55]
+        case .i64GtU: opcode = [0x56]
+        case .i64LeS: opcode = [0x57]
+        case .i64LeU: opcode = [0x58]
+        case .i64GeS: opcode = [0x59]
+        case .i64GeU: opcode = [0x5A]
+        case .f32Eq: opcode = [0x5B]
+        case .f32Ne: opcode = [0x5C]
+        case .f32Lt: opcode = [0x5D]
+        case .f32Gt: opcode = [0x5E]
+        case .f32Le: opcode = [0x5F]
+        case .f32Ge: opcode = [0x60]
+        case .f64Eq: opcode = [0x61]
+        case .f64Ne: opcode = [0x62]
+        case .f64Lt: opcode = [0x63]
+        case .f64Gt: opcode = [0x64]
+        case .f64Le: opcode = [0x65]
+        case .f64Ge: opcode = [0x66]
         }
 
-        try encodeInstruction(opcode, prefix)
+        try encodeInstruction(opcode)
     }
-    mutating func visitI64Eqz() throws { try encodeInstruction(0x50, nil) }
+    mutating func visitI64Eqz() throws { try encodeInstruction([0x50]) }
     mutating func visitUnary(_ unary: Instruction.Unary) throws {
-        let (prefix, opcode): (UInt8?, UInt8)
+        let opcode: [UInt8]
         switch unary {
-        case .i32Clz: (prefix, opcode) = (nil, 0x67)
-        case .i32Ctz: (prefix, opcode) = (nil, 0x68)
-        case .i32Popcnt: (prefix, opcode) = (nil, 0x69)
-        case .i64Clz: (prefix, opcode) = (nil, 0x79)
-        case .i64Ctz: (prefix, opcode) = (nil, 0x7A)
-        case .i64Popcnt: (prefix, opcode) = (nil, 0x7B)
-        case .f32Abs: (prefix, opcode) = (nil, 0x8B)
-        case .f32Neg: (prefix, opcode) = (nil, 0x8C)
-        case .f32Ceil: (prefix, opcode) = (nil, 0x8D)
-        case .f32Floor: (prefix, opcode) = (nil, 0x8E)
-        case .f32Trunc: (prefix, opcode) = (nil, 0x8F)
-        case .f32Nearest: (prefix, opcode) = (nil, 0x90)
-        case .f32Sqrt: (prefix, opcode) = (nil, 0x91)
-        case .f64Abs: (prefix, opcode) = (nil, 0x99)
-        case .f64Neg: (prefix, opcode) = (nil, 0x9A)
-        case .f64Ceil: (prefix, opcode) = (nil, 0x9B)
-        case .f64Floor: (prefix, opcode) = (nil, 0x9C)
-        case .f64Trunc: (prefix, opcode) = (nil, 0x9D)
-        case .f64Nearest: (prefix, opcode) = (nil, 0x9E)
-        case .f64Sqrt: (prefix, opcode) = (nil, 0x9F)
-        case .i32Extend8S: (prefix, opcode) = (nil, 0xC0)
-        case .i32Extend16S: (prefix, opcode) = (nil, 0xC1)
-        case .i64Extend8S: (prefix, opcode) = (nil, 0xC2)
-        case .i64Extend16S: (prefix, opcode) = (nil, 0xC3)
-        case .i64Extend32S: (prefix, opcode) = (nil, 0xC4)
+        case .i32Clz: opcode = [0x67]
+        case .i32Ctz: opcode = [0x68]
+        case .i32Popcnt: opcode = [0x69]
+        case .i64Clz: opcode = [0x79]
+        case .i64Ctz: opcode = [0x7A]
+        case .i64Popcnt: opcode = [0x7B]
+        case .f32Abs: opcode = [0x8B]
+        case .f32Neg: opcode = [0x8C]
+        case .f32Ceil: opcode = [0x8D]
+        case .f32Floor: opcode = [0x8E]
+        case .f32Trunc: opcode = [0x8F]
+        case .f32Nearest: opcode = [0x90]
+        case .f32Sqrt: opcode = [0x91]
+        case .f64Abs: opcode = [0x99]
+        case .f64Neg: opcode = [0x9A]
+        case .f64Ceil: opcode = [0x9B]
+        case .f64Floor: opcode = [0x9C]
+        case .f64Trunc: opcode = [0x9D]
+        case .f64Nearest: opcode = [0x9E]
+        case .f64Sqrt: opcode = [0x9F]
+        case .i32Extend8S: opcode = [0xC0]
+        case .i32Extend16S: opcode = [0xC1]
+        case .i64Extend8S: opcode = [0xC2]
+        case .i64Extend16S: opcode = [0xC3]
+        case .i64Extend32S: opcode = [0xC4]
         }
 
-        try encodeInstruction(opcode, prefix)
+        try encodeInstruction(opcode)
     }
     mutating func visitBinary(_ binary: Instruction.Binary) throws {
-        let (prefix, opcode): (UInt8?, UInt8)
+        let opcode: [UInt8]
         switch binary {
-        case .i32Add: (prefix, opcode) = (nil, 0x6A)
-        case .i32Sub: (prefix, opcode) = (nil, 0x6B)
-        case .i32Mul: (prefix, opcode) = (nil, 0x6C)
-        case .i32DivS: (prefix, opcode) = (nil, 0x6D)
-        case .i32DivU: (prefix, opcode) = (nil, 0x6E)
-        case .i32RemS: (prefix, opcode) = (nil, 0x6F)
-        case .i32RemU: (prefix, opcode) = (nil, 0x70)
-        case .i32And: (prefix, opcode) = (nil, 0x71)
-        case .i32Or: (prefix, opcode) = (nil, 0x72)
-        case .i32Xor: (prefix, opcode) = (nil, 0x73)
-        case .i32Shl: (prefix, opcode) = (nil, 0x74)
-        case .i32ShrS: (prefix, opcode) = (nil, 0x75)
-        case .i32ShrU: (prefix, opcode) = (nil, 0x76)
-        case .i32Rotl: (prefix, opcode) = (nil, 0x77)
-        case .i32Rotr: (prefix, opcode) = (nil, 0x78)
-        case .i64Add: (prefix, opcode) = (nil, 0x7C)
-        case .i64Sub: (prefix, opcode) = (nil, 0x7D)
-        case .i64Mul: (prefix, opcode) = (nil, 0x7E)
-        case .i64DivS: (prefix, opcode) = (nil, 0x7F)
-        case .i64DivU: (prefix, opcode) = (nil, 0x80)
-        case .i64RemS: (prefix, opcode) = (nil, 0x81)
-        case .i64RemU: (prefix, opcode) = (nil, 0x82)
-        case .i64And: (prefix, opcode) = (nil, 0x83)
-        case .i64Or: (prefix, opcode) = (nil, 0x84)
-        case .i64Xor: (prefix, opcode) = (nil, 0x85)
-        case .i64Shl: (prefix, opcode) = (nil, 0x86)
-        case .i64ShrS: (prefix, opcode) = (nil, 0x87)
-        case .i64ShrU: (prefix, opcode) = (nil, 0x88)
-        case .i64Rotl: (prefix, opcode) = (nil, 0x89)
-        case .i64Rotr: (prefix, opcode) = (nil, 0x8A)
-        case .f32Add: (prefix, opcode) = (nil, 0x92)
-        case .f32Sub: (prefix, opcode) = (nil, 0x93)
-        case .f32Mul: (prefix, opcode) = (nil, 0x94)
-        case .f32Div: (prefix, opcode) = (nil, 0x95)
-        case .f32Min: (prefix, opcode) = (nil, 0x96)
-        case .f32Max: (prefix, opcode) = (nil, 0x97)
-        case .f32Copysign: (prefix, opcode) = (nil, 0x98)
-        case .f64Add: (prefix, opcode) = (nil, 0xA0)
-        case .f64Sub: (prefix, opcode) = (nil, 0xA1)
-        case .f64Mul: (prefix, opcode) = (nil, 0xA2)
-        case .f64Div: (prefix, opcode) = (nil, 0xA3)
-        case .f64Min: (prefix, opcode) = (nil, 0xA4)
-        case .f64Max: (prefix, opcode) = (nil, 0xA5)
-        case .f64Copysign: (prefix, opcode) = (nil, 0xA6)
+        case .i32Add: opcode = [0x6A]
+        case .i32Sub: opcode = [0x6B]
+        case .i32Mul: opcode = [0x6C]
+        case .i32DivS: opcode = [0x6D]
+        case .i32DivU: opcode = [0x6E]
+        case .i32RemS: opcode = [0x6F]
+        case .i32RemU: opcode = [0x70]
+        case .i32And: opcode = [0x71]
+        case .i32Or: opcode = [0x72]
+        case .i32Xor: opcode = [0x73]
+        case .i32Shl: opcode = [0x74]
+        case .i32ShrS: opcode = [0x75]
+        case .i32ShrU: opcode = [0x76]
+        case .i32Rotl: opcode = [0x77]
+        case .i32Rotr: opcode = [0x78]
+        case .i64Add: opcode = [0x7C]
+        case .i64Sub: opcode = [0x7D]
+        case .i64Mul: opcode = [0x7E]
+        case .i64DivS: opcode = [0x7F]
+        case .i64DivU: opcode = [0x80]
+        case .i64RemS: opcode = [0x81]
+        case .i64RemU: opcode = [0x82]
+        case .i64And: opcode = [0x83]
+        case .i64Or: opcode = [0x84]
+        case .i64Xor: opcode = [0x85]
+        case .i64Shl: opcode = [0x86]
+        case .i64ShrS: opcode = [0x87]
+        case .i64ShrU: opcode = [0x88]
+        case .i64Rotl: opcode = [0x89]
+        case .i64Rotr: opcode = [0x8A]
+        case .f32Add: opcode = [0x92]
+        case .f32Sub: opcode = [0x93]
+        case .f32Mul: opcode = [0x94]
+        case .f32Div: opcode = [0x95]
+        case .f32Min: opcode = [0x96]
+        case .f32Max: opcode = [0x97]
+        case .f32Copysign: opcode = [0x98]
+        case .f64Add: opcode = [0xA0]
+        case .f64Sub: opcode = [0xA1]
+        case .f64Mul: opcode = [0xA2]
+        case .f64Div: opcode = [0xA3]
+        case .f64Min: opcode = [0xA4]
+        case .f64Max: opcode = [0xA5]
+        case .f64Copysign: opcode = [0xA6]
         }
 
-        try encodeInstruction(opcode, prefix)
+        try encodeInstruction(opcode)
     }
     mutating func visitConversion(_ conversion: Instruction.Conversion) throws {
-        let (prefix, opcode): (UInt8?, UInt8)
+        let opcode: [UInt8]
         switch conversion {
-        case .i32WrapI64: (prefix, opcode) = (nil, 0xA7)
-        case .i32TruncF32S: (prefix, opcode) = (nil, 0xA8)
-        case .i32TruncF32U: (prefix, opcode) = (nil, 0xA9)
-        case .i32TruncF64S: (prefix, opcode) = (nil, 0xAA)
-        case .i32TruncF64U: (prefix, opcode) = (nil, 0xAB)
-        case .i64ExtendI32S: (prefix, opcode) = (nil, 0xAC)
-        case .i64ExtendI32U: (prefix, opcode) = (nil, 0xAD)
-        case .i64TruncF32S: (prefix, opcode) = (nil, 0xAE)
-        case .i64TruncF32U: (prefix, opcode) = (nil, 0xAF)
-        case .i64TruncF64S: (prefix, opcode) = (nil, 0xB0)
-        case .i64TruncF64U: (prefix, opcode) = (nil, 0xB1)
-        case .f32ConvertI32S: (prefix, opcode) = (nil, 0xB2)
-        case .f32ConvertI32U: (prefix, opcode) = (nil, 0xB3)
-        case .f32ConvertI64S: (prefix, opcode) = (nil, 0xB4)
-        case .f32ConvertI64U: (prefix, opcode) = (nil, 0xB5)
-        case .f32DemoteF64: (prefix, opcode) = (nil, 0xB6)
-        case .f64ConvertI32S: (prefix, opcode) = (nil, 0xB7)
-        case .f64ConvertI32U: (prefix, opcode) = (nil, 0xB8)
-        case .f64ConvertI64S: (prefix, opcode) = (nil, 0xB9)
-        case .f64ConvertI64U: (prefix, opcode) = (nil, 0xBA)
-        case .f64PromoteF32: (prefix, opcode) = (nil, 0xBB)
-        case .i32ReinterpretF32: (prefix, opcode) = (nil, 0xBC)
-        case .i64ReinterpretF64: (prefix, opcode) = (nil, 0xBD)
-        case .f32ReinterpretI32: (prefix, opcode) = (nil, 0xBE)
-        case .f64ReinterpretI64: (prefix, opcode) = (nil, 0xBF)
-        case .i32TruncSatF32S: (prefix, opcode) = (0xFC, 0x00)
-        case .i32TruncSatF32U: (prefix, opcode) = (0xFC, 0x01)
-        case .i32TruncSatF64S: (prefix, opcode) = (0xFC, 0x02)
-        case .i32TruncSatF64U: (prefix, opcode) = (0xFC, 0x03)
-        case .i64TruncSatF32S: (prefix, opcode) = (0xFC, 0x04)
-        case .i64TruncSatF32U: (prefix, opcode) = (0xFC, 0x05)
-        case .i64TruncSatF64S: (prefix, opcode) = (0xFC, 0x06)
-        case .i64TruncSatF64U: (prefix, opcode) = (0xFC, 0x07)
+        case .i32WrapI64: opcode = [0xA7]
+        case .i32TruncF32S: opcode = [0xA8]
+        case .i32TruncF32U: opcode = [0xA9]
+        case .i32TruncF64S: opcode = [0xAA]
+        case .i32TruncF64U: opcode = [0xAB]
+        case .i64ExtendI32S: opcode = [0xAC]
+        case .i64ExtendI32U: opcode = [0xAD]
+        case .i64TruncF32S: opcode = [0xAE]
+        case .i64TruncF32U: opcode = [0xAF]
+        case .i64TruncF64S: opcode = [0xB0]
+        case .i64TruncF64U: opcode = [0xB1]
+        case .f32ConvertI32S: opcode = [0xB2]
+        case .f32ConvertI32U: opcode = [0xB3]
+        case .f32ConvertI64S: opcode = [0xB4]
+        case .f32ConvertI64U: opcode = [0xB5]
+        case .f32DemoteF64: opcode = [0xB6]
+        case .f64ConvertI32S: opcode = [0xB7]
+        case .f64ConvertI32U: opcode = [0xB8]
+        case .f64ConvertI64S: opcode = [0xB9]
+        case .f64ConvertI64U: opcode = [0xBA]
+        case .f64PromoteF32: opcode = [0xBB]
+        case .i32ReinterpretF32: opcode = [0xBC]
+        case .i64ReinterpretF64: opcode = [0xBD]
+        case .f32ReinterpretI32: opcode = [0xBE]
+        case .f64ReinterpretI64: opcode = [0xBF]
+        case .i32TruncSatF32S: opcode = [0xFC, 0x00]
+        case .i32TruncSatF32U: opcode = [0xFC, 0x01]
+        case .i32TruncSatF64S: opcode = [0xFC, 0x02]
+        case .i32TruncSatF64U: opcode = [0xFC, 0x03]
+        case .i64TruncSatF32S: opcode = [0xFC, 0x04]
+        case .i64TruncSatF32U: opcode = [0xFC, 0x05]
+        case .i64TruncSatF64S: opcode = [0xFC, 0x06]
+        case .i64TruncSatF64U: opcode = [0xFC, 0x07]
         }
 
-        try encodeInstruction(opcode, prefix)
+        try encodeInstruction(opcode)
     }
     mutating func visitMemoryInit(dataIndex: UInt32) throws {
-        try encodeInstruction(0x08, 0xFC)
+        try encodeInstruction([0xFC, 0x08])
         try encodeImmediates(dataIndex: dataIndex)
     }
     mutating func visitDataDrop(dataIndex: UInt32) throws {
-        try encodeInstruction(0x09, 0xFC)
+        try encodeInstruction([0xFC, 0x09])
         try encodeImmediates(dataIndex: dataIndex)
     }
     mutating func visitMemoryCopy(dstMem: UInt32, srcMem: UInt32) throws {
-        try encodeInstruction(0x0A, 0xFC)
+        try encodeInstruction([0xFC, 0x0A])
         try encodeImmediates(dstMem: dstMem, srcMem: srcMem)
     }
     mutating func visitMemoryFill(memory: UInt32) throws {
-        try encodeInstruction(0x0B, 0xFC)
+        try encodeInstruction([0xFC, 0x0B])
         try encodeImmediates(memory: memory)
     }
     mutating func visitTableInit(elemIndex: UInt32, table: UInt32) throws {
-        try encodeInstruction(0x0C, 0xFC)
+        try encodeInstruction([0xFC, 0x0C])
         try encodeImmediates(elemIndex: elemIndex, table: table)
     }
     mutating func visitElemDrop(elemIndex: UInt32) throws {
-        try encodeInstruction(0x0D, 0xFC)
+        try encodeInstruction([0xFC, 0x0D])
         try encodeImmediates(elemIndex: elemIndex)
     }
     mutating func visitTableCopy(dstTable: UInt32, srcTable: UInt32) throws {
-        try encodeInstruction(0x0E, 0xFC)
+        try encodeInstruction([0xFC, 0x0E])
         try encodeImmediates(dstTable: dstTable, srcTable: srcTable)
     }
     mutating func visitTableFill(table: UInt32) throws {
-        try encodeInstruction(0x11, 0xFC)
+        try encodeInstruction([0xFC, 0x11])
         try encodeImmediates(table: table)
     }
     mutating func visitTableGet(table: UInt32) throws {
-        try encodeInstruction(0x25, nil)
+        try encodeInstruction([0x25])
         try encodeImmediates(table: table)
     }
     mutating func visitTableSet(table: UInt32) throws {
-        try encodeInstruction(0x26, nil)
+        try encodeInstruction([0x26])
         try encodeImmediates(table: table)
     }
     mutating func visitTableGrow(table: UInt32) throws {
-        try encodeInstruction(0x0F, 0xFC)
+        try encodeInstruction([0xFC, 0x0F])
         try encodeImmediates(table: table)
     }
     mutating func visitTableSize(table: UInt32) throws {
-        try encodeInstruction(0x10, 0xFC)
+        try encodeInstruction([0xFC, 0x10])
         try encodeImmediates(table: table)
     }
 }
