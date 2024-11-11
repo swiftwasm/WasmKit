@@ -71,6 +71,8 @@ class WishYouWereFastBenchmark(Benchmark):
 
         def add_dir(subpath):
             path = os.path.join(suites_path, subpath)
+            if not os.path.exists(path):
+                return
             for filename in os.listdir(path):
                 if filename.endswith(".wasm"):
                     targets.append(os.path.join(path, filename))
