@@ -6,7 +6,7 @@ let package = Package(
     name: "Benchmarks",
     platforms: [.macOS(.v13)],
     dependencies: [
-        .package(path: "../"),
+        .package(name: "WasmKit", path: "../"),
         .package(url: "https://github.com/ordo-one/package-benchmark", .upToNextMajor(from: "1.4.0")),
     ]
 )
