@@ -16,7 +16,7 @@
   },
   "swift-format": {
     "repository": "https://github.com/swiftlang/swift-format.git",
-    "revision": "b268009b0d1182f9a573311c1a69eee9a7fd3d3f",
+    "revision": "c7a8b752e35d96577d1e9191d27cd9ea57dce2f2",
     "categories": ["default"]
   },
   "wish-you-were-fast": {
