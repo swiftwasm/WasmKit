@@ -523,17 +523,18 @@ enum WasmGen {
         var code = """
         import WasmTypes
 
+        @usableFromInline
         protocol BinaryInstructionDecoder {
             /// Claim the next byte to be decoded
-            func claimNextByte() throws -> UInt8
+            @inlinable func claimNextByte() throws -> UInt8
             /// Visit unknown instruction
-            func visitUnknown(_ opcode: [UInt8]) throws
+            @inlinable func visitUnknown(_ opcode: [UInt8]) throws
 
         """
         for instruction in instructions.categorized {
             guard !instruction.immediates.isEmpty else { continue }
             code += "    /// Decode \(instruction.description) immediates\n"
-            code += "    mutating func \(instruction.visitMethodName)("
+            code += "    @inlinable mutating func \(instruction.visitMethodName)("
             if let categoryType = instruction.categoryTypeName {
                 code += "_: Instruction.\(categoryType)"
             }
@@ -551,18 +552,17 @@ enum WasmGen {
         """
 
         code += """
-        extension BinaryInstructionDecoder {
-            @usableFromInline
-            mutating func parseBinaryInstruction<V: InstructionVisitor>(visitor: inout V) throws -> Bool {
+        @inlinable
+        func parseBinaryInstruction<V: InstructionVisitor, D: BinaryInstructionDecoder>(visitor: inout V, decoder: inout D) throws -> Bool {
         """
 
         func renderSwitchCase(_ root: Trie, depth: Int = 0) {
-            let indent = String(repeating: " ", count: (depth + 2) * 4)
+            let indent = String(repeating: " ", count: (depth + 1) * 4)
             func opcodeByteName(_ depth: Int) -> String { "opcode\(depth)" }
             let opcodeByte = opcodeByteName(depth)
             code += """
 
-            \(indent)let \(opcodeByte) = try claimNextByte()
+            \(indent)let \(opcodeByte) = try decoder.claimNextByte()
             \(indent)switch \(opcodeByte) {
 
             """
@@ -572,7 +572,7 @@ enum WasmGen {
                     if !instruction.immediates.isEmpty {
                         code += "\(indent)    let ("
                         code += instruction.immediates.map(\.label).joined(separator: ", ")
-                        code += ") = try \(instruction.visitMethodName)("
+                        code += ") = try decoder.\(instruction.visitMethodName)("
                         if instruction.category != nil {
                             code += ".\(instruction.name.enumCase)"
                         }
@@ -603,15 +603,14 @@ enum WasmGen {
                 }
             }
             code += "\(indent)default:\n"
-            code += "\(indent)    try visitUnknown("
+            code += "\(indent)    try decoder.visitUnknown("
             code += "[" + (0...depth).map { opcodeByteName($0) }.joined(separator: ", ") + "]"
             code += ")\n"
             code += "\(indent)}\n"
         }
 
         renderSwitchCase(root)
-        code += "        return false\n"
-        code += "    }\n"
+        code += "    return false\n"
         code += "}\n"
         return code
     }
