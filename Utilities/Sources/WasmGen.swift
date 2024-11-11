@@ -494,6 +494,128 @@ enum WasmGen {
         return code
     }
 
+    static func generateBinaryInstructionDecoder(_ instructions: InstructionSet) -> String {
+        struct Trie {
+            var children: [UInt8: Trie] = [:]
+            /// An instruction corresponding to this terminal trie node
+            let instruction: Instruction?
+
+            init(instruction: Instruction? = nil) {
+                self.instruction = instruction
+            }
+
+            mutating func insert<S: Collection>(_ opcode: S, instruction: Instruction) where S.Element == UInt8 {
+                guard let first = opcode.first else { return }
+                let isTermination = opcode.count == 1
+                if isTermination {
+                    assert(children[first] == nil)
+                    children[first] = Trie(instruction: instruction)
+                } else {
+                    children[first, default: Trie(instruction: nil)].insert(opcode.dropFirst(), instruction: instruction)
+                }
+            }
+        }
+
+        var root = Trie()
+        for instruction in instructions {
+            root.insert(instruction.opcode, instruction: instruction)
+        }
+        var code = """
+        import WasmTypes
+
+        protocol BinaryInstructionDecoder {
+            /// Claim the next byte to be decoded
+            func claimNextByte() throws -> UInt8
+            /// Visit unknown instruction
+            func visitUnknown(_ opcode: [UInt8]) throws
+
+        """
+        for instruction in instructions.categorized {
+            guard !instruction.immediates.isEmpty else { continue }
+            code += "    /// Decode \(instruction.description) immediates\n"
+            code += "    mutating func \(instruction.visitMethodName)("
+            if let categoryType = instruction.categoryTypeName {
+                code += "_: Instruction.\(categoryType)"
+            }
+            code += ") throws -> "
+            if instruction.immediates.count == 1 {
+                code += "\(instruction.immediates[0].type)"
+            } else {
+                code += "(" + instruction.immediates.map { "\($0.label): \($0.type)" }.joined(separator: ", ") + ")"
+            }
+            code += "\n"
+        }
+        code += """
+        }
+
+        """
+
+        code += """
+        extension BinaryInstructionDecoder {
+            @usableFromInline
+            mutating func parseBinaryInstruction<V: InstructionVisitor>(visitor: inout V) throws -> Bool {
+        """
+
+        func renderSwitchCase(_ root: Trie, depth: Int = 0) {
+            let indent = String(repeating: " ", count: (depth + 2) * 4)
+            func opcodeByteName(_ depth: Int) -> String { "opcode\(depth)" }
+            let opcodeByte = opcodeByteName(depth)
+            code += """
+
+            \(indent)let \(opcodeByte) = try claimNextByte()
+            \(indent)switch \(opcodeByte) {
+
+            """
+            for (opcode, trie) in root.children.sorted(by: { $0.key < $1.key }) {
+                code += "\(indent)case \(String(format: "0x%02X", opcode)):\n"
+                if let instruction = trie.instruction {
+                    if !instruction.immediates.isEmpty {
+                        code += "\(indent)    let ("
+                        code += instruction.immediates.map(\.label).joined(separator: ", ")
+                        code += ") = try \(instruction.visitMethodName)("
+                        if instruction.category != nil {
+                            code += ".\(instruction.name.enumCase)"
+                        }
+                        code += ")\n"
+                    }
+
+                    code += "\(indent)    try visitor.\(instruction.visitMethodName)("
+                    var arguments: [(label: String?, value: String)] = []
+                    if instruction.category != nil {
+                        arguments.append((label: nil, value: ".\(instruction.name.enumCase)"))
+                    }
+                    for immediate in instruction.immediates {
+                        arguments.append((label: immediate.label, value: immediate.label))
+                    }
+                    code += arguments.map { i in
+                        if let label = i.label {
+                            return "\(label): \(i.value)"
+                        } else {
+                            return i.value
+                        }
+                    }.joined(separator: ", ")
+                    code += ")\n"
+                    if instruction.name.text == "end" {
+                        code += "\(indent)    return true\n"
+                    }
+                } else {
+                    renderSwitchCase(trie, depth: depth + 1)
+                }
+            }
+            code += "\(indent)default:\n"
+            code += "\(indent)    try visitUnknown("
+            code += "[" + (0...depth).map { opcodeByteName($0) }.joined(separator: ", ") + "]"
+            code += ")\n"
+            code += "\(indent)}\n"
+        }
+
+        renderSwitchCase(root)
+        code += "        return false\n"
+        code += "    }\n"
+        code += "}\n"
+        return code
+    }
+
     static func formatInstructionSet(_ instructions: InstructionSet) -> String {
         var json = ""
         json += "[\n"
@@ -594,6 +716,10 @@ enum WasmGen {
                     + "\n\n"
                     + generateVisitorProtocol(instructions)
                     + "\n"
+            ),
+            GeneratedFile(
+                projectSources + ["WasmParser", "BinaryInstructionDecoder.swift"],
+                header + generateBinaryInstructionDecoder(instructions)
             ),
             GeneratedFile(
                 projectSources + ["WAT", "ParseTextInstruction.swift"],
