@@ -122,18 +122,17 @@ extension Code {
     /// ````
     @inlinable
     public func parseExpression<V: InstructionVisitor>(visitor: inout V) throws {
-        let parser = Parser(stream: StaticByteStream(bytes: self.expression), features: self.features)
-        var lastCode: InstructionCode?
+        var parser = Parser(stream: StaticByteStream(bytes: self.expression), features: self.features)
+        var lastIsEnd: Bool?
         while try !parser.stream.hasReachedEnd() {
-            lastCode = try parser.parseInstruction(visitor: &visitor)
+            lastIsEnd = try parser.parseInstruction(visitor: &visitor)
         }
-        guard lastCode == .end else {
+        guard lastIsEnd == true else {
             throw parser.makeError(.endOpcodeExpected)
         }
     }
 }
 
-// TODO: Move `doParseInstruction` under `ExpressionParser` struct
 @_documentation(visibility: internal)
 public struct ExpressionParser {
     /// The byte offset of the code in the module
@@ -143,9 +142,9 @@ public struct ExpressionParser {
     /// is not a part of the initial `FileHandleStream` buffer
     let initialStreamOffset: Int
     @usableFromInline
-    let parser: Parser<StaticByteStream>
+    var parser: Parser<StaticByteStream>
     @usableFromInline
-    var lastCode: InstructionCode?
+    var isLastEnd: Bool?
 
     public var offset: Int {
         self.codeOffset + self.parser.offset - self.initialStreamOffset
@@ -162,10 +161,10 @@ public struct ExpressionParser {
 
     @inlinable
     public mutating func visit<V: InstructionVisitor>(visitor: inout V) throws -> Bool {
-        lastCode = try parser.parseInstruction(visitor: &visitor)
+        isLastEnd = try parser.parseInstruction(visitor: &visitor)
         let shouldContinue = try !parser.stream.hasReachedEnd()
         if !shouldContinue {
-            guard lastCode == .end else {
+            guard isLastEnd == true else {
                 throw WasmParserError(.endOpcodeExpected, offset: offset)
             }
         }
@@ -267,11 +266,6 @@ extension WasmParserError.Message {
         Self("Expected reference type but got \(actual)")
     }
 
-    @usableFromInline static func unimplementedInstruction(_ opcode: UInt8, suffix: UInt32? = nil) -> Self {
-        let suffixText = suffix.map { " with suffix \($0)" } ?? ""
-        return Self("Unimplemented instruction: \(opcode)\(suffixText)")
-    }
-
     @usableFromInline
     static func unexpectedElementKind(expected: UInt32, actual: UInt32) -> Self {
         Self("Unexpected element kind: expected \(expected) but got \(actual)")
@@ -291,7 +285,7 @@ extension WasmParserError.Message {
         Self("Section size mismatch: expected \(expected) but got \(actual)")
     }
 
-    @usableFromInline static func illegalOpcode(_ opcode: UInt8) -> Self {
+    @usableFromInline static func illegalOpcode(_ opcode: [UInt8]) -> Self {
         Self("Illegal opcode: \(opcode)")
     }
 
@@ -586,333 +580,147 @@ extension Parser {
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/instructions.html>
-extension Parser {
-    @inlinable
-    func parseInstruction<V: InstructionVisitor>(visitor v: inout V) throws -> InstructionCode {
-        let rawCode = try stream.consumeAny()
-        guard let code = InstructionCode(rawValue: rawCode) else {
-            throw makeError(.illegalOpcode(rawCode))
+extension Parser: BinaryInstructionDecoder {
+    func parseMemoryIndex() throws -> UInt32 {
+        let zero = try stream.consumeAny()
+        guard zero == 0x00 else {
+            throw makeError(.zeroExpected(actual: zero))
         }
-        try doParseInstruction(code: code, visitor: &v)
-        return code
+        return 0
     }
 
-    @inlinable
-    func doParseInstruction<V: InstructionVisitor>(code: InstructionCode, visitor v: inout V) throws {
-        switch code {
-        case .unreachable: return try v.visitUnreachable()
-        case .nop: return try v.visitNop()
-        case .block: return try v.visitBlock(blockType: try parseResultType())
-        case .loop: return try v.visitLoop(blockType: try parseResultType())
-        case .if: return try v.visitIf(blockType: try parseResultType())
-        case .else: return try v.visitElse()
-        case .end: return try v.visitEnd()
-        case .br:
-            let label: UInt32 = try parseUnsigned()
-            return try v.visitBr(relativeDepth: label)
-        case .br_if:
-            let label: UInt32 = try parseUnsigned()
-            return try v.visitBrIf(relativeDepth: label)
-        case .br_table:
-            let labelIndices: [UInt32] = try parseVector { try parseUnsigned() }
-            let labelIndex: UInt32 = try parseUnsigned()
-            return try v.visitBrTable(targets: BrTable(labelIndices: labelIndices, defaultIndex: labelIndex))
-        case .return:
-            return try v.visitReturn()
-        case .call:
-            let index: UInt32 = try parseUnsigned()
-            return try v.visitCall(functionIndex: index)
-        case .call_indirect:
-            let typeIndex: TypeIndex = try parseUnsigned()
-            if try !features.contains(.referenceTypes) && stream.peek() != 0 {
-                // Check that reserved byte is zero when reference-types is disabled
-                throw makeError(.malformedIndirectCall)
-            }
-            let tableIndex: TableIndex = try parseUnsigned()
-            return try v.visitCallIndirect(typeIndex: typeIndex, tableIndex: tableIndex)
-        case .drop: return try v.visitDrop()
-        case .select: return try v.visitSelect()
-        case .typed_select:
-            let results = try parseVector { try parseValueType() }
-            guard results.count == 1 else {
-                throw makeError(.invalidResultArity(expected: 1, actual: results.count))
-            }
-            return try v.visitTypedSelect(type: results[0])
+    func visitUnknown(_ opcode: [UInt8]) throws {
+        throw makeError(.illegalOpcode(opcode))
+    }
 
-        case .local_get:
-            let index: UInt32 = try parseUnsigned()
-            return try v.visitLocalGet(localIndex: index)
-        case .local_set:
-            let index: UInt32 = try parseUnsigned()
-            return try v.visitLocalSet(localIndex: index)
-        case .local_tee:
-            let index: UInt32 = try parseUnsigned()
-            return try v.visitLocalTee(localIndex: index)
-        case .global_get:
-            let index: UInt32 = try parseUnsigned()
-            return try v.visitGlobalGet(globalIndex: index)
-        case .global_set:
-            let index: UInt32 = try parseUnsigned()
-            return try v.visitGlobalSet(globalIndex: index)
+    mutating func visitBlock() throws -> BlockType { try parseResultType() }
+    mutating func visitLoop() throws -> BlockType { try parseResultType() }
+    mutating func visitIf() throws -> BlockType { try parseResultType() }
+    mutating func visitBr() throws -> UInt32 { try parseUnsigned() }
+    mutating func visitBrIf() throws -> UInt32 { try parseUnsigned() }
+    mutating func visitBrTable() throws -> BrTable {
+        let labelIndices: [UInt32] = try parseVector { try parseUnsigned() }
+        let labelIndex: UInt32 = try parseUnsigned()
+        return BrTable(labelIndices: labelIndices, defaultIndex: labelIndex)
+    }
+    mutating func visitCall() throws -> UInt32 { try parseUnsigned() }
 
-        case .i32_load: return try v.visitLoad(.i32Load, memarg: try parseMemarg())
-        case .i64_load: return try v.visitLoad(.i64Load, memarg: try parseMemarg())
-        case .f32_load: return try v.visitLoad(.f32Load, memarg: try parseMemarg())
-        case .f64_load: return try v.visitLoad(.f64Load, memarg: try parseMemarg())
-        case .i32_load8_s: return try v.visitLoad(.i32Load8S, memarg: try parseMemarg())
-        case .i32_load8_u: return try v.visitLoad(.i32Load8U, memarg: try parseMemarg())
-        case .i32_load16_s: return try v.visitLoad(.i32Load16S, memarg: try parseMemarg())
-        case .i32_load16_u: return try v.visitLoad(.i32Load16U, memarg: try parseMemarg())
-        case .i64_load8_s: return try v.visitLoad(.i64Load8S, memarg: try parseMemarg())
-        case .i64_load8_u: return try v.visitLoad(.i64Load8U, memarg: try parseMemarg())
-        case .i64_load16_s: return try v.visitLoad(.i64Load16S, memarg: try parseMemarg())
-        case .i64_load16_u: return try v.visitLoad(.i64Load16U, memarg: try parseMemarg())
-        case .i64_load32_s: return try v.visitLoad(.i64Load32S, memarg: try parseMemarg())
-        case .i64_load32_u: return try v.visitLoad(.i64Load32U, memarg: try parseMemarg())
-        case .i32_store: return try v.visitStore(.i32Store, memarg: try parseMemarg())
-        case .i64_store: return try v.visitStore(.i64Store, memarg: try parseMemarg())
-        case .f32_store: return try v.visitStore(.f32Store, memarg: try parseMemarg())
-        case .f64_store: return try v.visitStore(.f64Store, memarg: try parseMemarg())
-        case .i32_store8: return try v.visitStore(.i32Store8, memarg: try parseMemarg())
-        case .i32_store16: return try v.visitStore(.i32Store16, memarg: try parseMemarg())
-        case .i64_store8: return try v.visitStore(.i64Store8, memarg: try parseMemarg())
-        case .i64_store16: return try v.visitStore(.i64Store16, memarg: try parseMemarg())
-        case .i64_store32: return try v.visitStore(.i64Store32, memarg: try parseMemarg())
-        case .memory_size:
-            let zero = try stream.consumeAny()
-            guard zero == 0x00 else {
-                throw makeError(.zeroExpected(actual: zero))
-            }
-            return try v.visitMemorySize(memory: UInt32(zero))
-        case .memory_grow:
-            let zero = try stream.consumeAny()
-            guard zero == 0x00 else {
-                throw makeError(.zeroExpected(actual: zero))
-            }
-            return try v.visitMemoryGrow(memory: UInt32(zero))
-
-        case .i32_const:
-            let n: UInt32 = try parseInteger()
-            return try v.visitI32Const(value: Int32(bitPattern: n))
-        case .i64_const:
-            let n: UInt64 = try parseInteger()
-            return try v.visitI64Const(value: Int64(bitPattern: n))
-        case .f32_const:
-            let n = try parseFloat()
-            return try v.visitF32Const(value: IEEE754.Float32(bitPattern: n))
-        case .f64_const:
-            let n = try parseDouble()
-            return try v.visitF64Const(value: IEEE754.Float64(bitPattern: n))
-
-        case .i32_eqz: return try v.visitI32Eqz()
-        case .i32_eq: return try v.visitCmp(.i32Eq)
-        case .i32_ne: return try v.visitCmp(.i32Ne)
-        case .i32_lt_s: return try v.visitCmp(.i32LtS)
-        case .i32_lt_u: return try v.visitCmp(.i32LtU)
-        case .i32_gt_s: return try v.visitCmp(.i32GtS)
-        case .i32_gt_u: return try v.visitCmp(.i32GtU)
-        case .i32_le_s: return try v.visitCmp(.i32LeS)
-        case .i32_le_u: return try v.visitCmp(.i32LeU)
-        case .i32_ge_s: return try v.visitCmp(.i32GeS)
-        case .i32_ge_u: return try v.visitCmp(.i32GeU)
-
-        case .i64_eqz: return try v.visitI64Eqz()
-        case .i64_eq: return try v.visitCmp(.i64Eq)
-        case .i64_ne: return try v.visitCmp(.i64Ne)
-        case .i64_lt_s: return try v.visitCmp(.i64LtS)
-        case .i64_lt_u: return try v.visitCmp(.i64LtU)
-        case .i64_gt_s: return try v.visitCmp(.i64GtS)
-        case .i64_gt_u: return try v.visitCmp(.i64GtU)
-        case .i64_le_s: return try v.visitCmp(.i64LeS)
-        case .i64_le_u: return try v.visitCmp(.i64LeU)
-        case .i64_ge_s: return try v.visitCmp(.i64GeS)
-        case .i64_ge_u: return try v.visitCmp(.i64GeU)
-
-        case .f32_eq: return try v.visitCmp(.f32Eq)
-        case .f32_ne: return try v.visitCmp(.f32Ne)
-        case .f32_lt: return try v.visitCmp(.f32Lt)
-        case .f32_gt: return try v.visitCmp(.f32Gt)
-        case .f32_le: return try v.visitCmp(.f32Le)
-        case .f32_ge: return try v.visitCmp(.f32Ge)
-
-        case .f64_eq: return try v.visitCmp(.f64Eq)
-        case .f64_ne: return try v.visitCmp(.f64Ne)
-        case .f64_lt: return try v.visitCmp(.f64Lt)
-        case .f64_gt: return try v.visitCmp(.f64Gt)
-        case .f64_le: return try v.visitCmp(.f64Le)
-        case .f64_ge: return try v.visitCmp(.f64Ge)
-
-        case .i32_clz: return try v.visitUnary(.i32Clz)
-        case .i32_ctz: return try v.visitUnary(.i32Ctz)
-        case .i32_popcnt: return try v.visitUnary(.i32Popcnt)
-        case .i32_add: return try v.visitBinary(.i32Add)
-        case .i32_sub: return try v.visitBinary(.i32Sub)
-        case .i32_mul: return try v.visitBinary(.i32Mul)
-        case .i32_div_s: return try v.visitBinary(.i32DivS)
-        case .i32_div_u: return try v.visitBinary(.i32DivU)
-        case .i32_rem_s: return try v.visitBinary(.i32RemS)
-        case .i32_rem_u: return try v.visitBinary(.i32RemU)
-        case .i32_and: return try v.visitBinary(.i32And)
-        case .i32_or: return try v.visitBinary(.i32Or)
-        case .i32_xor: return try v.visitBinary(.i32Xor)
-        case .i32_shl: return try v.visitBinary(.i32Shl)
-        case .i32_shr_s: return try v.visitBinary(.i32ShrS)
-        case .i32_shr_u: return try v.visitBinary(.i32ShrU)
-        case .i32_rotl: return try v.visitBinary(.i32Rotl)
-        case .i32_rotr: return try v.visitBinary(.i32Rotr)
-
-        case .i64_clz: return try v.visitUnary(.i64Clz)
-        case .i64_ctz: return try v.visitUnary(.i64Ctz)
-        case .i64_popcnt: return try v.visitUnary(.i64Popcnt)
-        case .i64_add: return try v.visitBinary(.i64Add)
-        case .i64_sub: return try v.visitBinary(.i64Sub)
-        case .i64_mul: return try v.visitBinary(.i64Mul)
-        case .i64_div_s: return try v.visitBinary(.i64DivS)
-        case .i64_div_u: return try v.visitBinary(.i64DivU)
-        case .i64_rem_s: return try v.visitBinary(.i64RemS)
-        case .i64_rem_u: return try v.visitBinary(.i64RemU)
-        case .i64_and: return try v.visitBinary(.i64And)
-        case .i64_or: return try v.visitBinary(.i64Or)
-        case .i64_xor: return try v.visitBinary(.i64Xor)
-        case .i64_shl: return try v.visitBinary(.i64Shl)
-        case .i64_shr_s: return try v.visitBinary(.i64ShrS)
-        case .i64_shr_u: return try v.visitBinary(.i64ShrU)
-        case .i64_rotl: return try v.visitBinary(.i64Rotl)
-        case .i64_rotr: return try v.visitBinary(.i64Rotr)
-
-        case .f32_abs: return try v.visitUnary(.f32Abs)
-        case .f32_neg: return try v.visitUnary(.f32Neg)
-        case .f32_ceil: return try v.visitUnary(.f32Ceil)
-        case .f32_floor: return try v.visitUnary(.f32Floor)
-        case .f32_trunc: return try v.visitUnary(.f32Trunc)
-        case .f32_nearest: return try v.visitUnary(.f32Nearest)
-        case .f32_sqrt: return try v.visitUnary(.f32Sqrt)
-
-        case .f32_add: return try v.visitBinary(.f32Add)
-        case .f32_sub: return try v.visitBinary(.f32Sub)
-        case .f32_mul: return try v.visitBinary(.f32Mul)
-        case .f32_div: return try v.visitBinary(.f32Div)
-        case .f32_min: return try v.visitBinary(.f32Min)
-        case .f32_max: return try v.visitBinary(.f32Max)
-        case .f32_copysign: return try v.visitBinary(.f32Copysign)
-
-        case .f64_abs: return try v.visitUnary(.f64Abs)
-        case .f64_neg: return try v.visitUnary(.f64Neg)
-        case .f64_ceil: return try v.visitUnary(.f64Ceil)
-        case .f64_floor: return try v.visitUnary(.f64Floor)
-        case .f64_trunc: return try v.visitUnary(.f64Trunc)
-        case .f64_nearest: return try v.visitUnary(.f64Nearest)
-        case .f64_sqrt: return try v.visitUnary(.f64Sqrt)
-
-        case .f64_add: return try v.visitBinary(.f64Add)
-        case .f64_sub: return try v.visitBinary(.f64Sub)
-        case .f64_mul: return try v.visitBinary(.f64Mul)
-        case .f64_div: return try v.visitBinary(.f64Div)
-        case .f64_min: return try v.visitBinary(.f64Min)
-        case .f64_max: return try v.visitBinary(.f64Max)
-        case .f64_copysign: return try v.visitBinary(.f64Copysign)
-
-        case .i32_wrap_i64: return try v.visitConversion(.i32WrapI64)
-        case .i32_trunc_f32_s: return try v.visitConversion(.i32TruncF32S)
-        case .i32_trunc_f32_u: return try v.visitConversion(.i32TruncF32U)
-        case .i32_trunc_f64_s: return try v.visitConversion(.i32TruncF64S)
-        case .i32_trunc_f64_u: return try v.visitConversion(.i32TruncF64U)
-        case .i64_extend_i32_s: return try v.visitConversion(.i64ExtendI32S)
-        case .i64_extend_i32_u: return try v.visitConversion(.i64ExtendI32U)
-        case .i64_trunc_f32_s: return try v.visitConversion(.i64TruncF32S)
-        case .i64_trunc_f32_u: return try v.visitConversion(.i64TruncF32U)
-        case .i64_trunc_f64_s: return try v.visitConversion(.i64TruncF64S)
-        case .i64_trunc_f64_u: return try v.visitConversion(.i64TruncF64U)
-        case .f32_convert_i32_s: return try v.visitConversion(.f32ConvertI32S)
-        case .f32_convert_i32_u: return try v.visitConversion(.f32ConvertI32U)
-        case .f32_convert_i64_s: return try v.visitConversion(.f32ConvertI64S)
-        case .f32_convert_i64_u: return try v.visitConversion(.f32ConvertI64U)
-        case .f32_demote_f64: return try v.visitConversion(.f32DemoteF64)
-        case .f64_convert_i32_s: return try v.visitConversion(.f64ConvertI32S)
-        case .f64_convert_i32_u: return try v.visitConversion(.f64ConvertI32U)
-        case .f64_convert_i64_s: return try v.visitConversion(.f64ConvertI64S)
-        case .f64_convert_i64_u: return try v.visitConversion(.f64ConvertI64U)
-        case .f64_promote_f32: return try v.visitConversion(.f64PromoteF32)
-        case .i32_reinterpret_f32: return try v.visitConversion(.i32ReinterpretF32)
-        case .i64_reinterpret_f64: return try v.visitConversion(.i64ReinterpretF64)
-        case .f32_reinterpret_i32: return try v.visitConversion(.f32ReinterpretI32)
-        case .f64_reinterpret_i64: return try v.visitConversion(.f64ReinterpretI64)
-        case .i32_extend8_s: return try v.visitUnary(.i32Extend8S)
-        case .i32_extend16_s: return try v.visitUnary(.i32Extend16S)
-        case .i64_extend8_s: return try v.visitUnary(.i64Extend8S)
-        case .i64_extend16_s: return try v.visitUnary(.i64Extend16S)
-        case .i64_extend32_s: return try v.visitUnary(.i64Extend32S)
-
-        case .ref_null:
-            let type = try parseValueType()
-
-            guard case let .ref(refType) = type else {
-                throw makeError(.expectedRefType(actual: type))
-            }
-
-            return try v.visitRefNull(type: refType)
-
-        case .ref_is_null: return try v.visitRefIsNull()
-
-        case .ref_func: return try v.visitRefFunc(functionIndex: try parseUnsigned())
-
-        case .table_get: return try v.visitTableGet(table: try parseUnsigned())
-
-        case .table_set: return try v.visitTableSet(table: try parseUnsigned())
-
-        case .wasm2InstructionPrefix:
-            let codeSuffix: UInt32 = try parseUnsigned()
-            switch codeSuffix {
-            case 0: return try v.visitConversion(.i32TruncSatF32S)
-            case 1: return try v.visitConversion(.i32TruncSatF32U)
-            case 2: return try v.visitConversion(.i32TruncSatF64S)
-            case 3: return try v.visitConversion(.i32TruncSatF64U)
-            case 4: return try v.visitConversion(.i64TruncSatF32S)
-            case 5: return try v.visitConversion(.i64TruncSatF32U)
-            case 6: return try v.visitConversion(.i64TruncSatF64S)
-            case 7: return try v.visitConversion(.i64TruncSatF64U)
-            case 8:
-                let dataIndex: DataIndex = try parseUnsigned()
-                let zero = try stream.consumeAny()
-                guard zero == 0x00 else {
-                    throw makeError(.zeroExpected(actual: zero))
-                }
-
-                return try v.visitMemoryInit(dataIndex: dataIndex)
-            case 9:
-                return try v.visitDataDrop(dataIndex: try parseUnsigned())
-            case 10:
-                let (zero1, zero2) = try (stream.consumeAny(), stream.consumeAny())
-                guard zero1 == 0x00 else {
-                    throw makeError(.zeroExpected(actual: zero1))
-                }
-                guard zero2 == 0x00 else {
-                    throw makeError(.zeroExpected(actual: zero2))
-                }
-                return try v.visitMemoryCopy(dstMem: 0, srcMem: 0)
-            case 11:
-                let zero = try stream.consumeAny()
-                guard zero == 0x00 else {
-                    throw makeError(.zeroExpected(actual: zero))
-                }
-
-                return try v.visitMemoryFill(memory: 0)
-            case 12:
-                let elementIndex: ElementIndex = try parseUnsigned()
-                let tableIndex: TableIndex = try parseUnsigned()
-                return try v.visitTableInit(elemIndex: elementIndex, table: tableIndex)
-            case 13: return try v.visitElemDrop(elemIndex: try parseUnsigned())
-            case 14:
-                let destinationTableIndex: TableIndex = try parseUnsigned()
-                let sourceTableIndex: TableIndex = try parseUnsigned()
-                return try v.visitTableCopy(dstTable: destinationTableIndex, srcTable: sourceTableIndex)
-            case 15: return try v.visitTableGrow(table: try parseUnsigned())
-            case 16: return try v.visitTableSize(table: try parseUnsigned())
-            case 17: return try v.visitTableFill(table: try parseUnsigned())
-            default:
-                throw makeError(.unimplementedInstruction(code.rawValue, suffix: codeSuffix))
-            }
+    mutating func visitCallIndirect() throws -> (typeIndex: UInt32, tableIndex: UInt32) {
+        let typeIndex: TypeIndex = try parseUnsigned()
+        if try !features.contains(.referenceTypes) && stream.peek() != 0 {
+            // Check that reserved byte is zero when reference-types is disabled
+            throw makeError(.malformedIndirectCall)
         }
+        let tableIndex: TableIndex = try parseUnsigned()
+        return (typeIndex, tableIndex)
+    }
+
+    mutating func visitTypedSelect() throws -> WasmTypes.ValueType {
+        let results = try parseVector { try parseValueType() }
+        guard results.count == 1 else {
+            throw makeError(.invalidResultArity(expected: 1, actual: results.count))
+        }
+        return results[0]
+    }
+
+    mutating func visitLocalGet() throws -> UInt32 { try parseUnsigned() }
+    mutating func visitLocalSet() throws -> UInt32 { try parseUnsigned() }
+    mutating func visitLocalTee() throws -> UInt32 { try parseUnsigned() }
+    mutating func visitGlobalGet() throws -> UInt32 { try parseUnsigned() }
+    mutating func visitGlobalSet() throws -> UInt32 { try parseUnsigned() }
+    mutating func visitLoad(_: Instruction.Load) throws -> MemArg { try parseMemarg() }
+    mutating func visitStore(_: Instruction.Store) throws -> MemArg { try parseMemarg() }
+    mutating func visitMemorySize() throws -> UInt32 {
+        try parseMemoryIndex()
+    }
+    mutating func visitMemoryGrow() throws -> UInt32 {
+        try parseMemoryIndex()
+    }
+    mutating func visitI32Const() throws -> Int32 {
+        let n: UInt32 = try parseInteger()
+        return Int32(bitPattern: n)
+    }
+    mutating func visitI64Const() throws -> Int64 {
+        let n: UInt64 = try parseInteger()
+        return Int64(bitPattern: n)
+    }
+    mutating func visitF32Const() throws -> IEEE754.Float32 {
+        let n = try parseFloat()
+        return IEEE754.Float32(bitPattern: n)
+    }
+    mutating func visitF64Const() throws -> IEEE754.Float64 {
+        let n = try parseDouble()
+        return IEEE754.Float64(bitPattern: n)
+    }
+    mutating func visitRefNull() throws -> WasmTypes.ReferenceType {
+        let type = try parseValueType()
+        guard case let .ref(refType) = type else {
+            throw makeError(.expectedRefType(actual: type))
+        }
+        return refType
+    }
+
+    mutating func visitRefFunc() throws -> UInt32 { try parseUnsigned() }
+    mutating func visitMemoryInit() throws -> UInt32 {
+        let dataIndex: DataIndex = try parseUnsigned()
+        _ = try parseMemoryIndex()
+        return dataIndex
+    }
+
+    mutating func visitDataDrop() throws -> UInt32 {
+        try parseUnsigned()
+    }
+
+    mutating func visitMemoryCopy() throws -> (dstMem: UInt32, srcMem: UInt32) {
+        _ = try parseMemoryIndex()
+        _ = try parseMemoryIndex()
+        return (0, 0)
+    }
+
+    mutating func visitMemoryFill() throws -> UInt32 {
+        let zero = try stream.consumeAny()
+        guard zero == 0x00 else {
+            throw makeError(.zeroExpected(actual: zero))
+        }
+        return 0
+    }
+
+    mutating func visitTableInit() throws -> (elemIndex: UInt32, table: UInt32) {
+        let elementIndex: ElementIndex = try parseUnsigned()
+        let tableIndex: TableIndex = try parseUnsigned()
+        return (elementIndex, tableIndex)
+    }
+    mutating func visitElemDrop() throws -> UInt32 {
+        try parseUnsigned()
+    }
+    mutating func visitTableCopy() throws -> (dstTable: UInt32, srcTable: UInt32) {
+        let destination: TableIndex = try parseUnsigned()
+        let source: TableIndex = try parseUnsigned()
+        return (destination, source)
+    }
+    mutating func visitTableFill() throws -> UInt32 {
+        try parseUnsigned()
+    }
+    mutating func visitTableGet() throws -> UInt32 {
+        try parseUnsigned()
+    }
+    mutating func visitTableSet() throws -> UInt32 {
+        try parseUnsigned()
+    }
+    mutating func visitTableGrow() throws -> UInt32 {
+        try parseUnsigned()
+    }
+    mutating func visitTableSize() throws -> UInt32 {
+        try parseUnsigned()
+    }
+    func claimNextByte() throws -> UInt8 {
+        return try stream.consumeAny()
+    }
+
+    @inline(__always)
+    @usableFromInline
+    mutating func parseInstruction<V: InstructionVisitor>(visitor v: inout V) throws -> Bool {
+        return try self.parseBinaryInstruction(visitor: &v)
     }
 
     @usableFromInline
@@ -928,12 +736,12 @@ extension Parser {
     }
 
     @usableFromInline
-    func parseConstExpression() throws -> ConstExpression {
+    mutating func parseConstExpression() throws -> ConstExpression {
         var factory = InstructionFactory()
-        var inst: InstructionCode
+        var isEnd: Bool
         repeat {
-            inst = try self.parseInstruction(visitor: &factory)
-        } while inst != .end
+            isEnd = try self.parseInstruction(visitor: &factory)
+        } while !isEnd
         return factory.insts
     }
 }
@@ -1016,7 +824,7 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#global-section>
     @usableFromInline
-    func parseGlobalSection() throws -> [Global] {
+    mutating func parseGlobalSection() throws -> [Global] {
         return try parseVector {
             let type = try parseGlobalType()
             let expression = try parseConstExpression()
@@ -1059,7 +867,7 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#element-section>
     @inlinable
-    func parseElementSection() throws -> [ElementSegment] {
+    mutating func parseElementSection() throws -> [ElementSegment] {
         return try parseVector {
             let flag = try ElementSegment.Flag(rawValue: parseUnsigned())
 
@@ -1152,7 +960,7 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#data-section>
     @inlinable
-    func parseDataSection() throws -> [DataSegment] {
+    mutating func parseDataSection() throws -> [DataSegment] {
         return try parseVector {
             let kind: UInt32 = try parseUnsigned()
             switch kind {
