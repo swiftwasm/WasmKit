@@ -21,7 +21,7 @@ final class SpectestTests: XCTestCase {
         let defaultConfig = EngineConfiguration()
         let ok = try await spectest(
             path: Self.testPaths,
-            include: ["bulk.wast"],
+            include: [],
             exclude: [],
             parallel: true,
             configuration: defaultConfig
