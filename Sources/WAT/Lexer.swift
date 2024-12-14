@@ -306,7 +306,10 @@ struct Lexer {
     private mutating func lexBlockComment() throws -> TokenKind {
         var level = 1
         while true {
-            switch try cursor.next() {
+            guard let char = try cursor.next() else {
+                throw cursor.unexpectedEof()
+            }
+            switch char {
             case "(":
                 if try cursor.peek() == ";" {
                     // Nested comment block

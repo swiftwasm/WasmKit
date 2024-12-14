@@ -25,6 +25,7 @@ class LexerTests: XCTestCase {
     }
 
     func testLexComment() {
+        XCTAssertEqual(try collectToken("(; foo ;)"), [.blockComment])
         try XCTAssertEqual(
             collectToken(
                 """
@@ -38,6 +39,12 @@ class LexerTests: XCTestCase {
         try XCTAssertEqual(collectToken(";; foo"), [.lineComment])
         try XCTAssertEqual(collectToken(";; foo\n(bar"), [.lineComment, .leftParen, .keyword])
 
+    }
+
+    func testLexBrokenComment() {
+        XCTAssertThrowsError(try collectToken("(;)"))
+        XCTAssertThrowsError(try collectToken("(; foo )"))
+        XCTAssertThrowsError(try collectToken(";)"))
     }
 
     func testLexIdAndString() throws {
