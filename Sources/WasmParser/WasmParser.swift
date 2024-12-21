@@ -430,6 +430,7 @@ extension Parser {
         case 0x7E: return .i64
         case 0x7D: return .f32
         case 0x7C: return .f64
+        case 0x7B: return .f64
         case 0x70: return .ref(.funcRef)
         case 0x6F: return .ref(.externRef)
         default:

@@ -119,6 +119,7 @@ extension ValueType: WasmEncodable {
         case .i64: encoder.output.append(0x7E)
         case .f32: encoder.output.append(0x7D)
         case .f64: encoder.output.append(0x7C)
+        case .v128: encoder.output.append(0x7B)
         case .ref(let refType): refType.encode(to: &encoder)
         }
     }

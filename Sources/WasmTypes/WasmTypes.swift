@@ -31,6 +31,8 @@ public enum ValueType: Equatable, Hashable {
     case f32
     /// 64-bit IEEE 754 floating-point number.
     case f64
+    /// 128-bit vector of packed integer or floating-point data.
+    case v128
     /// Reference value type.
     case ref(ReferenceType)
 }
