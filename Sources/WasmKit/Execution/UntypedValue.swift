@@ -142,6 +142,8 @@ struct UntypedValue: Equatable, Hashable {
         case .i64: return .i64(i64)
         case .f32: return .f32(rawF32)
         case .f64: return .f64(rawF64)
+        case .v128:
+            fatalError("v128 value type is not supported yet.")
         case .ref(let referenceType):
             return .ref(asReference(referenceType))
         }
