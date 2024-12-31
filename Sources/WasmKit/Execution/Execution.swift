@@ -266,7 +266,7 @@ extension Pc {
 /// Executes a WebAssembly function.
 ///
 /// - Parameters:
-///   - runtime: The runtime instance.
+///   - store: The store instance.
 ///   - function: The function to be executed.
 ///   - type: The function type.
 ///   - arguments: The arguments to be passed to the function.
@@ -280,7 +280,7 @@ func executeWasm(
     arguments: [Value],
     callerInstance: InternalInstance
 ) throws -> [Value] {
-    // NOTE: `runtime` variable must not outlive this function
+    // NOTE: `store` variable must not outlive this function
     let store = StoreRef(store)
     return try Execution.with(store: store) { (stack, sp) in
         // Advance the stack pointer to be able to reference negative indices
