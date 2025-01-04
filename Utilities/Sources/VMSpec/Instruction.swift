@@ -552,6 +552,12 @@ extension VMGen {
                         isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write) {
                 $0.field(name: "rawCallee", type: .UInt64)
             },
+            Instruction(name: "returnCallIndirect", documentation: "WebAssembly Core Instruction `return_call_indirect`",
+                        isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write) {
+                $0.field(name: "tableIndex", type: .UInt32)
+                $0.field(name: "rawType", type: .UInt32)
+                $0.field(name: "index", type: .VReg)
+            },
             Instruction(name: "unreachable", documentation: "WebAssembly Core Instruction `unreachable`",
                         isControl: true, mayThrow: true),
             Instruction(name: "nop", documentation: "WebAssembly Core Instruction `nop`"),

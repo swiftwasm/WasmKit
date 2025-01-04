@@ -167,6 +167,17 @@ extension Instruction.ReturnCallOperand {
     }
 }
 
+extension Instruction.ReturnCallIndirectOperand {
+
+    init(tableIndex: UInt32, type: InternedFuncType, index: VReg) {
+        self.init(tableIndex: tableIndex, rawType: type.id, index: index)
+    }
+
+    var type: InternedFuncType {
+        InternedFuncType(id: rawType)
+    }
+}
+
 extension Instruction {
     typealias BrOperand = Int32
     typealias OnEnterOperand = FunctionIndex
