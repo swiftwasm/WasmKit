@@ -12,6 +12,7 @@ final class SpectestTests: XCTestCase {
         [
             Self.testsuite.path,
             Self.testsuite.appendingPathComponent("proposals/memory64").path,
+            Self.testsuite.appendingPathComponent("proposals/tail-call").path,
             Self.projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite").path,
         ]
     }
@@ -24,20 +25,6 @@ final class SpectestTests: XCTestCase {
             include: [],
             exclude: [],
             parallel: true,
-            configuration: defaultConfig
-        )
-        XCTAssertTrue(ok)
-    }
-
-    func testRunTailCall() async throws {
-        let defaultConfig = EngineConfiguration()
-        let ok = try await spectest(
-            path: [
-                Self.testsuite.appendingPathComponent("proposals/tail-call").path,
-            ],
-            include: ["return_call_indirect.wast"],
-            exclude: [],
-            parallel: false,
             configuration: defaultConfig
         )
         XCTAssertTrue(ok)
