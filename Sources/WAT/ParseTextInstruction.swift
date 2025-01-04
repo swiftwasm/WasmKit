@@ -43,6 +43,12 @@ func parseTextInstruction<V: InstructionVisitor>(keyword: String, expressionPars
     case "call_indirect":
         let (typeIndex, tableIndex) = try expressionParser.visitCallIndirect(wat: &wat)
         return { return try $0.visitCallIndirect(typeIndex: typeIndex, tableIndex: tableIndex) }
+    case "return_call":
+        let (functionIndex) = try expressionParser.visitReturnCall(wat: &wat)
+        return { return try $0.visitReturnCall(functionIndex: functionIndex) }
+    case "return_call_indirect":
+        let (typeIndex, tableIndex) = try expressionParser.visitReturnCallIndirect(wat: &wat)
+        return { return try $0.visitReturnCallIndirect(typeIndex: typeIndex, tableIndex: tableIndex) }
     case "drop": return { return try $0.visitDrop() }
     case "select": return { return try $0.visitSelect() }
     case "local.get":

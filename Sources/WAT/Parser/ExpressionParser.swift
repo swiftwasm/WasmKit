@@ -450,6 +450,12 @@ extension ExpressionParser {
         let (_, typeIndex) = try wat.types.resolve(use: typeUse)
         return (UInt32(typeIndex), tableIndex)
     }
+    mutating func visitReturnCall(wat: inout Wat) throws -> UInt32 {
+        return try visitCall(wat: &wat)
+    }
+    mutating func visitReturnCallIndirect(wat: inout Wat) throws -> (typeIndex: UInt32, tableIndex: UInt32) {
+        return try visitCallIndirect(wat: &wat)
+    }
     mutating func visitTypedSelect(wat: inout Wat) throws -> ValueType {
         fatalError("unreachable because Instruction.json does not define the name of typed select and it is handled in parseTextInstruction() manually")
     }

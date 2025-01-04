@@ -187,6 +187,8 @@ public enum Instruction: Equatable {
     case `return`
     case `call`(functionIndex: UInt32)
     case `callIndirect`(typeIndex: UInt32, tableIndex: UInt32)
+    case `returnCall`(functionIndex: UInt32)
+    case `returnCallIndirect`(typeIndex: UInt32, tableIndex: UInt32)
     case `drop`
     case `select`
     case `typedSelect`(type: ValueType)
@@ -246,6 +248,8 @@ extension AnyInstructionVisitor {
     public mutating func visitReturn() throws { return try self.visit(.return) }
     public mutating func visitCall(functionIndex: UInt32) throws { return try self.visit(.call(functionIndex: functionIndex)) }
     public mutating func visitCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws { return try self.visit(.callIndirect(typeIndex: typeIndex, tableIndex: tableIndex)) }
+    public mutating func visitReturnCall(functionIndex: UInt32) throws { return try self.visit(.returnCall(functionIndex: functionIndex)) }
+    public mutating func visitReturnCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws { return try self.visit(.returnCallIndirect(typeIndex: typeIndex, tableIndex: tableIndex)) }
     public mutating func visitDrop() throws { return try self.visit(.drop) }
     public mutating func visitSelect() throws { return try self.visit(.select) }
     public mutating func visitTypedSelect(type: ValueType) throws { return try self.visit(.typedSelect(type: type)) }
@@ -316,6 +320,10 @@ public protocol InstructionVisitor {
     mutating func visitCall(functionIndex: UInt32) throws
     /// Visiting `call_indirect` instruction.
     mutating func visitCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws
+    /// Visiting `return_call` instruction.
+    mutating func visitReturnCall(functionIndex: UInt32) throws
+    /// Visiting `return_call_indirect` instruction.
+    mutating func visitReturnCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws
     /// Visiting `drop` instruction.
     mutating func visitDrop() throws
     /// Visiting `select` instruction.
@@ -409,6 +417,8 @@ extension InstructionVisitor {
         case .return: return try visitReturn()
         case let .call(functionIndex): return try visitCall(functionIndex: functionIndex)
         case let .callIndirect(typeIndex, tableIndex): return try visitCallIndirect(typeIndex: typeIndex, tableIndex: tableIndex)
+        case let .returnCall(functionIndex): return try visitReturnCall(functionIndex: functionIndex)
+        case let .returnCallIndirect(typeIndex, tableIndex): return try visitReturnCallIndirect(typeIndex: typeIndex, tableIndex: tableIndex)
         case .drop: return try visitDrop()
         case .select: return try visitSelect()
         case let .typedSelect(type): return try visitTypedSelect(type: type)
@@ -465,6 +475,8 @@ extension InstructionVisitor {
     public mutating func visitReturn() throws {}
     public mutating func visitCall(functionIndex: UInt32) throws {}
     public mutating func visitCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws {}
+    public mutating func visitReturnCall(functionIndex: UInt32) throws {}
+    public mutating func visitReturnCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws {}
     public mutating func visitDrop() throws {}
     public mutating func visitSelect() throws {}
     public mutating func visitTypedSelect(type: ValueType) throws {}
