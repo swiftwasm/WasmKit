@@ -116,7 +116,12 @@ class EncoderTests: XCTestCase {
 
                     let wast2jsonProcess = try Process.run(
                         wast2json,
-                        arguments: [wastFile.path, "-o", json.path]
+                        arguments: [
+                            wastFile.path,
+                            "--enable-memory64",
+                            "--enable-tail-call",
+                            "-o", json.path,
+                        ]
                     )
                     wast2jsonProcess.waitUntilExit()
 

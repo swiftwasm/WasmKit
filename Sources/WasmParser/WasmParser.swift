@@ -193,11 +193,14 @@ public struct WasmFeatureSet: OptionSet {
     /// The WebAssembly threads proposal
     @_alwaysEmitIntoClient
     public static var threads: WasmFeatureSet { WasmFeatureSet(rawValue: 1 << 2) }
+    /// The WebAssembly tail-call proposal
+    @_alwaysEmitIntoClient
+    public static var tailCall: WasmFeatureSet { WasmFeatureSet(rawValue: 1 << 3) }
 
     /// The default feature set
     public static let `default`: WasmFeatureSet = [.referenceTypes]
     /// The feature set with all features enabled
-    public static let all: WasmFeatureSet = [.memory64, .referenceTypes, .threads]
+    public static let all: WasmFeatureSet = [.memory64, .referenceTypes, .threads, .tailCall]
 }
 
 /// An error that occurs during parsing of a WebAssembly binary
@@ -625,6 +628,16 @@ extension Parser: BinaryInstructionDecoder {
             // Check that reserved byte is zero when reference-types is disabled
             throw makeError(.malformedIndirectCall)
         }
+        let tableIndex: TableIndex = try parseUnsigned()
+        return (typeIndex, tableIndex)
+    }
+
+    @inlinable mutating func visitReturnCall() throws -> UInt32 {
+        try parseUnsigned()
+    }
+
+    @inlinable mutating func visitReturnCallIndirect() throws -> (typeIndex: UInt32, tableIndex: UInt32) {
+        let typeIndex: TypeIndex = try parseUnsigned()
         let tableIndex: TableIndex = try parseUnsigned()
         return (typeIndex, tableIndex)
     }
