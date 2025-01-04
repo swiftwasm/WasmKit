@@ -178,6 +178,10 @@ extension ValidationError.Message {
     static func inconsistentDataCountAndDataSectionLength(dataCount: UInt32, dataSection: Int) -> Self {
         Self("Inconsistent data count and data section length: \(dataCount) vs \(dataSection)")
     }
+
+    static func typeMismatchOnReturnCall(expected: [ValueType], actual: [ValueType]) -> Self {
+        Self("return signatures have inconsistent types: expected \(expected) but got \(actual)")
+    }
 }
 
 /// Validates instructions within a given context.
@@ -225,6 +229,12 @@ struct InstructionValidator<Context: TranslatorContext> {
         }
         guard dataIndex < dataCount else {
             throw ValidationError(.indexOutOfBounds("data", dataIndex, max: dataCount))
+        }
+    }
+
+    func validateReturnCallLike(calleeType: FunctionType, callerType: FunctionType) throws {
+        guard calleeType.results == callerType.results else {
+            throw ValidationError(.typeMismatchOnReturnCall(expected: callerType.results, actual: calleeType.results))
         }
     }
 }

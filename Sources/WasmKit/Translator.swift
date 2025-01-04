@@ -157,10 +157,11 @@ private struct MetaProgramCounter {
 /// ```
 /// | Offset                             | Description          |
 /// |------------------------------------|----------------------|
-/// | SP-3 ~ SP-(max(params, results)+3) | Frame header         |
-/// | SP-3                               |   * Saved Instance   |
-/// | SP-2                               |   * Saved PC         |
-/// | SP-1                               |   * Saved SP         |
+/// | SP-(max(params, results)+3)        | Param/result slots   |------+
+/// | ...                                | ...                  |      |
+/// | SP-3                               | Saved Instance       |  Frame header
+/// | SP-2                               | Saved PC             |      |
+/// | SP-1                               | Saved SP             |------+
 /// | SP+0                               | Local variable 0     |
 /// | SP+1                               | Local variable 1     |
 /// | ...                                | ...                  |
@@ -175,6 +176,34 @@ private struct MetaProgramCounter {
 /// | SP+len(locals)+C+heighest(stack)-1 | Value stack N        |
 /// ```
 /// where `C` is the number of constant slots.
+///
+/// ## Example
+///
+/// Consider the following Wasm function:
+///
+/// ```wat
+/// (func (param i32 i32) (result i32)
+///   (local i32)
+///   (local i64)
+///   (local.set 2 (i32.add (local.get 0) (i32.const 42)))
+///   (return (local.get 2))
+/// )
+/// ```
+///
+/// Then the stack frame layout looks like: 
+///
+/// ```
+/// | Offset                             | Description          |
+/// |------------------------------------|----------------------|
+/// | -5                                 | Param 0 / Result 0   |------+
+/// | -4                                 | Param 1              |      |
+/// | -3                                 | Saved Instance       |  Frame header
+/// | -2                                 | Saved PC             |      |
+/// | -1                                 | Saved SP             |------+
+/// | 0                                  | Local 0 (i32)        |
+/// | 1                                  | Local 1 (i64)        |
+/// | 2                                  | Const 0 (i32:42)     |
+/// ```
 
 struct FrameHeaderLayout {
     let type: FunctionType
@@ -1007,8 +1036,15 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
 
     private mutating func visitReturnLike() throws {
+        try copyValuesIntoResultSlots(self.type.results, frameHeader: stackLayout.frameHeader)
+    }
+
+    /// Pop values from the stack and copy them to the return slots.
+    ///
+    /// - Parameter valueTypes: The types of the values to copy.
+    private mutating func copyValuesIntoResultSlots(_ valueTypes: [ValueType], frameHeader: FrameHeaderLayout) throws {
         var copies: [(source: VReg, dest: VReg)] = []
-        for (index, resultType) in self.type.results.enumerated().reversed() {
+        for (index, resultType) in valueTypes.enumerated().reversed() {
             guard let operand = try popOperand(resultType) else { continue }
             var source = ensureOnVReg(operand)
             if case .local(let localIndex) = operand, stackLayout.isParameter(localIndex) {
@@ -1018,7 +1054,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
                 emitCopyStack(from: localReg(localIndex), to: copyTo)
                 source = copyTo
             }
-            let dest = returnReg(index)
+            let dest = frameHeader.returnReg(index)
             copies.append((source, dest))
         }
         for (source, dest) in copies {
@@ -1486,6 +1522,40 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             spAddend: spAddend
         )
         emit(.callIndirect(operand))
+    }
+
+    mutating func visitReturnCall(functionIndex: UInt32) throws {
+        let calleeType = try self.module.functionType(functionIndex, interner: funcTypeInterner)
+        try validator.validateReturnCallLike(calleeType: calleeType, callerType: type)
+
+        guard let callee = self.module.resolveCallee(functionIndex) else {
+            // Skip actual code emission if validation-only mode
+            return
+        }
+
+        let calleeFrameHeader = FrameHeaderLayout(type: calleeType)
+        if calleeType == self.type {
+            // Fast path: If the callee and the caller have the same signature, we can
+            // skip reconstructing the frame header and we can just copy the parameters.
+            try copyValuesIntoResultSlots(calleeType.parameters, frameHeader: calleeFrameHeader)
+            emit(.returnCall(Instruction.ReturnCallOperand(callee: callee)))
+        } else {
+            // Ensure all parameters are on stack to avoid conflicting with the next resize.
+            preserveOnStack(depth: calleeType.parameters.count)
+            // Resize the current frame header while moving stack slots after the header
+            // to the resized positions
+            let newHeaderSize = FrameHeaderLayout.size(of: calleeType)
+            let delta = newHeaderSize - FrameHeaderLayout.size(of: type)
+            let sizeToCopy = VReg(FrameHeaderLayout.numberOfSavingSlots) + valueStack.stackRegBase + VReg(valueStack.height)
+            emit(.resizeFrameHeader(Instruction.ResizeFrameHeaderOperand(delta: delta, sizeToCopy: sizeToCopy)))
+            try copyValuesIntoResultSlots(calleeType.parameters, frameHeader: calleeFrameHeader)
+            emit(.returnCall(Instruction.ReturnCallOperand(callee: callee)))
+        }
+        try markUnreachable()
+    }
+
+    mutating func visitReturnCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws {
+        try markUnreachable()
     }
 
     mutating func visitDrop() throws -> Output {

@@ -29,6 +29,20 @@ final class SpectestTests: XCTestCase {
         XCTAssertTrue(ok)
     }
 
+    func testRunTailCall() async throws {
+        let defaultConfig = EngineConfiguration()
+        let ok = try await spectest(
+            path: [
+                Self.testsuite.appendingPathComponent("proposals/tail-call").path,
+            ],
+            include: ["return_call.wast"],
+            exclude: [],
+            parallel: false,
+            configuration: defaultConfig
+        )
+        XCTAssertTrue(ok)
+    }
+
     func testRunAllWithTokenThreading() async throws {
         let defaultConfig = EngineConfiguration()
         guard defaultConfig.threadingModel != .token else { return }

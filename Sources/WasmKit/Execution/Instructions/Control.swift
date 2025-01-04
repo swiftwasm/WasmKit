@@ -151,6 +151,26 @@ extension Execution {
         )
         return pc.next()
     }
+    
+    mutating func returnCall(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.ReturnCallOperand) throws -> (Pc, CodeSlot) {
+        var pc = pc
+        (pc, sp) = try tailInvoke(
+            function: immediate.callee,
+            callerInstance: currentInstance(sp: sp),
+            spAddend: 0,
+            sp: sp, pc: pc, md: &md, ms: &ms
+        )
+        return pc.next()
+    }
+
+    mutating func resizeFrameHeader(sp: inout Sp, immediate: Instruction.ResizeFrameHeaderOperand) throws {
+        let newSp = sp.advanced(by: Int(immediate.delta))
+        try checkStackBoundary(newSp)
+        let oldFrameHeader = sp.advanced(by: -FrameHeaderLayout.numberOfSavingSlots)
+        let newFrameHeader = newSp.advanced(by: -FrameHeaderLayout.numberOfSavingSlots)
+        newFrameHeader.update(from: oldFrameHeader, count: Int(immediate.sizeToCopy))
+        sp = newSp
+    }
 
     mutating func onEnter(sp: Sp, immediate: Instruction.OnEnterOperand) {
         let function = currentInstance(sp: sp).functions[Int(immediate)]

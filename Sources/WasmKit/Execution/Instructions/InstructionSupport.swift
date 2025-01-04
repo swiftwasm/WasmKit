@@ -157,6 +157,16 @@ extension Instruction.CallIndirectOperand {
     }
 }
 
+extension Instruction.ReturnCallOperand {
+    init(callee: InternalFunction) {
+        self.init(rawCallee: UInt64(UInt(bitPattern: callee.bitPattern)))
+    }
+
+    var callee: InternalFunction {
+        InternalFunction(bitPattern: Int(bitPattern: UInt(rawCallee)))
+    }
+}
+
 extension Instruction {
     typealias BrOperand = Int32
     typealias OnEnterOperand = FunctionIndex
@@ -314,6 +324,8 @@ struct InstructionPrintingContext {
             target.write("call_indirect \(reg(op.index)), \(op.tableIndex), (func_ty id:\(op.type.id)), sp: +\(op.spAddend)")
         case .compilingCall(let op):
             target.write("compiling_call \(callee(op.callee)), sp: +\(op.spAddend)")
+        case .returnCall(let op):
+            target.write("return_call \(callee(op.callee))")
         case .i32Load(let op): load("i32.load", op)
         case .i64Load(let op): load("i64.load", op)
         case .f32Load(let op): load("f32.load", op)
