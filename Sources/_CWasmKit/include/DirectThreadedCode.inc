@@ -62,6 +62,13 @@ SWIFT_CC(swiftasync) static inline void wasmkit_tc_returnCall(Sp sp, Pc pc, Md m
     if (error) return wasmkit_execution_state_set_error(error, sp, state);
     return ((wasmkit_tc_exec)next)(sp, pc, md, ms, state);
 }
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_returnCallIndirect(Sp sp, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_returnCallIndirect(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_returnCallIndirect(&sp, &pc, &md, &ms, state, &error);
+    if (error) return wasmkit_execution_state_set_error(error, sp, state);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, state);
+}
 SWIFT_CC(swiftasync) static inline void wasmkit_tc_unreachable(Sp sp, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
     SWIFT_CC(swift) uint64_t wasmkit_execute_unreachable(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
     void * _Nullable error = NULL; uint64_t next;
@@ -1265,6 +1272,7 @@ static const uintptr_t wasmkit_tc_exec_handlers[] = {
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_callIndirect),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_resizeFrameHeader),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_returnCall),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_returnCallIndirect),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_unreachable),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_nop),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_br),

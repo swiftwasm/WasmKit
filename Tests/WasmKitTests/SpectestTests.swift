@@ -35,7 +35,7 @@ final class SpectestTests: XCTestCase {
             path: [
                 Self.testsuite.appendingPathComponent("proposals/tail-call").path,
             ],
-            include: ["return_call.wast"],
+            include: ["return_call_indirect.wast"],
             exclude: [],
             parallel: false,
             configuration: defaultConfig

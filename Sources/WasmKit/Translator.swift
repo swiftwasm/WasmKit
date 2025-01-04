@@ -932,13 +932,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     private func checkBeforePop(typeHint: ValueType?, depth: Int = 0, controlFrame: ControlStack.ControlFrame) throws -> Bool {
         if _slowPath(valueStack.height - depth <= controlFrame.stackHeight) {
             if controlFrame.reachable {
-                let message: String
-                if let typeHint {
-                    message = "Expected a \(typeHint) value on stack but it's empty"
-                } else {
-                    message = "Expected a value on stack but it's empty"
-                }
-                throw TranslationError(message)
+                throw ValidationError(.expectedTypeOnStackButEmpty(expected: typeHint))
             }
             // Too many pop on unreachable path is ignored
             return false
@@ -1555,6 +1549,37 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
 
     mutating func visitReturnCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws {
+        let addressType = try module.addressType(tableIndex: tableIndex)
+        // Preserve function index slot on stack
+        let address = try popOnStackOperand(addressType)  // function address
+        let calleeType = try self.module.resolveType(typeIndex)
+        guard let address = address else { return }
+        let internType = funcTypeInterner.intern(calleeType)
+
+        let calleeFrameHeader = FrameHeaderLayout(type: calleeType)
+        if calleeType == self.type {
+            // Fast path: If the callee and the caller have the same signature, we can
+            // skip reconstructing the frame header and we can just copy the parameters.
+            try copyValuesIntoResultSlots(calleeType.parameters, frameHeader: calleeFrameHeader)
+        } else {
+            // Ensure all parameters are on stack to avoid conflicting with the next resize.
+            preserveOnStack(depth: calleeType.parameters.count)
+            // Resize the current frame header while moving stack slots after the header
+            // to the resized positions
+            let newHeaderSize = FrameHeaderLayout.size(of: calleeType)
+            let delta = newHeaderSize - FrameHeaderLayout.size(of: type)
+            // +1 for address slot as it's used by return_call_indirect executed after resize_frame_header
+            let sizeToCopy = 1 + VReg(FrameHeaderLayout.numberOfSavingSlots) + valueStack.stackRegBase + VReg(valueStack.height)
+            emit(.resizeFrameHeader(Instruction.ResizeFrameHeaderOperand(delta: delta, sizeToCopy: sizeToCopy)))
+            try copyValuesIntoResultSlots(calleeType.parameters, frameHeader: calleeFrameHeader)
+        }
+
+        let operand = Instruction.ReturnCallIndirectOperand(
+            tableIndex: tableIndex,
+            type: internType,
+            index: address
+        )
+        emit(.returnCallIndirect(operand))
         try markUnreachable()
     }
 

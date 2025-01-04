@@ -112,11 +112,11 @@ extension Execution {
     @inline(never)
     private func prepareForIndirectCall(
         sp: Sp, tableIndex: TableIndex, expectedType: InternedFuncType,
-        callIndirectOperand: Instruction.CallIndirectOperand
+        address: VReg
     ) throws -> (InternalFunction, InternalInstance) {
         let callerInstance = currentInstance(sp: sp)
         let table = callerInstance.tables[Int(tableIndex)]
-        let value = sp[callIndirectOperand.index].asAddressOffset(table.limits.isMemory64)
+        let value = sp[address].asAddressOffset(table.limits.isMemory64)
         let elementIndex = Int(value)
         guard elementIndex < table.elements.count else {
             throw Trap(.tableOutOfBounds(elementIndex))
@@ -141,7 +141,7 @@ extension Execution {
         var pc = pc
         let (function, callerInstance) = try prepareForIndirectCall(
             sp: sp, tableIndex: immediate.tableIndex, expectedType: immediate.type,
-            callIndirectOperand: immediate
+            address: immediate.index
         )
         (pc, sp) = try invoke(
             function: function,
@@ -157,6 +157,21 @@ extension Execution {
         (pc, sp) = try tailInvoke(
             function: immediate.callee,
             callerInstance: currentInstance(sp: sp),
+            spAddend: 0,
+            sp: sp, pc: pc, md: &md, ms: &ms
+        )
+        return pc.next()
+    }
+
+    mutating func returnCallIndirect(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.ReturnCallIndirectOperand) throws -> (Pc, CodeSlot) {
+        var pc = pc
+        let (function, callerInstance) = try prepareForIndirectCall(
+            sp: sp, tableIndex: immediate.tableIndex, expectedType: immediate.type,
+            address: immediate.index
+        )
+        (pc, sp) = try tailInvoke(
+            function: function,
+            callerInstance: callerInstance,
             spAddend: 0,
             sp: sp, pc: pc, md: &md, ms: &ms
         )

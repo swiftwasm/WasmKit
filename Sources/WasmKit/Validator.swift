@@ -132,6 +132,11 @@ extension ValidationError.Message {
         Self("expected \(expected) on the stack top but got \(actual)")
     }
 
+    static func expectedTypeOnStackButEmpty(expected: ValueType?) -> Self {
+        let typeHint = expected.map(String.init(describing:)) ?? "a value"
+        return Self("expected \(typeHint) on the stack top but it's empty")
+    }
+
     static func expectedMoreEndInstructions(count: Int) -> Self {
         Self("expect \(count) more `end` instructions")
     }
