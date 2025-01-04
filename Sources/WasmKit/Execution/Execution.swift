@@ -78,6 +78,20 @@ struct Execution {
         return Backtrace(symbols: symbols)
     }
 
+    private func initializeConstSlots(
+        sp: Sp, iseq: InstructionSequence,
+        numberOfNonParameterLocals: Int
+    ) {
+        // Initialize the locals with zeros (all types of value have the same representation)
+        sp.initialize(repeating: UntypedValue.default.storage, count: numberOfNonParameterLocals)
+        if let constants = iseq.constants.baseAddress {
+            let count = iseq.constants.count
+            sp.advanced(by: numberOfNonParameterLocals).withMemoryRebound(to: UntypedValue.self, capacity: count) {
+                $0.initialize(from: constants, count: count)
+            }
+        }
+    }
+
     /// Pushes a new call frame to the VM stack.
     @inline(__always)
     func pushFrame(
@@ -88,17 +102,8 @@ struct Execution {
         spAddend: VReg
     ) throws -> Sp {
         let newSp = sp.advanced(by: Int(spAddend))
-        guard newSp.advanced(by: iseq.maxStackHeight) < stackEnd else {
-            throw Trap(.callStackExhausted)
-        }
-        // Initialize the locals with zeros (all types of value have the same representation)
-        newSp.initialize(repeating: UntypedValue.default.storage, count: numberOfNonParameterLocals)
-        if let constants = iseq.constants.baseAddress {
-            let count = iseq.constants.count
-            newSp.advanced(by: numberOfNonParameterLocals).withMemoryRebound(to: UntypedValue.self, capacity: count) {
-                $0.initialize(from: constants, count: count)
-            }
-        }
+        try checkStackBoundary(newSp.advanced(by: iseq.maxStackHeight))
+        initializeConstSlots(sp: newSp, iseq: iseq, numberOfNonParameterLocals: numberOfNonParameterLocals)
         newSp.previousSP = sp
         newSp.returnPC = returnPC
         newSp.currentFunction = function
@@ -505,6 +510,11 @@ extension Execution {
         self.trap = (rawError, sp)
     }
 
+    @inline(__always)
+    func checkStackBoundary(_ sp: Sp) throws {
+        guard sp < stackEnd else { throw Trap(.callStackExhausted) }
+    }
+
     /// Returns the new program counter and stack pointer.
     @inline(never)
     func invoke(
@@ -522,6 +532,50 @@ extension Execution {
             try invokeHostFunction(function: function.host, sp: sp, spAddend: spAddend)
             return (pc, sp)
         }
+    }
+
+    @inline(never)
+    func tailInvoke(
+        function: InternalFunction,
+        callerInstance: InternalInstance?,
+        spAddend: VReg,
+        sp: Sp, pc: Pc, md: inout Md, ms: inout Ms
+    ) throws -> (Pc, Sp) {
+        if function.isWasm {
+            return try tailInvokeWasmFunction(
+                function: function.wasm, callerInstance: callerInstance,
+                spAddend: spAddend,
+                sp: sp, md: &md, ms: &ms
+            )
+        } else {
+            try invokeHostFunction(function: function.host, sp: sp, spAddend: spAddend)
+            return (pc, sp)
+        }
+    }
+
+    /// Executes the given wasm function while overwriting the current frame.
+    ///
+    /// Precondition: The frame header must be already resized to be compatible
+    /// with the callee's frame header layout.
+    @inline(__always)
+    private func tailInvokeWasmFunction(
+        function: EntityHandle<WasmFunctionEntity>,
+        callerInstance: InternalInstance?,
+        spAddend: VReg,
+        sp: Sp, md: inout Md, ms: inout Ms
+    ) throws -> (Pc, Sp) {
+        let iseq = try function.ensureCompiled(store: store)
+        let newSp = sp.advanced(by: Int(spAddend))
+        try checkStackBoundary(newSp.advanced(by: iseq.maxStackHeight))
+        newSp.currentFunction = function
+
+        initializeConstSlots(sp: newSp, iseq: iseq, numberOfNonParameterLocals: function.numberOfNonParameterLocals)
+
+        Execution.CurrentMemory.mayUpdateCurrentInstance(
+            instance: function.instance,
+            from: callerInstance, md: &md, ms: &ms
+        )
+        return (iseq.baseAddress, newSp)
     }
 
     /// Executes the given WebAssembly function.

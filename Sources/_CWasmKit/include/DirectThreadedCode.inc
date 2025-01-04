@@ -48,6 +48,20 @@ SWIFT_CC(swiftasync) static inline void wasmkit_tc_callIndirect(Sp sp, Pc pc, Md
     if (error) return wasmkit_execution_state_set_error(error, sp, state);
     return ((wasmkit_tc_exec)next)(sp, pc, md, ms, state);
 }
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_resizeFrameHeader(Sp sp, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_resizeFrameHeader(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_resizeFrameHeader(&sp, &pc, &md, &ms, state, &error);
+    if (error) return wasmkit_execution_state_set_error(error, sp, state);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, state);
+}
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_returnCall(Sp sp, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_returnCall(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_returnCall(&sp, &pc, &md, &ms, state, &error);
+    if (error) return wasmkit_execution_state_set_error(error, sp, state);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, state);
+}
 SWIFT_CC(swiftasync) static inline void wasmkit_tc_unreachable(Sp sp, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
     SWIFT_CC(swift) uint64_t wasmkit_execute_unreachable(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
     void * _Nullable error = NULL; uint64_t next;
@@ -1249,6 +1263,8 @@ static const uintptr_t wasmkit_tc_exec_handlers[] = {
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_compilingCall),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_internalCall),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_callIndirect),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_resizeFrameHeader),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_returnCall),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_unreachable),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_nop),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_br),

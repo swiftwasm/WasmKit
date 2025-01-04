@@ -86,7 +86,6 @@ extension VMGen {
             self.useCurrentMemory = useCurrentMemory
             self.immediate = immediate
             self.immediateLayout = immediateLayout
-            assert(isControl || !mayUpdateFrame, "non-control instruction should not update frame")
         }
 
         init(
@@ -543,6 +542,15 @@ extension VMGen {
                 $0.field(name: "rawType", type: .UInt32)
                 $0.field(name: "index", type: .VReg)
                 $0.field(name: "spAddend", type: .VReg)
+            },
+            Instruction(name: "resizeFrameHeader", documentation: "Resize the frame header",
+                        mayThrow: true, mayUpdateFrame: true) {
+                $0.field(name: "delta", type: .VReg)
+                $0.field(name: "sizeToCopy", type: .VReg)
+            },
+            Instruction(name: "returnCall", documentation: "WebAssembly Core Instruction `return_call`",
+                        isControl: true, mayThrow: true, mayUpdateFrame: true, useCurrentMemory: .write) {
+                $0.field(name: "rawCallee", type: .UInt64)
             },
             Instruction(name: "unreachable", documentation: "WebAssembly Core Instruction `unreachable`",
                         isControl: true, mayThrow: true),
