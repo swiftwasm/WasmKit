@@ -20,6 +20,7 @@ enum Spectest {
         var allFiles = [
             testsuitePath,
             testsuitePath.appendingPathComponent("proposals/memory64"),
+            testsuitePath.appendingPathComponent("proposals/tail-call"),
             rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite"),
         ].flatMap {
             try! FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil)
