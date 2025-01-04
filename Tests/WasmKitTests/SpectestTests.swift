@@ -16,6 +16,9 @@ final class SpectestTests: XCTestCase {
         ]
     }
 
+    static var functionReferences: [String] { [Self.testsuite.appendingPathComponent("proposals/function-references").path] }
+    static var gcPath: [String] { [Self.testsuite.appendingPathComponent("proposals/gc").path] }
+
     /// Run all the tests in the spectest suite.
     func testRunAll() async throws {
         let defaultConfig = EngineConfiguration()
@@ -41,5 +44,81 @@ final class SpectestTests: XCTestCase {
             configuration: config
         )
         XCTAssertTrue(ok)
+    }
+
+    func testFunctionReferencesProposals() async throws {
+        let defaultConfig = EngineConfiguration()
+        let result = try await spectestResult(
+            path: Self.functionReferences,
+            include: ["function-references/call_ref.wast"], // focusing on call_ref for now, but will update to run all function-references tests.
+            exclude: [],
+            parallel: false,
+            configuration: defaultConfig
+        )
+
+        XCTAssertEqual(result.passed, 8)
+        XCTAssertEqual(result.failed, 26)
+    }
+
+    /// Run the garbage collection proposal tests
+    /// As we add support, we can increase the passed count and delete entries from the failed array.
+    func testFunctionReferencesAndGarbageCollectionProposals() async throws {
+        let defaultConfig = EngineConfiguration()
+        let result = try await spectestResult(
+            path: Self.gcPath,
+            include: [],
+            exclude: [],
+            parallel: true,
+            configuration: defaultConfig
+        )
+
+        XCTAssertEqual(result.passed, 1316)
+        XCTAssertEqual(result.failed, 218)
+        XCTAssertEqual(
+            result.sortedFailedCases(),
+            [
+                "gc/array.wast",
+                "gc/array_copy.wast",
+                "gc/array_fill.wast",
+                "gc/array_init_data.wast",
+                "gc/array_init_elem.wast",
+                "gc/br_if.wast",
+                "gc/br_on_cast.wast",
+                "gc/br_on_cast_fail.wast",
+                "gc/br_on_non_null.wast",
+                "gc/br_on_null.wast",
+                "gc/br_table.wast",
+                "gc/call_ref.wast",
+                "gc/data.wast",
+                "gc/elem.wast",
+                "gc/extern.wast",
+                "gc/func.wast",
+                "gc/global.wast",
+                "gc/i31.wast",
+                "gc/linking.wast",
+                "gc/local_init.wast",
+                "gc/local_tee.wast",
+                "gc/ref.wast",
+                "gc/ref_as_non_null.wast",
+                "gc/ref_cast.wast",
+                "gc/ref_eq.wast",
+                "gc/ref_is_null.wast",
+                "gc/ref_null.wast",
+                "gc/ref_test.wast",
+                "gc/return_call.wast",
+                "gc/return_call_indirect.wast",
+                "gc/return_call_ref.wast",
+                "gc/select.wast",
+                "gc/struct.wast",
+                "gc/table-sub.wast",
+                "gc/table.wast",
+                "gc/type-canon.wast",
+                "gc/type-equivalence.wast",
+                "gc/type-rec.wast",
+                "gc/type-subtyping.wast",
+                "gc/unreached-invalid.wast",
+                "gc/unreached-valid.wast"
+            ]
+        )
     }
 }
