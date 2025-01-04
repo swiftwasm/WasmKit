@@ -17,7 +17,11 @@ enum Spectest {
     }
 
     static func wastFiles(include: [String] = [], exclude: [String] = ["annotations.wast"]) -> AnyIterator<URL> {
-        var allFiles = [testsuitePath, testsuitePath.appendingPathComponent("proposals/memory64")].flatMap {
+        var allFiles = [
+            testsuitePath,
+            testsuitePath.appendingPathComponent("proposals/memory64"),
+            rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite"),
+        ].flatMap {
             try! FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil)
         }.makeIterator()
 
