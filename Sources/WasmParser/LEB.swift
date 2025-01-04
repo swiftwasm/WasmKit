@@ -35,7 +35,7 @@ func decodeLEB128<IntType, Stream>(
 
 @inlinable
 func decodeLEB128<IntType, Stream>(
-    stream: Stream
+    stream: Stream, bitWidth: Int = IntType.bitWidth
 ) throws -> IntType where IntType: FixedWidthInteger, IntType: RawSignedInteger, Stream: ByteStream {
     let firstByte = try stream.consumeAny()
     var result = IntType.Unsigned(firstByte & 0b0111_1111)
@@ -54,8 +54,8 @@ func decodeLEB128<IntType, Stream>(
         result |= slice << shift
 
         // When we don't have enough bit width
-        if shift > (IntType.bitWidth - 7) {
-            let remainingBitWidth = IntType.bitWidth - Int(shift)
+        if shift > (bitWidth - 7) {
+            let remainingBitWidth = bitWidth - Int(shift)
             let continuationBit = (byte & 0b1000_0000) != 0
             // When a next byte is expected
             if continuationBit {
