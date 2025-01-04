@@ -80,7 +80,7 @@ struct Execution {
 
     /// Pushes a new call frame to the VM stack.
     @inline(__always)
-    mutating func pushFrame(
+    func pushFrame(
         iseq: InstructionSequence,
         function: EntityHandle<WasmFunctionEntity>,
         numberOfNonParameterLocals: Int,
@@ -107,7 +107,7 @@ struct Execution {
 
     /// Pops the current frame from the VM stack.
     @inline(__always)
-    mutating func popFrame(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) {
+    func popFrame(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) {
         let oldSp = sp
         sp = oldSp.previousSP.unsafelyUnwrapped
         pc = oldSp.returnPC.unsafelyUnwrapped
@@ -507,46 +507,67 @@ extension Execution {
 
     /// Returns the new program counter and stack pointer.
     @inline(never)
-    mutating func invoke(
+    func invoke(
         function: InternalFunction,
         callerInstance: InternalInstance?,
         spAddend: VReg,
         sp: Sp, pc: Pc, md: inout Md, ms: inout Ms
     ) throws -> (Pc, Sp) {
         if function.isWasm {
-            let function = function.wasm
-            let iseq = try function.ensureCompiled(store: store)
-
-            let newSp = try pushFrame(
-                iseq: iseq,
-                function: function,
-                numberOfNonParameterLocals: function.numberOfNonParameterLocals,
-                sp: sp,
-                returnPC: pc,
-                spAddend: spAddend
+            return try invokeWasmFunction(
+                function: function.wasm, callerInstance: callerInstance,
+                spAddend: spAddend, sp: sp, pc: pc, md: &md, ms: &ms
             )
-            Execution.CurrentMemory.mayUpdateCurrentInstance(
-                instance: function.instance,
-                from: callerInstance, md: &md, ms: &ms
-            )
-            return (iseq.baseAddress, newSp)
         } else {
-            let function = function.host
-            let resolvedType = store.value.engine.resolveType(function.type)
-            let layout = FrameHeaderLayout(type: resolvedType)
-            let parameters = resolvedType.parameters.enumerated().map { (i, type) in
-                sp[spAddend + layout.paramReg(i)].cast(to: type)
-            }
-            let instance = self.currentInstance(sp: sp)
-            let caller = Caller(
-                instanceHandle: instance,
-                store: store.value
-            )
-            let results = try function.implementation(caller, Array(parameters))
-            for (index, result) in results.enumerated() {
-                sp[spAddend + layout.returnReg(index)] = UntypedValue(result)
-            }
+            try invokeHostFunction(function: function.host, sp: sp, spAddend: spAddend)
             return (pc, sp)
+        }
+    }
+
+    /// Executes the given WebAssembly function.
+    @inline(__always)
+    private func invokeWasmFunction(
+        function: EntityHandle<WasmFunctionEntity>,
+        callerInstance: InternalInstance?,
+        spAddend: VReg,
+        sp: Sp, pc: Pc, md: inout Md, ms: inout Ms
+    ) throws -> (Pc, Sp) {
+        let iseq = try function.ensureCompiled(store: store)
+
+        let newSp = try pushFrame(
+            iseq: iseq,
+            function: function,
+            numberOfNonParameterLocals: function.numberOfNonParameterLocals,
+            sp: sp,
+            returnPC: pc,
+            spAddend: spAddend
+        )
+        Execution.CurrentMemory.mayUpdateCurrentInstance(
+            instance: function.instance,
+            from: callerInstance, md: &md, ms: &ms
+        )
+        return (iseq.baseAddress, newSp)
+    }
+
+    /// Executes the given host function.
+    ///
+    /// Note that this function does not modify neither the positions of the
+    /// stack pointer nor the program counter.
+    @inline(never)
+    private func invokeHostFunction(function: EntityHandle<HostFunctionEntity>, sp: Sp, spAddend: VReg) throws {
+        let resolvedType = store.value.engine.resolveType(function.type)
+        let layout = FrameHeaderLayout(type: resolvedType)
+        let parameters = resolvedType.parameters.enumerated().map { (i, type) in
+            sp[spAddend + layout.paramReg(i)].cast(to: type)
+        }
+        let instance = self.currentInstance(sp: sp)
+        let caller = Caller(
+            instanceHandle: instance,
+            store: store.value
+        )
+        let results = try function.implementation(caller, Array(parameters))
+        for (index, result) in results.enumerated() {
+            sp[spAddend + layout.returnReg(index)] = UntypedValue(result)
         }
     }
 }
