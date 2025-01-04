@@ -1518,6 +1518,34 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         emit(.callIndirect(operand))
     }
 
+    /// Emit instructions to prepare the frame header for a return call to replace the
+    /// current frame header with the callee's frame header layout.
+    ///
+    /// The frame header should have the callee's frame header layout and parameter
+    /// slots are filled with arguments on the caller's stack.
+    ///
+    /// - Parameters:
+    ///   - calleeType: The type of the callee function.
+    ///   - stackTopHeightToCopy: The height of the stack top needed to be available at the
+    ///     return-call-like instruction point.
+    private mutating func prepareFrameHeaderForReturnCall(calleeType: FunctionType, stackTopHeightToCopy: Int) throws {
+        let calleeFrameHeader = FrameHeaderLayout(type: calleeType)
+        if calleeType == self.type {
+            // Fast path: If the callee and the caller have the same signature, we can
+            // skip reconstructing the frame header and we can just copy the parameters.
+        } else {
+            // Ensure all parameters are on stack to avoid conflicting with the next resize.
+            preserveOnStack(depth: calleeType.parameters.count)
+            // Resize the current frame header while moving stack slots after the header
+            // to the resized positions
+            let newHeaderSize = FrameHeaderLayout.size(of: calleeType)
+            let delta = newHeaderSize - FrameHeaderLayout.size(of: type)
+            let sizeToCopy = VReg(FrameHeaderLayout.numberOfSavingSlots) + valueStack.stackRegBase + VReg(stackTopHeightToCopy)
+            emit(.resizeFrameHeader(Instruction.ResizeFrameHeaderOperand(delta: delta, sizeToCopy: sizeToCopy)))
+        }
+        try copyValuesIntoResultSlots(calleeType.parameters, frameHeader: calleeFrameHeader)
+    }
+
     mutating func visitReturnCall(functionIndex: UInt32) throws {
         let calleeType = try self.module.functionType(functionIndex, interner: funcTypeInterner)
         try validator.validateReturnCallLike(calleeType: calleeType, callerType: type)
@@ -1526,53 +1554,27 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
             // Skip actual code emission if validation-only mode
             return
         }
-
-        let calleeFrameHeader = FrameHeaderLayout(type: calleeType)
-        if calleeType == self.type {
-            // Fast path: If the callee and the caller have the same signature, we can
-            // skip reconstructing the frame header and we can just copy the parameters.
-            try copyValuesIntoResultSlots(calleeType.parameters, frameHeader: calleeFrameHeader)
-            emit(.returnCall(Instruction.ReturnCallOperand(callee: callee)))
-        } else {
-            // Ensure all parameters are on stack to avoid conflicting with the next resize.
-            preserveOnStack(depth: calleeType.parameters.count)
-            // Resize the current frame header while moving stack slots after the header
-            // to the resized positions
-            let newHeaderSize = FrameHeaderLayout.size(of: calleeType)
-            let delta = newHeaderSize - FrameHeaderLayout.size(of: type)
-            let sizeToCopy = VReg(FrameHeaderLayout.numberOfSavingSlots) + valueStack.stackRegBase + VReg(valueStack.height)
-            emit(.resizeFrameHeader(Instruction.ResizeFrameHeaderOperand(delta: delta, sizeToCopy: sizeToCopy)))
-            try copyValuesIntoResultSlots(calleeType.parameters, frameHeader: calleeFrameHeader)
-            emit(.returnCall(Instruction.ReturnCallOperand(callee: callee)))
-        }
+        try prepareFrameHeaderForReturnCall(calleeType: calleeType, stackTopHeightToCopy: valueStack.height)
+        emit(.returnCall(Instruction.ReturnCallOperand(callee: callee)))
         try markUnreachable()
     }
 
     mutating func visitReturnCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws {
+        let stackTopHeightToCopy = valueStack.height
         let addressType = try module.addressType(tableIndex: tableIndex)
         // Preserve function index slot on stack
         let address = try popOnStackOperand(addressType)  // function address
-        let calleeType = try self.module.resolveType(typeIndex)
         guard let address = address else { return }
+
+        let calleeType = try self.module.resolveType(typeIndex)
         let internType = funcTypeInterner.intern(calleeType)
 
-        let calleeFrameHeader = FrameHeaderLayout(type: calleeType)
-        if calleeType == self.type {
-            // Fast path: If the callee and the caller have the same signature, we can
-            // skip reconstructing the frame header and we can just copy the parameters.
-            try copyValuesIntoResultSlots(calleeType.parameters, frameHeader: calleeFrameHeader)
-        } else {
-            // Ensure all parameters are on stack to avoid conflicting with the next resize.
-            preserveOnStack(depth: calleeType.parameters.count)
-            // Resize the current frame header while moving stack slots after the header
-            // to the resized positions
-            let newHeaderSize = FrameHeaderLayout.size(of: calleeType)
-            let delta = newHeaderSize - FrameHeaderLayout.size(of: type)
-            // +1 for address slot as it's used by return_call_indirect executed after resize_frame_header
-            let sizeToCopy = 1 + VReg(FrameHeaderLayout.numberOfSavingSlots) + valueStack.stackRegBase + VReg(valueStack.height)
-            emit(.resizeFrameHeader(Instruction.ResizeFrameHeaderOperand(delta: delta, sizeToCopy: sizeToCopy)))
-            try copyValuesIntoResultSlots(calleeType.parameters, frameHeader: calleeFrameHeader)
-        }
+        try prepareFrameHeaderForReturnCall(
+            calleeType: calleeType,
+            // Keep the stack space including the function index slot to be
+            // accessible at the `return_call_indirect` instruction point.
+            stackTopHeightToCopy: stackTopHeightToCopy
+        )
 
         let operand = Instruction.ReturnCallIndirectOperand(
             tableIndex: tableIndex,
