@@ -74,6 +74,14 @@ extension BinaryInstructionEncoder {
         try encodeInstruction([0x11])
         try encodeImmediates(typeIndex: typeIndex, tableIndex: tableIndex)
     }
+    mutating func visitReturnCall(functionIndex: UInt32) throws {
+        try encodeInstruction([0x12])
+        try encodeImmediates(functionIndex: functionIndex)
+    }
+    mutating func visitReturnCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws {
+        try encodeInstruction([0x13])
+        try encodeImmediates(typeIndex: typeIndex, tableIndex: tableIndex)
+    }
     mutating func visitDrop() throws { try encodeInstruction([0x1A]) }
     mutating func visitSelect() throws { try encodeInstruction([0x1B]) }
     mutating func visitTypedSelect(type: ValueType) throws {

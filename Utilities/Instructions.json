@@ -12,6 +12,8 @@
   ["mvp"                 , "return"                   , ["0x0F"]        , []                                                 , null        ],
   ["mvp"                 , "call"                     , ["0x10"]        , [["functionIndex", "UInt32"]]                      , null        ],
   ["mvp"                 , "call_indirect"            , ["0x11"]        , [["typeIndex", "UInt32"], ["tableIndex", "UInt32"]], null        ],
+  ["tailCall"            , "return_call"              , ["0x12"]        , [["functionIndex", "UInt32"]]                      , null        ],
+  ["tailCall"            , "return_call_indirect"     , ["0x13"]        , [["typeIndex", "UInt32"], ["tableIndex", "UInt32"]], null        ],
   ["mvp"                 , "drop"                     , ["0x1A"]        , []                                                 , null        ],
   ["mvp"                 , "select"                   , ["0x1B"]        , []                                                 , null        ],
   ["referenceTypes"      , {"enumCase": "typedSelect"}, ["0x1C"]        , [["type", "ValueType"]]                            , null        ],

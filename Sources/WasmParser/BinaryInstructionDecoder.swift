@@ -26,6 +26,10 @@ protocol BinaryInstructionDecoder {
     @inlinable mutating func visitCall() throws -> UInt32
     /// Decode `call_indirect` immediates
     @inlinable mutating func visitCallIndirect() throws -> (typeIndex: UInt32, tableIndex: UInt32)
+    /// Decode `return_call` immediates
+    @inlinable mutating func visitReturnCall() throws -> UInt32
+    /// Decode `return_call_indirect` immediates
+    @inlinable mutating func visitReturnCallIndirect() throws -> (typeIndex: UInt32, tableIndex: UInt32)
     /// Decode `typedSelect` immediates
     @inlinable mutating func visitTypedSelect() throws -> ValueType
     /// Decode `local.get` immediates
@@ -122,6 +126,12 @@ func parseBinaryInstruction<V: InstructionVisitor, D: BinaryInstructionDecoder>(
     case 0x11:
         let (typeIndex, tableIndex) = try decoder.visitCallIndirect()
         try visitor.visitCallIndirect(typeIndex: typeIndex, tableIndex: tableIndex)
+    case 0x12:
+        let (functionIndex) = try decoder.visitReturnCall()
+        try visitor.visitReturnCall(functionIndex: functionIndex)
+    case 0x13:
+        let (typeIndex, tableIndex) = try decoder.visitReturnCallIndirect()
+        try visitor.visitReturnCallIndirect(typeIndex: typeIndex, tableIndex: tableIndex)
     case 0x1A:
         try visitor.visitDrop()
     case 0x1B:
