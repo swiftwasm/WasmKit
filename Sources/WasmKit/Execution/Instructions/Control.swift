@@ -151,13 +151,12 @@ extension Execution {
         )
         return pc.next()
     }
-    
+
     mutating func returnCall(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.ReturnCallOperand) throws -> (Pc, CodeSlot) {
         var pc = pc
         (pc, sp) = try tailInvoke(
             function: immediate.callee,
             callerInstance: currentInstance(sp: sp),
-            spAddend: 0,
             sp: sp, pc: pc, md: &md, ms: &ms
         )
         return pc.next()
@@ -172,13 +171,38 @@ extension Execution {
         (pc, sp) = try tailInvoke(
             function: function,
             callerInstance: callerInstance,
-            spAddend: 0,
             sp: sp, pc: pc, md: &md, ms: &ms
         )
         return pc.next()
     }
 
     mutating func resizeFrameHeader(sp: inout Sp, immediate: Instruction.ResizeFrameHeaderOperand) throws {
+        // The params/results space are resized by `delta` slots and the rest of the
+        // frame is copied to the new location. See the following diagram for the
+        // layout of the frame before and after the resize operation:
+        //
+        //
+        //              |--------BEFORE-------|   |--------AFTER--------|
+        //              |  Params  | Results  |   |  Params  | Results  |
+        //              |  ...     |   ...    |   |  ...     |   ...    |
+        // Old Header ->|---------------------|\  |  ...     |   ...    |              -+
+        //              |         Sp          | \ |  ...     |   ...    |               | delta
+        //              |---------------------|  \|---------------------|<- New Header -+  -+
+        //              |         Pc          |   |         Sp          |                   |
+        //              |---------------------|   |---------------------|                   |
+        //              |     Current Func    | C |         Pc          |                   |
+        //     Old Sp ->|---------------------| O |---------------------|                   |
+        //              |       Locals        | P |     Current Func    |                   |
+        //              |        ...          | Y |---------------------|<- New Sp          |
+        //              |---------------------|   |       Locals        |                   | sizeToCopy
+        //              |        Consts       |   |        ...          |                   |
+        //              |        ...          |   |---------------------|                   |
+        //              |---------------------|   |        Consts       |                   |
+        //              |     Value Stack     |   |        ...          |                   |
+        //              |        ...          |   |---------------------|                   |
+        //              |---------------------|\  |     Value Stack     |                   |
+        //                                      \ |        ...          |                   |
+        //                                       \|---------------------|                  -+
         let newSp = sp.advanced(by: Int(immediate.delta))
         try checkStackBoundary(newSp)
         let oldFrameHeader = sp.advanced(by: -FrameHeaderLayout.numberOfSavingSlots)

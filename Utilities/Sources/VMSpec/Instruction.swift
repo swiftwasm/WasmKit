@@ -543,7 +543,10 @@ extension VMGen {
                 $0.field(name: "index", type: .VReg)
                 $0.field(name: "spAddend", type: .VReg)
             },
-            Instruction(name: "resizeFrameHeader", documentation: "Resize the frame header",
+            Instruction(name: "resizeFrameHeader", documentation: """
+                        Resize the frame header by increasing param/result slots and copying `sizeToCopy`
+                        slots placed after the header
+                        """,
                         mayThrow: true, mayUpdateFrame: true) {
                 $0.field(name: "delta", type: .VReg)
                 $0.field(name: "sizeToCopy", type: .VReg)

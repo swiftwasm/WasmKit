@@ -538,17 +538,15 @@ extension Execution {
     func tailInvoke(
         function: InternalFunction,
         callerInstance: InternalInstance?,
-        spAddend: VReg,
         sp: Sp, pc: Pc, md: inout Md, ms: inout Ms
     ) throws -> (Pc, Sp) {
         if function.isWasm {
             return try tailInvokeWasmFunction(
                 function: function.wasm, callerInstance: callerInstance,
-                spAddend: spAddend,
                 sp: sp, md: &md, ms: &ms
             )
         } else {
-            try invokeHostFunction(function: function.host, sp: sp, spAddend: spAddend)
+            try invokeHostFunction(function: function.host, sp: sp, spAddend: 0)
             return (pc, sp)
         }
     }
@@ -561,21 +559,19 @@ extension Execution {
     private func tailInvokeWasmFunction(
         function: EntityHandle<WasmFunctionEntity>,
         callerInstance: InternalInstance?,
-        spAddend: VReg,
         sp: Sp, md: inout Md, ms: inout Ms
     ) throws -> (Pc, Sp) {
         let iseq = try function.ensureCompiled(store: store)
-        let newSp = sp.advanced(by: Int(spAddend))
-        try checkStackBoundary(newSp.advanced(by: iseq.maxStackHeight))
-        newSp.currentFunction = function
+        try checkStackBoundary(sp.advanced(by: iseq.maxStackHeight))
+        sp.currentFunction = function
 
-        initializeConstSlots(sp: newSp, iseq: iseq, numberOfNonParameterLocals: function.numberOfNonParameterLocals)
+        initializeConstSlots(sp: sp, iseq: iseq, numberOfNonParameterLocals: function.numberOfNonParameterLocals)
 
         Execution.CurrentMemory.mayUpdateCurrentInstance(
             instance: function.instance,
             from: callerInstance, md: &md, ms: &ms
         )
-        return (iseq.baseAddress, newSp)
+        return (iseq.baseAddress, sp)
     }
 
     /// Executes the given WebAssembly function.
