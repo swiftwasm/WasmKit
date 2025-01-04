@@ -190,7 +190,7 @@ private struct MetaProgramCounter {
 /// )
 /// ```
 ///
-/// Then the stack frame layout looks like: 
+/// Then the stack frame layout looks like:
 ///
 /// ```
 /// | Offset                             | Description          |

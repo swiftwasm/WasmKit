@@ -25,7 +25,8 @@ enum Instruction: Equatable {
     case internalCall(Instruction.CallOperand)
     /// WebAssembly Core Instruction `call_indirect`
     case callIndirect(Instruction.CallIndirectOperand)
-    /// Resize the frame header
+    /// Resize the frame header by increasing param/result slots and copying `sizeToCopy`
+    /// slots placed after the header
     case resizeFrameHeader(Instruction.ResizeFrameHeaderOperand)
     /// WebAssembly Core Instruction `return_call`
     case returnCall(Instruction.ReturnCallOperand)
