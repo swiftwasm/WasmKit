@@ -316,6 +316,10 @@ extension WasmParserError.Message {
     @usableFromInline static func invalidResultArity(expected: Int, actual: Int) -> Self {
         Self("invalid result arity: expected \(expected) but got \(actual)")
     }
+
+    @usableFromInline static func invalidFunctionType(_ index: Int64) -> Self {
+        Self("invalid function type index: \(index), expected a unsigned 32-bit integer")
+    }
 }
 
 /// > Note:
@@ -343,6 +347,11 @@ extension ByteStream {
     @inlinable
     func parseSigned<T: FixedWidthInteger & RawSignedInteger>() throws -> T {
         try decodeLEB128(stream: self)
+    }
+
+    @usableFromInline
+    func parseVarSigned33() throws -> Int64 {
+        try decodeLEB128(stream: self, bitWidth: 33)
     }
 }
 
@@ -452,7 +461,11 @@ extension Parser {
         case 0x7C...0x7F, 0x70, 0x6F:
             return try .type(parseValueType())
         default:
-            return try .funcType(TypeIndex(stream.consumeAny()))
+            let rawIndex = try stream.parseVarSigned33()
+            guard let index = TypeIndex(exactly: rawIndex) else {
+                throw makeError(.invalidFunctionType(rawIndex))
+            }
+            return .funcType(index)
         }
     }
 
