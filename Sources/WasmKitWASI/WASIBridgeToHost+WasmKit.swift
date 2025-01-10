@@ -4,6 +4,12 @@ import WasmKit
 public typealias WASIBridgeToHost = WASI.WASIBridgeToHost
 
 extension WASIBridgeToHost {
+
+    /// Register the WASI implementation to the given `imports`.
+    ///
+    /// - Parameters:
+    ///   - imports: The imports scope to register the WASI implementation.
+    ///   - store: The store to create the host functions.
     public func link(to imports: inout Imports, store: Store) {
         for (moduleName, module) in wasiHostModules {
             for (name, function) in module.functions {
@@ -35,6 +41,13 @@ extension WASIBridgeToHost {
         }
     }
 
+    /// Start a WASI application as a `command` instance.
+    ///
+    /// See <https://github.com/WebAssembly/WASI/blob/main/legacy/application-abi.md>
+    /// for more information about the WASI Preview 1 Application ABI.
+    ///
+    /// - Parameter instance: The WASI application instance.
+    /// - Returns: The exit code returned by the WASI application.
     public func start(_ instance: Instance) throws -> UInt32 {
         do {
             guard let start = instance.exports[function: "_start"] else {
@@ -45,6 +58,19 @@ extension WASIBridgeToHost {
             return code.code
         }
         return 0
+    }
+
+    /// Start a WASI application as a `reactor` instance.
+    ///
+    /// See <https://github.com/WebAssembly/WASI/blob/main/legacy/application-abi.md>
+    /// for more information about the WASI Preview 1 Application ABI.
+    ///
+    /// - Parameter instance: The WASI application instance.
+    public func initialize(_ instance: Instance) throws {
+        if let initialize = instance.exports[function: "_initialize"] {
+            // Call the optional `_initialize` function.
+            _ = try initialize()
+        }
     }
 
     @available(*, deprecated, message: "Use `Engine`-based API instead")
