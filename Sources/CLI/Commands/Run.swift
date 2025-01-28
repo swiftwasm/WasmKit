@@ -104,7 +104,13 @@ struct Run: ParsableCommand {
     @Argument
     var path: String
 
-    @Argument
+    @Argument(
+        parsing: .captureForPassthrough,
+        help: ArgumentHelp(
+            "Arguments to be passed as WASI command-line arguments or function parameters",
+            valueName: "arguments"
+        )
+    )
     var arguments: [String] = []
 
     func run() throws {
