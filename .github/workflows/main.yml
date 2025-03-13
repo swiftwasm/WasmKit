@@ -193,8 +193,8 @@ jobs:
     steps:
       - uses: compnerd/gha-setup-swift@main
         with:
-          branch: swift-5.10.1-release
-          tag: 5.10.1-RELEASE
+          branch: swift-6.0.3-release
+          tag: 6.0.3-RELEASE
       - uses: actions/checkout@v4
       - run: python3 ./Vendor/checkout-dependency
       # FIXME: CMake build is failing on CI due to "link: extra operand '/OUT:lib\\libXXXX.a'" error
@@ -207,7 +207,18 @@ jobs:
       # - run: cmake -G Ninja -B .build/cmake
       # - run: cmake --build .build/cmake
       # Run tests with SwiftPM
-      - run: swift test
+      - name: Run tests with SwiftPM
+        run: |
+          # Workaround for https://github.com/compnerd/swift-build/issues/909
+          $Win10SdkRoot = Get-ItemPropertyValue `
+            -Path "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows Kits\Installed Roots" `
+            -Name "KitsRoot10"
+          $WinSDKVersion = "10.0.22621.0"
+          $ExtraFlags = @("-Xswiftc", "-windows-sdk-version", "-Xswiftc", "${WinSDKVersion}",
+              "-Xswiftc", "-windows-sdk-root", "-Xswiftc", "${Win10SdkRoot}",
+              "-Xbuild-tools-swiftc", "-windows-sdk-version", "-Xbuild-tools-swiftc", "${WinSDKVersion}",
+              "-Xbuild-tools-swiftc", "-windows-sdk-root", "-Xbuild-tools-swiftc", "${Win10SdkRoot}")
+          swift test @ExtraFlags
 
   build-cmake:
     runs-on: ubuntu-20.04
