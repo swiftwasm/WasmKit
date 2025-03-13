@@ -59,7 +59,11 @@ let package = Package(
             exclude: ["ExtraSuite"]
         ),
 
-        .target(name: "WAT", dependencies: ["WasmParser"]),
+        .target(
+            name: "WAT",
+            dependencies: ["WasmParser"],
+            exclude: ["CMakeLists.txt"]
+        ),
         .testTarget(name: "WATTests", dependencies: ["WAT"]),
 
         .target(
