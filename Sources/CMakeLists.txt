@@ -5,6 +5,7 @@ add_subdirectory(SystemExtras)
 add_subdirectory(WASI)
 add_subdirectory(WasmTypes)
 add_subdirectory(WasmParser)
+add_subdirectory(WAT)
 
 if(WASMKIT_BUILD_CLI)
   add_subdirectory(CLI)
