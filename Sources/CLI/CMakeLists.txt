@@ -5,7 +5,7 @@ add_executable(wasmkit-cli
 )
 
 target_link_wasmkit_libraries(wasmkit-cli PUBLIC
-  ArgumentParser WasmKitWASI)
+  ArgumentParser WAT WasmKitWASI)
 
 install(TARGETS wasmkit-cli
   RUNTIME DESTINATION bin)
