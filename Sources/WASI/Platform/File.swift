@@ -24,6 +24,15 @@ extension FdWASIFile {
         )
     }
 
+    func sync() throws {
+        guard accessMode.contains(.write) else {
+            throw WASIAbi.Errno.EBADF
+        }
+        try WASIAbi.Errno.translatingPlatformErrno {
+            try fd.sync()
+        }
+    }
+
     @inlinable
     func write<Buffer: Sequence>(vectored buffer: Buffer) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
         guard accessMode.contains(.write) else {
