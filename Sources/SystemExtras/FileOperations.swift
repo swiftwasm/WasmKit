@@ -576,6 +576,21 @@ extension FileDescriptor {
     return .success(DirectoryStream(rawValue: dirp))
     #endif
   }
+
+  public func sync() throws {
+    return try _sync().get()
+  }
+
+  internal func _sync() -> Result<Void, Errno> {
+    #if os(Windows)
+    // TODO: Implement by `FlushFileBuffers`?
+    return .failure(Errno(rawValue: ERROR_NOT_SUPPORTED))
+    #else
+    nothingOrErrno(retryOnInterrupt: false) {
+      system_fsync(self.rawValue)
+    }
+    #endif
+  }
 }
 
 #if os(Windows)

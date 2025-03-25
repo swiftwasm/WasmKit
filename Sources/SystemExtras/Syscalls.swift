@@ -47,6 +47,11 @@ internal func system_fcntl(_ fd: Int32, _ cmd: Int32) -> CInt {
   return fcntl(fd, cmd)
 }
 
+// fsync
+internal func system_fsync(_ fd: Int32) -> CInt {
+  return fsync(fd)
+}
+
 #endif
 
 #if os(Linux)
