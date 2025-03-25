@@ -28,6 +28,7 @@ let package = Package(
         .executableTarget(
             name: "CLI",
             dependencies: [
+                "WAT",
                 "WasmKit",
                 "WasmKitWASI",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
