@@ -583,8 +583,11 @@ extension FileDescriptor {
 
   internal func _sync() -> Result<Void, Errno> {
     #if os(Windows)
-    // TODO: Implement by `FlushFileBuffers`?
-    return .failure(Errno(rawValue: ERROR_NOT_SUPPORTED))
+    let handle = HANDLE(bitPattern: _get_osfhandle(self.rawValue))
+    return nothingOrErrno(retryOnInterrupt: false) {
+      let ok = FlushFileBuffers(handle)
+      return ok ? 0 : -1
+    }
     #else
     nothingOrErrno(retryOnInterrupt: false) {
       #if SYSTEM_PACKAGE_DARWIN
