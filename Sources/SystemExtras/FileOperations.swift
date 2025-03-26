@@ -587,7 +587,11 @@ extension FileDescriptor {
     return .failure(Errno(rawValue: ERROR_NOT_SUPPORTED))
     #else
     nothingOrErrno(retryOnInterrupt: false) {
+      #if SYSTEM_PACKAGE_DARWIN
+      system_fcntl(self.rawValue, F_FULLFSYNC)
+      #else
       system_fsync(self.rawValue)
+      #endif
     }
     #endif
   }
