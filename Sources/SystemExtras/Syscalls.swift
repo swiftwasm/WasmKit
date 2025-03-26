@@ -54,6 +54,13 @@ internal func system_fsync(_ fd: Int32) -> CInt {
 
 #endif
 
+#if os(Linux) || os(FreeBSD) || os(OpenBSD) || os(Android) || os(Cygwin) || os(PS4)
+// fdatasync
+internal func system_fdatasync(_ fd: Int32) -> CInt {
+  return fdatasync(fd)
+}
+#endif
+
 #if os(Linux)
 // posix_fadvise
 internal func system_posix_fadvise(

@@ -25,6 +25,7 @@ protocol WASIFile: WASIEntry {
     func setFdStatFlags(_ flags: WASIAbi.Fdflags) throws
     func setFilestatSize(_ size: WASIAbi.FileSize) throws
     func sync() throws
+    func datasync() throws
 
     func tell() throws -> WASIAbi.FileSize
     func seek(offset: WASIAbi.FileDelta, whence: WASIAbi.Whence) throws -> WASIAbi.FileSize
