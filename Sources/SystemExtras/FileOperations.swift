@@ -598,6 +598,26 @@ extension FileDescriptor {
     }
     #endif
   }
+
+  public func datasync() throws {
+    return try _datasync().get()
+  }
+
+  internal func _datasync() -> Result<Void, Errno> {
+    #if os(Windows)
+    return self._sync()
+    #else
+    nothingOrErrno(retryOnInterrupt: false) {
+      #if SYSTEM_PACKAGE_DARWIN
+      system_fcntl(self.rawValue, F_FULLFSYNC)
+      #elseif os(Linux) || os(FreeBSD) || os(OpenBSD) || os(Android) || os(Cygwin) || os(PS4)
+      system_fdatasync(self.rawValue)
+      #else
+      system_fsync(self.rawValue)
+      #endif
+    }
+    #endif
+  }
 }
 
 #if os(Windows)

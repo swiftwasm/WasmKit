@@ -1516,7 +1516,10 @@ public class WASIBridgeToHost: WASI {
     }
 
     func fd_datasync(fd: WASIAbi.Fd) throws {
-        throw WASIAbi.Errno.ENOTSUP
+        guard case let .file(fileEntry) = fdTable[fd] else {
+            throw WASIAbi.Errno.EBADF
+        }
+        return try fileEntry.datasync()
     }
 
     func fd_fdstat_get(fileDescriptor: UInt32) throws -> WASIAbi.FdStat {
