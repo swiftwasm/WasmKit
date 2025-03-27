@@ -25,9 +25,6 @@ extension FdWASIFile {
     }
 
     func sync() throws {
-        guard accessMode.contains(.write) else {
-            throw WASIAbi.Errno.EBADF
-        }
         try WASIAbi.Errno.translatingPlatformErrno {
             try fd.sync()
         }
