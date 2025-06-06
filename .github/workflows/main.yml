@@ -103,8 +103,9 @@ jobs:
             wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-10-15-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-10-15-a-wasm32-unknown-wasi.artifactbundle.zip"
             wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2024-10-15-a-wasm32-unknown-wasi
             wasi-swift-sdk-checksum: "229cd9d3b0ed582c7ef7c3064888ad78764e4743b5a770df92554a94513f53fb"
+            test-args: "-Xswiftc -DWASMKIT_CI_TOOLCHAIN_NIGHTLY"
 
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     name: "build-linux (${{ matrix.swift }})"
 
     steps:
@@ -228,7 +229,7 @@ jobs:
           swift test @ExtraFlags
 
   build-cmake:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     container:
       image: swift:5.8-focal
     steps:
