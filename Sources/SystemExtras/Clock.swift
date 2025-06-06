@@ -6,6 +6,9 @@ import Glibc
 #elseif canImport(Musl)
 import CSystem
 import Musl
+#elseif canImport(Android)
+import CSystem
+import Android
 #elseif os(Windows)
 import CSystem
 import ucrt
@@ -28,7 +31,7 @@ public struct Clock: RawRepresentable {
 }
 
 extension Clock {
-  #if os(Linux)
+  #if os(Linux) || os(Android)
   @_alwaysEmitIntoClient
   public static var boottime: Clock { Clock(rawValue: CLOCK_BOOTTIME) }
   #endif
@@ -38,7 +41,7 @@ extension Clock {
   public static var rawMonotonic: Clock { Clock(rawValue: _CLOCK_MONOTONIC_RAW) }
   #endif
 
-  #if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(OpenBSD) || os(FreeBSD) || os(WASI)
+  #if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(OpenBSD) || os(FreeBSD) || os(WASI)
   @_alwaysEmitIntoClient
   public static var monotonic: Clock { Clock(rawValue: _CLOCK_MONOTONIC) }
   #endif

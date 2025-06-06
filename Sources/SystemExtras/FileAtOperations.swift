@@ -6,6 +6,9 @@ import Glibc
 #elseif canImport(Musl)
 import CSystem
 import Musl
+#elseif canImport(Android)
+import CSystem
+import Android
 #elseif os(Windows)
 import ucrt
 import WinSDK
@@ -44,7 +47,7 @@ extension FileDescriptor {
     #endif
 
     /* FIXME: Disabled until CSystem will include "linux/fcntl.h"
-    #if os(Linux)
+    #if os(Linux) || os(Android)
     /// Indicates the operation does't mount the basename component automatically
     ///
     /// If you specify this option and the file you pass to

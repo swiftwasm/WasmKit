@@ -6,6 +6,9 @@ import Glibc
 #elseif canImport(Musl)
 import CSystem
 import Musl
+#elseif canImport(Android)
+import CSystem
+import Android
 #elseif os(Windows)
 import ucrt
 import WinSDK
@@ -61,12 +64,12 @@ internal func system_fdatasync(_ fd: Int32) -> CInt {
 }
 #endif
 
-#if os(Linux)
+#if os(Linux) || os(Android)
 // posix_fadvise
 internal func system_posix_fadvise(
   _ fd: Int32, _ offset: Int, _ length: Int, _ advice: CInt
 ) -> CInt {
-  return posix_fadvise(fd, offset, length, advice)
+  return posix_fadvise(fd, .init(offset), .init(length), advice)
 }
 #endif
 
@@ -116,7 +119,7 @@ internal func system_symlinkat(
 extension CInterop {
   #if SYSTEM_PACKAGE_DARWIN
   public typealias DirP = UnsafeMutablePointer<DIR>
-  #elseif os(Linux)
+  #elseif os(Linux) || os(Android)
   public typealias DirP = OpaquePointer
   #else
   #error("Unsupported Platform")

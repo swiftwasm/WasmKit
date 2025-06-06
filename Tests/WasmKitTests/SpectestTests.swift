@@ -19,6 +19,9 @@ final class SpectestTests: XCTestCase {
 
     /// Run all the tests in the spectest suite.
     func testRunAll() async throws {
+        #if os(Android)
+        throw XCTSkip("unable to run spectest on Android due to missing files on emulator")
+        #endif
         let defaultConfig = EngineConfiguration()
         let ok = try await spectest(
             path: Self.testPaths,
@@ -31,6 +34,9 @@ final class SpectestTests: XCTestCase {
     }
 
     func testRunAllWithTokenThreading() async throws {
+        #if os(Android)
+        throw XCTSkip("unable to run spectest on Android due to missing files on emulator")
+        #endif
         let defaultConfig = EngineConfiguration()
         guard defaultConfig.threadingModel != .token else { return }
         // Sanity check that non-default threading models work.

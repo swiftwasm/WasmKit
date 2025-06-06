@@ -56,7 +56,11 @@ struct TestSupport {
             }
         #else
             if mkdtemp(&template) == nil {
+                #if os(Android)
+                throw Error(errno: __errno().pointee)
+                #else
                 throw Error(errno: errno)
+                #endif
             }
         #endif
 

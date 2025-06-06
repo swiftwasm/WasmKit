@@ -23,7 +23,7 @@ extension FdWASIEntry {
             try WASIAbi.Errno.translatingPlatformErrno {
                 try self.fd.adviseRead(offset: offset, length: length)
             }
-        #elseif os(Linux)
+        #elseif os(Linux) || os(Android)
             guard let offset = Int(exactly: offset),
                 let length = Int(exactly: length)
             else {
