@@ -127,7 +127,7 @@ let package = Package(
 if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
     package.dependencies += [
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.2.2"),
-        .package(url: "https://github.com/apple/swift-system", .upToNextMinor(from: "1.3.0")),
+        .package(url: "https://github.com/apple/swift-system", .upToNextMinor(from: "1.5.0")),
     ]
 } else {
     package.dependencies += [

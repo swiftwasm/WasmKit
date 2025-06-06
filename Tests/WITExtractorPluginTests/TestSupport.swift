@@ -25,7 +25,11 @@ struct TestSupport {
         var template = [UInt8](templatePath.path.utf8).map({ Int8($0) }) + [Int8(0)]
 
         if mkdtemp(&template) == nil {
+            #if os(Android)
+            throw Error(errno: __errno().pointee)
+            #else
             throw Error(errno: errno)
+            #endif
         }
 
         let path = String(cString: template)

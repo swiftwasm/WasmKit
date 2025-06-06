@@ -189,6 +189,13 @@ jobs:
       - name: Build (aarch64-swift-linux-musl)
         run: ./build-exec swift build --swift-sdk aarch64-swift-linux-musl
 
+  build-android:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Tests on Android emulator
+        uses: skiptools/swift-android-action@v2
+
   build-windows:
     runs-on: windows-latest
     steps:

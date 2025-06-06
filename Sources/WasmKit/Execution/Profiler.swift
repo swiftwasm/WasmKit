@@ -46,7 +46,7 @@ public class GuestTimeProfiler: EngineInterceptor {
 
         private static func getTimestamp() -> UInt64 {
             let clock: SystemExtras.Clock
-            #if os(Linux)
+            #if os(Linux) || os(Android)
                 clock = .boottime
             #elseif os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
                 clock = .rawMonotonic

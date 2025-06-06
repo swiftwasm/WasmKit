@@ -9,6 +9,9 @@ import SystemPackage
 #elseif canImport(Musl)
     import CSystem
     import Musl
+#elseif canImport(Android)
+    import CSystem
+    import Android
 #elseif os(Windows)
     import CSystem
     import ucrt

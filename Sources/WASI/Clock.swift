@@ -92,7 +92,7 @@ public protocol MonotonicClock {
     /// A monotonic clock that uses the system's monotonic clock.
     public struct SystemMonotonicClock: MonotonicClock {
         private var underlying: SystemExtras.Clock {
-            #if os(Linux)
+            #if os(Linux) || os(Android)
                 return .monotonic
             #elseif os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
                 return .rawUptime
@@ -125,7 +125,7 @@ public protocol MonotonicClock {
     /// A wall clock that uses the system's wall clock.
     public struct SystemWallClock: WallClock {
         private var underlying: SystemExtras.Clock {
-            #if os(Linux)
+            #if os(Linux) || os(Android)
                 return .boottime
             #elseif os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
                 return .rawMonotonic

@@ -6,6 +6,9 @@ import Glibc
 #elseif canImport(Musl)
 import CSystem
 import Musl
+#elseif canImport(Android)
+import CSystem
+import Android
 #elseif os(Windows)
 import ucrt
 import WinSDK
@@ -50,7 +53,7 @@ extension FileDescriptor {
     @_alwaysEmitIntoClient
     public init(rawValue: CInt) { self.rawValue = rawValue }
 
-    #if os(Linux)
+    #if os(Linux) || os(Android)
     /// Access the specified data in the near future.
     ///
     /// The corresponding C constant is `POSIX_FADV_WILLNEED`.
@@ -59,7 +62,7 @@ extension FileDescriptor {
     #endif
   }
 
-  #if os(Linux)
+  #if os(Linux) || os(Android)
   /// Announces an intention to access specific region of file data.
   ///
   /// - Parameters:

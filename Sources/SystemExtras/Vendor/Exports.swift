@@ -23,11 +23,11 @@ import Glibc
 #elseif canImport(Musl)
 import CSystem
 import Musl
-#elseif canImport(WASILibc)
-import WASILibc
 #elseif canImport(Android)
 import CSystem
 import Android
+#elseif canImport(WASILibc)
+import WASILibc
 #else
 #error("Unsupported Platform")
 #endif
