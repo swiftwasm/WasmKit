@@ -7,7 +7,7 @@ import XCTest
 final class IntegrationTests: XCTestCase {
     func testRunAll() throws {
         #if os(Android)
-        throw XCTSkip("unable to run spectest on Android due to missing files on emulator")
+            throw XCTSkip("unable to run spectest on Android due to missing files on emulator")
         #endif
         let testDir = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()

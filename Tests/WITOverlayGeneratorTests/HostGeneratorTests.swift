@@ -8,7 +8,7 @@ class HostGeneratorTests: XCTestCase {
     // but execute again here to collect coverage data.
     func testGenerateFromFixtures() throws {
         #if os(Android)
-        throw XCTSkip("unable to run spectest on Android due to missing files on emulator")
+            throw XCTSkip("unable to run spectest on Android due to missing files on emulator")
         #endif
         let fixturesDir = RuntimeTestHarness.testsDirectory.appendingPathComponent("Fixtures")
         for fixture in try FileManager.default.contentsOfDirectory(atPath: fixturesDir.path) {

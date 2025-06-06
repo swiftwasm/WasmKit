@@ -5,7 +5,7 @@ import XCTest
 final class FuzzTranslatorRegressionTests: XCTestCase {
     func testRunAll() throws {
         #if os(Android)
-        throw XCTSkip("Test skipped due to absolute path #filePath unavailable on emulator")
+            throw XCTSkip("Test skipped due to absolute path #filePath unavailable on emulator")
         #endif
         let sourceRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
