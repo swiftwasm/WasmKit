@@ -14,6 +14,14 @@ jobs:
     strategy:
       matrix:
         include:
+          # Swift 5.8.1
+          - os: macos-13
+            xcode: Xcode_14.3.1
+            development-toolchain-tag: swift-DEVELOPMENT-SNAPSHOT-2024-10-08-a
+            wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-10-15-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-10-15-a-wasm32-unknown-wasi.artifactbundle.zip"
+            wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2024-10-15-a-wasm32-unknown-wasi
+            wasi-swift-sdk-checksum: "229cd9d3b0ed582c7ef7c3064888ad78764e4743b5a770df92554a94513f53fb"
+            test-args: ""
           # Swift 5.9.0
           - os: macos-13
             xcode: Xcode_15.0.1
