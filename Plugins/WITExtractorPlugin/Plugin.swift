@@ -48,11 +48,16 @@ struct Plugin: CommandPlugin {
             "--package-name", context.package.displayName,
             "--wit-output-path", witOutputPath.string,
             "--swift-output-path", swiftOutputPath.string,
-            "-I", buildPath.string,
-            // SwiftPM 6.0 and later emits swiftmodule files into a separate directory
-            // https://github.com/swiftlang/swift-package-manager/pull/7212
             "-I", buildPath.appending(["Modules"]).string,
         ]
+
+        #if compiler(<6.0)
+        // Swift 5.10 and earlier emit module files under the per-configuration build directory
+        // instead of the Modules directory.
+        arguments += [
+            "-I", buildPath.string,
+        ]
+        #endif
         if let sdk {
             arguments += ["-sdk", sdk]
         }
