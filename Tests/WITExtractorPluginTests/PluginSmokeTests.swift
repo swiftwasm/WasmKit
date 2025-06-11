@@ -2,9 +2,6 @@ import XCTest
 
 class PluginSmokeTests: XCTestCase {
     func testExtractPlugin() throws {
-        #if WASMKIT_CI_TOOLCHAIN_NIGHTLY
-            throw XCTSkip("XFAIL: https://github.com/swiftwasm/WasmKit/issues/184")
-        #endif
         guard ProcessInfo.processInfo.environment["__XCODE_BUILT_PRODUCTS_DIR_PATHS"] == nil else {
             throw XCTSkip(
                 "\"swift package resolve\" somehow fails to clone git repository only when invoking from Xcode test runner"
