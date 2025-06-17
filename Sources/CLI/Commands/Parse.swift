@@ -1,6 +1,6 @@
+import SystemPackage
 import WAT
 import WasmKit
-import SystemPackage
 
 /// Parses a `.wasm` or `.wat` module.
 func parseWasm(filePath: FilePath) throws -> Module {
