@@ -517,6 +517,53 @@ enum WASIAbi {
         }
     }
 
+    struct Event: Equatable, GuestPointee {
+        struct FdReadWrite: Equatable, GuestPointee {
+            struct Flags: OptionSet, GuestPointee {
+                let rawValue: UInt16
+                static let hangup = Self(rawValue: 1)
+            }
+            let nBytes: FileSize
+            let flags: Flags
+            static let sizeInGuest: UInt32 = 16
+            static let alignInGuest: UInt32 = 8
+
+            static func readFromGuest(_ pointer: UnsafeGuestRawPointer) -> Self {
+                var pointer = pointer
+                return .init(nBytes: FileSize.readFromGuest(&pointer), flags: Flags.readFromGuest(&pointer))
+            }
+            static func writeToGuest(at pointer: UnsafeGuestRawPointer, value: Self) {
+                var pointer = pointer
+                FileSize.writeToGuest(at: &pointer, value: value.nBytes)
+                Flags.writeToGuest(at: &pointer, value: value.flags)
+            }
+        }
+
+        let userData: UserData
+        let error: Errno
+        let eventType: EventType
+        let fdReadWrite: FdReadWrite
+        static let sizeInGuest: UInt32 = 32
+        static let alignInGuest: UInt32 = 8
+
+        static func readFromGuest(_ pointer: UnsafeGuestRawPointer) -> Self {
+            var pointer = pointer
+            return .init(
+                userData: .readFromGuest(&pointer),
+                error: .readFromGuest(&pointer),
+                eventType: .readFromGuest(&pointer),
+                fdReadWrite: .readFromGuest(&pointer)
+            )
+        }
+        static func writeToGuest(at pointer: UnsafeGuestRawPointer, value: Self) {
+            var pointer = pointer
+            UserData.writeToGuest(at: &pointer, value: value.userData)
+            Errno.writeToGuest(at: &pointer, value: value.error)
+            EventType.writeToGuest(at: &pointer, value: value.eventType)
+            FdReadWrite.writeToGuest(at: &pointer, value: value.fdReadWrite)
+        }
+    }
+
     enum ClockId: UInt32 {
         /// The clock measuring real time. Time value zero corresponds with
         /// 1970-01-01T00:00:00Z.
