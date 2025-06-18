@@ -211,9 +211,8 @@ protocol WASI {
 
     /// Concurrently poll for the occurrence of a set of events.
     func poll_oneoff(
-        subscriptions: UnsafeGuestRawPointer,
-        events: UnsafeGuestRawPointer,
-        numberOfSubscriptions: WASIAbi.Size
+        subscriptions: UnsafeGuestBufferPointer<WASIAbi.Subscription>,
+        events: UnsafeGuestBufferPointer<WASIAbi.Event>
     ) throws -> WASIAbi.Size
 
     /// Write high-quality random data into a buffer.
@@ -221,7 +220,7 @@ protocol WASI {
 }
 
 enum WASIAbi {
-    enum Errno: UInt32, Error {
+    enum Errno: UInt32, Error, GuestPointee {
         /// No error occurred. System call completed successfully.
         case SUCCESS = 0
         /// Argument list too long.
@@ -952,7 +951,6 @@ public struct WASIHostModule {
 extension WASI {
     var _hostModules: [String: WASIHostModule] {
         let unimplementedFunctionTypes: [String: FunctionType] = [
-            "poll_oneoff": .init(parameters: [.i32, .i32, .i32, .i32], results: [.i32]),
             "proc_raise": .init(parameters: [.i32], results: [.i32]),
             "sched_yield": .init(parameters: [], results: [.i32]),
             "sock_accept": .init(parameters: [.i32, .i32, .i32], results: [.i32]),
@@ -1493,6 +1491,24 @@ extension WASI {
             }
         }
 
+        preview1["poll_oneoff"] = wasiFunction(
+            type: .init(parameters: [.i32, .i32, .i32, .i32], results: [.i32])
+        ) { caller, arguments in
+            try withMemoryBuffer(caller: caller) { buffer in
+                let subscriptionsBaseAddress = UnsafeGuestPointer<WASIAbi.Subscription>(memorySpace: buffer, offset: arguments[0].i32)
+                let eventsBaseAddress = UnsafeGuestPointer<WASIAbi.Event>(memorySpace: buffer, offset: arguments[1].i32)
+                let size = try self.poll_oneoff(
+                    subscriptions: .init(baseAddress: subscriptionsBaseAddress, count: arguments[2].i32),
+                    events: .init(baseAddress: eventsBaseAddress, count: arguments[2].i32)
+                )
+                buffer.withUnsafeMutableBufferPointer(offset: .init(arguments[3].i32), count: MemoryLayout<UInt32>.size) { raw in
+                    raw.withMemoryRebound(to: UInt32.self) { rebound in rebound[0] = size.littleEndian }
+                }
+
+                return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            }
+        }
+
         return [
             "wasi_snapshot_preview1": WASIHostModule(functions: preview1)
         ]
@@ -1977,11 +1993,24 @@ public class WASIBridgeToHost: WASI {
     }
 
     func poll_oneoff(
-        subscriptions: UnsafeGuestRawPointer,
-        events: UnsafeGuestRawPointer,
-        numberOfSubscriptions: WASIAbi.Size
+        subscriptions: UnsafeGuestBufferPointer<WASIAbi.Subscription>,
+        events: UnsafeGuestBufferPointer<WASIAbi.Event>
     ) throws -> WASIAbi.Size {
-        throw WASIAbi.Errno.ENOTSUP
+        for subscription in subscriptions {
+            switch subscription.union {
+            case .clock:
+                throw WASIAbi.Errno.ENOTSUP
+
+            case .fdRead(let fd), .fdWrite(let fd):
+                guard case let .file(entry) = self.fdTable[fd] else {
+                    throw WASIAbi.Errno.EBADF
+
+                }
+                throw WASIAbi.Errno.ENOTSUP
+            }
+        }
+
+        return 0
     }
 
     func random_get(buffer: UnsafeGuestPointer<UInt8>, length: WASIAbi.Size) {
