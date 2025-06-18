@@ -429,6 +429,48 @@ enum WASIAbi {
         case END = 2
     }
 
+    struct Clock: GuestPointee {
+        struct Flags: OptionSet, GuestPrimitivePointee {
+            let rawValue: UInt16
+
+            static let isAbsoluteTime = Self(rawValue: 1)
+        }
+
+        let id: ClockId
+        let timeout: Timestamp
+        let precision: Timestamp
+        let flags: Flags
+
+        static let sizeInGuest: UInt32 = 32
+        static let alignInGuest: UInt32 = max(ClockId.alignInGuest, Timestamp.alignInGuest, Flags.alignInGuest)
+
+        static func readFromGuest(_ pointer: UnsafeGuestRawPointer) -> Self {
+            var pointer = pointer
+            return .init(
+                id: .readFromGuest(&pointer),
+                timeout: .readFromGuest(&pointer),
+                precision: .readFromGuest(&pointer),
+                flags: .readFromGuest(&pointer)
+            )
+        }
+
+        static func writeToGuest(at pointer: UnsafeGuestRawPointer, value: Self) {
+            var pointer = pointer
+            ClockId.writeToGuest(at: &pointer, value: value.id)
+            Timestamp.writeToGuest(at: &pointer, value: value.timeout)
+            Timestamp.writeToGuest(at: &pointer, value: value.precision)
+            Flags.writeToGuest(at: &pointer, value: value.flags)
+        }
+    }
+
+    enum EventType: UInt8 {
+        case clock
+        case fdRead
+        case fdWrite
+    }
+
+    typealias UserData = UInt64
+
     enum ClockId: UInt32 {
         /// The clock measuring real time. Time value zero corresponds with
         /// 1970-01-01T00:00:00Z.
