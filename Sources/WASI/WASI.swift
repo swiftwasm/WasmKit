@@ -471,6 +471,52 @@ enum WASIAbi {
 
     typealias UserData = UInt64
 
+    struct Subscription: Equatable {
+        enum Union: Equatable, GuestPointee {
+            case clock(Clock)
+            case fdRead(Fd)
+            case fdWrite(Fd)
+
+            static let sizeInGuest: UInt32 = 40
+            static let alignInGuest: UInt32 = max(Clock.alignInGuest, Fd.alignInGuest)
+
+            static func readFromGuest(_ pointer: UnsafeGuestRawPointer) -> Self {
+                var pointer = pointer
+                let tag = UInt8.readFromGuest(&pointer)
+
+                switch tag {
+                case 0:
+                    return .clock(.readFromGuest(&pointer))
+
+                case 1:
+                    return .fdRead(.readFromGuest(&pointer))
+
+                case 2:
+                    return .fdWrite(.readFromGuest(&pointer))
+
+                default:
+                    // FIXME: should this throw?
+                    fatalError()
+                }
+            }
+
+            static func writeToGuest(at pointer: UnsafeGuestRawPointer, value: Self) {
+                var pointer = pointer
+                switch value {
+                case .clock(let clock):
+                    UInt8.writeToGuest(at: &pointer, value: 0)
+                    Clock.writeToGuest(at: &pointer, value: clock)
+                case .fdRead(let fd):
+                    UInt8.writeToGuest(at: &pointer, value: 1)
+                    Fd.writeToGuest(at: &pointer, value: fd)
+                case .fdWrite(let fd):
+                    UInt8.writeToGuest(at: &pointer, value: 2)
+                    Fd.writeToGuest(at: &pointer, value: fd)
+                }
+            }
+        }
+    }
+
     enum ClockId: UInt32 {
         /// The clock measuring real time. Time value zero corresponds with
         /// 1970-01-01T00:00:00Z.
