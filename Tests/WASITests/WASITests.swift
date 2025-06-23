@@ -1,7 +1,7 @@
-import XCTest
-
 import WasmKit
 import WasmTypes
+import XCTest
+
 @testable import WASI
 
 final class WASITests: XCTestCase {
