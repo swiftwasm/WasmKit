@@ -1,5 +1,7 @@
 import XCTest
 
+import WasmKit
+import WasmTypes
 @testable import WASI
 
 final class WASITests: XCTestCase {
@@ -133,5 +135,38 @@ final class WASITests: XCTestCase {
         try assertNotResolve("link-loop.txt", followSymlink: true) { error in
             XCTAssertEqual(error, .ELOOP)
         }
+    }
+
+    func testWASIAbi() throws {
+        let engine = Engine()
+        let store = Store(engine: engine)
+        let memory = try Memory(store: store, type: .init(min: 1))
+
+        // Test union size and alignment end-to-end
+        let start = UnsafeGuestRawPointer(memorySpace: memory, offset: 0)
+        var pointer = start
+        let read = WASIAbi.Subscription.Union.fdRead(.init(0))
+        let write = WASIAbi.Subscription.Union.fdWrite(.init(0))
+        let clock = WASIAbi.Subscription.Union.clock(.init(id: .REALTIME, timeout: 42, precision: 0, flags: []))
+        let event = WASIAbi.Event(userData: 3, error: .EIO, eventType: .fdRead, fdReadWrite: .init(nBytes: 37, flags: [.hangup]))
+        WASIAbi.Subscription.writeToGuest(at: &pointer, value: .init(userData: 1, union: read))
+        XCTAssertEqual(pointer.offset, 48)
+        WASIAbi.Subscription.writeToGuest(at: &pointer, value: .init(userData: 2, union: write))
+        XCTAssertEqual(pointer.offset, 48 * 2)
+        WASIAbi.Subscription.writeToGuest(at: &pointer, value: .init(userData: 3, union: clock))
+        XCTAssertEqual(pointer.offset, 48 * 3)
+        WASIAbi.Event.writeToGuest(at: &pointer, value: event)
+        XCTAssertEqual(pointer.offset, 48 * 3 + 32)
+
+        // Test that reading back yields same result
+        pointer = start
+        XCTAssertEqual(WASIAbi.Subscription.readFromGuest(&pointer), .init(userData: 1, union: read))
+        XCTAssertEqual(pointer.offset, 48)
+        XCTAssertEqual(WASIAbi.Subscription.readFromGuest(&pointer), .init(userData: 2, union: write))
+        XCTAssertEqual(pointer.offset, 48 * 2)
+        XCTAssertEqual(WASIAbi.Subscription.readFromGuest(&pointer), .init(userData: 3, union: clock))
+        XCTAssertEqual(pointer.offset, 48 * 3)
+        XCTAssertEqual(WASIAbi.Event.readFromGuest(&pointer), event)
+        XCTAssertEqual(pointer.offset, 48 * 3 + 32)
     }
 }
