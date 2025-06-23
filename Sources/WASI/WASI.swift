@@ -428,8 +428,8 @@ enum WASIAbi {
         case END = 2
     }
 
-    struct Clock: GuestPointee {
-        struct Flags: OptionSet, GuestPrimitivePointee {
+    struct Clock: Equatable, GuestPointee {
+        struct Flags: OptionSet, GuestPointee {
             let rawValue: UInt16
 
             static let isAbsoluteTime = Self(rawValue: 1)
@@ -462,7 +462,7 @@ enum WASIAbi {
         }
     }
 
-    enum EventType: UInt8 {
+    enum EventType: UInt8, GuestPointee {
         case clock
         case fdRead
         case fdWrite
@@ -470,7 +470,7 @@ enum WASIAbi {
 
     typealias UserData = UInt64
 
-    struct Subscription: Equatable {
+    struct Subscription: Equatable, GuestPointee {
         enum Union: Equatable, GuestPointee {
             case clock(Clock)
             case fdRead(Fd)
@@ -513,6 +513,22 @@ enum WASIAbi {
                     Fd.writeToGuest(at: &pointer, value: fd)
                 }
             }
+        }
+
+        let userData: UserData
+        let union: Union
+        static var sizeInGuest: UInt32 = 48
+        static var alignInGuest: UInt32 = max(UserData.alignInGuest, Union.alignInGuest)
+
+        static func readFromGuest(_ pointer: UnsafeGuestRawPointer) -> Self {
+            var pointer = pointer
+            return .init(userData: .readFromGuest(&pointer), union: .readFromGuest(&pointer))
+        }
+
+        static func writeToGuest(at pointer: UnsafeGuestRawPointer, value: Self) {
+            var pointer = pointer
+            UserData.writeToGuest(at: &pointer, value: value.userData)
+            Union.writeToGuest(at: &pointer, value: value.union)
         }
     }
 
@@ -563,7 +579,7 @@ enum WASIAbi {
         }
     }
 
-    enum ClockId: UInt32 {
+    enum ClockId: UInt32, GuestPointee {
         /// The clock measuring real time. Time value zero corresponds with
         /// 1970-01-01T00:00:00Z.
         case REALTIME = 0

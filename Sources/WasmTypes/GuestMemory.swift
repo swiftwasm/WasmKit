@@ -38,7 +38,15 @@ extension GuestPrimitivePointee {
 }
 
 /// Auto implementation of ``GuestPointee`` for ``RawRepresentable`` types
-extension GuestPrimitivePointee where Self: RawRepresentable, Self.RawValue: GuestPointee {
+extension GuestPointee where Self: RawRepresentable, Self.RawValue: GuestPointee {
+    public static var sizeInGuest: UInt32 {
+        RawValue.sizeInGuest
+    }
+
+    public static var alignInGuest: UInt32 {
+        RawValue.alignInGuest
+    }
+
     /// Reads a value of RawValue type and constructs a value of Self type
     public static func readFromGuest(_ pointer: UnsafeGuestRawPointer) -> Self {
         Self(rawValue: .readFromGuest(pointer))!
