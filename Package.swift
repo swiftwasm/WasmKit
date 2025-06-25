@@ -13,7 +13,7 @@ let DarwinPlatforms: [Platform]
 
 let package = Package(
     name: "WasmKit",
-    platforms: [.macOS(.v10_13), .iOS(.v12)],
+    platforms: [.macOS(.v13), .iOS(.v16)],
     products: [
         .executable(name: "wasmkit-cli", targets: ["CLI"]),
         .library(name: "WasmKit", targets: ["WasmKit"]),
