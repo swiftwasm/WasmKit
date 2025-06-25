@@ -2012,21 +2012,9 @@ public class WASIBridgeToHost: WASI {
         subscriptions: UnsafeGuestBufferPointer<WASIAbi.Subscription>,
         events: UnsafeGuestBufferPointer<WASIAbi.Event>
     ) throws -> WASIAbi.Size {
-        for subscription in subscriptions {
-            switch subscription.union {
-            case .clock:
-                throw WASIAbi.Errno.ENOTSUP
-
-            case .fdRead(let fd), .fdWrite(let fd):
-                guard case let .file(entry) = self.fdTable[fd] else {
-                    throw WASIAbi.Errno.EBADF
-
-                }
-                throw WASIAbi.Errno.ENOTSUP
-            }
-        }
-
-        return 0
+        guard !subscriptions.isEmpty else { throw WASIAbi.Errno.EINVAL }
+        try poll(subscriptions: subscriptions, self.fdTable)
+        return .init(subscriptions.count)
     }
 
     func random_get(buffer: UnsafeGuestPointer<UInt8>, length: WASIAbi.Size) {
