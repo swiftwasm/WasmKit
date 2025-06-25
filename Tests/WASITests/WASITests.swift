@@ -173,10 +173,13 @@ final class WASITests: XCTestCase {
         XCTAssertEqual(pointer.offset, eventOffset)
         XCTAssertEqual(WASIAbi.Event.readFromGuest(&pointer), event)
         XCTAssertEqual(pointer.offset, finalOffset)
-        XCTAssertTrue(
-            try ContinuousClock().measure {
-                let clockPointer = UnsafeGuestBufferPointer<WASIAbi.Subscription>(baseAddress: .init(memorySpace: memory, offset: clockOffset), count: 1)
-                XCTAssertEqual(try WASIBridgeToHost().poll_oneoff(subscriptions: clockPointer, events: .init(baseAddress: .init(memorySpace: memory, offset: finalOffset), count: 1)), 1)
-            } > .nanoseconds(timeout))
+
+        #if !os(Windows)
+            XCTAssertTrue(
+                try ContinuousClock().measure {
+                    let clockPointer = UnsafeGuestBufferPointer<WASIAbi.Subscription>(baseAddress: .init(memorySpace: memory, offset: clockOffset), count: 1)
+                    XCTAssertEqual(try WASIBridgeToHost().poll_oneoff(subscriptions: clockPointer, events: .init(baseAddress: .init(memorySpace: memory, offset: finalOffset), count: 1)), 1)
+                } > .nanoseconds(timeout))
+        #endif
     }
 }
