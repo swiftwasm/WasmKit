@@ -1,20 +1,20 @@
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#elseif canImport(Musl)
-import Musl
-#elseif canImport(Android)
-import Android
-#else
-#error("Unsupported Platform")
-#endif
-
 import SystemPackage
+
+#if canImport(Darwin)
+    import Darwin
+#elseif canImport(Glibc)
+    import Glibc
+#elseif canImport(Musl)
+    import Musl
+#elseif canImport(Android)
+    import Android
+#else
+    #error("Unsupported Platform")
+#endif
 
 extension FdTable {
     func fileDescriptor(fd: WASIAbi.Fd) throws -> FileDescriptor {
-        guard case let .file(entry) = self[fd], let fd = (entry as? FdWASIEntry)?.fd  else {
+        guard case let .file(entry) = self[fd], let fd = (entry as? FdWASIEntry)?.fd else {
             throw WASIAbi.Errno.EBADF
         }
 
