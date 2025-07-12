@@ -1,0 +1,65 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./Utilities/build-release.py -o wasmkit-x86_64-apple-macos.tar.gz -- --triple x86_64-apple-macos
+      - run: ./Utilities/build-release.py -o wasmkit-arm64-apple-macos.tar.gz  -- --triple arm64-apple-macos
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-wasmkit-x86_64-apple-macos
+          path: wasmkit-x86_64-apple-macos.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-wasmkit-arm64-apple-macos
+          path: wasmkit-arm64-apple-macos.tar.gz
+
+  build-musl:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure container
+        run: |
+          docker run -dit --name build-container -v $PWD:/workspace -w /workspace swift:6.0.1-jammy
+          echo 'docker exec -i build-container "$@"' > ./build-exec
+          chmod +x ./build-exec
+      - name: Install Static Linux SDK
+        run: ./build-exec swift sdk install "https://download.swift.org/swift-6.0.1-release/static-sdk/swift-6.0.1-RELEASE/swift-6.0.1-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz" --checksum "d4f46ba40e11e697387468e18987ee622908bc350310d8af54eb5e17c2ff5481"
+
+      - run: ./build-exec ./Utilities/build-release.py -o wasmkit-x86_64-swift-linux-musl.tar.gz  -- --swift-sdk x86_64-swift-linux-musl
+      - run: ./build-exec ./Utilities/build-release.py -o wasmkit-aarch64-swift-linux-musl.tar.gz -- --swift-sdk aarch64-swift-linux-musl
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-wasmkit-x86_64-swift-linux-musl
+          path: wasmkit-x86_64-swift-linux-musl.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-wasmkit-aarch64-swift-linux-musl
+          path: wasmkit-aarch64-swift-linux-musl.tar.gz
+
+  create-release:
+    needs:
+      - build-macos
+      - build-musl
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-wasmkit-*
+          path: ./release/
+      - name: Create Release
+        run: |
+          VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')
+          echo "Creating release $VERSION"
+          gh release create $VERSION --title $VERSION --notes "Release $VERSION" ./release/wasmkit-*
