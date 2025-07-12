@@ -47,7 +47,7 @@ def main():
         # For ELF binaries, use strip to remove debug symbols because
         # most of static archives in static linux Swift SDK contains
         # debug sections.
-        run(["strip", src_exe_path, "--strip-debug", "-o", dest_exe_path])
+        run(["llvm-strip", src_exe_path, "--strip-debug", "-o", dest_exe_path])
     else:
         shutil.copy(src_exe_path, dest_exe_path)
 
