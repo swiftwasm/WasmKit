@@ -35,6 +35,11 @@ jobs:
           chmod +x ./build-exec
       - name: Install Static Linux SDK
         run: ./build-exec swift sdk install "https://download.swift.org/swift-6.0.1-release/static-sdk/swift-6.0.1-RELEASE/swift-6.0.1-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz" --checksum "d4f46ba40e11e697387468e18987ee622908bc350310d8af54eb5e17c2ff5481"
+      - name: Install LLVM tools
+        run: |
+          ./build-exec apt-get update
+          ./build-exec apt-get install -y llvm-15
+          ./build-exec ln -s /usr/bin/llvm-strip-15 /usr/bin/llvm-strip
 
       - run: ./build-exec ./Utilities/build-release.py -o wasmkit-x86_64-swift-linux-musl.tar.gz  -- --swift-sdk x86_64-swift-linux-musl
       - run: ./build-exec ./Utilities/build-release.py -o wasmkit-aarch64-swift-linux-musl.tar.gz -- --swift-sdk aarch64-swift-linux-musl
