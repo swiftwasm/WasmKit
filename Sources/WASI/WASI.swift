@@ -211,9 +211,8 @@ protocol WASI {
 
     /// Concurrently poll for the occurrence of a set of events.
     func poll_oneoff(
-        subscriptions: UnsafeGuestRawPointer,
-        events: UnsafeGuestRawPointer,
-        numberOfSubscriptions: WASIAbi.Size
+        subscriptions: UnsafeGuestBufferPointer<WASIAbi.Subscription>,
+        events: UnsafeGuestBufferPointer<WASIAbi.Event>
     ) throws -> WASIAbi.Size
 
     /// Write high-quality random data into a buffer.
@@ -221,7 +220,7 @@ protocol WASI {
 }
 
 enum WASIAbi {
-    enum Errno: UInt32, Error {
+    enum Errno: UInt32, Error, GuestPointee {
         /// No error occurred. System call completed successfully.
         case SUCCESS = 0
         /// Argument list too long.
@@ -429,7 +428,158 @@ enum WASIAbi {
         case END = 2
     }
 
-    enum ClockId: UInt32 {
+    struct Clock: Equatable, GuestPointee {
+        struct Flags: OptionSet, GuestPointee {
+            let rawValue: UInt16
+
+            static let isAbsoluteTime = Self(rawValue: 1)
+        }
+
+        let id: ClockId
+        let timeout: Timestamp
+        let precision: Timestamp
+        let flags: Flags
+
+        static let sizeInGuest: UInt32 = 32
+        static let alignInGuest: UInt32 = max(ClockId.alignInGuest, Timestamp.alignInGuest, Flags.alignInGuest)
+
+        static func readFromGuest(_ pointer: UnsafeGuestRawPointer) -> Self {
+            var pointer = pointer
+            return .init(
+                id: .readFromGuest(&pointer),
+                timeout: .readFromGuest(&pointer),
+                precision: .readFromGuest(&pointer),
+                flags: .readFromGuest(&pointer)
+            )
+        }
+
+        static func writeToGuest(at pointer: UnsafeGuestRawPointer, value: Self) {
+            var pointer = pointer
+            ClockId.writeToGuest(at: &pointer, value: value.id)
+            Timestamp.writeToGuest(at: &pointer, value: value.timeout)
+            Timestamp.writeToGuest(at: &pointer, value: value.precision)
+            Flags.writeToGuest(at: &pointer, value: value.flags)
+        }
+    }
+
+    enum EventType: UInt8, GuestPointee {
+        case clock
+        case fdRead
+        case fdWrite
+    }
+
+    typealias UserData = UInt64
+
+    struct Subscription: Equatable, GuestPointee {
+        enum Union: Equatable, GuestPointee {
+            case clock(Clock)
+            case fdRead(Fd)
+            case fdWrite(Fd)
+
+            static let sizeInGuest: UInt32 = 40
+            static let alignInGuest: UInt32 = max(Clock.alignInGuest, Fd.alignInGuest)
+
+            static func readFromGuest(_ pointer: UnsafeGuestRawPointer) -> Self {
+                var pointer = pointer
+                let tag = UInt8.readFromGuest(&pointer)
+
+                switch tag {
+                case 0:
+                    return .clock(.readFromGuest(&pointer))
+
+                case 1:
+                    return .fdRead(.readFromGuest(&pointer))
+
+                case 2:
+                    return .fdWrite(.readFromGuest(&pointer))
+
+                default:
+                    // FIXME: should this throw?
+                    fatalError()
+                }
+            }
+
+            static func writeToGuest(at pointer: UnsafeGuestRawPointer, value: Self) {
+                var pointer = pointer
+                switch value {
+                case .clock(let clock):
+                    UInt8.writeToGuest(at: &pointer, value: 0)
+                    Clock.writeToGuest(at: &pointer, value: clock)
+                case .fdRead(let fd):
+                    UInt8.writeToGuest(at: &pointer, value: 1)
+                    Fd.writeToGuest(at: &pointer, value: fd)
+                case .fdWrite(let fd):
+                    UInt8.writeToGuest(at: &pointer, value: 2)
+                    Fd.writeToGuest(at: &pointer, value: fd)
+                }
+            }
+        }
+
+        let userData: UserData
+        let union: Union
+        static var sizeInGuest: UInt32 = 48
+        static var alignInGuest: UInt32 = max(UserData.alignInGuest, Union.alignInGuest)
+
+        static func readFromGuest(_ pointer: UnsafeGuestRawPointer) -> Self {
+            var pointer = pointer
+            return .init(userData: .readFromGuest(&pointer), union: .readFromGuest(&pointer))
+        }
+
+        static func writeToGuest(at pointer: UnsafeGuestRawPointer, value: Self) {
+            var pointer = pointer
+            UserData.writeToGuest(at: &pointer, value: value.userData)
+            Union.writeToGuest(at: &pointer, value: value.union)
+        }
+    }
+
+    struct Event: Equatable, GuestPointee {
+        struct FdReadWrite: Equatable, GuestPointee {
+            struct Flags: OptionSet, GuestPointee {
+                let rawValue: UInt16
+                static let hangup = Self(rawValue: 1)
+            }
+            let nBytes: FileSize
+            let flags: Flags
+            static let sizeInGuest: UInt32 = 16
+            static let alignInGuest: UInt32 = 8
+
+            static func readFromGuest(_ pointer: UnsafeGuestRawPointer) -> Self {
+                var pointer = pointer
+                return .init(nBytes: FileSize.readFromGuest(&pointer), flags: Flags.readFromGuest(&pointer))
+            }
+            static func writeToGuest(at pointer: UnsafeGuestRawPointer, value: Self) {
+                var pointer = pointer
+                FileSize.writeToGuest(at: &pointer, value: value.nBytes)
+                Flags.writeToGuest(at: &pointer, value: value.flags)
+            }
+        }
+
+        let userData: UserData
+        let error: Errno
+        let eventType: EventType
+        let fdReadWrite: FdReadWrite
+        static let sizeInGuest: UInt32 = 32
+        static let alignInGuest: UInt32 = 8
+
+        static func readFromGuest(_ pointer: UnsafeGuestRawPointer) -> Self {
+            var pointer = pointer
+            return .init(
+                userData: .readFromGuest(&pointer),
+                error: .readFromGuest(&pointer),
+                eventType: .readFromGuest(&pointer),
+                fdReadWrite: .readFromGuest(&pointer)
+            )
+        }
+        static func writeToGuest(at pointer: UnsafeGuestRawPointer, value: Self) {
+            var pointer = pointer
+            UserData.writeToGuest(at: &pointer, value: value.userData)
+            Errno.writeToGuest(at: &pointer, value: value.error)
+            EventType.writeToGuest(at: &pointer, value: value.eventType)
+            FdReadWrite.writeToGuest(at: &pointer, value: value.fdReadWrite)
+        }
+    }
+
+    enum ClockId: UInt32, GuestPointee {
         /// The clock measuring real time. Time value zero corresponds with
         /// 1970-01-01T00:00:00Z.
         case REALTIME = 0
@@ -817,7 +967,6 @@ public struct WASIHostModule {
 extension WASI {
     var _hostModules: [String: WASIHostModule] {
         let unimplementedFunctionTypes: [String: FunctionType] = [
-            "poll_oneoff": .init(parameters: [.i32, .i32, .i32, .i32], results: [.i32]),
             "proc_raise": .init(parameters: [.i32], results: [.i32]),
             "sched_yield": .init(parameters: [], results: [.i32]),
             "sock_accept": .init(parameters: [.i32, .i32, .i32], results: [.i32]),
@@ -1358,6 +1507,24 @@ extension WASI {
             }
         }
 
+        preview1["poll_oneoff"] = wasiFunction(
+            type: .init(parameters: [.i32, .i32, .i32, .i32], results: [.i32])
+        ) { caller, arguments in
+            try withMemoryBuffer(caller: caller) { buffer in
+                let subscriptionsBaseAddress = UnsafeGuestPointer<WASIAbi.Subscription>(memorySpace: buffer, offset: arguments[0].i32)
+                let eventsBaseAddress = UnsafeGuestPointer<WASIAbi.Event>(memorySpace: buffer, offset: arguments[1].i32)
+                let size = try self.poll_oneoff(
+                    subscriptions: .init(baseAddress: subscriptionsBaseAddress, count: arguments[2].i32),
+                    events: .init(baseAddress: eventsBaseAddress, count: arguments[2].i32)
+                )
+                buffer.withUnsafeMutableBufferPointer(offset: .init(arguments[3].i32), count: MemoryLayout<UInt32>.size) { raw in
+                    raw.withMemoryRebound(to: UInt32.self) { rebound in rebound[0] = size.littleEndian }
+                }
+
+                return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            }
+        }
+
         return [
             "wasi_snapshot_preview1": WASIHostModule(functions: preview1)
         ]
@@ -1842,11 +2009,12 @@ public class WASIBridgeToHost: WASI {
     }
 
     func poll_oneoff(
-        subscriptions: UnsafeGuestRawPointer,
-        events: UnsafeGuestRawPointer,
-        numberOfSubscriptions: WASIAbi.Size
+        subscriptions: UnsafeGuestBufferPointer<WASIAbi.Subscription>,
+        events: UnsafeGuestBufferPointer<WASIAbi.Event>
     ) throws -> WASIAbi.Size {
-        throw WASIAbi.Errno.ENOTSUP
+        guard !subscriptions.isEmpty else { throw WASIAbi.Errno.EINVAL }
+        try poll(subscriptions: subscriptions, self.fdTable)
+        return .init(subscriptions.count)
     }
 
     func random_get(buffer: UnsafeGuestPointer<UInt8>, length: WASIAbi.Size) {
