@@ -1824,7 +1824,13 @@ public class WASIBridgeToHost: WASI {
         oldFd: WASIAbi.Fd, oldPath: String,
         newFd: WASIAbi.Fd, newPath: String
     ) throws {
-        throw WASIAbi.Errno.ENOTSUP
+        guard case let .directory(oldDirEntry) = fdTable[oldFd] else {
+            throw WASIAbi.Errno.ENOTDIR
+        }
+        guard case let .directory(newDirEntry) = fdTable[newFd] else {
+            throw WASIAbi.Errno.ENOTDIR
+        }
+        try oldDirEntry.rename(from: oldPath, toDir: newDirEntry, to: newPath)
     }
 
     func path_symlink(oldPath: String, dirFd: WASIAbi.Fd, newPath: String) throws {

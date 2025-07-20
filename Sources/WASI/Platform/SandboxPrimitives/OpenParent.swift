@@ -31,6 +31,22 @@ internal func splitParent(path: String) -> (FilePath, FilePath.Component)? {
 }
 
 extension SandboxPrimitives {
+    /// Strip trailing slashes from a path, unless this reduces the path to "/" itself.
+    /// This is used by rename operations to prevent paths like "foo/" from canonicalizing
+    /// to "foo/." since these syscalls treat these differently.
+    static func stripDirSuffix(_ path: String) -> String {
+        var path = path
+        while path.count > 1 && path.hasSuffix("/") {
+            path = String(path.dropLast())
+        }
+        return path
+    }
+
+    /// Check if a path has trailing slashes
+    static func pathHasTrailingSlash(_ path: String) -> Bool {
+        return path.hasSuffix("/")
+    }
+
     static func openParent(start: FileDescriptor, path: String) throws -> (FileDescriptor, String) {
         guard let (dirName, basename) = splitParent(path: path) else {
             throw WASIAbi.Errno.ENOENT
