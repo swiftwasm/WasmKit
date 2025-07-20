@@ -12,12 +12,33 @@ final class IntegrationTests: XCTestCase {
         let testDir = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("Vendor/wasi-testsuite")
+        var failedTests = [FailedTest]()
         for testSuitePath in ["tests/assemblyscript/testsuite", "tests/c/testsuite", "tests/rust/testsuite"] {
             let suitePath = testDir.appendingPathComponent(testSuitePath)
-            try runTestSuite(path: suitePath)
+            failedTests.append(contentsOf: try runTestSuite(path: suitePath))
+        }
+
+        if !failedTests.isEmpty {
+            XCTFail("Failed tests: \(failedTests.map { "\($0.suite)/\($0.name)" }.joined(separator: ", "))")
+
+            if ProcessInfo.processInfo.environment["WASMKIT_WASI_DUMP_SKIPS"] != nil {
+                var itemsToSkip = [String: [String: String]]()
+                for test in failedTests {
+                    itemsToSkip[test.suite, default: [:]][test.name] = "Not implemented"
+                }
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = .prettyPrinted
+                print(String(data: try encoder.encode(itemsToSkip), encoding: .utf8)!)
+            }
         }
     }
 
+    struct FailedTest {
+        let suite: String
+        let name: String
+        let path: URL
+        let reason: String
+    }
     struct SuiteManifest: Codable {
         let name: String
     }
@@ -47,11 +68,36 @@ final class IntegrationTests: XCTestCase {
                 ],
             ]
         #else
-            return [:]
+            return [
+                "WASI Rust tests" : [
+                  "path_link" : "Not implemented",
+                  "dir_fd_op_failures" : "Not implemented",
+                  "path_rename_dir_trailing_slashes" : "Not implemented",
+                  "path_rename" : "Not implemented",
+                  "poll_oneoff_stdio" : "Not implemented",
+                  "overwrite_preopen" : "Not implemented",
+                  "path_filestat" : "Not implemented",
+                  "renumber" : "Not implemented",
+                  "symlink_filestat" : "Not implemented",
+                  "path_open_read_write" : "Not implemented",
+                  "path_open_preopen" : "Not implemented",
+                  "fd_fdstat_set_rights" : "Not implemented",
+                  "file_allocate" : "Not implemented",
+                  "stdio" : "Not implemented",
+                  "remove_directory_trailing_slashes" : "Not implemented",
+                  "symlink_create" : "Not implemented",
+                  "readlink" : "Not implemented",
+                  "sched_yield" : "Not implemented"
+                ],
+                "WASI C tests": [
+                    "sock_shutdown-invalid_fd" : "Not implemented",
+                    "sock_shutdown-not_sock": "Not implemented",
+                ]
+            ]
         #endif
     }
 
-    func runTestSuite(path: URL) throws {
+    func runTestSuite(path: URL) throws -> [FailedTest] {
         let manifestPath = path.appendingPathComponent("manifest.json")
         let manifest = try JSONDecoder().decode(SuiteManifest.self, from: Data(contentsOf: manifestPath))
 
@@ -70,6 +116,7 @@ final class IntegrationTests: XCTestCase {
 
         let skipTests = Self.skipTests[manifest.name] ?? [:]
 
+        var failedTests = [FailedTest]()
         for test in tests {
             guard test.pathExtension == "wasm" else { continue }
             let testName = test.deletingPathExtension().lastPathComponent
@@ -77,8 +124,13 @@ final class IntegrationTests: XCTestCase {
                 print("Skipping test \(testName): \(reason)")
                 continue
             }
-            try runTest(path: test)
+            do {
+                try runTest(path: test)
+            } catch {
+                failedTests.append(FailedTest(suite: manifest.name, name: testName, path: test, reason: String(describing: error)))
+            }
         }
+        return failedTests
     }
 
     struct CaseManifest: Codable {
