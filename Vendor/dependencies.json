@@ -6,7 +6,7 @@
   },
   "wasi-testsuite": {
     "repository": "https://github.com/WebAssembly/wasi-testsuite.git",
-    "revision": "c9c751586fd86b321d595bbef13f2c7403cfdbc5",
+    "revision": "f442fae1a214263aeeddb5395c0c50dc9403b7f8",
     "categories": ["default"]
   },
   "wasm-c-api": {

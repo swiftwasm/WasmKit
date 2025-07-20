@@ -12,46 +12,135 @@ final class IntegrationTests: XCTestCase {
         let testDir = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .appendingPathComponent("Vendor/wasi-testsuite")
+        var failedTests = [FailedTest]()
         for testSuitePath in ["tests/assemblyscript/testsuite", "tests/c/testsuite", "tests/rust/testsuite"] {
             let suitePath = testDir.appendingPathComponent(testSuitePath)
-            try runTestSuite(path: suitePath)
+            failedTests.append(contentsOf: try runTestSuite(path: suitePath))
+        }
+
+        if !failedTests.isEmpty {
+            XCTFail("Failed tests: \(failedTests.map { "\($0.suite)/\($0.name)" }.joined(separator: ", "))")
+
+            if ProcessInfo.processInfo.environment["WASMKIT_WASI_DUMP_SKIPS"] != nil {
+                var itemsToSkip = [String: [String: String]]()
+                for test in failedTests {
+                    itemsToSkip[test.suite, default: [:]][test.name] = "Not implemented"
+                }
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = .prettyPrinted
+                print(String(data: try encoder.encode(itemsToSkip), encoding: .utf8)!)
+            }
         }
     }
 
+    struct FailedTest {
+        let suite: String
+        let name: String
+        let path: URL
+        let reason: String
+    }
     struct SuiteManifest: Codable {
         let name: String
     }
 
-    static var skipTests: [String: [String: String]] {
+    static var skipTests: [String: Set<String>] {
         #if os(Windows)
             return [
-                "WASI Assemblyscript tests": [:],
+                "WASI Assemblyscript tests": [],
                 "WASI C tests": [
-                    "fdopendir-with-access": "Not implemented",
-                    "fopen-with-access": "Not implemented",
-                    "lseek": "Not implemented",
-                    "pread-with-access": "Not implemented",
-                    "pwrite-with-access": "Not implemented",
-                    "stat-dev-ino": "Not implemented",
+                    "fdopendir-with-access",
+                    "fopen-with-access",
+                    "lseek",
+                    "pread-with-access",
+                    "pwrite-with-access",
+                    "pwrite-with-append",
+                    "sock_shutdown-invalid_fd",
+                    "sock_shutdown-not_sock",
+                    "stat-dev-ino",
                 ],
                 "WASI Rust tests": [
-                    "close_preopen": "Not implemented",
-                    "dangling_fd": "Not implemented",
-                    "dangling_symlink": "Not implemented",
-                    "directory_seek": "Not implemented",
-                    "fd_advise": "Not implemented",
-                    "fd_filestat_set": "Not implemented",
-                    "fd_flags_set": "Not implemented",
-                    "fd_readdir": "Not implemented",
-                    "interesting_paths": "Not implemented",
+                    "close_preopen",
+                    "dangling_fd",
+                    "dangling_symlink",
+                    "dir_fd_op_failures",
+                    "directory_seek",
+                    "fd_advise",
+                    "fd_fdstat_set_rights",
+                    "fd_filestat_set",
+                    "fd_flags_set",
+                    "fd_readdir",
+                    "file_allocate",
+                    "file_pread_pwrite",
+                    "file_seek_tell",
+                    "file_truncation",
+                    "file_unbuffered_write",
+                    "fstflags_validate",
+                    "interesting_paths",
+                    "isatty",
+                    "nofollow_errors",
+                    "overwrite_preopen",
+                    "path_exists",
+                    "path_filestat",
+                    "path_link",
+                    "path_open_create_existing",
+                    "path_open_dirfd_not_dir",
+                    "path_open_missing",
+                    "path_open_nonblock",
+                    "path_open_preopen",
+                    "path_open_read_write",
+                    "path_rename",
+                    "path_rename_dir_trailing_slashes",
+                    "path_symlink_trailing_slashes",
+                    "poll_oneoff_stdio",
+                    "readlink",
+                    "remove_directory_trailing_slashes",
+                    "remove_nonempty_directory",
+                    "renumber",
+                    "sched_yield",
+                    "stdio",
+                    "symlink_create",
+                    "symlink_filestat",
+                    "symlink_loop",
+                    "truncation_rights",
+                    "unlink_file_trailing_slashes",
                 ],
             ]
         #else
-            return [:]
+            var tests: [String: Set<String>] = [
+                "WASI Rust tests": [
+                    "path_link",
+                    "dir_fd_op_failures",
+                    "path_rename_dir_trailing_slashes",
+                    "path_rename",
+                    "pwrite-with-append",
+                    "poll_oneoff_stdio",
+                    "overwrite_preopen",
+                    "path_filestat",
+                    "renumber",
+                    "symlink_filestat",
+                    "path_open_read_write",
+                    "path_open_preopen",
+                    "fd_fdstat_set_rights",
+                    "file_allocate",
+                    "stdio",
+                    "remove_directory_trailing_slashes",
+                    "symlink_create",
+                    "readlink",
+                    "sched_yield",
+                ],
+                "WASI C tests": [
+                    "sock_shutdown-invalid_fd",
+                    "sock_shutdown-not_sock",
+                ],
+            ]
+            #if os(Linux)
+                tests["WASI C tests"]?.insert("pwrite-with-append")
+            #endif
+            return tests
         #endif
     }
 
-    func runTestSuite(path: URL) throws {
+    func runTestSuite(path: URL) throws -> [FailedTest] {
         let manifestPath = path.appendingPathComponent("manifest.json")
         let manifest = try JSONDecoder().decode(SuiteManifest.self, from: Data(contentsOf: manifestPath))
 
@@ -68,17 +157,23 @@ final class IntegrationTests: XCTestCase {
         print("Running test suite: \(manifest.name)")
         let tests = try FileManager.default.contentsOfDirectory(at: path, includingPropertiesForKeys: nil, options: [])
 
-        let skipTests = Self.skipTests[manifest.name] ?? [:]
+        let skipTests = Self.skipTests[manifest.name] ?? []
 
+        var failedTests = [FailedTest]()
         for test in tests {
             guard test.pathExtension == "wasm" else { continue }
             let testName = test.deletingPathExtension().lastPathComponent
-            if let reason = skipTests[testName] {
-                print("Skipping test \(testName): \(reason)")
+            if skipTests.contains(testName) {
+                print("Skipping test \(testName)")
                 continue
             }
-            try runTest(path: test)
+            do {
+                try runTest(path: test)
+            } catch {
+                failedTests.append(FailedTest(suite: manifest.name, name: testName, path: test, reason: String(describing: error)))
+            }
         }
+        return failedTests
     }
 
     struct CaseManifest: Codable {
