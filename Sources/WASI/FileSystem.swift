@@ -61,6 +61,7 @@ protocol WASIDir: WASIEntry {
     func removeDirectory(atPath path: String) throws
     func removeFile(atPath path: String) throws
     func symlink(from sourcePath: String, to destPath: String) throws
+    func rename(from sourcePath: String, toDir newDir: any WASIDir, to destPath: String) throws
     func readEntries(cookie: WASIAbi.DirCookie) throws -> AnyIterator<Result<ReaddirElement, any Error>>
     func attributes(path: String, symlinkFollow: Bool) throws -> WASIAbi.Filestat
     func setFilestatTimes(

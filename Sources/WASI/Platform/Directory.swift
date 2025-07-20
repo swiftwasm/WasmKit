@@ -117,6 +117,44 @@ extension DirEntry: WASIDir, FdWASIEntry {
         }
     }
 
+    func rename(from sourcePath: String, toDir newDir: any WASIDir, to destPath: String) throws {
+        #if os(Windows)
+            throw WASIAbi.Errno.ENOSYS
+        #else
+            guard let newDir = newDir as? Self else {
+                throw WASIAbi.Errno.EBADF
+            }
+
+            // As a special case, rename ignores a trailing slash rather than treating
+            // it as equivalent to a trailing slash-dot, so strip any trailing slashes
+            // for the purposes of openParent.
+            let oldHasTrailingSlash = SandboxPrimitives.pathHasTrailingSlash(sourcePath)
+            let newHasTrailingSlash = SandboxPrimitives.pathHasTrailingSlash(destPath)
+
+            let oldPath = SandboxPrimitives.stripDirSuffix(sourcePath)
+            let newPath = SandboxPrimitives.stripDirSuffix(destPath)
+
+            let (sourceDir, sourceBasename) = try SandboxPrimitives.openParent(
+                start: fd, path: oldPath
+            )
+            let (destDir, destBasename) = try SandboxPrimitives.openParent(
+                start: newDir.fd, path: newPath
+            )
+
+            // Re-append a slash if the original path had one
+            let finalSourceBasename = oldHasTrailingSlash ? sourceBasename + "/" : sourceBasename
+            let finalDestBasename = newHasTrailingSlash ? destBasename + "/" : destBasename
+
+            try WASIAbi.Errno.translatingPlatformErrno {
+                try sourceDir.rename(
+                    at: FilePath(finalSourceBasename),
+                    to: destDir,
+                    at: FilePath(finalDestBasename)
+                )
+            }
+        #endif
+    }
+
     func readEntries(
         cookie: WASIAbi.DirCookie
     ) throws -> AnyIterator<Result<ReaddirElement, any Error>> {

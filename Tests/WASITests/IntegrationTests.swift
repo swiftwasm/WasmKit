@@ -110,8 +110,6 @@ final class IntegrationTests: XCTestCase {
                 "WASI Rust tests": [
                     "path_link",
                     "dir_fd_op_failures",
-                    "path_rename_dir_trailing_slashes",
-                    "path_rename",
                     "pwrite-with-append",
                     "poll_oneoff_stdio",
                     "overwrite_preopen",

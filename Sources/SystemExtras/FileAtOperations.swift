@@ -319,4 +319,57 @@ extension FileDescriptor {
     }
     #endif
   }
+
+  /// Rename a file or directory relative to directory file descriptors
+  ///
+  /// - Parameters:
+  ///   - oldPath: The relative location of the file or directory to rename.
+  ///   - newDirFd: The directory file descriptor for the new path.
+  ///   - newPath: The relative destination path to which to rename the file or directory.
+  ///
+  /// The corresponding C function is `renameat`.
+  @_alwaysEmitIntoClient
+  public func rename(
+    at oldPath: FilePath,
+    to newDirFd: FileDescriptor,
+    at newPath: FilePath
+  ) throws {
+    try oldPath.withPlatformString { cOldPath in
+      try newPath.withPlatformString { cNewPath in
+        try _rename(at: cOldPath, to: newDirFd, at: cNewPath).get()
+      }
+    }
+  }
+
+  /// Rename a file or directory relative to directory file descriptors
+  ///
+  /// - Parameters:
+  ///   - oldPath: The relative location of the file or directory to rename.
+  ///   - newDirFd: The directory file descriptor for the new path.
+  ///   - newPath: The relative destination path to which to rename the file or directory.
+  ///
+  /// The corresponding C function is `renameat`.
+  @_alwaysEmitIntoClient
+  public func rename(
+    at oldPath: UnsafePointer<CInterop.PlatformChar>,
+    to newDirFd: FileDescriptor,
+    at newPath: UnsafePointer<CInterop.PlatformChar>
+  ) throws {
+    try _rename(at: oldPath, to: newDirFd, at: newPath).get()
+  }
+
+  @usableFromInline
+  internal func _rename(
+    at oldPath: UnsafePointer<CInterop.PlatformChar>,
+    to newDirFd: FileDescriptor,
+    at newPath: UnsafePointer<CInterop.PlatformChar>
+  ) -> Result<(), Errno> {
+    #if os(Windows)
+    return .failure(Errno(rawValue: ERROR_NOT_SUPPORTED))
+    #else
+    return nothingOrErrno(retryOnInterrupt: false) {
+      system_renameat(self.rawValue, oldPath, newDirFd.rawValue, newPath)
+    }
+    #endif
+  }
 }
