@@ -1445,7 +1445,7 @@ extension WASI {
                     path: readString(pointer: arguments[1].i32, length: arguments[2].i32, buffer: buffer)
                 )
             }
-            return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
         }
 
         preview1["path_rename"] = wasiFunction(
@@ -1459,7 +1459,7 @@ extension WASI {
                     newPath: readString(pointer: arguments[4].i32, length: arguments[5].i32, buffer: buffer)
                 )
             }
-            return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
         }
 
         preview1["path_symlink"] = wasiFunction(
@@ -1472,7 +1472,7 @@ extension WASI {
                     newPath: readString(pointer: arguments[3].i32, length: arguments[4].i32, buffer: buffer)
                 )
             }
-            return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
         }
 
         preview1["path_unlink_file"] = wasiFunction(
@@ -1484,7 +1484,7 @@ extension WASI {
                     path: readString(pointer: arguments[1].i32, length: arguments[2].i32, buffer: buffer)
                 )
             }
-            return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
         }
 
         preview1["proc_exit"] = wasiFunction(type: .init(parameters: [.i32])) { memory, arguments in
@@ -1500,7 +1500,7 @@ extension WASI {
                     buffer: UnsafeGuestPointer<UInt8>(memorySpace: buffer, offset: arguments[0].i32),
                     length: arguments[1].i32
                 )
-                return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+                return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
             }
         }
 
@@ -1518,7 +1518,7 @@ extension WASI {
                     raw.withMemoryRebound(to: UInt32.self) { rebound in rebound[0] = size.littleEndian }
                 }
 
-                return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+                return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
             }
         }
 
@@ -1639,8 +1639,8 @@ public class WASIBridgeToHost: WASI {
             return WASIAbi.Timestamp(wallClockDuration: try wallClock.resolution())
         case .MONOTONIC:
             return try monotonicClock.resolution()
-        case .PROCESS_CPUTIME_ID, .THREAD_CPUTIME_ID:
-            throw WASIAbi.Errno.EBADF
+        default:
+            throw WASIAbi.Errno.ENOTSUP
         }
     }
 
@@ -1652,8 +1652,8 @@ public class WASIBridgeToHost: WASI {
             return WASIAbi.Timestamp(wallClockDuration: try wallClock.now())
         case .MONOTONIC:
             return try monotonicClock.now()
-        case .PROCESS_CPUTIME_ID, .THREAD_CPUTIME_ID:
-            throw WASIAbi.Errno.EBADF
+        default:
+            throw WASIAbi.Errno.ENOTSUP
         }
     }
 
@@ -2010,8 +2010,7 @@ public class WASIBridgeToHost: WASI {
         events: UnsafeGuestBufferPointer<WASIAbi.Event>
     ) throws -> WASIAbi.Size {
         guard !subscriptions.isEmpty else { throw WASIAbi.Errno.EINVAL }
-        try poll(subscriptions: subscriptions, self.fdTable)
-        return .init(subscriptions.count)
+        return try poll(subscriptions: subscriptions, events: events, self.fdTable)
     }
 
     func random_get(buffer: UnsafeGuestPointer<UInt8>, length: WASIAbi.Size) {
