@@ -375,7 +375,8 @@ extension UnsafeGuestBufferPointer: Collection {
 
     /// Accesses the pointee at the specified offset from the base address of the buffer.
     public subscript(position: UInt32) -> Element {
-        (self.baseAddress + position).pointee
+        get { (self.baseAddress + position * Element.sizeInGuest).pointee }
+        nonmutating set { Pointee.writeToGuest(at: self.baseAddress.raw.advanced(by: position * Element.sizeInGuest), value: newValue) }
     }
 
     /// Returns the position immediately after the given index.
