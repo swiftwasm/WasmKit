@@ -38,7 +38,15 @@ extension GuestPrimitivePointee {
 }
 
 /// Auto implementation of ``GuestPointee`` for ``RawRepresentable`` types
-extension GuestPrimitivePointee where Self: RawRepresentable, Self.RawValue: GuestPointee {
+extension GuestPointee where Self: RawRepresentable, Self.RawValue: GuestPointee {
+    public static var sizeInGuest: UInt32 {
+        RawValue.sizeInGuest
+    }
+
+    public static var alignInGuest: UInt32 {
+        RawValue.alignInGuest
+    }
+
     /// Reads a value of RawValue type and constructs a value of Self type
     public static func readFromGuest(_ pointer: UnsafeGuestRawPointer) -> Self {
         Self(rawValue: .readFromGuest(pointer))!
@@ -367,7 +375,8 @@ extension UnsafeGuestBufferPointer: Collection {
 
     /// Accesses the pointee at the specified offset from the base address of the buffer.
     public subscript(position: UInt32) -> Element {
-        (self.baseAddress + position).pointee
+        get { (self.baseAddress + position * Element.sizeInGuest).pointee }
+        nonmutating set { Pointee.writeToGuest(at: self.baseAddress.raw.advanced(by: position * Element.sizeInGuest), value: newValue) }
     }
 
     /// Returns the position immediately after the given index.
