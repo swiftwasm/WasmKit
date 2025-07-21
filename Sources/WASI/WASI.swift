@@ -1155,7 +1155,7 @@ extension WASI {
             try self.fd_fdstat_set_flags(
                 fd: arguments[0].i32, flags: WASIAbi.Fdflags(rawValue: rawFdFlags)
             )
-            return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
         }
 
         preview1["fd_fdstat_set_rights"] = wasiFunction(
@@ -1166,7 +1166,7 @@ extension WASI {
                 fsRightsBase: WASIAbi.Rights(rawValue: arguments[1].i64),
                 fsRightsInheriting: WASIAbi.Rights(rawValue: arguments[2].i64)
             )
-            return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
         }
 
         preview1["fd_filestat_get"] = wasiFunction(
@@ -1177,14 +1177,14 @@ extension WASI {
                 let filestatPointer = UnsafeGuestPointer<WASIAbi.Filestat>(memorySpace: buffer, offset: arguments[1].i32)
                 filestatPointer.pointee = filestat
             }
-            return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
         }
 
         preview1["fd_filestat_set_size"] = wasiFunction(
             type: .init(parameters: [.i32, .i64], results: [.i32])
         ) { caller, arguments in
             try self.fd_filestat_set_size(fd: arguments[0].i32, size: arguments[1].i64)
-            return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
         }
 
         preview1["fd_filestat_set_times"] = wasiFunction(
@@ -1198,7 +1198,7 @@ extension WASI {
                 atim: arguments[1].i64, mtim: arguments[2].i64,
                 fstFlags: WASIAbi.FstFlags(rawValue: rawFstFlags)
             )
-            return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
         }
 
         preview1["fd_pread"] = wasiFunction(
@@ -1216,7 +1216,7 @@ extension WASI {
                 let nreadPointer = UnsafeGuestPointer<WASIAbi.Size>(memorySpace: buffer, offset: arguments[4].i32)
                 nreadPointer.pointee = nread
             }
-            return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
         }
         preview1["fd_prestat_get"] = wasiFunction(type: .init(parameters: [.i32, .i32], results: [.i32])) { caller, arguments in
             let prestat = try self.fd_prestat_get(fd: arguments[0].i32)
@@ -1224,7 +1224,7 @@ extension WASI {
                 let prestatPointer = UnsafeGuestPointer<WASIAbi.Prestat>(memorySpace: buffer, offset: arguments[1].i32)
                 prestatPointer.pointee = prestat
             }
-            return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
         }
 
         preview1["fd_prestat_dir_name"] = wasiFunction(type: .init(parameters: [.i32, .i32, .i32], results: [.i32])) { caller, arguments in
@@ -1235,7 +1235,7 @@ extension WASI {
                     maxPathLength: arguments[2].i32
                 )
             }
-            return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
         }
 
         preview1["fd_pwrite"] = wasiFunction(
@@ -1253,7 +1253,7 @@ extension WASI {
                 let nwrittenPointer = UnsafeGuestPointer<WASIAbi.Size>(memorySpace: buffer, offset: arguments[4].i32)
                 nwrittenPointer.pointee = nwritten
             }
-            return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
         }
 
         preview1["fd_read"] = wasiFunction(
@@ -1270,7 +1270,7 @@ extension WASI {
                 let nreadPointer = UnsafeGuestPointer<WASIAbi.Size>(memorySpace: buffer, offset: arguments[3].i32)
                 nreadPointer.pointee = nread
             }
-            return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
         }
 
         preview1["fd_readdir"] = wasiFunction(type: .init(parameters: [.i32, .i32, .i32, .i64, .i32], results: [.i32])) { caller, arguments in
@@ -1285,7 +1285,7 @@ extension WASI {
                 )
                 let nwrittenPointer = UnsafeGuestPointer<WASIAbi.Size>(memorySpace: buffer, offset: arguments[4].i32)
                 nwrittenPointer.pointee = nwritten
-                return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+                return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
             }
         }
 
@@ -1293,14 +1293,14 @@ extension WASI {
             type: .init(parameters: [.i32, .i32], results: [.i32])
         ) { caller, arguments in
             try self.fd_renumber(fd: arguments[0].i32, to: arguments[1].i32)
-            return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
         }
 
         preview1["fd_seek"] = wasiFunction(
             type: .init(parameters: [.i32, .i64, .i32, .i32], results: [.i32])
         ) { caller, arguments in
             guard let whence = WASIAbi.Whence(rawValue: UInt8(arguments[2].i32)) else {
-                return [.i32(WASIAbi.Errno.EINVAL.rawValue)]
+                return [.i32(.init(WASIAbi.Errno.EINVAL.rawValue))]
             }
             let ret = try self.fd_seek(
                 fd: arguments[0].i32, offset: WASIAbi.FileDelta(bitPattern: arguments[1].i64), whence: whence
@@ -1309,12 +1309,12 @@ extension WASI {
                 let retPointer = UnsafeGuestPointer<WASIAbi.FileSize>(memorySpace: buffer, offset: arguments[3].i32)
                 retPointer.pointee = ret
             }
-            return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
         }
 
         preview1["fd_sync"] = wasiFunction(type: .init(parameters: [.i32], results: [.i32])) { caller, arguments in
             try self.fd_sync(fd: arguments[0].i32)
-            return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
         }
 
         preview1["fd_tell"] = wasiFunction(type: .init(parameters: [.i32, .i32], results: [.i32])) { caller, arguments in
@@ -1323,7 +1323,7 @@ extension WASI {
                 let retPointer = UnsafeGuestPointer<WASIAbi.FileSize>(memorySpace: buffer, offset: arguments[1].i32)
                 retPointer.pointee = ret
             }
-            return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
         }
 
         preview1["fd_write"] = wasiFunction(
@@ -1339,7 +1339,7 @@ extension WASI {
                 )
                 let nwrittenPointer = UnsafeGuestPointer<WASIAbi.Size>(memorySpace: buffer, offset: arguments[3].i32)
                 nwrittenPointer.pointee = nwritten
-                return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+                return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
             }
         }
 
@@ -1352,7 +1352,7 @@ extension WASI {
                     path: readString(pointer: arguments[1].i32, length: arguments[2].i32, buffer: buffer)
                 )
             }
-            return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
         }
         preview1["path_filestat_get"] = wasiFunction(
             type: .init(parameters: [.i32, .i32, .i32, .i32, .i32], results: [.i32])
@@ -1365,7 +1365,7 @@ extension WASI {
                 let filestatPointer = UnsafeGuestPointer<WASIAbi.Filestat>(memorySpace: buffer, offset: arguments[4].i32)
                 filestatPointer.pointee = filestat
             }
-            return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
         }
 
         preview1["path_filestat_set_times"] = wasiFunction(
@@ -1382,7 +1382,7 @@ extension WASI {
                     fstFlags: WASIAbi.FstFlags(rawValue: rawFstFlags)
                 )
             }
-            return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
         }
 
         preview1["path_link"] = wasiFunction(
@@ -1396,7 +1396,7 @@ extension WASI {
                     newPath: readString(pointer: arguments[5].i32, length: arguments[6].i32, buffer: buffer)
                 )
             }
-            return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
         }
 
         preview1["path_open"] = wasiFunction(
@@ -1414,7 +1414,7 @@ extension WASI {
                 )
                 let newFdPointer = UnsafeGuestPointer<WASIAbi.Fd>(memorySpace: buffer, offset: arguments[8].i32)
                 newFdPointer.pointee = newFd
-                return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+                return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
             }
         }
 
@@ -1433,7 +1433,7 @@ extension WASI {
                 let retPointer = UnsafeGuestPointer<WASIAbi.Size>(memorySpace: buffer, offset: arguments[5].i32)
                 retPointer.pointee = ret
             }
-            return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
         }
 
         preview1["path_remove_directory"] = wasiFunction(
