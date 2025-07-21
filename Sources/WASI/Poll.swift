@@ -54,7 +54,7 @@ func poll(
         }
 
         let result = poll(&pollfds, .init(pollfds.count), .init(timeoutMilliseconds))
-        let err = errno // Preserve `errno` global immediately after `poll`
+        let err = errno  // Preserve `errno` global immediately after `poll`
         var updatedEvents: WASIAbi.Size = 0
         if result == 0, let clockUserData {
             updatedEvents += 1
