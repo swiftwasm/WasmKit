@@ -220,7 +220,7 @@ protocol WASI {
 }
 
 enum WASIAbi {
-    enum Errno: UInt32, Error, GuestPointee {
+    enum Errno: UInt16, Error, GuestPointee {
         /// No error occurred. System call completed successfully.
         case SUCCESS = 0
         /// Argument list too long.
@@ -579,19 +579,20 @@ enum WASIAbi {
         }
     }
 
-    enum ClockId: UInt32, GuestPointee {
+    struct ClockId: Equatable, RawRepresentable, GuestPointee {
+        let rawValue: UInt32
         /// The clock measuring real time. Time value zero corresponds with
         /// 1970-01-01T00:00:00Z.
-        case REALTIME = 0
+        static let REALTIME = Self(rawValue: 0)
         /// The store-wide monotonic clock, which is defined as a clock measuring
         /// real time, whose value cannot be adjusted and which cannot have negative
         /// clock jumps. The epoch of this clock is undefined. The absolute time
         /// value of this clock therefore has no meaning.
-        case MONOTONIC = 1
+        static let MONOTONIC = Self(rawValue: 1)
         /// The CPU-time clock associated with the current process.
-        case PROCESS_CPUTIME_ID = 2
+        static let PROCESS_CPUTIME_ID = Self(rawValue: 2)
         /// The CPU-time clock associated with the current thread.
-        case THREAD_CPUTIME_ID = 3
+        static let THREAD_CPUTIME_ID = Self(rawValue: 3)
     }
 
     typealias Timestamp = UInt64
@@ -980,7 +981,7 @@ extension WASI {
             let (name, type) = entry
             functions[name] = WASIHostFunction(type: type) { _, _ in
                 print("\"\(name)\" not implemented yet")
-                return [.i32(WASIAbi.Errno.ENOSYS.rawValue)]
+                return [.i32(.init(WASIAbi.Errno.ENOSYS.rawValue))]
             }
         }
 
@@ -1013,7 +1014,7 @@ extension WASI {
                 do {
                     return try implementation(caller, arguments)
                 } catch let errno as WASIAbi.Errno {
-                    return [.i32(errno.rawValue)]
+                    return [.i32(.init(errno.rawValue))]
                 }
             }
         }
@@ -1026,7 +1027,7 @@ extension WASI {
                     argv: .init(memorySpace: buffer, offset: arguments[0].i32),
                     argvBuffer: .init(memorySpace: buffer, offset: arguments[1].i32)
                 )
-                return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+                return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
             }
         }
 
@@ -1039,7 +1040,7 @@ extension WASI {
                 argcPointer.pointee = argc
                 let bufferSizePointer = UnsafeGuestPointer<WASIAbi.Size>(memorySpace: buffer, offset: arguments[1].i32)
                 bufferSizePointer.pointee = bufferSize
-                return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+                return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
             }
         }
 
@@ -1051,7 +1052,7 @@ extension WASI {
                     environ: .init(memorySpace: buffer, offset: arguments[0].i32),
                     environBuffer: .init(memorySpace: buffer, offset: arguments[1].i32)
                 )
-                return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+                return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
             }
         }
 
@@ -1064,16 +1065,14 @@ extension WASI {
                 environSizePointer.pointee = environSize
                 let bufferSizePointer = UnsafeGuestPointer<WASIAbi.Size>(memorySpace: buffer, offset: arguments[1].i32)
                 bufferSizePointer.pointee = bufferSize
-                return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+                return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
             }
         }
 
         preview1["clock_res_get"] = wasiFunction(
             type: .init(parameters: [.i32, .i32], results: [.i32])
         ) { caller, arguments in
-            guard let id = WASIAbi.ClockId(rawValue: arguments[0].i32) else {
-                throw WASIAbi.Errno.EBADF
-            }
+            let id = WASIAbi.ClockId(rawValue: arguments[0].i32)
             let res = try self.clock_res_get(id: id)
             try withMemoryBuffer(caller: caller) { buffer in
                 let resPointer = UnsafeGuestPointer<WASIAbi.Timestamp>(
@@ -1081,15 +1080,13 @@ extension WASI {
                 )
                 resPointer.pointee = res
             }
-            return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
         }
 
         preview1["clock_time_get"] = wasiFunction(
             type: .init(parameters: [.i32, .i64, .i32], results: [.i32])
         ) { caller, arguments in
-            guard let id = WASIAbi.ClockId(rawValue: arguments[0].i32) else {
-                throw WASIAbi.Errno.EBADF
-            }
+            let id = WASIAbi.ClockId(rawValue: arguments[0].i32)
             let time = try self.clock_time_get(id: id, precision: WASIAbi.Timestamp(arguments[1].i64))
             try withMemoryBuffer(caller: caller) { buffer in
                 let resPointer = UnsafeGuestPointer<WASIAbi.Timestamp>(
@@ -1097,7 +1094,7 @@ extension WASI {
                 )
                 resPointer.pointee = time
             }
-            return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
         }
 
         preview1["fd_advise"] = wasiFunction(
@@ -1112,7 +1109,7 @@ extension WASI {
                 fd: arguments[0].i32, offset: arguments[1].i64,
                 length: arguments[2].i64, advice: advice
             )
-            return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
         }
 
         preview1["fd_allocate"] = wasiFunction(
@@ -1121,21 +1118,21 @@ extension WASI {
             try self.fd_allocate(
                 fd: arguments[0].i32, offset: arguments[1].i64, length: arguments[2].i64
             )
-            return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
         }
 
         preview1["fd_close"] = wasiFunction(
             type: .init(parameters: [.i32], results: [.i32])
         ) { caller, arguments in
             try self.fd_close(fd: arguments[0].i32)
-            return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
         }
 
         preview1["fd_datasync"] = wasiFunction(
             type: .init(parameters: [.i32], results: [.i32])
         ) { caller, arguments in
             try self.fd_datasync(fd: arguments[0].i32)
-            return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
         }
 
         preview1["fd_fdstat_get"] = wasiFunction(
@@ -1145,7 +1142,7 @@ extension WASI {
                 let stat = try self.fd_fdstat_get(fileDescriptor: arguments[0].i32)
                 let statPointer = UnsafeGuestPointer<WASIAbi.FdStat>(memorySpace: buffer, offset: arguments[1].i32)
                 statPointer.pointee = stat
-                return [.i32(WASIAbi.Errno.SUCCESS.rawValue)]
+                return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
             }
         }
 
