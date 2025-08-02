@@ -13,6 +13,7 @@ permissions: read-all
 jobs:
   BatchFuzzing:
     runs-on: ubuntu-latest
+    if: ${{ github.repository == 'swiftwasm/WasmKit' }}
     permissions:
       security-events: write
     strategy:

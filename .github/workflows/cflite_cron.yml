@@ -8,6 +8,7 @@ permissions: read-all
 jobs:
   Pruning:
     runs-on: ubuntu-latest
+    if: ${{ github.repository == 'swiftwasm/WasmKit' }}
     steps:
     - name: Build Fuzzers
       id: build
@@ -27,6 +28,7 @@ jobs:
         storage-repo-branch-coverage: gh-pages
   Coverage:
     runs-on: ubuntu-latest
+    if: ${{ github.repository == 'swiftwasm/WasmKit' }}
     steps:
     - name: Build Fuzzers
       id: build
