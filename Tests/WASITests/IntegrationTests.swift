@@ -113,7 +113,6 @@ final class IntegrationTests: XCTestCase {
                     "path_rename_dir_trailing_slashes",
                     "path_rename",
                     "pwrite-with-append",
-                    "poll_oneoff_stdio",
                     "overwrite_preopen",
                     "path_filestat",
                     "renumber",

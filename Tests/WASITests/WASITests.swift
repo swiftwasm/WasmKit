@@ -1,3 +1,5 @@
+import WasmKit
+import WasmTypes
 import XCTest
 
 @testable import WASI
@@ -133,5 +135,51 @@ final class WASITests: XCTestCase {
         try assertNotResolve("link-loop.txt", followSymlink: true) { error in
             XCTAssertEqual(error, .ELOOP)
         }
+    }
+
+    func testWASIAbi() throws {
+        let engine = Engine()
+        let store = Store(engine: engine)
+        let memory = try Memory(store: store, type: .init(min: 1))
+
+        // Test union size and alignment end-to-end
+        let start = UnsafeGuestRawPointer(memorySpace: memory, offset: 0)
+        var pointer = start
+        let read = WASIAbi.Subscription.Union.fdRead(.init(0))
+        let write = WASIAbi.Subscription.Union.fdWrite(.init(0))
+        let writeOffset = WASIAbi.Subscription.sizeInGuest
+        let timeout: WASIAbi.Timestamp = 100_000_000
+        let clock = WASIAbi.Subscription.Union.clock(.init(id: .REALTIME, timeout: timeout, precision: 0, flags: []))
+        let clockOffset = writeOffset + WASIAbi.Subscription.sizeInGuest
+        let event = WASIAbi.Event(userData: 3, error: .EIO, eventType: .fdRead, fdReadWrite: .init(nBytes: 37, flags: [.hangup]))
+        let eventOffset = clockOffset + WASIAbi.Subscription.sizeInGuest
+        let finalOffset = eventOffset + WASIAbi.Event.sizeInGuest
+        WASIAbi.Subscription.writeToGuest(at: &pointer, value: .init(userData: 1, union: read))
+        XCTAssertEqual(pointer.offset, writeOffset)
+        WASIAbi.Subscription.writeToGuest(at: &pointer, value: .init(userData: 2, union: write))
+        XCTAssertEqual(pointer.offset, clockOffset)
+        WASIAbi.Subscription.writeToGuest(at: &pointer, value: .init(userData: 3, union: clock))
+        XCTAssertEqual(pointer.offset, eventOffset)
+        WASIAbi.Event.writeToGuest(at: &pointer, value: event)
+        XCTAssertEqual(pointer.offset, finalOffset)
+
+        // Test that reading back yields same result
+        pointer = start
+        XCTAssertEqual(WASIAbi.Subscription.readFromGuest(&pointer), .init(userData: 1, union: read))
+        XCTAssertEqual(pointer.offset, writeOffset)
+        XCTAssertEqual(WASIAbi.Subscription.readFromGuest(&pointer), .init(userData: 2, union: write))
+        XCTAssertEqual(pointer.offset, clockOffset)
+        XCTAssertEqual(WASIAbi.Subscription.readFromGuest(&pointer), .init(userData: 3, union: clock))
+        XCTAssertEqual(pointer.offset, eventOffset)
+        XCTAssertEqual(WASIAbi.Event.readFromGuest(&pointer), event)
+        XCTAssertEqual(pointer.offset, finalOffset)
+
+        #if !os(Windows)
+            XCTAssertTrue(
+                try ContinuousClock().measure {
+                    let clockPointer = UnsafeGuestBufferPointer<WASIAbi.Subscription>(baseAddress: .init(memorySpace: memory, offset: clockOffset), count: 1)
+                    XCTAssertEqual(try WASIBridgeToHost().poll_oneoff(subscriptions: clockPointer, events: .init(baseAddress: .init(memorySpace: memory, offset: finalOffset), count: 1)), 1)
+                } > .nanoseconds(timeout))
+        #endif
     }
 }
