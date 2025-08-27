@@ -74,6 +74,19 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+      - name: Prepare Xcode platforms
+        run: |
+          set -euxo pipefail
+          sudo xcode-select -s /Applications/Xcode_16.4.app
+          sudo xcodebuild -runFirstLaunch || true
+          for PLAT in iOS tvOS watchOS visionOS; do
+            if ! xcodebuild -showsdks | grep -q "$PLAT"; then
+              echo "Downloading $PLAT platform..."
+              sudo xcodebuild -downloadPlatform "$PLAT"
+            fi
+          done
+          xcodebuild -showsdks
+          xcodebuild -scheme WasmKit-Package -showdestinations || true
       - run: xcrun xcodebuild -skipMacroValidation -skipPackagePluginValidation build -scheme WasmKit-Package -destination generic/platform=macOS
       - run: xcrun xcodebuild -skipMacroValidation -skipPackagePluginValidation build -scheme WasmKit-Package -destination generic/platform=iOS
       - run: xcrun xcodebuild -skipMacroValidation -skipPackagePluginValidation build -scheme WasmKit-Package -destination generic/platform=watchOS
