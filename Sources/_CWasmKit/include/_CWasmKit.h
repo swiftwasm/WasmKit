@@ -47,11 +47,21 @@ static inline void wasmkit_fwrite_stderr(const char *_Nonnull str, size_t len) {
 // MARK: - Swift Runtime Functions
 
 struct SwiftError;
+#ifdef __cplusplus
+extern "C" {
+#endif
+extern void swift_errorRelease(const struct SwiftError *_Nonnull object);
+#ifdef __cplusplus
+}
+#endif
 
 /// Releases the given Swift error object.
 static inline void wasmkit_swift_errorRelease(const void *_Nonnull object) {
-    extern void swift_errorRelease(const struct SwiftError *_Nonnull object);
+#ifdef __cplusplus
+    swift_errorRelease(static_cast<const struct SwiftError *_Nonnull>(object));
+#else
     swift_errorRelease(object);
+#endif
 }
 
 #endif // WASMKIT__CWASMKIT_H
