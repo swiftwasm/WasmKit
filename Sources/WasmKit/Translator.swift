@@ -1709,15 +1709,15 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     private mutating func popPushEmit(
         _ pop: ValueType,
         _ push: ValueType,
-        _ instruction: @escaping (_ popped: VReg, _ result: VReg, ValueStack) -> Instruction
+        _ instruction: @escaping (_ popped: VReg, _ result: VReg) -> Instruction
     ) throws {
         let value = try popVRegOperand(pop)
         let result = valueStack.push(push)
         if let value = value {
             emit(
-                instruction(value, result, valueStack),
-                resultRelink: { [valueStack] newResult in
-                    instruction(value, newResult, valueStack)
+                instruction(value, result),
+                resultRelink: { newResult in
+                    instruction(value, newResult)
                 })
         }
     }
@@ -1776,7 +1776,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     ) throws {
         let isMemory64 = try module.isMemory64(memoryIndex: 0)
         try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
-        try popPushEmit(.address(isMemory64: isMemory64), type) { value, result, stack in
+        try popPushEmit(.address(isMemory64: isMemory64), type) { value, result in
             let loadOperand = Instruction.LoadOperand(
                 offset: memarg.offset,
                 pointer: value,
@@ -1849,7 +1849,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         let isMemory64 = try module.isMemory64(memoryIndex: memory)
         let sizeType = ValueType.address(isMemory64: isMemory64)
         // Just pop/push the same type (i64 or i32) value
-        try popPushEmit(sizeType, sizeType) { value, result, stack in
+        try popPushEmit(sizeType, sizeType) { value, result in
             .memoryGrow(
                 Instruction.MemoryGrowOperand(
                     result: result, delta: value, memory: memory
@@ -1893,7 +1893,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     }
 
     private mutating func visitUnary(_ operand: ValueType, _ instruction: @escaping (Instruction.UnaryOperand) -> Instruction) throws {
-        try popPushEmit(operand, operand) { value, result, stack in
+        try popPushEmit(operand, operand) { value, result in
             return instruction(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
     }
@@ -1917,12 +1917,12 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         try visitBinary(operand, .i32, instruction)
     }
     private mutating func visitConversion(_ from: ValueType, _ to: ValueType, _ instruction: @escaping (Instruction.UnaryOperand) -> Instruction) throws {
-        try popPushEmit(from, to) { value, result, stack in
+        try popPushEmit(from, to) { value, result in
             return instruction(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
     }
     mutating func visitI32Eqz() throws -> Output {
-        try popPushEmit(.i32, .i32) { value, result, stack in
+        try popPushEmit(.i32, .i32) { value, result in
             .i32Eqz(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
     }
@@ -2018,7 +2018,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         try visitBinary(operand, result, instruction)
     }
     mutating func visitI64Eqz() throws -> Output {
-        try popPushEmit(.i64, .i32) { value, result, stack in
+        try popPushEmit(.i64, .i32) { value, result in
             .i64Eqz(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
     }
@@ -2217,7 +2217,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
         try popPushEmit(
             module.addressType(tableIndex: table),
             .ref(type.elementType)
-        ) { index, result, stack in
+        ) { index, result in
             return .tableGet(
                 Instruction.TableGetOperand(
                     index: index,
