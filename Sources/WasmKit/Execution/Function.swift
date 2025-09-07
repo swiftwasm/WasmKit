@@ -263,7 +263,7 @@ struct WasmFunctionEntity {
             intercepting: engine.interceptor != nil
         )
         let iseq = try code.withValue { code in
-            try translator.translate(code: code, instance: instance)
+            try translator.translate(code: code)
         }
         self.code = .compiled(iseq)
         return iseq

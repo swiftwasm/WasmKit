@@ -1115,10 +1115,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     // MARK: Main entry point
 
     /// Translate a Wasm expression into a sequence of instructions.
-    mutating func translate(
-        code: Code,
-        instance: InternalInstance
-    ) throws -> InstructionSequence {
+    mutating func translate(code: Code) throws -> InstructionSequence {
         if intercepting {
             // Emit `onEnter` instruction at the beginning of the function
             emit(.onEnter(functionIndex))
