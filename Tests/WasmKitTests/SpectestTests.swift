@@ -21,7 +21,7 @@
 
         @Test(
             .disabled("unable to run spectest on Android due to missing files on emulator", platforms: [.android]),
-            arguments: try SpectestDiscovery(path: Self.testPaths).discover()
+            arguments: try SpectestDiscovery(path: SpectestTests.testPaths).discover()
         )
         func run(test: TestCase) throws {
             let defaultConfig = EngineConfiguration()
@@ -31,7 +31,7 @@
 
         @Test(
             .disabled("unable to run spectest on Android due to missing files on emulator", platforms: [.android]),
-            arguments: try SpectestDiscovery(path: Self.testPaths).discover()
+            arguments: try SpectestDiscovery(path: SpectestTests.testPaths).discover()
         )
         func runWithTokenThreading(test: TestCase) throws {
             let defaultConfig = EngineConfiguration()
