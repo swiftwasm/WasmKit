@@ -16,30 +16,25 @@ enum Spectest {
         testsuitePath.appendingPathComponent(file)
     }
 
-    static func wastFiles(include: [String] = [], exclude: [String] = ["annotations.wast"]) -> AnyIterator<URL> {
-        var allFiles = [
+    static func wastFiles(include: [String] = [], exclude: [String] = ["annotations.wast"]) -> [URL] {
+        return [
             testsuitePath,
             testsuitePath.appendingPathComponent("proposals/memory64"),
             testsuitePath.appendingPathComponent("proposals/tail-call"),
             rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite"),
         ].flatMap {
             try! FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil)
-        }.makeIterator()
-
-        return AnyIterator {
-            while let filePath = allFiles.next() {
-                guard filePath.pathExtension == "wast" else {
-                    continue
-                }
-                guard !filePath.lastPathComponent.starts(with: "simd_") else { continue }
-                if !include.isEmpty {
-                    guard include.contains(filePath.lastPathComponent) else { continue }
-                } else {
-                    guard !exclude.contains(filePath.lastPathComponent) else { continue }
-                }
-                return filePath
+        }.compactMap { filePath in
+            guard filePath.pathExtension == "wast" else {
+                return nil
             }
-            return nil
+            guard !filePath.lastPathComponent.starts(with: "simd_") else { return nil }
+            if !include.isEmpty {
+                guard include.contains(filePath.lastPathComponent) else { return nil }
+            } else {
+                guard !exclude.contains(filePath.lastPathComponent) else { return nil }
+            }
+            return filePath
         }
     }
 

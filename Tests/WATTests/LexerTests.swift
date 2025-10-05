@@ -1,107 +1,104 @@
-import Foundation
-import WasmParser
-import XCTest
+#if canImport(Testing)
+    import Testing
+    import Foundation
+    import WasmParser
 
-@testable import WAT
+    @testable import WAT
 
-class LexerTests: XCTestCase {
-    func collectToken(_ source: String) throws -> [TokenKind] {
-        var lexer = Lexer(input: source)
-        var tokens: [TokenKind] = []
-        while let token = try lexer.rawLex() {
-            tokens.append(token.kind)
+    @Suite
+    struct LexerTests {
+        func collectToken(_ source: String) throws -> [TokenKind] {
+            var lexer = Lexer(input: source)
+            var tokens: [TokenKind] = []
+            while let token = try lexer.rawLex() {
+                tokens.append(token.kind)
+            }
+            return tokens
         }
-        return tokens
-    }
 
-    func testLexBasics() {
-        try XCTAssertEqual(collectToken(""), [])
-        try XCTAssertEqual(collectToken("(module"), [.leftParen, .keyword])
-        try XCTAssertEqual(collectToken("( module"), [.leftParen, .keyword])
-        try XCTAssertEqual(collectToken("(\tmodule"), [.leftParen, .keyword])
-        try XCTAssertEqual(collectToken("(\nmodule"), [.leftParen, .keyword])
-        try XCTAssertEqual(collectToken("(module)"), [.leftParen, .keyword, .rightParen])
+        @Test
+        func lexBasics() throws {
+            #expect(try collectToken("") == [])
+            #expect(try collectToken("(module") == [.leftParen, .keyword])
+            #expect(try collectToken("( module") == [.leftParen, .keyword])
+            #expect(try collectToken("(\tmodule") == [.leftParen, .keyword])
+            #expect(try collectToken("(\nmodule") == [.leftParen, .keyword])
+            #expect(try collectToken("(module)") == [.leftParen, .keyword, .rightParen])
 
-    }
+        }
 
-    func testLexComment() {
-        XCTAssertEqual(try collectToken("(; foo ;)"), [.blockComment])
-        try XCTAssertEqual(
-            collectToken(
-                """
-                (;
-                  multi-line comment
-                ;)
-                """
-            ),
-            [.blockComment]
-        )
-        try XCTAssertEqual(collectToken(";; foo"), [.lineComment])
-        try XCTAssertEqual(collectToken(";; foo\n(bar"), [.lineComment, .leftParen, .keyword])
+        @Test
+        func testLexComment() throws {
+            #expect(try collectToken("(; foo ;)") == [.blockComment])
+            #expect(
+                try collectToken(
+                    """
+                    (;
+                      multi-line comment
+                    ;)
+                    """
+                ) == [.blockComment]
+            )
+            #expect(try collectToken(";; foo") == [.lineComment])
+            #expect(try collectToken(";; foo\n(bar") == [.lineComment, .leftParen, .keyword])
 
-    }
+        }
 
-    func testLexBrokenComment() {
-        XCTAssertThrowsError(try collectToken("(;)"))
-        XCTAssertThrowsError(try collectToken("(; foo )"))
-        XCTAssertThrowsError(try collectToken(";)"))
-    }
+        @Test
+        func lexBrokenComment() throws {
+            #expect(throws: (any Error).self) { try collectToken("(;)") }
+            #expect(throws: (any Error).self) { try collectToken("(; foo )") }
+            #expect(throws: (any Error).self) { try collectToken(";)") }
+        }
 
-    func testLexIdAndString() throws {
-        try XCTAssertEqual(collectToken("$foo"), [.id])
-        try XCTAssertEqual(collectToken("\"foo\""), [.string(Array("foo".utf8))])
-        try XCTAssertEqual(collectToken("\"\\t\\n\\r\\\"\\\\\""), [.string(Array("\t\n\r\"\\".utf8))])
-        try XCTAssertEqual(collectToken("\"\\u{1F600}\""), [.string(Array("😀".utf8))])
-        try XCTAssertEqual(collectToken("$\"foo\""), [.id])
-        try XCTAssertEqual(collectToken("0$x"), [.unknown])
-    }
+        @Test
+        func lexIdAndString() throws {
+            #expect(try collectToken("$foo") == [.id])
+            #expect(try collectToken("\"foo\"") == [.string(Array("foo".utf8))])
+            #expect(try collectToken("\"\\t\\n\\r\\\"\\\\\"") == [.string(Array("\t\n\r\"\\".utf8))])
+            #expect(try collectToken("\"\\u{1F600}\"") == [.string(Array("😀".utf8))])
+            #expect(try collectToken("$\"foo\"") == [.id])
+            #expect(try collectToken("0$x") == [.unknown])
+        }
 
-    func testLexInteger() throws {
-        try XCTAssertEqual(collectToken("inf"), [.float(nil, .inf)])
-        try XCTAssertEqual(collectToken("+inf"), [.float(.plus, .inf)])
-        try XCTAssertEqual(collectToken("-inf"), [.float(.minus, .inf)])
-        try XCTAssertEqual(collectToken("nan"), [.float(nil, .nan(hexPattern: nil))])
-        try XCTAssertEqual(collectToken("+nan"), [.float(.plus, .nan(hexPattern: nil))])
-        try XCTAssertEqual(collectToken("-nan"), [.float(.minus, .nan(hexPattern: nil))])
-        try XCTAssertEqual(collectToken("nan:0x7f_ffff"), [.float(nil, .nan(hexPattern: "7fffff"))])
-        try XCTAssertEqual(collectToken("3.14"), [.float(nil, .decimalPattern("3.14"))])
-        try XCTAssertEqual(collectToken("1e+07"), [.float(nil, .decimalPattern("1e+07"))])
-        try XCTAssertEqual(collectToken("1E+07"), [.float(nil, .decimalPattern("1E+07"))])
-        try XCTAssertEqual(collectToken("0xff"), [.integer(nil, .hexPattern("ff"))])
-        try XCTAssertEqual(collectToken("8_128"), [.integer(nil, .decimalPattern("8128"))])
-        try XCTAssertEqual(collectToken("1.e10"), [.float(nil, .decimalPattern("1.e10"))])
-    }
+        @Test
+        func lexInteger() throws {
+            #expect(try collectToken("inf") == [.float(nil, .inf)])
+            #expect(try collectToken("+inf") == [.float(.plus, .inf)])
+            #expect(try collectToken("-inf") == [.float(.minus, .inf)])
+            #expect(try collectToken("nan") == [.float(nil, .nan(hexPattern: nil))])
+            #expect(try collectToken("+nan") == [.float(.plus, .nan(hexPattern: nil))])
+            #expect(try collectToken("-nan") == [.float(.minus, .nan(hexPattern: nil))])
+            #expect(try collectToken("nan:0x7f_ffff") == [.float(nil, .nan(hexPattern: "7fffff"))])
+            #expect(try collectToken("3.14") == [.float(nil, .decimalPattern("3.14"))])
+            #expect(try collectToken("1e+07") == [.float(nil, .decimalPattern("1e+07"))])
+            #expect(try collectToken("1E+07") == [.float(nil, .decimalPattern("1E+07"))])
+            #expect(try collectToken("0xff") == [.integer(nil, .hexPattern("ff"))])
+            #expect(try collectToken("8_128") == [.integer(nil, .decimalPattern("8128"))])
+            #expect(try collectToken("1.e10") == [.float(nil, .decimalPattern("1.e10"))])
+        }
 
-    func testLexFloatLiteral() throws {
-        try XCTAssertEqual(collectToken("nan:canonical"), [.keyword])
-        try XCTAssertEqual(collectToken("0x1.921fb6p+2"), [.float(nil, .hexPattern("1.921fb6p+2"))])
-    }
+        @Test
+        func lexFloatLiteral() throws {
+            #expect(try collectToken("nan:canonical") == [.keyword])
+            #expect(try collectToken("0x1.921fb6p+2") == [.float(nil, .hexPattern("1.921fb6p+2"))])
+        }
 
-    func testLexMemory() throws {
-        try XCTAssertEqual(collectToken("(module (memory 1))"), [.leftParen, .keyword, .leftParen, .keyword, .integer(nil, .decimalPattern("1")), .rightParen, .rightParen])
-    }
+        @Test
+        func lexMemory() throws {
+            #expect(try collectToken("(module (memory 1))") == [.leftParen, .keyword, .leftParen, .keyword, .integer(nil, .decimalPattern("1")), .rightParen, .rightParen])
+        }
 
-    func testLexSpectest() throws {
         // NOTE: We do the same check as a part of the EncoderTests, so it's
         // usually redundant and time-wasting to run this test every time.
         // Keeping it here just for local unit testing purposes.
-        try XCTSkipIf(
-            ProcessInfo.processInfo.environment["WASMKIT_LEXER_SPECTEST"] != "1"
+        @Test(
+            .enabled(if: ProcessInfo.processInfo.environment["WASMKIT_PARSER_SPECTEST"] == "1"),
+            arguments: Spectest.wastFiles(include: [])
         )
-        var failureCount = 0
-        for filePath in Spectest.wastFiles() {
-            print("Lexing \(filePath.path)...")
-            let source = try String(contentsOf: filePath)
-            do {
-                _ = try collectToken(source)
-            } catch {
-                failureCount += 1
-                XCTFail("Failed to lex \(filePath.path):\(error)")
-            }
-        }
-
-        if failureCount > 0 {
-            XCTFail("Failed to lex \(failureCount) files")
+        func lexSpectest(wastFile: URL) throws {
+            let source = try String(contentsOf: wastFile)
+            _ = try collectToken(source)
         }
     }
-}
+#endif
