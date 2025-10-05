@@ -5,12 +5,11 @@ import WasmParser
 
 @testable import WasmKit
 
-struct TestCase {
+struct TestCase: CustomStringConvertible {
     enum Error: Swift.Error {
         case invalidPath
     }
 
-    let content: Wast
     let path: String
     var relativePath: String {
         // Relative path from the current working directory
@@ -21,7 +20,11 @@ struct TestCase {
         return path
     }
 
-    static func load(include: [String], exclude: [String], in path: [String], log: ((String) -> Void)? = nil) throws -> [TestCase] {
+    var description: String {
+        return relativePath
+    }
+
+    static func load(include: [String], exclude: [String], in path: [String]) throws -> [TestCase] {
         let fileManager = FileManager.default
         var filePaths: [URL] = []
         for path in path {
@@ -62,13 +65,7 @@ struct TestCase {
 
         var testCases: [TestCase] = []
         for filePath in filePaths where try matchesPattern(filePath) {
-            guard let data = fileManager.contents(atPath: filePath.path) else {
-                assertionFailure("failed to load \(filePath)")
-                continue
-            }
-
-            let wast = try parseWAST(String(data: data, encoding: .utf8)!)
-            let spec = TestCase(content: wast, path: filePath.path)
+            let spec = TestCase(path: filePath.path)
             testCases.append(spec)
         }
 
@@ -130,12 +127,16 @@ class WastRunContext {
 
 extension TestCase {
     func run(spectestModule: Module, configuration: EngineConfiguration, handler: @escaping (TestCase, Location, Result) -> Void) throws {
+        guard let data = FileManager.default.contents(atPath: path) else {
+            assertionFailure("failed to load \(path)")
+            return
+        }
         let engine = Engine(configuration: configuration)
         let store = Store(engine: engine)
         let spectestInstance = try spectestModule.instantiate(store: store)
 
         let rootPath = FilePath(path).removingLastComponent().string
-        var content = content
+        var content = try parseWAST(String(data: data, encoding: .utf8)!)
         let context = WastRunContext(store: store, rootPath: rootPath)
         context.importsSpace.define(module: "spectest", spectestInstance.exports)
         do {
