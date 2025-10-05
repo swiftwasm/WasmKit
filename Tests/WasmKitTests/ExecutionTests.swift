@@ -79,7 +79,15 @@
             let instance = try module.instantiate(store: store, imports: imports)
             let _start = try #require(instance.exports[function: "_start"])
 
-            guard let trap: Trap = (#expect(throws: Trap.self) { try _start() }) else {
+            let trap: Trap
+            do {
+                let _ = try _start()
+                #expect((false), "Expected trap")
+                return
+            } catch let _trap as Trap {
+                trap = _trap
+            } catch {
+                #expect((false), "Expected trap: \(error)")
                 return
             }
             try assertTrap(trap)
