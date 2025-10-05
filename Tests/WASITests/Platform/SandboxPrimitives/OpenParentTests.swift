@@ -1,39 +1,42 @@
-import SystemPackage
-import XCTest
+#if canImport(Testing)
+    import Testing
+    import SystemPackage
 
-@testable import WASI
+    @testable import WASI
 
-final class OpenParentTests: XCTestCase {
-    func testSplitParent() {
-        func XCTCheck(
-            _ lhs: (FilePath, FilePath.Component)?,
-            _ rhs: (FilePath, FilePath.Component)?,
-            file: StaticString = #file,
-            line: UInt = #line
-        ) {
-            switch (lhs, rhs) {
-            case (.none, .none): return
-            case let (.some(lhs), .some(rhs)):
-                XCTAssertEqual(lhs.0, rhs.0, file: file, line: line)
-                XCTAssertEqual(lhs.1, rhs.1, file: file, line: line)
-            default:
-                XCTFail("\(String(describing: lhs)) and \(String(describing: rhs)) are not equal", file: file, line: line)
+    @Suite
+    struct OpenParentTests {
+        @Test
+        func testSplitParent() {
+            func check(
+                _ lhs: (FilePath, FilePath.Component)?,
+                _ rhs: (FilePath, FilePath.Component)?,
+                sourceLocation: SourceLocation = #_sourceLocation
+            ) {
+                switch (lhs, rhs) {
+                case (.none, .none): return
+                case let (.some(lhs), .some(rhs)):
+                    #expect(lhs.0 == rhs.0, sourceLocation: sourceLocation)
+                    #expect(lhs.1 == rhs.1, sourceLocation: sourceLocation)
+                default:
+                    #expect((false), "\(String(describing: lhs)) and \(String(describing: rhs)) are not equal", sourceLocation: sourceLocation)
+                }
             }
+
+            check(splitParent(path: ""), nil)
+
+            check(splitParent(path: "/"), (FilePath("/"), FilePath.Component(".")))
+            check(splitParent(path: "/."), (FilePath("/."), FilePath.Component(".")))
+            check(splitParent(path: "/a"), (FilePath("/"), FilePath.Component("a")))
+            check(splitParent(path: "/a/"), (FilePath("/a"), FilePath.Component(".")))
+            check(splitParent(path: "/a/."), (FilePath("/a/."), FilePath.Component(".")))
+            check(splitParent(path: "/a/.."), (FilePath("/a/.."), FilePath.Component(".")))
+
+            check(splitParent(path: "b"), (FilePath(""), FilePath.Component("b")))
+            check(splitParent(path: "b/."), (FilePath("b/."), FilePath.Component(".")))
+            check(splitParent(path: "b/.."), (FilePath("b/.."), FilePath.Component(".")))
+
+            check(splitParent(path: "../c"), (FilePath(".."), FilePath.Component("c")))
         }
-
-        XCTCheck(splitParent(path: ""), nil)
-
-        XCTCheck(splitParent(path: "/"), (FilePath("/"), FilePath.Component(".")))
-        XCTCheck(splitParent(path: "/."), (FilePath("/."), FilePath.Component(".")))
-        XCTCheck(splitParent(path: "/a"), (FilePath("/"), FilePath.Component("a")))
-        XCTCheck(splitParent(path: "/a/"), (FilePath("/a"), FilePath.Component(".")))
-        XCTCheck(splitParent(path: "/a/."), (FilePath("/a/."), FilePath.Component(".")))
-        XCTCheck(splitParent(path: "/a/.."), (FilePath("/a/.."), FilePath.Component(".")))
-
-        XCTCheck(splitParent(path: "b"), (FilePath(""), FilePath.Component("b")))
-        XCTCheck(splitParent(path: "b/."), (FilePath("b/."), FilePath.Component(".")))
-        XCTCheck(splitParent(path: "b/.."), (FilePath("b/.."), FilePath.Component(".")))
-
-        XCTCheck(splitParent(path: "../c"), (FilePath(".."), FilePath.Component("c")))
     }
-}
+#endif
