@@ -17,25 +17,29 @@ enum Spectest {
     }
 
     static func wastFiles(include: [String] = [], exclude: [String] = ["annotations.wast"]) -> [URL] {
-        return [
-            testsuitePath,
-            testsuitePath.appendingPathComponent("proposals/memory64"),
-            testsuitePath.appendingPathComponent("proposals/tail-call"),
-            rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite"),
-        ].flatMap {
-            try! FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil)
-        }.compactMap { filePath in
-            guard filePath.pathExtension == "wast" else {
-                return nil
+        #if os(Android)
+            return []
+        #else
+            return [
+                testsuitePath,
+                testsuitePath.appendingPathComponent("proposals/memory64"),
+                testsuitePath.appendingPathComponent("proposals/tail-call"),
+                rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite"),
+            ].flatMap {
+                try! FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil)
+            }.compactMap { filePath in
+                guard filePath.pathExtension == "wast" else {
+                    return nil
+                }
+                guard !filePath.lastPathComponent.starts(with: "simd_") else { return nil }
+                if !include.isEmpty {
+                    guard include.contains(filePath.lastPathComponent) else { return nil }
+                } else {
+                    guard !exclude.contains(filePath.lastPathComponent) else { return nil }
+                }
+                return filePath
             }
-            guard !filePath.lastPathComponent.starts(with: "simd_") else { return nil }
-            if !include.isEmpty {
-                guard include.contains(filePath.lastPathComponent) else { return nil }
-            } else {
-                guard !exclude.contains(filePath.lastPathComponent) else { return nil }
-            }
-            return filePath
-        }
+        #endif
     }
 
     static func deriveFeatureSet(wast: URL) -> WasmFeatureSet {

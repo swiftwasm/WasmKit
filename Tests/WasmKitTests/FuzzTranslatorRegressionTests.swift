@@ -23,18 +23,20 @@
             }
         }
 
-        @Test(
-            .disabled("unable to run fuzz translator regression tests on Android due to missing files on emulator", platforms: [.android]),
-            arguments: try failCases()
-        )
-        func run(test: Case) throws {
-            let data = try Data(contentsOf: test.path)
-            do {
-                try WasmKitFuzzing.fuzzInstantiation(bytes: Array(data))
-            } catch {
-                // Skip exceptions without crash
+        #if !os(Android)
+            @Test(
+                .disabled("unable to run fuzz translator regression tests on Android due to missing files on emulator", platforms: [.android]),
+                arguments: try failCases()
+            )
+            func run(test: Case) throws {
+                let data = try Data(contentsOf: test.path)
+                do {
+                    try WasmKitFuzzing.fuzzInstantiation(bytes: Array(data))
+                } catch {
+                    // Skip exceptions without crash
+                }
             }
-        }
+        #endif
     }
 
 #endif
