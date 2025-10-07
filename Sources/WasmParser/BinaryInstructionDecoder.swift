@@ -5,7 +5,7 @@
 import WasmTypes
 
 @usableFromInline
-protocol BinaryInstructionDecoder {
+package protocol BinaryInstructionDecoder {
     /// Claim the next byte to be decoded
     @inlinable func claimNextByte() throws -> UInt8
     /// Visit unknown instruction
