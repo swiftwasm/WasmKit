@@ -2239,6 +2239,16 @@ struct InstructionTranslator: InstructionVisitor {
             return .tableSize(Instruction.TableSizeOperand(tableIndex: table, result: LVReg(result)))
         }
     }
+
+    mutating func visitUnknown(_ opcode: [UInt8]) throws -> Bool {
+        guard opcode.count == 1 && opcode[0] == 0xFF else {
+            return false
+        }
+
+        emit(.breakpoint)
+
+        return true
+    }
 }
 
 struct TranslationError: Error, CustomStringConvertible {

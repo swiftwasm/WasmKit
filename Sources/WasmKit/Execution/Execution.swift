@@ -361,8 +361,11 @@ extension Execution {
         }
     }
 
-    /// A ``Error`` thrown when the execution normally ends.
+    /// An ``Error`` thrown when the execution normally ends.
     struct EndOfExecution: Error {}
+
+    /// An ``Error`` thrown when a breakpoint is triggered.
+    struct Breakpoint: Error {}
 
     /// The entry point for the execution of the WebAssembly function.
     @inline(never)

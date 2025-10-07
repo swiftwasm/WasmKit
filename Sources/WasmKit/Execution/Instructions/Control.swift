@@ -223,4 +223,8 @@ extension Execution {
             Function(handle: function, store: store.value)
         )
     }
+
+    mutating func breakpoint(sp: inout Sp, pc: Pc) throws -> (Pc, CodeSlot) {
+        throw Breakpoint()
+    }
 }

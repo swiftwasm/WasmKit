@@ -502,6 +502,16 @@ extension VMGen {
         // Profiling
         Instruction(name: "onEnter", documentation: "Intercept the entry of a function", immediate: "OnEnterOperand"),
         Instruction(name: "onExit", documentation: "Intercept the exit of a function", immediate: "OnExitOperand"),
+
+        // Debugging
+        Instruction(name: "breakpoint",
+            documentation: """
+            Stop the VM on this instruction as a breakpoint
+
+            This instruction is used in debugging scenarios.
+            """,
+            isControl: true, mayThrow: true, mayUpdateFrame: true
+        ),
     ]
 
     // MARK: - Instruction generation

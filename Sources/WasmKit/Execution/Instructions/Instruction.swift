@@ -413,6 +413,10 @@ enum Instruction: Equatable {
     case onEnter(Instruction.OnEnterOperand)
     /// Intercept the exit of a function
     case onExit(Instruction.OnExitOperand)
+    /// Stop the VM on this instruction as a breakpoint
+    /// 
+    /// This instruction is used in debugging scenarios.
+    case breakpoint
 }
 
 extension Instruction {
@@ -1271,6 +1275,7 @@ extension Instruction {
         case .tableElementDrop: return 196
         case .onEnter: return 197
         case .onExit: return 198
+        case .breakpoint: return 199
         }
     }
 }
@@ -1481,6 +1486,7 @@ extension Instruction {
         case 196: return .tableElementDrop(Instruction.TableElementDropOperand.load(from: &pc))
         case 197: return .onEnter(Instruction.OnEnterOperand.load(from: &pc))
         case 198: return .onExit(Instruction.OnExitOperand.load(from: &pc))
+        case 199: return .breakpoint
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -1694,6 +1700,7 @@ extension Instruction {
         case 196: return "tableElementDrop"
         case 197: return "onEnter"
         case 198: return "onExit"
+        case 199: return "breakpoint"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }

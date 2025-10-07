@@ -606,23 +606,27 @@ extension Parser: BinaryInstructionDecoder {
         return 0
     }
 
-    @inlinable package func visitUnknown(_ opcode: [UInt8]) throws {
+    @inlinable func throwUnknown(_ opcode: [UInt8]) throws -> Never {
         throw makeError(.illegalOpcode(opcode))
     }
 
-    @inlinable package mutating func visitBlock() throws -> BlockType { try parseResultType() }
-    @inlinable package mutating func visitLoop() throws -> BlockType { try parseResultType() }
-    @inlinable package mutating func visitIf() throws -> BlockType { try parseResultType() }
-    @inlinable package mutating func visitBr() throws -> UInt32 { try parseUnsigned() }
-    @inlinable package mutating func visitBrIf() throws -> UInt32 { try parseUnsigned() }
-    @inlinable package mutating func visitBrTable() throws -> BrTable {
+    @inlinable func visitUnknown(_ opcode: [UInt8]) throws -> Bool {
+        try throwUnknown(opcode)
+    }
+
+    @inlinable mutating func visitBlock() throws -> BlockType { try parseResultType() }
+    @inlinable mutating func visitLoop() throws -> BlockType { try parseResultType() }
+    @inlinable mutating func visitIf() throws -> BlockType { try parseResultType() }
+    @inlinable mutating func visitBr() throws -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitBrIf() throws -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitBrTable() throws -> BrTable {
         let labelIndices: [UInt32] = try parseVector { try parseUnsigned() }
         let labelIndex: UInt32 = try parseUnsigned()
         return BrTable(labelIndices: labelIndices, defaultIndex: labelIndex)
     }
-    @inlinable package mutating func visitCall() throws -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitCall() throws -> UInt32 { try parseUnsigned() }
 
-    @inlinable package mutating func visitCallIndirect() throws -> (typeIndex: UInt32, tableIndex: UInt32) {
+    @inlinable mutating func visitCallIndirect() throws -> (typeIndex: UInt32, tableIndex: UInt32) {
         let typeIndex: TypeIndex = try parseUnsigned()
         if try !features.contains(.referenceTypes) && stream.peek() != 0 {
             // Check that reserved byte is zero when reference-types is disabled
@@ -632,17 +636,17 @@ extension Parser: BinaryInstructionDecoder {
         return (typeIndex, tableIndex)
     }
 
-    @inlinable package mutating func visitReturnCall() throws -> UInt32 {
+    @inlinable mutating func visitReturnCall() throws -> UInt32 {
         try parseUnsigned()
     }
 
-    @inlinable package mutating func visitReturnCallIndirect() throws -> (typeIndex: UInt32, tableIndex: UInt32) {
+    @inlinable mutating func visitReturnCallIndirect() throws -> (typeIndex: UInt32, tableIndex: UInt32) {
         let typeIndex: TypeIndex = try parseUnsigned()
         let tableIndex: TableIndex = try parseUnsigned()
         return (typeIndex, tableIndex)
     }
 
-    @inlinable package mutating func visitTypedSelect() throws -> WasmTypes.ValueType {
+    @inlinable mutating func visitTypedSelect() throws -> WasmTypes.ValueType {
         let results = try parseVector { try parseValueType() }
         guard results.count == 1 else {
             throw makeError(.invalidResultArity(expected: 1, actual: results.count))
@@ -650,36 +654,36 @@ extension Parser: BinaryInstructionDecoder {
         return results[0]
     }
 
-    @inlinable package mutating func visitLocalGet() throws -> UInt32 { try parseUnsigned() }
-    @inlinable package mutating func visitLocalSet() throws -> UInt32 { try parseUnsigned() }
-    @inlinable package mutating func visitLocalTee() throws -> UInt32 { try parseUnsigned() }
-    @inlinable package mutating func visitGlobalGet() throws -> UInt32 { try parseUnsigned() }
-    @inlinable package mutating func visitGlobalSet() throws -> UInt32 { try parseUnsigned() }
-    @inlinable package mutating func visitLoad(_: Instruction.Load) throws -> MemArg { try parseMemarg() }
-    @inlinable package mutating func visitStore(_: Instruction.Store) throws -> MemArg { try parseMemarg() }
-    @inlinable package mutating func visitMemorySize() throws -> UInt32 {
+    @inlinable mutating func visitLocalGet() throws -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitLocalSet() throws -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitLocalTee() throws -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitGlobalGet() throws -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitGlobalSet() throws -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitLoad(_: Instruction.Load) throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitStore(_: Instruction.Store) throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitMemorySize() throws -> UInt32 {
         try parseMemoryIndex()
     }
-    @inlinable package mutating func visitMemoryGrow() throws -> UInt32 {
+    @inlinable mutating func visitMemoryGrow() throws -> UInt32 {
         try parseMemoryIndex()
     }
-    @inlinable package mutating func visitI32Const() throws -> Int32 {
+    @inlinable mutating func visitI32Const() throws -> Int32 {
         let n: UInt32 = try parseInteger()
         return Int32(bitPattern: n)
     }
-    @inlinable package mutating func visitI64Const() throws -> Int64 {
+    @inlinable mutating func visitI64Const() throws -> Int64 {
         let n: UInt64 = try parseInteger()
         return Int64(bitPattern: n)
     }
-    @inlinable package mutating func visitF32Const() throws -> IEEE754.Float32 {
+    @inlinable mutating func visitF32Const() throws -> IEEE754.Float32 {
         let n = try parseFloat()
         return IEEE754.Float32(bitPattern: n)
     }
-    @inlinable package mutating func visitF64Const() throws -> IEEE754.Float64 {
+    @inlinable mutating func visitF64Const() throws -> IEEE754.Float64 {
         let n = try parseDouble()
         return IEEE754.Float64(bitPattern: n)
     }
-    @inlinable package mutating func visitRefNull() throws -> WasmTypes.ReferenceType {
+    @inlinable mutating func visitRefNull() throws -> WasmTypes.ReferenceType {
         let type = try parseValueType()
         guard case let .ref(refType) = type else {
             throw makeError(.expectedRefType(actual: type))
@@ -687,24 +691,24 @@ extension Parser: BinaryInstructionDecoder {
         return refType
     }
 
-    @inlinable package mutating func visitRefFunc() throws -> UInt32 { try parseUnsigned() }
-    @inlinable package mutating func visitMemoryInit() throws -> UInt32 {
+    @inlinable mutating func visitRefFunc() throws -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitMemoryInit() throws -> UInt32 {
         let dataIndex: DataIndex = try parseUnsigned()
         _ = try parseMemoryIndex()
         return dataIndex
     }
 
-    @inlinable package mutating func visitDataDrop() throws -> UInt32 {
+    @inlinable mutating func visitDataDrop() throws -> UInt32 {
         try parseUnsigned()
     }
 
-    @inlinable package mutating func visitMemoryCopy() throws -> (dstMem: UInt32, srcMem: UInt32) {
+    @inlinable mutating func visitMemoryCopy() throws -> (dstMem: UInt32, srcMem: UInt32) {
         _ = try parseMemoryIndex()
         _ = try parseMemoryIndex()
         return (0, 0)
     }
 
-    @inlinable package mutating func visitMemoryFill() throws -> UInt32 {
+    @inlinable mutating func visitMemoryFill() throws -> UInt32 {
         let zero = try stream.consumeAny()
         guard zero == 0x00 else {
             throw makeError(.zeroExpected(actual: zero))
@@ -712,38 +716,39 @@ extension Parser: BinaryInstructionDecoder {
         return 0
     }
 
-    @inlinable package mutating func visitTableInit() throws -> (elemIndex: UInt32, table: UInt32) {
+    @inlinable mutating func visitTableInit() throws -> (elemIndex: UInt32, table: UInt32) {
         let elementIndex: ElementIndex = try parseUnsigned()
         let tableIndex: TableIndex = try parseUnsigned()
         return (elementIndex, tableIndex)
     }
-    @inlinable package mutating func visitElemDrop() throws -> UInt32 {
+    @inlinable mutating func visitElemDrop() throws -> UInt32 {
         try parseUnsigned()
     }
-    @inlinable package mutating func visitTableCopy() throws -> (dstTable: UInt32, srcTable: UInt32) {
+    @inlinable mutating func visitTableCopy() throws -> (dstTable: UInt32, srcTable: UInt32) {
         let destination: TableIndex = try parseUnsigned()
         let source: TableIndex = try parseUnsigned()
         return (destination, source)
     }
-    @inlinable package mutating func visitTableFill() throws -> UInt32 {
+    @inlinable mutating func visitTableFill() throws -> UInt32 {
         try parseUnsigned()
     }
-    @inlinable package mutating func visitTableGet() throws -> UInt32 {
+    @inlinable mutating func visitTableGet() throws -> UInt32 {
         try parseUnsigned()
     }
-    @inlinable package mutating func visitTableSet() throws -> UInt32 {
+    @inlinable mutating func visitTableSet() throws -> UInt32 {
         try parseUnsigned()
     }
-    @inlinable package mutating func visitTableGrow() throws -> UInt32 {
+    @inlinable mutating func visitTableGrow() throws -> UInt32 {
         try parseUnsigned()
     }
-    @inlinable package mutating func visitTableSize() throws -> UInt32 {
+    @inlinable mutating func visitTableSize() throws -> UInt32 {
         try parseUnsigned()
     }
     @inlinable package func claimNextByte() throws -> UInt8 {
         return try stream.consumeAny()
     }
 
+    /// Returns: `true` if the parsed instruction is the block end instruction.
     @inline(__always)
     @inlinable
     mutating func parseInstruction<V: InstructionVisitor>(visitor v: inout V) throws -> Bool {
