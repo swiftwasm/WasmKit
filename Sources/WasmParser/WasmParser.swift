@@ -744,7 +744,7 @@ extension Parser: BinaryInstructionDecoder {
     @inlinable mutating func visitTableSize() throws -> UInt32 {
         try parseUnsigned()
     }
-    @inlinable package func claimNextByte() throws -> UInt8 {
+    @inlinable func claimNextByte() throws -> UInt8 {
         return try stream.consumeAny()
     }
 
