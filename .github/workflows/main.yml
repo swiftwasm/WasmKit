@@ -14,14 +14,6 @@ jobs:
     strategy:
       matrix:
         include:
-          # Swift 5.10
-          - os: macos-14
-            xcode: Xcode_15.4
-            development-toolchain-tag: swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a
-            wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi.artifactbundle.zip"
-            wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi
-            wasi-swift-sdk-checksum: "37516de837411ea46e4f9e75d52bd742f6941febac49981aac0c4f20f02b8b54"
-            test-args: ""
           # Swift 6.0
           - os: macos-14
             xcode: Xcode_16.2
@@ -97,16 +89,6 @@ jobs:
     strategy:
       matrix:
         include:
-          - swift: "swift:5.10-focal"
-            development-toolchain-download: "https://download.swift.org/development/ubuntu2004/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a-ubuntu20.04.tar.gz"
-            wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi.artifactbundle.zip"
-            wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi
-            wasi-swift-sdk-checksum: "37516de837411ea46e4f9e75d52bd742f6941febac49981aac0c4f20f02b8b54"
-          - swift: "swift:5.10-amazonlinux2"
-            development-toolchain-download: "https://download.swift.org/development/amazonlinux2/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a-amazonlinux2.tar.gz"
-            wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi.artifactbundle.zip"
-            wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi
-            wasi-swift-sdk-checksum: "37516de837411ea46e4f9e75d52bd742f6941febac49981aac0c4f20f02b8b54"
           - swift: "swift:6.0-focal"
             development-toolchain-download: "https://download.swift.org/development/ubuntu2004/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a-ubuntu20.04.tar.gz"
             wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi.artifactbundle.zip"
