@@ -176,7 +176,7 @@ struct RuntimeTestHarness {
         return try compile(
             inputFiles: inputFiles,
             arguments: [
-                "-target", "wasm32-unknown-wasi",
+                "-target", "wasm32-unknown-wasip1",
                 "-enable-experimental-feature", "Extern",
                 "-static-stdlib",
                 "-Xclang-linker", "-mexec-model=reactor",

@@ -14,29 +14,29 @@ jobs:
     strategy:
       matrix:
         include:
-          # Swift 5.10
-          - os: macos-14
-            xcode: Xcode_15.4
-            development-toolchain-tag: swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a
-            wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi.artifactbundle.zip"
-            wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi
-            wasi-swift-sdk-checksum: "37516de837411ea46e4f9e75d52bd742f6941febac49981aac0c4f20f02b8b54"
-            test-args: ""
           # Swift 6.0
           - os: macos-14
             xcode: Xcode_16.2
-            development-toolchain-tag: swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a
-            wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi.artifactbundle.zip"
-            wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi
-            wasi-swift-sdk-checksum: "37516de837411ea46e4f9e75d52bd742f6941febac49981aac0c4f20f02b8b54"
+            development-toolchain-tag: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a
+            wasi-swift-sdk-download: "https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm.artifactbundle.tar.gz"
+            wasi-swift-sdk-id: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm
+            wasi-swift-sdk-checksum: "b64dfad9e1c9ccdf06f35cf9b1a00317e000df0c0de0b3eb9f49d6db0fcba4d9"
             test-args: ""
           # Swift 6.1
           - os: macos-15
             xcode: Xcode_16.4
-            development-toolchain-tag: swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a
-            wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi.artifactbundle.zip"
-            wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi
-            wasi-swift-sdk-checksum: "37516de837411ea46e4f9e75d52bd742f6941febac49981aac0c4f20f02b8b54"
+            development-toolchain-tag: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a
+            wasi-swift-sdk-download: "https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm.artifactbundle.tar.gz"
+            wasi-swift-sdk-id: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm
+            wasi-swift-sdk-checksum: "b64dfad9e1c9ccdf06f35cf9b1a00317e000df0c0de0b3eb9f49d6db0fcba4d9"
+            test-args: "--sanitize address"
+          # Swift 6.2
+          - os: macos-15
+            xcode: Xcode_26.0
+            development-toolchain-tag: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a
+            wasi-swift-sdk-download: "https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm.artifactbundle.tar.gz"
+            wasi-swift-sdk-id: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm
+            wasi-swift-sdk-checksum: "b64dfad9e1c9ccdf06f35cf9b1a00317e000df0c0de0b3eb9f49d6db0fcba4d9"
             test-args: "--sanitize address"
 
     runs-on: ${{ matrix.os }}
@@ -77,7 +77,7 @@ jobs:
       - name: Prepare Xcode platforms
         run: |
           set -euxo pipefail
-          sudo xcode-select -s /Applications/Xcode_16.4.app
+          sudo xcode-select -s /Applications/Xcode_26.0.app
           sudo xcodebuild -runFirstLaunch || true
           for PLAT in iOS tvOS watchOS visionOS; do
             if ! xcodebuild -showsdks | grep -q "$PLAT"; then
@@ -97,28 +97,33 @@ jobs:
     strategy:
       matrix:
         include:
-          - swift: "swift:5.10-focal"
-            development-toolchain-download: "https://download.swift.org/development/ubuntu2004/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a-ubuntu20.04.tar.gz"
-            wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi.artifactbundle.zip"
-            wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi
-            wasi-swift-sdk-checksum: "37516de837411ea46e4f9e75d52bd742f6941febac49981aac0c4f20f02b8b54"
-          - swift: "swift:5.10-amazonlinux2"
-            development-toolchain-download: "https://download.swift.org/development/amazonlinux2/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a-amazonlinux2.tar.gz"
-            wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi.artifactbundle.zip"
-            wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi
-            wasi-swift-sdk-checksum: "37516de837411ea46e4f9e75d52bd742f6941febac49981aac0c4f20f02b8b54"
-          - swift: "swift:6.0-focal"
-            development-toolchain-download: "https://download.swift.org/development/ubuntu2004/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a-ubuntu20.04.tar.gz"
-            wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi.artifactbundle.zip"
-            wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi
-            wasi-swift-sdk-checksum: "37516de837411ea46e4f9e75d52bd742f6941febac49981aac0c4f20f02b8b54"
+          - swift: "swift:6.0-jammy"
+            development-toolchain-download: "https://download.swift.org/development/ubuntu2204/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a-ubuntu22.04.tar.gz"
+            wasi-swift-sdk-download: "https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm.artifactbundle.tar.gz"
+            wasi-swift-sdk-id: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm
+            wasi-swift-sdk-checksum: "b64dfad9e1c9ccdf06f35cf9b1a00317e000df0c0de0b3eb9f49d6db0fcba4d9"
+          - swift: "swift:6.1-noble"
+            development-toolchain-download: "https://download.swift.org/development/ubuntu2404/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a-ubuntu24.04.tar.gz"
+            wasi-swift-sdk-download: "https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm.artifactbundle.tar.gz"
+            wasi-swift-sdk-id: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm
+            wasi-swift-sdk-checksum: "b64dfad9e1c9ccdf06f35cf9b1a00317e000df0c0de0b3eb9f49d6db0fcba4d9"
+          - swift: "swift:6.2-amazonlinux2"
+            development-toolchain-download: "https://download.swift.org/development/amazonlinux2/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a-amazonlinux2.tar.gz"
+            wasi-swift-sdk-download: "https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm.artifactbundle.tar.gz"
+            wasi-swift-sdk-id: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm
+            wasi-swift-sdk-checksum: "b64dfad9e1c9ccdf06f35cf9b1a00317e000df0c0de0b3eb9f49d6db0fcba4d9"
+          - swift: "swift:6.2-noble"
+            development-toolchain-download: "https://download.swift.org/development/ubuntu2404/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a-ubuntu24.04.tar.gz"
+            wasi-swift-sdk-download: "https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm.artifactbundle.tar.gz"
+            wasi-swift-sdk-id: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm
+            wasi-swift-sdk-checksum: "b64dfad9e1c9ccdf06f35cf9b1a00317e000df0c0de0b3eb9f49d6db0fcba4d9"
             test-args: "--enable-code-coverage"
             build-dev-dashboard: true
-          - swift: "swiftlang/swift:nightly-main-jammy"
-            development-toolchain-download: "https://download.swift.org/development/ubuntu2204/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a-ubuntu22.04.tar.gz"
-            wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi.artifactbundle.zip"
-            wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi
-            wasi-swift-sdk-checksum: "37516de837411ea46e4f9e75d52bd742f6941febac49981aac0c4f20f02b8b54"
+          - swift: "swiftlang/swift:nightly-main-noble"
+            development-toolchain-download: "https://download.swift.org/development/ubuntu2404/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a-ubuntu24.04.tar.gz"
+            wasi-swift-sdk-download: "https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm.artifactbundle.tar.gz"
+            wasi-swift-sdk-id: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm
+            wasi-swift-sdk-checksum: "b64dfad9e1c9ccdf06f35cf9b1a00317e000df0c0de0b3eb9f49d6db0fcba4d9"
             test-args: "-Xswiftc -DWASMKIT_CI_TOOLCHAIN_NIGHTLY"
 
     runs-on: ubuntu-22.04
@@ -137,7 +142,7 @@ jobs:
         run: |
           toolchain_path="/opt/swiftwasm"
           ./build-exec mkdir -p "$toolchain_path"
-          curl -L ${{ matrix.development-toolchain-download }} | ./build-exec tar xz --strip-component 1 -C "$toolchain_path"
+          curl -v -L ${{ matrix.development-toolchain-download }} | ./build-exec tar xz --strip-component 1 -C "$toolchain_path"
           echo "toolchain-path=$toolchain_path" >> $GITHUB_OUTPUT
           ./build-exec "$toolchain_path/usr/bin/swift" sdk install "${{ matrix.wasi-swift-sdk-download }}" --checksum "${{ matrix.wasi-swift-sdk-checksum }}"
           wasi_sdk_path=$(./build-exec "$toolchain_path/usr/bin/swift" sdk configure --show-configuration "${{ matrix.wasi-swift-sdk-id }}" wasm32-unknown-wasi | grep sdkRootPath: | cut -d: -f2)
@@ -186,9 +191,9 @@ jobs:
     strategy:
       matrix:
         include:
-          - swift: 6.0.1-jammy
-            musl-swift-sdk-download: "https://download.swift.org/swift-6.0.1-release/static-sdk/swift-6.0.1-RELEASE/swift-6.0.1-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz"
-            musl-swift-sdk-checksum: "d4f46ba40e11e697387468e18987ee622908bc350310d8af54eb5e17c2ff5481"
+          - swift: 6.2-noble
+            musl-swift-sdk-download: "https://download.swift.org/swift-6.2-release/static-sdk/swift-6.2-RELEASE/swift-6.2-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz"
+            musl-swift-sdk-checksum: "d2225840e592389ca517bbf71652f7003dbf45ac35d1e57d98b9250368769378"
     steps:
       - uses: actions/checkout@v4
       - name: Configure container
@@ -237,7 +242,7 @@ jobs:
   build-cmake:
     runs-on: ubuntu-22.04
     container:
-      image: swift:5.8-focal
+      image: swift:6.2-noble
     steps:
       - uses: actions/checkout@v4
       - name: Install Ninja
