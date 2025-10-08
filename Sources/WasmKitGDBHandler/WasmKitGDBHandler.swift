@@ -33,6 +33,7 @@ package final class WasmKitGDBHandler: ChannelInboundHandler {
             ])
 
         case .supportedFeatures:
+            // FIXME: should return a different set of supported features instead of echoing.
             responseKind = .raw(command.arguments)
 
         case .vContSupportedActions:
