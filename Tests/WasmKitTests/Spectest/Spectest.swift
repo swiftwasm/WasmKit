@@ -48,11 +48,11 @@ struct NullSpectestProgressReporter: SpectestProgressReporter {
 
 struct StderrSpectestProgressReporter: SpectestProgressReporter {
     func log(_ message: String, verbose: Bool) {
-        fputs(message + "\n", FileHandle.standardError.fileDescriptor)
+        try! FileHandle.standardError.write(contentsOf: Data((message + "\n").utf8))
     }
     func log(_ message: String, path: String, location: Location, verbose: Bool) {
         let (line, _) = location.computeLineAndColumn()
-        fputs("\(path):\(line): " + message + "\n", FileHandle.standardError.fileDescriptor)
+        try! FileHandle.standardError.write(contentsOf: Data(("\(path):\(line): " + message + "\n").utf8))
     }
 }
 
