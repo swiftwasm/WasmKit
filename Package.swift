@@ -4,12 +4,7 @@ import PackageDescription
 
 import class Foundation.ProcessInfo
 
-let DarwinPlatforms: [Platform]
-#if swift(<5.9)
-    DarwinPlatforms = [.macOS, .iOS, .watchOS, .tvOS]
-#else
-    DarwinPlatforms = [.macOS, .iOS, .watchOS, .tvOS, .visionOS]
-#endif
+let DarwinPlatforms: [Platform] = [.macOS, .iOS, .watchOS, .tvOS, .visionOS]
 
 let package = Package(
     name: "WasmKit",
@@ -121,7 +116,6 @@ let package = Package(
         .target(name: "WITExtractor"),
         .testTarget(name: "WITExtractorTests", dependencies: ["WITExtractor", "WIT"]),
     ],
-    swiftLanguageVersions: [.v5]
 )
 
 if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {

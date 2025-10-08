@@ -70,7 +70,6 @@ struct Execution {
             let symbolName = store.nameRegistry.symbolicate(.wasm(function))
             symbols.append(
                 Backtrace.Symbol(
-                    function: Function(handle: .wasm(function), store: store),
                     name: symbolName
                 )
             )

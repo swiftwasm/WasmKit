@@ -189,7 +189,7 @@ public struct Global: Equatable {
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#element-segments>
 public struct ElementSegment: Equatable {
     @usableFromInline
-    struct Flag: OptionSet {
+    struct Flag: OptionSet, Sendable {
         @usableFromInline let rawValue: UInt32
 
         @inlinable

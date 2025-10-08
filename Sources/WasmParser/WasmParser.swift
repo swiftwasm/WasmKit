@@ -175,7 +175,7 @@ public struct ExpressionParser {
 let WASM_MAGIC: [UInt8] = [0x00, 0x61, 0x73, 0x6D]
 
 /// Flags for enabling/disabling WebAssembly features
-public struct WasmFeatureSet: OptionSet {
+public struct WasmFeatureSet: OptionSet, Sendable {
     /// The raw value of the feature set
     public let rawValue: Int
 
@@ -206,7 +206,7 @@ public struct WasmFeatureSet: OptionSet {
 /// An error that occurs during parsing of a WebAssembly binary
 public struct WasmParserError: Swift.Error {
     @usableFromInline
-    struct Message {
+    struct Message: Sendable {
         let text: String
 
         init(_ text: String) {
