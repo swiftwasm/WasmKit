@@ -40,10 +40,10 @@ def main():
     #       swift-format.
     targets.remove(os.path.join("Sources", "SystemExtras"))
 
-    swift_format = build_swift_format()
+    # swift_format = build_swift_format()
 
     arguments = [
-        swift_format, "format", "--in-place", "--recursive", "--parallel"
+        "swift", "format", "format", "--in-place", "--recursive", "--parallel"
     ]
     for target in targets:
         arguments.append(os.path.join(SOURCE_ROOT, target))
