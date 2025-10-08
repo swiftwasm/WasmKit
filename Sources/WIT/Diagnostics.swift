@@ -6,7 +6,7 @@ struct DiagnosticError: Error {
     let diagnostic: Diagnostic
 }
 
-public struct Diagnostic {
+public struct Diagnostic: Sendable {
 
     public let message: String
     var textRange: TextRange?

@@ -3,12 +3,9 @@ import WasmTypes
 import struct WasmParser.Import
 
 /// The backtrace of the trap.
-struct Backtrace: CustomStringConvertible {
+struct Backtrace: CustomStringConvertible, Sendable {
     /// A symbol in the backtrace.
     struct Symbol {
-        /// The function that the symbol represents.
-        let function: Function
-
         /// The name of the symbol.
         let name: String?
     }

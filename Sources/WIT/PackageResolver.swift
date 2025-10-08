@@ -1,7 +1,7 @@
 import Foundation
 
 /// A unit of WIT package managing a collection of WIT source files
-public final class PackageUnit: Hashable, CustomStringConvertible {
+public final class PackageUnit: Hashable, CustomStringConvertible, Sendable {
     public let packageName: PackageNameSyntax
     public let sourceFiles: [SyntaxNode<SourceFileSyntax>]
 

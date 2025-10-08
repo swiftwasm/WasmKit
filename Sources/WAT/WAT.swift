@@ -1,7 +1,7 @@
 import WasmParser
 
 /// Options for encoding a WebAssembly module into a binary format.
-public struct EncodeOptions {
+public struct EncodeOptions: Sendable {
     /// Whether to include the name section.
     public var nameSection: Bool
 

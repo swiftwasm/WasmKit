@@ -61,7 +61,7 @@ class RequestEvaluatorTests: XCTestCase {
         )
 
         let cyclicalRequestError = try XCTUnwrap(anyError as? Evaluator.CyclicalRequestError)
-        XCTAssertEqual(cyclicalRequestError.activeRequests.count, 3)
+        XCTAssertEqual(cyclicalRequestError.activeRequestDescriptions.count, 3)
     }
 
     func testThrowingRequest() throws {

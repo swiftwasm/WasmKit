@@ -35,7 +35,7 @@ internal class Evaluator {
 
         // Check cyclical request
         if activeRequestsSet.contains(requestAsHashable) {
-            throw CyclicalRequestError(activeRequests: activeRequests + [request])
+            throw CyclicalRequestError(activeRequestDescriptions: activeRequests.map { "\($0)" } + ["\(request)"])
         }
 
         // Push the given request as an active request
@@ -64,11 +64,11 @@ internal class Evaluator {
 
 extension Evaluator {
     struct CyclicalRequestError: Error, CustomStringConvertible {
-        let activeRequests: [any EvaluationRequest]
+        let activeRequestDescriptions: [String]
 
         var description: String {
             var description = "==== Cycle detected! ====\n"
-            for (index, request) in activeRequests.enumerated() {
+            for (index, request) in activeRequestDescriptions.enumerated() {
                 let indent = String(repeating: "  ", count: index)
                 description += "\(indent)\\- \(request)\n"
             }

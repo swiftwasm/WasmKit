@@ -33,13 +33,13 @@ struct Version: Equatable, Hashable, CustomStringConvertible {
     }
 }
 
-public enum ASTItemSyntax: Equatable, Hashable {
+public enum ASTItemSyntax: Equatable, Hashable, Sendable {
     case interface(SyntaxNode<InterfaceSyntax>)
     case world(SyntaxNode<WorldSyntax>)
     case use(SyntaxNode<TopLevelUseSyntax>)
 }
 
-public struct PackageNameSyntax: Equatable, Hashable, CustomStringConvertible {
+public struct PackageNameSyntax: Equatable, Hashable, CustomStringConvertible, Sendable {
     public var namespace: Identifier
     public var name: Identifier
     var version: Version?
@@ -81,7 +81,7 @@ public struct WorldSyntax: Equatable, Hashable, SyntaxNodeProtocol {
     public var items: [WorldItemSyntax]
 }
 
-public enum WorldItemSyntax: Equatable, Hashable {
+public enum WorldItemSyntax: Equatable, Hashable, Sendable {
     case `import`(ImportSyntax)
     case export(ExportSyntax)
     case use(SyntaxNode<UseSyntax>)
@@ -89,19 +89,19 @@ public enum WorldItemSyntax: Equatable, Hashable {
     case include(IncludeSyntax)
 }
 
-public struct ImportSyntax: Equatable, Hashable {
+public struct ImportSyntax: Equatable, Hashable, Sendable {
     public var documents: DocumentsSyntax
     public var attributes: [AttributeSyntax]
     public var kind: ExternKindSyntax
 }
 
-public struct ExportSyntax: Equatable, Hashable {
+public struct ExportSyntax: Equatable, Hashable, Sendable {
     public var documents: DocumentsSyntax
     public var attributes: [AttributeSyntax]
     public var kind: ExternKindSyntax
 }
 
-public enum ExternKindSyntax: Equatable, Hashable {
+public enum ExternKindSyntax: Equatable, Hashable, Sendable {
     case interface(Identifier, [InterfaceItemSyntax])
     case path(UsePathSyntax)
     case function(Identifier, FunctionSyntax)
@@ -131,7 +131,7 @@ public struct TypeDefSyntax: Equatable, Hashable, SyntaxNodeProtocol {
     public var body: TypeDefBodySyntax
 }
 
-public enum TypeDefBodySyntax: Equatable, Hashable {
+public enum TypeDefBodySyntax: Equatable, Hashable, Sendable {
     case flags(FlagsSyntax)
     case resource(ResourceSyntax)
     case record(RecordSyntax)
@@ -141,11 +141,11 @@ public enum TypeDefBodySyntax: Equatable, Hashable {
     case alias(TypeAliasSyntax)
 }
 
-public struct TypeAliasSyntax: Equatable, Hashable {
+public struct TypeAliasSyntax: Equatable, Hashable, Sendable {
     public let typeRepr: TypeReprSyntax
 }
 
-public indirect enum TypeReprSyntax: Equatable, Hashable {
+public indirect enum TypeReprSyntax: Equatable, Hashable, Sendable {
     case bool
     case u8
     case u16
@@ -169,7 +169,7 @@ public indirect enum TypeReprSyntax: Equatable, Hashable {
     case stream(StreamSyntax)
 }
 
-public enum HandleSyntax: Equatable, Hashable {
+public enum HandleSyntax: Equatable, Hashable, Sendable {
     case own(resource: Identifier)
     case borrow(resource: Identifier)
 
@@ -181,65 +181,65 @@ public enum HandleSyntax: Equatable, Hashable {
     }
 }
 
-public struct ResourceSyntax: Equatable, Hashable {
+public struct ResourceSyntax: Equatable, Hashable, Sendable {
     var functions: [ResourceFunctionSyntax]
 }
 
-public enum ResourceFunctionSyntax: Equatable, Hashable {
+public enum ResourceFunctionSyntax: Equatable, Hashable, Sendable {
     case method(SyntaxNode<NamedFunctionSyntax>)
     case `static`(SyntaxNode<NamedFunctionSyntax>)
     case constructor(SyntaxNode<NamedFunctionSyntax>)
 }
 
-public struct RecordSyntax: Equatable, Hashable {
+public struct RecordSyntax: Equatable, Hashable, Sendable {
     public var fields: [FieldSyntax]
 }
 
-public struct FieldSyntax: Equatable, Hashable {
+public struct FieldSyntax: Equatable, Hashable, Sendable {
     public var documents: DocumentsSyntax
     public var name: Identifier
     public var type: TypeReprSyntax
     var textRange: TextRange
 }
 
-public struct FlagsSyntax: Equatable, Hashable {
+public struct FlagsSyntax: Equatable, Hashable, Sendable {
     public var flags: [FlagSyntax]
 }
 
-public struct FlagSyntax: Equatable, Hashable {
+public struct FlagSyntax: Equatable, Hashable, Sendable {
     public var documents: DocumentsSyntax
     public var name: Identifier
 }
 
-public struct VariantSyntax: Equatable, Hashable {
+public struct VariantSyntax: Equatable, Hashable, Sendable {
     public var cases: [CaseSyntax]
     var textRange: TextRange
 }
 
-public struct CaseSyntax: Equatable, Hashable {
+public struct CaseSyntax: Equatable, Hashable, Sendable {
     public var documents: DocumentsSyntax
     public var name: Identifier
     public var type: TypeReprSyntax?
     var textRange: TextRange
 }
 
-public struct EnumSyntax: Equatable, Hashable {
+public struct EnumSyntax: Equatable, Hashable, Sendable {
     public var cases: [EnumCaseSyntax]
     var textRange: TextRange
 }
 
-public struct EnumCaseSyntax: Equatable, Hashable {
+public struct EnumCaseSyntax: Equatable, Hashable, Sendable {
     public var documents: DocumentsSyntax
     public var name: Identifier
     var textRange: TextRange
 }
 
-public struct ResultSyntax: Equatable, Hashable {
+public struct ResultSyntax: Equatable, Hashable, Sendable {
     public let ok: TypeReprSyntax?
     public let error: TypeReprSyntax?
 }
 
-public struct StreamSyntax: Equatable, Hashable {
+public struct StreamSyntax: Equatable, Hashable, Sendable {
     var element: TypeReprSyntax?
     var end: TypeReprSyntax?
 }
@@ -256,20 +256,20 @@ public struct UnionSyntax: Equatable, Hashable, SyntaxNodeProtocol {
     var textRange: TextRange
 }
 
-public struct UnionCaseSyntax: Equatable, Hashable {
+public struct UnionCaseSyntax: Equatable, Hashable, Sendable {
     public var documents: DocumentsSyntax
     public var type: TypeReprSyntax
     var textRange: TextRange
 }
 
-public struct ParameterSyntax: Equatable, Hashable {
+public struct ParameterSyntax: Equatable, Hashable, Sendable {
     public var name: Identifier
     public var type: TypeReprSyntax
     var textRange: TextRange
 }
 public typealias ParameterList = [ParameterSyntax]
 
-public enum ResultListSyntax: Equatable, Hashable {
+public enum ResultListSyntax: Equatable, Hashable, Sendable {
     case named(ParameterList)
     case anon(TypeReprSyntax)
 
@@ -281,7 +281,7 @@ public enum ResultListSyntax: Equatable, Hashable {
     }
 }
 
-public struct FunctionSyntax: Equatable, Hashable {
+public struct FunctionSyntax: Equatable, Hashable, Sendable {
     public var parameters: ParameterList
     public var results: ResultListSyntax
     var textRange: TextRange
@@ -293,7 +293,7 @@ public struct UseSyntax: Equatable, Hashable, SyntaxNodeProtocol {
     public var names: [UseNameSyntax]
 }
 
-public enum UsePathSyntax: Equatable, Hashable {
+public enum UsePathSyntax: Equatable, Hashable, Sendable {
     case id(Identifier)
     case package(id: PackageNameSyntax, name: Identifier)
 
@@ -305,23 +305,23 @@ public enum UsePathSyntax: Equatable, Hashable {
     }
 }
 
-public struct UseNameSyntax: Equatable, Hashable {
+public struct UseNameSyntax: Equatable, Hashable, Sendable {
     public var name: Identifier
     public var asName: Identifier?
 }
 
-public struct IncludeSyntax: Equatable, Hashable {
+public struct IncludeSyntax: Equatable, Hashable, Sendable {
     var attributes: [AttributeSyntax]
     var from: UsePathSyntax
     var names: [IncludeNameSyntax]
 }
 
-public struct IncludeNameSyntax: Equatable, Hashable {
+public struct IncludeNameSyntax: Equatable, Hashable, Sendable {
     var name: Identifier
     var asName: Identifier
 }
 
-public struct Identifier: Equatable, Hashable, CustomStringConvertible {
+public struct Identifier: Equatable, Hashable, CustomStringConvertible, Sendable {
     public var text: String
     var textRange: TextRange
 
@@ -330,28 +330,28 @@ public struct Identifier: Equatable, Hashable, CustomStringConvertible {
     }
 }
 
-public struct DocumentsSyntax: Equatable, Hashable {
+public struct DocumentsSyntax: Equatable, Hashable, Sendable {
     var comments: [String]
 }
 
-public enum AttributeSyntax: Equatable, Hashable {
+public enum AttributeSyntax: Equatable, Hashable, Sendable {
     case since(SinceAttributeSyntax)
     case unstable(UnstableAttributeSyntax)
     case deprecated(DeprecatedAttributeSyntax)
 }
 
-public struct SinceAttributeSyntax: Equatable, Hashable {
+public struct SinceAttributeSyntax: Equatable, Hashable, Sendable {
     let version: Version
     let feature: Identifier?
     let textRange: TextRange
 }
 
-public struct UnstableAttributeSyntax: Equatable, Hashable {
+public struct UnstableAttributeSyntax: Equatable, Hashable, Sendable {
     let textRange: TextRange
     let feature: Identifier
 }
 
-public struct DeprecatedAttributeSyntax: Equatable, Hashable {
+public struct DeprecatedAttributeSyntax: Equatable, Hashable, Sendable {
     let textRange: TextRange
     let version: Version
 }
