@@ -8,8 +8,8 @@ import WasmTypes
 protocol BinaryInstructionDecoder {
     /// Claim the next byte to be decoded
     @inlinable func claimNextByte() throws -> UInt8
-    /// Visit unknown instruction
-    @inlinable func visitUnknown(_ opcode: [UInt8]) throws
+
+    func throwUnknown(_ opcode: [UInt8]) throws -> Never
     /// Decode `block` immediates
     @inlinable mutating func visitBlock() throws -> BlockType
     /// Decode `loop` immediates
@@ -87,8 +87,9 @@ protocol BinaryInstructionDecoder {
     /// Decode `table.size` immediates
     @inlinable mutating func visitTableSize() throws -> UInt32
 }
+
 @inlinable
-func parseBinaryInstruction<V: InstructionVisitor, D: BinaryInstructionDecoder>(visitor: inout V, decoder: inout D) throws -> Bool {
+func parseBinaryInstruction(visitor: inout some InstructionVisitor, decoder: inout some BinaryInstructionDecoder) throws -> Bool {
     let opcode0 = try decoder.claimNextByte()
     switch opcode0 {
     case 0x00:
@@ -562,10 +563,10 @@ func parseBinaryInstruction<V: InstructionVisitor, D: BinaryInstructionDecoder>(
             let (table) = try decoder.visitTableFill()
             try visitor.visitTableFill(table: table)
         default:
-            try decoder.visitUnknown([opcode0, opcode1])
+            if try !visitor.visitUnknown([opcode0, opcode1]) { try decoder.throwUnknown([opcode0, opcode1]) }
         }
     default:
-        try decoder.visitUnknown([opcode0])
+        if try !visitor.visitUnknown([opcode0]) { try decoder.throwUnknown([opcode0]) }
     }
     return false
 }

@@ -124,6 +124,8 @@ struct InternalFunction: Equatable, Hashable {
         _storage = bitPattern
     }
 
+    /// Returns `true` if the function is defined as a Wasm function in its original module.
+    /// Returns `false` if the function is implemented by the host.
     var isWasm: Bool {
         _storage & 0b1 == 0
     }
@@ -241,7 +243,7 @@ struct WasmFunctionEntity {
         switch code {
         case .uncompiled(let code):
             return try compile(store: store, code: code)
-        case .compiled(let iseq):
+        case .compiled(let iseq), .compiledAndPatchable(_, let iseq):
             return iseq
         }
     }
@@ -260,7 +262,7 @@ struct WasmFunctionEntity {
             locals: code.locals,
             functionIndex: index,
             codeSize: code.expression.count,
-            intercepting: engine.interceptor != nil
+            isIntercepting: engine.interceptor != nil
         )
         let iseq = try code.withValue { code in
             try translator.translate(code: code)
@@ -281,7 +283,8 @@ extension EntityHandle<WasmFunctionEntity> {
                 $0.code = .compiled(iseq)
                 return iseq
             }
-        case .compiled(let iseq): return iseq
+        case .compiled(let iseq), .compiledAndPatchable(_, let iseq):
+            return iseq
         }
     }
 }
@@ -313,6 +316,7 @@ struct InstructionSequence {
 enum CodeBody {
     case uncompiled(InternalUncompiledCode)
     case compiled(InstructionSequence)
+    case compiledAndPatchable(InternalUncompiledCode, InstructionSequence)
 }
 
 extension Reference {

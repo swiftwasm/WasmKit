@@ -212,6 +212,7 @@ extension Execution {
         case 196: return self.execute_tableElementDrop(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 197: return self.execute_onEnter(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 198: return self.execute_onExit(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 199: return try self.execute_breakpoint(sp: &sp, pc: &pc, md: &md, ms: &ms)
         default: preconditionFailure("Unknown instruction!?")
 
         }
@@ -1793,6 +1794,12 @@ extension Execution {
         self.onExit(sp: sp.pointee, immediate: immediate)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_breakpoint") @inline(__always)
+    mutating func execute_breakpoint(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
+        let next: CodeSlot
+        (pc.pointee, next) = try self.breakpoint(sp: &sp.pointee, pc: pc.pointee)
         return next
     }
 }

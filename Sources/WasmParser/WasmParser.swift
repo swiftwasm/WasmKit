@@ -606,8 +606,12 @@ extension Parser: BinaryInstructionDecoder {
         return 0
     }
 
-    @inlinable func visitUnknown(_ opcode: [UInt8]) throws {
+    @inlinable func throwUnknown(_ opcode: [UInt8]) throws -> Never {
         throw makeError(.illegalOpcode(opcode))
+    }
+
+    @inlinable func visitUnknown(_ opcode: [UInt8]) throws -> Bool {
+        try throwUnknown(opcode)
     }
 
     @inlinable mutating func visitBlock() throws -> BlockType { try parseResultType() }
@@ -744,6 +748,7 @@ extension Parser: BinaryInstructionDecoder {
         return try stream.consumeAny()
     }
 
+    /// Returns: `true` if the parsed instruction is the block end instruction.
     @inline(__always)
     @inlinable
     mutating func parseInstruction<V: InstructionVisitor>(visitor v: inout V) throws -> Bool {

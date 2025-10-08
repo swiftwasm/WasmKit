@@ -110,6 +110,8 @@ enum WasmGen {
 
         code += """
 
+                /// Returns: `true` if the parser should silently proceed parsing.
+                mutating func visitUnknown(_ opcode: [UInt8]) throws -> Bool
             }
             """
 
@@ -162,7 +164,11 @@ enum WasmGen {
             }.joined(separator: ", ")
             code += ") throws {}\n"
         }
-        code += "}\n"
+        code += """
+            public mutating func visitUnknown(_ opcode: [UInt8]) throws -> Bool { false }
+        }
+
+        """
 
         return code
     }
@@ -527,8 +533,9 @@ enum WasmGen {
         protocol BinaryInstructionDecoder {
             /// Claim the next byte to be decoded
             @inlinable func claimNextByte() throws -> UInt8
-            /// Visit unknown instruction
-            @inlinable func visitUnknown(_ opcode: [UInt8]) throws
+
+            /// Throw an error due to unknown opcode.
+            func throwUnknown(_ opcode: [UInt8]) throws -> Never
 
         """
         for instruction in instructions.categorized {
@@ -552,8 +559,9 @@ enum WasmGen {
         """
 
         code += """
+
         @inlinable
-        func parseBinaryInstruction<V: InstructionVisitor, D: BinaryInstructionDecoder>(visitor: inout V, decoder: inout D) throws -> Bool {
+        func parseBinaryInstruction(visitor: inout some InstructionVisitor, decoder: inout some BinaryInstructionDecoder) throws -> Bool {
         """
 
         func renderSwitchCase(_ root: Trie, depth: Int = 0) {
@@ -603,9 +611,10 @@ enum WasmGen {
                 }
             }
             code += "\(indent)default:\n"
-            code += "\(indent)    try decoder.visitUnknown("
-            code += "[" + (0...depth).map { opcodeByteName($0) }.joined(separator: ", ") + "]"
-            code += ")\n"
+            code += "\(indent)    if try !visitor.visitUnknown("
+            let opcode = "[" + (0...depth).map { opcodeByteName($0) }.joined(separator: ", ") + "]"
+            code += opcode
+            code += ") { try decoder.throwUnknown(\(opcode)) }\n"
             code += "\(indent)}\n"
         }
 

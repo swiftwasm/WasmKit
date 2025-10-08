@@ -398,6 +398,8 @@ public protocol InstructionVisitor {
     mutating func visitTableGrow(table: UInt32) throws
     /// Visiting `table.size` instruction.
     mutating func visitTableSize(table: UInt32) throws
+    /// Returns: `true` if the parser should silently proceed parsing.
+    mutating func visitUnknown(_ opcode: [UInt8]) throws -> Bool
 }
 
 extension InstructionVisitor {
@@ -514,5 +516,6 @@ extension InstructionVisitor {
     public mutating func visitTableSet(table: UInt32) throws {}
     public mutating func visitTableGrow(table: UInt32) throws {}
     public mutating func visitTableSize(table: UInt32) throws {}
+    public mutating func visitUnknown(_ opcode: [UInt8]) throws -> Bool { false }
 }
 
