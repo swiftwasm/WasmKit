@@ -159,6 +159,7 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
     package.dependencies += [
         .package(path: "../swift-argument-parser"),
         .package(path: "../swift-system"),
+        .package(path: "../swift-nio"),
     ]
 }
 
