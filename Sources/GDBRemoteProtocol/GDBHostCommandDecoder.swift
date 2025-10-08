@@ -1,7 +1,5 @@
 import NIOCore
 
-import struct Foundation.Date
-
 extension ByteBuffer {
     var isChecksumDelimiterAtReader: Bool {
         self.peekInteger(as: UInt8.self) == UInt8(ascii: "#")
