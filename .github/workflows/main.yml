@@ -142,7 +142,7 @@ jobs:
         run: |
           toolchain_path="/opt/swiftwasm"
           ./build-exec mkdir -p "$toolchain_path"
-          curl -v -L ${{ matrix.development-toolchain-download }} | ./build-exec tar xz --strip-component 1 -C "$toolchain_path"
+          curl -L ${{ matrix.development-toolchain-download }} | ./build-exec tar xz --strip-component 1 -C "$toolchain_path"
           echo "toolchain-path=$toolchain_path" >> $GITHUB_OUTPUT
           ./build-exec "$toolchain_path/usr/bin/swift" sdk install "${{ matrix.wasi-swift-sdk-download }}" --checksum "${{ matrix.wasi-swift-sdk-checksum }}"
           wasi_sdk_path=$(./build-exec "$toolchain_path/usr/bin/swift" sdk configure --show-configuration "${{ matrix.wasi-swift-sdk-id }}" wasm32-unknown-wasi | grep sdkRootPath: | cut -d: -f2)
