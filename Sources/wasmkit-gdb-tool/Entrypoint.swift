@@ -40,7 +40,7 @@ struct Entrypoint: ParsableCommand {
                     try channel.pipeline.syncOperations.addHandlers([
                         ByteToMessageHandler(GDBHostCommandDecoder()),
                         MessageToByteHandler(GDBTargetResponseEncoder()),
-                        WasmKitHandler(),
+                        WasmKitGDBHandler(),
                     ])
                 }
             }
