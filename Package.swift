@@ -115,7 +115,7 @@ let package = Package(
 
         .target(name: "WITExtractor"),
         .testTarget(name: "WITExtractorTests", dependencies: ["WITExtractor", "WIT"]),
-    ],
+    ]
 )
 
 if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
