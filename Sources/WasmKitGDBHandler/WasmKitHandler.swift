@@ -1,11 +1,11 @@
-import LLDBRemoteProtocol
+import GDBRemoteProtocol
 import NIOCore
 import WasmKit
 
 import struct Foundation.Date
 
 package final class WasmKitHandler: ChannelInboundHandler {
-    package typealias InboundIn = Packet<HostCommand>
+    package typealias InboundIn = Packet<GDBHostCommand>
     package typealias OutboundOut = TargetResponse
 
     /// Whether `QStartNoAckMode` command was previously sent.
@@ -24,15 +24,36 @@ package final class WasmKitHandler: ChannelInboundHandler {
         switch command.kind {
         case .startNoAckMode, .isThreadSuffixSupported, .listThreadsInStopReply:
             responseKind = .ok
+
+        case .hostInfo:
+            responseKind = .hostInfo([
+                "arch": "wasm32",
+                "ptrsize": "4",
+                "endian": "little",
+                "ostype": "wasip1",
+                "vendor": "WasmKit"
+            ])
+
         case .supportedFeatures:
             responseKind = .raw(command.arguments)
-        default:
+
+        case .vContSupportedActions:
+            responseKind = .vContSupportedActions([.continue, .step, .stop])
+
+        case .isVAttachOrWaitSupported, .enableErrorStrings, .processInfo:
+            responseKind = .empty
+
+        case .currentThreadID:
+            responseKind = .raw("QC 1")
+
+        case .generalRegisters, .firstThreadInfo:
             fatalError()
         }
 
         context.writeAndFlush(
             wrapOutboundOut(.init(kind: responseKind, isNoAckModeActive: self.isNoAckModeActive)),
-            promise: nil)
+            promise: nil
+        )
         if command.kind == .startNoAckMode {
             self.isNoAckModeActive = true
         }

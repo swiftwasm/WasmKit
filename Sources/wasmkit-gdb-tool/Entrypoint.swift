@@ -1,8 +1,8 @@
 import ArgumentParser
-import LLDBRemoteProtocol
+import GDBRemoteProtocol
 import NIOCore
 import NIOPosix
-import WasmKitLLDBHandler
+import WasmKitGDBHandler
 
 @main
 struct Entrypoint: ParsableCommand {
@@ -24,8 +24,8 @@ struct Entrypoint: ParsableCommand {
                     // make sure to instantiate your `ChannelHandlers` inside of
                     // the closure as it will be invoked once per connection.
                     try channel.pipeline.syncOperations.addHandlers([
-                        ByteToMessageHandler(CommandDecoder()),
-                        MessageToByteHandler(ResponseEncoder()),
+                        ByteToMessageHandler(GDBHostCommandDecoder()),
+                        MessageToByteHandler(GDBTargetResponseEncoder()),
                         WasmKitHandler(),
                     ])
                 }

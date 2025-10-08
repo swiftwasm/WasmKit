@@ -120,30 +120,30 @@ let package = Package(
         .target(name: "WITExtractor"),
         .testTarget(name: "WITExtractorTests", dependencies: ["WITExtractor", "WIT"]),
 
-        .target(name: "LLDBRemoteProtocol",
+        .target(name: "GDBRemoteProtocol",
             dependencies: [
                 .product(name: "NIOCore", package: "swift-nio"),
             ]
         ),
-        .testTarget(name: "LLDBRemoteProtocolTests", dependencies: ["LLDBRemoteProtocol"]),
+        .testTarget(name: "GDBRemoteProtocolTests", dependencies: ["GDBRemoteProtocol"]),
 
         .target(
-            name: "WasmKitLLDBHandler",
+            name: "WasmKitGDBHandler",
             dependencies: [
                 .product(name: "NIOCore", package: "swift-nio"),
                 "WasmKit",
-                "LLDBRemoteProtocol",
+                "GDBRemoteProtocol",
             ],
         ),
 
         .executableTarget(
-            name: "wasmkit-lldb",
+            name: "wasmkit-gdb-tool",
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
-                "LLDBRemoteProtocol",
-                "WasmKitLLDBHandler",
+                "GDBRemoteProtocol",
+                "WasmKitGDBHandler",
             ]
         ),
     ],
