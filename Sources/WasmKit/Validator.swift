@@ -190,8 +190,8 @@ extension ValidationError.Message {
 }
 
 /// Validates instructions within a given context.
-struct InstructionValidator<Context: TranslatorContext> {
-    let context: Context
+struct InstructionValidator {
+    let context: InternalInstance
 
     func validateMemArg(_ memarg: MemArg, naturalAlignment: Int) throws {
         if memarg.align > naturalAlignment {
