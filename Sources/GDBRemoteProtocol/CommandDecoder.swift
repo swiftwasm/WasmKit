@@ -12,7 +12,7 @@ extension ByteBuffer {
     }
 }
 
-package struct CommandDecoder: ByteToMessageDecoder {
+package struct GDBHostCommandDecoder: ByteToMessageDecoder {
     enum Error: Swift.Error {
         case expectedCommandStart
         case unknownCommandKind(String)
@@ -20,7 +20,7 @@ package struct CommandDecoder: ByteToMessageDecoder {
         case checksumIncorrect
     }
 
-    package typealias InboundOut = Packet<HostCommand>
+    package typealias InboundOut = Packet<GDBHostCommand>
 
     private var accummulatedKind = [UInt8]()
     private var accummulatedArguments = [UInt8]()
@@ -32,12 +32,16 @@ package struct CommandDecoder: ByteToMessageDecoder {
         UInt8(self.accummulatedSum % 256)
     }
 
-    mutating package func decode(buffer: inout ByteBuffer) throws -> Packet<HostCommand>? {
+    mutating package func decode(buffer: inout ByteBuffer) throws -> Packet<GDBHostCommand>? {
         // Command start delimiters.
-        guard
-            buffer.readInteger(as: UInt8.self) == UInt8(ascii: "+")
-                && buffer.readInteger(as: UInt8.self) == UInt8(ascii: "$")
+        let firstStartDelimiter = buffer.readInteger(as: UInt8.self)
+        let secondStartDelimiter = buffer.readInteger(as: UInt8.self)
+        guard firstStartDelimiter == UInt8(ascii: "+")
+                && secondStartDelimiter == UInt8(ascii: "$")
         else {
+            if let firstStartDelimiter, let secondStartDelimiter {
+                print("unexpected delimiter: \(Character(UnicodeScalar(firstStartDelimiter)))\(Character(UnicodeScalar(secondStartDelimiter)))")
+            }
             throw Error.expectedCommandStart
         }
 
@@ -74,7 +78,7 @@ package struct CommandDecoder: ByteToMessageDecoder {
 
         let kindString = String(decoding: self.accummulatedKind, as: UTF8.self)
 
-        if let commandKind = HostCommand.Kind(rawValue: kindString) {
+        if let commandKind = GDBHostCommand.Kind(rawValue: kindString) {
             buffer.moveReaderIndex(forwardBy: 1)
 
             guard let checksumString = buffer.readString(length: 2),
