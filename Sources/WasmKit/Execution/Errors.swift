@@ -107,7 +107,7 @@ enum TrapReason: Error, CustomStringConvertible {
             return "integer overflow"
         case .invalidConversionToInteger:
             return "invalid conversion to integer"
-        case let .indirectCallToNull(elementIndex):
+        case .indirectCallToNull(let elementIndex):
             return "indirect call to null element (uninitialized element \(elementIndex))"
         case .typeMismatchCall(let actual, let expected):
             return "indirect call type mismatch, expected \(expected), got \(actual)"

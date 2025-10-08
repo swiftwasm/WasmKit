@@ -98,28 +98,28 @@ extension Value {
     /// Returns the value as a 32-bit signed integer.
     /// - Precondition: The value is of type `i32`.
     public var i32: UInt32 {
-        guard case let .i32(result) = self else { fatalError() }
+        guard case .i32(let result) = self else { fatalError() }
         return result
     }
 
     /// Returns the value as a 64-bit signed integer.
     /// - Precondition: The value is of type `i64`.
     public var i64: UInt64 {
-        guard case let .i64(result) = self else { fatalError() }
+        guard case .i64(let result) = self else { fatalError() }
         return result
     }
 
     /// Returns the value as a 32-bit floating-point number.
     /// - Precondition: The value is of type `f32`.
     public var f32: UInt32 {
-        guard case let .f32(result) = self else { fatalError() }
+        guard case .f32(let result) = self else { fatalError() }
         return result
     }
 
     /// Returns the value as a 64-bit floating-point number.
     /// - Precondition: The value is of type `f64`.
     public var f64: UInt64 {
-        guard case let .f64(result) = self else { fatalError() }
+        guard case .f64(let result) = self else { fatalError() }
         return result
     }
 }

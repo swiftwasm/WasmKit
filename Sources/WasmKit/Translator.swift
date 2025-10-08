@@ -684,9 +684,9 @@ struct InstructionTranslator: InstructionVisitor {
                 self.unpinnedLabels.remove(ref)
                 for user in users {
                     switch user.action {
-                    case let .emitInstruction(insertAt, source, make):
+                    case .emitInstruction(let insertAt, let source, let make):
                         assign(at: insertAt.offsetFromHead, make(self, source, pc))
-                    case let .fillBrTableEntry(brTable, index, make):
+                    case .fillBrTableEntry(let brTable, let index, let make):
                         brTable[index] = make(self, pc)
                     }
                 }
@@ -705,13 +705,14 @@ struct InstructionTranslator: InstructionVisitor {
             _ makeInstruction: @escaping (Immediate) -> Instruction,
             _ ref: LabelRef,
             line: UInt = #line,
-            make: @escaping (
-                ISeqBuilder,
-                // The position of the next slot of the creating instruction
-                _ source: MetaProgramCounter,
-                // The position of the resolved label
-                _ target: MetaProgramCounter
-            ) -> (Immediate)
+            make:
+                @escaping (
+                    ISeqBuilder,
+                    // The position of the next slot of the creating instruction
+                    _ source: MetaProgramCounter,
+                    // The position of the resolved label
+                    _ target: MetaProgramCounter
+                ) -> (Immediate)
         ) {
             let insertAt = insertingPC
 
@@ -1186,7 +1187,7 @@ struct InstructionTranslator: InstructionVisitor {
 
     mutating func visitElse() throws -> Output {
         var frame = try controlStack.currentFrame()
-        guard case let .if(elseLabel, endLabel, _) = frame.kind else {
+        guard case .if(let elseLabel, let endLabel, _) = frame.kind else {
             throw ValidationError(.expectedIfControlFrame)
         }
         preserveOnStack(depth: valueStack.height - frame.stackHeight)
@@ -1579,7 +1580,7 @@ struct InstructionTranslator: InstructionVisitor {
         switch (value1Type, value2Type) {
         case (.some(.ref(_)), _), (_, .some(.ref(_))):
             throw ValidationError(.cannotSelectOnReferenceTypes)
-        case let (.some(type1), .some(type2)):
+        case (.some(let type1), .some(let type2)):
             guard type1 == type2 else {
                 throw ValidationError(.typeMismatchOnSelect(expected: type1, actual: type2))
             }
@@ -1735,10 +1736,11 @@ struct InstructionTranslator: InstructionVisitor {
     private mutating func pop2PushEmit(
         _ pops: (ValueType, ValueType),
         _ push: ValueType,
-        _ instruction: @escaping (
-            _ popped: (VReg, VReg),
-            _ result: VReg
-        ) -> Instruction
+        _ instruction:
+            @escaping (
+                _ popped: (VReg, VReg),
+                _ result: VReg
+            ) -> Instruction
     ) throws {
         guard let pop1 = try popVRegOperand(pops.0),
             let pop2 = try popVRegOperand(pops.1)
@@ -2270,7 +2272,7 @@ extension FunctionType {
             self.init(parameters: [], results: [valueType])
         case .empty:
             self.init(parameters: [], results: [])
-        case let .funcType(typeIndex):
+        case .funcType(let typeIndex):
             let typeIndex = Int(typeIndex)
             guard typeIndex < typeSection.count else {
                 throw ValidationError(.indexOutOfBounds("type", typeIndex, max: typeSection.count))

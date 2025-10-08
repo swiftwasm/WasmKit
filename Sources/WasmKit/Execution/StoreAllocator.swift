@@ -272,7 +272,7 @@ extension StoreAllocator {
             }
 
             switch (importEntry.descriptor, external) {
-            case let (.function(typeIndex), .function(externalFunc)):
+            case (.function(let typeIndex), .function(let externalFunc)):
                 let type = externalFunc.type
                 guard typeIndex < module.types.count else {
                     throw ValidationError(.indexOutOfBounds("type", typeIndex, max: module.types.count))
@@ -284,19 +284,19 @@ extension StoreAllocator {
                 }
                 importedFunctions.append(externalFunc)
 
-            case let (.table(tableType), .table(table)):
+            case (.table(let tableType), .table(let table)):
                 if let max = table.limits.max, max < tableType.limits.min {
                     throw ImportError(.incompatibleTableType(importEntry, actual: tableType, expected: table.tableType))
                 }
                 importedTables.append(table)
 
-            case let (.memory(memoryType), .memory(memory)):
+            case (.memory(let memoryType), .memory(let memory)):
                 if let max = memory.limit.max, max < memoryType.min {
                     throw ImportError(.incompatibleMemoryType(importEntry, actual: memoryType, expected: memory.limit))
                 }
                 importedMemories.append(memory)
 
-            case let (.global(globalType), .global(global)):
+            case (.global(let globalType), .global(let global)):
                 guard globalType == global.globalType else {
                     throw ImportError(.incompatibleGlobalType(importEntry, actual: global.globalType, expected: globalType))
                 }
@@ -402,7 +402,7 @@ extension StoreAllocator {
             for (index, datum) in module.data.enumerated() {
                 let segment: InternalDataSegment
                 switch datum {
-                case let .passive(bytes):
+                case .passive(let bytes):
                     segment = allocate(bytes: bytes)
                 case .active:
                     // Active segments are copied into memories while instantiation
@@ -416,16 +416,16 @@ extension StoreAllocator {
 
         func createExportValue(_ export: WasmParser.Export) throws -> InternalExternalValue {
             switch export.descriptor {
-            case let .function(index):
+            case .function(let index):
                 let handle = try functions[validating: Int(index)]
                 return .function(handle)
-            case let .table(index):
+            case .table(let index):
                 let handle = try tables[validating: Int(index)]
                 return .table(handle)
-            case let .memory(index):
+            case .memory(let index):
                 let handle = try memories[validating: Int(index)]
                 return .memory(handle)
-            case let .global(index):
+            case .global(let index):
                 let handle = try globals[validating: Int(index)]
                 return .global(handle)
             }

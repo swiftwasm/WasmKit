@@ -44,7 +44,7 @@ final class ParseWorldTests: XCTestCase {
         XCTAssertEqual(world.name.text, "x")
         XCTAssertEqual(world.items.count, 1)
         let item = world.items[0]
-        guard case let .type(typeDef) = item else {
+        guard case .type(let typeDef) = item else {
             XCTFail("unexpected item type: \(item)")
             return
         }
@@ -68,11 +68,11 @@ final class ParseWorldTests: XCTestCase {
         XCTAssertEqual(world.items.count, 3)
         do {
             let item = world.items[0]
-            guard case let .import(importItem) = item else {
+            guard case .import(let importItem) = item else {
                 XCTFail("unexpected item type: \(item)")
                 return
             }
-            guard case let .function(name, _) = importItem.kind else {
+            guard case .function(let name, _) = importItem.kind else {
                 XCTFail("unexpected import type: \(importItem.kind)")
                 return
             }
@@ -81,11 +81,11 @@ final class ParseWorldTests: XCTestCase {
 
         do {
             let item = world.items[1]
-            guard case let .import(importItem) = item else {
+            guard case .import(let importItem) = item else {
                 XCTFail("unexpected item type: \(item)")
                 return
             }
-            guard case let .interface(name, iface) = importItem.kind else {
+            guard case .interface(let name, let iface) = importItem.kind else {
                 XCTFail("unexpected import type: \(importItem.kind)")
                 return
             }
@@ -95,11 +95,11 @@ final class ParseWorldTests: XCTestCase {
 
         do {
             let item = world.items[2]
-            guard case let .import(importItem) = item else {
+            guard case .import(let importItem) = item else {
                 XCTFail("unexpected item type: \(item)")
                 return
             }
-            guard case let .path(path) = importItem.kind else {
+            guard case .path(let path) = importItem.kind else {
                 XCTFail("unexpected import type: \(importItem.kind)")
                 return
             }
@@ -117,11 +117,11 @@ final class ParseWorldTests: XCTestCase {
         )
         XCTAssertEqual(world.items.count, 1)
         let item = world.items[0]
-        guard case let .export(export) = item else {
+        guard case .export(let export) = item else {
             XCTFail("unexpected item type: \(item)")
             return
         }
-        guard case let .function(name, _) = export.kind else {
+        guard case .function(let name, _) = export.kind else {
             XCTFail("unexpected export type: \(export.kind)")
             return
         }
@@ -141,7 +141,7 @@ final class ParseWorldTests: XCTestCase {
         XCTAssertEqual(world.items.count, 3)
         do {
             let item = world.items[0]
-            guard case let .include(include) = item else {
+            guard case .include(let include) = item else {
                 XCTFail("unexpected item type: \(item)")
                 return
             }
@@ -151,7 +151,7 @@ final class ParseWorldTests: XCTestCase {
 
         do {
             let item = world.items[1]
-            guard case let .include(include) = item else {
+            guard case .include(let include) = item else {
                 XCTFail("unexpected item type: \(item)")
                 return
             }
@@ -164,7 +164,7 @@ final class ParseWorldTests: XCTestCase {
 
         do {
             let item = world.items[2]
-            guard case let .include(include) = item else {
+            guard case .include(let include) = item else {
                 XCTFail("unexpected item type: \(item)")
                 return
             }
@@ -188,7 +188,7 @@ final class ParseWorldTests: XCTestCase {
         )
         XCTAssertEqual(world.items.count, 1)
         let item = world.items[0]
-        guard case let .type(typeDef) = item else {
+        guard case .type(let typeDef) = item else {
             XCTFail("unexpected item type: \(item)")
             return
         }
@@ -207,7 +207,7 @@ final class ParseWorldTests: XCTestCase {
         )
         XCTAssertEqual(world.items.count, 1)
         let item = world.items[0]
-        guard case let .type(typeDef) = item else {
+        guard case .type(let typeDef) = item else {
             XCTFail("unexpected item type: \(item)")
             return
         }
@@ -226,7 +226,7 @@ final class ParseWorldTests: XCTestCase {
         )
         XCTAssertEqual(world.items.count, 1)
         let item = world.items[0]
-        guard case let .type(typeDef) = item else {
+        guard case .type(let typeDef) = item else {
             XCTFail("unexpected item type: \(item)")
             return
         }
@@ -245,7 +245,7 @@ final class ParseWorldTests: XCTestCase {
         )
         XCTAssertEqual(world.items.count, 1)
         let item = world.items[0]
-        guard case let .type(typeDef) = item else {
+        guard case .type(let typeDef) = item else {
             XCTFail("unexpected item type: \(item)")
             return
         }
@@ -262,7 +262,7 @@ final class ParseWorldTests: XCTestCase {
         )
         XCTAssertEqual(world.items.count, 1)
         let item = world.items[0]
-        guard case let .type(typeDef) = item else {
+        guard case .type(let typeDef) = item else {
             XCTFail("unexpected item type: \(item)")
             return
         }
@@ -281,7 +281,7 @@ final class ParseWorldTests: XCTestCase {
         )
         XCTAssertEqual(world.items.count, 1)
         let item = world.items[0]
-        guard case let .type(typeDef) = item else {
+        guard case .type(let typeDef) = item else {
             XCTFail("unexpected item type: \(item)")
             return
         }
@@ -301,7 +301,7 @@ final class ParseWorldTests: XCTestCase {
         )
         XCTAssertEqual(world.items.count, 1)
         let item = world.items[0]
-        guard case let .type(typeDef) = item else {
+        guard case .type(let typeDef) = item else {
             XCTFail("unexpected item type: \(item)")
             return
         }
@@ -318,7 +318,7 @@ final class ParseWorldTests: XCTestCase {
         )
         XCTAssertEqual(world.items.count, 1)
         let item = world.items[0]
-        guard case let .use(use) = item else {
+        guard case .use(let use) = item else {
             XCTFail("unexpected item type: \(item)")
             return
         }

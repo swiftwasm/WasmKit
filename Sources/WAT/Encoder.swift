@@ -244,7 +244,7 @@ extension WAT.WatParser.ElementDecl {
         if let tableIndex = tableIndex {
             encoder.writeUnsignedLEB128(tableIndex)
         }
-        if case let .active(_, offset) = self.mode {
+        if case .active(_, let offset) = self.mode {
             switch offset {
             case .expression(var lexer):
                 try encoder.writeExpression(lexer: &lexer, wat: &wat)
@@ -288,7 +288,7 @@ extension WAT.WatParser.ElementDecl {
             }
         } else {
             encoder.encodeVector(collector.instructions) { instruction, encoder in
-                guard case let .refFunc(funcIndex) = instruction else { fatalError("non-ref.func instruction in non-expression mode") }
+                guard case .refFunc(let funcIndex) = instruction else { fatalError("non-ref.func instruction in non-expression mode") }
                 encoder.writeUnsignedLEB128(funcIndex)
             }
         }
@@ -325,7 +325,7 @@ extension Export: WasmEncodable {
 extension WatParser.GlobalDecl {
     func encode(to encoder: inout Encoder, wat: inout Wat) throws {
         encoder.encode(type)
-        guard case var .definition(expr) = kind else {
+        guard case .definition(var expr) = kind else {
             fatalError("imported global declaration should not be encoded here")
         }
         try encoder.writeExpression(lexer: &expr, wat: &wat)
@@ -539,7 +539,7 @@ func encode(module: inout Wat, options: EncodeOptions) throws -> [UInt8] {
 
     var codeEncoder = Encoder()
     let functions = module.functionsMap.compactMap { (function: WatParser.FunctionDecl) -> ([WatParser.LocalDecl], WatParser.FunctionDecl)? in
-        guard case let .definition(locals, _) = function.kind else {
+        guard case .definition(let locals, _) = function.kind else {
             return nil
         }
         return (locals, function)

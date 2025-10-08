@@ -81,7 +81,7 @@ struct WatParser {
         ///
         /// - Returns: Type index of this function
         func parse<V: InstructionVisitor>(visitor: inout V, wat: inout Wat, features: WasmFeatureSet) throws -> Int {
-            guard case let .definition(locals, body) = kind else {
+            guard case .definition(let locals, let body) = kind else {
                 fatalError("Imported functions cannot be parsed")
             }
             let (type, typeIndex) = try wat.types.resolve(use: typeUse)

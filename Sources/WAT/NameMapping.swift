@@ -169,7 +169,7 @@ struct TypesMap {
     /// Resolves a block type from a type use
     mutating func resolveBlockType(use: WatParser.TypeUse) throws -> BlockType {
         switch (use.index, use.inline) {
-        case let (indexOrId?, inline):
+        case (let indexOrId?, let inline):
             let (type, index) = try resolveAndCheck(use: indexOrId, inline: inline)
             return try resolveBlockType(signature: type.signature, resolveSignatureIndex: { _ in index })
         case (nil, let inline?):
@@ -180,7 +180,7 @@ struct TypesMap {
 
     mutating func resolveIndex(use: WatParser.TypeUse) throws -> Int {
         switch (use.index, use.inline) {
-        case let (indexOrId?, _):
+        case (let indexOrId?, _):
             return try nameMapping.resolveIndex(use: indexOrId)
         case (nil, let inline):
             let inline = inline?.signature ?? WasmTypes.FunctionType(parameters: [], results: [])
@@ -208,7 +208,7 @@ struct TypesMap {
     /// Resolves a function type from a type use with an optional inline type
     mutating func resolve(use: WatParser.TypeUse) throws -> (type: WatParser.FunctionType, index: Int) {
         switch (use.index, use.inline) {
-        case let (indexOrId?, inline):
+        case (let indexOrId?, let inline):
             return try resolveAndCheck(use: indexOrId, inline: inline)
         case (nil, let inline):
             // If no index and no inline type, then it's a function type with no parameters or results

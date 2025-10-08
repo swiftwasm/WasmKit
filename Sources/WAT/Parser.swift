@@ -53,7 +53,7 @@ internal struct Parser {
 
     mutating func takeUnsignedInt<IntegerType: UnsignedInteger & FixedWidthInteger>(_: IntegerType.Type = IntegerType.self) throws -> IntegerType? {
         guard let token = try peek() else { return nil }
-        guard case let .integer(nil, pattern) = token.kind else {
+        guard case .integer(nil, let pattern) = token.kind else {
             return nil
         }
         try consume()
@@ -75,7 +75,7 @@ internal struct Parser {
         fromBitPattern: (UnsignedType) -> IntegerType
     ) throws -> IntegerType? {
         guard let token = try peek() else { return nil }
-        guard case let .integer(sign, pattern) = token.kind else {
+        guard case .integer(let sign, let pattern) = token.kind else {
             return nil
         }
         try consume()
@@ -213,7 +213,7 @@ internal struct Parser {
             return value
         }
         switch token.kind {
-        case let .float(sign, pattern):
+        case .float(let sign, let pattern):
             let float: F
             switch pattern {
             case .decimalPattern(let pattern):
@@ -232,7 +232,7 @@ internal struct Parser {
                 return bitPattern
             }
             return toBitPattern(sign == .minus ? -float : float)
-        case let .integer(sign, pattern):
+        case .integer(let sign, let pattern):
             let float: F
             switch pattern {
             case .hexPattern(let pattern):

@@ -1494,7 +1494,7 @@ public class WASIBridgeToHost: WASI {
     }
 
     func fd_advise(fd: WASIAbi.Fd, offset: WASIAbi.FileSize, length: WASIAbi.FileSize, advice: WASIAbi.Advice) throws {
-        guard case let .file(fileEntry) = fdTable[fd] else {
+        guard case .file(let fileEntry) = fdTable[fd] else {
             throw WASIAbi.Errno.EBADF
         }
         try fileEntry.advise(offset: offset, length: length, advice: advice)
@@ -1518,7 +1518,7 @@ public class WASIBridgeToHost: WASI {
     }
 
     func fd_datasync(fd: WASIAbi.Fd) throws {
-        guard case let .file(fileEntry) = fdTable[fd] else {
+        guard case .file(let fileEntry) = fdTable[fd] else {
             throw WASIAbi.Errno.EBADF
         }
         return try fileEntry.datasync()
@@ -1527,7 +1527,7 @@ public class WASIBridgeToHost: WASI {
     func fd_fdstat_get(fileDescriptor: UInt32) throws -> WASIAbi.FdStat {
         let entry = self.fdTable[fileDescriptor]
         switch entry {
-        case let .file(entry):
+        case .file(let entry):
             return try entry.fdStat()
         case .directory:
             return WASIAbi.FdStat(
@@ -1542,7 +1542,7 @@ public class WASIBridgeToHost: WASI {
     }
 
     func fd_fdstat_set_flags(fd: WASIAbi.Fd, flags: WASIAbi.Fdflags) throws {
-        guard case let .file(fileEntry) = fdTable[fd] else {
+        guard case .file(let fileEntry) = fdTable[fd] else {
             throw WASIAbi.Errno.EBADF
         }
         try fileEntry.setFdStatFlags(flags)
@@ -1564,7 +1564,7 @@ public class WASIBridgeToHost: WASI {
     }
 
     func fd_filestat_set_size(fd: WASIAbi.Fd, size: WASIAbi.FileSize) throws {
-        guard case let .file(entry) = fdTable[fd] else {
+        guard case .file(let entry) = fdTable[fd] else {
             throw WASIAbi.Errno.EBADF
         }
         return try entry.setFilestatSize(size)
@@ -1584,14 +1584,14 @@ public class WASIBridgeToHost: WASI {
         fd: WASIAbi.Fd, iovs: UnsafeGuestBufferPointer<WASIAbi.IOVec>,
         offset: WASIAbi.FileSize
     ) throws -> WASIAbi.Size {
-        guard case let .file(fileEntry) = fdTable[fd] else {
+        guard case .file(let fileEntry) = fdTable[fd] else {
             throw WASIAbi.Errno.EBADF
         }
         return try fileEntry.pread(into: iovs, offset: offset)
     }
 
     func fd_prestat_get(fd: WASIAbi.Fd) throws -> WASIAbi.Prestat {
-        guard case let .directory(entry) = fdTable[fd],
+        guard case .directory(let entry) = fdTable[fd],
             let preopenPath = entry.preopenPath
         else {
             throw WASIAbi.Errno.EBADF
@@ -1600,7 +1600,7 @@ public class WASIBridgeToHost: WASI {
     }
 
     func fd_prestat_dir_name(fd: WASIAbi.Fd, path: UnsafeGuestPointer<UInt8>, maxPathLength: WASIAbi.Size) throws {
-        guard case let .directory(entry) = fdTable[fd],
+        guard case .directory(let entry) = fdTable[fd],
             var preopenPath = entry.preopenPath
         else {
             throw WASIAbi.Errno.EBADF
@@ -1620,7 +1620,7 @@ public class WASIBridgeToHost: WASI {
         fd: WASIAbi.Fd, iovs: UnsafeGuestBufferPointer<WASIAbi.IOVec>,
         offset: WASIAbi.FileSize
     ) throws -> WASIAbi.Size {
-        guard case let .file(fileEntry) = fdTable[fd] else {
+        guard case .file(let fileEntry) = fdTable[fd] else {
             throw WASIAbi.Errno.EBADF
         }
         return try fileEntry.pwrite(vectored: iovs, offset: offset)
@@ -1630,7 +1630,7 @@ public class WASIBridgeToHost: WASI {
         fd: WASIAbi.Fd,
         iovs: UnsafeGuestBufferPointer<WASIAbi.IOVec>
     ) throws -> WASIAbi.Size {
-        guard case let .file(fileEntry) = fdTable[fd] else {
+        guard case .file(let fileEntry) = fdTable[fd] else {
             throw WASIAbi.Errno.EBADF
         }
         return try fileEntry.read(into: iovs)
@@ -1641,7 +1641,7 @@ public class WASIBridgeToHost: WASI {
         buffer: UnsafeGuestBufferPointer<UInt8>,
         cookie: WASIAbi.DirCookie
     ) throws -> WASIAbi.Size {
-        guard case let .directory(dirEntry) = fdTable[fd] else {
+        guard case .directory(let dirEntry) = fdTable[fd] else {
             throw WASIAbi.Errno.EBADF
         }
 
@@ -1693,21 +1693,21 @@ public class WASIBridgeToHost: WASI {
     }
 
     func fd_seek(fd: WASIAbi.Fd, offset: WASIAbi.FileDelta, whence: WASIAbi.Whence) throws -> WASIAbi.FileSize {
-        guard case let .file(fileEntry) = fdTable[fd] else {
+        guard case .file(let fileEntry) = fdTable[fd] else {
             throw WASIAbi.Errno.EBADF
         }
         return try fileEntry.seek(offset: offset, whence: whence)
     }
 
     func fd_sync(fd: WASIAbi.Fd) throws {
-        guard case let .file(fileEntry) = fdTable[fd] else {
+        guard case .file(let fileEntry) = fdTable[fd] else {
             throw WASIAbi.Errno.EBADF
         }
         return try fileEntry.sync()
     }
 
     func fd_tell(fd: WASIAbi.Fd) throws -> WASIAbi.FileSize {
-        guard case let .file(fileEntry) = fdTable[fd] else {
+        guard case .file(let fileEntry) = fdTable[fd] else {
             throw WASIAbi.Errno.EBADF
         }
         return try fileEntry.tell()
@@ -1717,14 +1717,14 @@ public class WASIBridgeToHost: WASI {
         fileDescriptor: WASIAbi.Fd,
         ioVectors: UnsafeGuestBufferPointer<WASIAbi.IOVec>
     ) throws -> UInt32 {
-        guard case let .file(entry) = self.fdTable[fileDescriptor] else {
+        guard case .file(let entry) = self.fdTable[fileDescriptor] else {
             throw WASIAbi.Errno.EBADF
         }
         return try entry.write(vectored: ioVectors)
     }
 
     func path_create_directory(dirFd: WASIAbi.Fd, path: String) throws {
-        guard case let .directory(dirEntry) = fdTable[dirFd] else {
+        guard case .directory(let dirEntry) = fdTable[dirFd] else {
             throw WASIAbi.Errno.ENOTDIR
         }
         try dirEntry.createDirectory(atPath: path)
@@ -1733,7 +1733,7 @@ public class WASIBridgeToHost: WASI {
     func path_filestat_get(
         dirFd: WASIAbi.Fd, flags: WASIAbi.LookupFlags, path: String
     ) throws -> WASIAbi.Filestat {
-        guard case let .directory(dirEntry) = fdTable[dirFd] else {
+        guard case .directory(let dirEntry) = fdTable[dirFd] else {
             throw WASIAbi.Errno.ENOTDIR
         }
         return try dirEntry.attributes(
@@ -1746,7 +1746,7 @@ public class WASIBridgeToHost: WASI {
         path: String, atim: WASIAbi.Timestamp, mtim: WASIAbi.Timestamp,
         fstFlags: WASIAbi.FstFlags
     ) throws {
-        guard case let .directory(dirEntry) = fdTable[dirFd] else {
+        guard case .directory(let dirEntry) = fdTable[dirFd] else {
             throw WASIAbi.Errno.ENOTDIR
         }
         try dirEntry.setFilestatTimes(
@@ -1775,7 +1775,7 @@ public class WASIBridgeToHost: WASI {
         #if os(Windows)
             throw WASIAbi.Errno.ENOTSUP
         #else
-            guard case let .directory(dirEntry) = fdTable[dirFd] else {
+            guard case .directory(let dirEntry) = fdTable[dirFd] else {
                 throw WASIAbi.Errno.ENOTDIR
             }
             var accessMode: FileAccessMode = []
@@ -1814,7 +1814,7 @@ public class WASIBridgeToHost: WASI {
     }
 
     func path_remove_directory(dirFd: WASIAbi.Fd, path: String) throws {
-        guard case let .directory(dirEntry) = fdTable[dirFd] else {
+        guard case .directory(let dirEntry) = fdTable[dirFd] else {
             throw WASIAbi.Errno.ENOTDIR
         }
         try dirEntry.removeDirectory(atPath: path)
@@ -1824,24 +1824,24 @@ public class WASIBridgeToHost: WASI {
         oldFd: WASIAbi.Fd, oldPath: String,
         newFd: WASIAbi.Fd, newPath: String
     ) throws {
-        guard case let .directory(oldDirEntry) = fdTable[oldFd] else {
+        guard case .directory(let oldDirEntry) = fdTable[oldFd] else {
             throw WASIAbi.Errno.ENOTDIR
         }
-        guard case let .directory(newDirEntry) = fdTable[newFd] else {
+        guard case .directory(let newDirEntry) = fdTable[newFd] else {
             throw WASIAbi.Errno.ENOTDIR
         }
         try oldDirEntry.rename(from: oldPath, toDir: newDirEntry, to: newPath)
     }
 
     func path_symlink(oldPath: String, dirFd: WASIAbi.Fd, newPath: String) throws {
-        guard case let .directory(dirEntry) = fdTable[dirFd] else {
+        guard case .directory(let dirEntry) = fdTable[dirFd] else {
             throw WASIAbi.Errno.ENOTDIR
         }
         try dirEntry.symlink(from: oldPath, to: newPath)
     }
 
     func path_unlink_file(dirFd: WASIAbi.Fd, path: String) throws {
-        guard case let .directory(dirEntry) = fdTable[dirFd] else {
+        guard case .directory(let dirEntry) = fdTable[dirFd] else {
             throw WASIAbi.Errno.ENOTDIR
         }
         try dirEntry.removeFile(atPath: path)

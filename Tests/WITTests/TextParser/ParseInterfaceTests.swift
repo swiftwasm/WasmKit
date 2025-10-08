@@ -43,7 +43,7 @@ class ParseInterfaceTests: XCTestCase {
         XCTAssertEqual(iface.name.text, "x")
         XCTAssertEqual(iface.items.count, 1)
         let item = iface.items[0]
-        guard case let .function(function) = item else {
+        guard case .function(let function) = item else {
             XCTFail("unexpected item type: \(item)")
             return
         }
@@ -64,7 +64,7 @@ class ParseInterfaceTests: XCTestCase {
         )
         XCTAssertEqual(iface.items.count, 1)
         let item = iface.items[0]
-        guard case let .typeDef(typeDef) = item else {
+        guard case .typeDef(let typeDef) = item else {
             XCTFail("unexpected item type: \(item)")
             return
         }
@@ -83,7 +83,7 @@ class ParseInterfaceTests: XCTestCase {
         )
         XCTAssertEqual(iface.items.count, 1)
         let item = iface.items[0]
-        guard case let .typeDef(typeDef) = item else {
+        guard case .typeDef(let typeDef) = item else {
             XCTFail("unexpected item type: \(item)")
             return
         }
@@ -102,7 +102,7 @@ class ParseInterfaceTests: XCTestCase {
         )
         XCTAssertEqual(iface.items.count, 1)
         let item = iface.items[0]
-        guard case let .typeDef(typeDef) = item else {
+        guard case .typeDef(let typeDef) = item else {
             XCTFail("unexpected item type: \(item)")
             return
         }
@@ -121,7 +121,7 @@ class ParseInterfaceTests: XCTestCase {
         )
         XCTAssertEqual(iface.items.count, 1)
         let item = iface.items[0]
-        guard case let .typeDef(typeDef) = item else {
+        guard case .typeDef(let typeDef) = item else {
             XCTFail("unexpected item type: \(item)")
             return
         }
@@ -138,7 +138,7 @@ class ParseInterfaceTests: XCTestCase {
         )
         XCTAssertEqual(iface.items.count, 1)
         let item = iface.items[0]
-        guard case let .typeDef(typeDef) = item else {
+        guard case .typeDef(let typeDef) = item else {
             XCTFail("unexpected item type: \(item)")
             return
         }
@@ -157,7 +157,7 @@ class ParseInterfaceTests: XCTestCase {
         )
         XCTAssertEqual(iface.items.count, 1)
         let item = iface.items[0]
-        guard case let .typeDef(typeDef) = item else {
+        guard case .typeDef(let typeDef) = item else {
             XCTFail("unexpected item type: \(item)")
             return
         }
@@ -177,7 +177,7 @@ class ParseInterfaceTests: XCTestCase {
         )
         XCTAssertEqual(iface.items.count, 1)
         let item = iface.items[0]
-        guard case let .typeDef(typeDef) = item else {
+        guard case .typeDef(let typeDef) = item else {
             XCTFail("unexpected item type: \(item)")
             return
         }
@@ -194,7 +194,7 @@ class ParseInterfaceTests: XCTestCase {
         )
         XCTAssertEqual(iface.items.count, 1)
         let item = iface.items[0]
-        guard case let .function(function) = item else {
+        guard case .function(let function) = item else {
             XCTFail("unexpected item type: \(item)")
             return
         }
@@ -211,7 +211,7 @@ class ParseInterfaceTests: XCTestCase {
         )
         XCTAssertEqual(iface.items.count, 1)
         let item = iface.items[0]
-        guard case let .use(use) = item else {
+        guard case .use(let use) = item else {
             XCTFail("unexpected item type: \(item)")
             return
         }

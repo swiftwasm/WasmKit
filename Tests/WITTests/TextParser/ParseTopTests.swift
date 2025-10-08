@@ -134,7 +134,7 @@ class ParseTopTests: XCTestCase {
         var lexer = Lexer(cursor: .init(input: "use ns1:pkg1/item1@1.0.0"))
         let use = try TopLevelUseSyntax.parse(lexer: &lexer, documents: .init(comments: []), attributes: [])
         XCTAssertEqual(use.item.name.text, "item1")
-        guard case let .package(id, _) = use.item else {
+        guard case .package(let id, _) = use.item else {
             XCTFail("expected package but got \(use.item)")
             return
         }
@@ -156,7 +156,7 @@ class ParseTopTests: XCTestCase {
             return
         }
         do {
-            guard case let .since(attribute) = attributes[0] else {
+            guard case .since(let attribute) = attributes[0] else {
                 XCTFail("expected since but got \(attributes[0])")
                 return
             }
@@ -164,7 +164,7 @@ class ParseTopTests: XCTestCase {
             XCTAssertEqual(attribute.feature?.text, nil)
         }
         do {
-            guard case let .since(attribute) = attributes[1] else {
+            guard case .since(let attribute) = attributes[1] else {
                 XCTFail("expected since but got \(attributes[1])")
                 return
             }
@@ -177,7 +177,7 @@ class ParseTopTests: XCTestCase {
         var lexer = Lexer(cursor: .init(input: "@unstable(feature = foo)"))
         let attributes = try AttributeSyntax.parseItems(lexer: &lexer)
         XCTAssertEqual(attributes.count, 1)
-        guard case let .unstable(attribute) = attributes.first else {
+        guard case .unstable(let attribute) = attributes.first else {
             XCTFail("expected since but got \(attributes)")
             return
         }
@@ -188,7 +188,7 @@ class ParseTopTests: XCTestCase {
         var lexer = Lexer(cursor: .init(input: "@deprecated(version = 1.0.3)"))
         let attributes = try AttributeSyntax.parseItems(lexer: &lexer)
         XCTAssertEqual(attributes.count, 1)
-        guard case let .deprecated(attribute) = attributes.first else {
+        guard case .deprecated(let attribute) = attributes.first else {
             XCTFail("expected since but got \(attributes)")
             return
         }

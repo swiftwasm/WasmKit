@@ -331,7 +331,7 @@ extension WastRunContext {
             return try wastInvoke(call: invoke)
         case .get(let module, let globalName):
             let instance = try deriveInstance(by: module)
-            guard case let .global(global) = instance.export(globalName) else {
+            guard case .global(let global) = instance.export(globalName) else {
                 throw SpectestError("no global export with name \(globalName) in a module instance \(instance)")
             }
             return [global.value]
@@ -396,21 +396,21 @@ extension WastRunContext {
 extension Value {
     func isTestEquivalent(to value: Self) -> Bool {
         switch (self, value) {
-        case let (.i32(lhs), .i32(rhs)):
+        case (.i32(let lhs), .i32(let rhs)):
             return lhs == rhs
-        case let (.i64(lhs), .i64(rhs)):
+        case (.i64(let lhs), .i64(let rhs)):
             return lhs == rhs
-        case let (.f32(lhs), .f32(rhs)):
+        case (.f32(let lhs), .f32(let rhs)):
             let lhs = Float32(bitPattern: lhs)
             let rhs = Float32(bitPattern: rhs)
             return lhs.isNaN && rhs.isNaN || lhs == rhs
-        case let (.f64(lhs), .f64(rhs)):
+        case (.f64(let lhs), .f64(let rhs)):
             let lhs = Float64(bitPattern: lhs)
             let rhs = Float64(bitPattern: rhs)
             return lhs.isNaN && rhs.isNaN || lhs == rhs
-        case let (.ref(.extern(lhs)), .ref(.extern(rhs))):
+        case (.ref(.extern(let lhs)), .ref(.extern(let rhs))):
             return lhs == rhs
-        case let (.ref(.function(lhs)), .ref(.function(rhs))):
+        case (.ref(.function(let lhs)), .ref(.function(let rhs))):
             return lhs == rhs
         default:
             return false

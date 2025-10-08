@@ -166,7 +166,7 @@ public struct Module {
 
         // Steps 14-15.
         for element in elements {
-            guard case let .active(tableIndex, offset) = element.mode else { continue }
+            guard case .active(let tableIndex, let offset) = element.mode else { continue }
             let table = try instance.tables[validating: Int(tableIndex)]
             let offsetValue = try offset.evaluate(
                 context: constEvalContext,
@@ -194,7 +194,7 @@ public struct Module {
         }
 
         // Step 16.
-        for case let .active(data) in data {
+        for case .active(let data) in data {
             let memory = try instance.memories[validating: Int(data.index)]
             let offsetValue = try data.offset.evaluate(
                 context: constEvalContext,

@@ -15,7 +15,7 @@
             ) {
                 switch (lhs, rhs) {
                 case (.none, .none): return
-                case let (.some(lhs), .some(rhs)):
+                case (.some(let lhs), .some(let rhs)):
                     #expect(lhs.0 == rhs.0, sourceLocation: sourceLocation)
                     #expect(lhs.1 == rhs.1, sourceLocation: sourceLocation)
                 default:
