@@ -25,7 +25,7 @@ Hello, World!
 
 You can use WasmKit as a [Swift Package Manager](https://www.swift.org/documentation/package-manager/) dependency.
 
-Run the following command to add the dependency:
+Run the following commands to add the dependency:
 
 ```
 swift package add-dependency https://github.com/swiftwasm/WasmKit --up-to-next-minor-from 0.1.6
