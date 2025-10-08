@@ -132,7 +132,7 @@ jobs:
             wasi-swift-sdk-checksum: "37516de837411ea46e4f9e75d52bd742f6941febac49981aac0c4f20f02b8b54"
             test-args: "--enable-code-coverage"
             build-dev-dashboard: true
-          - swift: "swiftlang/swift:nightly-main-jammy"
+          - swift: "swiftlang/swift:nightly-main-noble"
             development-toolchain-download: "https://download.swift.org/development/ubuntu2204/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a-ubuntu22.04.tar.gz"
             wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi.artifactbundle.zip"
             wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi
