@@ -1,5 +1,5 @@
 @usableFromInline
-enum StreamError<Element>: Swift.Error, Equatable where Element: Hashable {
+enum StreamError<Element>: Swift.Error, Equatable where Element: Hashable & Sendable {
     case unexpectedEnd(expected: Set<Element>?)
     case unexpected(Element, index: Int, expected: Set<Element>?)
 }
