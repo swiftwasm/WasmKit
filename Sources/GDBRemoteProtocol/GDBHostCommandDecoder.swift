@@ -117,8 +117,5 @@ package struct GDBHostCommandDecoder: ByteToMessageDecoder {
         // Shift by checksum bytes
         context.fireChannelRead(wrapInboundOut(command))
         return .continue
-        // } else {
-        //     throw Error.unknownCommand(accummulated)
-        // }
     }
 }
