@@ -38,6 +38,14 @@ jobs:
             wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi
             wasi-swift-sdk-checksum: "37516de837411ea46e4f9e75d52bd742f6941febac49981aac0c4f20f02b8b54"
             test-args: "--sanitize address"
+          # Swift 6.2
+          - os: macos-15
+            xcode: Xcode_26.0
+            development-toolchain-tag: swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a
+            wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi.artifactbundle.zip"
+            wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi
+            wasi-swift-sdk-checksum: "37516de837411ea46e4f9e75d52bd742f6941febac49981aac0c4f20f02b8b54"
+            test-args: "--sanitize address"
 
     runs-on: ${{ matrix.os }}
     name: "build-macos (${{ matrix.xcode }})"
@@ -77,7 +85,7 @@ jobs:
       - name: Prepare Xcode platforms
         run: |
           set -euxo pipefail
-          sudo xcode-select -s /Applications/Xcode_16.4.app
+          sudo xcode-select -s /Applications/Xcode_26.0.app
           sudo xcodebuild -runFirstLaunch || true
           for PLAT in iOS tvOS watchOS visionOS; do
             if ! xcodebuild -showsdks | grep -q "$PLAT"; then
@@ -108,6 +116,16 @@ jobs:
             wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi
             wasi-swift-sdk-checksum: "37516de837411ea46e4f9e75d52bd742f6941febac49981aac0c4f20f02b8b54"
           - swift: "swift:6.0-focal"
+            development-toolchain-download: "https://download.swift.org/development/ubuntu2004/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a-ubuntu20.04.tar.gz"
+            wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi.artifactbundle.zip"
+            wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi
+            wasi-swift-sdk-checksum: "37516de837411ea46e4f9e75d52bd742f6941febac49981aac0c4f20f02b8b54"
+          - swift: "swift:6.1-jammy"
+            development-toolchain-download: "https://download.swift.org/development/ubuntu2004/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a-ubuntu20.04.tar.gz"
+            wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi.artifactbundle.zip"
+            wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi
+            wasi-swift-sdk-checksum: "37516de837411ea46e4f9e75d52bd742f6941febac49981aac0c4f20f02b8b54"
+          - swift: "swift:6.2-noble"
             development-toolchain-download: "https://download.swift.org/development/ubuntu2004/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a-ubuntu20.04.tar.gz"
             wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi.artifactbundle.zip"
             wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi
@@ -186,9 +204,9 @@ jobs:
     strategy:
       matrix:
         include:
-          - swift: 6.0.1-jammy
-            musl-swift-sdk-download: "https://download.swift.org/swift-6.0.1-release/static-sdk/swift-6.0.1-RELEASE/swift-6.0.1-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz"
-            musl-swift-sdk-checksum: "d4f46ba40e11e697387468e18987ee622908bc350310d8af54eb5e17c2ff5481"
+          - swift: 6.2-noble
+            musl-swift-sdk-download: "https://download.swift.org/swift-6.2-release/static-sdk/swift-6.2-RELEASE/swift-6.2-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz"
+            musl-swift-sdk-checksum: "d2225840e592389ca517bbf71652f7003dbf45ac35d1e57d98b9250368769378"
     steps:
       - uses: actions/checkout@v4
       - name: Configure container
@@ -237,7 +255,7 @@ jobs:
   build-cmake:
     runs-on: ubuntu-22.04
     container:
-      image: swift:5.8-focal
+      image: swift:6.2-noble
     steps:
       - uses: actions/checkout@v4
       - name: Install Ninja
