@@ -373,7 +373,7 @@ extension ByteStream {
         var decoder = UTF8()
         Decode: while true {
             switch decoder.decode(&iterator) {
-            case let .scalarValue(scalar): name.append(Character(scalar))
+            case .scalarValue(let scalar): name.append(Character(scalar))
             case .emptyInput: break Decode
             case .error: throw WasmParserError(.invalidUTF8(bytes), offset: currentIndex)
             }
@@ -681,7 +681,7 @@ extension Parser: BinaryInstructionDecoder {
     }
     @inlinable mutating func visitRefNull() throws -> WasmTypes.ReferenceType {
         let type = try parseValueType()
-        guard case let .ref(refType) = type else {
+        guard case .ref(let refType) = type else {
             throw makeError(.expectedRefType(actual: type))
         }
         return refType
@@ -924,7 +924,7 @@ extension Parser {
             if flag.segmentHasRefType {
                 let valueType = try parseValueType()
 
-                guard case let .ref(refType) = valueType else {
+                guard case .ref(let refType) = valueType else {
                     throw makeError(.expectedRefType(actual: valueType))
                 }
 

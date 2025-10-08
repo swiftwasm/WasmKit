@@ -91,7 +91,7 @@ class NameLookupTests: XCTestCase {
             interfaceName: "x",
             typeName: "my-type"
         )
-        guard case let .record(record) = type else {
+        guard case .record(let record) = type else {
             XCTFail("expected record but got \(type)")
             return
         }
@@ -115,7 +115,7 @@ class NameLookupTests: XCTestCase {
             interfaceName: "x",
             typeName: "my-type"
         )
-        guard case let .record(record) = type else {
+        guard case .record(let record) = type else {
             XCTFail("expected record but got \(type)")
             return
         }
@@ -147,7 +147,7 @@ class NameLookupTests: XCTestCase {
             ],
             namespace: "foo", package: "root", interfaceName: "x", typeName: "my-type"
         )
-        guard case let .record(record) = type else {
+        guard case .record(let record) = type else {
             XCTFail("expected record but got \(type)")
             return
         }
@@ -180,7 +180,7 @@ class NameLookupTests: XCTestCase {
             ],
             namespace: "foo", package: "root", interfaceName: "x", typeName: "my-type"
         )
-        guard case let .record(record) = type else {
+        guard case .record(let record) = type else {
             XCTFail("expected record but got \(type)")
             return
         }
@@ -273,11 +273,11 @@ class NameLookupTests: XCTestCase {
                 default: return nil
                 }
             }.first)
-        guard case let .import(importItem) = try XCTUnwrap(world.items.first) else {
+        guard case .import(let importItem) = try XCTUnwrap(world.items.first) else {
             XCTFail("expected import item but got \(String(describing: world.items.first))")
             return
         }
-        guard case let .interface(name, items) = importItem.kind else {
+        guard case .interface(let name, let items) = importItem.kind else {
             XCTFail("expected inline interface but got \(importItem.kind)")
             return
         }

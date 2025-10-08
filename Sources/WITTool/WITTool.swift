@@ -178,7 +178,7 @@ struct SwiftSourceSummaryProvider: SourceSummaryProvider {
     let typeMapping: (String) -> String?
 
     func enumCaseNames(byWITName witName: String) -> [String]? {
-        guard case let .enumType(enumType) = summary.lookupType(byWITName: witName) else {
+        guard case .enumType(let enumType) = summary.lookupType(byWITName: witName) else {
             return nil
         }
         return enumType.cases.map(\.name)

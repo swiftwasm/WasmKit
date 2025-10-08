@@ -121,7 +121,7 @@ extension Execution {
         guard elementIndex < table.elements.count else {
             throw Trap(.tableOutOfBounds(elementIndex))
         }
-        guard case let .function(rawBitPattern?) = table.elements[elementIndex]
+        guard case .function(let rawBitPattern?) = table.elements[elementIndex]
         else {
             throw Trap(.indirectCallToNull(elementIndex))
         }

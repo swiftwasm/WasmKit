@@ -18,7 +18,7 @@
 
         func parseModule(_ source: String) throws -> ModuleDirective? {
             let directives = try parseWast(source)
-            guard case let .module(moduleDirective) = directives.first else {
+            guard case .module(let moduleDirective) = directives.first else {
                 #expect((false), "Expected module directive")
                 return nil
             }
@@ -27,7 +27,7 @@
 
         func parseBinaryModule(_ source: String) throws -> (source: [UInt8], id: String?)? {
             guard let module = try parseModule(source) else { return nil }
-            guard case let .binary(content) = module.source else { return nil }
+            guard case .binary(let content) = module.source else { return nil }
             return (content, module.id)
         }
 
@@ -101,8 +101,8 @@
                 """#)
 
             #expect(directives.count == 2)
-            guard case let .module(directive) = try #require(directives.last),
-                case let .binary(content) = directive.source
+            guard case .module(let directive) = try #require(directives.last),
+                case .binary(let content) = directive.source
             else {
                 return
             }
@@ -135,7 +135,7 @@
                 """
             let wast = try parseWast(source)
             #expect(wast.count == 5)
-            guard case let .module(module) = wast.first, case var .text(wat) = module.source else {
+            guard case .module(let module) = wast.first, case .text(var wat) = module.source else {
                 #expect((false), "expect a module directive")
                 return
             }

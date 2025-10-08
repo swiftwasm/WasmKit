@@ -46,7 +46,7 @@ public struct CanonicalCallContext {
         guard results.count == 1 else {
             throw CanonicalABIError(description: "\"cabi_realloc\" export should return a single value")
         }
-        guard case let .i32(new) = results[0] else {
+        guard case .i32(let new) = results[0] else {
             throw CanonicalABIError(description: "\"cabi_realloc\" export should return an i32 value")
         }
         return UnsafeGuestRawPointer(memorySpace: guestMemory, offset: new)

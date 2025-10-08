@@ -162,7 +162,7 @@ class RuntimeTypesTests: XCTestCase {
             XCTAssertEqual(try component.returnSingle(), .a(33_550_336))
 
             let value1 = try component.returnLarge()
-            guard case let .c256(value1) = value1 else {
+            guard case .c256(let value1) = value1 else {
                 XCTFail("unexpected variant case \(value1)")
                 return
             }
@@ -175,7 +175,7 @@ class RuntimeTypesTests: XCTestCase {
             }
 
             let value3 = try component.roundtripLarge(v: .c256(24))
-            guard case let .c256(value3) = value3 else {
+            guard case .c256(let value3) = value3 else {
                 XCTFail("unexpected variant case \(value3)")
                 return
             }
@@ -291,7 +291,7 @@ class RuntimeTypesTests: XCTestCase {
 extension VariantTestWorld.Single: Equatable {
     static func == (lhs: VariantTestWorld.Single, rhs: VariantTestWorld.Single) -> Bool {
         switch (lhs, rhs) {
-        case let (.a(lhs), .a(rhs)): return lhs == rhs
+        case (.a(let lhs), .a(let rhs)): return lhs == rhs
         }
     }
 }

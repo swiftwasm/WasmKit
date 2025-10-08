@@ -219,9 +219,9 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws -> Wat {
         }
 
         switch decl.kind {
-        case let .type(decl):
+        case .type(let decl):
             try typesMap.add(decl)
-        case let .function(decl):
+        case .function(let decl):
             try checkImportOrder(decl.importNames)
             let index = try functionsMap.add(decl)
             addExports(decl.exports, index: index, kind: .function)
@@ -233,7 +233,7 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws -> Wat {
                     return .function(TypeIndex(typeIndex))
                 }
             }
-        case let .table(decl):
+        case .table(let decl):
             try checkImportOrder(decl.importNames)
             let index = try tablesMap.add(decl)
             addExports(decl.exports, index: index, kind: .table)
@@ -246,7 +246,7 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws -> Wat {
             if let importNames = decl.importNames {
                 addImport(importNames) { .table(decl.type) }
             }
-        case let .memory(decl):
+        case .memory(let decl):
             try checkImportOrder(decl.importNames)
             let index = try memoriesMap.add(decl)
             if var inlineData = decl.inlineData {
@@ -259,7 +259,7 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws -> Wat {
             if let importNames = decl.importNames {
                 addImport(importNames) { .memory(decl.type) }
             }
-        case let .global(decl):
+        case .global(let decl):
             try checkImportOrder(decl.importNames)
             let index = try globalsMap.add(decl)
             addExports(decl.exports, index: index, kind: .global)
@@ -268,13 +268,13 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws -> Wat {
             case .imported(let importNames):
                 addImport(importNames) { .global(decl.type) }
             }
-        case let .element(decl):
+        case .element(let decl):
             try elementSegmentsMap.add(decl)
-        case let .export(decl):
+        case .export(let decl):
             exportDecls.append(decl)
-        case let .data(decl):
+        case .data(let decl):
             try dataSegmentsMap.add(decl)
-        case let .start(startIndex):
+        case .start(let startIndex):
             guard start == nil else {
                 throw WatParserError("Multiple start sections", location: location)
             }

@@ -100,7 +100,7 @@ struct SourceSummaryBuilder {
             // Ignore static fields
             if let isStatic = declChild.body.static, isStatic { continue }
 
-            guard case let .typeNominal(fieldTypeNode) = child.body.children?.first else {
+            guard case .typeNominal(let fieldTypeNode) = child.body.children?.first else {
                 diagnostics.add(
                     .warning("Skipping \(node.parent.printedName)/\(child.body.printedName) field due to missing nominal type child node")
                 )
@@ -141,7 +141,7 @@ struct SourceSummaryBuilder {
                 // If the result is not TypeFunc, it has no payload
                 return nil
             }
-            guard case let .typeNominal(payloadTupleType) = resultType.children?.last else {
+            guard case .typeNominal(let payloadTupleType) = resultType.children?.last else {
                 return nil
             }
             return payloadTupleType
@@ -178,13 +178,13 @@ struct SourceSummaryBuilder {
         let witName = ConvertCase.witIdentifier(identifier: node.parent.name)
         var results: [SwiftFunctionSource.Parameter] = []
 
-        if case let .typeNominal(resultNode) = node.parent.children?.first {
+        if case .typeNominal(let resultNode) = node.parent.children?.first {
             // If returns a tuple, it's a function that returns multiple values.
             if resultNode.parent.parent.name == "Tuple" {
                 let tupleElements = resultNode.parent.parent.children ?? []
 
                 for elementNode in tupleElements {
-                    guard case let .typeNominal(resultNominalNode) = elementNode else {
+                    guard case .typeNominal(let resultNominalNode) = elementNode else {
                         diagnostics.add(
                             .warning("Skipping \(node.parent.printedName)'s result due to missing nominal type child node")
                         )

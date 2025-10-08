@@ -215,7 +215,7 @@ extension InternalFunction {
         function: EntityHandle<WasmFunctionEntity>
     ) {
         let entity = self.wasm
-        guard case let .compiled(iseq) = entity.code else {
+        guard case .compiled(let iseq) = entity.code else {
             preconditionFailure()
         }
         return (iseq, entity.numberOfNonParameterLocals, entity)

@@ -85,7 +85,7 @@ extension WasmParser.ElementSegment {
         context: C, expression: ConstExpression
     ) throws -> Reference {
         switch expression[0] {
-        case let .refFunc(index):
+        case .refFunc(let index):
             return try context.functionRef(index)
         case .refNull(.funcRef):
             return .function(nil)
