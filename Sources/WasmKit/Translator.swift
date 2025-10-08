@@ -820,7 +820,9 @@ struct InstructionTranslator: InstructionVisitor {
     /// The index of the function in the module
     let functionIndex: FunctionIndex
     /// Whether a call to this function should be intercepted
-    let intercepting: Bool
+    let isIntercepting: Bool
+    /// Whether Wasm debugging facilities are currently enabled.
+    let isDebugging: Bool
     var constantSlots: ConstSlots
     let validator: InstructionValidator
 
@@ -833,7 +835,8 @@ struct InstructionTranslator: InstructionVisitor {
         locals: [WasmTypes.ValueType],
         functionIndex: FunctionIndex,
         codeSize: Int,
-        intercepting: Bool
+        isIntercepting: Bool,
+        isDebugging: Bool = false
     ) throws {
         self.allocator = allocator
         self.funcTypeInterner = funcTypeInterner
@@ -849,7 +852,8 @@ struct InstructionTranslator: InstructionVisitor {
         self.valueStack = ValueStack(stackLayout: stackLayout)
         self.locals = Locals(types: type.parameters + locals)
         self.functionIndex = functionIndex
-        self.intercepting = intercepting
+        self.isIntercepting = isIntercepting
+        self.isDebugging = isDebugging
         self.constantSlots = ConstSlots(stackLayout: stackLayout)
         self.validator = InstructionValidator(context: module)
 
@@ -1059,7 +1063,7 @@ struct InstructionTranslator: InstructionVisitor {
         return emittedCopy
     }
     private mutating func translateReturn() throws {
-        if intercepting {
+        if isIntercepting {
             // Emit `onExit` instruction before every `return` instruction
             emit(.onExit(functionIndex))
         }
@@ -1098,7 +1102,7 @@ struct InstructionTranslator: InstructionVisitor {
 
     /// Translate a Wasm expression into a sequence of instructions.
     mutating func translate(code: Code) throws -> InstructionSequence {
-        if intercepting {
+        if isIntercepting {
             // Emit `onEnter` instruction at the beginning of the function
             emit(.onEnter(functionIndex))
         }
@@ -2241,7 +2245,7 @@ struct InstructionTranslator: InstructionVisitor {
     }
 
     mutating func visitUnknown(_ opcode: [UInt8]) throws -> Bool {
-        guard opcode.count == 1 && opcode[0] == 0xFF else {
+        guard self.isDebugging && opcode.count == 1 && opcode[0] == 0xFF else {
             return false
         }
 

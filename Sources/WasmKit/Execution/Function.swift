@@ -262,7 +262,7 @@ struct WasmFunctionEntity {
             locals: code.locals,
             functionIndex: index,
             codeSize: code.expression.count,
-            intercepting: engine.interceptor != nil
+            isIntercepting: engine.interceptor != nil
         )
         let iseq = try code.withValue { code in
             try translator.translate(code: code)
