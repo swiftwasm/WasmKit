@@ -31,7 +31,7 @@ package final class WasmKitHandler: ChannelInboundHandler {
                 "ptrsize": "4",
                 "endian": "little",
                 "ostype": "wasip1",
-                "vendor": "WasmKit"
+                "vendor": "WasmKit",
             ])
 
         case .supportedFeatures:

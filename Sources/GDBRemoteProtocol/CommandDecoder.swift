@@ -36,7 +36,8 @@ package struct GDBHostCommandDecoder: ByteToMessageDecoder {
         // Command start delimiters.
         let firstStartDelimiter = buffer.readInteger(as: UInt8.self)
         let secondStartDelimiter = buffer.readInteger(as: UInt8.self)
-        guard firstStartDelimiter == UInt8(ascii: "+")
+        guard
+            firstStartDelimiter == UInt8(ascii: "+")
                 && secondStartDelimiter == UInt8(ascii: "$")
         else {
             if let firstStartDelimiter, let secondStartDelimiter {
