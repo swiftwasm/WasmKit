@@ -5,8 +5,8 @@ import WasmKit
 import struct Foundation.Date
 
 package final class WasmKitHandler: ChannelInboundHandler {
-    package typealias InboundIn = Packet<GDBHostCommand>
-    package typealias OutboundOut = TargetResponse
+    package typealias InboundIn = GDBPacket<GDBHostCommand>
+    package typealias OutboundOut = GDBTargetResponse
 
     /// Whether `QStartNoAckMode` command was previously sent.
     private var isNoAckModeActive = false
@@ -18,7 +18,7 @@ package final class WasmKitHandler: ChannelInboundHandler {
         data: NIOAny
     ) {
         let command = self.unwrapInboundIn(data).payload
-        let responseKind: TargetResponse.Kind
+        let responseKind: GDBTargetResponse.Kind
         print(command.kind)
 
         switch command.kind {

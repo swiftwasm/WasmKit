@@ -20,7 +20,7 @@ package struct GDBHostCommandDecoder: ByteToMessageDecoder {
         case checksumIncorrect
     }
 
-    package typealias InboundOut = Packet<GDBHostCommand>
+    package typealias InboundOut = GDBPacket<GDBHostCommand>
 
     private var accummulatedKind = [UInt8]()
     private var accummulatedArguments = [UInt8]()
@@ -32,7 +32,7 @@ package struct GDBHostCommandDecoder: ByteToMessageDecoder {
         UInt8(self.accummulatedSum % 256)
     }
 
-    mutating package func decode(buffer: inout ByteBuffer) throws -> Packet<GDBHostCommand>? {
+    mutating package func decode(buffer: inout ByteBuffer) throws -> GDBPacket<GDBHostCommand>? {
         // Command start delimiters.
         let firstStartDelimiter = buffer.readInteger(as: UInt8.self)
         let secondStartDelimiter = buffer.readInteger(as: UInt8.self)
