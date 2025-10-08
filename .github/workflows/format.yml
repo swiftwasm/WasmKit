@@ -12,7 +12,7 @@ jobs:
       image: swift:6.2-noble
     steps:
       - uses: actions/checkout@v4
-      - run: ./Utilities/format.py
+      - run: apt-get update && apt-get install -y python3 && ./Utilities/format.py
       - name: Check for formatting changes
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
