@@ -43,7 +43,7 @@ dependencies: [
 targets: [
     // ...other targets
     .target(
-        name: "<your-package-target-name",
+        name: "<your-package-target-name>",
         dependencies: [.product(name: "WasmKit", package: "WasmKit")],
     )
 ]
