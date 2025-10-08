@@ -33,23 +33,7 @@ class ISeqAllocator {
     }
 }
 
-protocol TranslatorContext {
-    func resolveType(_ index: TypeIndex) throws -> FunctionType
-    func resolveBlockType(_ blockType: BlockType) throws -> FunctionType
-    func functionType(_ index: FunctionIndex, interner: Interner<FunctionType>) throws -> FunctionType
-    func globalType(_ index: GlobalIndex) throws -> ValueType
-    func isMemory64(memoryIndex index: MemoryIndex) throws -> Bool
-    func isMemory64(tableIndex index: TableIndex) throws -> Bool
-    func tableType(_ index: TableIndex) throws -> TableType
-    func elementType(_ index: ElementIndex) throws -> ReferenceType
-    func resolveCallee(_ index: FunctionIndex) -> InternalFunction?
-    func isSameInstance(_ instance: InternalInstance) -> Bool
-    func resolveGlobal(_ index: GlobalIndex) -> InternalGlobal?
-    func validateFunctionIndex(_ index: FunctionIndex) throws
-    var dataCount: UInt32? { get }
-}
-
-extension TranslatorContext {
+extension InternalInstance {
     func addressType(memoryIndex: MemoryIndex) throws -> ValueType {
         return ValueType.addressType(isMemory64: try isMemory64(memoryIndex: memoryIndex))
     }
@@ -59,9 +43,7 @@ extension TranslatorContext {
     func validateElementSegment(_ index: ElementIndex) throws {
         _ = try elementType(index)
     }
-}
 
-extension InternalInstance: TranslatorContext {
     func resolveType(_ index: TypeIndex) throws -> FunctionType {
         guard Int(index) < self.types.count else {
             throw ValidationError(.indexOutOfBounds("type", index, max: UInt32(self.types.count)))
@@ -311,7 +293,7 @@ struct StackLayout {
     }
 }
 
-struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
+struct InstructionTranslator: InstructionVisitor {
     typealias Output = Void
 
     typealias LabelRef = Int
@@ -828,7 +810,7 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
 
     let allocator: ISeqAllocator
     let funcTypeInterner: Interner<FunctionType>
-    let module: Context
+    let module: InternalInstance
     private var iseqBuilder: ISeqBuilder
     var controlStack: ControlStack
     var valueStack: ValueStack
@@ -840,13 +822,13 @@ struct InstructionTranslator<Context: TranslatorContext>: InstructionVisitor {
     /// Whether a call to this function should be intercepted
     let intercepting: Bool
     var constantSlots: ConstSlots
-    let validator: InstructionValidator<Context>
+    let validator: InstructionValidator
 
     init(
         allocator: ISeqAllocator,
         engineConfiguration: EngineConfiguration,
         funcTypeInterner: Interner<FunctionType>,
-        module: Context,
+        module: InternalInstance,
         type: FunctionType,
         locals: [WasmTypes.ValueType],
         functionIndex: FunctionIndex,
