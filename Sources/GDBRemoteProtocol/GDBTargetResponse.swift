@@ -8,7 +8,7 @@ package enum VContActions: String {
     case stepInRange = "r"
 }
 
-package struct TargetResponse {
+package struct GDBTargetResponse {
     package enum Kind {
         case ok
         case hostInfo(KeyValuePairs<String, String>)

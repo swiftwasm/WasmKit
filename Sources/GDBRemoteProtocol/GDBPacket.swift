@@ -1,4 +1,4 @@
-package struct Packet<Payload> {
+package struct GDBPacket<Payload> {
     package let payload: Payload
 
     package let checksum: UInt8
@@ -9,4 +9,4 @@ package struct Packet<Payload> {
     }
 }
 
-extension Packet: Equatable where Payload: Equatable {}
+extension GDBPacket: Equatable where Payload: Equatable {}

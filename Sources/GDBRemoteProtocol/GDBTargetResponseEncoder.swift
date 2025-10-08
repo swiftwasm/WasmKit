@@ -9,7 +9,7 @@ extension String {
 
 package struct GDBTargetResponseEncoder: MessageToByteEncoder {
     package init() {}
-    package func encode(data: TargetResponse, out: inout ByteBuffer) throws {
+    package func encode(data: GDBTargetResponse, out: inout ByteBuffer) throws {
         if !data.isNoAckModeActive {
             out.writeInteger(UInt8(ascii: "+"))
         }
