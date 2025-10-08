@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import argparse
 import subprocess
 import os
 
@@ -11,12 +12,12 @@ def run(arguments):
     subprocess.run(arguments, check=True)
 
 
-def build_swift_format():
+def build_swift_format() -> list[str]:
     # Build swift-format
     package_path = os.path.join(SOURCE_ROOT, "Vendor", "swift-format")
     bin_path = os.path.join(package_path, ".build", "release", "swift-format")
     if os.path.exists(bin_path):
-        return bin_path
+        return [bin_path]
 
     run(["./Vendor/checkout-dependency", "swift-format"])
 
@@ -32,7 +33,7 @@ def main():
                     description='Ensures that codebase formatting is consistent')
     parser.add_argument('-b', '--build-swift-format', action='store_true')
     args = parser.parse_args()
-  
+
     targets = []
     for targets_dir in ["Sources", "Tests"]:
         targets_path = os.path.join(SOURCE_ROOT, targets_dir)
