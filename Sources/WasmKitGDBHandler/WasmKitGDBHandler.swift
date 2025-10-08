@@ -4,7 +4,7 @@ import WasmKit
 
 import struct Foundation.Date
 
-package final class WasmKitHandler: ChannelInboundHandler {
+package final class WasmKitGDBHandler: ChannelInboundHandler {
     package typealias InboundIn = GDBPacket<GDBHostCommand>
     package typealias OutboundOut = GDBTargetResponse
 
