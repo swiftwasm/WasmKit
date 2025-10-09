@@ -17,8 +17,8 @@ struct Backtrace: CustomStringConvertible, Sendable {
 
             var description: String {
                 switch self {
-                    case .iseq(let pc): "iseq(\(Int(bitPattern: pc)))"
-                    case .wasm(let wasmAddress): "wasm(\(wasmAddress))"
+                case .iseq(let pc): "iseq(\(Int(bitPattern: pc)))"
+                case .wasm(let wasmAddress): "wasm(\(wasmAddress))"
                 }
             }
         }
