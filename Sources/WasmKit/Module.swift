@@ -145,6 +145,8 @@ public struct Module {
         ///   - store: The ``Store`` to allocate the instance in.
         ///   - imports: The imports to use for instantiation. All imported entities
         ///     must be allocated in the given store.
+        ///   - isDebuggable: Whether the module should support debugging actions
+        ///     (breakpoints etc) after instantiation.
         public func instantiate(store: Store, imports: Imports = [:], isDebuggable: Bool) throws -> Instance {
             Instance(handle: try self.instantiateHandle(store: store, imports: imports, isDebuggable: isDebuggable), store: store)
         }
