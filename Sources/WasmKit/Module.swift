@@ -138,17 +138,17 @@ public struct Module {
         Instance(handle: try self.instantiateHandle(store: store, imports: imports), store: store)
     }
 
-#if WasmDebuggingSupport
-    /// Instantiate this module in the given imports.
-    ///
-    /// - Parameters:
-    ///   - store: The ``Store`` to allocate the instance in.
-    ///   - imports: The imports to use for instantiation. All imported entities
-    ///     must be allocated in the given store.
-    public func instantiate(store: Store, imports: Imports = [:], isDebuggable: Bool) throws -> Instance {
-        Instance(handle: try self.instantiateHandle(store: store, imports: imports, isDebuggable: isDebuggable), store: store)
-    }
-#endif
+    #if WasmDebuggingSupport
+        /// Instantiate this module in the given imports.
+        ///
+        /// - Parameters:
+        ///   - store: The ``Store`` to allocate the instance in.
+        ///   - imports: The imports to use for instantiation. All imported entities
+        ///     must be allocated in the given store.
+        public func instantiate(store: Store, imports: Imports = [:], isDebuggable: Bool) throws -> Instance {
+            Instance(handle: try self.instantiateHandle(store: store, imports: imports, isDebuggable: isDebuggable), store: store)
+        }
+    #endif
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#instantiation>

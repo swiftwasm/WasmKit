@@ -19,43 +19,44 @@ package actor WasmKitDebugger {
         let responseKind: GDBTargetResponse.Kind
         logger.trace("handling GDB host command", metadata: ["GDBHostCommand": .string(command.kind.rawValue)])
 
-        responseKind = switch command.kind {
-        case .startNoAckMode, .isThreadSuffixSupported, .listThreadsInStopReply:
-            .ok
+        responseKind =
+            switch command.kind {
+            case .startNoAckMode, .isThreadSuffixSupported, .listThreadsInStopReply:
+                .ok
 
-        case .hostInfo:
-            .keyValuePairs([
-                "arch": "wasm32",
-                "ptrsize": "4",
-                "endian": "little",
-                "ostype": "wasip1",
-                "vendor": "WasmKit",
-            ])
+            case .hostInfo:
+                .keyValuePairs([
+                    "arch": "wasm32",
+                    "ptrsize": "4",
+                    "endian": "little",
+                    "ostype": "wasip1",
+                    "vendor": "WasmKit",
+                ])
 
-        case .supportedFeatures:
-            // FIXME: should return a different set of supported features instead of echoing.
-            .raw(command.arguments)
+            case .supportedFeatures:
+                // FIXME: should return a different set of supported features instead of echoing.
+                .raw(command.arguments)
 
-        case .vContSupportedActions:
-            .vContSupportedActions([.continue, .step, .stop])
+            case .vContSupportedActions:
+                .vContSupportedActions([.continue, .step, .stop])
 
-        case .isVAttachOrWaitSupported, .enableErrorStrings:
-            .empty
-        case .processInfo:
-            .raw("pid:1;parent-pid:1;arch:wasm32;endian:little;ptrsize:4;")
+            case .isVAttachOrWaitSupported, .enableErrorStrings:
+                .empty
+            case .processInfo:
+                .raw("pid:1;parent-pid:1;arch:wasm32;endian:little;ptrsize:4;")
 
-        case .currentThreadID:
-            .raw("QC1")
+            case .currentThreadID:
+                .raw("QC1")
 
-        case .firstThreadInfo:
-            .raw("m1")
+            case .firstThreadInfo:
+                .raw("m1")
 
-        case .subsequentThreadInfo:
-            .raw("l")
+            case .subsequentThreadInfo:
+                .raw("l")
 
-        case .generalRegisters:
-            fatalError()
-        }
+            case .generalRegisters:
+                fatalError()
+            }
 
         defer {
             if command.kind == .startNoAckMode {
