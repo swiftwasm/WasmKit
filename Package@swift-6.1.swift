@@ -8,7 +8,7 @@ let DarwinPlatforms: [Platform] = [.macOS, .iOS, .watchOS, .tvOS, .visionOS]
 
 let package = Package(
     name: "WasmKit",
-    platforms: [.macOS(.v10_13), .iOS(.v12)],
+    platforms: [.macOS(.v14), .iOS(.v12)],
     products: [
         .executable(name: "wasmkit-cli", targets: ["CLI"]),
         .library(name: "WasmKit", targets: ["WasmKit"]),
@@ -122,6 +122,7 @@ let package = Package(
 
         .target(name: "GDBRemoteProtocol",
             dependencies: [
+                .product(name: "Logging", package: "swift-log"),
                 .product(name: "NIOCore", package: "swift-nio"),
             ]
         ),
@@ -131,6 +132,7 @@ let package = Package(
             name: "WasmKitGDBHandler",
             dependencies: [
                 .product(name: "NIOCore", package: "swift-nio"),
+                .product(name: "SystemPackage", package: "swift-system"),
                 "WasmKit",
                 "GDBRemoteProtocol",
             ],
@@ -140,8 +142,10 @@ let package = Package(
             name: "wasmkit-gdb-tool",
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                .product(name: "Logging", package: "swift-log"),
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
+                .product(name: "SystemPackage", package: "swift-system"),
                 "GDBRemoteProtocol",
                 "WasmKitGDBHandler",
             ]
@@ -154,12 +158,14 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.5.1"),
         .package(url: "https://github.com/apple/swift-system", from: "1.5.0"),
         .package(url: "https://github.com/apple/swift-nio", from: "2.86.2"),
+        .package(url: "https://github.com/apple/swift-log", from: "1.6.4"),
     ]
 } else {
     package.dependencies += [
         .package(path: "../swift-argument-parser"),
         .package(path: "../swift-system"),
         .package(path: "../swift-nio"),
+        .package(path: "../swift-log"),
     ]
 }
 
