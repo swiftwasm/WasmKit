@@ -1,3 +1,4 @@
+import Logging
 import NIOCore
 
 extension ByteBuffer {
@@ -20,10 +21,14 @@ package struct GDBHostCommandDecoder: ByteToMessageDecoder {
 
     package typealias InboundOut = GDBPacket<GDBHostCommand>
 
+    private var accumulatedDelimiter: UInt8?
+
     private var accummulatedKind = [UInt8]()
     private var accummulatedArguments = [UInt8]()
 
-    package init() {}
+    private let logger: Logger
+
+    package init(logger: Logger) { self.logger = logger }
 
     private var accummulatedSum = 0
     package var accummulatedChecksum: UInt8 {
@@ -31,16 +36,24 @@ package struct GDBHostCommandDecoder: ByteToMessageDecoder {
     }
 
     mutating package func decode(buffer: inout ByteBuffer) throws -> GDBPacket<GDBHostCommand>? {
+        guard let firstStartDelimiter = self.accumulatedDelimiter ?? buffer.readInteger(as: UInt8.self) else {
+            // Not enough data to parse.
+            return nil
+        }
+        guard let secondStartDelimiter = buffer.readInteger(as: UInt8.self) else {
+            // Preserve what we already read.
+            self.accumulatedDelimiter = firstStartDelimiter
+
+            // Not enough data to parse.
+            return nil
+        }
+
         // Command start delimiters.
-        let firstStartDelimiter = buffer.readInteger(as: UInt8.self)
-        let secondStartDelimiter = buffer.readInteger(as: UInt8.self)
         guard
             firstStartDelimiter == UInt8(ascii: "+")
                 && secondStartDelimiter == UInt8(ascii: "$")
         else {
-            if let firstStartDelimiter, let secondStartDelimiter {
-                print("unexpected delimiter: \(Character(UnicodeScalar(firstStartDelimiter)))\(Character(UnicodeScalar(secondStartDelimiter)))")
-            }
+            logger.error("unexpected delimiter: \(Character(UnicodeScalar(firstStartDelimiter)))\(Character(UnicodeScalar(secondStartDelimiter)))")
             throw Error.expectedCommandStart
         }
 
@@ -70,6 +83,7 @@ package struct GDBHostCommandDecoder: ByteToMessageDecoder {
         }
 
         defer {
+            self.accumulatedDelimiter = nil
             self.accummulatedKind = []
             self.accummulatedArguments = []
             self.accummulatedSum = 0
@@ -108,7 +122,7 @@ package struct GDBHostCommandDecoder: ByteToMessageDecoder {
         context: ChannelHandlerContext,
         buffer: inout ByteBuffer
     ) throws -> DecodingState {
-        print(buffer.peekString(length: buffer.readableBytes)!)
+        logger.trace(.init(stringLiteral: buffer.peekString(length: buffer.readableBytes)!))
 
         guard let command = try self.decode(buffer: &buffer) else {
             return .needMoreData

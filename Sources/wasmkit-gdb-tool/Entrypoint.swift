@@ -14,16 +14,46 @@
 
 import ArgumentParser
 import GDBRemoteProtocol
+import Logging
 import NIOCore
 import NIOPosix
+import SystemPackage
 import WasmKitGDBHandler
 
+#if hasFeature(RetroactiveAttribute)
+    extension Logger.Level: @retroactive ExpressibleByArgument {}
+    extension FilePath: @retroactive ExpressibleByArgument {
+        public init?(argument: String) {
+            self.init(argument)
+        }
+    }
+#else
+    extension Logger.Level: ExpressibleByArgument {}
+    extension FilePath: ExpressibleByArgument {
+        public init?(argument: String) {
+            self.init(argument)
+        }
+    }
+#endif
+
 @main
-struct Entrypoint: ParsableCommand {
+struct Entrypoint: AsyncParsableCommand {
     @Option(help: "TCP port that a debugger can connect to")
     var port = 8080
 
-    func run() throws {
+    @Option(name: .shortAndLong)
+    var logLevel = Logger.Level.info
+
+    @Argument
+    var wasmModulePath: FilePath
+
+    func run() async throws {
+        let logger = {
+            var result = Logger(label: "org.swiftwasm.WasmKit")
+            result.logLevel = self.logLevel
+            return result
+        }()
+
         let group = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
         let bootstrap = ServerBootstrap(group: group)
             // Specify backlog and enable SO_REUSEADDR for the server itself
@@ -38,9 +68,8 @@ struct Entrypoint: ParsableCommand {
                     // make sure to instantiate your `ChannelHandlers` inside of
                     // the closure as it will be invoked once per connection.
                     try channel.pipeline.syncOperations.addHandlers([
-                        ByteToMessageHandler(GDBHostCommandDecoder()),
+                        ByteToMessageHandler(GDBHostCommandDecoder(logger: logger)),
                         MessageToByteHandler(GDBTargetResponseEncoder()),
-                        WasmKitGDBHandler(),
                     ])
                 }
             }
@@ -49,11 +78,38 @@ struct Entrypoint: ParsableCommand {
             .childChannelOption(.socketOption(.so_reuseaddr), value: 1)
             .childChannelOption(.maxMessagesPerRead, value: 16)
             .childChannelOption(.recvAllocator, value: AdaptiveRecvByteBufferAllocator())
-        let channel = try bootstrap.bind(host: "127.0.0.1", port: port).wait()
-        /* the server will now be accepting connections */
-        print("listening on port \(port)")
 
-        try channel.closeFuture.wait()  // wait forever as we never close the Channel
-        try group.syncShutdownGracefully()
+        let serverChannel = try await bootstrap.bind(host: "127.0.0.1", port: port) { childChannel in
+            childChannel.eventLoop.makeCompletedFuture {
+                try NIOAsyncChannel<GDBPacket<GDBHostCommand>, GDBTargetResponse>(
+                    wrappingChannelSynchronously: childChannel
+                )
+            }
+        }
+        /* the server will now be accepting connections */
+        logger.info("listening on port \(port)")
+
+        let debugger = try WasmKitDebugger(logger: logger, moduleFilePath: self.wasmModulePath)
+
+        try await withThrowingDiscardingTaskGroup { group in
+            try await serverChannel.executeThenClose { serverChannelInbound in
+                for try await connectionChannel in serverChannelInbound {
+                    group.addTask {
+                        do {
+                            try await connectionChannel.executeThenClose { connectionChannelInbound, connectionChannelOutbound in
+                                for try await inboundData in connectionChannelInbound {
+                                    // Let's echo back all inbound data
+                                    try await connectionChannelOutbound.write(debugger.handle(command: inboundData.payload))
+                                }
+                            }
+                        } catch {
+                            logger.error("Error in GDB remote protocol connection channel", metadata: ["error": "\(error)"])
+                        }
+                    }
+                }
+            }
+        }
+
+        try await group.shutdownGracefully()
     }
 }

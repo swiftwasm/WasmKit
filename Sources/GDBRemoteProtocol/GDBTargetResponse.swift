@@ -11,7 +11,7 @@ package enum VContActions: String {
 package struct GDBTargetResponse {
     package enum Kind {
         case ok
-        case hostInfo(KeyValuePairs<String, String>)
+        case keyValuePairs(KeyValuePairs<String, String>)
         case vContSupportedActions([VContActions])
         case raw(String)
         case empty

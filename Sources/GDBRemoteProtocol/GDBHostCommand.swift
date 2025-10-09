@@ -2,11 +2,9 @@
 /// * https://sourceware.org/gdb/current/onlinedocs/gdb.html/General-Query-Packets.html
 /// * https://lldb.llvm.org/resources/lldbgdbremote.html
 package struct GDBHostCommand: Equatable {
-    package enum Kind: Equatable {
+    package enum Kind: String, Equatable {
         // Currently listed in the order that LLDB sends them in.
-        case generalRegisters
         case startNoAckMode
-        case firstThreadInfo
         case supportedFeatures
         case isThreadSuffixSupported
         case listThreadsInStopReply
@@ -16,6 +14,10 @@ package struct GDBHostCommand: Equatable {
         case enableErrorStrings
         case processInfo
         case currentThreadID
+        case firstThreadInfo
+        case subsequentThreadInfo
+
+        case generalRegisters
 
         package init?(rawValue: String) {
             switch rawValue {
@@ -41,6 +43,10 @@ package struct GDBHostCommand: Equatable {
                 self = .processInfo
             case "qC":
                 self = .currentThreadID
+            case "qfThreadInfo":
+                self = .firstThreadInfo
+            case "qsThreadInfo":
+                self = .subsequentThreadInfo
             default:
                 return nil
             }
