@@ -61,18 +61,14 @@ struct Execution {
 
     static func captureBacktrace(sp: Sp, store: Store) -> Backtrace {
         var frames = FrameIterator(sp: sp)
-        var symbols: [Backtrace.Symbol?] = []
+        var symbols: [Backtrace.Symbol] = []
         while let frame = frames.next() {
             guard let function = frame.function else {
-                symbols.append(nil)
+                symbols.append(.init(name: nil, debuggingAddress: .iseq(frame.pc)))
                 continue
             }
             let symbolName = store.nameRegistry.symbolicate(.wasm(function))
-            symbols.append(
-                Backtrace.Symbol(
-                    name: symbolName
-                )
-            )
+            symbols.append(.init(name: symbolName, debuggingAddress: .iseq(frame.pc)))
         }
         return Backtrace(symbols: symbols)
     }

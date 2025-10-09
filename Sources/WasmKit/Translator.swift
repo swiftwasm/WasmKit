@@ -822,8 +822,6 @@ struct InstructionTranslator: InstructionVisitor {
     let functionIndex: FunctionIndex
     /// Whether a call to this function should be intercepted
     let isIntercepting: Bool
-    /// Whether Wasm debugging facilities are currently enabled.
-    let isDebugging: Bool
     var constantSlots: ConstSlots
     let validator: InstructionValidator
 
@@ -836,8 +834,7 @@ struct InstructionTranslator: InstructionVisitor {
         locals: [WasmTypes.ValueType],
         functionIndex: FunctionIndex,
         codeSize: Int,
-        isIntercepting: Bool,
-        isDebugging: Bool = false
+        isIntercepting: Bool
     ) throws {
         self.allocator = allocator
         self.funcTypeInterner = funcTypeInterner
@@ -854,7 +851,6 @@ struct InstructionTranslator: InstructionVisitor {
         self.locals = Locals(types: type.parameters + locals)
         self.functionIndex = functionIndex
         self.isIntercepting = isIntercepting
-        self.isDebugging = isDebugging
         self.constantSlots = ConstSlots(stackLayout: stackLayout)
         self.validator = InstructionValidator(context: module)
 
@@ -2262,7 +2258,7 @@ struct InstructionTranslator: InstructionVisitor {
     }
 
     mutating func visitUnknown(_ opcode: [UInt8]) throws -> Bool {
-        guard self.isDebugging && opcode.count == 1 && opcode[0] == 0xFF else {
+        guard self.module.isDebuggable && opcode.count == 1 && opcode[0] == 0xFF else {
             return false
         }
 

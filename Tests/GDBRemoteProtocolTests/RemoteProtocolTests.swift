@@ -1,4 +1,5 @@
 import GDBRemoteProtocol
+import Logging
 import NIOCore
 import Testing
 
@@ -6,7 +7,9 @@ import Testing
 struct LLDBRemoteProtocolTests {
     @Test
     func decoding() throws {
-        var decoder = GDBHostCommandDecoder()
+        var logger = Logger(label: "com.swiftwasm.WasmKit.tests")
+        logger.logLevel = .critical
+        var decoder = GDBHostCommandDecoder(logger: logger)
 
         var buffer = ByteBuffer(string: "+$g#67")
         var packet = try decoder.decode(buffer: &buffer)

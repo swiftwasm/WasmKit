@@ -19,7 +19,7 @@ package struct GDBTargetResponseEncoder: MessageToByteEncoder {
         case .ok:
             out.writeBytes("ok#da".utf8)
 
-        case .hostInfo(let info):
+        case .keyValuePairs(let info):
             out.writeBytes(info.map { (key, value) in "\(key):\(value);" }.joined().appendedChecksum)
 
         case .vContSupportedActions(let actions):

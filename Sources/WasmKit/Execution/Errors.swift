@@ -8,16 +8,30 @@ struct Backtrace: CustomStringConvertible, Sendable {
     struct Symbol {
         /// The name of the symbol.
         let name: String?
+        let debuggingAddress: DebuggingAddress
+
+        /// Address of the symbol for debugging purposes.
+        enum DebuggingAddress: CustomStringConvertible, @unchecked Sendable {
+            case iseq(Pc)
+            case wasm(UInt64)
+
+            var description: String {
+                switch self {
+                    case .iseq(let pc): "iseq(\(Int(bitPattern: pc)))"
+                    case .wasm(let wasmAddress): "wasm(\(wasmAddress))"
+                }
+            }
+        }
     }
 
     /// The symbols in the backtrace.
-    let symbols: [Symbol?]
+    let symbols: [Symbol]
 
     /// Textual description of the backtrace.
     var description: String {
         symbols.enumerated().map { (index, symbol) in
-            let name = symbol?.name ?? "unknown"
-            return "    \(index): \(name)"
+            let name = symbol.name ?? "unknown"
+            return "    \(symbol.debuggingAddress): \(name)"
         }.joined(separator: "\n")
     }
 }
