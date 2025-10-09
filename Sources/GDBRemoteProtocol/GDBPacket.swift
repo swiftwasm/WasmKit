@@ -1,4 +1,4 @@
-package struct GDBPacket<Payload> {
+package struct GDBPacket<Payload: Sendable>: Sendable {
     package let payload: Payload
 
     package let checksum: UInt8
