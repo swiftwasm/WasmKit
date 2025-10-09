@@ -8,7 +8,7 @@ let DarwinPlatforms: [Platform] = [.macOS, .iOS, .watchOS, .tvOS, .visionOS]
 
 let package = Package(
     name: "WasmKit",
-    platforms: [.macOS(.v14), .iOS(.v13)],
+    platforms: [.macOS(.v14), .iOS(.v17)],
     products: [
         .executable(name: "wasmkit-cli", targets: ["CLI"]),
         .library(name: "WasmKit", targets: ["WasmKit"]),
