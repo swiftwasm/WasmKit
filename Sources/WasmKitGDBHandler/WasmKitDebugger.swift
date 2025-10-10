@@ -56,10 +56,9 @@ package actor WasmKitDebugger {
 
             case .targetStatus:
                 .keyValuePairs([
-                     "T05thread": "1",
-                     "reason": "trace"
-                ]
-           )
+                    "T05thread": "1",
+                    "reason": "trace",
+                ])
 
             case .generalRegisters:
                 fatalError()
