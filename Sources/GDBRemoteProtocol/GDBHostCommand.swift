@@ -16,6 +16,7 @@ package struct GDBHostCommand: Equatable {
         case currentThreadID
         case firstThreadInfo
         case subsequentThreadInfo
+        case targetStatus
 
         case generalRegisters
 
@@ -47,6 +48,9 @@ package struct GDBHostCommand: Equatable {
                 self = .firstThreadInfo
             case "qsThreadInfo":
                 self = .subsequentThreadInfo
+            case "?":
+                self = .targetStatus
+
             default:
                 return nil
             }

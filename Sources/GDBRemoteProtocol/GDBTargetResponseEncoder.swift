@@ -23,7 +23,7 @@ package struct GDBTargetResponseEncoder: MessageToByteEncoder {
             out.writeBytes(info.map { (key, value) in "\(key):\(value);" }.joined().appendedChecksum)
 
         case .vContSupportedActions(let actions):
-            out.writeBytes("vCont;\(actions.map(\.rawValue).joined())".appendedChecksum)
+            out.writeBytes("vCont;\(actions.map { "\($0.rawValue);" }.joined())".appendedChecksum)
 
         case .raw(let str):
             out.writeBytes(str.appendedChecksum)
