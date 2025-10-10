@@ -385,10 +385,8 @@ extension Execution {
         )
         do {
             switch self.store.value.engine.configuration.threadingModel {
-            #if !os(WASI)
-                case .direct:
-                    try runDirectThreaded(sp: sp, pc: pc, md: md, ms: ms)
-            #endif
+            case .direct:
+                try runDirectThreaded(sp: sp, pc: pc, md: md, ms: ms)
             case .token:
                 try runTokenThreaded(sp: &sp, pc: &pc, md: &md, ms: &ms)
             }
@@ -397,12 +395,14 @@ extension Execution {
         }
     }
 
-    #if !os(WASI)
-        /// Starts the main execution loop using the direct threading model.
-        @inline(never)
-        mutating func runDirectThreaded(
-            sp: Sp, pc: Pc, md: Md, ms: Ms
-        ) throws {
+    /// Starts the main execution loop using the direct threading model.
+    @inline(never)
+    mutating func runDirectThreaded(
+        sp: Sp, pc: Pc, md: Md, ms: Ms
+    ) throws {
+        #if os(WASI)
+            fatalError("Direct threading is not supported on WASI")
+        #else
             var pc = pc
             let handler = pc.read(wasmkit_tc_exec.self)
             wasmkit_tc_start(handler, sp, pc, md, ms, &self)
@@ -418,8 +418,8 @@ extension Execution {
                 // Attach backtrace if the thrown error is a trap
                 throw trap.withBacktrace(Self.captureBacktrace(sp: trappingSp, store: store.value))
             }
-        }
-    #endif
+        #endif
+    }
 
     #if EngineStats
         /// A helper structure for collecting instruction statistics.

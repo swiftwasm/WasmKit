@@ -34,12 +34,10 @@ public struct EngineConfiguration {
     /// The threading model, which determines how to dispatch instruction
     /// execution, to use for the virtual machine interpreter.
     public enum ThreadingModel {
-        #if !os(WASI)
-            /// Direct threaded code
-            /// - Note: This is the default model for platforms that support
-            /// `musttail` calls.
-            case direct
-        #endif
+        /// Direct threaded code
+        /// - Note: This is the default model for platforms that support
+        /// `musttail` calls.
+        case direct
         /// Indirect threaded code
         /// - Note: This is a fallback model for platforms that do not support
         /// `musttail` calls.

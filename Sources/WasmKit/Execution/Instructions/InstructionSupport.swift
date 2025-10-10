@@ -220,10 +220,8 @@ typealias OpcodeID = UInt64
 extension Instruction {
     func headSlot(threadingModel: EngineConfiguration.ThreadingModel) -> CodeSlot {
         switch threadingModel {
-        #if !os(WASI)
-            case .direct:
-                return CodeSlot(handler)
-        #endif
+        case .direct:
+            return CodeSlot(handler)
         case .token:
             return opcodeID
         }
