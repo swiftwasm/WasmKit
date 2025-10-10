@@ -111,12 +111,20 @@ extension Clock {
 
     @_alwaysEmitIntoClient
     public static var now: TimeSpec {
+#if os(WASI)
       return TimeSpec(rawValue: CInterop.TimeSpec(tv_sec: 0, tv_nsec: Int(UTIME_NOW)))
+#else
+      return TimeSpec(rawValue: CInterop.TimeSpec(tv_sec: 0, tv_nsec: Int(_UTIME_NOW)))
+#endif
     }
 
     @_alwaysEmitIntoClient
     public static var omit: TimeSpec {
+#if os(WASI)
       return TimeSpec(rawValue: CInterop.TimeSpec(tv_sec: 0, tv_nsec: Int(UTIME_OMIT)))
+#else
+      return TimeSpec(rawValue: CInterop.TimeSpec(tv_sec: 0, tv_nsec: Int(_UTIME_OMIT)))
+#endif
     }
   }
 }
