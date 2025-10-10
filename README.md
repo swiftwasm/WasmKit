@@ -9,7 +9,7 @@ The best way to learn how to use WasmKit is to look at the [Examples](./Examples
 
 ### Command Line Tool
 
-WasmKit provides a command line tool to run WebAssembly binaries compliant with WASI.
+WasmKit provides a command line tool to run WebAssembly binaries compatible with [https://wasi.dev](WASI)..
 
 ```sh
 $ git clone https://github.com/swiftwasm/WasmKit.git
