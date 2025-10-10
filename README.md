@@ -58,7 +58,7 @@ targets: [
 - Compact and embeddable
     - Debug build complete in 5 seconds[^1]
 - Batteries included
-    - WASI support, WAT parser/assembler, etc.
+    - WASI support, WAT (WebAssembly text format) parser/assembler, etc.
 
 
 ## Supported Platforms
