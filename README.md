@@ -25,14 +25,14 @@ Hello, World!
 
 To use WasmKit in your package, add it as a [Swift Package Manager](https://www.swift.org/documentation/package-manager/) dependency.
 
-Run the following commands to add the dependency:
+Run the following commands in the same directory as your `Package.swift` manifest to add the dependency:
 
 ```
 swift package add-dependency https://github.com/swiftwasm/WasmKit --up-to-next-minor-from 0.1.6
 swift package add-target-dependency WasmKit <your-package-target-name> --package WasmKit
 ```
 
-You can also add the following snippet manually to your `Package.swift` file:
+You can also add the following snippet manually instead to your `Package.swift` file:
 
 ```swift
 dependencies: [
@@ -58,7 +58,7 @@ targets: [
 - Compact and embeddable
     - Debug build complete in 5 seconds[^1]
 - Batteries included
-    - WASI support, WAT parser, etc.
+    - WASI support, WAT parser/assembler, etc.
 
 
 ## Supported Platforms
@@ -91,7 +91,7 @@ and should work on the following platforms:
 
 ## Minimum Supported Swift Version
 
-The minimum supported version is Swift 6.0, which is the version used to bootstrap the Swift toolchain in [ci.swift.org](https://ci.swift.org/).
+The minimum supported version is Swift 6.0, which is the version used to bootstrap the Swift toolchain on [ci.swift.org](https://ci.swift.org/).
 
 ## Testing
 
