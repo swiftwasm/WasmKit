@@ -125,6 +125,13 @@ extension BinaryInstructionEncoder {
         case .i64Load16U: opcode = [0x33]
         case .i64Load32S: opcode = [0x34]
         case .i64Load32U: opcode = [0x35]
+        case .i32AtomicLoad: opcode = [0xFE, 0x10]
+        case .i64AtomicLoad: opcode = [0xFE, 0x11]
+        case .i32AtomicLoad8U: opcode = [0xFE, 0x12]
+        case .i32AtomicLoad16U: opcode = [0xFE, 0x13]
+        case .i64AtomicLoad8U: opcode = [0xFE, 0x14]
+        case .i64AtomicLoad16U: opcode = [0xFE, 0x15]
+        case .i64AtomicLoad32U: opcode = [0xFE, 0x16]
         }
 
         try encodeInstruction(opcode)

@@ -20,6 +20,13 @@ public enum Instruction: Equatable {
         case i64Load16U
         case i64Load32S
         case i64Load32U
+        case i32AtomicLoad
+        case i64AtomicLoad
+        case i32AtomicLoad8U
+        case i32AtomicLoad16U
+        case i64AtomicLoad8U
+        case i64AtomicLoad16U
+        case i64AtomicLoad32U
     }
     public enum Store: Equatable {
         case i32Store

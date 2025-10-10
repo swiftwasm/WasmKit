@@ -333,6 +333,27 @@ func parseTextInstruction<V: InstructionVisitor>(keyword: String, expressionPars
     case "i64.trunc_sat_f64_s": return { return try $0.visitConversion(.i64TruncSatF64S) }
     case "i64.trunc_sat_f64_u": return { return try $0.visitConversion(.i64TruncSatF64U) }
     case "atomic.fence": return { return try $0.visitAtomicFence() }
+    case "i32.atomic.load":
+        let (memarg) = try expressionParser.visitLoad(.i32AtomicLoad, wat: &wat)
+        return { return try $0.visitLoad(.i32AtomicLoad, memarg: memarg) }
+    case "i64.atomic.load":
+        let (memarg) = try expressionParser.visitLoad(.i64AtomicLoad, wat: &wat)
+        return { return try $0.visitLoad(.i64AtomicLoad, memarg: memarg) }
+    case "i32.atomic.load8_u":
+        let (memarg) = try expressionParser.visitLoad(.i32AtomicLoad8U, wat: &wat)
+        return { return try $0.visitLoad(.i32AtomicLoad8U, memarg: memarg) }
+    case "i32.atomic.load16_u":
+        let (memarg) = try expressionParser.visitLoad(.i32AtomicLoad16U, wat: &wat)
+        return { return try $0.visitLoad(.i32AtomicLoad16U, memarg: memarg) }
+    case "i64.atomic.load8_u":
+        let (memarg) = try expressionParser.visitLoad(.i64AtomicLoad8U, wat: &wat)
+        return { return try $0.visitLoad(.i64AtomicLoad8U, memarg: memarg) }
+    case "i64.atomic.load16_u":
+        let (memarg) = try expressionParser.visitLoad(.i64AtomicLoad16U, wat: &wat)
+        return { return try $0.visitLoad(.i64AtomicLoad16U, memarg: memarg) }
+    case "i64.atomic.load32_u":
+        let (memarg) = try expressionParser.visitLoad(.i64AtomicLoad32U, wat: &wat)
+        return { return try $0.visitLoad(.i64AtomicLoad32U, memarg: memarg) }
     default: return nil
     }
 }

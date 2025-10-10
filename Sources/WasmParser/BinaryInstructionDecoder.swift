@@ -579,6 +579,27 @@ func parseBinaryInstruction(visitor: inout some InstructionVisitor, decoder: ino
             default:
                 if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
             }
+        case 0x10:
+            let (memarg) = try decoder.visitLoad(.i32AtomicLoad)
+            try visitor.visitLoad(.i32AtomicLoad, memarg: memarg)
+        case 0x11:
+            let (memarg) = try decoder.visitLoad(.i64AtomicLoad)
+            try visitor.visitLoad(.i64AtomicLoad, memarg: memarg)
+        case 0x12:
+            let (memarg) = try decoder.visitLoad(.i32AtomicLoad8U)
+            try visitor.visitLoad(.i32AtomicLoad8U, memarg: memarg)
+        case 0x13:
+            let (memarg) = try decoder.visitLoad(.i32AtomicLoad16U)
+            try visitor.visitLoad(.i32AtomicLoad16U, memarg: memarg)
+        case 0x14:
+            let (memarg) = try decoder.visitLoad(.i64AtomicLoad8U)
+            try visitor.visitLoad(.i64AtomicLoad8U, memarg: memarg)
+        case 0x15:
+            let (memarg) = try decoder.visitLoad(.i64AtomicLoad16U)
+            try visitor.visitLoad(.i64AtomicLoad16U, memarg: memarg)
+        case 0x16:
+            let (memarg) = try decoder.visitLoad(.i64AtomicLoad32U)
+            try visitor.visitLoad(.i64AtomicLoad32U, memarg: memarg)
         default:
             if try !visitor.visitUnknown([opcode0, opcode1]) { try decoder.throwUnknown([opcode0, opcode1]) }
         }
