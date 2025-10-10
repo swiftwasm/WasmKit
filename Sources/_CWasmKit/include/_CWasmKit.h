@@ -1,6 +1,7 @@
 #ifndef WASMKIT__CWASMKIT_H
 #define WASMKIT__CWASMKIT_H
 
+#include <stdatomic.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>

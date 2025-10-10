@@ -392,4 +392,5 @@ extension BinaryInstructionEncoder {
         try encodeInstruction([0xFC, 0x10])
         try encodeImmediates(table: table)
     }
+    mutating func visitAtomicFence() throws { try encodeInstruction([0xFE, 0x03, 0x00]) }
 }

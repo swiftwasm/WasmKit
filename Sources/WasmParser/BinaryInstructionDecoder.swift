@@ -9,6 +9,7 @@ protocol BinaryInstructionDecoder {
     /// Claim the next byte to be decoded
     @inlinable func claimNextByte() throws -> UInt8
 
+    /// Throw an error due to unknown opcode.
     func throwUnknown(_ opcode: [UInt8]) throws -> Never
     /// Decode `block` immediates
     @inlinable mutating func visitBlock() throws -> BlockType
@@ -562,6 +563,22 @@ func parseBinaryInstruction(visitor: inout some InstructionVisitor, decoder: ino
         case 0x11:
             let (table) = try decoder.visitTableFill()
             try visitor.visitTableFill(table: table)
+        default:
+            if try !visitor.visitUnknown([opcode0, opcode1]) { try decoder.throwUnknown([opcode0, opcode1]) }
+        }
+    case 0xFE:
+
+        let opcode1 = try decoder.claimNextByte()
+        switch opcode1 {
+        case 0x03:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x00:
+                try visitor.visitAtomicFence()
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
         default:
             if try !visitor.visitUnknown([opcode0, opcode1]) { try decoder.throwUnknown([opcode0, opcode1]) }
         }
