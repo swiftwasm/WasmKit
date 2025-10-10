@@ -125,6 +125,13 @@ extension BinaryInstructionEncoder {
         case .i64Load16U: opcode = [0x33]
         case .i64Load32S: opcode = [0x34]
         case .i64Load32U: opcode = [0x35]
+        case .i32AtomicLoad: opcode = [0xFE, 0x10]
+        case .i64AtomicLoad: opcode = [0xFE, 0x11]
+        case .i32AtomicLoad8U: opcode = [0xFE, 0x12]
+        case .i32AtomicLoad16U: opcode = [0xFE, 0x13]
+        case .i64AtomicLoad8U: opcode = [0xFE, 0x14]
+        case .i64AtomicLoad16U: opcode = [0xFE, 0x15]
+        case .i64AtomicLoad32U: opcode = [0xFE, 0x16]
         }
 
         try encodeInstruction(opcode)
@@ -142,6 +149,13 @@ extension BinaryInstructionEncoder {
         case .i64Store8: opcode = [0x3C]
         case .i64Store16: opcode = [0x3D]
         case .i64Store32: opcode = [0x3E]
+        case .i32AtomicStore: opcode = [0xFE, 0x17]
+        case .i64AtomicStore: opcode = [0xFE, 0x18]
+        case .i32AtomicStore8: opcode = [0xFE, 0x19]
+        case .i32AtomicStore16: opcode = [0xFE, 0x1A]
+        case .i64AtomicStore8: opcode = [0xFE, 0x1B]
+        case .i64AtomicStore16: opcode = [0xFE, 0x1C]
+        case .i64AtomicStore32: opcode = [0xFE, 0x1D]
         }
 
         try encodeInstruction(opcode)
@@ -392,4 +406,5 @@ extension BinaryInstructionEncoder {
         try encodeInstruction([0xFC, 0x10])
         try encodeImmediates(table: table)
     }
+    mutating func visitAtomicFence() throws { try encodeInstruction([0xFE, 0x03, 0x00]) }
 }

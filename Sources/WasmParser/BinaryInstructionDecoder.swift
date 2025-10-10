@@ -9,6 +9,7 @@ protocol BinaryInstructionDecoder {
     /// Claim the next byte to be decoded
     @inlinable func claimNextByte() throws -> UInt8
 
+    /// Throw an error due to unknown opcode.
     func throwUnknown(_ opcode: [UInt8]) throws -> Never
     /// Decode `block` immediates
     @inlinable mutating func visitBlock() throws -> BlockType
@@ -562,6 +563,64 @@ func parseBinaryInstruction(visitor: inout some InstructionVisitor, decoder: ino
         case 0x11:
             let (table) = try decoder.visitTableFill()
             try visitor.visitTableFill(table: table)
+        default:
+            if try !visitor.visitUnknown([opcode0, opcode1]) { try decoder.throwUnknown([opcode0, opcode1]) }
+        }
+    case 0xFE:
+
+        let opcode1 = try decoder.claimNextByte()
+        switch opcode1 {
+        case 0x03:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x00:
+                try visitor.visitAtomicFence()
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x10:
+            let (memarg) = try decoder.visitLoad(.i32AtomicLoad)
+            try visitor.visitLoad(.i32AtomicLoad, memarg: memarg)
+        case 0x11:
+            let (memarg) = try decoder.visitLoad(.i64AtomicLoad)
+            try visitor.visitLoad(.i64AtomicLoad, memarg: memarg)
+        case 0x12:
+            let (memarg) = try decoder.visitLoad(.i32AtomicLoad8U)
+            try visitor.visitLoad(.i32AtomicLoad8U, memarg: memarg)
+        case 0x13:
+            let (memarg) = try decoder.visitLoad(.i32AtomicLoad16U)
+            try visitor.visitLoad(.i32AtomicLoad16U, memarg: memarg)
+        case 0x14:
+            let (memarg) = try decoder.visitLoad(.i64AtomicLoad8U)
+            try visitor.visitLoad(.i64AtomicLoad8U, memarg: memarg)
+        case 0x15:
+            let (memarg) = try decoder.visitLoad(.i64AtomicLoad16U)
+            try visitor.visitLoad(.i64AtomicLoad16U, memarg: memarg)
+        case 0x16:
+            let (memarg) = try decoder.visitLoad(.i64AtomicLoad32U)
+            try visitor.visitLoad(.i64AtomicLoad32U, memarg: memarg)
+        case 0x17:
+            let (memarg) = try decoder.visitStore(.i32AtomicStore)
+            try visitor.visitStore(.i32AtomicStore, memarg: memarg)
+        case 0x18:
+            let (memarg) = try decoder.visitStore(.i64AtomicStore)
+            try visitor.visitStore(.i64AtomicStore, memarg: memarg)
+        case 0x19:
+            let (memarg) = try decoder.visitStore(.i32AtomicStore8)
+            try visitor.visitStore(.i32AtomicStore8, memarg: memarg)
+        case 0x1A:
+            let (memarg) = try decoder.visitStore(.i32AtomicStore16)
+            try visitor.visitStore(.i32AtomicStore16, memarg: memarg)
+        case 0x1B:
+            let (memarg) = try decoder.visitStore(.i64AtomicStore8)
+            try visitor.visitStore(.i64AtomicStore8, memarg: memarg)
+        case 0x1C:
+            let (memarg) = try decoder.visitStore(.i64AtomicStore16)
+            try visitor.visitStore(.i64AtomicStore16, memarg: memarg)
+        case 0x1D:
+            let (memarg) = try decoder.visitStore(.i64AtomicStore32)
+            try visitor.visitStore(.i64AtomicStore32, memarg: memarg)
         default:
             if try !visitor.visitUnknown([opcode0, opcode1]) { try decoder.throwUnknown([opcode0, opcode1]) }
         }

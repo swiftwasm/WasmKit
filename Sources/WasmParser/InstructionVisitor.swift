@@ -20,6 +20,13 @@ public enum Instruction: Equatable {
         case i64Load16U
         case i64Load32S
         case i64Load32U
+        case i32AtomicLoad
+        case i64AtomicLoad
+        case i32AtomicLoad8U
+        case i32AtomicLoad16U
+        case i64AtomicLoad8U
+        case i64AtomicLoad16U
+        case i64AtomicLoad32U
     }
     public enum Store: Equatable {
         case i32Store
@@ -31,6 +38,13 @@ public enum Instruction: Equatable {
         case i64Store8
         case i64Store16
         case i64Store32
+        case i32AtomicStore
+        case i64AtomicStore
+        case i32AtomicStore8
+        case i32AtomicStore16
+        case i64AtomicStore8
+        case i64AtomicStore16
+        case i64AtomicStore32
     }
     public enum Cmp: Equatable {
         case i32Eq
@@ -226,6 +240,7 @@ public enum Instruction: Equatable {
     case `tableSet`(table: UInt32)
     case `tableGrow`(table: UInt32)
     case `tableSize`(table: UInt32)
+    case `atomicFence`
 }
 
 /// A visitor that visits all instructions by a single visit method.
@@ -287,6 +302,7 @@ extension AnyInstructionVisitor {
     public mutating func visitTableSet(table: UInt32) throws { return try self.visit(.tableSet(table: table)) }
     public mutating func visitTableGrow(table: UInt32) throws { return try self.visit(.tableGrow(table: table)) }
     public mutating func visitTableSize(table: UInt32) throws { return try self.visit(.tableSize(table: table)) }
+    public mutating func visitAtomicFence() throws { return try self.visit(.atomicFence) }
 }
 
 /// A visitor for WebAssembly instructions.
@@ -398,6 +414,8 @@ public protocol InstructionVisitor {
     mutating func visitTableGrow(table: UInt32) throws
     /// Visiting `table.size` instruction.
     mutating func visitTableSize(table: UInt32) throws
+    /// Visiting `atomic.fence` instruction.
+    mutating func visitAtomicFence() throws
     /// Returns: `true` if the parser should silently proceed parsing.
     mutating func visitUnknown(_ opcode: [UInt8]) throws -> Bool
 }
@@ -458,6 +476,7 @@ extension InstructionVisitor {
         case let .tableSet(table): return try visitTableSet(table: table)
         case let .tableGrow(table): return try visitTableGrow(table: table)
         case let .tableSize(table): return try visitTableSize(table: table)
+        case .atomicFence: return try visitAtomicFence()
         }
     }
 }
@@ -516,6 +535,7 @@ extension InstructionVisitor {
     public mutating func visitTableSet(table: UInt32) throws {}
     public mutating func visitTableGrow(table: UInt32) throws {}
     public mutating func visitTableSize(table: UInt32) throws {}
+    public mutating func visitAtomicFence() throws {}
     public mutating func visitUnknown(_ opcode: [UInt8]) throws -> Bool { false }
 }
 
