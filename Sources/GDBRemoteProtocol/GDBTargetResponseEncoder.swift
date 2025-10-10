@@ -17,7 +17,7 @@ package struct GDBTargetResponseEncoder: MessageToByteEncoder {
 
         switch data.kind {
         case .ok:
-            out.writeBytes("ok#da".utf8)
+            out.writeBytes("OK#9a".utf8)
 
         case .keyValuePairs(let info):
             out.writeBytes(info.map { (key, value) in "\(key):\(value);" }.joined().appendedChecksum)
