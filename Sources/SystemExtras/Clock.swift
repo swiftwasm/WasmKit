@@ -13,6 +13,7 @@ import Android
 import CSystem
 import ucrt
 #elseif os(WASI)
+import CSystemExtras
 import WASILibc
 #else
 #error("Unsupported Platform")
@@ -46,6 +47,11 @@ extension Clock {
   #if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(OpenBSD) || os(FreeBSD)
   @_alwaysEmitIntoClient
   public static var monotonic: Clock { Clock(rawValue: _CLOCK_MONOTONIC) }
+  #endif
+
+  #if os(WASI)
+  @_alwaysEmitIntoClient
+  public static var monotonic: Clock { Clock(rawValue: csystemextras_monotonic_clockid()) }
   #endif
 
   #if os(OpenBSD) || os(FreeBSD)

@@ -92,12 +92,10 @@ public protocol MonotonicClock {
     /// A monotonic clock that uses the system's monotonic clock.
     public struct SystemMonotonicClock: MonotonicClock {
         private var underlying: SystemExtras.Clock {
-            #if os(Linux) || os(Android)
+            #if os(Linux) || os(Android) || os(WASI)
                 return .monotonic
             #elseif os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
                 return .rawUptime
-            #elseif os(WASI)
-                return .monotonic
             #elseif os(OpenBSD) || os(FreeBSD)
                 return .uptime
             #else

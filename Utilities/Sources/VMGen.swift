@@ -460,6 +460,7 @@ enum VMGen {
                 + generateDirectThreadedCode(instructions: instructions, inlineImpls: inlineImpls)
                 + """
 
+                #if !os(WASI)
                 extension Instruction {
                     /// The tail-calling execution handler for the instruction.
                     var handler: UInt {
@@ -471,6 +472,7 @@ enum VMGen {
                         }
                     }
                 }
+                #endif
 
                 """
             ),

@@ -1930,6 +1930,7 @@ extension Execution {
     }
 }
 
+#if !os(WASI)
 extension Instruction {
     /// The tail-calling execution handler for the instruction.
     var handler: UInt {
@@ -1941,3 +1942,4 @@ extension Instruction {
         }
     }
 }
+#endif

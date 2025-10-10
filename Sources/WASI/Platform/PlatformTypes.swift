@@ -43,14 +43,14 @@ extension WASIAbi.Fdflags {
             if platformOpenOptions.contains(.nonBlocking) {
                 fdFlags.insert(.NONBLOCK)
             }
-#if !os(WASI)
-            if platformOpenOptions.contains(.dataSync) {
-                fdFlags.insert(.DSYNC)
-            }
-            if platformOpenOptions.contains(.fileSync) {
-                fdFlags.insert(.SYNC)
-            }
-#endif
+            #if !os(WASI)
+                if platformOpenOptions.contains(.dataSync) {
+                    fdFlags.insert(.DSYNC)
+                }
+                if platformOpenOptions.contains(.fileSync) {
+                    fdFlags.insert(.SYNC)
+                }
+            #endif
             #if os(Linux)
                 if platformOpenOptions.contains(.readSync) {
                     fdFlags.insert(.RSYNC)
@@ -69,14 +69,14 @@ extension WASIAbi.Fdflags {
             if self.contains(.NONBLOCK) {
                 flags.insert(.nonBlocking)
             }
-#if !os(WASI)
-            if self.contains(.DSYNC) {
-                flags.insert(.dataSync)
-            }
-            if self.contains(.SYNC) {
-                flags.insert(.fileSync)
-            }
-#endif
+            #if !os(WASI)
+                if self.contains(.DSYNC) {
+                    flags.insert(.dataSync)
+                }
+                if self.contains(.SYNC) {
+                    flags.insert(.fileSync)
+                }
+            #endif
             #if os(Linux)
                 if self.contains(.RSYNC) {
                     flags.insert(.readSync)

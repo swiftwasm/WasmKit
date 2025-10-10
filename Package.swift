@@ -89,13 +89,16 @@ let package = Package(
         .target(
             name: "SystemExtras",
             dependencies: [
-                .product(name: "SystemPackage", package: "swift-system")
+                .product(name: "SystemPackage", package: "swift-system"),
+                .target(name: "CSystemExtras", condition: .when(platforms: [.wasi])),
             ],
             exclude: ["CMakeLists.txt"],
             swiftSettings: [
                 .define("SYSTEM_PACKAGE_DARWIN", .when(platforms: DarwinPlatforms))
             ]
         ),
+
+        .target(name: "CSystemExtras"),
 
         .executableTarget(
             name: "WITTool",
@@ -121,7 +124,7 @@ let package = Package(
 if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
     package.dependencies += [
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.2.2"),
-        .package(url: "https://github.com/apple/swift-system", from: "1.6.0"),
+        .package(url: "https://github.com/apple/swift-system", from: "1.5.0"),
     ]
 } else {
     package.dependencies += [

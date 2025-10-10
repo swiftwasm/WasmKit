@@ -241,4 +241,3 @@ public struct LocalFileLoader: PackageFileLoader {
         return try fileManager.contentsOfDirectory(atPath: depsDir.path)
     }
 }
-
