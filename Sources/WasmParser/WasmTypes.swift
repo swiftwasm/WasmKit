@@ -395,15 +395,15 @@ extension Instruction.Store {
     @_alwaysEmitIntoClient
     public var naturalAlignment: Int {
         switch self {
-        case .i32Store: return 2
-        case .i64Store: return 3
+        case .i32Store, .i32AtomicStore: return 2
+        case .i64Store, .i64AtomicStore: return 3
         case .f32Store: return 2
         case .f64Store: return 3
-        case .i32Store8: return 0
-        case .i32Store16: return 1
-        case .i64Store8: return 0
-        case .i64Store16: return 1
-        case .i64Store32: return 2
+        case .i32Store8, .i32AtomicStore8: return 0
+        case .i32Store16, .i32AtomicStore16: return 1
+        case .i64Store8, .i64AtomicStore8: return 0
+        case .i64Store16, .i64AtomicStore16: return 1
+        case .i64Store32, .i64AtomicStore32: return 2
         }
     }
 
@@ -411,15 +411,15 @@ extension Instruction.Store {
     @_alwaysEmitIntoClient
     public var type: ValueType {
         switch self {
-        case .i32Store: return .i32
-        case .i64Store: return .i64
+        case .i32Store, .i32AtomicStore: return .i32
+        case .i64Store, .i64AtomicStore: return .i64
         case .f32Store: return .f32
         case .f64Store: return .f64
-        case .i32Store8: return .i32
-        case .i32Store16: return .i32
-        case .i64Store8: return .i64
-        case .i64Store16: return .i64
-        case .i64Store32: return .i64
+        case .i32Store8, .i32AtomicStore8: return .i32
+        case .i32Store16, .i32AtomicStore16: return .i32
+        case .i64Store8, .i64AtomicStore8: return .i64
+        case .i64Store16, .i64AtomicStore16: return .i64
+        case .i64Store32, .i64AtomicStore32: return .i64
         }
     }
 }

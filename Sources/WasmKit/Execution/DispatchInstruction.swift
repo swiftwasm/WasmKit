@@ -1819,7 +1819,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i32AtomicLoad") @inline(__always)
     mutating func execute_i32AtomicLoad(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.LoadOperand.load(from: &pc.pointee)
-        try self.i32AtomicLoad(sp: sp.pointee, md: md.pointee, ms: ms.pointee, immediate: immediate)
+        try memoryLoad(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: immediate, loadAs: UInt32.self, castToValue: { .i32($0) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -1827,7 +1827,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicLoad") @inline(__always)
     mutating func execute_i64AtomicLoad(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.LoadOperand.load(from: &pc.pointee)
-        try self.i64AtomicLoad(sp: sp.pointee, md: md.pointee, ms: ms.pointee, immediate: immediate)
+        try memoryLoad(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: immediate, loadAs: UInt64.self, castToValue: { .i64($0) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -1835,7 +1835,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i32AtomicLoad8U") @inline(__always)
     mutating func execute_i32AtomicLoad8U(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.LoadOperand.load(from: &pc.pointee)
-        try self.i32AtomicLoad8U(sp: sp.pointee, md: md.pointee, ms: ms.pointee, immediate: immediate)
+        try memoryLoad(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: immediate, loadAs: UInt8.self, castToValue: { .i32(UInt32($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -1843,7 +1843,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i32AtomicLoad16U") @inline(__always)
     mutating func execute_i32AtomicLoad16U(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.LoadOperand.load(from: &pc.pointee)
-        try self.i32AtomicLoad16U(sp: sp.pointee, md: md.pointee, ms: ms.pointee, immediate: immediate)
+        try memoryLoad(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: immediate, loadAs: UInt16.self, castToValue: { .i32(UInt32($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -1851,7 +1851,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicLoad8U") @inline(__always)
     mutating func execute_i64AtomicLoad8U(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.LoadOperand.load(from: &pc.pointee)
-        try self.i64AtomicLoad8U(sp: sp.pointee, md: md.pointee, ms: ms.pointee, immediate: immediate)
+        try memoryLoad(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: immediate, loadAs: UInt8.self, castToValue: { .i64(UInt64($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -1859,7 +1859,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicLoad16U") @inline(__always)
     mutating func execute_i64AtomicLoad16U(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.LoadOperand.load(from: &pc.pointee)
-        try self.i64AtomicLoad16U(sp: sp.pointee, md: md.pointee, ms: ms.pointee, immediate: immediate)
+        try memoryLoad(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: immediate, loadAs: UInt16.self, castToValue: { .i64(UInt64($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -1867,7 +1867,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicLoad32U") @inline(__always)
     mutating func execute_i64AtomicLoad32U(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.LoadOperand.load(from: &pc.pointee)
-        try self.i64AtomicLoad32U(sp: sp.pointee, md: md.pointee, ms: ms.pointee, immediate: immediate)
+        try memoryLoad(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: immediate, loadAs: UInt32.self, castToValue: { .i64(UInt64($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -1875,7 +1875,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i32AtomicStore") @inline(__always)
     mutating func execute_i32AtomicStore(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.StoreOperand.load(from: &pc.pointee)
-        try self.i32AtomicStore(sp: sp.pointee, md: md.pointee, ms: ms.pointee, immediate: immediate)
+        try memoryStore(sp: sp.pointee, md: md.pointee, ms: ms.pointee, storeOperand: immediate, castFromValue: { $0.i32 })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -1883,7 +1883,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicStore") @inline(__always)
     mutating func execute_i64AtomicStore(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.StoreOperand.load(from: &pc.pointee)
-        try self.i64AtomicStore(sp: sp.pointee, md: md.pointee, ms: ms.pointee, immediate: immediate)
+        try memoryStore(sp: sp.pointee, md: md.pointee, ms: ms.pointee, storeOperand: immediate, castFromValue: { $0.i64 })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -1891,7 +1891,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i32AtomicStore8") @inline(__always)
     mutating func execute_i32AtomicStore8(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.StoreOperand.load(from: &pc.pointee)
-        try self.i32AtomicStore8(sp: sp.pointee, md: md.pointee, ms: ms.pointee, immediate: immediate)
+        try memoryStore(sp: sp.pointee, md: md.pointee, ms: ms.pointee, storeOperand: immediate, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -1899,7 +1899,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i32AtomicStore16") @inline(__always)
     mutating func execute_i32AtomicStore16(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.StoreOperand.load(from: &pc.pointee)
-        try self.i32AtomicStore16(sp: sp.pointee, md: md.pointee, ms: ms.pointee, immediate: immediate)
+        try memoryStore(sp: sp.pointee, md: md.pointee, ms: ms.pointee, storeOperand: immediate, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -1907,7 +1907,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicStore8") @inline(__always)
     mutating func execute_i64AtomicStore8(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.StoreOperand.load(from: &pc.pointee)
-        try self.i64AtomicStore8(sp: sp.pointee, md: md.pointee, ms: ms.pointee, immediate: immediate)
+        try memoryStore(sp: sp.pointee, md: md.pointee, ms: ms.pointee, storeOperand: immediate, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -1915,7 +1915,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicStore16") @inline(__always)
     mutating func execute_i64AtomicStore16(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.StoreOperand.load(from: &pc.pointee)
-        try self.i64AtomicStore16(sp: sp.pointee, md: md.pointee, ms: ms.pointee, immediate: immediate)
+        try memoryStore(sp: sp.pointee, md: md.pointee, ms: ms.pointee, storeOperand: immediate, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -1923,7 +1923,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicStore32") @inline(__always)
     mutating func execute_i64AtomicStore32(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.StoreOperand.load(from: &pc.pointee)
-        try self.i64AtomicStore32(sp: sp.pointee, md: md.pointee, ms: ms.pointee, immediate: immediate)
+        try memoryStore(sp: sp.pointee, md: md.pointee, ms: ms.pointee, storeOperand: immediate, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next

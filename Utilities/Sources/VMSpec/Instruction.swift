@@ -384,6 +384,8 @@ extension VMGen {
         return LoadOpInfo(type: type, op: op, loadAs: loadAs, castToValue: castToValue, isSigned: isSigned, isFloatingPoint: isFloatingPoint)
     }
 
+    static let memoryAtomicLoadOps = memoryLoadOps.filter { !$0.isFloatingPoint && !$0.isSigned }
+
     struct StoreOpInfo {
         let type: String
         let op: String
@@ -411,10 +413,9 @@ extension VMGen {
     ].map { (type, op, castFromValue, isFloatingPoint) in
         return StoreOpInfo(type: type, op: op, castFromValue: castFromValue, isFloatingPoint: isFloatingPoint)
     }
+    static let memoryAtomicStoreOps = memoryStoreOps.filter { !$0.isFloatingPoint }
     static let memoryLoadStoreInsts: [Instruction] = memoryLoadOps.map(\.instruction) + memoryStoreOps.map(\.instruction)
-    static let memoryAtomicInsts: [Instruction] =
-        memoryLoadOps.filter { !$0.isFloatingPoint && !$0.isSigned }.map(\.atomicInstruction) +
-        memoryStoreOps.filter { !$0.isFloatingPoint }.map(\.atomicInstruction)
+    static let memoryAtomicInsts: [Instruction] = memoryAtomicLoadOps.map(\.atomicInstruction) + memoryAtomicStoreOps.map(\.atomicInstruction)
     static let memoryOpInsts: [Instruction] = [
         Instruction(name: "memorySize", documentation: "WebAssembly Core Instruction `memory.size`") {
             $0.field(name: "memoryIndex", type: .MemoryIndex)

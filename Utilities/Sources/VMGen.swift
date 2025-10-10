@@ -85,6 +85,17 @@ enum VMGen {
             """
         }
 
+        for op in memoryAtomicLoadOps {
+            inlineImpls[op.atomicInstruction.name] = """
+            try memoryLoad(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: immediate, loadAs: \(op.loadAs).self, castToValue: { \(op.castToValue) })
+            """
+        }
+        for op in memoryAtomicStoreOps {
+            inlineImpls[op.atomicInstruction.name] = """
+            try memoryStore(sp: sp.pointee, md: md.pointee, ms: ms.pointee, storeOperand: immediate, castFromValue: { \(op.castFromValue) })
+            """
+        }
+
         return inlineImpls
     }
 
