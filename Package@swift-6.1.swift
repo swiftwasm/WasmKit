@@ -8,7 +8,7 @@ let DarwinPlatforms: [Platform] = [.macOS, .iOS, .watchOS, .tvOS, .visionOS]
 
 let package = Package(
     name: "WasmKit",
-    platforms: [.macOS(.v14), .iOS(.v17)],
+    platforms: [.macOS(.v15), .iOS(.v17)],
     products: [
         .executable(name: "wasmkit-cli", targets: ["CLI"]),
         .library(name: "WasmKit", targets: ["WasmKit"]),
@@ -93,13 +93,16 @@ let package = Package(
         .target(
             name: "SystemExtras",
             dependencies: [
-                .product(name: "SystemPackage", package: "swift-system")
+                .product(name: "SystemPackage", package: "swift-system"),
+                .target(name: "CSystemExtras", condition: .when(platforms: [.wasi])),
             ],
             exclude: ["CMakeLists.txt"],
             swiftSettings: [
                 .define("SYSTEM_PACKAGE_DARWIN", .when(platforms: DarwinPlatforms))
             ]
         ),
+
+        .target(name: "CSystemExtras"),
 
         .executableTarget(
             name: "WITTool",
