@@ -38,6 +38,13 @@ public enum Instruction: Equatable {
         case i64Store8
         case i64Store16
         case i64Store32
+        case i32AtomicStore
+        case i64AtomicStore
+        case i32AtomicStore8
+        case i32AtomicStore16
+        case i64AtomicStore8
+        case i64AtomicStore16
+        case i64AtomicStore32
     }
     public enum Cmp: Equatable {
         case i32Eq

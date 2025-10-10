@@ -354,6 +354,27 @@ func parseTextInstruction<V: InstructionVisitor>(keyword: String, expressionPars
     case "i64.atomic.load32_u":
         let (memarg) = try expressionParser.visitLoad(.i64AtomicLoad32U, wat: &wat)
         return { return try $0.visitLoad(.i64AtomicLoad32U, memarg: memarg) }
+    case "i32.atomic.store":
+        let (memarg) = try expressionParser.visitStore(.i32AtomicStore, wat: &wat)
+        return { return try $0.visitStore(.i32AtomicStore, memarg: memarg) }
+    case "i64.atomic.store":
+        let (memarg) = try expressionParser.visitStore(.i64AtomicStore, wat: &wat)
+        return { return try $0.visitStore(.i64AtomicStore, memarg: memarg) }
+    case "i32.atomic.store8":
+        let (memarg) = try expressionParser.visitStore(.i32AtomicStore8, wat: &wat)
+        return { return try $0.visitStore(.i32AtomicStore8, memarg: memarg) }
+    case "i32.atomic.store16":
+        let (memarg) = try expressionParser.visitStore(.i32AtomicStore16, wat: &wat)
+        return { return try $0.visitStore(.i32AtomicStore16, memarg: memarg) }
+    case "i64.atomic.store8":
+        let (memarg) = try expressionParser.visitStore(.i64AtomicStore8, wat: &wat)
+        return { return try $0.visitStore(.i64AtomicStore8, memarg: memarg) }
+    case "i64.atomic.store16":
+        let (memarg) = try expressionParser.visitStore(.i64AtomicStore16, wat: &wat)
+        return { return try $0.visitStore(.i64AtomicStore16, memarg: memarg) }
+    case "i64.atomic.store32":
+        let (memarg) = try expressionParser.visitStore(.i64AtomicStore32, wat: &wat)
+        return { return try $0.visitStore(.i64AtomicStore32, memarg: memarg) }
     default: return nil
     }
 }

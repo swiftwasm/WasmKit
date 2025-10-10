@@ -149,6 +149,13 @@ extension BinaryInstructionEncoder {
         case .i64Store8: opcode = [0x3C]
         case .i64Store16: opcode = [0x3D]
         case .i64Store32: opcode = [0x3E]
+        case .i32AtomicStore: opcode = [0xFE, 0x17]
+        case .i64AtomicStore: opcode = [0xFE, 0x18]
+        case .i32AtomicStore8: opcode = [0xFE, 0x19]
+        case .i32AtomicStore16: opcode = [0xFE, 0x1A]
+        case .i64AtomicStore8: opcode = [0xFE, 0x1B]
+        case .i64AtomicStore16: opcode = [0xFE, 0x1C]
+        case .i64AtomicStore32: opcode = [0xFE, 0x1D]
         }
 
         try encodeInstruction(opcode)
