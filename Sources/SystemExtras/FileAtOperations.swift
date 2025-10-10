@@ -12,6 +12,8 @@ import Android
 #elseif os(Windows)
 import ucrt
 import WinSDK
+#elseif os(WASI)
+import WASILibc
 #else
 #error("Unsupported Platform")
 #endif

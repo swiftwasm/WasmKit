@@ -400,21 +400,25 @@ extension Execution {
     mutating func runDirectThreaded(
         sp: Sp, pc: Pc, md: Md, ms: Ms
     ) throws {
-        var pc = pc
-        let handler = pc.read(wasmkit_tc_exec.self)
-        wasmkit_tc_start(handler, sp, pc, md, ms, &self)
-        if let (rawError, trappingSp) = self.trap {
-            let error = unsafeBitCast(rawError, to: Error.self)
-            // Manually release the error object because the trap is caught in C and
-            // held as a raw pointer.
-            wasmkit_swift_errorRelease(rawError)
+        #if os(WASI)
+            fatalError("Direct threading is not supported on WASI")
+        #else
+            var pc = pc
+            let handler = pc.read(wasmkit_tc_exec.self)
+            wasmkit_tc_start(handler, sp, pc, md, ms, &self)
+            if let (rawError, trappingSp) = self.trap {
+                let error = unsafeBitCast(rawError, to: Error.self)
+                // Manually release the error object because the trap is caught in C and
+                // held as a raw pointer.
+                wasmkit_swift_errorRelease(rawError)
 
-            guard let trap = error as? Trap else {
-                throw error
+                guard let trap = error as? Trap else {
+                    throw error
+                }
+                // Attach backtrace if the thrown error is a trap
+                throw trap.withBacktrace(Self.captureBacktrace(sp: trappingSp, store: store.value))
             }
-            // Attach backtrace if the thrown error is a trap
-            throw trap.withBacktrace(Self.captureBacktrace(sp: trappingSp, store: store.value))
-        }
+        #endif
     }
 
     #if EngineStats

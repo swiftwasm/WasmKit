@@ -463,12 +463,16 @@ enum VMGen {
                 extension Instruction {
                     /// The tail-calling execution handler for the instruction.
                     var handler: UInt {
+                        #if os(WASI)
+                        fatalError("Direct threading is not supported on WASI")
+                        #else
                         return withUnsafePointer(to: wasmkit_tc_exec_handlers) {
                             let count = MemoryLayout.size(ofValue: wasmkit_tc_exec_handlers) / MemoryLayout<wasmkit_tc_exec>.size
                             return $0.withMemoryRebound(to: UInt.self, capacity: count) {
                                 $0[Int(self.opcodeID)]
                             }
                         }
+                        #endif
                     }
                 }
 

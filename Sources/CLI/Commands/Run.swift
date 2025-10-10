@@ -59,12 +59,16 @@ struct Run: ParsableCommand {
     var directories: [String] = []
 
     enum ThreadingModel: String, ExpressibleByArgument, CaseIterable {
-        case direct
+        #if !os(WASI)
+            case direct
+        #endif
         case token
 
         func resolve() -> EngineConfiguration.ThreadingModel {
             switch self {
-            case .direct: return .direct
+            #if !os(WASI)
+                case .direct: return .direct
+            #endif
             case .token: return .token
             }
         }

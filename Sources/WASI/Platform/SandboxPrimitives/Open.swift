@@ -15,6 +15,8 @@ import SystemPackage
 #elseif os(Windows)
     import CSystem
     import ucrt
+#elseif os(WASI)
+    import WASILibc
 #else
     #error("Unsupported Platform")
 #endif
@@ -127,13 +129,17 @@ struct PathResolution {
                         throw openErrno
                     }
 
-                    try self.symlink(component: component)
+                    #if os(WASI)
+                        throw Errno.notSupported
+                    #else
+                        try self.symlink(component: component)
+                    #endif
                 #endif
             }
         }
     }
 
-    #if !os(Windows)
+    #if !os(Windows) && !os(WASI)
         mutating func symlink(component: FilePath.Component) throws {
             /// Thin wrapper around readlinkat(2)
             func _readlinkat(_ fd: CInt, _ path: UnsafePointer<CChar>) throws -> FilePath {
