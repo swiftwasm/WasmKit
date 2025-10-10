@@ -126,7 +126,7 @@ jobs:
             wasi-swift-sdk-checksum: "b64dfad9e1c9ccdf06f35cf9b1a00317e000df0c0de0b3eb9f49d6db0fcba4d9"
             test-args: "-Xswiftc -DWASMKIT_CI_TOOLCHAIN_NIGHTLY"
 
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     name: "build-linux (${{ matrix.swift }})"
 
     steps:
@@ -240,7 +240,7 @@ jobs:
         run: swift test
 
   build-cmake:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     container:
       image: swift:6.2-noble
     steps:
@@ -254,3 +254,16 @@ jobs:
       - run: cmake -G Ninja -B ./build
       - run: cmake --build ./build
       - run: ./build/bin/wasmkit-cli --version
+
+  build-wasi:
+    runs-on: ubuntu-24.04
+    container:
+      image: swift:6.2-noble
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install jq
+        run: apt-get update && apt-get install -y jq
+      - name: Install Swift SDK
+        run: swift sdk install https://download.swift.org/swift-6.2-branch/wasm-sdk/swift-6.2-DEVELOPMENT-SNAPSHOT-2025-10-09-a/swift-6.2-DEVELOPMENT-SNAPSHOT-2025-10-09-a_wasm.artifactbundle.tar.gz --checksum 048667dbddd50bfb797d09d194bd0c1c53b251a121f4b870402154b0adab556e
+      - run: swift build --swift-sdk "$(swiftc -print-target-info | jq -r '.swiftCompilerTag')_wasm"
+    
