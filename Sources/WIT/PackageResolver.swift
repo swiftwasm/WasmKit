@@ -195,52 +195,50 @@ extension SourceFileSyntax {
     }
 }
 
-#if !os(WASI)
-    /// A ``PackageFileLoader`` adapter for local file system.
-    public struct LocalFileLoader: PackageFileLoader {
-        public typealias FilePath = String
+/// A ``PackageFileLoader`` adapter for local file system.
+public struct LocalFileLoader: PackageFileLoader {
+    public typealias FilePath = String
 
-        let fileManager: FileManager
+    let fileManager: FileManager
 
-        public init(fileManager: FileManager = .default) {
-            self.fileManager = fileManager
-        }
-
-        enum Error: Swift.Error {
-            case failedToLoadFile(FilePath)
-        }
-
-        private func isDirectory(filePath: String) -> Bool {
-            var isDirectory: ObjCBool = false
-            let exists = fileManager.fileExists(atPath: filePath, isDirectory: &isDirectory)
-            return exists && isDirectory.boolValue
-        }
-
-        public func contentsOfWITFile(at filePath: String) throws -> String {
-            guard let bytes = fileManager.contents(atPath: filePath) else {
-                throw Error.failedToLoadFile(filePath)
-            }
-            return String(decoding: bytes, as: UTF8.self)
-        }
-
-        public func packageFiles(in packageDirectory: String) throws -> [String] {
-            let dirURL = URL(fileURLWithPath: packageDirectory)
-            return try fileManager.contentsOfDirectory(atPath: packageDirectory).filter { fileName in
-                return fileName.hasSuffix(".wit")
-                    && {
-                        let filePath = dirURL.appendingPathComponent(fileName)
-                        return !isDirectory(filePath: filePath.path)
-                    }()
-            }
-            .map { dirURL.appendingPathComponent($0).path }
-        }
-
-        public func dependencyDirectories(from packageDirectory: String) throws -> [String] {
-            let dirURL = URL(fileURLWithPath: packageDirectory)
-            let depsDir = dirURL.appendingPathComponent("deps")
-            guard isDirectory(filePath: depsDir.path) else { return [] }
-            return try fileManager.contentsOfDirectory(atPath: depsDir.path)
-        }
+    public init(fileManager: FileManager = .default) {
+        self.fileManager = fileManager
     }
 
-#endif
+    enum Error: Swift.Error {
+        case failedToLoadFile(FilePath)
+    }
+
+    private func isDirectory(filePath: String) -> Bool {
+        var isDirectory: ObjCBool = false
+        let exists = fileManager.fileExists(atPath: filePath, isDirectory: &isDirectory)
+        return exists && isDirectory.boolValue
+    }
+
+    public func contentsOfWITFile(at filePath: String) throws -> String {
+        guard let bytes = fileManager.contents(atPath: filePath) else {
+            throw Error.failedToLoadFile(filePath)
+        }
+        return String(decoding: bytes, as: UTF8.self)
+    }
+
+    public func packageFiles(in packageDirectory: String) throws -> [String] {
+        let dirURL = URL(fileURLWithPath: packageDirectory)
+        return try fileManager.contentsOfDirectory(atPath: packageDirectory).filter { fileName in
+            return fileName.hasSuffix(".wit")
+                && {
+                    let filePath = dirURL.appendingPathComponent(fileName)
+                    return !isDirectory(filePath: filePath.path)
+                }()
+        }
+        .map { dirURL.appendingPathComponent($0).path }
+    }
+
+    public func dependencyDirectories(from packageDirectory: String) throws -> [String] {
+        let dirURL = URL(fileURLWithPath: packageDirectory)
+        let depsDir = dirURL.appendingPathComponent("deps")
+        guard isDirectory(filePath: depsDir.path) else { return [] }
+        return try fileManager.contentsOfDirectory(atPath: depsDir.path)
+    }
+}
+

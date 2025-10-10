@@ -12,6 +12,8 @@ import Android
 #elseif os(Windows)
 import CSystem
 import ucrt
+#elseif os(WASI)
+import WASILibc
 #else
 #error("Unsupported Platform")
 #endif
@@ -43,7 +45,7 @@ internal var _AT_NO_AUTOMOUNT: CInt { AT_NO_AUTOMOUNT }
 #endif
 */
 
-#if !os(Windows)
+#if !os(Windows) && !os(WASI)
 @_alwaysEmitIntoClient
 internal var _F_GETFL: CInt { F_GETFL }
 @_alwaysEmitIntoClient
@@ -61,7 +63,7 @@ internal var _O_SYNC: CInt { O_SYNC }
 internal var _O_RSYNC: CInt { O_RSYNC }
 #endif
 
-#if !os(Windows)
+#if !os(Windows) && !os(WASI)
 @_alwaysEmitIntoClient
 internal var _UTIME_NOW: CInt {
     #if os(Linux) || os(Android)
@@ -132,16 +134,15 @@ internal var _CLOCK_BOOTTIME: CInterop.ClockId { CLOCK_BOOTTIME }
 @_alwaysEmitIntoClient
 internal var _CLOCK_MONOTONIC_RAW: CInterop.ClockId { CLOCK_MONOTONIC_RAW }
 #endif
-#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(OpenBSD) || os(FreeBSD) || os(WASI)
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(OpenBSD) || os(FreeBSD)
 @_alwaysEmitIntoClient
 internal var _CLOCK_MONOTONIC: CInterop.ClockId { CLOCK_MONOTONIC }
 #endif
-
 #if SYSTEM_PACKAGE_DARWIN
 @_alwaysEmitIntoClient
 internal var _CLOCK_UPTIME_RAW: CInterop.ClockId { CLOCK_UPTIME_RAW }
 #endif
-#if os(OpenBSD) || os(FreeBSD) || os(WASI)
+#if os(OpenBSD) || os(FreeBSD)
 @_alwaysEmitIntoClient
 internal var _CLOCK_UPTIME: CInterop.ClockId { CLOCK_UPTIME }
 #endif

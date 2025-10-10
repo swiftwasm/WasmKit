@@ -15,6 +15,8 @@ import SystemPackage
 #elseif os(Windows)
     import CSystem
     import ucrt
+#elseif os(WASI)
+    import WASILibc
 #else
     #error("Unsupported Platform")
 #endif

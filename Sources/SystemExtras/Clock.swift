@@ -12,6 +12,8 @@ import Android
 #elseif os(Windows)
 import CSystem
 import ucrt
+#elseif os(WASI)
+import WASILibc
 #else
 #error("Unsupported Platform")
 #endif
@@ -41,12 +43,12 @@ extension Clock {
   public static var rawMonotonic: Clock { Clock(rawValue: _CLOCK_MONOTONIC_RAW) }
   #endif
 
-  #if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(OpenBSD) || os(FreeBSD) || os(WASI)
+  #if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(OpenBSD) || os(FreeBSD)
   @_alwaysEmitIntoClient
   public static var monotonic: Clock { Clock(rawValue: _CLOCK_MONOTONIC) }
   #endif
 
-  #if os(OpenBSD) || os(FreeBSD) || os(WASI)
+  #if os(OpenBSD) || os(FreeBSD)
   @_alwaysEmitIntoClient
   public static var uptime: Clock { Clock(rawValue: _CLOCK_UPTIME) }
   #endif
@@ -92,10 +94,10 @@ extension Clock {
     public var rawValue: CInterop.TimeSpec
 
     @_alwaysEmitIntoClient
-    public var seconds: Int { rawValue.tv_sec }
+    public var seconds: Int64 { .init(rawValue.tv_sec) }
 
     @_alwaysEmitIntoClient
-    public var nanoseconds: Int { rawValue.tv_nsec }
+    public var nanoseconds: Int64 { .init(rawValue.tv_nsec) }
 
     @_alwaysEmitIntoClient
     public init(rawValue: CInterop.TimeSpec) {
@@ -104,17 +106,17 @@ extension Clock {
 
     @_alwaysEmitIntoClient
     public init(seconds: Int, nanoseconds: Int) {
-      self.init(rawValue: CInterop.TimeSpec(tv_sec: seconds, tv_nsec: nanoseconds))
+      self.init(rawValue: CInterop.TimeSpec(tv_sec: .init(seconds), tv_nsec: nanoseconds))
     }
 
     @_alwaysEmitIntoClient
     public static var now: TimeSpec {
-      return TimeSpec(rawValue: CInterop.TimeSpec(tv_sec: 0, tv_nsec: Int(_UTIME_NOW)))
+      return TimeSpec(rawValue: CInterop.TimeSpec(tv_sec: 0, tv_nsec: Int(UTIME_NOW)))
     }
 
     @_alwaysEmitIntoClient
     public static var omit: TimeSpec {
-      return TimeSpec(rawValue: CInterop.TimeSpec(tv_sec: 0, tv_nsec: Int(_UTIME_OMIT)))
+      return TimeSpec(rawValue: CInterop.TimeSpec(tv_sec: 0, tv_nsec: Int(UTIME_OMIT)))
     }
   }
 }
