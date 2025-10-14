@@ -37,8 +37,7 @@ package actor WasmKitDebugger {
                 ])
 
             case .supportedFeatures:
-                // FIXME: should return a different set of supported features instead of echoing.
-                .raw(command.arguments)
+                .raw("qXfer:libraries:read+;PacketSize=1000;")
 
             case .vContSupportedActions:
                 .vContSupportedActions([.continue, .step])
@@ -46,7 +45,13 @@ package actor WasmKitDebugger {
             case .isVAttachOrWaitSupported, .enableErrorStrings:
                 .empty
             case .processInfo:
-                .raw("pid:1;parent-pid:1;arch:wasm32;endian:little;ptrsize:4;")
+                .keyValuePairs([
+                    "pid": "1",
+                    "parent-pid": "1",
+                    "arch": "wasm32",
+                    "endian": "little",
+                    "ptrsize": "4",
+                ])
 
             case .currentThreadID:
                 .raw("QC1")
@@ -62,6 +67,9 @@ package actor WasmKitDebugger {
                     "T05thread": "1",
                     "reason": "trace",
                 ])
+
+            case .registerInfo:
+                .raw("name:pc;alt-name:pc;bitsize:64;offset:0;encoding:uint;format:hex;set:General Purpose Registers;gcc:16;dwarf:16;generic:pc;")
 
             case .generalRegisters:
                 fatalError()
