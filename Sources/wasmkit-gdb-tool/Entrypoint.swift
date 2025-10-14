@@ -20,22 +20,6 @@ import NIOPosix
 import SystemPackage
 import WasmKitGDBHandler
 
-#if hasFeature(RetroactiveAttribute)
-    extension Logger.Level: @retroactive ExpressibleByArgument {}
-    extension FilePath: @retroactive ExpressibleByArgument {
-        public init?(argument: String) {
-            self.init(argument)
-        }
-    }
-#else
-    extension Logger.Level: ExpressibleByArgument {}
-    extension FilePath: ExpressibleByArgument {
-        public init?(argument: String) {
-            self.init(argument)
-        }
-    }
-#endif
-
 @main
 struct Entrypoint: AsyncParsableCommand {
     @Option(help: "TCP port that a debugger can connect to")
@@ -52,7 +36,7 @@ struct Entrypoint: AsyncParsableCommand {
     )
     var logLevel = Logger.Level.info
 
-    @Argument
+    @Argument(transform: { FilePath($0) })
     var wasmModulePath: FilePath
 
     func run() async throws {
