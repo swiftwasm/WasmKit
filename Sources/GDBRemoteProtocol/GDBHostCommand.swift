@@ -82,13 +82,13 @@ package struct GDBHostCommand: Equatable {
         let registerInfoPrefix = "qRegisterInfo"
 
         if kindString.starts(with: "x") {
-           self.kind = .readMemoryBinaryData
-           self.arguments = String(kindString.dropFirst())
-           return
+            self.kind = .readMemoryBinaryData
+            self.arguments = String(kindString.dropFirst())
+            return
         } else if kindString.starts(with: "m") {
-           self.kind = .readMemory
-           self.arguments = String(kindString.dropFirst())
-           return
+            self.kind = .readMemory
+            self.arguments = String(kindString.dropFirst())
+            return
         } else if kindString.starts(with: registerInfoPrefix) {
             self.kind = .registerInfo
 
