@@ -1,12 +1,10 @@
 import GDBRemoteProtocol
 import Logging
+import Synchronization
 import SystemPackage
 import WasmKit
 
 package actor WasmKitDebugger {
-    /// Whether `QStartNoAckMode` command was previously sent.
-    private var isNoAckModeActive = false
-
     private let module: Module
     private let logger: Logger
 
@@ -19,9 +17,14 @@ package actor WasmKitDebugger {
         let responseKind: GDBTargetResponse.Kind
         logger.trace("handling GDB host command", metadata: ["GDBHostCommand": .string(command.kind.rawValue)])
 
+        var isNoAckModeActivated = false
         responseKind =
             switch command.kind {
-            case .startNoAckMode, .isThreadSuffixSupported, .listThreadsInStopReply:
+            case .startNoAckMode:
+                isNoAckModeActivated = true
+                fallthrough
+
+            case .isThreadSuffixSupported, .listThreadsInStopReply:
                 .ok
 
             case .hostInfo:
@@ -38,7 +41,7 @@ package actor WasmKitDebugger {
                 .raw(command.arguments)
 
             case .vContSupportedActions:
-                .vContSupportedActions([.continue, .step, .stop])
+                .vContSupportedActions([.continue, .step])
 
             case .isVAttachOrWaitSupported, .enableErrorStrings:
                 .empty
@@ -64,12 +67,9 @@ package actor WasmKitDebugger {
                 fatalError()
             }
 
-        defer {
-            if command.kind == .startNoAckMode {
-                self.isNoAckModeActive = true
-            }
-        }
-        return .init(kind: responseKind, isNoAckModeActive: self.isNoAckModeActive)
+        logger.trace("handler produced a response", metadata: ["GDBTargetResponse": .string("\(responseKind)")])
+
+        return .init(kind: responseKind, isNoAckModeActivated: isNoAckModeActivated)
     }
 
 }

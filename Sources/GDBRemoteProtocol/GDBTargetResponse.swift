@@ -18,10 +18,10 @@ package struct GDBTargetResponse {
     }
 
     package let kind: Kind
-    package let isNoAckModeActive: Bool
+    package let isNoAckModeActivated: Bool
 
-    package init(kind: Kind, isNoAckModeActive: Bool) {
+    package init(kind: Kind, isNoAckModeActivated: Bool) {
         self.kind = kind
-        self.isNoAckModeActive = isNoAckModeActive
+        self.isNoAckModeActivated = isNoAckModeActivated
     }
 }
