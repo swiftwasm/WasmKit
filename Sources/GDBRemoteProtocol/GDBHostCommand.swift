@@ -1,7 +1,7 @@
 /// See GDB and LLDB remote protocol documentation for more details:
 /// * https://sourceware.org/gdb/current/onlinedocs/gdb.html/General-Query-Packets.html
 /// * https://lldb.llvm.org/resources/lldbgdbremote.html
-package struct GDBHostCommand {
+package struct GDBHostCommand: Equatable {
     enum Error: Swift.Error {
         case unexpectedArgumentsValue
         case unknownCommand(kind: String, arguments: String)
@@ -67,22 +67,27 @@ package struct GDBHostCommand {
 
     package let arguments: String
 
-    package init(kind: String, arguments: String) throws {
+    package init(kindString: String, arguments: String) throws {
         let registerInfoPrefix = "qRegisterInfo"
-        if kind.starts(with: registerInfoPrefix) {
+        if kindString.starts(with: registerInfoPrefix) {
             self.kind = .registerInfo
 
             guard arguments.isEmpty else {
                 throw Error.unexpectedArgumentsValue
             }
-            self.arguments = String(kind.dropFirst(registerInfoPrefix.count))
+            self.arguments = String(kindString.dropFirst(registerInfoPrefix.count))
             return
-        } else if let kind = Kind(rawValue: kind) {
+        } else if let kind = Kind(rawValue: kindString) {
             self.kind = kind
         } else {
-            throw Error.unknownCommand(kind: kind, arguments: arguments)
+            throw Error.unknownCommand(kind: kindString, arguments: arguments)
         }
 
-       self.arguments = arguments
+        self.arguments = arguments
+    }
+
+    package init(kind: Kind, arguments: String) {
+        self.kind = kind
+        self.arguments = arguments
     }
 }
