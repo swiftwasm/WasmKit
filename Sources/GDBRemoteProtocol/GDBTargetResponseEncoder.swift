@@ -7,11 +7,16 @@ extension String {
     }
 }
 
-package struct GDBTargetResponseEncoder: MessageToByteEncoder {
+package class GDBTargetResponseEncoder: MessageToByteEncoder {
+    private var isNoAckModeActive = false
+
     package init() {}
     package func encode(data: GDBTargetResponse, out: inout ByteBuffer) throws {
-        if !data.isNoAckModeActive {
+        if !isNoAckModeActive {
             out.writeInteger(UInt8(ascii: "+"))
+        }
+        if data.isNoAckModeActivated {
+            self.isNoAckModeActive = true
         }
         out.writeInteger(UInt8(ascii: "$"))
 

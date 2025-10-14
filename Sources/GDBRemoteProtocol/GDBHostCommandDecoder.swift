@@ -13,6 +13,7 @@ extension ByteBuffer {
 
 package struct GDBHostCommandDecoder: ByteToMessageDecoder {
     enum Error: Swift.Error {
+        case expectedAck
         case expectedCommandStart
         case unknownCommandKind(String)
         case expectedChecksum
@@ -35,25 +36,41 @@ package struct GDBHostCommandDecoder: ByteToMessageDecoder {
         UInt8(self.accummulatedSum % 256)
     }
 
+    private var isNoAckModeRequested = false
+    private var isNoAckModeActive = false
+
     mutating package func decode(buffer: inout ByteBuffer) throws -> GDBPacket<GDBHostCommand>? {
-        guard let firstStartDelimiter = self.accumulatedDelimiter ?? buffer.readInteger(as: UInt8.self) else {
+        guard var startDelimiter = self.accumulatedDelimiter ?? buffer.readInteger(as: UInt8.self) else {
             // Not enough data to parse.
             return nil
         }
-        guard let secondStartDelimiter = buffer.readInteger(as: UInt8.self) else {
-            // Preserve what we already read.
-            self.accumulatedDelimiter = firstStartDelimiter
 
-            // Not enough data to parse.
-            return nil
+        if !isNoAckModeActive {
+            let firstStartDelimiter = startDelimiter
+
+            guard firstStartDelimiter == UInt8(ascii: "+") else {
+                logger.error("unexpected ack character: \(Character(UnicodeScalar(startDelimiter)))")
+                throw Error.expectedAck
+            }
+
+            if isNoAckModeRequested {
+                self.isNoAckModeActive = true
+            }
+
+            guard let secondStartDelimiter = buffer.readInteger(as: UInt8.self) else {
+                // Preserve what we already read.
+                self.accumulatedDelimiter = firstStartDelimiter
+
+                // Not enough data to parse.
+                return nil
+            }
+
+            startDelimiter = secondStartDelimiter
         }
 
         // Command start delimiters.
-        guard
-            firstStartDelimiter == UInt8(ascii: "+")
-                && secondStartDelimiter == UInt8(ascii: "$")
-        else {
-            logger.error("unexpected delimiter: \(Character(UnicodeScalar(firstStartDelimiter)))\(Character(UnicodeScalar(secondStartDelimiter)))")
+        guard startDelimiter == UInt8(ascii: "$") else {
+            logger.error("unexpected delimiter: \(Character(UnicodeScalar(startDelimiter)))")
             throw Error.expectedCommandStart
         }
 
@@ -104,6 +121,10 @@ package struct GDBHostCommandDecoder: ByteToMessageDecoder {
             guard (first * 16) + last == self.accummulatedChecksum else {
                 // FIXME: better diagnostics
                 throw Error.checksumIncorrect
+            }
+
+            if commandKind == .startNoAckMode {
+                self.isNoAckModeRequested = true
             }
 
             return .init(
