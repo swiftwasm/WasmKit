@@ -69,7 +69,21 @@ package actor WasmKitDebugger {
                 ])
 
             case .registerInfo:
-                .raw("name:pc;alt-name:pc;bitsize:64;offset:0;encoding:uint;format:hex;set:General Purpose Registers;gcc:16;dwarf:16;generic:pc;")
+                if command.arguments == "0" {
+                    .keyValuePairs([
+                        "name": "pc",
+                        "bitsize": "64",
+                        "offset": "0",
+                        "encoding": "uint",
+                        "format": "hex",
+                        "set": "General Purpose Registers",
+                        "gcc": "16",
+                        "dwarf": "16",
+                        "generic": "pc"
+                    ])
+                } else {
+                    .raw("E45")
+                }
 
             case .generalRegisters:
                 fatalError()
