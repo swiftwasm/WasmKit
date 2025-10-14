@@ -23,6 +23,11 @@ package struct GDBHostCommand: Equatable {
         case subsequentThreadInfo
         case targetStatus
         case registerInfo
+        case structuredDataPlugins
+        case transfer
+        case readMemoryBinaryData
+        case readMemory
+        case wasmCallStack
 
         case generalRegisters
 
@@ -56,6 +61,12 @@ package struct GDBHostCommand: Equatable {
                 self = .subsequentThreadInfo
             case "?":
                 self = .targetStatus
+            case "qStructuredDataPlugins":
+                self = .structuredDataPlugins
+            case "qXfer":
+                self = .transfer
+            case "qWasmCallStack":
+                self = .wasmCallStack
 
             default:
                 return nil
@@ -69,7 +80,16 @@ package struct GDBHostCommand: Equatable {
 
     package init(kindString: String, arguments: String) throws {
         let registerInfoPrefix = "qRegisterInfo"
-        if kindString.starts(with: registerInfoPrefix) {
+
+        if kindString.starts(with: "x") {
+           self.kind = .readMemoryBinaryData
+           self.arguments = String(kindString.dropFirst())
+           return
+        } else if kindString.starts(with: "m") {
+           self.kind = .readMemory
+           self.arguments = String(kindString.dropFirst())
+           return
+        } else if kindString.starts(with: registerInfoPrefix) {
             self.kind = .registerInfo
 
             guard arguments.isEmpty else {
