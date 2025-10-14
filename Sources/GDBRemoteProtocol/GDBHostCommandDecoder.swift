@@ -17,7 +17,7 @@ package struct GDBHostCommandDecoder: ByteToMessageDecoder {
         case expectedCommandStart
         case unknownCommandKind(String)
         case expectedChecksum
-        case checksumIncorrect
+        case checksumIncorrect(expectedChecksum: Int, receivedChecksum: UInt8)
     }
 
     package typealias InboundOut = GDBPacket<GDBHostCommand>
@@ -106,37 +106,34 @@ package struct GDBHostCommandDecoder: ByteToMessageDecoder {
             self.accummulatedSum = 0
         }
 
-        let kindString = String(decoding: self.accummulatedKind, as: UTF8.self)
+        buffer.moveReaderIndex(forwardBy: 1)
 
-        if let commandKind = GDBHostCommand.Kind(rawValue: kindString) {
-            buffer.moveReaderIndex(forwardBy: 1)
-
-            guard let checksumString = buffer.readString(length: 2),
-                let first = checksumString.first?.hexDigitValue,
-                let last = checksumString.last?.hexDigitValue
-            else {
-                throw Error.expectedChecksum
-            }
-
-            guard (first * 16) + last == self.accummulatedChecksum else {
-                // FIXME: better diagnostics
-                throw Error.checksumIncorrect
-            }
-
-            if commandKind == .startNoAckMode {
-                self.isNoAckModeRequested = true
-            }
-
-            return .init(
-                payload: .init(
-                    kind: commandKind,
-                    arguments: String(decoding: self.accummulatedArguments, as: UTF8.self)
-                ),
-                checksum: accummulatedChecksum,
-            )
-        } else {
-            throw Error.unknownCommandKind(kindString)
+        guard let checksumString = buffer.readString(length: 2),
+            let first = checksumString.first?.hexDigitValue,
+            let last = checksumString.last?.hexDigitValue
+        else {
+            throw Error.expectedChecksum
         }
+
+        let expectedChecksum = (first * 16) + last
+
+        guard expectedChecksum == self.accummulatedChecksum else {
+            throw Error.checksumIncorrect(
+                expectedChecksum: expectedChecksum,
+                receivedChecksum: self.accummulatedChecksum
+            )
+        }
+
+        let payload = try GDBHostCommand(
+            kind: String(decoding: self.accummulatedKind, as: UTF8.self),
+            arguments: String(decoding: self.accummulatedArguments, as: UTF8.self)
+        )
+
+        if payload.kind == .startNoAckMode {
+            self.isNoAckModeRequested = true
+        }
+
+        return .init(payload: payload, checksum: accummulatedChecksum)
     }
 
     mutating package func decode(
