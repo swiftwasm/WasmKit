@@ -79,7 +79,7 @@ package actor WasmKitDebugger {
                         "set": "General Purpose Registers",
                         "gcc": "16",
                         "dwarf": "16",
-                        "generic": "pc"
+                        "generic": "pc",
                     ])
                 } else {
                     .raw("E45")

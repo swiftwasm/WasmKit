@@ -125,7 +125,7 @@ package struct GDBHostCommandDecoder: ByteToMessageDecoder {
         }
 
         let payload = try GDBHostCommand(
-            kind: String(decoding: self.accummulatedKind, as: UTF8.self),
+            kindString: String(decoding: self.accummulatedKind, as: UTF8.self),
             arguments: String(decoding: self.accummulatedArguments, as: UTF8.self)
         )
 
