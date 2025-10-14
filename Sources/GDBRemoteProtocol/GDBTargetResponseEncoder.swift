@@ -2,8 +2,8 @@ import Foundation
 import NIOCore
 
 extension String {
-    fileprivate var appendedChecksum: String.UTF8View {
-        "\(self)#\(String(format:"%02X", self.utf8.reduce(0, { $0 + Int($1) }) % 256))".utf8
+    fileprivate var appendedChecksum: String {
+        "\(self)#\(String(format:"%02X", self.utf8.reduce(0, { $0 + Int($1) }) % 256))"
     }
 }
 
@@ -22,19 +22,19 @@ package class GDBTargetResponseEncoder: MessageToByteEncoder {
 
         switch data.kind {
         case .ok:
-            out.writeBytes("OK#9a".utf8)
+            out.writeString("OK#9a")
 
         case .keyValuePairs(let info):
-            out.writeBytes(info.map { (key, value) in "\(key):\(value);" }.joined().appendedChecksum)
+            out.writeString(info.map { (key, value) in "\(key):\(value);" }.joined().appendedChecksum)
 
         case .vContSupportedActions(let actions):
-            out.writeBytes("vCont;\(actions.map { "\($0.rawValue);" }.joined())".appendedChecksum)
+            out.writeString("vCont;\(actions.map { "\($0.rawValue);" }.joined())".appendedChecksum)
 
         case .raw(let str):
-            out.writeBytes(str.appendedChecksum)
+            out.writeString(str.appendedChecksum)
 
         case .empty:
-            out.writeBytes("".appendedChecksum)
+            out.writeString("".appendedChecksum)
         }
     }
 }
