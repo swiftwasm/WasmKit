@@ -130,18 +130,6 @@ let package = Package(
             ]
         ),
         .testTarget(name: "GDBRemoteProtocolTests", dependencies: ["GDBRemoteProtocol"]),
-
-        .target(
-            name: "WasmKitGDBHandler",
-            dependencies: [
-                .product(name: "_NIOFileSystem", package: "swift-nio"),
-                .product(name: "NIOCore", package: "swift-nio"),
-                .product(name: "SystemPackage", package: "swift-system"),
-                "WasmKit",
-                "WasmKitWASI",
-                "GDBRemoteProtocol",
-            ],
-        ),
     ],
 )
 
@@ -201,6 +189,18 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
                 "GDBRemoteProtocol",
                 "WasmKitGDBHandler",
             ]
+        ),
+
+        .target(
+            name: "WasmKitGDBHandler",
+            dependencies: [
+                .product(name: "_NIOFileSystem", package: "swift-nio"),
+                .product(name: "NIOCore", package: "swift-nio"),
+                .product(name: "SystemPackage", package: "swift-system"),
+                "WasmKit",
+                "WasmKitWASI",
+                "GDBRemoteProtocol",
+            ],
         ),
     ])
 #endif
