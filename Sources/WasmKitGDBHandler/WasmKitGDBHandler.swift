@@ -1,27 +1,61 @@
 import GDBRemoteProtocol
 import Logging
+import NIOCore
+import NIOFileSystem
 import Synchronization
 import SystemPackage
 import WasmKit
+import WasmKitWASI
+
+extension BinaryInteger {
+    init?(hexEncoded: Substring) {
+        var result = Self.zero
+        for (offset, element) in hexEncoded.reversed().enumerated() {
+            guard let digit = element.hexDigitValue else { return nil }
+            result += Self(digit) << (offset * 4)
+        }
+
+        self = result
+    }
+}
 
 package actor WasmKitGDBHandler {
     enum Error: Swift.Error {
         case unknownTransferArguments
+        case unknownReadMemoryArguments
+        case entrypointFunctionNotFound
     }
 
+    private let wasmBinary: ByteBuffer
     private let module: Module
     private let moduleFilePath: FilePath
     private let logger: Logger
     private let debuggerExecution: DebuggerExecution
     private let instance: Instance
+    private let entrypointFunction: Function
+    private let functionsRLE: [(wasmAddress: Int, iSeqAddress: Int)] = []
 
-    package init(logger: Logger, moduleFilePath: FilePath) throws {
+    package init(logger: Logger, moduleFilePath: FilePath) async throws {
         self.logger = logger
-        self.module = try parseWasm(filePath: moduleFilePath)
+
+        self.wasmBinary = try await FileSystem.shared.withFileHandle(forReadingAt: moduleFilePath) {
+            try await $0.readToEnd(maximumSizeAllowed: .unlimited)
+        }
+
+        self.module = try parseWasm(bytes: .init(buffer: self.wasmBinary))
         self.moduleFilePath = moduleFilePath
         let store = Store(engine: Engine())
         self.debuggerExecution = DebuggerExecution(store: store)
-        self.instance = try module.instantiate(store: store)
+
+        var imports = Imports()
+        let wasi = try WASIBridgeToHost()
+        wasi.link(to: &imports, store: store)
+        self.instance = try module.instantiate(store: store, imports: imports)
+
+        guard case .function(let entrypointFunction) = self.instance.exports["_start"] else {
+            throw Error.entrypointFunctionNotFound
+        }
+        self.entrypointFunction = entrypointFunction
     }
 
     package func handle(command: GDBHostCommand) throws -> GDBTargetResponse {
@@ -47,7 +81,7 @@ package actor WasmKitGDBHandler {
             ])
 
         case .supportedFeatures:
-            responseKind = .raw("qXfer:libraries:read+;PacketSize=1000;")
+            responseKind = .string("qXfer:libraries:read+;PacketSize=1000;")
 
         case .vContSupportedActions:
             responseKind = .vContSupportedActions([.continue, .step])
@@ -65,13 +99,13 @@ package actor WasmKitGDBHandler {
             ])
 
         case .currentThreadID:
-            responseKind = .raw("QC1")
+            responseKind = .string("QC1")
 
         case .firstThreadInfo:
-            responseKind = .raw("m1")
+            responseKind = .string("m1")
 
         case .subsequentThreadInfo:
-            responseKind = .raw("l")
+            responseKind = .string("l")
 
         case .targetStatus:
             responseKind = .keyValuePairs([
@@ -93,12 +127,12 @@ package actor WasmKitGDBHandler {
                     "generic": "pc",
                 ])
             } else {
-                responseKind = .raw("E45")
+                responseKind = .string("E45")
             }
 
         case .transfer:
             if command.arguments.starts(with: "libraries:read:") {
-                responseKind = .raw(
+                responseKind = .string(
                     """
                     l<library-list>
                         <library name="\(self.moduleFilePath.string)"><section address="0x4000000000000000"/></library>
@@ -109,7 +143,20 @@ package actor WasmKitGDBHandler {
             }
 
         case .readMemory:
-            responseKind = .empty
+            let argumentsArray = command.arguments.split(separator: ",")
+            guard
+                argumentsArray.count == 2,
+                let address = UInt64(hexEncoded: argumentsArray[0]),
+                var length = Int(hexEncoded: argumentsArray[1])
+            else { throw Error.unknownReadMemoryArguments }
+
+            let binaryOffset = Int(address - 0x4000000000000000)
+
+            if binaryOffset + length > wasmBinary.readableBytes {
+                length = wasmBinary.readableBytes - binaryOffset
+            }
+
+            responseKind = .hexEncodedBinary(wasmBinary.readableBytesView[binaryOffset..<(binaryOffset + length)])
 
         case .wasmCallStack:
             print(self.debuggerExecution.captureBacktrace())
