@@ -4,7 +4,7 @@ import Synchronization
 import SystemPackage
 import WasmKit
 
-package actor WasmKitDebugger {
+package actor WasmKitGDBHandler {
     enum Error: Swift.Error {
         case unknownTransferArguments
     }
@@ -12,11 +12,16 @@ package actor WasmKitDebugger {
     private let module: Module
     private let moduleFilePath: FilePath
     private let logger: Logger
+    private let debuggerExecution: DebuggerExecution
+    private let instance: Instance
 
     package init(logger: Logger, moduleFilePath: FilePath) throws {
         self.logger = logger
         self.module = try parseWasm(filePath: moduleFilePath)
         self.moduleFilePath = moduleFilePath
+        let store = Store(engine: Engine())
+        self.debuggerExecution = DebuggerExecution(store: store)
+        self.instance = try module.instantiate(store: store)
     }
 
     package func handle(command: GDBHostCommand) throws -> GDBTargetResponse {
@@ -106,7 +111,11 @@ package actor WasmKitDebugger {
         case .readMemory:
             responseKind = .empty
 
-        case .wasmCallStack, .generalRegisters:
+        case .wasmCallStack:
+            print(self.debuggerExecution.captureBacktrace())
+            responseKind = .empty
+
+        case .generalRegisters:
             fatalError()
         }
 
