@@ -134,9 +134,11 @@ let package = Package(
         .target(
             name: "WasmKitGDBHandler",
             dependencies: [
+                .product(name: "_NIOFileSystem", package: "swift-nio"),
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "SystemPackage", package: "swift-system"),
                 "WasmKit",
+                "WasmKitWASI",
                 "GDBRemoteProtocol",
             ],
         ),

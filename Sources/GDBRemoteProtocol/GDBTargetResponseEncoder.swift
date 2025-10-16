@@ -30,8 +30,12 @@ package class GDBTargetResponseEncoder: MessageToByteEncoder {
         case .vContSupportedActions(let actions):
             out.writeString("vCont;\(actions.map { "\($0.rawValue);" }.joined())".appendedChecksum)
 
-        case .raw(let str):
+        case .string(let str):
             out.writeString(str.appendedChecksum)
+
+        case .hexEncodedBinary(let binary):
+            let hexDump = ByteBuffer(bytes: binary).hexDump(format: .compact)
+            out.writeString(hexDump.appendedChecksum)
 
         case .empty:
             out.writeString("".appendedChecksum)

@@ -1,3 +1,5 @@
+import NIOCore
+
 /// Actions supported in the `vCont` host command.
 package enum VContActions: String {
     case `continue` = "c"
@@ -13,7 +15,8 @@ package struct GDBTargetResponse {
         case ok
         case keyValuePairs(KeyValuePairs<String, String>)
         case vContSupportedActions([VContActions])
-        case raw(String)
+        case string(String)
+        case hexEncodedBinary(ByteBufferView)
         case empty
     }
 
