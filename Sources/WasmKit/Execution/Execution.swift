@@ -4,7 +4,7 @@ import _CWasmKit
 ///
 /// Each new invocation through exported function has a separate ``Execution``
 /// even though the invocation happens during another invocation.
-struct Execution {
+struct Execution: ~Copyable {
     /// The reference to the ``Store`` associated with the execution.
     let store: StoreRef
     /// The end of the VM stack space.
@@ -13,6 +13,11 @@ struct Execution {
     /// This property must not be assigned to be non-nil more than once.
     /// - Note: If the trap is set, it must be released manually.
     private var trap: (error: UnsafeRawPointer, sp: Sp)? = nil
+
+    package init(store: StoreRef, stackEnd: UnsafeMutablePointer<StackSlot>) {
+        self.store = store
+        self.stackEnd = stackEnd
+    }
 
     /// Executes the given closure with a new execution state associated with
     /// the given ``Store`` instance.
