@@ -11,7 +11,10 @@ struct Backtrace: CustomStringConvertible, Sendable {
         let debuggingAddress: DebuggingAddress
 
         /// Address of the symbol for debugging purposes.
-        enum DebuggingAddress: CustomStringConvertible, @unchecked Sendable {
+        enum DebuggingAddress: CustomStringConvertible,
+            // `Pc` is a pointer, which is not `Sendable` by default.
+            @unchecked Sendable
+        {
             case iseq(Pc)
             case wasm(UInt64)
 
@@ -31,7 +34,7 @@ struct Backtrace: CustomStringConvertible, Sendable {
     var description: String {
         symbols.enumerated().map { (index, symbol) in
             let name = symbol.name ?? "unknown"
-            return "    \(symbol.debuggingAddress): \(name)"
+            return "    \(index): (\(symbol.debuggingAddress)) \(name)"
         }.joined(separator: "\n")
     }
 }
