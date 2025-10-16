@@ -150,7 +150,7 @@ package actor WasmKitGDBHandler {
                 var length = Int(hexEncoded: argumentsArray[1])
             else { throw Error.unknownReadMemoryArguments }
 
-            let binaryOffset = Int(address - 0x4000000000000000)
+            let binaryOffset = Int(address - 0x4000_0000_0000_0000)
 
             if binaryOffset + length > wasmBinary.readableBytes {
                 length = wasmBinary.readableBytes - binaryOffset
