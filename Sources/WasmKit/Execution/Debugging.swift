@@ -10,12 +10,15 @@ package struct DebuggerExecution: ~Copyable {
         self.execution = Execution(store: StoreRef(store), stackEnd: valueStack.advanced(by: limit))
     }
 
+    package func toggleBreakpoint() {
+
+    }
+
     package func captureBacktrace() -> Backtrace {
-            return Execution.captureBacktrace(sp: self.valueStack, store: self.store)
+        return Execution.captureBacktrace(sp: self.valueStack, store: self.store)
     }
 
     deinit {
         valueStack.deallocate()
     }
 }
-
