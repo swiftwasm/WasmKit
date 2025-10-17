@@ -91,7 +91,7 @@ function(add_wasmkit_library name)
   endif()
 
   target_compile_options(${name} PRIVATE
-    $<$<COMPILE_LANGUAGE:Swift>:-color-diagnostics;-package-name;WasmKit>
+    $<$<COMPILE_LANGUAGE:Swift>:-color-diagnostics>
   )
 
   if(LLVM_USE_LINKER)
