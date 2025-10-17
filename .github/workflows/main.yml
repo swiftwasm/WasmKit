@@ -242,7 +242,7 @@ jobs:
   build-cmake:
     runs-on: ubuntu-24.04
     container:
-      image: "swiftlang/swift:nightly-main-noble"
+      image: swift:6.2-noble
     steps:
       - uses: actions/checkout@v4
       - name: Install Ninja
