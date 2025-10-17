@@ -1,3 +1,5 @@
+#if WasmDebuggingSupport
+
 import GDBRemoteProtocol
 import Logging
 import NIOCore
@@ -30,7 +32,7 @@ package actor WasmKitGDBHandler {
     private let module: Module
     private let moduleFilePath: FilePath
     private let logger: Logger
-    private let debuggerExecution: DebuggerExecution
+    private let debugger: Debugger
     private let instance: Instance
     private let entrypointFunction: Function
     private let functionsRLE: [(wasmAddress: Int, iSeqAddress: Int)] = []
@@ -45,7 +47,7 @@ package actor WasmKitGDBHandler {
         self.module = try parseWasm(bytes: .init(buffer: self.wasmBinary))
         self.moduleFilePath = moduleFilePath
         let store = Store(engine: Engine())
-        self.debuggerExecution = DebuggerExecution(store: store)
+        self.debugger = Debugger(store: store)
 
         var imports = Imports()
         let wasi = try WASIBridgeToHost()
@@ -150,7 +152,7 @@ package actor WasmKitGDBHandler {
                 var length = Int(hexEncoded: argumentsArray[1])
             else { throw Error.unknownReadMemoryArguments }
 
-            let binaryOffset = Int(address - 0x4000_0000_0000_0000)
+            let binaryOffset = Int(address - 0x4000000000000000)
 
             if binaryOffset + length > wasmBinary.readableBytes {
                 length = wasmBinary.readableBytes - binaryOffset
@@ -159,7 +161,7 @@ package actor WasmKitGDBHandler {
             responseKind = .hexEncodedBinary(wasmBinary.readableBytesView[binaryOffset..<(binaryOffset + length)])
 
         case .wasmCallStack:
-            print(self.debuggerExecution.captureBacktrace())
+            print(self.debugger.captureBacktrace())
             responseKind = .empty
 
         case .generalRegisters:
@@ -172,3 +174,5 @@ package actor WasmKitGDBHandler {
     }
 
 }
+
+#endif

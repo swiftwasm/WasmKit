@@ -40,6 +40,7 @@ struct Entrypoint: AsyncParsableCommand {
     var wasmModulePath: FilePath
 
     func run() async throws {
+#if WasmDebuggingSupport
         let logger = {
             var result = Logger(label: "org.swiftwasm.WasmKit")
             result.logLevel = self.logLevel
@@ -102,5 +103,8 @@ struct Entrypoint: AsyncParsableCommand {
                 }
             }
         }
+#else
+        fatalError("Build WasmKit with `WasmDebuggingSupport` trait")
+#endif
     }
 }

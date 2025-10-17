@@ -1,4 +1,6 @@
-package struct DebuggerExecution: ~Copyable {
+#if WasmDebuggingSupport
+
+package struct Debugger: ~Copyable {
     let valueStack: Sp
     let execution: Execution
     let store: Store
@@ -22,3 +24,5 @@ package struct DebuggerExecution: ~Copyable {
         valueStack.deallocate()
     }
 }
+
+#endif
