@@ -83,6 +83,8 @@ struct InstanceEntity /* : ~Copyable */ {
     var functionRefs: Set<InternalFunction>
     var features: WasmFeatureSet
     var dataCount: UInt32?
+    var isDebuggable: Bool
+    var iSeqToWasmMapping: [Pc: UInt64]
 
     static var empty: InstanceEntity {
         InstanceEntity(
@@ -96,7 +98,9 @@ struct InstanceEntity /* : ~Copyable */ {
             exports: [:],
             functionRefs: [],
             features: [],
-            dataCount: nil
+            dataCount: nil,
+            isDebuggable: false,
+            iSeqToWasmMapping: [:]
         )
     }
 
