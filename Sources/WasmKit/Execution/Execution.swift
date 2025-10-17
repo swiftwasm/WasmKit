@@ -14,10 +14,12 @@ struct Execution: ~Copyable {
     /// - Note: If the trap is set, it must be released manually.
     private var trap: (error: UnsafeRawPointer, sp: Sp)? = nil
 
+#if WasmDebuggingSupport
     package init(store: StoreRef, stackEnd: UnsafeMutablePointer<StackSlot>) {
         self.store = store
         self.stackEnd = stackEnd
     }
+#endif
 
     /// Executes the given closure with a new execution state associated with
     /// the given ``Store`` instance.
