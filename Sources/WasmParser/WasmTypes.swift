@@ -15,9 +15,9 @@ public struct Code {
     @usableFromInline
     internal let features: WasmFeatureSet
 
-#if WasmDebuggingSupport
-    package var originalAddress: Int { self.offset }
-#endif
+    #if WasmDebuggingSupport
+        package var originalAddress: Int { self.offset }
+    #endif
 
     @inlinable
     init(locals: [ValueType], expression: ArraySlice<UInt8>, offset: Int, features: WasmFeatureSet) {

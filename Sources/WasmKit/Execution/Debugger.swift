@@ -41,14 +41,14 @@
             precondition(function.handle.isWasm)
 
             switch function.handle.wasm.code {
-                case .debuggable(let wasm, _):
-                    return wasm.originalAddress
-                case .uncompiled:
-                    try function.handle.wasm.ensureCompiled(store: StoreRef(self.store))
-                    return try self.originalAddress(function: function)
-                case .compiled:
-                    print(function.handle.wasm.code)
-                    fatalError()
+            case .debuggable(let wasm, _):
+                return wasm.originalAddress
+            case .uncompiled:
+                try function.handle.wasm.ensureCompiled(store: StoreRef(self.store))
+                return try self.originalAddress(function: function)
+            case .compiled:
+                print(function.handle.wasm.code)
+                fatalError()
             }
         }
 

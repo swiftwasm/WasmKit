@@ -1114,11 +1114,11 @@ struct InstructionTranslator: InstructionVisitor {
 
     private mutating func updateInstructionMapping() {
         // This is a hot path, so best to exclude the code altogether if the trait isn't enabled.
-#if WasmDebuggingSupport
-        guard self.module.isDebuggable else { return }
+        #if WasmDebuggingSupport
+            guard self.module.isDebuggable else { return }
 
-        self.iSeqToWasmMapping[self.iseqBuilder.insertingPC.offsetFromHead] = self.binaryOffset
-#endif
+            self.iSeqToWasmMapping[self.iseqBuilder.insertingPC.offsetFromHead] = self.binaryOffset
+        #endif
     }
 
     // MARK: Main entry point
