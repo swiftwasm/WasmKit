@@ -420,7 +420,7 @@ public protocol InstructionVisitor: ~Copyable {
     mutating func visitUnknown(_ opcode: [UInt8]) throws -> Bool
 }
 
-extension InstructionVisitor {
+extension InstructionVisitor where Self: ~Copyable {
     /// Visits an instruction.
     public mutating func visit(_ instruction: Instruction) throws {
         switch instruction {

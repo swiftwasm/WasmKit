@@ -90,7 +90,7 @@ protocol BinaryInstructionDecoder {
 }
 
 @inlinable
-func parseBinaryInstruction(visitor: inout some InstructionVisitor & ~Copyable, decoder: inout some BinaryInstructionDecoder) throws -> Bool {
+func parseBinaryInstruction(visitor: inout some InstructionVisitor, decoder: inout some BinaryInstructionDecoder) throws -> Bool {
     let opcode0 = try decoder.claimNextByte()
     switch opcode0 {
     case 0x00:

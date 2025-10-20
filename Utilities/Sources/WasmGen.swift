@@ -95,7 +95,7 @@ enum WasmGen {
             ///
             /// The visitor pattern is used while parsing WebAssembly expressions to allow for easy extensibility.
             /// See the expression parsing method ``Code/parseExpression(visitor:)``
-            public protocol InstructionVisitor {
+            public protocol InstructionVisitor: ~Copyable {
             """
 
         for instruction in instructions.categorized {
@@ -118,7 +118,7 @@ enum WasmGen {
         code += """
 
 
-            extension InstructionVisitor {
+            extension InstructionVisitor where Self: ~Copyable {
                 /// Visits an instruction.
                 public mutating func visit(_ instruction: Instruction) throws {
                     switch instruction {
@@ -150,7 +150,7 @@ enum WasmGen {
         code += """
 
             // MARK: - Placeholder implementations
-            extension InstructionVisitor {
+            extension InstructionVisitor where Self: ~Copyable {
 
             """
         for instruction in instructions.categorized {
