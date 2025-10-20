@@ -561,7 +561,7 @@ enum WasmGen {
         code += """
 
         @inlinable
-        func parseBinaryInstruction(visitor: inout some InstructionVisitor, decoder: inout some BinaryInstructionDecoder) throws -> Bool {
+        func parseBinaryInstruction(visitor: inout some InstructionVisitor & ~Copyable, decoder: inout some BinaryInstructionDecoder) throws -> Bool {
         """
 
         func renderSwitchCase(_ root: Trie, depth: Int = 0) {
