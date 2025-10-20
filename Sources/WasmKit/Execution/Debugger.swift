@@ -16,7 +16,7 @@
         let functionAddresses: [Int]
         let entrypointFunction: Function
 
-        package init(module: Module, store: Store, imports: Imports) throws(Error) {
+        package init(module: Module, store: Store, imports: Imports) throws {
             let limit = store.engine.configuration.stackSize / MemoryLayout<StackSlot>.stride
             let instance = try module.instantiate(store: store, imports: imports, isDebuggable: true)
 
