@@ -25,16 +25,12 @@
         enum Error: Swift.Error {
             case unknownTransferArguments
             case unknownReadMemoryArguments
-            case entrypointFunctionNotFound
         }
 
         private let wasmBinary: ByteBuffer
-        private let module: Module
         private let moduleFilePath: FilePath
         private let logger: Logger
         private let debugger: Debugger
-        private let instance: Instance
-        private let entrypointFunction: Function
         private let functionsRLE: [(wasmAddress: Int, iSeqAddress: Int)] = []
 
         package init(logger: Logger, moduleFilePath: FilePath) async throws {
@@ -44,20 +40,15 @@
                 try await $0.readToEnd(maximumSizeAllowed: .unlimited)
             }
 
-            self.module = try parseWasm(bytes: .init(buffer: self.wasmBinary))
             self.moduleFilePath = moduleFilePath
-            let store = Store(engine: Engine())
-            self.debugger = Debugger(store: store)
 
+            let store = Store(engine: Engine())
             var imports = Imports()
             let wasi = try WASIBridgeToHost()
             wasi.link(to: &imports, store: store)
-            self.instance = try module.instantiate(store: store, imports: imports)
 
-            guard case .function(let entrypointFunction) = self.instance.exports["_start"] else {
-                throw Error.entrypointFunctionNotFound
-            }
-            self.entrypointFunction = entrypointFunction
+            self.debugger = try Debugger(module: parseWasm(bytes: .init(buffer: self.wasmBinary)), store: store, imports: imports)
+            try self.debugger.stopAtEntrypoint()
         }
 
         package func handle(command: GDBHostCommand) throws -> GDBTargetResponse {

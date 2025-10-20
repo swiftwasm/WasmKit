@@ -6,6 +6,9 @@ import WasmTypes
 
 @usableFromInline
 protocol BinaryInstructionDecoder {
+    /// Current offset in the decoded Wasm binary.
+    var offset: Int { get }
+
     /// Claim the next byte to be decoded
     @inlinable func claimNextByte() throws -> UInt8
 
@@ -91,6 +94,8 @@ protocol BinaryInstructionDecoder {
 
 @inlinable
 func parseBinaryInstruction(visitor: inout some InstructionVisitor, decoder: inout some BinaryInstructionDecoder) throws -> Bool {
+    visitor.binaryOffset = decoder.offset
+
     let opcode0 = try decoder.claimNextByte()
     switch opcode0 {
     case 0x00:

@@ -84,7 +84,7 @@ struct InstanceEntity /* : ~Copyable */ {
     var features: WasmFeatureSet
     var dataCount: UInt32?
     var isDebuggable: Bool
-    var iSeqToWasmMapping: [Pc: UInt64]
+    var iSeqToWasmMapping: [Pc: Int]
 
     static var empty: InstanceEntity {
         InstanceEntity(

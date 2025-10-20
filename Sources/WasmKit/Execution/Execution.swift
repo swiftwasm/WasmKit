@@ -69,13 +69,14 @@ struct Execution: ~Copyable {
     static func captureBacktrace(sp: Sp, store: Store) -> Backtrace {
         var frames = FrameIterator(sp: sp)
         var symbols: [Backtrace.Symbol] = []
+
         while let frame = frames.next() {
             guard let function = frame.function else {
-                symbols.append(.init(name: nil, debuggingAddress: .iseq(frame.pc)))
+                symbols.append(.init(name: nil, address: frame.pc))
                 continue
             }
             let symbolName = store.nameRegistry.symbolicate(.wasm(function))
-            symbols.append(.init(name: symbolName, debuggingAddress: .iseq(frame.pc)))
+            symbols.append(.init(name: symbolName, address: frame.pc))
         }
         return Backtrace(symbols: symbols)
     }
@@ -251,7 +252,7 @@ extension Sp {
         nonmutating set { self[-1] = UInt64(UInt(bitPattern: newValue)) }
     }
 
-    fileprivate var currentInstance: InternalInstance? {
+    var currentInstance: InternalInstance? {
         currentFunction?.instance
     }
 }

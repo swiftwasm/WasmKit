@@ -5,26 +5,10 @@ import struct WasmParser.Import
 /// The backtrace of the trap.
 struct Backtrace: CustomStringConvertible, Sendable {
     /// A symbol in the backtrace.
-    struct Symbol {
+    struct Symbol: @unchecked Sendable {
         /// The name of the symbol.
         let name: String?
-        let debuggingAddress: DebuggingAddress
-
-        /// Address of the symbol for debugging purposes.
-        enum DebuggingAddress: CustomStringConvertible,
-            // `Pc` is a pointer, which is not `Sendable` by default.
-            @unchecked Sendable
-        {
-            case iseq(Pc)
-            case wasm(UInt64)
-
-            var description: String {
-                switch self {
-                case .iseq(let pc): "iseq(\(Int(bitPattern: pc)))"
-                case .wasm(let wasmAddress): "wasm(\(wasmAddress))"
-                }
-            }
-        }
+        let address: Pc
     }
 
     /// The symbols in the backtrace.
@@ -35,7 +19,7 @@ struct Backtrace: CustomStringConvertible, Sendable {
         print("backtrace contains \(symbols.count) symbols")
         return symbols.enumerated().map { (index, symbol) in
             let name = symbol.name ?? "unknown"
-            return "    \(index): (\(symbol.debuggingAddress)) \(name)"
+            return "    \(index): (\(symbol.address)) \(name)"
         }.joined(separator: "\n")
     }
 }
