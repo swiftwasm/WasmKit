@@ -33,11 +33,11 @@
             self.execution = Execution(store: StoreRef(store), stackEnd: valueStack.advanced(by: limit))
         }
 
-        package mutating func stopAtEntrypoint() throws(Error) {
+        package mutating func stopAtEntrypoint() throws {
             try self.toggleBreakpoint(address: self.originalAddress(function: entrypointFunction))
         }
 
-        package func originalAddress(function: Function) throws(Error) -> Int {
+        package func originalAddress(function: Function) throws -> Int {
             precondition(function.handle.isWasm)
 
             switch function.handle.wasm.code {
@@ -52,7 +52,7 @@
             }
         }
 
-        package mutating func toggleBreakpoint(address: Int) throws(Error) {
+        package mutating func toggleBreakpoint(address: Int) throws {
             print("attempt to toggle a breakpoint at \(address)")
         }
 
