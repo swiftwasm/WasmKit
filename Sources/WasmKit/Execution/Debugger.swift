@@ -16,8 +16,14 @@
 
         }
 
-        package func captureBacktrace() -> Backtrace {
-            return Execution.captureBacktrace(sp: self.valueStack, store: self.store)
+        /// Array of addresses in the Wasm binary of executed instructions on the call stack.
+        package var currentCallStack: [UInt64] {
+            return Execution.captureBacktrace(sp: self.valueStack, store: self.store).symbols.map {
+                switch $0.debuggingAddress {
+                    case .iseq: fatalError()
+                    case .wasm(let pc): return pc
+                }
+            }
         }
 
         deinit {

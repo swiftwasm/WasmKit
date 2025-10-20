@@ -3,9 +3,9 @@ import WasmTypes
 import struct WasmParser.Import
 
 /// The backtrace of the trap.
-package struct Backtrace: CustomStringConvertible, Sendable {
+struct Backtrace: CustomStringConvertible, Sendable {
     /// A symbol in the backtrace.
-    package struct Symbol {
+    struct Symbol {
         /// The name of the symbol.
         let name: String?
         let debuggingAddress: DebuggingAddress
@@ -31,7 +31,7 @@ package struct Backtrace: CustomStringConvertible, Sendable {
     let symbols: [Symbol]
 
     /// Textual description of the backtrace.
-    package var description: String {
+    var description: String {
         print("backtrace contains \(symbols.count) symbols")
         return symbols.enumerated().map { (index, symbol) in
             let name = symbol.name ?? "unknown"
