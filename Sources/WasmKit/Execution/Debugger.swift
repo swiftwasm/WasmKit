@@ -33,7 +33,7 @@
             self.execution = Execution(store: StoreRef(store), stackEnd: valueStack.advanced(by: limit))
         }
 
-        package func stopAtEntrypoint() throws(Error) {
+        package mutating func stopAtEntrypoint() throws(Error) {
             try self.toggleBreakpoint(address: self.originalAddress(function: entrypointFunction))
         }
 
