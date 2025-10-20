@@ -20,8 +20,8 @@
         package var currentCallStack: [UInt64] {
             return Execution.captureBacktrace(sp: self.valueStack, store: self.store).symbols.map {
                 switch $0.debuggingAddress {
-                    case .iseq: fatalError()
-                    case .wasm(let pc): return pc
+                case .iseq: fatalError()
+                case .wasm(let pc): return pc
                 }
             }
         }
