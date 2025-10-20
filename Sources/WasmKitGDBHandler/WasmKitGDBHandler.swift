@@ -30,7 +30,7 @@
         private let wasmBinary: ByteBuffer
         private let moduleFilePath: FilePath
         private let logger: Logger
-        private let debugger: Debugger
+        private var debugger: Debugger
         private let functionsRLE: [(wasmAddress: Int, iSeqAddress: Int)] = []
 
         package init(logger: Logger, moduleFilePath: FilePath) async throws {
