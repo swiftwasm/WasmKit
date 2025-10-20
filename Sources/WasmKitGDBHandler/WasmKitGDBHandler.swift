@@ -161,7 +161,7 @@
                 responseKind = .hexEncodedBinary(wasmBinary.readableBytesView[binaryOffset..<(binaryOffset + length)])
 
             case .wasmCallStack:
-                print(self.debugger.captureBacktrace())
+                print(self.debugger.currentCallStack)
                 responseKind = .empty
 
             case .generalRegisters:
