@@ -10,6 +10,22 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  check-autogen-diff:
+    runs-on: ubuntu-latest
+    container:
+      image: swift:6.2-noble
+    steps:
+      - uses: actions/checkout@v4
+      - name: Re-generate auto-generated code checks
+        run: |
+          swift run -q --package-path Utilities WasmKitDevUtils
+      - name: Check for changes
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git diff --exit-code || {
+            echo "::error::The auto-generated code utilities changed some files. Please see \`Utilities/README.md\`, re-run the tools, and commit the changes."
+            exit 1
+          }
   build-macos:
     strategy:
       matrix:
