@@ -16,17 +16,16 @@ jobs:
       image: swift:6.2-noble
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-      - name: Run auto-generated code checks
+      - name: Re-generate auto-generated code checks
         run: |
-          swift run -q --package-path Utilities WasmKitDevUtils wasmgen >> wasmgen.txt
-          swift run -q --package-path Utilities WasmKitDevUtils vmgen >> vmgen.txt
-          cat wasmgen.txt
-          cat vmgen.txt
-          test -s wasmgen.txt && echo '⚠️ Uncommitted changes made by `WasmKitDevUtils wasmgen`' && exit 1
-          test -s vmgen.txt && echo '⚠️ Uncommitted changes made by `WasmKitDevUtils vmgen`' && exit 1
-
+          swift run -q --package-path Utilities WasmKitDevUtils
+      - name: Check for changes
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git diff --exit-code || {
+            echo "::error::The auto-generated code utilities changed some files. Please see \`Utilities/README.md\`, re-run the tools, and commit the changes."
+            exit 1
+          }
   build-macos:
     strategy:
       matrix:
