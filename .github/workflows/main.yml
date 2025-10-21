@@ -10,6 +10,19 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  check-codegen-diff:
+    runs-on: ubuntu-latest
+    name: "Verify auto-generated code is committed"
+    container:
+      image: swift:6.2-noble
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run auto-generated code checks
+        run: |
+          swift run --package-path Utilities WasmKitDevUtils wasmgen
+          swift run --package-path Utilities WasmKitDevUtils vmgen
+          [ $(git diff | wc -l) == 0 ] || exit 1
+
   build-macos:
     strategy:
       matrix:
