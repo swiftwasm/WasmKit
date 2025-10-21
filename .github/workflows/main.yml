@@ -21,8 +21,12 @@ jobs:
       - name: Run auto-generated code checks
         shell: bash
         run: |
-          test $(swift run -q --package-path Utilities WasmKitDevUtils wasmgen | wc -l) = "0"
-          test $(swift run -q --package-path Utilities WasmKitDevUtils vmgen | wc -l) = "0"
+          swift run -q --package-path Utilities WasmKitDevUtils wasmgen >> wasmgen.txt
+          swift run -q --package-path Utilities WasmKitDevUtils vmgen >> vmgen.txt
+          cat wasmgen.txt
+          cat vmgen.txt
+          test -s wasmgen.txt && exit 1
+          test -s vmgen.txt && exit 1
 
   build-macos:
     strategy:
