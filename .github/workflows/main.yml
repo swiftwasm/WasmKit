@@ -20,9 +20,8 @@ jobs:
           fetch-depth: 2
       - name: Run auto-generated code checks
         run: |
-          swift run --package-path Utilities WasmKitDevUtils wasmgen
-          swift run --package-path Utilities WasmKitDevUtils vmgen
-          [ $(git diff | wc -l) == 0 ] || exit 1
+          [[ $(swift run -q --package-path Utilities WasmKitDevUtils wasmgen | wc -l) == 0 ]] || exit 1
+          [[ $(swift run --package-path Utilities WasmKitDevUtils vmgen | wc -l) == 0 ]] || exit 1
 
   build-macos:
     strategy:
