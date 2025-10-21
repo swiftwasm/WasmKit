@@ -310,7 +310,7 @@ extension AnyInstructionVisitor {
 /// The visitor pattern is used while parsing WebAssembly expressions to allow for easy extensibility.
 /// See the expression parsing method ``Code/parseExpression(visitor:)``
 public protocol InstructionVisitor {
-    /// Current offset in the original Wasm binary.
+    /// Current offset in visitor's instruction stream.
     var binaryOffset: Int { get set }
 
     /// Visiting `unreachable` instruction.

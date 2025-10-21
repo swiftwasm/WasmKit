@@ -540,9 +540,6 @@ enum WasmGen {
             /// Claim the next byte to be decoded
             @inlinable func claimNextByte() throws -> UInt8
 
-            /// Current offset in decoder's instruction stream.
-            var currentOffset: Int { get }
-
             /// Throw an error due to unknown opcode.
             func throwUnknown(_ opcode: [UInt8]) throws -> Never
 
