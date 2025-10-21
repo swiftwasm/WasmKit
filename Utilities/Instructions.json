@@ -216,6 +216,5 @@
   ["threads"             , "i32.atomic.store16"       , ["0xFE", "0x1A"], [["memarg", "MemArg"]]                             , "store"     ],
   ["threads"             , "i64.atomic.store8"        , ["0xFE", "0x1B"], [["memarg", "MemArg"]]                             , "store"     ],
   ["threads"             , "i64.atomic.store16"       , ["0xFE", "0x1C"], [["memarg", "MemArg"]]                             , "store"     ],
-  ["threads"             , "i64.atomic.store32"       , ["0xFE", "0x1D"], [["memarg", "MemArg"]]                             , "store"     ],
-  ["threads"             , "i32.atomic.rmw.add"       , ["0xFE", "0x1E"], []                             , "binary"     ]
+  ["threads"             , "i64.atomic.store32"       , ["0xFE", "0x1D"], [["memarg", "MemArg"]]                             , "store"     ]
 ]
