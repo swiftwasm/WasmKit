@@ -25,8 +25,8 @@ jobs:
           swift run -q --package-path Utilities WasmKitDevUtils vmgen >> vmgen.txt
           cat wasmgen.txt
           cat vmgen.txt
-          test -s wasmgen.txt && exit 1
-          test -s vmgen.txt && exit 1
+          test -s wasmgen.txt && echo "Uncommitted changes made by `WasmKitDevUtils wasmgen`" && exit 1
+          test -s vmgen.txt && echo "Uncommitted changes made by `WasmKitDevUtils vmgen`" && exit 1
 
   build-macos:
     strategy:
