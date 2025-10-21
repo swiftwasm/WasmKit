@@ -16,9 +16,6 @@
         /// Instance of parsed Wasm ``module``.
         private let instance: Instance
 
-        /// Addresses of each function in the code section of ``module``
-        private let functionAddresses: [FunctionAddress]
-
         /// Reference to the entrypoint function of the currently debugged module, for use in ``stopAtEntrypoint``.
         private let entrypointFunction: Function
 
@@ -37,7 +34,6 @@
 
             self.instance = instance
             self.module = module
-            self.functionAddresses = module.functions.map { $0.code.originalAddress }
             self.entrypointFunction = entrypointFunction
             self.valueStack = UnsafeMutablePointer<StackSlot>.allocate(capacity: limit)
             self.store = store
