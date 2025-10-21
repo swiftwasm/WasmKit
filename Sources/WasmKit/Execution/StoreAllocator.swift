@@ -453,7 +453,8 @@ extension StoreAllocator {
             features: module.features,
             dataCount: module.dataCount,
             isDebuggable: isDebuggable,
-            iSeqToWasmMapping: [:]
+            iseqToWasmMapping: [:],
+            wasmToIseqMapping: [:]
         )
         instancePointer.initialize(to: instanceEntity)
         instanceInitialized = true

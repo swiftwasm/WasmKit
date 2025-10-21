@@ -830,8 +830,10 @@ struct InstructionTranslator: InstructionVisitor {
     /// Current offset to an instruction in the original Wasm binary processed by this translator.
     var binaryOffset: Int = 0
 
-    /// Mapping from `self.iseqBuilder.instructions` to Wasm instructions
-    var iSeqToWasmMapping = [Int: Int]()
+    /// Mapping from `self.iseqBuilder.instructions` to Wasm instructions.
+    /// As mapping between iSeq to Wasm is many:many, but we only care about first mapping for overlapping address,
+    /// we need to iterate on it in the order the mappings were stored to ensure we don't overwrite the frist mapping.
+    var iseqToWasmMapping = [(iseq: Int, wasm: Int)]()
 
     init(
         allocator: ISeqAllocator,
@@ -1098,9 +1100,16 @@ struct InstructionTranslator: InstructionVisitor {
         let initializedElementsIndex = buffer.initialize(fromContentsOf: instructions)
         assert(initializedElementsIndex == instructions.endIndex)
 
-        for (iseq, wasm) in self.iSeqToWasmMapping {
+        for (iseq, wasm) in self.iseqToWasmMapping {
             self.module.withValue {
-                $0.iSeqToWasmMapping[iseq + buffer.baseAddress.unsafelyUnwrapped] = wasm
+                let absoluteISeq = iseq + buffer.baseAddress.unsafelyUnwrapped
+                // Don't override the existing mapping, only store a new pair if there's no mapping for a given key.
+                if $0.iseqToWasmMapping[absoluteISeq] == nil {
+                    $0.iseqToWasmMapping[absoluteISeq] = wasm
+                }
+                if $0.wasmToIseqMapping[wasm] == nil {
+                    $0.wasmToIseqMapping[wasm] = absoluteISeq
+                }
             }
         }
 
@@ -1117,7 +1126,7 @@ struct InstructionTranslator: InstructionVisitor {
         #if WasmDebuggingSupport
             guard self.module.isDebuggable else { return }
 
-            self.iSeqToWasmMapping[self.iseqBuilder.insertingPC.offsetFromHead] = self.binaryOffset
+            self.iseqToWasmMapping.append((self.iseqBuilder.insertingPC.offsetFromHead, self.binaryOffset))
         #endif
     }
 

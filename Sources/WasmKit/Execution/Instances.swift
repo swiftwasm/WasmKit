@@ -84,7 +84,14 @@ struct InstanceEntity /* : ~Copyable */ {
     var features: WasmFeatureSet
     var dataCount: UInt32?
     var isDebuggable: Bool
-    var iSeqToWasmMapping: [Pc: Int]
+
+    /// Mapping from iSeq Pc to instruction addresses in the original binary.
+    /// Used for handling current call stack requests issued by a ``Debugger`` instance.
+    var iseqToWasmMapping: [Pc: Int]
+
+    /// Mapping from Wasm instruction addresses in the original binary to iSeq instruction addresses.
+    /// Used for handling breakpoint requests issued by a ``Debugger`` instance.
+    var wasmToIseqMapping: [Int: Pc]
 
     static var empty: InstanceEntity {
         InstanceEntity(
@@ -100,7 +107,8 @@ struct InstanceEntity /* : ~Copyable */ {
             features: [],
             dataCount: nil,
             isDebuggable: false,
-            iSeqToWasmMapping: [:]
+            iseqToWasmMapping: [:],
+            wasmToIseqMapping: [:]
         )
     }
 
