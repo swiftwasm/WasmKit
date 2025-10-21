@@ -19,7 +19,6 @@ jobs:
         with:
           fetch-depth: 2
       - name: Run auto-generated code checks
-        shell: bash
         run: |
           swift run -q --package-path Utilities WasmKitDevUtils wasmgen >> wasmgen.txt
           swift run -q --package-path Utilities WasmKitDevUtils vmgen >> vmgen.txt
