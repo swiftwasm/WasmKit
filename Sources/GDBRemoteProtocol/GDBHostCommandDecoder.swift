@@ -68,8 +68,17 @@ package struct GDBHostCommandDecoder: ByteToMessageDecoder {
     package var accummulatedChecksum: UInt8 {
         UInt8(self.accummulatedSum % 256)
     }
-
+    
+    /// Whether `QStartNoAckMode` command was sent. Note that this is separate
+    /// from ``isNoAckModeActive``. This mode is "activated" for the subsequent
+    /// host command, which is when `isNoAckModeActive` is set by the decoder to
+    /// `false`, but not for the immediate response.
+    /// See https://sourceware.org/gdb/current/onlinedocs/gdb.html/Packet-Acknowledgment.html#Packet-Acknowledgment
     private var isNoAckModeRequested = false
+
+    /// Whether `QStartNoAckMode` command was sent and this mode has been
+    /// subsequently activated.
+    /// See https://sourceware.org/gdb/current/onlinedocs/gdb.html/Packet-Acknowledgment.html#Packet-Acknowledgment
     private var isNoAckModeActive = false
 
     package mutating func decode(
