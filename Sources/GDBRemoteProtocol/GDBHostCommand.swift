@@ -1,3 +1,17 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2025 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+/// A command sent from a debugger host (GDB or LLDB) to a debugger target (a device
+/// or a virtual machine being debugged).
 /// See GDB and LLDB remote protocol documentation for more details:
 /// * https://sourceware.org/gdb/current/onlinedocs/gdb.html/General-Query-Packets.html
 /// * https://lldb.llvm.org/resources/lldbgdbremote.html
@@ -31,6 +45,7 @@ package struct GDBHostCommand: Equatable {
 
         case generalRegisters
 
+        /// Decodes kind of a command from a raw string sent from a host.
         package init?(rawValue: String) {
             switch rawValue {
             case "g":
@@ -74,8 +89,10 @@ package struct GDBHostCommand: Equatable {
         }
     }
 
+    /// The kind of a host command for the target to act upon.
     package let kind: Kind
 
+    /// Arguments supplied with a host command.
     package let arguments: String
 
     package init(kindString: String, arguments: String) throws {
@@ -106,6 +123,7 @@ package struct GDBHostCommand: Equatable {
         self.arguments = arguments
     }
 
+    /// Memberwise initializer of `GDBHostCommand` type.
     package init(kind: Kind, arguments: String) {
         self.kind = kind
         self.arguments = arguments
