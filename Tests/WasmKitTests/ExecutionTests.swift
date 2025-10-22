@@ -1,5 +1,5 @@
-import WAT
 import Testing
+import WAT
 
 @testable import WasmKit
 
