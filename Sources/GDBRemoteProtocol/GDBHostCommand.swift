@@ -90,7 +90,7 @@ package struct GDBHostCommand: Equatable {
 
     /// Arguments supplied with a host command.
     package let arguments: String
-    
+
     /// Initialize a host command from raw strings sent from a host.
     /// - Parameters:
     ///   - kindString: raw ``String`` that denotes kind of the command.

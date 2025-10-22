@@ -63,15 +63,15 @@ package struct GDBHostCommandDecoder: ByteToMessageDecoder {
 
     private var accummulatedKind = [UInt8]()
     private var accummulatedArguments = [UInt8]()
-    
+
     /// Logger instance used by this decoder.
     private let logger: Logger
-    
+
     /// Initializes a new decoder.
     /// - Parameter logger: logger instance that consumes messages from the newly
     /// initialized decoder.
     package init(logger: Logger) { self.logger = logger }
-    
+
     /// Sum of the raw character values consumed in the current command so far,
     /// used in checksum computation.
     private var accummulatedSum = 0
@@ -80,7 +80,7 @@ package struct GDBHostCommandDecoder: ByteToMessageDecoder {
     package var accummulatedChecksum: UInt8 {
         UInt8(self.accummulatedSum % 256)
     }
-    
+
     /// Whether `QStartNoAckMode` command was sent. Note that this is separate
     /// from ``isNoAckModeActive``. This mode is "activated" for the subsequent
     /// host command, which is when `isNoAckModeActive` is set by the decoder to
