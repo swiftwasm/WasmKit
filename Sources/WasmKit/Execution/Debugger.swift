@@ -1,7 +1,7 @@
 #if WasmDebuggingSupport
 
     package struct Debugger: ~Copyable {
-        enum Error: Swift.Error {
+        package enum Error: Swift.Error {
             case entrypointFunctionNotFound
             case noInstructionMappingAvailable(Int)
         }
@@ -59,8 +59,9 @@
             }
         }
 
-        package mutating func enableBreakpoint(address: Int) throws {
+        package mutating func enableBreakpoint(address: Int) throws(Error) {
             print("attempt to toggle a breakpoint at \(address)")
+            print("available mapping: \(self.instance.handle.wasmToIseqMapping)")
 
             guard self.breakpoints[address] == nil else {
                 print("breakpoint at \(address) already enabled")
@@ -74,7 +75,7 @@
             iseq.pointee = Instruction.breakpoint.headSlot(threadingModel: self.threadingModel)
         }
 
-        package mutating func disableBreakpoint(address: Int) throws {
+        package mutating func disableBreakpoint(address: Int) throws(Error) {
             print("attempt to toggle a breakpoint at \(address)")
 
             guard let oldCodeSlot = self.breakpoints[address] else {
@@ -85,11 +86,12 @@
             guard let iseq = self.instance.handle.wasmToIseqMapping[address] else {
                 throw Error.noInstructionMappingAvailable(address)
             }
-            iseq.pointee = oldCodeSlot
             self.breakpoints[address] = nil
+            iseq.pointee = oldCodeSlot
         }
 
-        mutating func enableBreakpoint(functionIndex: FunctionIndex, offset: Int) {
+        package func run() throws {
+            try self.entrypointFunction()
         }
 
         /// Array of addresses in the Wasm binary of executed instructions on the call stack.

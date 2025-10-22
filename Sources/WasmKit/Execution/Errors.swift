@@ -16,8 +16,7 @@ struct Backtrace: CustomStringConvertible, Sendable {
 
     /// Textual description of the backtrace.
     var description: String {
-        print("backtrace contains \(symbols.count) symbols")
-        return symbols.enumerated().map { (index, symbol) in
+        symbols.enumerated().map { (index, symbol) in
             let name = symbol.name ?? "unknown"
             return "    \(index): (\(symbol.address)) \(name)"
         }.joined(separator: "\n")
