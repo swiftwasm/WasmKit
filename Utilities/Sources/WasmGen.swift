@@ -96,9 +96,6 @@ enum WasmGen {
             /// The visitor pattern is used while parsing WebAssembly expressions to allow for easy extensibility.
             /// See the expression parsing method ``Code/parseExpression(visitor:)``
             public protocol InstructionVisitor {
-                /// Current offset in visitor's instruction stream.
-                var binaryOffset: Int { get set }
-
             """
 
         for instruction in instructions.categorized {
@@ -534,9 +531,6 @@ enum WasmGen {
 
         @usableFromInline
         protocol BinaryInstructionDecoder {
-            /// Current offset in the decoded Wasm binary.
-            var offset: Int { get }
-
             /// Claim the next byte to be decoded
             @inlinable func claimNextByte() throws -> UInt8
 
@@ -568,7 +562,6 @@ enum WasmGen {
 
         @inlinable
         func parseBinaryInstruction(visitor: inout some InstructionVisitor, decoder: inout some BinaryInstructionDecoder) throws -> Bool {
-            visitor.binaryOffset = decoder.offset
         """
 
         func renderSwitchCase(_ root: Trie, depth: Int = 0) {

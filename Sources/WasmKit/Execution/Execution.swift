@@ -4,7 +4,7 @@ import _CWasmKit
 ///
 /// Each new invocation through exported function has a separate ``Execution``
 /// even though the invocation happens during another invocation.
-struct Execution: ~Copyable {
+struct Execution {
     /// The reference to the ``Store`` associated with the execution.
     let store: StoreRef
     /// The end of the VM stack space.
@@ -13,13 +13,6 @@ struct Execution: ~Copyable {
     /// This property must not be assigned to be non-nil more than once.
     /// - Note: If the trap is set, it must be released manually.
     private var trap: (error: UnsafeRawPointer, sp: Sp)? = nil
-
-    #if WasmDebuggingSupport
-        package init(store: StoreRef, stackEnd: UnsafeMutablePointer<StackSlot>) {
-            self.store = store
-            self.stackEnd = stackEnd
-        }
-    #endif
 
     /// Executes the given closure with a new execution state associated with
     /// the given ``Store`` instance.
@@ -68,15 +61,18 @@ struct Execution: ~Copyable {
 
     static func captureBacktrace(sp: Sp, store: Store) -> Backtrace {
         var frames = FrameIterator(sp: sp)
-        var symbols: [Backtrace.Symbol] = []
-
+        var symbols: [Backtrace.Symbol?] = []
         while let frame = frames.next() {
             guard let function = frame.function else {
-                symbols.append(.init(name: nil, address: frame.pc))
+                symbols.append(nil)
                 continue
             }
             let symbolName = store.nameRegistry.symbolicate(.wasm(function))
-            symbols.append(.init(name: symbolName, address: frame.pc))
+            symbols.append(
+                Backtrace.Symbol(
+                    name: symbolName
+                )
+            )
         }
         return Backtrace(symbols: symbols)
     }
@@ -252,7 +248,7 @@ extension Sp {
         nonmutating set { self[-1] = UInt64(UInt(bitPattern: newValue)) }
     }
 
-    var currentInstance: InternalInstance? {
+    fileprivate var currentInstance: InternalInstance? {
         currentFunction?.instance
     }
 }

@@ -5,21 +5,19 @@ import struct WasmParser.Import
 /// The backtrace of the trap.
 struct Backtrace: CustomStringConvertible, Sendable {
     /// A symbol in the backtrace.
-    struct Symbol: @unchecked Sendable {
+    struct Symbol {
         /// The name of the symbol.
         let name: String?
-        let address: Pc
     }
 
     /// The symbols in the backtrace.
-    let symbols: [Symbol]
+    let symbols: [Symbol?]
 
     /// Textual description of the backtrace.
     var description: String {
-        print("backtrace contains \(symbols.count) symbols")
-        return symbols.enumerated().map { (index, symbol) in
-            let name = symbol.name ?? "unknown"
-            return "    \(index): (\(symbol.address)) \(name)"
+        symbols.enumerated().map { (index, symbol) in
+            let name = symbol?.name ?? "unknown"
+            return "    \(index): \(name)"
         }.joined(separator: "\n")
     }
 }

@@ -243,7 +243,7 @@ struct WasmFunctionEntity {
         switch code {
         case .uncompiled(let code):
             return try compile(store: store, code: code)
-        case .compiled(let iseq), .debuggable(_, let iseq):
+        case .compiled(let iseq), .compiledAndPatchable(_, let iseq):
             return iseq
         }
     }
@@ -280,14 +280,10 @@ extension EntityHandle<WasmFunctionEntity> {
         case .uncompiled(let code):
             return try self.withValue {
                 let iseq = try $0.compile(store: store, code: code)
-                if $0.instance.isDebuggable {
-                    $0.code = .debuggable(code, iseq)
-                } else {
-                    $0.code = .compiled(iseq)
-                }
+                $0.code = .compiled(iseq)
                 return iseq
             }
-        case .compiled(let iseq), .debuggable(_, let iseq):
+        case .compiled(let iseq), .compiledAndPatchable(_, let iseq):
             return iseq
         }
     }
@@ -320,7 +316,7 @@ struct InstructionSequence {
 enum CodeBody {
     case uncompiled(InternalUncompiledCode)
     case compiled(InstructionSequence)
-    case debuggable(InternalUncompiledCode, InstructionSequence)
+    case compiledAndPatchable(InternalUncompiledCode, InstructionSequence)
 }
 
 extension Reference {
