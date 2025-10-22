@@ -1,7 +1,7 @@
-import WasmKit
-import WasmKitFuzzing
 import Foundation
 import Testing
+import WasmKit
+import WasmKitFuzzing
 
 @Suite
 struct FuzzTranslatorRegressionTests {
@@ -37,4 +37,3 @@ struct FuzzTranslatorRegressionTests {
         }
     #endif
 }
-

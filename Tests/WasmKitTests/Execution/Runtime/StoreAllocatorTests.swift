@@ -1,6 +1,6 @@
+import Testing
 import WAT
 import WasmParser
-import Testing
 
 @testable import WasmKit
 
@@ -48,4 +48,3 @@ struct StoreAllocatorTests {
         #expect(weakAllocator == nil)
     }
 }
-

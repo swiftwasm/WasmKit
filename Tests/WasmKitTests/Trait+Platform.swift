@@ -26,4 +26,3 @@ extension Trait where Self == ConditionTrait {
         }
     }
 }
-

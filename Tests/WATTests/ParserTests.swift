@@ -1,5 +1,5 @@
-import Testing
 import Foundation
+import Testing
 import WasmParser
 
 @testable import WAT
@@ -193,4 +193,3 @@ struct ParserTests {
         _ = try parseWast(source, features: Spectest.deriveFeatureSet(wast: wastFile))
     }
 }
-
