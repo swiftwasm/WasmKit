@@ -158,6 +158,7 @@ extension TableType: WasmEncodable {
 struct ElementExprCollector: AnyInstructionVisitor {
     typealias Output = Void
 
+    var binaryOffset: Int = 0
     var isAllRefFunc: Bool = true
     var instructions: [Instruction] = []
 
@@ -443,6 +444,7 @@ extension WatParser.DataSegmentDecl {
 }
 
 struct ExpressionEncoder: BinaryInstructionEncoder {
+    var binaryOffset: Int = 0
     var encoder = Encoder()
     var hasDataSegmentInstruction: Bool = false
 

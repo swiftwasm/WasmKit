@@ -138,9 +138,23 @@ public struct Module {
         Instance(handle: try self.instantiateHandle(store: store, imports: imports), store: store)
     }
 
+    #if WasmDebuggingSupport
+        /// Instantiate this module in the given imports.
+        ///
+        /// - Parameters:
+        ///   - store: The ``Store`` to allocate the instance in.
+        ///   - imports: The imports to use for instantiation. All imported entities
+        ///     must be allocated in the given store.
+        ///   - isDebuggable: Whether the module should support debugging actions
+        ///     (breakpoints etc) after instantiation.
+        public func instantiate(store: Store, imports: Imports = [:], isDebuggable: Bool) throws -> Instance {
+            Instance(handle: try self.instantiateHandle(store: store, imports: imports, isDebuggable: isDebuggable), store: store)
+        }
+    #endif
+
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#instantiation>
-    private func instantiateHandle(store: Store, imports: Imports) throws -> InternalInstance {
+    private func instantiateHandle(store: Store, imports: Imports, isDebuggable: Bool = false) throws -> InternalInstance {
         try ModuleValidator(module: self).validate()
 
         // Steps 5-8.
@@ -152,7 +166,8 @@ public struct Module {
         let instance = try store.allocator.allocate(
             module: self, engine: store.engine,
             resourceLimiter: store.resourceLimiter,
-            imports: imports
+            imports: imports,
+            isDebuggable: isDebuggable
         )
 
         if let nameSection = customSections.first(where: { $0.name == "name" }) {
