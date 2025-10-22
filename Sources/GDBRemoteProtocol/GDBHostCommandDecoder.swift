@@ -2,36 +2,69 @@ import Logging
 import NIOCore
 
 extension ByteBuffer {
+    /// Returns `true` if byte to be read immediately is a GDB RP checksum
+    /// delimiter. Returns `false` otherwise.
     var isChecksumDelimiterAtReader: Bool {
         self.peekInteger(as: UInt8.self) == UInt8(ascii: "#")
     }
 
+    /// Returns `true` if byte to be read immediately is a GDB RP command arguments
+    /// delimiter. Returns `false` otherwise.
     var isArgumentsDelimiterAtReader: Bool {
         self.peekInteger(as: UInt8.self) == UInt8(ascii: ":")
     }
 }
 
+/// Decoder of GDB RP host commands, that takes raw `ByteBuffer` as an input encoded
+/// per https://sourceware.org/gdb/current/onlinedocs/gdb.html/Overview.html#Overview
+/// and produces a `GDBPacket<GDBHostCommand>` value as output. This decoder is
+/// compatible with NIO channel pipelines, making it easy to integrate with different
+/// I/O configurations.
 package struct GDBHostCommandDecoder: ByteToMessageDecoder {
-    enum Error: Swift.Error {
+    /// Errors that can be thrown during host command decoding.
+    package enum Error: Swift.Error {
+        /// Expected `+` acknowledgement character to be included in the packet, when
+        /// ``GDBHostCommandDecoder/isNoAckModeActive`` is set to `false`.
         case expectedAck
+
+        /// Expected command to start with `$` character`.
         case expectedCommandStart
-        case unknownCommandKind(String)
+
+        /// Expected checksum to be included with the packet was not found.
         case expectedChecksum
+
+        /// Expected checksum included with the packet did not match the expected value.
         case checksumIncorrect(expectedChecksum: Int, receivedChecksum: UInt8)
+
+        /// Unexpected arguments value supplied for a given command.
+        case unexpectedArgumentsValue
+
+        /// Host command kind could not be parsed. See `GDBHostCommand.Kind` for the
+        /// list of supported commands.
+        case unknownCommand(kind: String, arguments: String)
     }
 
+    /// Type of the output value produced by this decoder.
     package typealias InboundOut = GDBPacket<GDBHostCommand>
 
     private var accumulatedDelimiter: UInt8?
 
     private var accummulatedKind = [UInt8]()
     private var accummulatedArguments = [UInt8]()
-
+    
+    /// Logger instance used by this decoder.
     private let logger: Logger
-
+    
+    /// Initializes a new decoder.
+    /// - Parameter logger: logger instance that consumes messages from the newly
+    /// initialized decoder.
     package init(logger: Logger) { self.logger = logger }
-
+    
+    /// Sum of the raw character values consumed in the current command so far,
+    /// used in checksum computation.
     private var accummulatedSum = 0
+
+    /// Computed checksum for the values consumed in the current command so far.
     package var accummulatedChecksum: UInt8 {
         UInt8(self.accummulatedSum % 256)
     }
@@ -39,13 +72,15 @@ package struct GDBHostCommandDecoder: ByteToMessageDecoder {
     private var isNoAckModeRequested = false
     private var isNoAckModeActive = false
 
-    mutating package func decode(buffer: inout ByteBuffer) throws -> GDBPacket<GDBHostCommand>? {
+    package mutating func decode(
+        buffer: inout ByteBuffer
+    ) throws(Error) -> GDBPacket<GDBHostCommand>? {
         guard var startDelimiter = self.accumulatedDelimiter ?? buffer.readInteger(as: UInt8.self) else {
             // Not enough data to parse.
             return nil
         }
 
-        if !isNoAckModeActive {
+        if !self.isNoAckModeActive {
             let firstStartDelimiter = startDelimiter
 
             guard firstStartDelimiter == UInt8(ascii: "+") else {
@@ -53,7 +88,7 @@ package struct GDBHostCommandDecoder: ByteToMessageDecoder {
                 throw Error.expectedAck
             }
 
-            if isNoAckModeRequested {
+            if self.isNoAckModeRequested {
                 self.isNoAckModeActive = true
             }
 
@@ -70,7 +105,7 @@ package struct GDBHostCommandDecoder: ByteToMessageDecoder {
 
         // Command start delimiters.
         guard startDelimiter == UInt8(ascii: "$") else {
-            logger.error("unexpected delimiter: \(Character(UnicodeScalar(startDelimiter)))")
+            self.logger.error("unexpected delimiter: \(Character(UnicodeScalar(startDelimiter)))")
             throw Error.expectedCommandStart
         }
 
@@ -139,7 +174,7 @@ package struct GDBHostCommandDecoder: ByteToMessageDecoder {
     mutating package func decode(
         context: ChannelHandlerContext,
         buffer: inout ByteBuffer
-    ) throws -> DecodingState {
+    ) throws(Error) -> DecodingState {
         logger.trace(.init(stringLiteral: buffer.peekString(length: buffer.readableBytes)!))
 
         guard let command = try self.decode(buffer: &buffer) else {
