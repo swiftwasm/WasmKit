@@ -16,6 +16,7 @@
 /// * https://sourceware.org/gdb/current/onlinedocs/gdb.html/General-Query-Packets.html
 /// * https://lldb.llvm.org/resources/lldbgdbremote.html
 package struct GDBHostCommand: Equatable {
+    /// Kind of the command sent from the debugger host to the debugger target.
     package enum Kind: String, Equatable {
         // Currently listed in the order that LLDB sends them in.
         case startNoAckMode

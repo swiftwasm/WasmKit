@@ -14,11 +14,16 @@ import Foundation
 import NIOCore
 
 extension String {
+    /// Computes a GDB RP checksum of characters in a given string.
     fileprivate var appendedChecksum: String {
         "\(self)#\(String(format:"%02X", self.utf8.reduce(0, { $0 + Int($1) }) % 256))"
     }
 }
 
+/// Encoder of GDB RP target responses, that takes ``GDBTargetResponse`` as an input
+/// and encodes it per https://sourceware.org/gdb/current/onlinedocs/gdb.html/Overview.html#Overview
+/// format in a `ByteBuffer` value as output. This encoder is compatible with NIO channel pipelines,
+/// making it easy to integrate with different I/O configurations.
 package class GDBTargetResponseEncoder: MessageToByteEncoder {
     private var isNoAckModeActive = false
 
@@ -27,7 +32,7 @@ package class GDBTargetResponseEncoder: MessageToByteEncoder {
         if !isNoAckModeActive {
             out.writeInteger(UInt8(ascii: "+"))
         }
-        if data.isNoAckModeActivated {
+        if data.isNoAckModeActivate {
             self.isNoAckModeActive = true
         }
         out.writeInteger(UInt8(ascii: "$"))
