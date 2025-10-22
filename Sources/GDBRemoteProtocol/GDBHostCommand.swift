@@ -16,11 +16,6 @@
 /// * https://sourceware.org/gdb/current/onlinedocs/gdb.html/General-Query-Packets.html
 /// * https://lldb.llvm.org/resources/lldbgdbremote.html
 package struct GDBHostCommand: Equatable {
-    enum Error: Swift.Error {
-        case unexpectedArgumentsValue
-        case unknownCommand(kind: String, arguments: String)
-    }
-
     package enum Kind: String, Equatable {
         // Currently listed in the order that LLDB sends them in.
         case startNoAckMode
@@ -94,8 +89,12 @@ package struct GDBHostCommand: Equatable {
 
     /// Arguments supplied with a host command.
     package let arguments: String
-
-    package init(kindString: String, arguments: String) throws {
+    
+    /// Initialize a host command from raw strings sent from a host.
+    /// - Parameters:
+    ///   - kindString: raw ``String`` that denotes kind of the command.
+    ///   - arguments: raw arguments that immediately follow kind of the command.
+    package init(kindString: String, arguments: String) throws(GDBHostCommandDecoder.Error) {
         let registerInfoPrefix = "qRegisterInfo"
 
         if kindString.starts(with: "x") {
@@ -110,20 +109,20 @@ package struct GDBHostCommand: Equatable {
             self.kind = .registerInfo
 
             guard arguments.isEmpty else {
-                throw Error.unexpectedArgumentsValue
+                throw GDBHostCommandDecoder.Error.unexpectedArgumentsValue
             }
             self.arguments = String(kindString.dropFirst(registerInfoPrefix.count))
             return
         } else if let kind = Kind(rawValue: kindString) {
             self.kind = kind
         } else {
-            throw Error.unknownCommand(kind: kindString, arguments: arguments)
+            throw GDBHostCommandDecoder.Error.unknownCommand(kind: kindString, arguments: arguments)
         }
 
         self.arguments = arguments
     }
 
-    /// Memberwise initializer of `GDBHostCommand` type.
+    /// Member-wise initializer of `GDBHostCommand` type.
     package init(kind: Kind, arguments: String) {
         self.kind = kind
         self.arguments = arguments

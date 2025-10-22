@@ -10,6 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// GDB host commands and target responses are wrapped with delimiters followed
+/// by a single byte checksum value. This type denotes such a packet by attaching
+/// a checksum value to the contained payload.
+/// See GDB remote protocol overview for more details:
+/// https://sourceware.org/gdb/current/onlinedocs/gdb.html/Overview.html#Overview
 package struct GDBPacket<Payload: Sendable>: Sendable {
     package let payload: Payload
     package let checksum: UInt8
