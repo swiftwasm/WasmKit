@@ -253,19 +253,18 @@ struct WasmFunctionEntity {
         let store = store.value
         let engine = store.engine
         let type = self.type
-        var translator = try InstructionTranslator(
-            allocator: store.allocator.iseqAllocator,
-            engineConfiguration: engine.configuration,
-            funcTypeInterner: engine.funcTypeInterner,
-            module: instance,
-            type: engine.resolveType(type),
-            locals: code.locals,
-            functionIndex: index,
-            codeSize: code.expression.count,
-            isIntercepting: engine.interceptor != nil
-        )
         let iseq = try code.withValue { code in
-            try translator.translate(code: code)
+            try InstructionTranslator(
+                allocator: store.allocator.iseqAllocator,
+                engineConfiguration: engine.configuration,
+                funcTypeInterner: engine.funcTypeInterner,
+                module: instance,
+                type: engine.resolveType(type),
+                locals: code.locals,
+                functionIndex: index,
+                codeSize: code.expression.count,
+                isIntercepting: engine.interceptor != nil
+            ).translate(code: code)
         }
         self.code = .compiled(iseq)
         return iseq
