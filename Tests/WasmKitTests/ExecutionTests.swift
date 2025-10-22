@@ -111,7 +111,7 @@
                 """
             ) { trap in
                 #expect(
-                    trap.backtrace?.symbols.compactMap(\.name) == [
+                    trap.backtrace?.symbols.compactMap(\.?.name) == [
                         "foo",
                         "bar",
                         "_start",
@@ -138,7 +138,7 @@
                 """
             ) { trap in
                 #expect(
-                    trap.backtrace?.symbols.compactMap(\.name) == [
+                    trap.backtrace?.symbols.compactMap(\.?.name) == [
                         "wasm function[1]",
                         "bar",
                         "_start",
