@@ -1,8 +1,8 @@
 import Foundation
 import SystemPackage
+import Testing
 import WasmKit
 import WasmKitWASI
-import Testing
 
 @Suite
 struct IntegrationTests {
@@ -209,4 +209,3 @@ struct IntegrationTests {
         #expect(exitCode == manifest.exitCode ?? 0, "\(path.path)")
     }
 }
-

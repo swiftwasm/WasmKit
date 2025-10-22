@@ -78,4 +78,3 @@ struct HostModuleTests {
         #expect(isQuxCalled == true)
     }
 }
-
