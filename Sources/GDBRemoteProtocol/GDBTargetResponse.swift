@@ -42,11 +42,11 @@ package struct GDBTargetResponse {
     /// Whether `QStartNoAckMode` is activated and no ack `+` symbol should be sent
     /// before encoding this response.
     /// See https://sourceware.org/gdb/current/onlinedocs/gdb.html/Packet-Acknowledgment.html#Packet-Acknowledgment
-    package let isNoAckModeActivate: Bool
+    package let isNoAckModeActive: Bool
 
     /// Member-wise initializer for the debugger response.
-    package init(kind: Kind, isNoAckModeActivate: Bool) {
+    package init(kind: Kind, isNoAckModeActive: Bool) {
         self.kind = kind
-        self.isNoAckModeActivate = isNoAckModeActivate
+        self.isNoAckModeActive = isNoAckModeActive
     }
 }

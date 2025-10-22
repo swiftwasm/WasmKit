@@ -20,7 +20,7 @@ package class GDBTargetResponseEncoder: MessageToByteEncoder {
         if !isNoAckModeActive {
             out.writeInteger(UInt8(ascii: "+"))
         }
-        if data.isNoAckModeActivate {
+        if data.isNoAckModeActive {
             self.isNoAckModeActive = true
         }
         out.writeInteger(UInt8(ascii: "$"))

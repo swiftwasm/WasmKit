@@ -55,10 +55,10 @@
             let responseKind: GDBTargetResponse.Kind
             logger.trace("handling GDB host command", metadata: ["GDBHostCommand": .string(command.kind.rawValue)])
 
-            var isNoAckModeActivated = false
+            var isNoAckModeActive = false
             switch command.kind {
             case .startNoAckMode:
-                isNoAckModeActivated = true
+                isNoAckModeActive = true
                 fallthrough
 
             case .isThreadSuffixSupported, .listThreadsInStopReply:
@@ -161,9 +161,8 @@
 
             logger.trace("handler produced a response", metadata: ["GDBTargetResponse": .string("\(responseKind)")])
 
-            return .init(kind: responseKind, isNoAckModeActivated: isNoAckModeActivated)
+            return .init(kind: responseKind, isNoAckModeActive: isNoAckModeActive)
         }
-
     }
 
 #endif
