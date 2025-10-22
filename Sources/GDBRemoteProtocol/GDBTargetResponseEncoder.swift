@@ -28,7 +28,7 @@ package class GDBTargetResponseEncoder: MessageToByteEncoder {
     private var isNoAckModeActive = false
 
     package init() {}
-    package func encode(data: GDBTargetResponse, out: inout ByteBuffer) throws {
+    package func encode(data: GDBTargetResponse, out: inout ByteBuffer) {
         if !isNoAckModeActive {
             out.writeInteger(UInt8(ascii: "+"))
         }
