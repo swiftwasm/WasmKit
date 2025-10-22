@@ -4,10 +4,8 @@
     import Logging
     import NIOCore
     import NIOFileSystem
-    import Synchronization
     import SystemPackage
     import WasmKit
-    import WasmKitWASI
 
     extension BinaryInteger {
         init?(hexEncoded: Substring) {
