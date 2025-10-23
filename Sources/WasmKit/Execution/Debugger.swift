@@ -1,5 +1,45 @@
 #if WasmDebuggingSupport
 
+    extension [Int] {
+        func binarySearch(nextClosestTo value: Int) -> Int? {
+            switch self.count {
+            case 0:
+                return nil
+            default:
+                var slice = self[0..<self.count]
+                while slice.count > 1 {
+                    let middle = (slice.endIndex - slice.startIndex) / 2
+                    if slice[middle] < value {
+                        // Not found anything in the lower half, assigning higher half to `slice`.
+                        slice = slice[(middle + 1)..<slice.endIndex]
+                    } else {
+                        // Not found anything in the higher half, assigning lower half to `slice`.
+                        slice = slice[slice.startIndex..<middle]
+                    }
+                }
+
+                return self[slice.startIndex]
+            }
+        }
+    }
+
+    extension Instance {
+        func findIseq(forWasmAddress address: Int) throws(Debugger.Error) -> Pc {
+            // Look in the main mapping first
+            guard
+                let iseq = handle.wasmToIseqMapping[address]
+                    // If nothing found, find the closest Wasm address using binary search
+                    ?? handle.wasmMappings.binarySearch(nextClosestTo: address)
+                    // Look in the main mapping again with the next closest address if binary search produced anything
+                    .flatMap({ handle.wasmToIseqMapping[$0] })
+            else {
+                throw Debugger.Error.noInstructionMappingAvailable(address)
+            }
+
+            return iseq
+        }
+    }
+
     package struct Debugger: ~Copyable {
         package enum Error: Swift.Error {
             case entrypointFunctionNotFound
@@ -60,17 +100,12 @@
         }
 
         package mutating func enableBreakpoint(address: Int) throws(Error) {
-            print("attempt to toggle a breakpoint at \(address)")
-            print("available mapping: \(self.instance.handle.wasmToIseqMapping)")
-
             guard self.breakpoints[address] == nil else {
-                print("breakpoint at \(address) already enabled")
                 return
             }
 
-            guard let iseq = self.instance.handle.wasmToIseqMapping[address] else {
-                throw Error.noInstructionMappingAvailable(address)
-            }
+            let iseq = try self.instance.findIseq(forWasmAddress: address)
+
             self.breakpoints[address] = iseq.pointee
             iseq.pointee = Instruction.breakpoint.headSlot(threadingModel: self.threadingModel)
         }
@@ -83,9 +118,8 @@
                 return
             }
 
-            guard let iseq = self.instance.handle.wasmToIseqMapping[address] else {
-                throw Error.noInstructionMappingAvailable(address)
-            }
+            let iseq = try self.instance.findIseq(forWasmAddress: address)
+
             self.breakpoints[address] = nil
             iseq.pointee = oldCodeSlot
         }
