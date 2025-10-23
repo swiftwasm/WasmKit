@@ -24,19 +24,21 @@
     }
 
     extension Instance {
-        func findIseq(forWasmAddress address: Int) throws(Debugger.Error) -> Pc {
-            // Look in the main mapping first
-            guard
-                let iseq = handle.wasmToIseqMapping[address]
-                    // If nothing found, find the closest Wasm address using binary search
-                    ?? handle.wasmMappings.binarySearch(nextClosestTo: address)
-                    // Look in the main mapping again with the next closest address if binary search produced anything
-                    .flatMap({ handle.wasmToIseqMapping[$0] })
+        func findIseq(forWasmAddress address: Int) throws(Debugger.Error) -> (iseq: Pc, wasm: Int) {
+            // Look in the main mapping
+            if let iseq = handle.wasmToIseqMapping[address] {
+                return (iseq, address)
+            }
+
+            // If nothing found, find the closest Wasm address using binary search
+            guard let nextAddress = handle.wasmMappings.binarySearch(nextClosestTo: address),
+                // Look in the main mapping again with the next closest address if binary search produced anything
+                let iseq = handle.wasmToIseqMapping[nextAddress]
             else {
                 throw Debugger.Error.noInstructionMappingAvailable(address)
             }
 
-            return iseq
+            return (iseq, nextAddress)
         }
     }
 
@@ -112,10 +114,12 @@
                 return
             }
 
-            let iseq = try self.instance.findIseq(forWasmAddress: address)
+            let (iseq, wasm) = try self.instance.findIseq(forWasmAddress: address)
 
-            self.breakpoints[address] = iseq.pointee
+            self.breakpoints[wasm] = iseq.pointee
             iseq.pointee = Instruction.breakpoint.headSlot(threadingModel: self.threadingModel)
+
+            print("breakpoint enabled at \(iseq)")
         }
 
         package mutating func disableBreakpoint(address: Int) throws(Error) {
@@ -123,38 +127,47 @@
                 return
             }
 
-            let iseq = try self.instance.findIseq(forWasmAddress: address)
+            let (iseq, wasm) = try self.instance.findIseq(forWasmAddress: address)
 
-            self.breakpoints[address] = nil
+            self.breakpoints[wasm] = nil
             iseq.pointee = oldCodeSlot
         }
 
         package mutating func run() throws {
-            try self.execution.executeWasm(
-                threadingModel: self.threadingModel,
-                function: self.entrypointFunction.handle,
-                type: self.entrypointFunction.type,
-                arguments: [],
-                sp: &self.valueStack,
-                pc: &self.pc
-            )
+            do {
+                try self.execution.executeWasm(
+                    threadingModel: self.threadingModel,
+                    function: self.entrypointFunction.handle,
+                    type: self.entrypointFunction.type,
+                    arguments: [],
+                    sp: &self.valueStack,
+                    pc: &self.pc
+                )
+            } catch _ as Execution.Breakpoint {
+                pc -= 1
+                throw Execution.Breakpoint()
+            }
         }
 
         /// Array of addresses in the Wasm binary of executed instructions on the call stack.
         package var currentCallStack: [Int] {
             let isDebuggable = self.instance.handle.isDebuggable
 
-            print(self.pc)
-            return Execution.captureBacktrace(sp: self.valueStack, store: self.store).symbols.compactMap {
-                print(self.instance.handle.iseqToWasmMapping)
-                print(self.instance.handle.wasmToIseqMapping)
+            var result = Execution.captureBacktrace(sp: self.valueStack, store: self.store).symbols.compactMap {
                 return self.instance.handle.iseqToWasmMapping[$0.address]
             }
+            if let wasmPc = self.instance.handle.iseqToWasmMapping[self.pc] {
+                result.append(wasmPc)
+            }
+
+            print(result)
+            return result
         }
 
         deinit {
-            self.valueStack.deallocate()
-            self.pc.deallocate()
+            print("Debugger.deinit")
+            // self.valueStack.deallocate()
+            // self.pc.deallocate()
         }
     }
 
