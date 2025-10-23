@@ -111,10 +111,7 @@
         }
 
         package mutating func disableBreakpoint(address: Int) throws(Error) {
-            print("attempt to toggle a breakpoint at \(address)")
-
             guard let oldCodeSlot = self.breakpoints[address] else {
-                print("breakpoint at \(address) already disabled")
                 return
             }
 
@@ -131,7 +128,6 @@
         /// Array of addresses in the Wasm binary of executed instructions on the call stack.
         package var currentCallStack: [Int] {
             let isDebuggable = self.instance.handle.isDebuggable
-            print("isDebuggable is \(isDebuggable)")
 
             return Execution.captureBacktrace(sp: self.valueStack, store: self.store).symbols.map {
                 self.instance.handle.iseqToWasmMapping[$0.address]!

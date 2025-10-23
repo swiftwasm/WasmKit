@@ -23,7 +23,6 @@
         func stopAtEntrypoint() throws {
             let store = Store(engine: Engine())
             let bytes = try wat2wasm(trivialModuleWAT)
-            print(bytes.count)
             let module = try parseWasm(bytes: bytes)
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
