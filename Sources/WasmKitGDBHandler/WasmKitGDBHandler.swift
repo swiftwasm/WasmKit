@@ -6,6 +6,7 @@
     import NIOFileSystem
     import SystemPackage
     import WasmKit
+    import WasmKitWASI
 
     extension BinaryInteger {
         init?(hexEncoded: Substring) {

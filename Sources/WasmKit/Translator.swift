@@ -1127,6 +1127,7 @@ struct InstructionTranslator: InstructionVisitor {
             guard self.module.isDebuggable else { return }
 
             self.iseqToWasmMapping.append((self.iseqBuilder.insertingPC.offsetFromHead, self.binaryOffset))
+            print("added iSeqToWasmMapping[\(self.iseqBuilder.insertingPC.offsetFromHead)] = \(self.binaryOffset)")
         #endif
     }
 
@@ -1901,6 +1902,9 @@ struct InstructionTranslator: InstructionVisitor {
     }
 
     private mutating func visitConst(_ type: ValueType, _ value: Value) {
+        print("in \(#function) self.binaryOffset is \(self.binaryOffset)")
+
+        // TODO: document this behavior
         if let constSlotIndex = constantSlots.allocate(value) {
             valueStack.pushConst(constSlotIndex, type: type)
             iseqBuilder.resetLastEmission()
@@ -1908,6 +1912,7 @@ struct InstructionTranslator: InstructionVisitor {
         }
         let value = UntypedValue(value)
         let is32Bit = type == .i32 || type == .f32
+        print("emitting const \(value)")
         if is32Bit {
             pushEmit(
                 type,
