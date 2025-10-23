@@ -31,6 +31,10 @@
             #expect(throws: Execution.Breakpoint.self) {
                 try debugger.run()
             }
+
+            let callStack = debugger.currentCallStack
+            #expect(callStack.count == 1)
+            #expect(callStack.first == debugger.breakpoints.keys.first)
         }
 
         @Test

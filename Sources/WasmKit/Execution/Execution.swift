@@ -293,7 +293,7 @@ func executeWasm(
     return try Execution.with(store: store) { (stack, sp) in
         // Advance the stack pointer to be able to reference negative indices
         // for saving slots.
-        let sp = sp.advanced(by: FrameHeaderLayout.numberOfSavingSlots)
+        var sp = sp.advanced(by: FrameHeaderLayout.numberOfSavingSlots)
         // Mark root stack pointer and current function as nil.
         sp.previousSP = nil
         sp.currentFunction = nil
@@ -305,9 +305,10 @@ func executeWasm(
             rootISeq[0] = Instruction.endOfExecution.headSlot(
                 threadingModel: store.value.engine.configuration.threadingModel
             )
+            var pc = rootISeq.baseAddress!
             try stack.execute(
-                sp: sp,
-                pc: rootISeq.baseAddress!,
+                sp: &sp,
+                pc: &pc,
                 handle: handle,
                 type: type
             )
@@ -317,6 +318,46 @@ func executeWasm(
         }
     }
 }
+
+#if WasmDebuggingSupport
+    extension Execution {
+        @inline(never)
+        mutating func executeWasm(
+            threadingModel: EngineConfiguration.ThreadingModel,
+            function handle: InternalFunction,
+            type: FunctionType,
+            arguments: [Value],
+            sp: inout Sp,
+            pc: inout Pc
+        ) throws -> [Value] {
+            // Advance the stack pointer to be able to reference negative indices
+            // for saving slots.
+            sp = sp.advanced(by: FrameHeaderLayout.numberOfSavingSlots)
+            // Mark root stack pointer and current function as nil.
+            sp.previousSP = nil
+            sp.currentFunction = nil
+            for (index, argument) in arguments.enumerated() {
+                sp[VReg(index)] = UntypedValue(argument)
+            }
+
+            try withUnsafeTemporaryAllocation(of: CodeSlot.self, capacity: 2) { rootISeq in
+                rootISeq[0] = Instruction.endOfExecution.headSlot(
+                    threadingModel: threadingModel
+                )
+                pc = rootISeq.baseAddress!
+                try self.execute(
+                    sp: &sp,
+                    pc: &pc,
+                    handle: handle,
+                    type: type
+                )
+            }
+            return type.results.enumerated().map { (i, type) in
+                sp[VReg(i)].cast(to: type)
+            }
+        }
+    }
+#endif
 
 extension Execution {
     /// A namespace for the "current memory" (Md and Ms) management.
@@ -373,14 +414,12 @@ extension Execution {
     /// The entry point for the execution of the WebAssembly function.
     @inline(never)
     mutating func execute(
-        sp: Sp, pc: Pc,
+        sp: inout Sp, pc: inout Pc,
         handle: InternalFunction,
         type: FunctionType
     ) throws {
-        var sp: Sp = sp
         var md: Md = nil
         var ms: Ms = 0
-        var pc = pc
         (pc, sp) = try invoke(
             function: handle,
             callerInstance: nil,
@@ -390,7 +429,7 @@ extension Execution {
         do {
             switch self.store.value.engine.configuration.threadingModel {
             case .direct:
-                try runDirectThreaded(sp: sp, pc: pc, md: md, ms: ms)
+                try runDirectThreaded(sp: sp, pc: &pc, md: md, ms: ms)
             case .token:
                 try runTokenThreaded(sp: &sp, pc: &pc, md: &md, ms: &ms)
             }
@@ -402,12 +441,11 @@ extension Execution {
     /// Starts the main execution loop using the direct threading model.
     @inline(never)
     mutating func runDirectThreaded(
-        sp: Sp, pc: Pc, md: Md, ms: Ms
+        sp: Sp, pc: inout Pc, md: Md, ms: Ms
     ) throws {
         #if os(WASI)
             fatalError("Direct threading is not supported on WASI")
         #else
-            var pc = pc
             let handler = pc.read(wasmkit_tc_exec.self)
             wasmkit_tc_start(handler, sp, pc, md, ms, &self)
             if let (rawError, trappingSp) = self.trap {

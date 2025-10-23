@@ -46,8 +46,8 @@
             case noInstructionMappingAvailable(Int)
         }
 
-        private let valueStack: Sp
-        private let execution: Execution
+        private var valueStack: Sp
+        private var execution: Execution
         private let store: Store
 
         /// Parsed in-memory representation of a Wasm module instantiated for debugging.
@@ -62,7 +62,8 @@
         /// Threading model of the Wasm engine configuration cached for a potentially hot path.
         private let threadingModel: EngineConfiguration.ThreadingModel
 
-        private var breakpoints = [Int: CodeSlot]()
+        private(set) var breakpoints = [Int: CodeSlot]()
+        private var pc: Pc
 
         package init(module: Module, store: Store, imports: Imports) throws {
             let limit = store.engine.configuration.stackSize / MemoryLayout<StackSlot>.stride
@@ -79,6 +80,13 @@
             self.store = store
             self.execution = Execution(store: StoreRef(store), stackEnd: valueStack.advanced(by: limit))
             self.threadingModel = store.engine.configuration.threadingModel
+            let endOfExecution = Instruction.endOfExecution.headSlot(
+                threadingModel: threadingModel
+            )
+            // TODO: clarify why `func executeWasm` allocates 2 Pc slots on the native stack
+            self.pc = Pc.allocate(capacity: 2)
+            self.pc[0] = endOfExecution
+
         }
 
         package mutating func stopAtEntrypoint() throws {
@@ -121,21 +129,32 @@
             iseq.pointee = oldCodeSlot
         }
 
-        package func run() throws {
-            try self.entrypointFunction()
+        package mutating func run() throws {
+            try self.execution.executeWasm(
+                threadingModel: self.threadingModel,
+                function: self.entrypointFunction.handle,
+                type: self.entrypointFunction.type,
+                arguments: [],
+                sp: &self.valueStack,
+                pc: &self.pc
+            )
         }
 
         /// Array of addresses in the Wasm binary of executed instructions on the call stack.
         package var currentCallStack: [Int] {
             let isDebuggable = self.instance.handle.isDebuggable
 
-            return Execution.captureBacktrace(sp: self.valueStack, store: self.store).symbols.map {
-                self.instance.handle.iseqToWasmMapping[$0.address]!
+            print(self.pc)
+            return Execution.captureBacktrace(sp: self.valueStack, store: self.store).symbols.compactMap {
+                print(self.instance.handle.iseqToWasmMapping)
+                print(self.instance.handle.wasmToIseqMapping)
+                return self.instance.handle.iseqToWasmMapping[$0.address]
             }
         }
 
         deinit {
-            valueStack.deallocate()
+            self.valueStack.deallocate()
+            self.pc.deallocate()
         }
     }
 
