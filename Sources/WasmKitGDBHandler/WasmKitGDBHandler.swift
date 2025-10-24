@@ -38,6 +38,7 @@
         enum Error: Swift.Error {
             case unknownTransferArguments
             case unknownReadMemoryArguments
+            case stoppingAtEntrypointFailed
         }
 
         private let wasmBinary: ByteBuffer
@@ -63,6 +64,9 @@
 
             self.debugger = try Debugger(module: parseWasm(bytes: .init(buffer: self.wasmBinary)), store: store, imports: imports)
             try self.debugger.stopAtEntrypoint()
+            guard try self.debugger.run() == nil else {
+                throw Error.stoppingAtEntrypointFailed
+            }
         }
 
         package func handle(command: GDBHostCommand) throws -> GDBTargetResponse {
@@ -114,7 +118,7 @@
             case .subsequentThreadInfo:
                 responseKind = .string("l")
 
-            case .targetStatus:
+            case .targetStatus, .threadStopInfo:
                 responseKind = .keyValuePairs([
                     "T05thread": "1",
                     "reason": "trace",
