@@ -62,7 +62,7 @@ struct Entrypoint: AsyncParsableCommand {
                             // the closure as it will be invoked once per connection.
                             try channel.pipeline.syncOperations.addHandlers([
                                 ByteToMessageHandler(GDBHostCommandDecoder(logger: logger)),
-                                MessageToByteHandler(GDBTargetResponseEncoder()),
+                                MessageToByteHandler(GDBTargetResponseEncoder(logger: logger)),
                             ])
                         }
                     }
