@@ -235,7 +235,7 @@ extension Sp {
     // MARK: - Special slots
 
     /// The current executing function.
-    fileprivate var currentFunction: EntityHandle<WasmFunctionEntity>? {
+    var currentFunction: EntityHandle<WasmFunctionEntity>? {
         get { return EntityHandle<WasmFunctionEntity>(bitPattern: UInt(self[-3].i64)) }
         nonmutating set { self[-3] = UInt64(UInt(bitPattern: newValue?.bitPattern ?? 0)) }
     }
