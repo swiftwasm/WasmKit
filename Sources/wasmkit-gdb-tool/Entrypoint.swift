@@ -82,7 +82,7 @@ struct Entrypoint: AsyncParsableCommand {
                 /* the server will now be accepting connections */
                 logger.info("listening on port \(port)")
 
-                let debugger = try await WasmKitGDBHandler(logger: logger, moduleFilePath: self.wasmModulePath)
+                let debugger = try await WasmKitGDBHandler(moduleFilePath: self.wasmModulePath, logger: logger, allocator: serverChannel.channel.allocator)
 
                 try await withThrowingDiscardingTaskGroup { group in
                     try await serverChannel.executeThenClose { serverChannelInbound in

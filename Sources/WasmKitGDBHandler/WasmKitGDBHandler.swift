@@ -20,6 +20,8 @@
         }
     }
 
+    private let codeOffset = UInt64(0x4000_0000_0000_0000)
+
     package actor WasmKitGDBHandler {
         enum Error: Swift.Error {
             case unknownTransferArguments
@@ -29,11 +31,12 @@
         private let wasmBinary: ByteBuffer
         private let moduleFilePath: FilePath
         private let logger: Logger
+        private let allocator: ByteBufferAllocator
         private var debugger: Debugger
-        private let functionsRLE: [(wasmAddress: Int, iSeqAddress: Int)] = []
 
-        package init(logger: Logger, moduleFilePath: FilePath) async throws {
+        package init(moduleFilePath: FilePath, logger: Logger, allocator: ByteBufferAllocator) async throws {
             self.logger = logger
+            self.allocator = allocator
 
             self.wasmBinary = try await FileSystem.shared.withFileHandle(forReadingAt: moduleFilePath) {
                 try await $0.readToEnd(maximumSizeAllowed: .unlimited)
@@ -142,7 +145,7 @@
                     var length = Int(hexEncoded: argumentsArray[1])
                 else { throw Error.unknownReadMemoryArguments }
 
-                let binaryOffset = Int(address - 0x4000_0000_0000_0000)
+                let binaryOffset = Int(address - codeOffset)
 
                 if binaryOffset + length > wasmBinary.readableBytes {
                     length = wasmBinary.readableBytes - binaryOffset
@@ -151,8 +154,12 @@
                 responseKind = .hexEncodedBinary(wasmBinary.readableBytesView[binaryOffset..<(binaryOffset + length)])
 
             case .wasmCallStack:
-                print(self.debugger.currentCallStack)
-                responseKind = .empty
+                let callStack = self.debugger.currentCallStack
+                var buffer = self.allocator.buffer(capacity: callStack.count * 8)
+                for pc in callStack {
+                    buffer.writeInteger(UInt64(pc) + codeOffset, endianness: .little)
+                }
+                responseKind = .hexEncodedBinary(buffer.readableBytesView)
 
             case .generalRegisters:
                 fatalError()
