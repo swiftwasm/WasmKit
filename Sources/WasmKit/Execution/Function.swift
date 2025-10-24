@@ -172,8 +172,7 @@ extension InternalFunction {
                 store: store,
                 function: self,
                 type: resolvedType,
-                arguments: arguments,
-                callerInstance: entity.instance
+                arguments: arguments
             )
         } else {
             let entity = host

@@ -49,7 +49,7 @@
         }
 
         private let valueStack: Sp
-        private let execution: Execution
+        private var execution: Execution
         private let store: Store
 
         /// Parsed in-memory representation of a Wasm module instantiated for debugging.
@@ -66,7 +66,9 @@
 
         private(set) var breakpoints = [Int: CodeSlot]()
 
-        private var iseqPc: Pc?
+        private var currentBreakpoint: Execution.Breakpoint?
+
+        private var pc = Pc.allocate(capacity: 1)
 
         package init(module: Module, store: Store, imports: Imports) throws {
             let limit = store.engine.configuration.stackSize / MemoryLayout<StackSlot>.stride
@@ -83,6 +85,7 @@
             self.store = store
             self.execution = Execution(store: StoreRef(store), stackEnd: valueStack.advanced(by: limit))
             self.threadingModel = store.engine.configuration.threadingModel
+            self.pc.pointee = Instruction.endOfExecution.headSlot(threadingModel: threadingModel)
         }
 
         package mutating func stopAtEntrypoint() throws {
@@ -125,25 +128,33 @@
             iseq.pointee = oldCodeSlot
         }
 
-        /// Returns: `true` if current instance ran to completion, `false` if it stopped at a breakpoint.
-        package mutating func run() throws -> Bool {
+        /// Returns: `[Value]` result of `entrypointFunction` if current instance ran to completion, `nil` if it stopped at a breakpoint.
+        package mutating func run() throws -> [Value]? {
             do {
-                try self.entrypointFunction()
-                return true
+                return try self.execution.executeWasm(
+                    threadingModel: self.threadingModel,
+                    function: self.entrypointFunction.handle,
+                    type: self.entrypointFunction.type,
+                    arguments: [],
+                    sp: self.valueStack,
+                    pc: self.pc
+                )
             } catch let breakpoint as Execution.Breakpoint {
-                self.iseqPc = breakpoint.pc
-                return false
+                self.currentBreakpoint = breakpoint
+                return nil
             }
         }
 
         /// Array of addresses in the Wasm binary of executed instructions on the call stack.
         package var currentCallStack: [Int] {
-            let isDebuggable = self.instance.handle.isDebuggable
+            guard let currentBreakpoint else {
+                return []
+            }
 
-            var result = Execution.captureBacktrace(sp: self.valueStack, store: self.store).symbols.compactMap {
+            var result = Execution.captureBacktrace(sp: currentBreakpoint.sp, store: self.store).symbols.compactMap {
                 return self.instance.handle.iseqToWasmMapping[$0.address]
             }
-            if let iseqPc, let wasmPc = self.instance.handle.iseqToWasmMapping[iseqPc] {
+            if let wasmPc = self.instance.handle.iseqToWasmMapping[currentBreakpoint.pc] {
                 result.append(wasmPc)
             }
 
@@ -151,7 +162,8 @@
         }
 
         deinit {
-            valueStack.deallocate()
+            self.valueStack.deallocate()
+            self.pc.deallocate()
         }
     }
 

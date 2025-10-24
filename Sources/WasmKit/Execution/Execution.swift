@@ -286,7 +286,6 @@ func executeWasm(
     function handle: InternalFunction,
     type: FunctionType,
     arguments: [Value],
-    callerInstance: InternalInstance
 ) throws -> [Value] {
     // NOTE: `store` variable must not outlive this function
     let store = StoreRef(store)
@@ -319,6 +318,41 @@ func executeWasm(
 }
 
 extension Execution {
+
+    #if WasmDebuggingSupport
+
+        mutating func executeWasm(
+            threadingModel: EngineConfiguration.ThreadingModel,
+            function handle: InternalFunction,
+            type: FunctionType,
+            arguments: [Value],
+            sp: Sp,
+            pc: Pc
+        ) throws -> [Value] {
+            // Advance the stack pointer to be able to reference negative indices
+            // for saving slots.
+            let sp = sp.advanced(by: FrameHeaderLayout.numberOfSavingSlots)
+            // Mark root stack pointer and current function as nil.
+            sp.previousSP = nil
+            sp.currentFunction = nil
+            for (index, argument) in arguments.enumerated() {
+                sp[VReg(index)] = UntypedValue(argument)
+            }
+
+            try self.execute(
+                sp: sp,
+                pc: pc,
+                handle: handle,
+                type: type
+            )
+
+            return type.results.enumerated().map { (i, type) in
+                sp[VReg(i)].cast(to: type)
+            }
+        }
+
+    #endif
+
     /// A namespace for the "current memory" (Md and Ms) management.
     enum CurrentMemory {
         /// Assigns the current memory to the given internal memory.
@@ -369,6 +403,7 @@ extension Execution {
 
     /// An ``Error`` thrown when a breakpoint is triggered.
     struct Breakpoint: Error, @unchecked Sendable {
+        let sp: Sp
         let pc: Pc
     }
 

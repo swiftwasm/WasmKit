@@ -29,7 +29,7 @@
             try debugger.stopAtEntrypoint()
             #expect(debugger.breakpoints.count == 1)
 
-            #expect(try debugger.run() == false)
+            #expect(try debugger.run() == nil)
 
             let expectedPc = try #require(debugger.breakpoints.keys.first)
             #expect(debugger.currentCallStack == [expectedPc])
