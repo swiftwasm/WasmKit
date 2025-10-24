@@ -48,8 +48,8 @@
             case noInstructionMappingAvailable(Int)
         }
 
-        private var valueStack: Sp
-        private var execution: Execution
+        private let valueStack: Sp
+        private let execution: Execution
         private let store: Store
 
         /// Parsed in-memory representation of a Wasm module instantiated for debugging.
@@ -65,7 +65,8 @@
         private let threadingModel: EngineConfiguration.ThreadingModel
 
         private(set) var breakpoints = [Int: CodeSlot]()
-        private var pc: Pc
+
+        private var iseqPc: Pc?
 
         package init(module: Module, store: Store, imports: Imports) throws {
             let limit = store.engine.configuration.stackSize / MemoryLayout<StackSlot>.stride
@@ -82,13 +83,6 @@
             self.store = store
             self.execution = Execution(store: StoreRef(store), stackEnd: valueStack.advanced(by: limit))
             self.threadingModel = store.engine.configuration.threadingModel
-            let endOfExecution = Instruction.endOfExecution.headSlot(
-                threadingModel: threadingModel
-            )
-            // TODO: clarify why `func executeWasm` allocates 2 Pc slots on the native stack
-            self.pc = Pc.allocate(capacity: 2)
-            self.pc[0] = endOfExecution
-
         }
 
         package mutating func stopAtEntrypoint() throws {
@@ -118,8 +112,6 @@
 
             self.breakpoints[wasm] = iseq.pointee
             iseq.pointee = Instruction.breakpoint.headSlot(threadingModel: self.threadingModel)
-
-            print("breakpoint enabled at \(iseq)")
         }
 
         package mutating func disableBreakpoint(address: Int) throws(Error) {
@@ -133,19 +125,14 @@
             iseq.pointee = oldCodeSlot
         }
 
-        package mutating func run() throws {
+        /// Returns: `true` if current instance ran to completion, `false` if it stopped at a breakpoint.
+        package mutating func run() throws -> Bool {
             do {
-                try self.execution.executeWasm(
-                    threadingModel: self.threadingModel,
-                    function: self.entrypointFunction.handle,
-                    type: self.entrypointFunction.type,
-                    arguments: [],
-                    sp: &self.valueStack,
-                    pc: &self.pc
-                )
-            } catch _ as Execution.Breakpoint {
-                pc -= 1
-                throw Execution.Breakpoint()
+                try self.entrypointFunction()
+                return true
+            } catch let breakpoint as Execution.Breakpoint {
+                self.iseqPc = breakpoint.pc
+                return false
             }
         }
 
@@ -156,18 +143,15 @@
             var result = Execution.captureBacktrace(sp: self.valueStack, store: self.store).symbols.compactMap {
                 return self.instance.handle.iseqToWasmMapping[$0.address]
             }
-            if let wasmPc = self.instance.handle.iseqToWasmMapping[self.pc] {
+            if let iseqPc, let wasmPc = self.instance.handle.iseqToWasmMapping[iseqPc] {
                 result.append(wasmPc)
             }
 
-            print(result)
             return result
         }
 
         deinit {
-            print("Debugger.deinit")
-            // self.valueStack.deallocate()
-            // self.pc.deallocate()
+            valueStack.deallocate()
         }
     }
 

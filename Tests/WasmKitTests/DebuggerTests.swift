@@ -27,14 +27,12 @@
             var debugger = try Debugger(module: module, store: store, imports: [:])
 
             try debugger.stopAtEntrypoint()
+            #expect(debugger.breakpoints.count == 1)
 
-            #expect(throws: Execution.Breakpoint.self) {
-                try debugger.run()
-            }
+            #expect(try debugger.run() == false)
 
-            let callStack = debugger.currentCallStack
-            #expect(callStack.count == 1)
-            #expect(callStack.first == debugger.breakpoints.keys.first)
+            let expectedPc = try #require(debugger.breakpoints.keys.first)
+            #expect(debugger.currentCallStack == [expectedPc])
         }
 
         @Test

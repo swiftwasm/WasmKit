@@ -225,6 +225,9 @@ extension Execution {
     }
 
     mutating func breakpoint(sp: inout Sp, pc: Pc) throws -> (Pc, CodeSlot) {
-        throw Breakpoint()
+        throw Breakpoint(
+            // Throw `pc` value before the breakpoint was triggered to allow resumption in same place
+            pc: pc - 1
+        )
     }
 }
