@@ -18,6 +18,7 @@
     import NIOFileSystem
     import SystemPackage
     import WasmKit
+    import WasmKitWASI
 
     extension BinaryInteger {
         init?(hexEncoded: Substring) {
@@ -31,25 +32,41 @@
         }
     }
 
+    private let codeOffset = UInt64(0x4000_0000_0000_0000)
+
     package actor WasmKitGDBHandler {
         enum Error: Swift.Error {
             case unknownTransferArguments
             case unknownReadMemoryArguments
+            case stoppingAtEntrypointFailed
         }
 
         private let wasmBinary: ByteBuffer
         private let moduleFilePath: FilePath
         private let logger: Logger
-        private let functionsRLE: [(wasmAddress: Int, iSeqAddress: Int)] = []
+        private let allocator: ByteBufferAllocator
+        private var debugger: Debugger
 
-        package init(logger: Logger, moduleFilePath: FilePath) async throws {
+        package init(moduleFilePath: FilePath, logger: Logger, allocator: ByteBufferAllocator) async throws {
             self.logger = logger
+            self.allocator = allocator
 
             self.wasmBinary = try await FileSystem.shared.withFileHandle(forReadingAt: moduleFilePath) {
                 try await $0.readToEnd(maximumSizeAllowed: .unlimited)
             }
 
             self.moduleFilePath = moduleFilePath
+
+            let store = Store(engine: Engine())
+            var imports = Imports()
+            let wasi = try WASIBridgeToHost()
+            wasi.link(to: &imports, store: store)
+
+            self.debugger = try Debugger(module: parseWasm(bytes: .init(buffer: self.wasmBinary)), store: store, imports: imports)
+            try self.debugger.stopAtEntrypoint()
+            guard try self.debugger.run() == nil else {
+                throw Error.stoppingAtEntrypointFailed
+            }
         }
 
         package func handle(command: GDBHostCommand) throws -> GDBTargetResponse {
@@ -101,7 +118,7 @@
             case .subsequentThreadInfo:
                 responseKind = .string("l")
 
-            case .targetStatus:
+            case .targetStatus, .threadStopInfo:
                 responseKind = .keyValuePairs([
                     "T05thread": "1",
                     "reason": "trace",
@@ -144,7 +161,7 @@
                     var length = Int(hexEncoded: argumentsArray[1])
                 else { throw Error.unknownReadMemoryArguments }
 
-                let binaryOffset = Int(address - 0x4000_0000_0000_0000)
+                let binaryOffset = Int(address - codeOffset)
 
                 if binaryOffset + length > wasmBinary.readableBytes {
                     length = wasmBinary.readableBytes - binaryOffset
@@ -152,7 +169,15 @@
 
                 responseKind = .hexEncodedBinary(wasmBinary.readableBytesView[binaryOffset..<(binaryOffset + length)])
 
-            case .wasmCallStack, .generalRegisters:
+            case .wasmCallStack:
+                let callStack = self.debugger.currentCallStack
+                var buffer = self.allocator.buffer(capacity: callStack.count * 8)
+                for pc in callStack {
+                    buffer.writeInteger(UInt64(pc) + codeOffset, endianness: .little)
+                }
+                responseKind = .hexEncodedBinary(buffer.readableBytesView)
+
+            case .generalRegisters:
                 fatalError()
             }
 

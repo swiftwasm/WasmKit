@@ -178,6 +178,19 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
             exclude: ["Fixtures"]
         ),
 
+        .executableTarget(
+            name: "wasmkit-gdb-tool",
+            dependencies: [
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                .product(name: "Logging", package: "swift-log"),
+                .product(name: "NIOCore", package: "swift-nio"),
+                .product(name: "NIOPosix", package: "swift-nio"),
+                .product(name: "SystemPackage", package: "swift-system"),
+                "GDBRemoteProtocol",
+                "WasmKitGDBHandler",
+            ]
+        ),
+
         .target(
             name: "WasmKitGDBHandler",
             dependencies: [

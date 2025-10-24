@@ -38,6 +38,7 @@ package struct GDBHostCommand: Equatable {
         case readMemoryBinaryData
         case readMemory
         case wasmCallStack
+        case threadStopInfo
 
         case generalRegisters
 
@@ -97,6 +98,7 @@ package struct GDBHostCommand: Equatable {
     ///   - arguments: raw arguments that immediately follow kind of the command.
     package init(kindString: String, arguments: String) throws(GDBHostCommandDecoder.Error) {
         let registerInfoPrefix = "qRegisterInfo"
+        let threadStopInfoPrefix = "qThreadStopInfo"
 
         if kindString.starts(with: "x") {
             self.kind = .readMemoryBinaryData
@@ -108,6 +110,14 @@ package struct GDBHostCommand: Equatable {
             return
         } else if kindString.starts(with: registerInfoPrefix) {
             self.kind = .registerInfo
+
+            guard arguments.isEmpty else {
+                throw GDBHostCommandDecoder.Error.unexpectedArgumentsValue
+            }
+            self.arguments = String(kindString.dropFirst(registerInfoPrefix.count))
+            return
+        } else if kindString.starts(with: threadStopInfoPrefix) {
+            self.kind = .threadStopInfo
 
             guard arguments.isEmpty else {
                 throw GDBHostCommandDecoder.Error.unexpectedArgumentsValue
