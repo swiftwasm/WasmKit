@@ -285,7 +285,7 @@ func executeWasm(
     store: Store,
     function handle: InternalFunction,
     type: FunctionType,
-    arguments: [Value],
+    arguments: [Value]
 ) throws -> [Value] {
     // NOTE: `store` variable must not outlive this function
     let store = StoreRef(store)
