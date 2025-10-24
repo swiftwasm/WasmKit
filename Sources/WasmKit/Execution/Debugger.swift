@@ -43,7 +43,7 @@
     }
 
     package struct Debugger: ~Copyable {
-        package enum Error: Swift.Error {
+        package enum Error: Swift.Error, @unchecked Sendable {
             case entrypointFunctionNotFound
             case unknownCurrentFunctionForResumedBreakpoint(UnsafeMutablePointer<UInt64>)
             case noInstructionMappingAvailable(Int)
@@ -130,7 +130,8 @@
             iseq.pointee = oldCodeSlot
         }
 
-        /// Returns: `[Value]` result of `entrypointFunction` if current instance ran to completion, `nil` if it stopped at a breakpoint.
+        /// - Returns: `[Value]` result of `entrypointFunction` if current instance ran to completion,
+        /// `nil` if it stopped at a breakpoint.
         package mutating func run() throws -> [Value]? {
             do {
                 if let currentBreakpoint {
