@@ -33,6 +33,8 @@
 
             let expectedPc = try #require(debugger.breakpoints.keys.first)
             #expect(debugger.currentCallStack == [expectedPc])
+
+            #expect(try debugger.run() == [.i32(42)])
         }
 
         @Test

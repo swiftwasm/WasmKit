@@ -557,6 +557,11 @@ extension Execution {
         self.trap = (rawError, sp)
     }
 
+    /// Used by the debugger to resume execution after breakpoints.
+    mutating func resetError() {
+        self.trap = nil
+    }
+
     @inline(__always)
     func checkStackBoundary(_ sp: Sp) throws {
         guard sp < stackEnd else { throw Trap(.callStackExhausted) }

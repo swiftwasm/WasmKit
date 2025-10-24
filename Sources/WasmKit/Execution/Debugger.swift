@@ -45,7 +45,9 @@
     package struct Debugger: ~Copyable {
         package enum Error: Swift.Error {
             case entrypointFunctionNotFound
+            case unknownCurrentFunctionForResumedBreakpoint(UnsafeMutablePointer<UInt64>)
             case noInstructionMappingAvailable(Int)
+            case noReverseInstructionMappingAvailable(UnsafeMutablePointer<UInt64>)
         }
 
         private let valueStack: Sp
@@ -66,7 +68,7 @@
 
         private(set) var breakpoints = [Int: CodeSlot]()
 
-        private var currentBreakpoint: Execution.Breakpoint?
+        private var currentBreakpoint: (iseq: Execution.Breakpoint, wasmPc: Int)?
 
         private var pc = Pc.allocate(capacity: 1)
 
@@ -131,16 +133,58 @@
         /// Returns: `[Value]` result of `entrypointFunction` if current instance ran to completion, `nil` if it stopped at a breakpoint.
         package mutating func run() throws -> [Value]? {
             do {
-                return try self.execution.executeWasm(
-                    threadingModel: self.threadingModel,
-                    function: self.entrypointFunction.handle,
-                    type: self.entrypointFunction.type,
-                    arguments: [],
-                    sp: self.valueStack,
-                    pc: self.pc
-                )
+                if let currentBreakpoint {
+                    // Remove the breakpoint before resuming
+                    try self.disableBreakpoint(address: currentBreakpoint.wasmPc)
+                    self.execution.resetError()
+
+                    var sp = currentBreakpoint.iseq.sp
+                    var pc = currentBreakpoint.iseq.pc
+                    var md: Md = nil
+                    var ms: Ms = 0
+
+                    guard let currentFunction = sp.currentFunction else {
+                        throw Error.unknownCurrentFunctionForResumedBreakpoint(sp)
+                    }
+
+                    Execution.CurrentMemory.mayUpdateCurrentInstance(
+                        instance: currentFunction.instance,
+                        from: self.instance.handle,
+                        md: &md,
+                        ms: &ms
+                    )
+
+                    do {
+                        switch self.threadingModel {
+                        case .direct:
+                            try self.execution.runDirectThreaded(sp: sp, pc: pc, md: md, ms: ms)
+                        case .token:
+                            try self.execution.runTokenThreaded(sp: &sp, pc: &pc, md: &md, ms: &ms)
+                        }
+                    } catch is Execution.EndOfExecution {
+                    }
+
+                    let type = self.store.engine.funcTypeInterner.resolve(currentFunction.type)
+                    return type.results.enumerated().map { (i, type) in
+                        sp[VReg(i)].cast(to: type)
+                    }
+                } else {
+                    return try self.execution.executeWasm(
+                        threadingModel: self.threadingModel,
+                        function: self.entrypointFunction.handle,
+                        type: self.entrypointFunction.type,
+                        arguments: [],
+                        sp: self.valueStack,
+                        pc: self.pc
+                    )
+                }
             } catch let breakpoint as Execution.Breakpoint {
-                self.currentBreakpoint = breakpoint
+                let pc = breakpoint.pc
+                guard let wasmPc = self.instance.handle.iseqToWasmMapping[pc] else {
+                    throw Error.noReverseInstructionMappingAvailable(pc)
+                }
+
+                self.currentBreakpoint = (breakpoint, wasmPc)
                 return nil
             }
         }
@@ -151,12 +195,10 @@
                 return []
             }
 
-            var result = Execution.captureBacktrace(sp: currentBreakpoint.sp, store: self.store).symbols.compactMap {
+            var result = Execution.captureBacktrace(sp: currentBreakpoint.iseq.sp, store: self.store).symbols.compactMap {
                 return self.instance.handle.iseqToWasmMapping[$0.address]
             }
-            if let wasmPc = self.instance.handle.iseqToWasmMapping[currentBreakpoint.pc] {
-                result.append(wasmPc)
-            }
+            result.append(currentBreakpoint.wasmPc)
 
             return result
         }
