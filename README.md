@@ -68,7 +68,7 @@ and should work on the following platforms:
 
 - macOS 10.13+, iOS 12.0+, tvOS 12.0+, watchOS 6.0+
 - Amazon Linux 2, Debian 12, Ubuntu 22.04+, Fedora 39+
-- [Android API Level 30](https://developer.android.com/tools/releases/platforms)
+- Android [API Level 30](https://developer.android.com/tools/releases/platforms)
 - Windows 10+
 
 ## Implementation Status
