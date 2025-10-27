@@ -5,7 +5,7 @@
         /// - Parameter value: the array element to search for or to use as a baseline when searching.
         /// - Returns: array element `result`, where `result - value` is the smallest possible, while
         /// `result > value` also holds.
-        fileprivate func binarySearch(nextClosestTo value: Int) -> Int? {
+        package func binarySearch(nextClosestTo value: Int) -> Int? {
             switch self.count {
             case 0:
                 return nil
