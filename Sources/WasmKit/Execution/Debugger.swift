@@ -1,7 +1,7 @@
 #if WasmDebuggingSupport
 
     extension [Int] {
-        /// Uses search to find for an element in an array that's the next closest to a given value.
+        /// Uses binary search to find an element in `self` that's next closest to a given value.
         /// - Parameter value: the array element to search for or to use as a baseline when searching.
         /// - Returns: array element `result`, where `result - value` is the smallest possible, and `result > value`.
         fileprivate func binarySearch(nextClosestTo value: Int) -> Int? {
