@@ -3,7 +3,8 @@
     extension [Int] {
         /// Uses binary search to find an element in `self` that's next closest to a given value.
         /// - Parameter value: the array element to search for or to use as a baseline when searching.
-        /// - Returns: array element `result`, where `result - value` is the smallest possible, and `result > value`.
+        /// - Returns: array element `result`, where `result - value` is the smallest possible, while
+        /// `result > value` also holds.
         fileprivate func binarySearch(nextClosestTo value: Int) -> Int? {
             switch self.count {
             case 0:
