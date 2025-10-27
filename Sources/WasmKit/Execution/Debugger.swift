@@ -1,7 +1,7 @@
 #if WasmDebuggingSupport
 
     extension [Int] {
-        func binarySearch(nextClosestTo value: Int) -> Int? {
+        fileprivate func binarySearch(nextClosestTo value: Int) -> Int? {
             switch self.count {
             case 0:
                 return nil
@@ -24,7 +24,7 @@
     }
 
     extension Instance {
-        func findIseq(forWasmAddress address: Int) throws(Debugger.Error) -> (iseq: Pc, wasm: Int) {
+        fileprivate func findIseq(forWasmAddress address: Int) throws(Debugger.Error) -> (iseq: Pc, wasm: Int) {
             // Look in the main mapping
             if let iseq = handle.wasmToIseqMapping[address] {
                 return (iseq, address)
