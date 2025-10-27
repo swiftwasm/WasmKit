@@ -321,6 +321,8 @@ extension Execution {
 
     #if WasmDebuggingSupport
 
+        /// Counterpart to the free `executeWasm` function but implemented as a method of `Execution`,
+        /// Useful for representation of debugger state that needs to own `Execution`'s memory.
         mutating func executeWasm(
             threadingModel: EngineConfiguration.ThreadingModel,
             function handle: InternalFunction,

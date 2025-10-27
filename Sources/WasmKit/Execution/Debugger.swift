@@ -30,8 +30,8 @@
     extension Instance {
         /// Return an address of WasmKit's iseq bytecode instruction that matches a given Wasm instruction address.
         /// - Parameter address: the Wasm instruction to find a mapping for.
-        /// - Returns: A tuple with an address of found iseq instruction and the closests matching Wasm instruction
-        /// if no direct match was found.
+        /// - Returns: A tuple with an address of found iseq instruction and the original Wasm instruction or next 
+        /// closest match if no direct match was found.
         fileprivate func findIseq(forWasmAddress address: Int) throws(Debugger.Error) -> (iseq: Pc, wasm: Int) {
             // Look in the main mapping
             if let iseq = handle.wasmToIseqMapping[address] {
@@ -50,7 +50,7 @@
         }
     }
 
-    /// User-facing debugger state that driven by a debugger host. This implementation has no knowledge of the exact
+    /// User-facing debugger state driven by a debugger host. This implementation has no knowledge of the exact
     /// debugger protocol, which allows any protocol implementation or direct API users to be layered on top if needed.
     package struct Debugger: ~Copyable {
         package enum Error: Swift.Error, @unchecked Sendable {
@@ -71,9 +71,10 @@
         private let instance: Instance
 
         /// Reference to the entrypoint function of the currently debugged module, for use in ``stopAtEntrypoint``.
+        /// Currently assumed to be the WASI command `_start` entrypoint.
         private let entrypointFunction: Function
 
-        /// Threading model of the Wasm engine configuration cached for a potentially hot path.
+        /// Threading model of the Wasm engine configuration, cached for a potentially hot path.
         private let threadingModel: EngineConfiguration.ThreadingModel
 
         private(set) var breakpoints = [Int: CodeSlot]()
@@ -112,7 +113,7 @@
         }
 
         /// Finds a Wasm address for the first instruction in a given function.
-        /// - Parameter function: the Wasm function to find a Wasm address for.
+        /// - Parameter function: the Wasm function to find the first Wasm instruction address for.
         /// - Returns: byte offset of the first Wasm instruction of given function in the module it was parsed from.
         private func originalAddress(function: Function) throws -> Int {
             precondition(function.handle.isWasm)
@@ -128,10 +129,11 @@
             }
         }
 
-        /// Enable a breakpoint at a given Wasm address.
+        /// Enables a breakpoint at a given Wasm address.
         /// - Parameter address: byte offset of the Wasm instruction that will be replaced with a breakpoint. If no
         /// direct internal bytecode matching instruction is found, the next closest internal bytecode instruction
-        /// is replaced with a breakpoint. The original instruction to be restored is preserved in debugger state.
+        /// is replaced with a breakpoint. The original instruction to be restored is preserved in debugger state
+        /// represented by `self`.
         /// See also ``Debugger/disableBreakpoint(address:)``.
         package mutating func enableBreakpoint(address: Int) throws(Error) {
             guard self.breakpoints[address] == nil else {

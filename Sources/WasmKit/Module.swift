@@ -139,7 +139,7 @@ public struct Module {
     }
 
     #if WasmDebuggingSupport
-        /// Instantiate this module in the given imports.
+        /// Instantiate this module with the given imports.
         ///
         /// - Parameters:
         ///   - store: The ``Store`` to allocate the instance in.

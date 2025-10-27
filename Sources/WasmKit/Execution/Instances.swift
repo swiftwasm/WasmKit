@@ -85,11 +85,11 @@ struct InstanceEntity /* : ~Copyable */ {
     var dataCount: UInt32?
     var isDebuggable: Bool
 
-    /// Mapping from iSeq Pc to instruction addresses in the original binary.
+    /// Mapping from iseq Pc to instruction addresses in the original binary.
     /// Used for handling current call stack requests issued by a ``Debugger`` instance.
     var iseqToWasmMapping = [Pc: Int]()
 
-    /// Mapping from Wasm instruction addresses in the original binary to iSeq instruction addresses.
+    /// Mapping from Wasm instruction addresses in the original binary to iseq instruction addresses.
     /// Used for handling breakpoint requests issued by a ``Debugger`` instance.
     var wasmToIseqMapping = [Int: Pc]()
 
