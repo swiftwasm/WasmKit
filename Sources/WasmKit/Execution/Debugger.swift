@@ -28,7 +28,7 @@
     }
 
     extension Instance {
-        /// Return an address of WasmKit's iseq bytecode instruction that matches a given Wasm instruction address.
+        /// Computes an address of WasmKit's iseq bytecode instruction that matches a given Wasm instruction address.
         /// - Parameter address: the Wasm instruction to find a mapping for.
         /// - Returns: A tuple with an address of found iseq instruction and the original Wasm instruction or next
         /// closest match if no direct match was found.
@@ -162,9 +162,9 @@
             iseq.pointee = oldCodeSlot
         }
 
-        /// If the module instantiated by the debugger is stopped at a breakpoint, the breakpoint is disabled
+        /// Resumes the module instantiated by the debugger stopped at a breakpoint. The breakpoint is disabled
         /// and execution is resumed until the next breakpoint is triggered or all remaining instructions are
-        /// executed. If the module is not stopped at a breakpoint, this function retusn immediately.
+        /// executed. If the module is not stopped at a breakpoint, this function returns immediately.
         /// - Returns: `[Value]` result of `entrypointFunction` if current instance ran to completion,
         /// `nil` if it stopped at a breakpoint.
         package mutating func run() throws -> [Value]? {
