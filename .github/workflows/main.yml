@@ -235,7 +235,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run Tests on Android emulator
-        uses: skiptools/swift-android-action@v2.6.4
+        uses: skiptools/swift-android-action@v2
 
   build-windows:
     runs-on: windows-latest
