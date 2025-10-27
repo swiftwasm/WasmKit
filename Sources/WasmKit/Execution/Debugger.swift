@@ -30,7 +30,7 @@
     extension Instance {
         /// Return an address of WasmKit's iseq bytecode instruction that matches a given Wasm instruction address.
         /// - Parameter address: the Wasm instruction to find a mapping for.
-        /// - Returns: A tuple with an address of found iseq instruction and the original Wasm instruction or next 
+        /// - Returns: A tuple with an address of found iseq instruction and the original Wasm instruction or next
         /// closest match if no direct match was found.
         fileprivate func findIseq(forWasmAddress address: Int) throws(Debugger.Error) -> (iseq: Pc, wasm: Int) {
             // Look in the main mapping
