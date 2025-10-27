@@ -1,9 +1,9 @@
 #if WasmDebuggingSupport
 
-extension [Int] {
-    /// Uses search to find for an element in an array that's the next closest to a given value.
-    /// - Parameter value: the array element to search for or to use as a baseline when searching.
-    /// - Returns: array element `result`, where `result - value` is the smallest possible, and `result > value`.
+    extension [Int] {
+        /// Uses search to find for an element in an array that's the next closest to a given value.
+        /// - Parameter value: the array element to search for or to use as a baseline when searching.
+        /// - Returns: array element `result`, where `result - value` is the smallest possible, and `result > value`.
         fileprivate func binarySearch(nextClosestTo value: Int) -> Int? {
             switch self.count {
             case 0:
@@ -26,11 +26,11 @@ extension [Int] {
         }
     }
 
-extension Instance {
-    /// Return an address of WasmKit's iseq bytecode instruction that matches a given Wasm instruction address.
-    /// - Parameter address: the Wasm instruction to find a mapping for.
-    /// - Returns: A tuple with an address of found iseq instruction and the closests matching Wasm instruction
-    /// if no direct match was found.
+    extension Instance {
+        /// Return an address of WasmKit's iseq bytecode instruction that matches a given Wasm instruction address.
+        /// - Parameter address: the Wasm instruction to find a mapping for.
+        /// - Returns: A tuple with an address of found iseq instruction and the closests matching Wasm instruction
+        /// if no direct match was found.
         fileprivate func findIseq(forWasmAddress address: Int) throws(Debugger.Error) -> (iseq: Pc, wasm: Int) {
             // Look in the main mapping
             if let iseq = handle.wasmToIseqMapping[address] {
@@ -49,8 +49,8 @@ extension Instance {
         }
     }
 
-/// User-facing debugger state that driven by a debugger host. This implementation has no knowledge of the exact
-/// debugger protocol, which allows any protocol implementation or direct API users to be layered on top if needed.
+    /// User-facing debugger state that driven by a debugger host. This implementation has no knowledge of the exact
+    /// debugger protocol, which allows any protocol implementation or direct API users to be layered on top if needed.
     package struct Debugger: ~Copyable {
         package enum Error: Swift.Error, @unchecked Sendable {
             case entrypointFunctionNotFound
@@ -80,7 +80,7 @@ extension Instance {
         private var currentBreakpoint: (iseq: Execution.Breakpoint, wasmPc: Int)?
 
         private var pc = Pc.allocate(capacity: 1)
-        
+
         /// Initializes a new debugger state instance.
         /// - Parameters:
         ///   - module: Wasm module to instantiate.
@@ -103,13 +103,13 @@ extension Instance {
             self.threadingModel = store.engine.configuration.threadingModel
             self.pc.pointee = Instruction.endOfExecution.headSlot(threadingModel: threadingModel)
         }
-        
+
         /// Sets a breakpoint at the first instruction in the entrypoint function of the module instantiated by
         /// this debugger.
         package mutating func stopAtEntrypoint() throws {
             try self.enableBreakpoint(address: self.originalAddress(function: entrypointFunction))
         }
-        
+
         /// Finds a Wasm address for the first instruction in a given function.
         /// - Parameter function: the Wasm function to find a Wasm address for.
         /// - Returns: byte offset of the first Wasm instruction of given function in the module it was parsed from.
@@ -126,7 +126,7 @@ extension Instance {
                 fatalError()
             }
         }
-        
+
         /// Enable a breakpoint at a given Wasm address.
         /// - Parameter address: byte offset of the Wasm instruction that will be replaced with a breakpoint. If no
         /// direct internal bytecode matching instruction is found, the next closest internal bytecode instruction
@@ -142,7 +142,7 @@ extension Instance {
             self.breakpoints[wasm] = iseq.pointee
             iseq.pointee = Instruction.breakpoint.headSlot(threadingModel: self.threadingModel)
         }
-        
+
         /// Disables a breakpoint at a given Wasm address. If no breakpoint at a given address was previously set with
         /// `self.enableBreakpoint(address:), this function immediately returns.
         /// - Parameter address: byte offset of the Wasm instruction that was replaced with a breakpoint. The original
