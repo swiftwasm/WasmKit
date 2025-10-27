@@ -1,1 +1,0 @@
-../GDBRemoteProtocol/LICENSE.txt
