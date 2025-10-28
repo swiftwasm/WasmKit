@@ -188,7 +188,7 @@ jobs:
         run: sudo chown -R $USER .build/html
       - if: matrix.build-dev-dashboard
         id: deployment
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: .build/html
 
@@ -232,10 +232,19 @@ jobs:
 
   build-android:
     runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        include:
+          - swift-version: "6.2"
+          - swift-version: nightly-main
+
     steps:
       - uses: actions/checkout@v4
       - name: Run Tests on Android emulator
         uses: skiptools/swift-android-action@v2
+        with:
+          android-api-level: 30
+          swift-version: "${{ matrix.swift-version }}"
 
   build-windows:
     runs-on: windows-latest
