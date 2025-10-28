@@ -93,3 +93,14 @@ $ swift test
 This project was originally developed by [@akkyie](https://github.com/akkyie), and is now maintained by the community.
 
 [^1]: On a 2020 Mac mini (M1, 16GB RAM) with Swift 5.10. Measured by `swift package resolve && swift package clean && time swift build --product PrintAdd`.
+License
+
+## License
+
+WasmKit runtime modules are licensed under MIT License. See [LICENSE](https://raw.githubusercontent.com/swiftwasm/WasmKit/refs/heads/main/LICENSE) file for license information.
+
+GDB Remote Protocol support (`GDBRemoteProtocol` and `WasmKitGDBHandler` modules) is licensed separately under Apache License v2.0 with Runtime Library Exception, Copyright 2025 Apple Inc. and the Swift project authors.
+
+See https://swift.org/LICENSE.txt for license information.
+
+See https://swift.org/CONTRIBUTORS.txt for Swift project authors.

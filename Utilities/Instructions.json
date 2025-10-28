@@ -209,5 +209,12 @@
   ["threads"             , "i32.atomic.load16_u"      , ["0xFE", "0x13"], [["memarg", "MemArg"]]                             , "load"      ],
   ["threads"             , "i64.atomic.load8_u"       , ["0xFE", "0x14"], [["memarg", "MemArg"]]                             , "load"      ],
   ["threads"             , "i64.atomic.load16_u"      , ["0xFE", "0x15"], [["memarg", "MemArg"]]                             , "load"      ],
-  ["threads"             , "i64.atomic.load32_u"      , ["0xFE", "0x16"], [["memarg", "MemArg"]]                             , "load"      ]
+  ["threads"             , "i64.atomic.load32_u"      , ["0xFE", "0x16"], [["memarg", "MemArg"]]                             , "load"      ],
+  ["threads"             , "i32.atomic.store"         , ["0xFE", "0x17"], [["memarg", "MemArg"]]                             , "store"     ],
+  ["threads"             , "i64.atomic.store"         , ["0xFE", "0x18"], [["memarg", "MemArg"]]                             , "store"     ],
+  ["threads"             , "i32.atomic.store8"        , ["0xFE", "0x19"], [["memarg", "MemArg"]]                             , "store"     ],
+  ["threads"             , "i32.atomic.store16"       , ["0xFE", "0x1A"], [["memarg", "MemArg"]]                             , "store"     ],
+  ["threads"             , "i64.atomic.store8"        , ["0xFE", "0x1B"], [["memarg", "MemArg"]]                             , "store"     ],
+  ["threads"             , "i64.atomic.store16"       , ["0xFE", "0x1C"], [["memarg", "MemArg"]]                             , "store"     ],
+  ["threads"             , "i64.atomic.store32"       , ["0xFE", "0x1D"], [["memarg", "MemArg"]]                             , "store"     ]
 ]

@@ -17,7 +17,7 @@ jobs:
           VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')
           echo "{WASMKIT_VERSION}={$VERSION}" >> "$GITHUB_ENV"
       - run: ./Utilities/build-release.py -o wasmkit-x86_64-apple-macos.tar.gz -s $WASMKIT_VERSION -- --triple x86_64-apple-macos
-      - run: ./Utilities/build-release.py -o wasmkit-arm64-apple-macos.tar.gz  -s $WASMKIT_VERSION --triple arm64-apple-macos
+      - run: ./Utilities/build-release.py -o wasmkit-arm64-apple-macos.tar.gz  -s $WASMKIT_VERSION -- --triple arm64-apple-macos
       - uses: actions/upload-artifact@v5
         with:
           name: release-wasmkit-x86_64-apple-macos
@@ -65,7 +65,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v6
         with:
           pattern: release-wasmkit-*
           path: ./release/
