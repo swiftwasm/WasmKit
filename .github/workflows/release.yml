@@ -13,13 +13,16 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - run: ./Utilities/build-release.py -o wasmkit-x86_64-apple-macos.tar.gz -- --triple x86_64-apple-macos
-      - run: ./Utilities/build-release.py -o wasmkit-arm64-apple-macos.tar.gz  -- --triple arm64-apple-macos
-      - uses: actions/upload-artifact@v4
+      - run: |
+          VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')
+          echo "{WASMKIT_VERSION}={$VERSION}" >> "$GITHUB_ENV"
+      - run: ./Utilities/build-release.py -o wasmkit-x86_64-apple-macos.tar.gz -s $WASMKIT_VERSION -- --triple x86_64-apple-macos
+      - run: ./Utilities/build-release.py -o wasmkit-arm64-apple-macos.tar.gz  -s $WASMKIT_VERSION --triple arm64-apple-macos
+      - uses: actions/upload-artifact@v5
         with:
           name: release-wasmkit-x86_64-apple-macos
           path: wasmkit-x86_64-apple-macos.tar.gz
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: release-wasmkit-arm64-apple-macos
           path: wasmkit-arm64-apple-macos.tar.gz
@@ -41,13 +44,16 @@ jobs:
           ./build-exec apt-get install -y llvm-15
           ./build-exec ln -s /usr/bin/llvm-strip-15 /usr/bin/llvm-strip
 
-      - run: ./build-exec ./Utilities/build-release.py -o wasmkit-x86_64-swift-linux-musl.tar.gz  -- --swift-sdk x86_64-swift-linux-musl
-      - run: ./build-exec ./Utilities/build-release.py -o wasmkit-aarch64-swift-linux-musl.tar.gz -- --swift-sdk aarch64-swift-linux-musl
-      - uses: actions/upload-artifact@v4
+      - run: |
+          VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')
+          echo "{WASMKIT_VERSION}={$VERSION}" >> "$GITHUB_ENV"
+      - run: ./build-exec ./Utilities/build-release.py -o wasmkit-x86_64-swift-linux-musl.tar.gz  -s $WASMKIT_VERSION -- --swift-sdk x86_64-swift-linux-musl
+      - run: ./build-exec ./Utilities/build-release.py -o wasmkit-aarch64-swift-linux-musl.tar.gz -s $WASMKIT_VERSION -- --swift-sdk aarch64-swift-linux-musl
+      - uses: actions/upload-artifact@v5
         with:
           name: release-wasmkit-x86_64-swift-linux-musl
           path: wasmkit-x86_64-swift-linux-musl.tar.gz
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: release-wasmkit-aarch64-swift-linux-musl
           path: wasmkit-aarch64-swift-linux-musl.tar.gz

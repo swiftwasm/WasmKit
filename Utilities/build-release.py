@@ -26,9 +26,31 @@ def main():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("-o", "--output", required=True)
+    parser.add_argument("-s", "--semantic-version", required=True)
     parser.add_argument("extra_build_args", nargs="*")
 
     args = parser.parse_args()
+
+    # Check that `README.md` has been updated with the latest version.
+    version_ok = False
+    with open(os.path.join(SOURCE_ROOT, 'README.md')) as file:
+      for line in file:
+        if f'from: "{args.semantic_version}"' in line:
+            version_ok = True
+
+    if not version_ok:
+      print("Expected README.md to contain a reference of the newly released version.", file=sys.stderr)
+      sys.exit(1)
+
+    version_ok = False
+    with open(os.path.join(SOURCE_ROOT, 'Sources', 'CLI', 'CLI.swift')) as file:
+      for line in file:
+        if f'version: "{args.semantic_version}"' in line:
+            version_ok = True
+
+    if not version_ok:
+      print("Expected `Sources/CLI/CLI.swift` to specify the newly released version.", file=sys.stderr)
+      sys.exit(1)
 
     build_args = ["swift", "build", "-c", "release", "--product", "wasmkit-cli", "--package-path", SOURCE_ROOT] + args.extra_build_args
     bin_path = subprocess.check_output(build_args + ["--show-bin-path"], text=True).strip()
