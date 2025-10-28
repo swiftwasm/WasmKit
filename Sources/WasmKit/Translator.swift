@@ -1101,13 +1101,13 @@ struct InstructionTranslator: InstructionVisitor {
         assert(initializedElementsIndex == instructions.endIndex)
 
         #if WasmDebuggingSupport
-        for (iseq, wasm) in self.iseqToWasmMapping {
-            self.module.withValue {
-                let absoluteIseq = iseq + buffer.baseAddress.unsafelyUnwrapped
-                $0.instructionMapping.add(wasm: wasm, iseq: absoluteIseq)
+            for (iseq, wasm) in self.iseqToWasmMapping {
+                self.module.withValue {
+                    let absoluteIseq = iseq + buffer.baseAddress.unsafelyUnwrapped
+                    $0.instructionMapping.add(wasm: wasm, iseq: absoluteIseq)
+                }
             }
-        }
-#endif
+        #endif
 
         let constants = allocator.allocateConstants(self.constantSlots.values)
         return InstructionSequence(
