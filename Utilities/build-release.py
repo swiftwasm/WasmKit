@@ -39,9 +39,10 @@ def main():
             version_ok = True
 
     if not version_ok:
-      print("Expected README.md to contain a reference of the newly released version.", file=sys.stderr)
+      print("Expected README.md to contain a reference to the newly released version in Package.swift sample.", file=sys.stderr)
       sys.exit(1)
 
+    # Check that `CLI.swift` has been updated with the latest version.
     version_ok = False
     with open(os.path.join(SOURCE_ROOT, 'Sources', 'CLI', 'CLI.swift')) as file:
       for line in file:
