@@ -1100,19 +1100,14 @@ struct InstructionTranslator: InstructionVisitor {
         let initializedElementsIndex = buffer.initialize(fromContentsOf: instructions)
         assert(initializedElementsIndex == instructions.endIndex)
 
+        #if WasmDebuggingSupport
         for (iseq, wasm) in self.iseqToWasmMapping {
             self.module.withValue {
-                let absoluteISeq = iseq + buffer.baseAddress.unsafelyUnwrapped
-                // Don't override the existing mapping, only store a new pair if there's no mapping for a given key.
-                if $0.iseqToWasmMapping[absoluteISeq] == nil {
-                    $0.iseqToWasmMapping[absoluteISeq] = wasm
-                }
-                if $0.wasmToIseqMapping[wasm] == nil {
-                    $0.wasmToIseqMapping[wasm] = absoluteISeq
-                }
-                $0.wasmMappings.append(wasm)
+                let absoluteIseq = iseq + buffer.baseAddress.unsafelyUnwrapped
+                $0.instructionMapping.add(wasm: wasm, iseq: absoluteIseq)
             }
         }
+#endif
 
         let constants = allocator.allocateConstants(self.constantSlots.values)
         return InstructionSequence(
@@ -2304,16 +2299,6 @@ struct InstructionTranslator: InstructionVisitor {
         pushEmit(try module.addressType(tableIndex: table)) { result in
             return .tableSize(Instruction.TableSizeOperand(tableIndex: table, result: LVReg(result)))
         }
-    }
-
-    mutating func visitUnknown(_ opcode: [UInt8]) throws -> Bool {
-        guard self.module.isDebuggable && opcode.count == 1 && opcode[0] == 0xFF else {
-            return false
-        }
-
-        emit(.breakpoint)
-
-        return true
     }
 }
 

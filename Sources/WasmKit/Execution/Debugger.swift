@@ -1,55 +1,4 @@
 #if WasmDebuggingSupport
-
-    extension [Int] {
-        /// Uses binary search to find an element in `self` that's next closest to a given value.
-        /// - Parameter value: the array element to search for or to use as a baseline when searching.
-        /// - Returns: array element `result`, where `result - value` is the smallest possible, while
-        /// `result > value` also holds.
-        package func binarySearch(nextClosestTo value: Int) -> Int? {
-            switch self.count {
-            case 0:
-                return nil
-            default:
-                var slice = self[0..<self.count]
-                while slice.count > 1 {
-                    let middle = (slice.endIndex - slice.startIndex) / 2
-                    if slice[middle] < value {
-                        // Not found anything in the lower half, assigning higher half to `slice`.
-                        slice = slice[(middle + 1)..<slice.endIndex]
-                    } else {
-                        // Not found anything in the higher half, assigning lower half to `slice`.
-                        slice = slice[slice.startIndex..<middle]
-                    }
-                }
-
-                return self[slice.startIndex]
-            }
-        }
-    }
-
-    extension Instance {
-        /// Computes an address of WasmKit's iseq bytecode instruction that matches a given Wasm instruction address.
-        /// - Parameter address: the Wasm instruction to find a mapping for.
-        /// - Returns: A tuple with an address of found iseq instruction and the original Wasm instruction or next
-        /// closest match if no direct match was found.
-        fileprivate func findIseq(forWasmAddress address: Int) throws(Debugger.Error) -> (iseq: Pc, wasm: Int) {
-            // Look in the main mapping
-            if let iseq = handle.wasmToIseqMapping[address] {
-                return (iseq, address)
-            }
-
-            // If nothing found, find the closest Wasm address using binary search
-            guard let nextAddress = handle.wasmMappings.binarySearch(nextClosestTo: address),
-                // Look in the main mapping again with the next closest address if binary search produced anything
-                let iseq = handle.wasmToIseqMapping[nextAddress]
-            else {
-                throw Debugger.Error.noInstructionMappingAvailable(address)
-            }
-
-            return (iseq, nextAddress)
-        }
-    }
-
     /// User-facing debugger state driven by a debugger host. This implementation has no knowledge of the exact
     /// debugger protocol, which allows any protocol implementation or direct API users to be layered on top if needed.
     package struct Debugger: ~Copyable {
@@ -140,7 +89,9 @@
                 return
             }
 
-            let (iseq, wasm) = try self.instance.findIseq(forWasmAddress: address)
+            guard let (iseq, wasm) = try self.instance.handle.instructionMapping.findIseq(forWasmAddress: address) else {
+                throw Error.noInstructionMappingAvailable(address)
+            }
 
             self.breakpoints[wasm] = iseq.pointee
             iseq.pointee = Instruction.breakpoint.headSlot(threadingModel: self.threadingModel)
@@ -156,7 +107,9 @@
                 return
             }
 
-            let (iseq, wasm) = try self.instance.findIseq(forWasmAddress: address)
+            guard let (iseq, wasm) = try self.instance.handle.instructionMapping.findIseq(forWasmAddress: address) else {
+                throw Error.noInstructionMappingAvailable(address)
+            }
 
             self.breakpoints[wasm] = nil
             iseq.pointee = oldCodeSlot
@@ -216,7 +169,7 @@
                 }
             } catch let breakpoint as Execution.Breakpoint {
                 let pc = breakpoint.pc
-                guard let wasmPc = self.instance.handle.iseqToWasmMapping[pc] else {
+                guard let wasmPc = self.instance.handle.instructionMapping.findWasm(forIseqAddress: pc) else {
                     throw Error.noReverseInstructionMappingAvailable(pc)
                 }
 
@@ -232,7 +185,7 @@
             }
 
             var result = Execution.captureBacktrace(sp: currentBreakpoint.iseq.sp, store: self.store).symbols.compactMap {
-                return self.instance.handle.iseqToWasmMapping[$0.address]
+                return self.instance.handle.instructionMapping.findWasm(forIseqAddress: $0.address)
             }
             result.append(currentBreakpoint.wasmPc)
 
