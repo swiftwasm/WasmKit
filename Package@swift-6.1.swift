@@ -1,4 +1,4 @@
-// swift-tools-version:6.0
+// swift-tools-version:6.1
 
 import PackageDescription
 
@@ -8,7 +8,7 @@ let DarwinPlatforms: [Platform] = [.macOS, .iOS, .watchOS, .tvOS, .visionOS]
 
 let package = Package(
     name: "WasmKit",
-    platforms: [.macOS(.v10_13), .iOS(.v12)],
+    platforms: [.macOS(.v15), .iOS(.v17)],
     products: [
         .executable(name: "wasmkit-cli", targets: ["CLI"]),
         .library(name: "WasmKit", targets: ["WasmKit"]),
@@ -18,6 +18,10 @@ let package = Package(
         .library(name: "WAT", targets: ["WAT"]),
         .library(name: "WIT", targets: ["WIT"]),
         .library(name: "_CabiShims", targets: ["_CabiShims"]),
+    ],
+    traits: [
+        .default(enabledTraits: []),
+        "WasmDebuggingSupport"
     ],
     targets: [
         .executableTarget(
@@ -118,18 +122,30 @@ let package = Package(
 
         .target(name: "WITExtractor"),
         .testTarget(name: "WITExtractorTests", dependencies: ["WITExtractor", "WIT"]),
-    ]
+
+        .target(name: "GDBRemoteProtocol",
+            dependencies: [
+                .product(name: "Logging", package: "swift-log"),
+                .product(name: "NIOCore", package: "swift-nio"),
+            ]
+        ),
+        .testTarget(name: "GDBRemoteProtocolTests", dependencies: ["GDBRemoteProtocol"]),
+    ],
 )
 
 if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
     package.dependencies += [
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.5.1"),
         .package(url: "https://github.com/apple/swift-system", from: "1.5.0"),
+        .package(url: "https://github.com/apple/swift-nio", from: "2.86.2"),
+        .package(url: "https://github.com/apple/swift-log", from: "1.6.4"),
     ]
 } else {
     package.dependencies += [
         .package(path: "../swift-argument-parser"),
         .package(path: "../swift-system"),
+        .package(path: "../swift-nio"),
+        .package(path: "../swift-log"),
     ]
 }
 
@@ -160,6 +176,18 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
         .testTarget(
             name: "WITExtractorPluginTests",
             exclude: ["Fixtures"]
+        ),
+
+        .target(
+            name: "WasmKitGDBHandler",
+            dependencies: [
+                .product(name: "_NIOFileSystem", package: "swift-nio"),
+                .product(name: "NIOCore", package: "swift-nio"),
+                .product(name: "SystemPackage", package: "swift-system"),
+                "WasmKit",
+                "WasmKitWASI",
+                "GDBRemoteProtocol",
+            ],
         ),
     ])
 #endif

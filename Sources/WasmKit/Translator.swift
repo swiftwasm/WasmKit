@@ -1807,6 +1807,14 @@ struct InstructionTranslator: InstructionVisitor {
         case .i64Load16U: instruction = Instruction.i64Load16U
         case .i64Load32S: instruction = Instruction.i64Load32S
         case .i64Load32U: instruction = Instruction.i64Load32U
+        case .i32AtomicLoad: instruction = Instruction.i32AtomicLoad
+        case .i64AtomicLoad: instruction = Instruction.i64AtomicLoad
+        case .i32AtomicLoad8U: instruction = Instruction.i32AtomicLoad8U
+        case .i32AtomicLoad16U: instruction = Instruction.i32AtomicLoad16U
+        case .i64AtomicLoad8U: instruction = Instruction.i64AtomicLoad8U
+        case .i64AtomicLoad16U: instruction = Instruction.i64AtomicLoad16U
+        case .i64AtomicLoad32U: instruction = Instruction.i64AtomicLoad32U
+
         }
         try visitLoad(memarg, load.type, load.naturalAlignment, instruction)
     }
@@ -1823,6 +1831,13 @@ struct InstructionTranslator: InstructionVisitor {
         case .i64Store8: instruction = Instruction.i64Store8
         case .i64Store16: instruction = Instruction.i64Store16
         case .i64Store32: instruction = Instruction.i64Store32
+        case .i32AtomicStore: instruction = Instruction.i32AtomicStore
+        case .i64AtomicStore: instruction = Instruction.i64AtomicStore
+        case .i32AtomicStore8: instruction = Instruction.i32AtomicStore8
+        case .i32AtomicStore16: instruction = Instruction.i32AtomicStore16
+        case .i64AtomicStore8: instruction = Instruction.i64AtomicStore8
+        case .i64AtomicStore16: instruction = Instruction.i64AtomicStore16
+        case .i64AtomicStore32: instruction = Instruction.i64AtomicStore32
         }
         try visitStore(memarg, store.type, store.naturalAlignment, instruction)
     }

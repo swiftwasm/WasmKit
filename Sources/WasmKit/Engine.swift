@@ -48,7 +48,11 @@ public struct EngineConfiguration {
         }
 
         static var defaultForCurrentPlatform: ThreadingModel {
-            return useDirectThreadedCode ? .direct : .token
+            #if os(WASI)
+                return .token
+            #else
+                return useDirectThreadedCode ? .direct : .token
+            #endif
         }
     }
 

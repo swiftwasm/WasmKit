@@ -12,6 +12,8 @@ import Android
 #elseif os(Windows)
 import ucrt
 import WinSDK
+#elseif os(WASI)
+import WASILibc
 #else
 #error("Unsupported Platform")
 #endif
@@ -127,7 +129,7 @@ internal func system_symlinkat(
 extension CInterop {
   #if SYSTEM_PACKAGE_DARWIN
   public typealias DirP = UnsafeMutablePointer<DIR>
-  #elseif os(Linux) || os(Android)
+  #elseif os(Linux) || os(Android) || os(WASI)
   public typealias DirP = OpaquePointer
   #else
   #error("Unsupported Platform")

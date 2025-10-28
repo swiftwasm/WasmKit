@@ -353,54 +353,69 @@ extension VMGen {
         let op: String
         let loadAs: String
         let castToValue: String
+        let isSigned: Bool
+        let isFloatingPoint: Bool
         var instruction: Instruction {
             Instruction(name: "\(type)\(op)", documentation: "WebAssembly Core Instruction `\(type).\(VMGen.snakeCase(pascalCase: op))`",
+                        mayThrow: true, useCurrentMemory: .read, immediateLayout: .load)
+        }
+        var atomicInstruction: Instruction {
+            Instruction(name: "\(type)Atomic\(op)", documentation: "WebAssembly Core Instruction `\(type).atomic.\(VMGen.snakeCase(pascalCase: op))`",
                         mayThrow: true, useCurrentMemory: .read, immediateLayout: .load)
         }
     }
 
     static let memoryLoadOps: [LoadOpInfo] = [
-        ("i32", "Load", "UInt32", ".i32($0)"),
-        ("i64", "Load", "UInt64", ".i64($0)"),
-        ("f32", "Load", "UInt32", ".rawF32($0)"),
-        ("f64", "Load", "UInt64", ".rawF64($0)"),
-        ("i32", "Load8S", "Int8", ".init(signed: Int32($0))"),
-        ("i32", "Load8U", "UInt8", ".i32(UInt32($0))"),
-        ("i32", "Load16S", "Int16", ".init(signed: Int32($0))"),
-        ("i32", "Load16U", "UInt16", ".i32(UInt32($0))"),
-        ("i64", "Load8S", "Int8", ".init(signed: Int64($0))"),
-        ("i64", "Load8U", "UInt8", ".i64(UInt64($0))"),
-        ("i64", "Load16S", "Int16", ".init(signed: Int64($0))"),
-        ("i64", "Load16U", "UInt16", ".i64(UInt64($0))"),
-        ("i64", "Load32S", "Int32", ".init(signed: Int64($0))"),
-        ("i64", "Load32U", "UInt32", ".i64(UInt64($0))"),
-    ].map { (type, op, loadAs, castToValue) in
-        return LoadOpInfo(type: type, op: op, loadAs: loadAs, castToValue: castToValue)
+        ("i32", "Load", "UInt32", ".i32($0)", false, false),
+        ("i64", "Load", "UInt64", ".i64($0)", false, false),
+        ("f32", "Load", "UInt32", ".rawF32($0)", false, true),
+        ("f64", "Load", "UInt64", ".rawF64($0)", false, true),
+        ("i32", "Load8S", "Int8", ".init(signed: Int32($0))", true, false),
+        ("i32", "Load8U", "UInt8", ".i32(UInt32($0))", false, false),
+        ("i32", "Load16S", "Int16", ".init(signed: Int32($0))", true, false),
+        ("i32", "Load16U", "UInt16", ".i32(UInt32($0))", false, false),
+        ("i64", "Load8S", "Int8", ".init(signed: Int64($0))", true, false),
+        ("i64", "Load8U", "UInt8", ".i64(UInt64($0))", false, false),
+        ("i64", "Load16S", "Int16", ".init(signed: Int64($0))", true, false),
+        ("i64", "Load16U", "UInt16", ".i64(UInt64($0))", false, false),
+        ("i64", "Load32S", "Int32", ".init(signed: Int64($0))", true, false),
+        ("i64", "Load32U", "UInt32", ".i64(UInt64($0))", false, false),
+    ].map { (type, op, loadAs, castToValue, isSigned, isFloatingPoint) in
+        return LoadOpInfo(type: type, op: op, loadAs: loadAs, castToValue: castToValue, isSigned: isSigned, isFloatingPoint: isFloatingPoint)
     }
+
+    static let memoryAtomicLoadOps = memoryLoadOps.filter { !$0.isFloatingPoint && !$0.isSigned }
 
     struct StoreOpInfo {
         let type: String
         let op: String
         let castFromValue: String
+        let isFloatingPoint: Bool
         var instruction: Instruction {
             Instruction(name: "\(type)\(op)", documentation: "WebAssembly Core Instruction `\(type).\(VMGen.snakeCase(pascalCase: op))`",
                         mayThrow: true, useCurrentMemory: .read, immediateLayout: .store)
         }
+        var atomicInstruction: Instruction {
+            Instruction(name: "\(type)Atomic\(op)", documentation: "WebAssembly Core Instruction `\(type).atomic.\(VMGen.snakeCase(pascalCase: op))`",
+                        mayThrow: true, useCurrentMemory: .read, immediateLayout: .store)
+        }
     }
     static let memoryStoreOps: [StoreOpInfo] = [
-        ("i32", "Store", "$0.i32"),
-        ("i64", "Store", "$0.i64"),
-        ("f32", "Store", "$0.rawF32"),
-        ("f64", "Store", "$0.rawF64"),
-        ("i32", "Store8", "UInt8(truncatingIfNeeded: $0.i32)"),
-        ("i32", "Store16", "UInt16(truncatingIfNeeded: $0.i32)"),
-        ("i64", "Store8", "UInt8(truncatingIfNeeded: $0.i64)"),
-        ("i64", "Store16", "UInt16(truncatingIfNeeded: $0.i64)"),
-        ("i64", "Store32", "UInt32(truncatingIfNeeded: $0.i64)"),
-    ].map { (type, op, castFromValue) in
-        return StoreOpInfo(type: type, op: op, castFromValue: castFromValue)
+        ("i32", "Store", "$0.i32", false),
+        ("i64", "Store", "$0.i64", false),
+        ("f32", "Store", "$0.rawF32", true),
+        ("f64", "Store", "$0.rawF64", true),
+        ("i32", "Store8", "UInt8(truncatingIfNeeded: $0.i32)", false),
+        ("i32", "Store16", "UInt16(truncatingIfNeeded: $0.i32)", false),
+        ("i64", "Store8", "UInt8(truncatingIfNeeded: $0.i64)", false),
+        ("i64", "Store16", "UInt16(truncatingIfNeeded: $0.i64)", false),
+        ("i64", "Store32", "UInt32(truncatingIfNeeded: $0.i64)", false),
+    ].map { (type, op, castFromValue, isFloatingPoint) in
+        return StoreOpInfo(type: type, op: op, castFromValue: castFromValue, isFloatingPoint: isFloatingPoint)
     }
+    static let memoryAtomicStoreOps = memoryStoreOps.filter { !$0.isFloatingPoint }
     static let memoryLoadStoreInsts: [Instruction] = memoryLoadOps.map(\.instruction) + memoryStoreOps.map(\.instruction)
+    static let memoryAtomicInsts: [Instruction] = memoryAtomicLoadOps.map(\.atomicInstruction) + memoryAtomicStoreOps.map(\.atomicInstruction)
     static let memoryOpInsts: [Instruction] = [
         Instruction(name: "memorySize", documentation: "WebAssembly Core Instruction `memory.size`") {
             $0.field(name: "memoryIndex", type: .MemoryIndex)
@@ -608,6 +623,7 @@ extension VMGen {
         instructions += floatBinOps.map(\.instruction)
         instructions += floatUnaryOps.map(\.instruction)
         instructions += miscInsts
+        instructions += memoryAtomicInsts
         return instructions
     }
 

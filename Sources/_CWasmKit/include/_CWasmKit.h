@@ -1,6 +1,7 @@
 #ifndef WASMKIT__CWASMKIT_H
 #define WASMKIT__CWASMKIT_H
 
+#include <stdatomic.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -16,6 +17,7 @@ typedef void *_Nullable Pc;
 typedef void *_Nullable Md;
 typedef size_t Ms;
 
+#if WASMKIT_USE_DIRECT_THREADED_CODE
 /// The function type for executing a single instruction and transitioning to
 /// the next instruction by tail calling. `swiftasync` calling convention is
 /// used to keep `state` in the context register and to force tail calling.
@@ -39,6 +41,7 @@ static inline void wasmkit_tc_start(
 ) {
   exec(sp, pc, md, ms, state);
 }
+#endif
 
 static inline void wasmkit_fwrite_stderr(const char *_Nonnull str, size_t len) {
   fwrite(str, 1, len, stderr);

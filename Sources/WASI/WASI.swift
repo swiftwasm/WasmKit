@@ -12,6 +12,8 @@ import WasmTypes
     import Android
 #elseif os(Windows)
     import ucrt
+#elseif os(WASI)
+    import WASILibc
 #else
     #error("Unsupported Platform")
 #endif
@@ -1391,7 +1393,7 @@ public class WASIBridgeToHost: WASI {
         fdTable[2] = .file(StdioFileEntry(fd: stderr, accessMode: .write))
 
         for (guestPath, hostPath) in preopens {
-            #if os(Windows)
+            #if os(Windows) || os(WASI)
                 let fd = try FileDescriptor.open(FilePath(hostPath), .readWrite)
             #else
                 let fd = try hostPath.withCString { cHostPath in

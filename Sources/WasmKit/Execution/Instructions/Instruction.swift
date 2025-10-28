@@ -417,6 +417,34 @@ enum Instruction: Equatable {
     /// 
     /// This instruction is used in debugging scenarios.
     case breakpoint
+    /// WebAssembly Core Instruction `i32.atomic.load`
+    case i32AtomicLoad(Instruction.LoadOperand)
+    /// WebAssembly Core Instruction `i64.atomic.load`
+    case i64AtomicLoad(Instruction.LoadOperand)
+    /// WebAssembly Core Instruction `i32.atomic.load8_u`
+    case i32AtomicLoad8U(Instruction.LoadOperand)
+    /// WebAssembly Core Instruction `i32.atomic.load16_u`
+    case i32AtomicLoad16U(Instruction.LoadOperand)
+    /// WebAssembly Core Instruction `i64.atomic.load8_u`
+    case i64AtomicLoad8U(Instruction.LoadOperand)
+    /// WebAssembly Core Instruction `i64.atomic.load16_u`
+    case i64AtomicLoad16U(Instruction.LoadOperand)
+    /// WebAssembly Core Instruction `i64.atomic.load32_u`
+    case i64AtomicLoad32U(Instruction.LoadOperand)
+    /// WebAssembly Core Instruction `i32.atomic.store`
+    case i32AtomicStore(Instruction.StoreOperand)
+    /// WebAssembly Core Instruction `i64.atomic.store`
+    case i64AtomicStore(Instruction.StoreOperand)
+    /// WebAssembly Core Instruction `i32.atomic.store8`
+    case i32AtomicStore8(Instruction.StoreOperand)
+    /// WebAssembly Core Instruction `i32.atomic.store16`
+    case i32AtomicStore16(Instruction.StoreOperand)
+    /// WebAssembly Core Instruction `i64.atomic.store8`
+    case i64AtomicStore8(Instruction.StoreOperand)
+    /// WebAssembly Core Instruction `i64.atomic.store16`
+    case i64AtomicStore16(Instruction.StoreOperand)
+    /// WebAssembly Core Instruction `i64.atomic.store32`
+    case i64AtomicStore32(Instruction.StoreOperand)
 }
 
 extension Instruction {
@@ -1066,6 +1094,20 @@ extension Instruction {
         case .tableElementDrop(let immediate): return immediate
         case .onEnter(let immediate): return immediate
         case .onExit(let immediate): return immediate
+        case .i32AtomicLoad(let immediate): return immediate
+        case .i64AtomicLoad(let immediate): return immediate
+        case .i32AtomicLoad8U(let immediate): return immediate
+        case .i32AtomicLoad16U(let immediate): return immediate
+        case .i64AtomicLoad8U(let immediate): return immediate
+        case .i64AtomicLoad16U(let immediate): return immediate
+        case .i64AtomicLoad32U(let immediate): return immediate
+        case .i32AtomicStore(let immediate): return immediate
+        case .i64AtomicStore(let immediate): return immediate
+        case .i32AtomicStore8(let immediate): return immediate
+        case .i32AtomicStore16(let immediate): return immediate
+        case .i64AtomicStore8(let immediate): return immediate
+        case .i64AtomicStore16(let immediate): return immediate
+        case .i64AtomicStore32(let immediate): return immediate
         default: return nil
         }
     }
@@ -1276,6 +1318,20 @@ extension Instruction {
         case .onEnter: return 197
         case .onExit: return 198
         case .breakpoint: return 199
+        case .i32AtomicLoad: return 200
+        case .i64AtomicLoad: return 201
+        case .i32AtomicLoad8U: return 202
+        case .i32AtomicLoad16U: return 203
+        case .i64AtomicLoad8U: return 204
+        case .i64AtomicLoad16U: return 205
+        case .i64AtomicLoad32U: return 206
+        case .i32AtomicStore: return 207
+        case .i64AtomicStore: return 208
+        case .i32AtomicStore8: return 209
+        case .i32AtomicStore16: return 210
+        case .i64AtomicStore8: return 211
+        case .i64AtomicStore16: return 212
+        case .i64AtomicStore32: return 213
         }
     }
 }
@@ -1487,6 +1543,20 @@ extension Instruction {
         case 197: return .onEnter(Instruction.OnEnterOperand.load(from: &pc))
         case 198: return .onExit(Instruction.OnExitOperand.load(from: &pc))
         case 199: return .breakpoint
+        case 200: return .i32AtomicLoad(Instruction.LoadOperand.load(from: &pc))
+        case 201: return .i64AtomicLoad(Instruction.LoadOperand.load(from: &pc))
+        case 202: return .i32AtomicLoad8U(Instruction.LoadOperand.load(from: &pc))
+        case 203: return .i32AtomicLoad16U(Instruction.LoadOperand.load(from: &pc))
+        case 204: return .i64AtomicLoad8U(Instruction.LoadOperand.load(from: &pc))
+        case 205: return .i64AtomicLoad16U(Instruction.LoadOperand.load(from: &pc))
+        case 206: return .i64AtomicLoad32U(Instruction.LoadOperand.load(from: &pc))
+        case 207: return .i32AtomicStore(Instruction.StoreOperand.load(from: &pc))
+        case 208: return .i64AtomicStore(Instruction.StoreOperand.load(from: &pc))
+        case 209: return .i32AtomicStore8(Instruction.StoreOperand.load(from: &pc))
+        case 210: return .i32AtomicStore16(Instruction.StoreOperand.load(from: &pc))
+        case 211: return .i64AtomicStore8(Instruction.StoreOperand.load(from: &pc))
+        case 212: return .i64AtomicStore16(Instruction.StoreOperand.load(from: &pc))
+        case 213: return .i64AtomicStore32(Instruction.StoreOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -1701,6 +1771,20 @@ extension Instruction {
         case 197: return "onEnter"
         case 198: return "onExit"
         case 199: return "breakpoint"
+        case 200: return "i32AtomicLoad"
+        case 201: return "i64AtomicLoad"
+        case 202: return "i32AtomicLoad8U"
+        case 203: return "i32AtomicLoad16U"
+        case 204: return "i64AtomicLoad8U"
+        case 205: return "i64AtomicLoad16U"
+        case 206: return "i64AtomicLoad32U"
+        case 207: return "i32AtomicStore"
+        case 208: return "i64AtomicStore"
+        case 209: return "i32AtomicStore8"
+        case 210: return "i32AtomicStore16"
+        case 211: return "i64AtomicStore8"
+        case 212: return "i64AtomicStore16"
+        case 213: return "i64AtomicStore32"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }
