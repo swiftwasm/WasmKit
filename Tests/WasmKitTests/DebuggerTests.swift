@@ -31,13 +31,15 @@
 
             #expect(try debugger.run() == nil)
 
-            var expectedPc = try #require(debugger.breakpoints.keys.first)
-            #expect(debugger.currentCallStack == [expectedPc])
+            let firstExpectedPc = try #require(debugger.breakpoints.keys.first)
+            #expect(debugger.currentCallStack == [firstExpectedPc])
 
             try debugger.step()
             #expect(try debugger.breakpoints.count == 1)
-            expectedPc = try #require(debugger.breakpoints.keys.first)
-            #expect(debugger.currentCallStack == [expectedPc])
+            let secondExpectedPc = try #require(debugger.breakpoints.keys.first)
+            #expect(debugger.currentCallStack == [secondExpectedPc])
+
+            #expect(firstExpectedPc < secondExpectedPc)
 
             #expect(try debugger.run() == [.i32(42)])
         }
