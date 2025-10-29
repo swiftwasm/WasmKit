@@ -188,6 +188,7 @@
                 return
             }
 
+            // TODO: analyze actual instruction branching to set the breakpoint correctly.
             try self.enableBreakpoint(address: currentBreakpoint.wasmPc + 1)
             let result = try self.run()
             assert(result == nil)
