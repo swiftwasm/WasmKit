@@ -65,7 +65,9 @@ struct DebuggerInstructionMapping {
                 return nil
             default:
                 var slice = self[0..<self.count]
-                while slice.count > 1 {
+                while slice.count > 1, let last = slice.last {
+                    guard last >= value else { return nil }
+
                     let middle = (slice.endIndex - slice.startIndex) / 2
                     if slice[middle] < value {
                         // Not found anything in the lower half, assigning higher half to `slice`.

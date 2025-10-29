@@ -49,6 +49,8 @@
 
             result = try #require([9, 15, 37].binarySearch(nextClosestTo: 0))
             #expect(result == 9)
+
+            #expect([9, 15, 37].binarySearch(nextClosestTo: 42) == nil)
         }
     }
 

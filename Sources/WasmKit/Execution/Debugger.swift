@@ -151,6 +151,7 @@
                             try self.execution.runTokenThreaded(sp: &sp, pc: &pc, md: &md, ms: &ms)
                         }
                     } catch is Execution.EndOfExecution {
+                        // The module successfully executed till the "end of execution" instruction.
                     }
 
                     let type = self.store.engine.funcTypeInterner.resolve(currentFunction.type)
@@ -176,6 +177,19 @@
                 self.currentBreakpoint = (breakpoint, wasmPc)
                 return nil
             }
+        }
+
+        /// Steps by a single Wasm instruction in the module instantiated by the debugger stopped at a breakpoint.
+        /// The current breakpoint is disabled and new breakpoints are put on the next instruction (or instructions in case
+        /// of multiple possible execution branches). After breakpoints setup, execution is resumed until suspension.
+        /// If the module is not stopped at a breakpoint, this function returns immediately.
+        package mutating func step() throws {
+            guard let currentBreakpoint else {
+                return
+            }
+
+            try self.enableBreakpoint(address: currentBreakpoint.wasmPc + 1)
+            try self.run()
         }
 
         /// Array of addresses in the Wasm binary of executed instructions on the call stack.
