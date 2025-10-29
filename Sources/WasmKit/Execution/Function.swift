@@ -172,8 +172,7 @@ extension InternalFunction {
                 store: store,
                 function: self,
                 type: resolvedType,
-                arguments: arguments,
-                callerInstance: entity.instance
+                arguments: arguments
             )
         } else {
             let entity = host
@@ -243,7 +242,7 @@ struct WasmFunctionEntity {
         switch code {
         case .uncompiled(let code):
             return try compile(store: store, code: code)
-        case .compiled(let iseq), .compiledAndPatchable(_, let iseq):
+        case .compiled(let iseq), .debuggable(_, let iseq):
             return iseq
         }
     }
@@ -280,10 +279,14 @@ extension EntityHandle<WasmFunctionEntity> {
         case .uncompiled(let code):
             return try self.withValue {
                 let iseq = try $0.compile(store: store, code: code)
-                $0.code = .compiled(iseq)
+                if $0.instance.isDebuggable {
+                    $0.code = .debuggable(code, iseq)
+                } else {
+                    $0.code = .compiled(iseq)
+                }
                 return iseq
             }
-        case .compiled(let iseq), .compiledAndPatchable(_, let iseq):
+        case .compiled(let iseq), .debuggable(_, let iseq):
             return iseq
         }
     }
@@ -316,7 +319,7 @@ struct InstructionSequence {
 enum CodeBody {
     case uncompiled(InternalUncompiledCode)
     case compiled(InstructionSequence)
-    case compiledAndPatchable(InternalUncompiledCode, InstructionSequence)
+    case debuggable(InternalUncompiledCode, InstructionSequence)
 }
 
 extension Reference {

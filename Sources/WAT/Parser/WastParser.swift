@@ -54,6 +54,7 @@ struct WastParser {
     }
 
     struct ConstExpressionCollector: WastConstInstructionVisitor {
+        var binaryOffset: Int = 0
         let addValue: (Value) -> Void
 
         mutating func visitI32Const(value: Int32) throws { addValue(.i32(UInt32(bitPattern: value))) }

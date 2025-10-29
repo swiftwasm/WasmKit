@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import Foundation
+import Logging
 import NIOCore
 
 extension String {
@@ -27,7 +28,12 @@ extension String {
 package class GDBTargetResponseEncoder: MessageToByteEncoder {
     private var isNoAckModeActive = false
 
-    package init() {}
+    private let logger: Logger
+
+    package init(logger: Logger) {
+        self.logger = logger
+    }
+
     package func encode(data: GDBTargetResponse, out: inout ByteBuffer) {
         if !isNoAckModeActive {
             out.writeInteger(UInt8(ascii: "+"))
@@ -51,8 +57,9 @@ package class GDBTargetResponseEncoder: MessageToByteEncoder {
             out.writeString(str.appendedChecksum)
 
         case .hexEncodedBinary(let binary):
-            let hexDump = ByteBuffer(bytes: binary).hexDump(format: .compact)
-            out.writeString(hexDump.appendedChecksum)
+            let hexDumpResponse = ByteBuffer(bytes: binary).hexDump(format: .compact).appendedChecksum
+            self.logger.trace("GDBTargetResponseEncoder encoded a response", metadata: ["RawResponse": .string(hexDumpResponse)])
+            out.writeString(hexDumpResponse)
 
         case .empty:
             out.writeString("".appendedChecksum)

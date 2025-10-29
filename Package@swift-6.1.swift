@@ -21,7 +21,7 @@ let package = Package(
     ],
     traits: [
         .default(enabledTraits: []),
-        "WasmDebuggingSupport"
+        "WasmDebuggingSupport",
     ],
     targets: [
         .executableTarget(
@@ -123,7 +123,8 @@ let package = Package(
         .target(name: "WITExtractor"),
         .testTarget(name: "WITExtractorTests", dependencies: ["WITExtractor", "WIT"]),
 
-        .target(name: "GDBRemoteProtocol",
+        .target(
+            name: "GDBRemoteProtocol",
             dependencies: [
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "NIOCore", package: "swift-nio"),

@@ -251,7 +251,8 @@ extension StoreAllocator {
         module: Module,
         engine: Engine,
         resourceLimiter: any ResourceLimiter,
-        imports: Imports
+        imports: Imports,
+        isDebuggable: Bool
     ) throws -> InternalInstance {
         // Step 1 of module allocation algorithm, according to Wasm 2.0 spec.
 
@@ -450,7 +451,9 @@ extension StoreAllocator {
             exports: exports,
             functionRefs: functionRefs,
             features: module.features,
-            dataCount: module.dataCount
+            dataCount: module.dataCount,
+            isDebuggable: isDebuggable,
+            instructionMapping: .init()
         )
         instancePointer.initialize(to: instanceEntity)
         instanceInitialized = true

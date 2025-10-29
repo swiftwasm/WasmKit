@@ -757,6 +757,8 @@ extension Parser: BinaryInstructionDecoder {
 
     @usableFromInline
     struct InstructionFactory: AnyInstructionVisitor {
+        @usableFromInline var binaryOffset: Int = 0
+
         @usableFromInline var insts: [Instruction] = []
 
         @inlinable init() {}
