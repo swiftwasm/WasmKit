@@ -189,7 +189,8 @@
             }
 
             try self.enableBreakpoint(address: currentBreakpoint.wasmPc + 1)
-            try self.run()
+            let result = try self.run()
+            assert(result == nil)
         }
 
         /// Array of addresses in the Wasm binary of executed instructions on the call stack.

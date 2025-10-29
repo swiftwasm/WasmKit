@@ -53,7 +53,6 @@
         private let logger: Logger
         private let allocator: ByteBufferAllocator
         private var debugger: Debugger
-        private var hasSteppedBefore = false
 
         package init(moduleFilePath: FilePath, logger: Logger, allocator: ByteBufferAllocator) async throws {
             self.logger = logger
@@ -203,8 +202,6 @@
                 responseKind = .hexEncodedBinary(buffer.readableBytesView)
 
             case .resumeThreads:
-                guard !self.hasSteppedBefore else { fatalError() }
-
                 // TODO: support multiple threads each with its own action here.
                 let threadActions = command.arguments.components(separatedBy: ":")
                 guard threadActions.count == 2, let threadActionString = threadActions.first else {
@@ -216,7 +213,6 @@
                 }
 
                 try self.debugger.step()
-                self.hasSteppedBefore = true
 
                 responseKind = self.currentThreadStopInfo
 
