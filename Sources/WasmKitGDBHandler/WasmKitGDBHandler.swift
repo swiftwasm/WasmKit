@@ -125,7 +125,7 @@
                 responseKind = .vContSupportedActions([.continue, .step])
 
             case .isVAttachOrWaitSupported, .enableErrorStrings, .structuredDataPlugins, .readMemoryBinaryData,
-            .symbolLookup, .jsonThreadsInfo, .jsonThreadExtendedInfo:
+                .symbolLookup, .jsonThreadsInfo, .jsonThreadExtendedInfo:
                 responseKind = .empty
 
             case .processInfo:
