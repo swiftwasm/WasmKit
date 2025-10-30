@@ -34,7 +34,7 @@ package struct GDBTargetResponse {
 
         /// A list of key-value pairs, with keys delimited from values by a colon `:`
         /// character, and pairs in the list delimited by the semicolon `;` character.
-        case keyValuePairs(KeyValuePairs<String, String>)
+        case keyValuePairs([(String, String)])
 
         /// List of ``VContActions`` values delimited by the semicolon `;` character.
         case vContSupportedActions([VContActions])

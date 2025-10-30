@@ -20,7 +20,7 @@
     @Suite
     struct DebuggerTests {
         @Test
-        func stopAtEntrypoint() throws {
+        func breakpoints() throws {
             let store = Store(engine: Engine())
             let bytes = try wat2wasm(trivialModuleWAT)
             let module = try parseWasm(bytes: bytes)
@@ -31,8 +31,15 @@
 
             #expect(try debugger.run() == nil)
 
-            let expectedPc = try #require(debugger.breakpoints.keys.first)
-            #expect(debugger.currentCallStack == [expectedPc])
+            let firstExpectedPc = try #require(debugger.breakpoints.keys.first)
+            #expect(debugger.currentCallStack == [firstExpectedPc])
+
+            try debugger.step()
+            #expect(try debugger.breakpoints.count == 1)
+            let secondExpectedPc = try #require(debugger.breakpoints.keys.first)
+            #expect(debugger.currentCallStack == [secondExpectedPc])
+
+            #expect(firstExpectedPc < secondExpectedPc)
 
             #expect(try debugger.run() == [.i32(42)])
         }
@@ -41,14 +48,14 @@
         func binarySearch() throws {
             #expect([Int]().binarySearch(nextClosestTo: 42) == nil)
 
-            var result = try #require([1].binarySearch(nextClosestTo: 8))
-            #expect(result == 1)
+            #expect([1].binarySearch(nextClosestTo: 1) == 1)
+            #expect([1].binarySearch(nextClosestTo: 8) == nil)
 
-            result = try #require([9, 15, 37].binarySearch(nextClosestTo: 28))
-            #expect(result == 37)
+            #expect([9, 15, 37].binarySearch(nextClosestTo: 28) == 37)
+            #expect([9, 15, 37].binarySearch(nextClosestTo: 0) == 9)
+            #expect([9, 15, 37].binarySearch(nextClosestTo: 42) == nil)
 
-            result = try #require([9, 15, 37].binarySearch(nextClosestTo: 0))
-            #expect(result == 9)
+            #expect([106, 110, 111].binarySearch(nextClosestTo: 107) == 110)
         }
     }
 

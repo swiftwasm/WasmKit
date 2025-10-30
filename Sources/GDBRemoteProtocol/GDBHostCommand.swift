@@ -39,6 +39,10 @@ package struct GDBHostCommand: Equatable {
         case readMemory
         case wasmCallStack
         case threadStopInfo
+        case symbolLookup
+        case jsonThreadsInfo
+        case jsonThreadExtendedInfo
+        case resumeThreads
 
         case generalRegisters
 
@@ -79,6 +83,12 @@ package struct GDBHostCommand: Equatable {
                 self = .transfer
             case "qWasmCallStack":
                 self = .wasmCallStack
+            case "qSymbol":
+                self = .symbolLookup
+            case "jThreadsInfo":
+                self = .jsonThreadsInfo
+            case "jThreadExtendedInfo":
+                self = .jsonThreadExtendedInfo
 
             default:
                 return nil
@@ -99,6 +109,7 @@ package struct GDBHostCommand: Equatable {
     package init(kindString: String, arguments: String) throws(GDBHostCommandDecoder.Error) {
         let registerInfoPrefix = "qRegisterInfo"
         let threadStopInfoPrefix = "qThreadStopInfo"
+        let resumeThreadsPrefix = "vCont"
 
         if kindString.starts(with: "x") {
             self.kind = .readMemoryBinaryData
@@ -123,6 +134,12 @@ package struct GDBHostCommand: Equatable {
                 throw GDBHostCommandDecoder.Error.unexpectedArgumentsValue
             }
             self.arguments = String(kindString.dropFirst(registerInfoPrefix.count))
+            return
+        } else if kindString != "vCont?" && kindString.starts(with: resumeThreadsPrefix) {
+            self.kind = .resumeThreads
+
+            // Strip the prefix and a semicolon ';' delimiter, append arguments back with the original delimiter.
+            self.arguments = String(kindString.dropFirst(resumeThreadsPrefix.count + 1)) + ":" + arguments
             return
         } else if let kind = Kind(rawValue: kindString) {
             self.kind = kind
