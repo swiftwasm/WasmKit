@@ -1,7 +1,5 @@
 #if WasmDebuggingSupport
 
-    import WASI
-
     /// Debugger state owner, driven by a debugger host. This implementation has no knowledge of the exact
     /// debugger protocol, which allows any protocol implementation or direct API users to be layered on top if needed.
     package struct Debugger: ~Copyable {
