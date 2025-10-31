@@ -54,7 +54,12 @@
         private let allocator: ByteBufferAllocator
         private var debugger: Debugger
 
-        package init(moduleFilePath: FilePath, logger: Logger, allocator: ByteBufferAllocator) async throws {
+        package init(
+            moduleFilePath: FilePath,
+            engineConfiguration: EngineConfiguration,
+            logger: Logger,
+            allocator: ByteBufferAllocator
+        ) async throws {
             self.logger = logger
             self.allocator = allocator
 
@@ -64,7 +69,7 @@
 
             self.moduleFilePath = moduleFilePath
 
-            let store = Store(engine: Engine())
+            let store = Store(engine: Engine(configuration: engineConfiguration))
             var imports = Imports()
             let wasi = try WASIBridgeToHost()
             wasi.link(to: &imports, store: store)
