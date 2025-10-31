@@ -2,6 +2,7 @@
 
     import Testing
     import WAT
+
     @testable import WasmKit
 
     private let trivialModuleWAT = """

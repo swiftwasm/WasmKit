@@ -26,7 +26,7 @@ struct Backtrace: CustomStringConvertible, Sendable {
 /// An error that occurs during execution of a WebAssembly module.
 public struct Trap: Error, CustomStringConvertible {
     /// The reason for the trap.
-    var reason: TrapReason
+    package internal(set) var reason: TrapReason
 
     /// The backtrace of the trap.
     private(set) var backtrace: Backtrace?
@@ -57,8 +57,8 @@ public struct Trap: Error, CustomStringConvertible {
 }
 
 /// A reason for a trap that occurred during execution of a WebAssembly module.
-enum TrapReason: Error, CustomStringConvertible {
-    struct Message {
+package enum TrapReason: Error, CustomStringConvertible {
+    package struct Message {
         let text: String
 
         init(_ text: String) {
@@ -89,7 +89,7 @@ enum TrapReason: Error, CustomStringConvertible {
     case invalidConversionToInteger
 
     /// The description of the trap reason.
-    var description: String {
+    package var description: String {
         switch self {
         case .message(let message):
             return message.text

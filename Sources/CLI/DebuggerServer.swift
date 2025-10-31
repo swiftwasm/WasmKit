@@ -71,29 +71,47 @@
                 /* the server will now be accepting connections */
                 logger.info("Debugger server listening on port \(port)")
 
-                let debugger = try await WasmKitGDBHandler(
+                let debuggerHandler = try await WasmKitGDBHandler(
                     moduleFilePath: self.wasmModulePath,
                     engineConfiguration: self.engineConfiguration,
                     logger: logger,
                     allocator: serverChannel.channel.allocator
                 )
 
-                try await withThrowingDiscardingTaskGroup { group in
-                    try await serverChannel.executeThenClose { serverChannelInbound in
-                        for try await connectionChannel in serverChannelInbound {
-                            group.addTask {
-                                do {
-                                    try await connectionChannel.executeThenClose { connectionChannelInbound, connectionChannelOutbound in
-                                        for try await inboundData in connectionChannelInbound {
-                                            try await connectionChannelOutbound.write(debugger.handle(command: inboundData.payload))
+                // Discarding task group was designed for persistent server purposes, where a single failing request
+                // isn't taking down the entire server. In our case we need to be able to shut down the server on
+                // debugger client's request, so let's wrap the discarding task group with a throwing task group
+                // for cancellation.
+                try await withThrowingTaskGroup { cancellableGroup in
+                    // Use `AsyncStream` for sending a signal out of the discarding group.
+                    let (shutDownStream, shutDownContinuation) = AsyncStream<()>.makeStream()
+
+                    cancellableGroup.addTask {
+                        try await withThrowingDiscardingTaskGroup { discardingGroup in
+                            try await serverChannel.executeThenClose { serverChannelInbound in
+                                for try await connectionChannel in serverChannelInbound {
+                                    discardingGroup.addTask {
+                                        do {
+                                            try await connectionChannel.executeThenClose { connectionChannelInbound, connectionChannelOutbound in
+                                                for try await inboundData in connectionChannelInbound {
+                                                    try await connectionChannelOutbound.write(debuggerHandler.handle(command: inboundData.payload))
+                                                }
+                                            }
+                                        } catch WasmKitGDBHandler.Error.killRequestReceived {
+                                            logger.info("Debugger shut down request received")
+                                            shutDownContinuation.yield()
+                                        } catch {
+                                            logger.error("Error in GDB remote protocol connection channel", metadata: ["error": "\(error)"])
                                         }
                                     }
-                                } catch {
-                                    logger.error("Error in GDB remote protocol connection channel", metadata: ["error": "\(error)"])
                                 }
                             }
                         }
                     }
+
+                    // The stream isn't really sending data, just a single type of empty signal, wait for the first one.
+                    await shutDownStream.first { _ in true }
+                    cancellableGroup.cancelAll()
                 }
             }
         }

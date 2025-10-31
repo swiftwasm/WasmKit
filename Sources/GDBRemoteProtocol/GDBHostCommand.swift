@@ -43,6 +43,8 @@ package struct GDBHostCommand: Equatable {
         case jsonThreadsInfo
         case jsonThreadExtendedInfo
         case resumeThreads
+        case `continue`
+        case kill
 
         case generalRegisters
 
@@ -89,6 +91,10 @@ package struct GDBHostCommand: Equatable {
                 self = .jsonThreadsInfo
             case "jThreadExtendedInfo":
                 self = .jsonThreadExtendedInfo
+            case "c":
+                self = .continue
+            case "k":
+                self = .kill
 
             default:
                 return nil

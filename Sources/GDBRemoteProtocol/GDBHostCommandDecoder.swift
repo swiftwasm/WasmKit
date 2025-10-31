@@ -109,10 +109,6 @@ package struct GDBHostCommandDecoder: ByteToMessageDecoder {
                 throw Error.expectedAck
             }
 
-            if self.isNoAckModeRequested {
-                self.isNoAckModeActive = true
-            }
-
             guard let secondStartDelimiter = buffer.readInteger(as: UInt8.self) else {
                 // Preserve what we already read.
                 self.accumulatedDelimiter = firstStartDelimiter
@@ -122,6 +118,11 @@ package struct GDBHostCommandDecoder: ByteToMessageDecoder {
             }
 
             startDelimiter = secondStartDelimiter
+
+            if self.isNoAckModeRequested {
+                self.isNoAckModeActive = true
+            }
+
         }
 
         // Command start delimiters.
@@ -196,9 +197,13 @@ package struct GDBHostCommandDecoder: ByteToMessageDecoder {
         context: ChannelHandlerContext,
         buffer: inout ByteBuffer
     ) throws(Error) -> DecodingState {
-        logger.trace(.init(stringLiteral: buffer.peekString(length: buffer.readableBytes)!))
+        logger.trace(
+            "GDBHostCommandDecoder.\(#function) received data",
+            metadata: ["readableBytes": .init(stringLiteral: buffer.peekString(length: buffer.readableBytes)!)]
+        )
 
         guard let command = try self.decode(buffer: &buffer) else {
+            logger.trace("Not enough data in GDBHostCommandDecoder to decode a host command")
             return .needMoreData
         }
 
