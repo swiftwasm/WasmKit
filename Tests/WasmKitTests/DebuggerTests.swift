@@ -31,7 +31,6 @@
             #expect(debugger.breakpoints.count == 1)
 
             try debugger.run()
-
             let firstExpectedPc = try #require(debugger.breakpoints.keys.first)
             #expect(debugger.currentCallStack == [firstExpectedPc])
 
@@ -44,7 +43,6 @@
             #expect(firstExpectedPc < secondExpectedPc)
 
             try debugger.run()
-
             guard case .entrypointReturned(let values) = debugger.state, values == [.i32(42)] else {
                 Issue.record("Unexpected debugger state after `debugger.run()` call")
                 return

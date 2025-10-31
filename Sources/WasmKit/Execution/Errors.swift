@@ -58,7 +58,7 @@ public struct Trap: Error, CustomStringConvertible {
 
 /// A reason for a trap that occurred during execution of a WebAssembly module.
 public enum TrapReason: Error, CustomStringConvertible {
-    public struct Message {
+    public struct Message: Sendable {
         let text: String
 
         init(_ text: String) {
