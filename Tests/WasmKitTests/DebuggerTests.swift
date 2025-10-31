@@ -56,6 +56,7 @@
             #expect([9, 15, 37].binarySearch(nextClosestTo: 42) == nil)
 
             #expect([106, 110, 111].binarySearch(nextClosestTo: 107) == 110)
+            #expect([106, 110, 111, 113, 119, 120, 122, 128, 136].binarySearch(nextClosestTo: 121) == 122)
         }
     }
 

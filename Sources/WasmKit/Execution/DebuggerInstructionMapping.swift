@@ -70,13 +70,13 @@ struct DebuggerInstructionMapping {
                 while let last = slice.last {
                     guard last >= value else { return nil }
 
-                    let middle = (slice.endIndex - slice.startIndex) / 2
+                    let middle = slice.startIndex + (slice.endIndex - slice.startIndex) / 2
                     guard middle > 0 else { break }
 
-                    if slice[middle] < value {
+                    if self[middle] < value {
                         // Not found anything in the lower half, assigning higher half to `slice`.
                         slice = slice[(middle + 1)..<slice.endIndex]
-                    } else if slice[middle] > value && slice[middle - 1] > value {
+                    } else if self[middle] > value && self[middle - 1] > value {
                         // Not found anything in the higher half, assigning lower half to `slice`.
                         slice = slice[slice.startIndex..<middle]
                     } else {
