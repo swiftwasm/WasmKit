@@ -11,7 +11,7 @@
         package enum State {
             case instantiated
             case stoppedAtBreakpoint(BreakpointState)
-            case trapped(Trap)
+            case trapped(String)
             case wasiModuleExited(exitCode: UInt32)
             case entrypointReturned([Value])
         }

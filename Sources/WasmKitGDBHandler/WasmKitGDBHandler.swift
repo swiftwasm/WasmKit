@@ -121,9 +121,9 @@
 
                     return .string("W\(self.hexDump(exitCode, endianness: .big))")
 
-                case .trapped(let trap):
+                case .trapped(let trapReason):
                     result.append(("reason", "trap"))
-                    result.append(("description", trap.reason.description))
+                    result.append(("description", trapReason))
                     return .keyValuePairs(result)
 
                 case .instantiated:
