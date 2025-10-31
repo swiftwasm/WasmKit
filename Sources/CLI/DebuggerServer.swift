@@ -109,7 +109,7 @@
                         }
                     }
 
-                    // The stream isn't really sending data, just a single type of empty signal, wait for the first one.
+                    // The stream isn't really sending data, just a single empty value, wait for the first one.
                     await shutDownStream.first { _ in true }
                     cancellableGroup.cancelAll()
                 }
