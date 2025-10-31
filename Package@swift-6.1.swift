@@ -32,6 +32,12 @@ let package = Package(
                 "WasmKitWASI",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "SystemPackage", package: "swift-system"),
+
+                .product(name: "Logging", package: "swift-log", condition: .when(traits: ["WasmDebuggingSupport"])),
+                .product(name: "NIOCore", package: "swift-nio", condition: .when(traits: ["WasmDebuggingSupport"])),
+                .product(name: "NIOPosix", package: "swift-nio", condition: .when(traits: ["WasmDebuggingSupport"])),
+                .target(name: "GDBRemoteProtocol", condition: .when(traits: ["WasmDebuggingSupport"])),
+                .target(name: "WasmKitGDBHandler", condition: .when(traits: ["WasmDebuggingSupport"])),
             ],
             exclude: ["CMakeLists.txt"]
         ),

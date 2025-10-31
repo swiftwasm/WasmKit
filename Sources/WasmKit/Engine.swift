@@ -30,10 +30,10 @@ public final class Engine {
 }
 
 /// The configuration for the WebAssembly execution engine.
-public struct EngineConfiguration {
+public struct EngineConfiguration: Sendable {
     /// The threading model, which determines how to dispatch instruction
     /// execution, to use for the virtual machine interpreter.
-    public enum ThreadingModel {
+    public enum ThreadingModel: Sendable {
         /// Direct threaded code
         /// - Note: This is the default model for platforms that support
         /// `musttail` calls.
@@ -61,7 +61,7 @@ public struct EngineConfiguration {
 
     /// The compilation mode of WebAssembly modules to the internal virtual
     /// machine instruction sequence.
-    public enum CompilationMode {
+    public enum CompilationMode: Sendable {
         /// Eager compilation, where the module is compiled to the internal
         /// instruction sequence immediately after instantiation.
         case eager

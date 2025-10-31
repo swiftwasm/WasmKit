@@ -7,7 +7,7 @@ import WasmKitWASI
     import os.signpost
 #endif
 
-struct Run: ParsableCommand {
+struct Run: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "Run a WebAssembly module",
         discussion: """
@@ -105,6 +105,17 @@ struct Run: ParsableCommand {
     )
     var stackSize: Int?
 
+    #if WasmDebuggingSupport
+
+        @Option(
+            help: """
+            TCP port that a debugger client supporting GDP Remote Protocol (like GDB or LLDB) can connect to. \
+            Only WASI Command modules are currently supported by WasmKit debugging facilities.
+            """)
+        var debuggerPort: Int?
+
+    #endif
+
     @Argument
     var path: String
 
@@ -117,7 +128,26 @@ struct Run: ParsableCommand {
     )
     var arguments: [String] = []
 
-    func run() throws {
+    func run() async throws {
+        #if WasmDebuggingSupport
+
+            if let debuggerPort {
+                guard !self.signpost && self.profileOutput == nil else {
+                    fatalError("Signpost logging and profiling are currently not supported while debugging Wasm modules.")
+                }
+
+                let debuggerServer = DebuggerServer(
+                    port: debuggerPort,
+                    logLevel: self.verbose ? .trace : .info,
+                    wasmModulePath: FilePath(self.path),
+                    engineConfiguration: self.deriveRuntimeConfiguration()
+                )
+                try await debuggerServer.run()
+                return
+            }
+
+        #endif
+
         log("Started parsing module", verbose: true)
 
         let module: Module
@@ -200,8 +230,8 @@ struct Run: ParsableCommand {
 
     private func deriveRuntimeConfiguration() -> EngineConfiguration {
         return EngineConfiguration(
-            threadingModel: threadingModel?.resolve(),
-            compilationMode: compilationMode?.resolve(),
+            threadingModel: self.threadingModel?.resolve(),
+            compilationMode: self.compilationMode?.resolve(),
             stackSize: self.stackSize
         )
     }
