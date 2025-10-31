@@ -109,9 +109,9 @@ struct Run: AsyncParsableCommand {
 
         @Option(
             help: """
-            TCP port that a debugger client supporting GDP Remote Protocol (like GDB or LLDB) can connect to. \
-            Only WASI Command modules are currently supported by WasmKit debugging facilities.
-            """)
+                TCP port that a debugger client supporting GDP Remote Protocol (like GDB or LLDB) can connect to. \
+                Only WASI Command modules are currently supported by WasmKit debugging facilities.
+                """)
         var debuggerPort: Int?
 
     #endif
