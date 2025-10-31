@@ -122,7 +122,6 @@ package struct GDBHostCommandDecoder: ByteToMessageDecoder {
             if self.isNoAckModeRequested {
                 self.isNoAckModeActive = true
             }
-
         }
 
         // Command start delimiters.
