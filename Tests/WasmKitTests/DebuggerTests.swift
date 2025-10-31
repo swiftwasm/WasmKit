@@ -34,7 +34,6 @@
             let firstExpectedPc = try #require(debugger.breakpoints.keys.first)
             #expect(debugger.currentCallStack == [firstExpectedPc])
 
-
             try debugger.step()
             #expect(try debugger.breakpoints.count == 1)
             let secondExpectedPc = try #require(debugger.breakpoints.keys.first)
