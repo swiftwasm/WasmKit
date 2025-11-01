@@ -37,15 +37,18 @@
     package actor WasmKitGDBHandler {
         enum ResumeThreadsAction: String {
             case step = "s"
+            case `continue` = "c"
         }
 
-        enum Error: Swift.Error {
+        package enum Error: Swift.Error {
             case unknownTransferArguments
             case unknownReadMemoryArguments
             case stoppingAtEntrypointFailed
             case multipleThreadsNotSupported
             case unknownThreadAction(String)
             case hostCommandNotImplemented(GDBHostCommand.Kind)
+            case exitCodeUnknown([Value])
+            case killRequestReceived
         }
 
         private let wasmBinary: ByteBuffer
@@ -76,28 +79,57 @@
 
             self.debugger = try Debugger(module: parseWasm(bytes: .init(buffer: self.wasmBinary)), store: store, imports: imports)
             try self.debugger.stopAtEntrypoint()
-            guard try self.debugger.run() == nil else {
+            try self.debugger.run()
+            guard case .stoppedAtBreakpoint = self.debugger.state else {
                 throw Error.stoppingAtEntrypointFailed
             }
         }
 
-        var currentThreadStopInfo: GDBTargetResponse.Kind {
-            var result: [(String, String)] = [
-                ("T05thread", "1"),
-                ("reason", "trace"),
-                ("threads", "1"),
-            ]
-            if let pc = self.debugger.currentCallStack.first {
-                let pcInHostAddressSpace = UInt64(pc) + codeOffset
-                var beBuffer = self.allocator.buffer(capacity: 8)
-                beBuffer.writeInteger(pcInHostAddressSpace, endianness: .big)
-                result.append(("thread-pcs", beBuffer.hexDump(format: .compact)))
-                var leBuffer = self.allocator.buffer(capacity: 8)
-                leBuffer.writeInteger(pcInHostAddressSpace, endianness: .little)
-                result.append(("00", leBuffer.hexDump(format: .compact)))
-            }
+        private func hexDump<I: FixedWidthInteger>(_ value: I, endianness: Endianness) -> String {
 
-            return .keyValuePairs(result)
+            var buffer = self.allocator.buffer(capacity: MemoryLayout<I>.size)
+            buffer.writeInteger(value, endianness: endianness)
+            return buffer.hexDump(format: .compact)
+        }
+
+        var currentThreadStopInfo: GDBTargetResponse.Kind {
+            get throws {
+                var result: [(String, String)] = [
+                    ("T05thread", "1"),
+                    ("threads", "1"),
+                ]
+                switch self.debugger.state {
+                case .stoppedAtBreakpoint(let breakpoint):
+                    let pc = breakpoint.wasmPc
+                    let pcInHostAddressSpace = UInt64(pc) + codeOffset
+                    result.append(("thread-pcs", self.hexDump(pcInHostAddressSpace, endianness: .big)))
+                    result.append(("00", self.hexDump(pcInHostAddressSpace, endianness: .little)))
+                    result.append(("reason", "trace"))
+                    return .keyValuePairs(result)
+
+                case .wasiModuleExited(let exitCode):
+                    return .string("W\(self.hexDump(exitCode, endianness: .big))")
+
+                case .entrypointReturned(let values):
+                    guard !values.isEmpty else {
+                        return .string("W\(self.hexDump(0 as UInt8, endianness: .big))")
+                    }
+
+                    guard case .i32(let exitCode) = values.first else {
+                        throw Error.exitCodeUnknown(values)
+                    }
+
+                    return .string("W\(self.hexDump(exitCode, endianness: .big))")
+
+                case .trapped(let trapReason):
+                    result.append(("reason", "trap"))
+                    result.append(("description", trapReason))
+                    return .keyValuePairs(result)
+
+                case .instantiated:
+                    return .empty
+                }
+            }
         }
 
         package func handle(command: GDBHostCommand) throws -> GDBTargetResponse {
@@ -151,7 +183,7 @@
                 responseKind = .string("l")
 
             case .targetStatus, .threadStopInfo:
-                responseKind = self.currentThreadStopInfo
+                responseKind = try self.currentThreadStopInfo
 
             case .registerInfo:
                 if command.arguments == "0" {
@@ -217,9 +249,22 @@
                     throw Error.unknownThreadAction(threadActionString)
                 }
 
-                try self.debugger.step()
+                switch threadAction {
+                case .step:
+                    try self.debugger.step()
+                case .continue:
+                    try self.debugger.run()
+                }
 
-                responseKind = self.currentThreadStopInfo
+                responseKind = try self.currentThreadStopInfo
+
+            case .continue:
+                try self.debugger.run()
+
+                responseKind = try self.currentThreadStopInfo
+
+            case .kill:
+                throw Error.killRequestReceived
 
             case .generalRegisters:
                 throw Error.hostCommandNotImplemented(command.kind)

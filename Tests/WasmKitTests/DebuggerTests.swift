@@ -2,6 +2,7 @@
 
     import Testing
     import WAT
+
     @testable import WasmKit
 
     private let trivialModuleWAT = """
@@ -29,8 +30,7 @@
             try debugger.stopAtEntrypoint()
             #expect(debugger.breakpoints.count == 1)
 
-            #expect(try debugger.run() == nil)
-
+            try debugger.run()
             let firstExpectedPc = try #require(debugger.breakpoints.keys.first)
             #expect(debugger.currentCallStack == [firstExpectedPc])
 
@@ -41,7 +41,11 @@
 
             #expect(firstExpectedPc < secondExpectedPc)
 
-            #expect(try debugger.run() == [.i32(42)])
+            try debugger.run()
+            guard case .entrypointReturned(let values) = debugger.state, values == [.i32(42)] else {
+                Issue.record("Unexpected debugger state after `debugger.run()` call")
+                return
+            }
         }
 
         @Test
@@ -56,6 +60,7 @@
             #expect([9, 15, 37].binarySearch(nextClosestTo: 42) == nil)
 
             #expect([106, 110, 111].binarySearch(nextClosestTo: 107) == 110)
+            #expect([106, 110, 111, 113, 119, 120, 122, 128, 136].binarySearch(nextClosestTo: 121) == 122)
         }
     }
 

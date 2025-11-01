@@ -24,7 +24,7 @@ struct Backtrace: CustomStringConvertible, Sendable {
 }
 
 /// An error that occurs during execution of a WebAssembly module.
-public struct Trap: Error, CustomStringConvertible {
+struct Trap: Error, CustomStringConvertible {
     /// The reason for the trap.
     var reason: TrapReason
 

@@ -1,7 +1,21 @@
 #if WasmDebuggingSupport
-    /// User-facing debugger state driven by a debugger host. This implementation has no knowledge of the exact
+
+    /// Debugger state owner, driven by a debugger host. This implementation has no knowledge of the exact
     /// debugger protocol, which allows any protocol implementation or direct API users to be layered on top if needed.
     package struct Debugger: ~Copyable {
+        package struct BreakpointState {
+            let iseq: Execution.Breakpoint
+            package let wasmPc: Int
+        }
+
+        package enum State {
+            case instantiated
+            case stoppedAtBreakpoint(BreakpointState)
+            case trapped(String)
+            case wasiModuleExited(exitCode: UInt32)
+            case entrypointReturned([Value])
+        }
+
         package enum Error: Swift.Error, @unchecked Sendable {
             case entrypointFunctionNotFound
             case unknownCurrentFunctionForResumedBreakpoint(UnsafeMutablePointer<UInt64>)
@@ -28,7 +42,7 @@
 
         private(set) var breakpoints = [Int: CodeSlot]()
 
-        private var currentBreakpoint: (iseq: Execution.Breakpoint, wasmPc: Int)?
+        package private(set) var state: State
 
         private var pc = Pc.allocate(capacity: 1)
 
@@ -53,6 +67,7 @@
             self.execution = Execution(store: StoreRef(store), stackEnd: valueStack.advanced(by: limit))
             self.threadingModel = store.engine.configuration.threadingModel
             self.pc.pointee = Instruction.endOfExecution.headSlot(threadingModel: threadingModel)
+            self.state = .instantiated
         }
 
         /// Sets a breakpoint at the first instruction in the entrypoint function of the module instantiated by
@@ -89,7 +104,7 @@
                 return
             }
 
-            guard let (iseq, wasm) = try self.instance.handle.instructionMapping.findIseq(forWasmAddress: address) else {
+            guard let (iseq, wasm) = self.instance.handle.instructionMapping.findIseq(forWasmAddress: address) else {
                 throw Error.noInstructionMappingAvailable(address)
             }
 
@@ -107,7 +122,7 @@
                 return
             }
 
-            guard let (iseq, wasm) = try self.instance.handle.instructionMapping.findIseq(forWasmAddress: address) else {
+            guard let (iseq, wasm) = self.instance.handle.instructionMapping.findIseq(forWasmAddress: address) else {
                 throw Error.noInstructionMappingAvailable(address)
             }
 
@@ -118,17 +133,16 @@
         /// Resumes the module instantiated by the debugger stopped at a breakpoint. The breakpoint is disabled
         /// and execution is resumed until the next breakpoint is triggered or all remaining instructions are
         /// executed. If the module is not stopped at a breakpoint, this function returns immediately.
-        /// - Returns: `[Value]` result of `entrypointFunction` if current instance ran to completion,
-        /// `nil` if it stopped at a breakpoint.
-        package mutating func run() throws -> [Value]? {
+        package mutating func run() throws {
             do {
-                if let currentBreakpoint {
+                if case .stoppedAtBreakpoint(let breakpoint) = self.state {
                     // Remove the breakpoint before resuming
-                    try self.disableBreakpoint(address: currentBreakpoint.wasmPc)
+                    try self.disableBreakpoint(address: breakpoint.wasmPc)
                     self.execution.resetError()
 
-                    var sp = currentBreakpoint.iseq.sp
-                    var pc = currentBreakpoint.iseq.pc
+                    let iseq = breakpoint.iseq
+                    var sp = iseq.sp
+                    var pc = iseq.pc
                     var md: Md = nil
                     var ms: Ms = 0
 
@@ -138,7 +152,6 @@
 
                     Execution.CurrentMemory.mayUpdateCurrentInstance(
                         instance: currentFunction.instance,
-                        from: self.instance.handle,
                         md: &md,
                         ms: &ms
                     )
@@ -152,14 +165,14 @@
                         }
                     } catch is Execution.EndOfExecution {
                         // The module successfully executed till the "end of execution" instruction.
-                    }
-
-                    let type = self.store.engine.funcTypeInterner.resolve(currentFunction.type)
-                    return type.results.enumerated().map { (i, type) in
-                        sp[VReg(i)].cast(to: type)
+                        let type = self.store.engine.funcTypeInterner.resolve(currentFunction.type)
+                        self.state = .entrypointReturned(
+                            type.results.enumerated().map { (i, type) in
+                                sp[VReg(i)].cast(to: type)
+                            })
                     }
                 } else {
-                    return try self.execution.executeWasm(
+                    let result = try self.execution.executeWasm(
                         threadingModel: self.threadingModel,
                         function: self.entrypointFunction.handle,
                         type: self.entrypointFunction.type,
@@ -167,6 +180,7 @@
                         sp: self.valueStack,
                         pc: self.pc
                     )
+                    self.state = .entrypointReturned(result)
                 }
             } catch let breakpoint as Execution.Breakpoint {
                 let pc = breakpoint.pc
@@ -174,8 +188,7 @@
                     throw Error.noReverseInstructionMappingAvailable(pc)
                 }
 
-                self.currentBreakpoint = (breakpoint, wasmPc)
-                return nil
+                self.state = .stoppedAtBreakpoint(.init(iseq: breakpoint, wasmPc: wasmPc))
             }
         }
 
@@ -184,26 +197,25 @@
         /// of multiple possible execution branches). After breakpoints setup, execution is resumed until suspension.
         /// If the module is not stopped at a breakpoint, this function returns immediately.
         package mutating func step() throws {
-            guard let currentBreakpoint else {
+            guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
                 return
             }
 
             // TODO: analyze actual instruction branching to set the breakpoint correctly.
-            try self.enableBreakpoint(address: currentBreakpoint.wasmPc + 1)
-            let result = try self.run()
-            assert(result == nil)
+            try self.enableBreakpoint(address: breakpoint.wasmPc + 1)
+            try self.run()
         }
 
         /// Array of addresses in the Wasm binary of executed instructions on the call stack.
         package var currentCallStack: [Int] {
-            guard let currentBreakpoint else {
+            guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
                 return []
             }
 
-            var result = Execution.captureBacktrace(sp: currentBreakpoint.iseq.sp, store: self.store).symbols.compactMap {
+            var result = Execution.captureBacktrace(sp: breakpoint.iseq.sp, store: self.store).symbols.compactMap {
                 return self.instance.handle.instructionMapping.findWasm(forIseqAddress: $0.address)
             }
-            result.append(currentBreakpoint.wasmPc)
+            result.append(breakpoint.wasmPc)
 
             return result
         }
