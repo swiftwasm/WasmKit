@@ -86,7 +86,6 @@
         }
 
         private func hexDump<I: FixedWidthInteger>(_ value: I, endianness: Endianness) -> String {
-
             var buffer = self.allocator.buffer(capacity: MemoryLayout<I>.size)
             buffer.writeInteger(value, endianness: endianness)
             return buffer.hexDump(format: .compact)
