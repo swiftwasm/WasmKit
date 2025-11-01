@@ -45,6 +45,8 @@ package struct GDBHostCommand: Equatable {
         case resumeThreads
         case `continue`
         case kill
+        case insertSoftwareBreakpoint
+        case removeSoftwareBreakpoint
 
         case generalRegisters
 
@@ -107,6 +109,45 @@ package struct GDBHostCommand: Equatable {
 
     /// Arguments supplied with a host command.
     package let arguments: String
+
+    struct ParsingRule {
+        let kind: Kind
+        let prefix: String
+        var separator: String? = nil
+    }
+
+    static let parsingRules: [ParsingRule] = [
+        .init(
+            kind: .readMemoryBinaryData,
+            prefix: "x",
+        ),
+        .init(
+            kind: .readMemory,
+            prefix: "m",
+        ),
+        .init(
+            kind: .insertSoftwareBreakpoint,
+            prefix: "Z0",
+            separator: ",",
+        ),
+        .init(
+            kind: .removeSoftwareBreakpoint,
+            prefix: "z0",
+            separator: ",",
+        ),
+        .init(
+            kind: .registerInfo,
+            prefix: "qRegisterInfo",
+        ),
+        .init(
+            kind: .threadStopInfo,
+            prefix: "qThreadStopInfo",
+        ),
+        .init(
+            kind: .resumeThreads,
+            prefix: "vCont;"
+        )
+    ]
 
     /// Initialize a host command from raw strings sent from a host.
     /// - Parameters:
