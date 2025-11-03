@@ -48,6 +48,11 @@
 
         private var pc = Pc.allocate(capacity: 1)
 
+        /// Addresses of functions in the original Wasm binary, used looking up functions when a breakpoint
+        /// is enabled at an arbitrary address if it isn't present in ``InstructionMapping`` yet (i.e. the
+        /// was not compiled yet in lazy compilation mode).
+        private let functionAddresses: [Int]
+
         /// Initializes a new debugger state instance.
         /// - Parameters:
         ///   - module: Wasm module to instantiate.
@@ -61,6 +66,7 @@
                 throw Error.entrypointFunctionNotFound
             }
 
+            self.functionAddresses = module.functions.map(\.code.originalAddress)
             self.instance = instance
             self.module = module
             self.entrypointFunction = entrypointFunction
@@ -81,7 +87,7 @@
         /// Finds a Wasm address for the first instruction in a given function.
         /// - Parameter function: the Wasm function to find the first Wasm instruction address for.
         /// - Returns: byte offset of the first Wasm instruction of given function in the module it was parsed from.
-        private func originalAddress(function: Function) throws -> Int {
+        package func originalAddress(function: Function) throws -> Int {
             precondition(function.handle.isWasm)
 
             switch function.handle.wasm.code {
@@ -95,6 +101,22 @@
             }
         }
 
+        private func findIseq(forWasmAddress address: Int) throws(Error) -> (iseq: Pc, wasm: Int) {
+            if let (iseq, wasm) = self.instance.handle.instructionMapping.findIseq(forWasmAddress: address) {
+                return (iseq, wasm)
+            }
+            // else if let functionIndex = self.functionAddresses.firstIndex(where: { $0 > address }) - 1 {
+            //     let function = self.module.functions[functionIndex]
+            //     try function.handle.wasm.ensureCompiled(store: StoreRef(self.store))
+            //
+            //     if let (iseq, wasm) = self.instance.handle.instructionMapping.findIseq(forWasmAddress: address) {
+            //         return (iseq, wasm)
+            //     }
+            // }
+            //
+            throw Error.noInstructionMappingAvailable(address)
+        }
+
         /// Enables a breakpoint at a given Wasm address.
         /// - Parameter address: byte offset of the Wasm instruction that will be replaced with a breakpoint. If no
         /// direct internal bytecode matching instruction is found, the next closest internal bytecode instruction
@@ -106,10 +128,7 @@
                 return
             }
 
-            guard let (iseq, wasm) = self.instance.handle.instructionMapping.findIseq(forWasmAddress: address) else {
-                throw Error.noInstructionMappingAvailable(address)
-            }
-
+            let (iseq, wasm) = try self.findIseq(forWasmAddress: address)
             self.breakpoints[wasm] = iseq.pointee
             iseq.pointee = Instruction.breakpoint.headSlot(threadingModel: self.threadingModel)
         }
@@ -124,9 +143,7 @@
                 return
             }
 
-            guard let (iseq, wasm) = self.instance.handle.instructionMapping.findIseq(forWasmAddress: address) else {
-                throw Error.noInstructionMappingAvailable(address)
-            }
+            let (iseq, wasm) = try self.findIseq(forWasmAddress: address)
 
             self.breakpoints[wasm] = nil
             iseq.pointee = oldCodeSlot
@@ -137,7 +154,8 @@
         /// executed. If the module is not stopped at a breakpoint, this function returns immediately.
         package mutating func run() throws {
             do {
-                if case .stoppedAtBreakpoint(let breakpoint) = self.state {
+                switch self.state {
+                case .stoppedAtBreakpoint(let breakpoint):
                     // Remove the breakpoint before resuming
                     try self.disableBreakpoint(address: breakpoint.wasmPc)
                     self.execution.resetError()
@@ -174,7 +192,7 @@
                             }
                         )
                     }
-                } else {
+                case .instantiated:
                     let result = try self.execution.executeWasm(
                         threadingModel: self.threadingModel,
                         function: self.entrypointFunction.handle,
@@ -184,6 +202,9 @@
                         pc: self.pc
                     )
                     self.state = .entrypointReturned(result)
+
+                case .trapped, .wasiModuleExited, .entrypointReturned:
+                    fatalError("Restarting a WASI module from the debugger is not implemented yet.")
                 }
             } catch let breakpoint as Execution.Breakpoint {
                 let pc = breakpoint.pc

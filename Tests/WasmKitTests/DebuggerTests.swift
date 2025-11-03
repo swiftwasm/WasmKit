@@ -18,6 +18,24 @@
         )
         """
 
+    private let multiFunctionWAT = """
+        (module
+            (func (export "_start") (result i32) (local $x i32)
+                (i32.const 42)
+                (i32.const 0)
+                (i32.eqz)
+                (drop)
+                (local.set $x)
+                (local.get $x)
+                (call $f)
+            )
+
+            (func $f (param $a i32) (result i32)
+                (local.get $a)
+            )
+        )
+        """
+
     @Suite
     struct DebuggerTests {
         @Test
@@ -46,6 +64,16 @@
                 Issue.record("Unexpected debugger state after `debugger.run()` call")
                 return
             }
+        }
+
+        @Test
+        func lazyFunctionsCompilation() throws {
+            let store = Store(engine: Engine())
+            let bytes = try wat2wasm(trivialModuleWAT)
+            let module = try parseWasm(bytes: bytes)
+            var debugger = try Debugger(module: module, store: store, imports: [:])
+
+            #expect(try debugger.originalAddress(function: module.functions[1]) == 42)
         }
 
         @Test
