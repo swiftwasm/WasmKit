@@ -1,5 +1,7 @@
 #if WasmDebuggingSupport
 
+    import struct WASI.WASIExitCode
+
     /// Debugger state owner, driven by a debugger host. This implementation has no knowledge of the exact
     /// debugger protocol, which allows any protocol implementation or direct API users to be layered on top if needed.
     package struct Debugger: ~Copyable {
@@ -169,7 +171,8 @@
                         self.state = .entrypointReturned(
                             type.results.enumerated().map { (i, type) in
                                 sp[VReg(i)].cast(to: type)
-                            })
+                            }
+                        )
                     }
                 } else {
                     let result = try self.execution.executeWasm(
@@ -189,6 +192,8 @@
                 }
 
                 self.state = .stoppedAtBreakpoint(.init(iseq: breakpoint, wasmPc: wasmPc))
+            } catch let error as WASIExitCode {
+                self.state = .wasiModuleExited(exitCode: error.code)
             }
         }
 

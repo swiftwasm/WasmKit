@@ -122,7 +122,11 @@
                     return .keyValuePairs(result)
 
                 case .wasiModuleExited(let exitCode):
-                    return .string("W\(self.hexDump(exitCode, endianness: .big))")
+                    if exitCode > UInt8.max {
+                        return .string("W\(self.hexDump(exitCode, endianness: .big))")
+                    } else {
+                        return .string("W\(self.hexDump(UInt8(exitCode), endianness: .big))")
+                    }
 
                 case .entrypointReturned(let values):
                     guard !values.isEmpty else {
@@ -281,11 +285,11 @@
                 throw Error.killRequestReceived
 
             case .insertSoftwareBreakpoint:
-                try self.debugger.disableBreakpoint(address: self.firstHexArgument(argumentsString: command.arguments, separator: ",", endianness: .big))
+                try self.debugger.enableBreakpoint(address: self.firstHexArgument(argumentsString: command.arguments, separator: ",", endianness: .big))
                 responseKind = .ok
 
             case .removeSoftwareBreakpoint:
-                try self.debugger.enableBreakpoint(address: self.firstHexArgument(argumentsString: command.arguments, separator: ",", endianness: .big))
+                try self.debugger.disableBreakpoint(address: self.firstHexArgument(argumentsString: command.arguments, separator: ",", endianness: .big))
                 responseKind = .ok
 
             case .generalRegisters:

@@ -114,6 +114,10 @@ package struct GDBHostCommand: Equatable {
         let kind: Kind
         let prefix: String
         var separator: String? = nil
+
+        /// Whether command arguments us a `:` delimiter, which usually otherwise
+        /// separates command kind from arguments.
+        var argumentsContainColonDelimiter = false
     }
 
     static let parsingRules: [ParsingRule] = [
@@ -128,12 +132,10 @@ package struct GDBHostCommand: Equatable {
         .init(
             kind: .insertSoftwareBreakpoint,
             prefix: "Z0",
-            separator: ",",
         ),
         .init(
             kind: .removeSoftwareBreakpoint,
             prefix: "z0",
-            separator: ",",
         ),
         .init(
             kind: .registerInfo,
@@ -145,7 +147,8 @@ package struct GDBHostCommand: Equatable {
         ),
         .init(
             kind: .resumeThreads,
-            prefix: "vCont;"
+            prefix: "vCont;",
+            argumentsContainColonDelimiter: true
         ),
     ]
 
@@ -157,7 +160,13 @@ package struct GDBHostCommand: Equatable {
         for rule in Self.parsingRules {
             if kindString.starts(with: rule.prefix) {
                 self.kind = rule.kind
-                self.arguments = String(kindString.dropFirst(rule.prefix.count)) + arguments
+                let prependedArguments = kindString.dropFirst(rule.prefix.count)
+
+                if rule.argumentsContainColonDelimiter {
+                    self.arguments = "\(prependedArguments):\(arguments)"
+                } else {
+                    self.arguments = prependedArguments + arguments
+                }
                 return
             }
         }

@@ -82,7 +82,7 @@
                 // isn't taking down the entire server. In our case we need to be able to shut down the server on
                 // debugger client's request, so let's wrap the discarding task group with a throwing task group
                 // for cancellation.
-                try await withThrowingTaskGroup { cancellableGroup in
+                await withThrowingTaskGroup { cancellableGroup in
                     // Use `AsyncStream` for sending a signal out of the discarding group.
                     let (shutDownStream, shutDownContinuation) = AsyncStream<()>.makeStream()
 
