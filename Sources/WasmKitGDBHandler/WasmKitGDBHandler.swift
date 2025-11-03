@@ -280,12 +280,11 @@
             case .kill:
                 throw Error.killRequestReceived
 
-
             case .insertSoftwareBreakpoint:
                 try self.debugger.disableBreakpoint(address: self.firstHexArgument(argumentsString: command.arguments, separator: ",", endianness: .big))
                 responseKind = .ok
 
-            case.removeSoftwareBreakpoint:
+            case .removeSoftwareBreakpoint:
                 try self.debugger.enableBreakpoint(address: self.firstHexArgument(argumentsString: command.arguments, separator: ",", endianness: .big))
                 responseKind = .ok
 
