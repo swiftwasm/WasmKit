@@ -146,7 +146,7 @@ package struct GDBHostCommand: Equatable {
         .init(
             kind: .resumeThreads,
             prefix: "vCont;"
-        )
+        ),
     ]
 
     /// Initialize a host command from raw strings sent from a host.
@@ -154,41 +154,15 @@ package struct GDBHostCommand: Equatable {
     ///   - kindString: raw ``String`` that denotes kind of the command.
     ///   - arguments: raw arguments that immediately follow kind of the command.
     package init(kindString: String, arguments: String) throws(GDBHostCommandDecoder.Error) {
-        let registerInfoPrefix = "qRegisterInfo"
-        let threadStopInfoPrefix = "qThreadStopInfo"
-        let resumeThreadsPrefix = "vCont"
-
-        if kindString.starts(with: "x") {
-            self.kind = .readMemoryBinaryData
-            self.arguments = String(kindString.dropFirst())
-            return
-        } else if kindString.starts(with: "m") {
-            self.kind = .readMemory
-            self.arguments = String(kindString.dropFirst())
-            return
-        } else if kindString.starts(with: registerInfoPrefix) {
-            self.kind = .registerInfo
-
-            guard arguments.isEmpty else {
-                throw GDBHostCommandDecoder.Error.unexpectedArgumentsValue
+        for rule in Self.parsingRules {
+            if kindString.starts(with: rule.prefix) {
+                self.kind = rule.kind
+                self.arguments = String(kindString.dropFirst(rule.prefix.count)) + arguments
+                return
             }
-            self.arguments = String(kindString.dropFirst(registerInfoPrefix.count))
-            return
-        } else if kindString.starts(with: threadStopInfoPrefix) {
-            self.kind = .threadStopInfo
+        }
 
-            guard arguments.isEmpty else {
-                throw GDBHostCommandDecoder.Error.unexpectedArgumentsValue
-            }
-            self.arguments = String(kindString.dropFirst(registerInfoPrefix.count))
-            return
-        } else if kindString != "vCont?" && kindString.starts(with: resumeThreadsPrefix) {
-            self.kind = .resumeThreads
-
-            // Strip the prefix and a semicolon ';' delimiter, append arguments back with the original delimiter.
-            self.arguments = String(kindString.dropFirst(resumeThreadsPrefix.count + 1)) + ":" + arguments
-            return
-        } else if let kind = Kind(rawValue: kindString) {
+        if let kind = Kind(rawValue: kindString) {
             self.kind = kind
         } else {
             throw GDBHostCommandDecoder.Error.unknownCommand(kind: kindString, arguments: arguments)

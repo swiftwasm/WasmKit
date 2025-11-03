@@ -49,6 +49,7 @@
             case hostCommandNotImplemented(GDBHostCommand.Kind)
             case exitCodeUnknown([Value])
             case killRequestReceived
+            case unknownHexEncodedArguments(String)
         }
 
         private let wasmBinary: ByteBuffer
@@ -89,6 +90,20 @@
             var buffer = self.allocator.buffer(capacity: MemoryLayout<I>.size)
             buffer.writeInteger(value, endianness: endianness)
             return buffer.hexDump(format: .compact)
+        }
+
+        private func firstHexArgument<I: FixedWidthInteger>(argumentsString: String, separator: Character, endianness: Endianness) throws -> I {
+            guard let hexString = argumentsString.split(separator: separator).first else {
+                throw Error.unknownHexEncodedArguments(argumentsString)
+            }
+
+            var hexBuffer = try self.allocator.buffer(plainHexEncodedBytes: String(hexString))
+
+            guard let argument = hexBuffer.readInteger(endianness: endianness, as: I.self) else {
+                throw Error.unknownHexEncodedArguments(argumentsString)
+            }
+
+            return argument
         }
 
         var currentThreadStopInfo: GDBTargetResponse.Kind {
@@ -264,6 +279,15 @@
 
             case .kill:
                 throw Error.killRequestReceived
+
+
+            case .insertSoftwareBreakpoint:
+                try self.debugger.disableBreakpoint(address: self.firstHexArgument(argumentsString: command.arguments, separator: ",", endianness: .big))
+                responseKind = .ok
+
+            case.removeSoftwareBreakpoint:
+                try self.debugger.enableBreakpoint(address: self.firstHexArgument(argumentsString: command.arguments, separator: ",", endianness: .big))
+                responseKind = .ok
 
             case .generalRegisters:
                 throw Error.hostCommandNotImplemented(command.kind)
