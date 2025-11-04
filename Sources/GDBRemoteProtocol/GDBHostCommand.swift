@@ -110,17 +110,21 @@ package struct GDBHostCommand: Equatable {
     /// Arguments supplied with a host command.
     package let arguments: String
 
-    struct ParsingRule {
+    /// Helper type for representing parsing prefixes in host commands.
+    private struct ParsingRule {
+        /// Kind of the host command parsed by this rul.
         let kind: Kind
-        let prefix: String
-        var separator: String? = nil
 
-        /// Whether command arguments us a `:` delimiter, which usually otherwise
+        /// String prefix required for the raw string to match for the rule
+        /// to yield a parsed command.
+        let prefix: String
+
+        /// Whether command arguments use a `:` delimiter, which usually otherwise
         /// separates command kind from arguments.
         var argumentsContainColonDelimiter = false
     }
 
-    static let parsingRules: [ParsingRule] = [
+    private static let parsingRules: [ParsingRule] = [
         .init(
             kind: .readMemoryBinaryData,
             prefix: "x",
