@@ -1,7 +1,5 @@
 #if WasmDebuggingSupport
 
-    import struct WASI.WASIExitCode
-
     /// Debugger state owner, driven by a debugger host. This implementation has no knowledge of the exact
     /// debugger protocol, which allows any protocol implementation or direct API users to be layered on top if needed.
     package struct Debugger: ~Copyable {
@@ -14,7 +12,6 @@
             case instantiated
             case stoppedAtBreakpoint(BreakpointState)
             case trapped(String)
-            case wasiModuleExited(exitCode: UInt32)
             case entrypointReturned([Value])
         }
 
@@ -213,8 +210,8 @@
                     )
                     self.state = .entrypointReturned(result)
 
-                case .trapped, .wasiModuleExited, .entrypointReturned:
-                    fatalError("Restarting a WASI module from the debugger is not implemented yet.")
+                case .trapped, .entrypointReturned:
+                    fatalError("Restarting a Wasm module from the debugger is not implemented yet.")
                 }
             } catch let breakpoint as Execution.Breakpoint {
                 let pc = breakpoint.pc
@@ -223,8 +220,6 @@
                 }
 
                 self.state = .stoppedAtBreakpoint(.init(iseq: breakpoint, wasmPc: wasmPc))
-            } catch let error as WASIExitCode {
-                self.state = .wasiModuleExited(exitCode: error.code)
             }
         }
 

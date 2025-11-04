@@ -121,13 +121,6 @@
                     result.append(("reason", "trace"))
                     return .keyValuePairs(result)
 
-                case .wasiModuleExited(let exitCode):
-                    if exitCode > UInt8.max {
-                        return .string("W\(self.hexDump(exitCode, endianness: .big))")
-                    } else {
-                        return .string("W\(self.hexDump(UInt8(exitCode), endianness: .big))")
-                    }
-
                 case .entrypointReturned(let values):
                     guard !values.isEmpty else {
                         return .string("W\(self.hexDump(0 as UInt8, endianness: .big))")
