@@ -285,11 +285,23 @@
                 throw Error.killRequestReceived
 
             case .insertSoftwareBreakpoint:
-                try self.debugger.enableBreakpoint(address: self.firstHexArgument(argumentsString: command.arguments, separator: ",", endianness: .big))
+                try self.debugger.enableBreakpoint(
+                    address: Int(self.firstHexArgument(
+                        argumentsString: command.arguments,
+                        separator: ",",
+                        endianness: .big
+                    ) - codeOffset)
+                )
                 responseKind = .ok
 
             case .removeSoftwareBreakpoint:
-                try self.debugger.disableBreakpoint(address: self.firstHexArgument(argumentsString: command.arguments, separator: ",", endianness: .big))
+                try self.debugger.disableBreakpoint(
+                    address: Int(self.firstHexArgument(
+                        argumentsString: command.arguments,
+                        separator: ",",
+                        endianness: .big
+                    ) - codeOffset)
+                )
                 responseKind = .ok
 
             case .generalRegisters:

@@ -51,7 +51,7 @@
         /// Addresses of functions in the original Wasm binary, used looking up functions when a breakpoint
         /// is enabled at an arbitrary address if it isn't present in ``InstructionMapping`` yet (i.e. the
         /// was not compiled yet in lazy compilation mode).
-        private let functionAddresses: [Int]
+        private let functionAddresses: [(address: Int, instanceFunctionIndex: Int)]
 
         /// Initializes a new debugger state instance.
         /// - Parameters:
@@ -66,8 +66,15 @@
                 throw Error.entrypointFunctionNotFound
             }
 
-            self.functionAddresses = module.functions.map(\.code.originalAddress)
             self.instance = instance
+            self.functionAddresses = instance.handle.functions.enumerated().filter { $0.element.isWasm }.lazy.map {
+                switch $0.element.wasm.code {
+                case .uncompiled(let wasm), .debuggable(let wasm, _):
+                    return (address: wasm.originalAddress, instanceFunctionIndex: $0.offset)
+                case .compiled:
+                    fatalError()
+                }
+            }
             self.module = module
             self.entrypointFunction = entrypointFunction
             self.valueStack = UnsafeMutablePointer<StackSlot>.allocate(capacity: limit)
@@ -101,19 +108,20 @@
             }
         }
 
-        private func findIseq(forWasmAddress address: Int) throws(Error) -> (iseq: Pc, wasm: Int) {
+        private func findIseq(forWasmAddress address: Int) throws -> (iseq: Pc, wasm: Int) {
             if let (iseq, wasm) = self.instance.handle.instructionMapping.findIseq(forWasmAddress: address) {
                 return (iseq, wasm)
             }
-            // else if let functionIndex = self.functionAddresses.firstIndex(where: { $0 > address }) - 1 {
-            //     let function = self.module.functions[functionIndex]
-            //     try function.handle.wasm.ensureCompiled(store: StoreRef(self.store))
-            //
-            //     if let (iseq, wasm) = self.instance.handle.instructionMapping.findIseq(forWasmAddress: address) {
-            //         return (iseq, wasm)
-            //     }
-            // }
-            //
+
+            let followingIndex = self.functionAddresses.firstIndex(where: { $0.address > address }) ?? self.functionAddresses.endIndex
+            let functionIndex = self.functionAddresses[followingIndex - 1].instanceFunctionIndex
+            let function = instance.handle.functions[functionIndex]
+            try function.wasm.ensureCompiled(store: StoreRef(self.store))
+
+            if let (iseq, wasm) = self.instance.handle.instructionMapping.findIseq(forWasmAddress: address) {
+                return (iseq, wasm)
+            }
+
             throw Error.noInstructionMappingAvailable(address)
         }
 
@@ -123,14 +131,16 @@
         /// is replaced with a breakpoint. The original instruction to be restored is preserved in debugger state
         /// represented by `self`.
         /// See also ``Debugger/disableBreakpoint(address:)``.
-        package mutating func enableBreakpoint(address: Int) throws(Error) {
+        @discardableResult
+        package mutating func enableBreakpoint(address: Int) throws -> Int {
             guard self.breakpoints[address] == nil else {
-                return
+                return address
             }
 
             let (iseq, wasm) = try self.findIseq(forWasmAddress: address)
             self.breakpoints[wasm] = iseq.pointee
             iseq.pointee = Instruction.breakpoint.headSlot(threadingModel: self.threadingModel)
+            return wasm
         }
 
         /// Disables a breakpoint at a given Wasm address. If no breakpoint at a given address was previously set with
@@ -138,7 +148,7 @@
         /// - Parameter address: byte offset of the Wasm instruction that was replaced with a breakpoint. The original
         /// instruction is restored from debugger state and replaces the breakpoint instruction.
         /// See also ``Debugger/enableBreakpoint(address:)``.
-        package mutating func disableBreakpoint(address: Int) throws(Error) {
+        package mutating func disableBreakpoint(address: Int) throws {
             guard let oldCodeSlot = self.breakpoints[address] else {
                 return
             }
@@ -238,10 +248,10 @@
                 return []
             }
 
-            var result = Execution.captureBacktrace(sp: breakpoint.iseq.sp, store: self.store).symbols.compactMap {
+            var result = [breakpoint.wasmPc]
+            result.append(contentsOf: Execution.captureBacktrace(sp: breakpoint.iseq.sp, store: self.store).symbols.compactMap {
                 return self.instance.handle.instructionMapping.findWasm(forIseqAddress: $0.address)
-            }
-            result.append(breakpoint.wasmPc)
+            })
 
             return result
         }
