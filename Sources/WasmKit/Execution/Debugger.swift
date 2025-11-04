@@ -249,9 +249,10 @@
             }
 
             var result = [breakpoint.wasmPc]
-            result.append(contentsOf: Execution.captureBacktrace(sp: breakpoint.iseq.sp, store: self.store).symbols.compactMap {
-                return self.instance.handle.instructionMapping.findWasm(forIseqAddress: $0.address)
-            })
+            result.append(
+                contentsOf: Execution.captureBacktrace(sp: breakpoint.iseq.sp, store: self.store).symbols.compactMap {
+                    return self.instance.handle.instructionMapping.findWasm(forIseqAddress: $0.address)
+                })
 
             return result
         }
