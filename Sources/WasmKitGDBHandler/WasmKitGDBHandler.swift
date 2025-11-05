@@ -32,7 +32,7 @@
         }
     }
 
-    private let codeOffset  = UInt64(0x4000_0000_0000_0000)
+    private let codeOffset = UInt64(0x4000_0000_0000_0000)
     private let stackOffset = UInt64(0x8000_0000_0000_0000)
 
     package actor WasmKitGDBHandler {
@@ -249,7 +249,6 @@
                 } else {
                     fatalError("Linear memory reads are not implemented in the debugger yet.")
                 }
-
 
             case .wasmCallStack:
                 let callStack = self.debugger.currentCallStack
