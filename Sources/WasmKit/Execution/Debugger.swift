@@ -45,7 +45,7 @@
 
         private var pc = Pc.allocate(capacity: 1)
 
-        /// Addresses of functions in the original Wasm binary, used looking up functions when a breakpoint
+        /// Addresses of functions in the original Wasm binary, used for looking up functions when a breakpoint
         /// is enabled at an arbitrary address if it isn't present in ``InstructionMapping`` yet (i.e. the
         /// was not compiled yet in lazy compilation mode).
         private let functionAddresses: [(address: Int, instanceFunctionIndex: Int)]
@@ -91,7 +91,7 @@
         /// Finds a Wasm address for the first instruction in a given function.
         /// - Parameter function: the Wasm function to find the first Wasm instruction address for.
         /// - Returns: byte offset of the first Wasm instruction of given function in the module it was parsed from.
-        package func originalAddress(function: Function) throws -> Int {
+        private func originalAddress(function: Function) throws -> Int {
             precondition(function.handle.isWasm)
 
             switch function.handle.wasm.code {
