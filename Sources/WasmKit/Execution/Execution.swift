@@ -46,7 +46,7 @@ struct Execution: ~Copyable {
     struct FrameIterator: IteratorProtocol {
         struct Element {
             let pc: Pc
-            let function: EntityHandle<WasmFunctionEntity>?
+            let sp: Sp
         }
 
         /// The stack pointer currently traversed.
@@ -62,7 +62,7 @@ struct Execution: ~Copyable {
                 return nil
             }
             self.sp = sp.previousSP
-            return Element(pc: pc, function: sp.currentFunction)
+            return Element(pc: pc, sp: sp)
         }
     }
 
@@ -71,7 +71,7 @@ struct Execution: ~Copyable {
         var symbols: [Backtrace.Symbol] = []
 
         while let frame = frames.next() {
-            guard let function = frame.function else {
+            guard let function = frame.sp.currentFunction else {
                 symbols.append(.init(name: nil, address: frame.pc))
                 continue
             }

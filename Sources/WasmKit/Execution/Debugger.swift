@@ -4,6 +4,7 @@
     /// debugger protocol, which allows any protocol implementation or direct API users to be layered on top if needed.
     package struct Debugger: ~Copyable {
         package struct BreakpointState {
+            let sp: Sp
             let iseq: Execution.Breakpoint
             package let wasmPc: Int
         }
@@ -43,7 +44,8 @@
 
         package private(set) var state: State
 
-        private var pc = Pc.allocate(capacity: 1)
+        /// Pc ofthe final instruction that a successful program will execute, initialized with `Instruction.endofExecution`
+        private let endOfExecution = Pc.allocate(capacity: 1)
 
         /// Addresses of functions in the original Wasm binary, used looking up functions when a breakpoint
         /// is enabled at an arbitrary address if it isn't present in ``InstructionMapping`` yet (i.e. the
@@ -78,7 +80,7 @@
             self.store = store
             self.execution = Execution(store: StoreRef(store), stackEnd: valueStack.advanced(by: limit))
             self.threadingModel = store.engine.configuration.threadingModel
-            self.pc.pointee = Instruction.endOfExecution.headSlot(threadingModel: threadingModel)
+            self.endOfExecution.pointee = Instruction.endOfExecution.headSlot(threadingModel: threadingModel)
             self.state = .instantiated
         }
 
@@ -206,7 +208,7 @@
                         type: self.entrypointFunction.type,
                         arguments: [],
                         sp: self.valueStack,
-                        pc: self.pc
+                        pc: self.endOfExecution
                     )
                     self.state = .entrypointReturned(result)
 
@@ -219,7 +221,7 @@
                     throw Error.noReverseInstructionMappingAvailable(pc)
                 }
 
-                self.state = .stoppedAtBreakpoint(.init(iseq: breakpoint, wasmPc: wasmPc))
+                self.state = .stoppedAtBreakpoint(.init(sp: breakpoint.sp, iseq: breakpoint, wasmPc: wasmPc))
             }
         }
 
@@ -235,6 +237,10 @@
             // TODO: analyze actual instruction branching to set the breakpoint correctly.
             try self.enableBreakpoint(address: breakpoint.wasmPc + 1)
             try self.run()
+        }
+
+        package func getLocal(frameIndex: Int, localIndex: Int) -> Address {
+
         }
 
         /// Array of addresses in the Wasm binary of executed instructions on the call stack.
@@ -254,7 +260,7 @@
 
         deinit {
             self.valueStack.deallocate()
-            self.pc.deallocate()
+            self.endOfExecution.deallocate()
         }
     }
 

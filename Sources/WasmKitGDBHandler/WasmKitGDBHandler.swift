@@ -32,7 +32,8 @@
         }
     }
 
-    private let codeOffset = UInt64(0x4000_0000_0000_0000)
+    private let codeOffset  = UInt64(0x4000_0000_0000_0000)
+    private let stackOffset = UInt64(0x8000_0000_0000_0000)
 
     package actor WasmKitGDBHandler {
         enum ResumeThreadsAction: String {
@@ -50,6 +51,7 @@
             case exitCodeUnknown([Value])
             case killRequestReceived
             case unknownHexEncodedArguments(String)
+            case unknownWasmLocalArguments(String)
         }
 
         private let wasmBinary: ByteBuffer
@@ -229,17 +231,25 @@
                 let argumentsArray = command.arguments.split(separator: ",")
                 guard
                     argumentsArray.count == 2,
-                    let address = UInt64(hexEncoded: argumentsArray[0]),
+                    let hostAddress = UInt64(hexEncoded: argumentsArray[0]),
                     var length = Int(hexEncoded: argumentsArray[1])
                 else { throw Error.unknownReadMemoryArguments }
 
-                let binaryOffset = Int(address - codeOffset)
+                if address > stackOffset {
+                    let stackOffset = address - codeOffset
 
-                if binaryOffset + length > wasmBinary.readableBytes {
-                    length = wasmBinary.readableBytes - binaryOffset
+                    fatalError("Stack reads are not implemented in the debugger yet")
+                } else if address > codeOffset {
+                    let binaryOffset = address - stackOffset
+                    if binaryOffset + length > wasmBinary.readableBytes {
+                        length = wasmBinary.readableBytes - binaryOffset
+                    }
+
+                    responseKind = .hexEncodedBinary(wasmBinary.readableBytesView[binaryOffset..<(binaryOffset + length)])
+                } else {
+                    fatalError("Linear memory reads are not implemented in the debugger yet.")
                 }
 
-                responseKind = .hexEncodedBinary(wasmBinary.readableBytesView[binaryOffset..<(binaryOffset + length)])
 
             case .wasmCallStack:
                 let callStack = self.debugger.currentCallStack
@@ -298,6 +308,23 @@
                         ) - codeOffset)
                 )
                 responseKind = .ok
+
+            case .wasmLocal:
+                let arguments = command.arguments.split(separator: ";")
+                guard arguments.count == 2,
+                    let frameIndexString = arguments.first,
+                    let frameIndex = UInt32(frameIndexString),
+                    let localIndexString = arguments.last,
+                    let localIndex = UInt32(localIndexString)
+                else {
+                    throw Error.unknownWasmLocalArguments(command.arguments)
+                }
+
+                var response = self.allocator.buffer(capacity: 64)
+                response.writeInteger(frameIndex, endianness: .little)
+                response.writeInteger(localIndex, endianness: .little)
+
+                responseKind = .hexEncodedBinary(response)
 
             case .generalRegisters:
                 throw Error.hostCommandNotImplemented(command.kind)
