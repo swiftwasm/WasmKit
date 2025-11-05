@@ -45,6 +45,8 @@ package struct GDBHostCommand: Equatable {
         case resumeThreads
         case `continue`
         case kill
+        case insertSoftwareBreakpoint
+        case removeSoftwareBreakpoint
 
         case generalRegisters
 
@@ -108,46 +110,72 @@ package struct GDBHostCommand: Equatable {
     /// Arguments supplied with a host command.
     package let arguments: String
 
+    /// Helper type for representing parsing prefixes in host commands.
+    private struct ParsingRule {
+        /// Kind of the host command parsed by this rul.
+        let kind: Kind
+
+        /// String prefix required for the raw string to match for the rule
+        /// to yield a parsed command.
+        let prefix: String
+
+        /// Whether command arguments use a `:` delimiter, which usually otherwise
+        /// separates command kind from arguments.
+        var argumentsContainColonDelimiter = false
+    }
+
+    private static let parsingRules: [ParsingRule] = [
+        .init(
+            kind: .readMemoryBinaryData,
+            prefix: "x",
+        ),
+        .init(
+            kind: .readMemory,
+            prefix: "m",
+        ),
+        .init(
+            kind: .insertSoftwareBreakpoint,
+            prefix: "Z0",
+        ),
+        .init(
+            kind: .removeSoftwareBreakpoint,
+            prefix: "z0",
+        ),
+        .init(
+            kind: .registerInfo,
+            prefix: "qRegisterInfo",
+        ),
+        .init(
+            kind: .threadStopInfo,
+            prefix: "qThreadStopInfo",
+        ),
+        .init(
+            kind: .resumeThreads,
+            prefix: "vCont;",
+            argumentsContainColonDelimiter: true
+        ),
+    ]
+
     /// Initialize a host command from raw strings sent from a host.
     /// - Parameters:
     ///   - kindString: raw ``String`` that denotes kind of the command.
     ///   - arguments: raw arguments that immediately follow kind of the command.
     package init(kindString: String, arguments: String) throws(GDBHostCommandDecoder.Error) {
-        let registerInfoPrefix = "qRegisterInfo"
-        let threadStopInfoPrefix = "qThreadStopInfo"
-        let resumeThreadsPrefix = "vCont"
+        for rule in Self.parsingRules {
+            if kindString.starts(with: rule.prefix) {
+                self.kind = rule.kind
+                let prependedArguments = kindString.dropFirst(rule.prefix.count)
 
-        if kindString.starts(with: "x") {
-            self.kind = .readMemoryBinaryData
-            self.arguments = String(kindString.dropFirst())
-            return
-        } else if kindString.starts(with: "m") {
-            self.kind = .readMemory
-            self.arguments = String(kindString.dropFirst())
-            return
-        } else if kindString.starts(with: registerInfoPrefix) {
-            self.kind = .registerInfo
-
-            guard arguments.isEmpty else {
-                throw GDBHostCommandDecoder.Error.unexpectedArgumentsValue
+                if rule.argumentsContainColonDelimiter {
+                    self.arguments = "\(prependedArguments):\(arguments)"
+                } else {
+                    self.arguments = prependedArguments + arguments
+                }
+                return
             }
-            self.arguments = String(kindString.dropFirst(registerInfoPrefix.count))
-            return
-        } else if kindString.starts(with: threadStopInfoPrefix) {
-            self.kind = .threadStopInfo
+        }
 
-            guard arguments.isEmpty else {
-                throw GDBHostCommandDecoder.Error.unexpectedArgumentsValue
-            }
-            self.arguments = String(kindString.dropFirst(registerInfoPrefix.count))
-            return
-        } else if kindString != "vCont?" && kindString.starts(with: resumeThreadsPrefix) {
-            self.kind = .resumeThreads
-
-            // Strip the prefix and a semicolon ';' delimiter, append arguments back with the original delimiter.
-            self.arguments = String(kindString.dropFirst(resumeThreadsPrefix.count + 1)) + ":" + arguments
-            return
-        } else if let kind = Kind(rawValue: kindString) {
+        if let kind = Kind(rawValue: kindString) {
             self.kind = kind
         } else {
             throw GDBHostCommandDecoder.Error.unknownCommand(kind: kindString, arguments: arguments)

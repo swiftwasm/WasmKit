@@ -49,6 +49,7 @@
             case hostCommandNotImplemented(GDBHostCommand.Kind)
             case exitCodeUnknown([Value])
             case killRequestReceived
+            case unknownHexEncodedArguments(String)
         }
 
         private let wasmBinary: ByteBuffer
@@ -91,6 +92,20 @@
             return buffer.hexDump(format: .compact)
         }
 
+        private func firstHexArgument<I: FixedWidthInteger>(argumentsString: String, separator: Character, endianness: Endianness) throws -> I {
+            guard let hexString = argumentsString.split(separator: separator).first else {
+                throw Error.unknownHexEncodedArguments(argumentsString)
+            }
+
+            var hexBuffer = try self.allocator.buffer(plainHexEncodedBytes: String(hexString))
+
+            guard let argument = hexBuffer.readInteger(endianness: endianness, as: I.self) else {
+                throw Error.unknownHexEncodedArguments(argumentsString)
+            }
+
+            return argument
+        }
+
         var currentThreadStopInfo: GDBTargetResponse.Kind {
             get throws {
                 var result: [(String, String)] = [
@@ -105,9 +120,6 @@
                     result.append(("00", self.hexDump(pcInHostAddressSpace, endianness: .little)))
                     result.append(("reason", "trace"))
                     return .keyValuePairs(result)
-
-                case .wasiModuleExited(let exitCode):
-                    return .string("W\(self.hexDump(exitCode, endianness: .big))")
 
                 case .entrypointReturned(let values):
                     guard !values.isEmpty else {
@@ -264,6 +276,28 @@
 
             case .kill:
                 throw Error.killRequestReceived
+
+            case .insertSoftwareBreakpoint:
+                try self.debugger.enableBreakpoint(
+                    address: Int(
+                        self.firstHexArgument(
+                            argumentsString: command.arguments,
+                            separator: ",",
+                            endianness: .big
+                        ) - codeOffset)
+                )
+                responseKind = .ok
+
+            case .removeSoftwareBreakpoint:
+                try self.debugger.disableBreakpoint(
+                    address: Int(
+                        self.firstHexArgument(
+                            argumentsString: command.arguments,
+                            separator: ",",
+                            endianness: .big
+                        ) - codeOffset)
+                )
+                responseKind = .ok
 
             case .generalRegisters:
                 throw Error.hostCommandNotImplemented(command.kind)

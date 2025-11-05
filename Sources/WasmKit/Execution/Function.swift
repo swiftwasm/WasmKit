@@ -216,10 +216,12 @@ extension InternalFunction {
         function: EntityHandle<WasmFunctionEntity>
     ) {
         let entity = self.wasm
-        guard case .compiled(let iseq) = entity.code else {
+        switch entity.code {
+        case .compiled(let iseq), .debuggable(_, let iseq):
+            return (iseq, entity.numberOfNonParameterLocals, entity)
+        case .uncompiled:
             preconditionFailure()
         }
-        return (iseq, entity.numberOfNonParameterLocals, entity)
     }
 }
 

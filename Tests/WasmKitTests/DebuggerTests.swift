@@ -18,6 +18,24 @@
         )
         """
 
+    private let multiFunctionWAT = """
+        (module
+            (func (export "_start") (result i32) (local $x i32)
+                (i32.const 42)
+                (i32.const 0)
+                (i32.eqz)
+                (drop)
+                (local.set $x)
+                (local.get $x)
+                (call $f)
+            )
+
+            (func $f (param $a i32) (result i32)
+                (local.get $a)
+            )
+        )
+        """
+
     @Suite
     struct DebuggerTests {
         @Test
@@ -35,7 +53,7 @@
             #expect(debugger.currentCallStack == [firstExpectedPc])
 
             try debugger.step()
-            #expect(try debugger.breakpoints.count == 1)
+            #expect(debugger.breakpoints.count == 1)
             let secondExpectedPc = try #require(debugger.breakpoints.keys.first)
             #expect(debugger.currentCallStack == [secondExpectedPc])
 
@@ -46,6 +64,25 @@
                 Issue.record("Unexpected debugger state after `debugger.run()` call")
                 return
             }
+        }
+
+        /// Ensures that breakpoints and call stacks work across multiple function calls.
+        @Test
+        func lazyFunctionsCompilation() throws {
+            let store = Store(engine: Engine())
+            let bytes = try wat2wasm(multiFunctionWAT)
+            let module = try parseWasm(bytes: bytes)
+
+            #expect(module.functions.count == 2)
+            var debugger = try Debugger(module: module, store: store, imports: [:])
+
+            let breakpointAddress = try debugger.enableBreakpoint(
+                address: module.functions[1].code.originalAddress
+            )
+            try debugger.run()
+
+            #expect(debugger.currentCallStack.count == 2)
+            #expect(debugger.currentCallStack.first == breakpointAddress)
         }
 
         @Test
