@@ -52,6 +52,11 @@
         /// was not compiled yet in lazy compilation mode).
         private let functionAddresses: [(address: Int, instanceFunctionIndex: Int)]
 
+        /// Addresses of functions in the original Wasm binary, used for looking up functions when a breakpoint
+        /// is enabled at an arbitrary address if it isn't present in ``InstructionMapping`` yet (i.e. the
+        /// was not compiled yet in lazy compilation mode).
+        private let functionAddresses: [(address: Int, instanceFunctionIndex: Int)]
+
         /// Initializes a new debugger state instance.
         /// - Parameters:
         ///   - module: Wasm module to instantiate.
