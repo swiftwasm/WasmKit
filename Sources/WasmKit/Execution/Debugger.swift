@@ -252,13 +252,12 @@
             }
         }
 
-
         /// Iterates through Wasm call stack to return a local at a given address when
         /// debugged module is stopped at a breakpoint.
         /// - Parameter address: address of the local to return.
         /// - Returns: Raw untyped Wasm value at a given address
         package func getLocal(address: LocalAddress) throws(Error) -> UInt64 {
-            guard case let .stoppedAtBreakpoint(breakpoint) = self.state else {
+            guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
                 throw Error.notStoppedAtBreakpoint
             }
 

@@ -32,7 +32,6 @@
         }
     }
 
-
     extension Debugger.LocalAddress {
         package init(raw: UInt64) {
             let rawAdjusted = raw - localOffset
@@ -40,7 +39,7 @@
         }
     }
 
-    private let codeOffset  = UInt64(0x4000_0000_0000_0000)
+    private let codeOffset = UInt64(0x4000_0000_0000_0000)
     private let stackOffset = UInt64(0x8000_0000_0000_0000)
     private let localOffset = UInt64(0xC000_0000_0000_0000)
 
@@ -246,7 +245,7 @@
 
                 if address > localOffset {
                     let localRaw = address - localOffset
-                    let localAddress = Debugger.LocalAddress(frameIndex: )
+                    let localAddress = Debugger.LocalAddress(frameIndex:)
                 } else if address > stackOffset {
                     fatalError("Stack reads are not implemented in the debugger yet")
                 } else if address > codeOffset {
