@@ -21,6 +21,9 @@
             case unknownCurrentFunctionForResumedBreakpoint(UnsafeMutablePointer<UInt64>)
             case noInstructionMappingAvailable(Int)
             case noReverseInstructionMappingAvailable(UnsafeMutablePointer<UInt64>)
+            case stackFuncIndexOOB(LocalAddress)
+            case stackLocalIndexOOB(LocalAddress)
+            case notStoppedAtBreakpoint
         }
 
         private let valueStack: Sp
@@ -48,11 +51,6 @@
         private let endOfExecution = Pc.allocate(capacity: 1)
 
         /// Addresses of functions in the original Wasm binary, used looking up functions when a breakpoint
-        /// is enabled at an arbitrary address if it isn't present in ``InstructionMapping`` yet (i.e. the
-        /// was not compiled yet in lazy compilation mode).
-        private let functionAddresses: [(address: Int, instanceFunctionIndex: Int)]
-
-        /// Addresses of functions in the original Wasm binary, used for looking up functions when a breakpoint
         /// is enabled at an arbitrary address if it isn't present in ``InstructionMapping`` yet (i.e. the
         /// was not compiled yet in lazy compilation mode).
         private let functionAddresses: [(address: Int, instanceFunctionIndex: Int)]
@@ -244,8 +242,38 @@
             try self.run()
         }
 
-        package func getLocal(frameIndex: Int, localIndex: Int) -> Address {
+        package struct LocalAddress {
+            let frameIndex: UInt32
+            let localIndex: UInt32
 
+            package init(frameIndex: Int, localIndex: Int) {
+                self.frameIndex = frameIndex
+                self.localIndex = localIndex
+            }
+        }
+
+
+        /// Iterates through Wasm call stack to return a local at a given address when
+        /// debugged module is stopped at a breakpoint.
+        /// - Parameter address: address of the local to return.
+        /// - Returns: Raw untyped Wasm value at a given address
+        package func getLocal(address: LocalAddress) throws(Error) -> UInt64 {
+            guard case let .stoppedAtBreakpoint(breakpoint) = self.state else {
+                throw Error.notStoppedAtBreakpoint
+            }
+
+            var i = 0
+            for frame in Execution.CallStack(sp: breakpoint.sp) {
+                guard address.frameIndex == i else {
+                    i += 1
+                    continue
+                }
+
+                // TODO: can we guarantee we have no local index OOB here?
+                return frame.sp[address.localIndex].storage
+            }
+
+            throw Error.stackFuncIndexOOB(address)
         }
 
         /// Array of addresses in the Wasm binary of executed instructions on the call stack.

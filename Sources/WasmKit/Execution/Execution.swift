@@ -42,35 +42,43 @@ struct Execution: ~Copyable {
         sp.currentInstance.unsafelyUnwrapped
     }
 
-    /// An iterator for the call frames in the VM stack.
-    struct FrameIterator: IteratorProtocol {
-        struct Element {
-            let pc: Pc
-            let sp: Sp
-        }
-
-        /// The stack pointer currently traversed.
-        private var sp: Sp?
-
-        init(sp: Sp) {
-            self.sp = sp
-        }
-
-        mutating func next() -> Element? {
-            guard let sp = self.sp, let pc = sp.returnPC else {
-                // Reached the root frame, whose stack pointer is nil.
-                return nil
+    struct CallStack: Sequence {
+        /// An iterator for the call frames in the VM stack.
+        struct FrameIterator: IteratorProtocol {
+            struct Element {
+                let pc: Pc
+                let sp: Sp
             }
-            self.sp = sp.previousSP
-            return Element(pc: pc, sp: sp)
+
+            /// The stack pointer currently traversed.
+            private var sp: Sp?
+
+            init(sp: Sp) {
+                self.sp = sp
+            }
+
+            mutating func next() -> Element? {
+                guard let sp = self.sp, let pc = sp.returnPC else {
+                    // Reached the root frame, whose stack pointer is nil.
+                    return nil
+                }
+                self.sp = sp.previousSP
+                return Element(pc: pc, sp: sp)
+            }
+        }
+
+        let sp: Sp
+
+        func makeIterator() -> FrameIterator {
+            FrameIterator(sp: self.sp)
         }
     }
 
     static func captureBacktrace(sp: Sp, store: Store) -> Backtrace {
-        var frames = FrameIterator(sp: sp)
+        let callStack = CallStack(sp: sp)
         var symbols: [Backtrace.Symbol] = []
 
-        while let frame = frames.next() {
+        for frame in callStack {
             guard let function = frame.sp.currentFunction else {
                 symbols.append(.init(name: nil, address: frame.pc))
                 continue
