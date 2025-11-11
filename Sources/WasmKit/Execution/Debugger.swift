@@ -81,7 +81,11 @@
             self.entrypointFunction = entrypointFunction
             self.valueStack = UnsafeMutablePointer<StackSlot>.allocate(capacity: limit)
             self.store = store
-            self.execution = Execution(store: StoreRef(store), stackEnd: valueStack.advanced(by: limit))
+            self.execution = Execution(
+                store: StoreRef(store),
+                stackStart: .init(start: valueStack, count: limit),
+                stackEnd: valueStack.advanced(by: limit)
+            )
             self.threadingModel = store.engine.configuration.threadingModel
             self.endOfExecution.pointee = Instruction.endOfExecution.headSlot(threadingModel: threadingModel)
             self.state = .instantiated
@@ -242,7 +246,7 @@
             try self.run()
         }
 
-        package struct LocalAddress {
+        package struct LocalAddress: Equatable {
             let frameIndex: UInt32
             let localIndex: UInt32
 
@@ -250,13 +254,20 @@
                 self.frameIndex = frameIndex
                 self.localIndex = localIndex
             }
+
+            package init?(raw: UInt64, offset: UInt64) {
+                guard raw >= offset else { return nil }
+
+                let rawAdjusted = raw - offset
+                self.init(frameIndex: UInt32(truncatingIfNeeded: rawAdjusted >> 32), localIndex: UInt32(truncatingIfNeeded: rawAdjusted))
+            }
         }
 
         /// Iterates through Wasm call stack to return a local at a given address when
         /// debugged module is stopped at a breakpoint.
         /// - Parameter address: address of the local to return.
         /// - Returns: Raw untyped Wasm value at a given address
-        package func getLocal(address: LocalAddress) throws(Error) -> UInt64 {
+        package func getLocalPointer(address: LocalAddress) throws(Error) -> UnsafeRawPointer {
             guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
                 throw Error.notStoppedAtBreakpoint
             }
@@ -268,8 +279,19 @@
                     continue
                 }
 
-                // TODO: can we guarantee we have no local index OOB here?
-                return frame.sp[address.localIndex].storage
+                guard let currentFunction = frame.sp.currentFunction else {
+                    throw Error.unknownCurrentFunctionForResumedBreakpoint(frame.sp)
+                }
+
+                let type = self.store.engine.funcTypeInterner.resolve(currentFunction.type)
+                let localsCount = type.parameters.count + currentFunction.numberOfNonParameterLocals
+
+                guard address.localIndex < localsCount else {
+                    throw Error.stackLocalIndexOOB(address)
+                }
+
+                let result = UnsafeRawPointer(frame.sp.advanced(by: Int(address.localIndex)))
+                return result
             }
 
             throw Error.stackFuncIndexOOB(address)
@@ -288,6 +310,10 @@
                 })
 
             return result
+        }
+
+        package var stackMemory: UnsafeRawBufferPointer {
+            UnsafeRawBufferPointer(self.execution.stackStart)
         }
 
         deinit {

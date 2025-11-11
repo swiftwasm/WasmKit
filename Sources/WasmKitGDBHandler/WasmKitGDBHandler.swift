@@ -32,16 +32,7 @@
         }
     }
 
-    extension Debugger.LocalAddress {
-        package init(raw: UInt64) {
-            let rawAdjusted = raw - localOffset
-            self.init(frameIndex: UInt32(truncatingIfNeeded: rawAdjusted >> 32), localIndex: UInt32(truncatingIfNeeded: rawAdjusted))
-        }
-    }
-
     private let codeOffset = UInt64(0x4000_0000_0000_0000)
-    private let stackOffset = UInt64(0x8000_0000_0000_0000)
-    private let localOffset = UInt64(0xC000_0000_0000_0000)
 
     package actor WasmKitGDBHandler {
         enum ResumeThreadsAction: String {
@@ -67,6 +58,7 @@
         private let logger: Logger
         private let allocator: ByteBufferAllocator
         private var debugger: Debugger
+        private let stackOffsetInProtocolSpace: UInt64
 
         package init(
             moduleFilePath: FilePath,
@@ -94,6 +86,11 @@
             guard case .stoppedAtBreakpoint = self.debugger.state else {
                 throw Error.stoppingAtEntrypointFailed
             }
+
+            var stackOffset = Int(codeOffset) + wasmBinary.readableBytes
+            // Untyped raw Wasm values in VM's stack are stored as `UInt64`.
+            stackOffset.roundUpToAlignment(for: UInt64.self)
+            self.stackOffsetInProtocolSpace = UInt64(stackOffset)
         }
 
         private func hexDump<I: FixedWidthInteger>(_ value: I, endianness: Endianness) -> String {
@@ -239,22 +236,27 @@
                 let argumentsArray = command.arguments.split(separator: ",")
                 guard
                     argumentsArray.count == 2,
-                    let address = UInt64(hexEncoded: argumentsArray[0]),
+                    let addressInProtocolSpace = UInt64(hexEncoded: argumentsArray[0]),
                     var length = Int(hexEncoded: argumentsArray[1])
                 else { throw Error.unknownReadMemoryArguments }
 
-                if address > localOffset {
-                    let localAddress = Debugger.LocalAddress(raw: address)
-                    fatalError()
-                } else if address > stackOffset {
-                    fatalError("Stack reads are not implemented in the debugger yet")
-                } else if address > codeOffset {
-                    let binaryOffset = Int(address - stackOffset)
-                    if binaryOffset + length > wasmBinary.readableBytes {
-                        length = wasmBinary.readableBytes - binaryOffset
+                if addressInProtocolSpace >= self.stackOffsetInProtocolSpace {
+                    let stackAddress = Int(addressInProtocolSpace - self.stackOffsetInProtocolSpace)
+                    if stackAddress + length > self.debugger.stackMemory.count {
+                        length = self.debugger.stackMemory.count - stackAddress
                     }
 
-                    responseKind = .hexEncodedBinary(wasmBinary.readableBytesView[binaryOffset..<(binaryOffset + length)])
+                    responseKind = .hexEncodedBinary(
+                        ByteBuffer(
+                            bytes: self.debugger.stackMemory[stackAddress..<(stackAddress + length)]
+                        ).readableBytesView)
+                } else if addressInProtocolSpace >= codeOffset {
+                    let codeAddress = Int(addressInProtocolSpace - codeOffset)
+                    if codeAddress + length > wasmBinary.readableBytes {
+                        length = wasmBinary.readableBytes - codeAddress
+                    }
+
+                    responseKind = .hexEncodedBinary(wasmBinary.readableBytesView[codeAddress..<(codeAddress + length)])
                 } else {
                     fatalError("Linear memory reads are not implemented in the debugger yet.")
                 }
@@ -328,11 +330,19 @@
                     throw Error.unknownWasmLocalArguments(command.arguments)
                 }
 
-                var response = self.allocator.buffer(capacity: 64)
-                response.writeInteger(frameIndex, endianness: .little)
-                response.writeInteger(localIndex, endianness: .little)
+                let localAddress = Debugger.LocalAddress(frameIndex: frameIndex, localIndex: localIndex)
+                let localPointer = try self.debugger.getLocalPointer(address: localAddress)
+                let responseAddress = self.stackOffsetInProtocolSpace + UInt64(localPointer - self.debugger.stackMemory.baseAddress!)
 
-                responseKind = .hexEncodedBinary(response.readableBytesView)
+                responseKind = .hexEncodedBinary(
+                    ByteBuffer(
+                        integer: responseAddress,
+                        endianness: .little
+                    ).readableBytesView
+                )
+
+            case .memoryRegionInfo:
+                responseKind = .empty
 
             case .generalRegisters:
                 throw Error.hostCommandNotImplemented(command.kind)

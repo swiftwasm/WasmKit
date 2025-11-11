@@ -99,6 +99,16 @@
             #expect([106, 110, 111].binarySearch(nextClosestTo: 107) == 110)
             #expect([106, 110, 111, 113, 119, 120, 122, 128, 136].binarySearch(nextClosestTo: 121) == 122)
         }
+
+        @Test
+        func localAddress() {
+            let localOffset = UInt64(0xC000_0000_0000_0000)
+
+            #expect(Debugger.LocalAddress(raw: 0, offset: localOffset) == nil)
+            #expect(Debugger.LocalAddress(raw: 0xABCDEF, offset: localOffset) == nil)
+            #expect(Debugger.LocalAddress(raw: 0xC000_0000_0000_ABCD, offset: localOffset) == Debugger.LocalAddress(frameIndex: 0, localIndex: 0xABCD))
+            #expect(Debugger.LocalAddress(raw: 0xC000_0000_0000_ABCD, offset: localOffset) == Debugger.LocalAddress(frameIndex: 0, localIndex: 0xABCD))
+        }
     }
 
 #endif
