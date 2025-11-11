@@ -246,7 +246,7 @@
             let frameIndex: UInt32
             let localIndex: UInt32
 
-            package init(frameIndex: Int, localIndex: Int) {
+            package init(frameIndex: UInt32, localIndex: UInt32) {
                 self.frameIndex = frameIndex
                 self.localIndex = localIndex
             }

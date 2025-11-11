@@ -244,12 +244,12 @@
                 else { throw Error.unknownReadMemoryArguments }
 
                 if address > localOffset {
-                    let localRaw = address - localOffset
-                    let localAddress = Debugger.LocalAddress(frameIndex:)
+                    let localAddress = Debugger.LocalAddress(raw: address)
+                    fatalError()
                 } else if address > stackOffset {
                     fatalError("Stack reads are not implemented in the debugger yet")
                 } else if address > codeOffset {
-                    let binaryOffset = address - stackOffset
+                    let binaryOffset = Int(address - stackOffset)
                     if binaryOffset + length > wasmBinary.readableBytes {
                         length = wasmBinary.readableBytes - binaryOffset
                     }
@@ -332,7 +332,7 @@
                 response.writeInteger(frameIndex, endianness: .little)
                 response.writeInteger(localIndex, endianness: .little)
 
-                responseKind = .hexEncodedBinary(response)
+                responseKind = .hexEncodedBinary(response.readableBytesView)
 
             case .generalRegisters:
                 throw Error.hostCommandNotImplemented(command.kind)
