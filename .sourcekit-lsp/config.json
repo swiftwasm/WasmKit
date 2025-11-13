@@ -1,0 +1,5 @@
+{
+    "swiftPM": {
+        "traits": ["WasmDebuggingSupport"]
+    }
+}

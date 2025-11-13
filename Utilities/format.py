@@ -58,6 +58,7 @@ def main():
     for target in targets:
         arguments.append(os.path.join(SOURCE_ROOT, target))
     arguments.append(os.path.join(SOURCE_ROOT, "Package.swift"))
+    arguments.append(os.path.join(SOURCE_ROOT, "Package@swift-6.1.swift"))
     run(arguments)
 
 

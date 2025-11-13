@@ -4,7 +4,7 @@ import _CWasmKit
 ///
 /// Each new invocation through exported function has a separate ``Execution``
 /// even though the invocation happens during another invocation.
-struct Execution {
+struct Execution: ~Copyable {
     /// The reference to the ``Store`` associated with the execution.
     let store: StoreRef
     /// The end of the VM stack space.
@@ -13,6 +13,13 @@ struct Execution {
     /// This property must not be assigned to be non-nil more than once.
     /// - Note: If the trap is set, it must be released manually.
     private var trap: (error: UnsafeRawPointer, sp: Sp)? = nil
+
+    #if WasmDebuggingSupport
+        package init(store: StoreRef, stackEnd: UnsafeMutablePointer<StackSlot>) {
+            self.store = store
+            self.stackEnd = stackEnd
+        }
+    #endif
 
     /// Executes the given closure with a new execution state associated with
     /// the given ``Store`` instance.
@@ -61,18 +68,15 @@ struct Execution {
 
     static func captureBacktrace(sp: Sp, store: Store) -> Backtrace {
         var frames = FrameIterator(sp: sp)
-        var symbols: [Backtrace.Symbol?] = []
+        var symbols: [Backtrace.Symbol] = []
+
         while let frame = frames.next() {
             guard let function = frame.function else {
-                symbols.append(nil)
+                symbols.append(.init(name: nil, address: frame.pc))
                 continue
             }
             let symbolName = store.nameRegistry.symbolicate(.wasm(function))
-            symbols.append(
-                Backtrace.Symbol(
-                    name: symbolName
-                )
-            )
+            symbols.append(.init(name: symbolName, address: frame.pc))
         }
         return Backtrace(symbols: symbols)
     }
@@ -231,7 +235,7 @@ extension Sp {
     // MARK: - Special slots
 
     /// The current executing function.
-    fileprivate var currentFunction: EntityHandle<WasmFunctionEntity>? {
+    var currentFunction: EntityHandle<WasmFunctionEntity>? {
         get { return EntityHandle<WasmFunctionEntity>(bitPattern: UInt(self[-3].i64)) }
         nonmutating set { self[-3] = UInt64(UInt(bitPattern: newValue?.bitPattern ?? 0)) }
     }
@@ -248,7 +252,7 @@ extension Sp {
         nonmutating set { self[-1] = UInt64(UInt(bitPattern: newValue)) }
     }
 
-    fileprivate var currentInstance: InternalInstance? {
+    var currentInstance: InternalInstance? {
         currentFunction?.instance
     }
 }
@@ -281,8 +285,7 @@ func executeWasm(
     store: Store,
     function handle: InternalFunction,
     type: FunctionType,
-    arguments: [Value],
-    callerInstance: InternalInstance
+    arguments: [Value]
 ) throws -> [Value] {
     // NOTE: `store` variable must not outlive this function
     let store = StoreRef(store)
@@ -315,6 +318,43 @@ func executeWasm(
 }
 
 extension Execution {
+
+    #if WasmDebuggingSupport
+
+        /// Counterpart to the free `executeWasm` function but implemented as a method of `Execution`,
+        /// Useful for representation of debugger state that needs to own `Execution`'s memory.
+        mutating func executeWasm(
+            threadingModel: EngineConfiguration.ThreadingModel,
+            function handle: InternalFunction,
+            type: FunctionType,
+            arguments: [Value],
+            sp: Sp,
+            pc: Pc
+        ) throws -> [Value] {
+            // Advance the stack pointer to be able to reference negative indices
+            // for saving slots.
+            let sp = sp.advanced(by: FrameHeaderLayout.numberOfSavingSlots)
+            // Mark root stack pointer and current function as nil.
+            sp.previousSP = nil
+            sp.currentFunction = nil
+            for (index, argument) in arguments.enumerated() {
+                sp[VReg(index)] = UntypedValue(argument)
+            }
+
+            try self.execute(
+                sp: sp,
+                pc: pc,
+                handle: handle,
+                type: type
+            )
+
+            return type.results.enumerated().map { (i, type) in
+                sp[VReg(i)].cast(to: type)
+            }
+        }
+
+    #endif
+
     /// A namespace for the "current memory" (Md and Ms) management.
     enum CurrentMemory {
         /// Assigns the current memory to the given internal memory.
@@ -364,7 +404,10 @@ extension Execution {
     struct EndOfExecution: Error {}
 
     /// An ``Error`` thrown when a breakpoint is triggered.
-    struct Breakpoint: Error {}
+    struct Breakpoint: Error, @unchecked Sendable {
+        let sp: Sp
+        let pc: Pc
+    }
 
     /// The entry point for the execution of the WebAssembly function.
     @inline(never)
@@ -514,6 +557,11 @@ extension Execution {
     mutating func setError(_ rawError: UnsafeRawPointer, sp: Sp) {
         precondition(self.trap == nil)
         self.trap = (rawError, sp)
+    }
+
+    /// Used by the debugger to resume execution after breakpoints.
+    mutating func resetError() {
+        self.trap = nil
     }
 
     @inline(__always)

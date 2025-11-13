@@ -53,7 +53,7 @@ public typealias ElementAddress = Int
 @available(*, unavailable, message: "Address-based APIs has been removed")
 public typealias DataAddress = Int
 
-public enum Reference: Hashable {
+public enum Reference: Hashable, Sendable {
     /// A reference to a function.
     case function(FunctionAddress?)
     /// A reference to an external entity.
@@ -61,7 +61,7 @@ public enum Reference: Hashable {
 }
 
 /// Runtime representation of a value.
-public enum Value: Hashable {
+public enum Value: Hashable, Sendable {
     /// Value of a 32-bit signed or unsigned integer.
     case i32(UInt32)
     /// Value of a 64-bit signed or unsigned integer.
