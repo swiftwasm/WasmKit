@@ -264,11 +264,10 @@
             }
         }
 
-        package func packedStackFrame(frameIndex: UInt32, reader: (RawSpan) -> ()) throws {
+        package func packedStackFrame(frameIndex: UInt32, reader: (RawSpan) -> Void) throws {
             guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
                 throw Error.notStoppedAtBreakpoint
             }
-
 
             throw Error.stackFrameIndexOOB(frameIndex)
         }
