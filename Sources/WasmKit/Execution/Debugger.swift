@@ -54,7 +54,7 @@
         /// was not compiled yet in lazy compilation mode).
         private let functionAddresses: [(address: Int, instanceFunctionIndex: Int)]
 
-        private var stackFrameBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 1, alignment: 8)
+        private var stackFrame = DebuggerStackFrame()
 
         /// Initializes a new debugger state instance.
         /// - Parameters:
@@ -269,32 +269,7 @@
                 throw Error.notStoppedAtBreakpoint
             }
 
-            var i = 0
-            for frame in Execution.CallStack(sp: breakpoint.iseq.sp) {
-                guard frameIndex == i else {
-                    i += 1
-                    continue
-                }
 
-                guard let currentFunction = frame.sp.currentFunction else {
-                    throw Error.unknownCurrentFunctionForResumedBreakpoint(frame.sp)
-                }
-
-                try currentFunction.ensureCompiled(store: StoreRef(self.store))
-
-                guard case .debuggable(let wasm, let iseq) = currentFunction.code else {
-                    fatalError()
-                }
-
-
-                // Wasm function arguments are also addressed as locals.
-                let type = self.store.engine.funcTypeInterner.resolve(currentFunction.type)
-                let localsCount = type.parameters.count + currentFunction.numberOfNonParameterLocals
-                let localTypes = wasm.locals
-                iseq.maxStackHeight
-
-                reader(self.stackFrameBuffer.bytes)
-            }
             throw Error.stackFrameIndexOOB(frameIndex)
         }
 
@@ -366,7 +341,6 @@
         deinit {
             self.valueStack.deallocate()
             self.endOfExecution.deallocate()
-            self.stackFrameBuffer.deallocate()
         }
     }
 
