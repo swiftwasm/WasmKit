@@ -264,7 +264,7 @@
             }
         }
 
-        package func packedStackFrame(frameIndex: UInt32, reader: (RawSpan) -> ()) throws(Error) {
+        package func packedStackFrame(frameIndex: UInt32, reader: (RawSpan) -> ()) throws {
             guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
                 throw Error.notStoppedAtBreakpoint
             }
@@ -280,18 +280,18 @@
                     throw Error.unknownCurrentFunctionForResumedBreakpoint(frame.sp)
                 }
 
-                let code = switch currentFunction.code {
-                case .compiled:
-                    // FIXME: we should be able examine frames of uncompiled functions
+                try currentFunction.ensureCompiled(store: StoreRef(self.store))
+
+                guard case .debuggable(let wasm, let iseq) = currentFunction.code else {
                     fatalError()
-                case .debuggable(let code, _), .uncompiled(let code):
-                    code
                 }
+
 
                 // Wasm function arguments are also addressed as locals.
                 let type = self.store.engine.funcTypeInterner.resolve(currentFunction.type)
                 let localsCount = type.parameters.count + currentFunction.numberOfNonParameterLocals
-                let localTypes = code.locals
+                let localTypes = wasm.locals
+                iseq.maxStackHeight
 
                 reader(self.stackFrameBuffer.bytes)
             }
@@ -327,16 +327,17 @@
                 }
 
                 // If locals that aren't function arguments are addressed, those can be found by index directly.
-                let result = if address.localIndex > type.parameters.count {
-                    UnsafeRawPointer(frame.sp + Int(address.localIndex))
-                } else {
-                    // Otherwise we need function arguments, and those are stored in the frame header.
-                    // See ``FrameHeaderLayout`` comments, we need to skip 3 bytes for:
-                    // 1. Saved instance
-                    // 2. Saved Pc.
-                    // 3. Saved Sp
-                    UnsafeRawPointer(frame.sp - FrameHeaderLayout.numberOfSavingSlots - type.parameters.count + Int(address.localIndex))
-                }
+                let result =
+                    if address.localIndex > type.parameters.count {
+                        UnsafeRawPointer(frame.sp + Int(address.localIndex))
+                    } else {
+                        // Otherwise we need function arguments, and those are stored in the frame header.
+                        // See ``FrameHeaderLayout`` comments, we need to skip 3 bytes for:
+                        // 1. Saved instance
+                        // 2. Saved Pc.
+                        // 3. Saved Sp
+                        UnsafeRawPointer(frame.sp - FrameHeaderLayout.numberOfSavingSlots - type.parameters.count + Int(address.localIndex))
+                    }
                 return result
             }
 
