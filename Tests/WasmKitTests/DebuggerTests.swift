@@ -83,6 +83,9 @@
 
             #expect(debugger.currentCallStack.count == 2)
             #expect(debugger.currentCallStack.first == breakpointAddress)
+
+            let localPointer = try debugger.getLocalPointer(address: .init(frameIndex: 0, localIndex: 0))
+            #expect(localPointer.load(as: UInt64.self) == 42)
         }
 
         @Test

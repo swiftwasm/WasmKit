@@ -4,7 +4,6 @@
     /// debugger protocol, which allows any protocol implementation or direct API users to be layered on top if needed.
     package struct Debugger: ~Copyable {
         package struct BreakpointState {
-            let sp: Sp
             let iseq: Execution.Breakpoint
             package let wasmPc: Int
         }
@@ -21,8 +20,8 @@
             case unknownCurrentFunctionForResumedBreakpoint(UnsafeMutablePointer<UInt64>)
             case noInstructionMappingAvailable(Int)
             case noReverseInstructionMappingAvailable(UnsafeMutablePointer<UInt64>)
-            case stackFuncIndexOOB(LocalAddress)
-            case stackLocalIndexOOB(LocalAddress)
+            case stackFrameIndexOOB(UInt32)
+            case stackLocalIndexOOB(UInt32)
             case notStoppedAtBreakpoint
         }
 
@@ -54,6 +53,8 @@
         /// is enabled at an arbitrary address if it isn't present in ``InstructionMapping`` yet (i.e. the
         /// was not compiled yet in lazy compilation mode).
         private let functionAddresses: [(address: Int, instanceFunctionIndex: Int)]
+
+        private var stackFrameBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 1, alignment: 8)
 
         /// Initializes a new debugger state instance.
         /// - Parameters:
@@ -228,7 +229,7 @@
                     throw Error.noReverseInstructionMappingAvailable(pc)
                 }
 
-                self.state = .stoppedAtBreakpoint(.init(sp: breakpoint.sp, iseq: breakpoint, wasmPc: wasmPc))
+                self.state = .stoppedAtBreakpoint(.init(iseq: breakpoint, wasmPc: wasmPc))
             }
         }
 
@@ -263,6 +264,40 @@
             }
         }
 
+        package func packedStackFrame(frameIndex: UInt32, reader: (RawSpan) -> ()) throws(Error) {
+            guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
+                throw Error.notStoppedAtBreakpoint
+            }
+
+            var i = 0
+            for frame in Execution.CallStack(sp: breakpoint.iseq.sp) {
+                guard frameIndex == i else {
+                    i += 1
+                    continue
+                }
+
+                guard let currentFunction = frame.sp.currentFunction else {
+                    throw Error.unknownCurrentFunctionForResumedBreakpoint(frame.sp)
+                }
+
+                let code = switch currentFunction.code {
+                case .compiled:
+                    // FIXME: we should be able examine frames of uncompiled functions
+                    fatalError()
+                case .debuggable(let code, _), .uncompiled(let code):
+                    code
+                }
+
+                // Wasm function arguments are also addressed as locals.
+                let type = self.store.engine.funcTypeInterner.resolve(currentFunction.type)
+                let localsCount = type.parameters.count + currentFunction.numberOfNonParameterLocals
+                let localTypes = code.locals
+
+                reader(self.stackFrameBuffer.bytes)
+            }
+            throw Error.stackFrameIndexOOB(frameIndex)
+        }
+
         /// Iterates through Wasm call stack to return a local at a given address when
         /// debugged module is stopped at a breakpoint.
         /// - Parameter address: address of the local to return.
@@ -273,7 +308,7 @@
             }
 
             var i = 0
-            for frame in Execution.CallStack(sp: breakpoint.sp) {
+            for frame in Execution.CallStack(sp: breakpoint.iseq.sp) {
                 guard address.frameIndex == i else {
                     i += 1
                     continue
@@ -283,18 +318,29 @@
                     throw Error.unknownCurrentFunctionForResumedBreakpoint(frame.sp)
                 }
 
+                // Wasm function arguments are also addressed as locals.
                 let type = self.store.engine.funcTypeInterner.resolve(currentFunction.type)
                 let localsCount = type.parameters.count + currentFunction.numberOfNonParameterLocals
 
                 guard address.localIndex < localsCount else {
-                    throw Error.stackLocalIndexOOB(address)
+                    throw Error.stackLocalIndexOOB(address.localIndex)
                 }
 
-                let result = UnsafeRawPointer(frame.sp.advanced(by: Int(address.localIndex)))
+                // If locals that aren't function arguments are addressed, those can be found by index directly.
+                let result = if address.localIndex > type.parameters.count {
+                    UnsafeRawPointer(frame.sp + Int(address.localIndex))
+                } else {
+                    // Otherwise we need function arguments, and those are stored in the frame header.
+                    // See ``FrameHeaderLayout`` comments, we need to skip 3 bytes for:
+                    // 1. Saved instance
+                    // 2. Saved Pc.
+                    // 3. Saved Sp
+                    UnsafeRawPointer(frame.sp - FrameHeaderLayout.numberOfSavingSlots - type.parameters.count + Int(address.localIndex))
+                }
                 return result
             }
 
-            throw Error.stackFuncIndexOOB(address)
+            throw Error.stackFrameIndexOOB(address.frameIndex)
         }
 
         /// Array of addresses in the Wasm binary of executed instructions on the call stack.
@@ -319,6 +365,7 @@
         deinit {
             self.valueStack.deallocate()
             self.endOfExecution.deallocate()
+            self.stackFrameBuffer.deallocate()
         }
     }
 
