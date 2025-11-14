@@ -247,75 +247,12 @@
             try self.run()
         }
 
-        package struct LocalAddress: Equatable {
-            let frameIndex: UInt32
-            let localIndex: UInt32
-
-            package init(frameIndex: UInt32, localIndex: UInt32) {
-                self.frameIndex = frameIndex
-                self.localIndex = localIndex
-            }
-
-            package init?(raw: UInt64, offset: UInt64) {
-                guard raw >= offset else { return nil }
-
-                let rawAdjusted = raw - offset
-                self.init(frameIndex: UInt32(truncatingIfNeeded: rawAdjusted >> 32), localIndex: UInt32(truncatingIfNeeded: rawAdjusted))
-            }
-        }
-
-        package func packedStackFrame(frameIndex: UInt32, reader: (RawSpan) -> Void) throws {
+        package mutating func packedStackFrame<T>(frameIndex: Int, reader: (RawSpan, DebuggerStackFrame.Layout) -> T) throws -> T {
             guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
                 throw Error.notStoppedAtBreakpoint
             }
 
-            throw Error.stackFrameIndexOOB(frameIndex)
-        }
-
-        /// Iterates through Wasm call stack to return a local at a given address when
-        /// debugged module is stopped at a breakpoint.
-        /// - Parameter address: address of the local to return.
-        /// - Returns: Raw untyped Wasm value at a given address
-        package func getLocalPointer(address: LocalAddress) throws(Error) -> UnsafeRawPointer {
-            guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
-                throw Error.notStoppedAtBreakpoint
-            }
-
-            var i = 0
-            for frame in Execution.CallStack(sp: breakpoint.iseq.sp) {
-                guard address.frameIndex == i else {
-                    i += 1
-                    continue
-                }
-
-                guard let currentFunction = frame.sp.currentFunction else {
-                    throw Error.unknownCurrentFunctionForResumedBreakpoint(frame.sp)
-                }
-
-                // Wasm function arguments are also addressed as locals.
-                let type = self.store.engine.funcTypeInterner.resolve(currentFunction.type)
-                let localsCount = type.parameters.count + currentFunction.numberOfNonParameterLocals
-
-                guard address.localIndex < localsCount else {
-                    throw Error.stackLocalIndexOOB(address.localIndex)
-                }
-
-                // If locals that aren't function arguments are addressed, those can be found by index directly.
-                let result =
-                    if address.localIndex > type.parameters.count {
-                        UnsafeRawPointer(frame.sp + Int(address.localIndex))
-                    } else {
-                        // Otherwise we need function arguments, and those are stored in the frame header.
-                        // See ``FrameHeaderLayout`` comments, we need to skip 3 bytes for:
-                        // 1. Saved instance
-                        // 2. Saved Pc.
-                        // 3. Saved Sp
-                        UnsafeRawPointer(frame.sp - FrameHeaderLayout.numberOfSavingSlots - type.parameters.count + Int(address.localIndex))
-                    }
-                return result
-            }
-
-            throw Error.stackFrameIndexOOB(address.frameIndex)
+            return try self.stackFrame.withFrames(sp: breakpoint.iseq.sp, frameIndex: frameIndex, store: self.store, reader: reader)
         }
 
         /// Array of addresses in the Wasm binary of executed instructions on the call stack.

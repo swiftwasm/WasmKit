@@ -60,6 +60,9 @@
         private var debugger: Debugger
         private let stackOffsetInProtocolSpace: UInt64
 
+        /// Mapping from frame index to a buffer with packed representation of a frame with its layout.
+        private var stackFrames = [Int: (ByteBuffer, DebuggerStackFrame.Layout)]()
+
         package init(
             moduleFilePath: FilePath,
             engineConfiguration: EngineConfiguration,
@@ -280,6 +283,9 @@
                     throw Error.unknownThreadAction(threadActionString)
                 }
 
+                // Stack frames become invalid after running or stepping.
+                self.stackFrames = [:]
+
                 switch threadAction {
                 case .step:
                     try self.debugger.step()
@@ -290,6 +296,9 @@
                 responseKind = try self.currentThreadStopInfo
 
             case .continue:
+                // Stack frames become invalid after running or stepping.
+                self.stackFrames = [:]
+
                 try self.debugger.run()
 
                 responseKind = try self.currentThreadStopInfo
@@ -323,19 +332,31 @@
                 let arguments = command.arguments.split(separator: ";")
                 guard arguments.count == 2,
                     let frameIndexString = arguments.first,
-                    let frameIndex = UInt32(frameIndexString),
+                    let frameIndex = Int(frameIndexString),
                     let localIndexString = arguments.last,
-                    let localIndex = UInt32(localIndexString)
+                    let localIndex = Int(localIndexString)
                 else {
                     throw Error.unknownWasmLocalArguments(command.arguments)
                 }
 
-                let localAddress = Debugger.LocalAddress(frameIndex: frameIndex, localIndex: localIndex)
-                let localPointer = try self.debugger.getLocalPointer(address: localAddress)
-                let responseAddress = self.stackOffsetInProtocolSpace + UInt64(localPointer - self.debugger.stackMemory.baseAddress!)
+                let (buffer, layout) = try self.debugger.packedStackFrame(frameIndex: frameIndex) { span, layout in
+                    var buffer = self.allocator.buffer(capacity: span.byteCount)
+                    // Working around availability limitations until https://github.com/apple/swift-nio/pull/3447 is merged.
+                    _ = span.withUnsafeBytes {
+                        buffer.writeBytes($0)
+                    }
+                    return (buffer, layout)
+                }
+
+                self.stackFrames[frameIndex] = (buffer, layout)
+                // FIXME: adjust the address so that frame indices are accounted for
+                let responseAddress = self.stackOffsetInProtocolSpace + UInt64(layout.localOffsets[localIndex])
+                // let localPointer = try self.debugger.getLocalPointer(address: localAddress)
+                // print("localPointer is \(localPointer)")
+                // let responseAddress = self.stackOffsetInProtocolSpace + UInt64(localPointer - self.debugger.stackMemory.baseAddress!)
 
                 responseKind = .hexEncodedBinary(
-                    ByteBuffer(
+                    self.allocator.buffer(
                         integer: responseAddress,
                         endianness: .little
                     ).readableBytesView

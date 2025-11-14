@@ -36,16 +36,16 @@ public enum ValueType: Equatable, Hashable, Sendable {
     /// Reference value type.
     case ref(ReferenceType)
 
-#if WasmDebuggingSupport
-    package var byteSize: Int {
-        switch self {
-        case .i32, .f32: 4
-        case .i64, .f64: 8
-        case .v128: 16
-        case .ref: fatalError("bitwise copy of references not implemented yet")
+    #if WasmDebuggingSupport
+        package var byteSize: Int {
+            switch self {
+            case .i32, .f32: 4
+            case .i64, .f64: 8
+            case .v128: 16
+            case .ref: fatalError("bitwise copy of references not implemented yet")
+            }
         }
-    }
-#endif
+    #endif
 }
 
 /// Runtime representation of a WebAssembly function reference.
