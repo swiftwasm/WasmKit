@@ -50,6 +50,7 @@
             case exitCodeUnknown([Value])
             case killRequestReceived
             case unknownHexEncodedArguments(String)
+            case unknownWasmLocalArguments(String)
         }
 
         private let wasmBinary: ByteBuffer
@@ -57,6 +58,10 @@
         private let logger: Logger
         private let allocator: ByteBufferAllocator
         private var debugger: Debugger
+        private let stackOffsetInProtocolSpace: UInt64
+
+        /// Mapping from frame index to a buffer with packed representation of a frame with its layout.
+        private var stackFrames = [Int: (ByteBuffer, DebuggerStackFrame.Layout)]()
 
         package init(
             moduleFilePath: FilePath,
@@ -84,6 +89,11 @@
             guard case .stoppedAtBreakpoint = self.debugger.state else {
                 throw Error.stoppingAtEntrypointFailed
             }
+
+            var stackOffset = Int(codeOffset) + wasmBinary.readableBytes
+            // Untyped raw Wasm values in VM's stack are stored as `UInt64`.
+            stackOffset.roundUpToAlignment(for: UInt64.self)
+            self.stackOffsetInProtocolSpace = UInt64(stackOffset)
         }
 
         private func hexDump<I: FixedWidthInteger>(_ value: I, endianness: Endianness) -> String {
@@ -229,17 +239,30 @@
                 let argumentsArray = command.arguments.split(separator: ",")
                 guard
                     argumentsArray.count == 2,
-                    let address = UInt64(hexEncoded: argumentsArray[0]),
+                    let addressInProtocolSpace = UInt64(hexEncoded: argumentsArray[0]),
                     var length = Int(hexEncoded: argumentsArray[1])
                 else { throw Error.unknownReadMemoryArguments }
 
-                let binaryOffset = Int(address - codeOffset)
+                if addressInProtocolSpace >= self.stackOffsetInProtocolSpace {
+                    let stackAddress = Int(addressInProtocolSpace - self.stackOffsetInProtocolSpace)
+                    if stackAddress + length > self.debugger.stackMemory.count {
+                        length = self.debugger.stackMemory.count - stackAddress
+                    }
 
-                if binaryOffset + length > wasmBinary.readableBytes {
-                    length = wasmBinary.readableBytes - binaryOffset
+                    responseKind = .hexEncodedBinary(
+                        ByteBuffer(
+                            bytes: self.debugger.stackMemory[stackAddress..<(stackAddress + length)]
+                        ).readableBytesView)
+                } else if addressInProtocolSpace >= codeOffset {
+                    let codeAddress = Int(addressInProtocolSpace - codeOffset)
+                    if codeAddress + length > wasmBinary.readableBytes {
+                        length = wasmBinary.readableBytes - codeAddress
+                    }
+
+                    responseKind = .hexEncodedBinary(wasmBinary.readableBytesView[codeAddress..<(codeAddress + length)])
+                } else {
+                    fatalError("Linear memory reads are not implemented in the debugger yet.")
                 }
-
-                responseKind = .hexEncodedBinary(wasmBinary.readableBytesView[binaryOffset..<(binaryOffset + length)])
 
             case .wasmCallStack:
                 let callStack = self.debugger.currentCallStack
@@ -260,6 +283,9 @@
                     throw Error.unknownThreadAction(threadActionString)
                 }
 
+                // Stack frames become invalid after running or stepping.
+                self.stackFrames = [:]
+
                 switch threadAction {
                 case .step:
                     try self.debugger.step()
@@ -270,6 +296,9 @@
                 responseKind = try self.currentThreadStopInfo
 
             case .continue:
+                // Stack frames become invalid after running or stepping.
+                self.stackFrames = [:]
+
                 try self.debugger.run()
 
                 responseKind = try self.currentThreadStopInfo
@@ -298,6 +327,43 @@
                         ) - codeOffset)
                 )
                 responseKind = .ok
+
+            case .wasmLocal:
+                let arguments = command.arguments.split(separator: ";")
+                guard arguments.count == 2,
+                    let frameIndexString = arguments.first,
+                    let frameIndex = Int(frameIndexString),
+                    let localIndexString = arguments.last,
+                    let localIndex = Int(localIndexString)
+                else {
+                    throw Error.unknownWasmLocalArguments(command.arguments)
+                }
+
+                let (buffer, layout) = try self.debugger.packedStackFrame(frameIndex: frameIndex) { span, layout in
+                    var buffer = self.allocator.buffer(capacity: span.byteCount)
+                    // Working around availability limitations until https://github.com/apple/swift-nio/pull/3447 is merged.
+                    _ = span.withUnsafeBytes {
+                        buffer.writeBytes($0)
+                    }
+                    return (buffer, layout)
+                }
+
+                self.stackFrames[frameIndex] = (buffer, layout)
+                // FIXME: adjust the address so that frame indices are accounted for
+                let responseAddress = self.stackOffsetInProtocolSpace + UInt64(layout.localOffsets[localIndex])
+                // let localPointer = try self.debugger.getLocalPointer(address: localAddress)
+                // print("localPointer is \(localPointer)")
+                // let responseAddress = self.stackOffsetInProtocolSpace + UInt64(localPointer - self.debugger.stackMemory.baseAddress!)
+
+                responseKind = .hexEncodedBinary(
+                    self.allocator.buffer(
+                        integer: responseAddress,
+                        endianness: .little
+                    ).readableBytesView
+                )
+
+            case .memoryRegionInfo:
+                responseKind = .empty
 
             case .generalRegisters:
                 throw Error.hostCommandNotImplemented(command.kind)
