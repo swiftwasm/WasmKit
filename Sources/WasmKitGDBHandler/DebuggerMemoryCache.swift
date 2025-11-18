@@ -26,24 +26,25 @@
         }
 
         func getAddressOfLocal(debugger: inout Debugger, frameIndex: Int, localIndex: Int) throws -> UInt64 {
-                let (buffer, layout) = try debugger.packedStackFrame(frameIndex: frameIndex) { span, layout in
-                    var buffer = self.allocator.buffer(capacity: span.byteCount)
-                    buffer.writeBytes(span)
-                    return (buffer, layout)
-                }
+            let (buffer, layout) = try debugger.packedStackFrame(frameIndex: frameIndex) { span, layout in
+                var buffer = self.allocator.buffer(capacity: span.byteCount)
+                buffer.writeBytes(span)
+                return (buffer, layout)
+            }
 
-                self.stackFrames[frameIndex] = (buffer, layout)
-                // FIXME: adjust the address so that frame indices are accounted for
-                let responseAddress = self.stackOffsetInProtocolSpace + UInt64(layout.localOffsets[localIndex])
-                // let localPointer = try self.debugger.getLocalPointer(address: localAddress)
-                // print("localPointer is \(localPointer)")
-                // let responseAddress = self.stackOffsetInProtocolSpace + UInt64(localPointer - self.debugger.stackMemory.baseAddress!)
+            self.stackFrames[frameIndex] = (buffer, layout)
+            // FIXME: adjust the address so that frame indices are accounted for
+            let responseAddress = self.stackOffsetInProtocolSpace + UInt64(layout.localOffsets[localIndex])
+            // let localPointer = try self.debugger.getLocalPointer(address: localAddress)
+            // print("localPointer is \(localPointer)")
+            // let responseAddress = self.stackOffsetInProtocolSpace + UInt64(localPointer - self.debugger.stackMemory.baseAddress!)
 
-                return responseAddress
+            return responseAddress
 
         }
 
-        func readMemory(debugger: borrowing Debugger,
+        func readMemory(
+            debugger: borrowing Debugger,
             addressInProtocolSpace: UInt64,
             length: Int
         ) -> ByteBufferView {
@@ -58,8 +59,8 @@
                 }
 
                 return ByteBuffer(
-                        bytes: debugger.stackMemory[stackAddress..<(stackAddress + length)]
-                    ).readableBytesView
+                    bytes: debugger.stackMemory[stackAddress..<(stackAddress + length)]
+                ).readableBytesView
             } else if addressInProtocolSpace >= debuggerCodeOffset {
                 print("wasmBinary")
                 let codeAddress = Int(addressInProtocolSpace - debuggerCodeOffset)
