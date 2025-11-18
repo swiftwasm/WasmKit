@@ -20,7 +20,7 @@
             case unknownCurrentFunctionForResumedBreakpoint(UnsafeMutablePointer<UInt64>)
             case noInstructionMappingAvailable(Int)
             case noReverseInstructionMappingAvailable(UnsafeMutablePointer<UInt64>)
-            case stackFrameIndexOOB(UInt32)
+            case stackFrameIndexOOB(Int)
             case stackLocalIndexOOB(UInt32)
             case notStoppedAtBreakpoint
         }

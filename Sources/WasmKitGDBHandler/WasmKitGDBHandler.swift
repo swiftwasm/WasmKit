@@ -32,8 +32,6 @@
         }
     }
 
-    private let codeOffset = UInt64(0x4000_0000_0000_0000)
-
     package actor WasmKitGDBHandler {
         enum ResumeThreadsAction: String {
             case step = "s"
@@ -53,15 +51,12 @@
             case unknownWasmLocalArguments(String)
         }
 
-        private let wasmBinary: ByteBuffer
         private let moduleFilePath: FilePath
         private let logger: Logger
         private let allocator: ByteBufferAllocator
         private var debugger: Debugger
-        private let stackOffsetInProtocolSpace: UInt64
 
-        /// Mapping from frame index to a buffer with packed representation of a frame with its layout.
-        private var stackFrames = [Int: (ByteBuffer, DebuggerStackFrame.Layout)]()
+        private var memoryCache: DebuggerMemoryCache
 
         package init(
             moduleFilePath: FilePath,
@@ -72,7 +67,7 @@
             self.logger = logger
             self.allocator = allocator
 
-            self.wasmBinary = try await FileSystem.shared.withFileHandle(forReadingAt: moduleFilePath) {
+            let wasmBinary = try await FileSystem.shared.withFileHandle(forReadingAt: moduleFilePath) {
                 try await $0.readToEnd(maximumSizeAllowed: .unlimited)
             }
 
@@ -83,17 +78,14 @@
             let wasi = try WASIBridgeToHost()
             wasi.link(to: &imports, store: store)
 
-            self.debugger = try Debugger(module: parseWasm(bytes: .init(buffer: self.wasmBinary)), store: store, imports: imports)
+            self.debugger = try Debugger(module: parseWasm(bytes: .init(buffer: wasmBinary)), store: store, imports: imports)
             try self.debugger.stopAtEntrypoint()
             try self.debugger.run()
             guard case .stoppedAtBreakpoint = self.debugger.state else {
                 throw Error.stoppingAtEntrypointFailed
             }
 
-            var stackOffset = Int(codeOffset) + wasmBinary.readableBytes
-            // Untyped raw Wasm values in VM's stack are stored as `UInt64`.
-            stackOffset.roundUpToAlignment(for: UInt64.self)
-            self.stackOffsetInProtocolSpace = UInt64(stackOffset)
+            self.memoryCache = DebuggerMemoryCache(allocator: allocator, wasmBinary: wasmBinary)
         }
 
         private func hexDump<I: FixedWidthInteger>(_ value: I, endianness: Endianness) -> String {
@@ -243,26 +235,9 @@
                     var length = Int(hexEncoded: argumentsArray[1])
                 else { throw Error.unknownReadMemoryArguments }
 
-                if addressInProtocolSpace >= self.stackOffsetInProtocolSpace {
-                    let stackAddress = Int(addressInProtocolSpace - self.stackOffsetInProtocolSpace)
-                    if stackAddress + length > self.debugger.stackMemory.count {
-                        length = self.debugger.stackMemory.count - stackAddress
-                    }
-
-                    responseKind = .hexEncodedBinary(
-                        ByteBuffer(
-                            bytes: self.debugger.stackMemory[stackAddress..<(stackAddress + length)]
-                        ).readableBytesView)
-                } else if addressInProtocolSpace >= codeOffset {
-                    let codeAddress = Int(addressInProtocolSpace - codeOffset)
-                    if codeAddress + length > wasmBinary.readableBytes {
-                        length = wasmBinary.readableBytes - codeAddress
-                    }
-
-                    responseKind = .hexEncodedBinary(wasmBinary.readableBytesView[codeAddress..<(codeAddress + length)])
-                } else {
-                    fatalError("Linear memory reads are not implemented in the debugger yet.")
-                }
+                responseKind = .hexEncodedBinary(
+                    self.memoryCache.readMemory(addressInProtocolSpace: addressInProtocolSpace, length: length)
+                )
 
             case .wasmCallStack:
                 let callStack = self.debugger.currentCallStack
@@ -284,7 +259,7 @@
                 }
 
                 // Stack frames become invalid after running or stepping.
-                self.stackFrames = [:]
+                self.memoryCache.invalidate()
 
                 switch threadAction {
                 case .step:
@@ -297,7 +272,7 @@
 
             case .continue:
                 // Stack frames become invalid after running or stepping.
-                self.stackFrames = [:]
+                self.memoryCache.invalidate()
 
                 try self.debugger.run()
 
@@ -313,7 +288,7 @@
                             argumentsString: command.arguments,
                             separator: ",",
                             endianness: .big
-                        ) - codeOffset)
+                        ) - debuggerCodeOffset)
                 )
                 responseKind = .ok
 
@@ -324,7 +299,7 @@
                             argumentsString: command.arguments,
                             separator: ",",
                             endianness: .big
-                        ) - codeOffset)
+                        ) - debuggerCodeOffset)
                 )
                 responseKind = .ok
 
@@ -339,25 +314,13 @@
                     throw Error.unknownWasmLocalArguments(command.arguments)
                 }
 
-                let (buffer, layout) = try self.debugger.packedStackFrame(frameIndex: frameIndex) { span, layout in
-                    var buffer = self.allocator.buffer(capacity: span.byteCount)
-                    // Working around availability limitations until https://github.com/apple/swift-nio/pull/3447 is merged.
-                    _ = span.withUnsafeBytes {
-                        buffer.writeBytes($0)
-                    }
-                    return (buffer, layout)
-                }
-
-                self.stackFrames[frameIndex] = (buffer, layout)
-                // FIXME: adjust the address so that frame indices are accounted for
-                let responseAddress = self.stackOffsetInProtocolSpace + UInt64(layout.localOffsets[localIndex])
-                // let localPointer = try self.debugger.getLocalPointer(address: localAddress)
-                // print("localPointer is \(localPointer)")
-                // let responseAddress = self.stackOffsetInProtocolSpace + UInt64(localPointer - self.debugger.stackMemory.baseAddress!)
-
                 responseKind = .hexEncodedBinary(
                     self.allocator.buffer(
-                        integer: responseAddress,
+                        integer: try self.memoryCache.getAddressOfLocal(
+                            debugger: &self.debugger,
+                            frameIndex: frameIndex,
+                            localIndex: localIndex
+                        ),
                         endianness: .little
                     ).readableBytesView
                 )
