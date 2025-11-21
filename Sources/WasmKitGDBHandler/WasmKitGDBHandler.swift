@@ -117,7 +117,7 @@
                 switch self.debugger.state {
                 case .stoppedAtBreakpoint(let breakpoint):
                     let pc = breakpoint.wasmPc
-                    let pcInHostAddressSpace = UInt64(pc) + codeOffset
+                    let pcInHostAddressSpace = UInt64(pc) + executableCodeOffset
                     result.append(("thread-pcs", self.hexDump(pcInHostAddressSpace, endianness: .big)))
                     result.append(("00", self.hexDump(pcInHostAddressSpace, endianness: .little)))
                     result.append(("reason", "trace"))
@@ -232,18 +232,22 @@
                 guard
                     argumentsArray.count == 2,
                     let addressInProtocolSpace = UInt64(hexEncoded: argumentsArray[0]),
-                    var length = Int(hexEncoded: argumentsArray[1])
+                    let length = Int(hexEncoded: argumentsArray[1])
                 else { throw Error.unknownReadMemoryArguments }
 
                 responseKind = .hexEncodedBinary(
-                    self.memoryCache.readMemory(addressInProtocolSpace: addressInProtocolSpace, length: length)
+                    self.memoryCache.readMemory(
+                        debugger: self.debugger,
+                        addressInProtocolSpace: addressInProtocolSpace,
+                        length: length
+                    )
                 )
 
             case .wasmCallStack:
                 let callStack = self.debugger.currentCallStack
                 var buffer = self.allocator.buffer(capacity: callStack.count * 8)
                 for pc in callStack {
-                    buffer.writeInteger(UInt64(pc) + codeOffset, endianness: .little)
+                    buffer.writeInteger(UInt64(pc) + executableCodeOffset, endianness: .little)
                 }
                 responseKind = .hexEncodedBinary(buffer.readableBytesView)
 
@@ -288,7 +292,7 @@
                             argumentsString: command.arguments,
                             separator: ",",
                             endianness: .big
-                        ) - debuggerCodeOffset)
+                        ) - executableCodeOffset)
                 )
                 responseKind = .ok
 
@@ -299,7 +303,7 @@
                             argumentsString: command.arguments,
                             separator: ",",
                             endianness: .big
-                        ) - debuggerCodeOffset)
+                        ) - executableCodeOffset)
                 )
                 responseKind = .ok
 
