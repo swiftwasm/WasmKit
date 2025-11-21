@@ -1373,10 +1373,12 @@ public class WASIBridgeToHost: WASI {
     private let wallClock: WallClock
     private let monotonicClock: MonotonicClock
     private var randomGenerator: RandomBufferGenerator
+    private let fileSystem: FileSystem
 
     public init(
         args: [String] = [],
         environment: [String: String] = [:],
+        fileSystemProvider: (any FileSystemProvider)? = nil,
         preopens: [String: String] = [:],
         stdin: FileDescriptor = .standardInput,
         stdout: FileDescriptor = .standardOutput,
@@ -1387,29 +1389,25 @@ public class WASIBridgeToHost: WASI {
     ) throws {
         self.args = args
         self.environment = environment
-        var fdTable = FdTable()
-        fdTable[0] = .file(StdioFileEntry(fd: stdin, accessMode: .read))
-        fdTable[1] = .file(StdioFileEntry(fd: stdout, accessMode: .write))
-        fdTable[2] = .file(StdioFileEntry(fd: stderr, accessMode: .write))
-
-        for (guestPath, hostPath) in preopens {
-            #if os(Windows) || os(WASI)
-                let fd = try FileDescriptor.open(FilePath(hostPath), .readWrite)
-            #else
-                let fd = try hostPath.withCString { cHostPath in
-                    let fd = open(cHostPath, O_DIRECTORY)
-                    if fd < 0 {
-                        let errno = errno
-                        throw WASIError(description: "Failed to open preopen path '\(hostPath)': \(String(cString: strerror(errno)))")
-                    }
-                    return FileDescriptor(rawValue: fd)
-                }
-            #endif
-
-            if try fd.attributes().fileType.isDirectory {
-                _ = try fdTable.push(.directory(DirEntry(preopenPath: guestPath, fd: fd)))
+        if let provider = fileSystemProvider {
+            guard let fs = provider as? FileSystem else {
+                throw WASIError(description: "Invalid file system provider")
             }
+            self.fileSystem = fs
+        } else {
+            self.fileSystem = HostFileSystem(preopens: preopens)
         }
+
+        var fdTable = FdTable()
+        fdTable[0] = .file(self.fileSystem.createStdioFile(fd: stdin, accessMode: .read))
+        fdTable[1] = .file(self.fileSystem.createStdioFile(fd: stdout, accessMode: .write))
+        fdTable[2] = .file(self.fileSystem.createStdioFile(fd: stderr, accessMode: .write))
+
+        for preopenPath in self.fileSystem.getPreopenPaths() {
+            let dirEntry = try self.fileSystem.openDirectory(at: preopenPath)
+            _ = try fdTable.push(.directory(dirEntry))
+        }
+
         self.fdTable = fdTable
         self.wallClock = wallClock
         self.monotonicClock = monotonicClock
@@ -1774,41 +1772,22 @@ public class WASIBridgeToHost: WASI {
         fsRightsInheriting: WASIAbi.Rights,
         fdflags: WASIAbi.Fdflags
     ) throws -> WASIAbi.Fd {
-        #if os(Windows)
-            throw WASIAbi.Errno.ENOTSUP
-        #else
-            guard case .directory(let dirEntry) = fdTable[dirFd] else {
-                throw WASIAbi.Errno.ENOTDIR
-            }
-            var accessMode: FileAccessMode = []
-            if fsRightsBase.contains(.FD_READ) {
-                accessMode.insert(.read)
-            }
-            if fsRightsBase.contains(.FD_WRITE) {
-                accessMode.insert(.write)
-            }
-            let hostFd = try dirEntry.openFile(
-                symlinkFollow: dirFlags.contains(.SYMLINK_FOLLOW),
-                path: path, oflags: oflags, accessMode: accessMode,
-                fdflags: fdflags
-            )
+        guard case .directory(let dirEntry) = fdTable[dirFd] else {
+            throw WASIAbi.Errno.ENOTDIR
+        }
 
-            let actualFileType = try hostFd.attributes().fileType
-            if oflags.contains(.DIRECTORY), actualFileType != .directory {
-                // Check O_DIRECTORY validity just in case when the host system
-                // doesn't respects O_DIRECTORY.
-                throw WASIAbi.Errno.ENOTDIR
-            }
+        let newEntry = try fileSystem.openAt(
+            dirFd: dirEntry,
+            path: path,
+            oflags: oflags,
+            fsRightsBase: fsRightsBase,
+            fsRightsInheriting: fsRightsInheriting,
+            fdflags: fdflags,
+            symlinkFollow: dirFlags.contains(.SYMLINK_FOLLOW)
+        )
 
-            let newEntry: FdEntry
-            if actualFileType == .directory {
-                newEntry = .directory(DirEntry(preopenPath: nil, fd: hostFd))
-            } else {
-                newEntry = .file(RegularFileEntry(fd: hostFd, accessMode: accessMode))
-            }
-            let guestFd = try fdTable.push(newEntry)
-            return guestFd
-        #endif
+        let guestFd = try fdTable.push(newEntry)
+        return guestFd
     }
 
     func path_readlink(fd: WASIAbi.Fd, path: String, buffer: UnsafeGuestBufferPointer<UInt8>) throws -> WASIAbi.Size {
