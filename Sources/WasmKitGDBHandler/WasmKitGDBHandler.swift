@@ -32,8 +32,6 @@
         }
     }
 
-    private let codeOffset = UInt64(0x4000_0000_0000_0000)
-
     package actor WasmKitGDBHandler {
         enum ResumeThreadsAction: String {
             case step = "s"
@@ -50,13 +48,15 @@
             case exitCodeUnknown([Value])
             case killRequestReceived
             case unknownHexEncodedArguments(String)
+            case unknownWasmLocalArguments(String)
         }
 
-        private let wasmBinary: ByteBuffer
         private let moduleFilePath: FilePath
         private let logger: Logger
         private let allocator: ByteBufferAllocator
         private var debugger: Debugger
+
+        private var memoryCache: DebuggerMemoryCache
 
         package init(
             moduleFilePath: FilePath,
@@ -67,7 +67,7 @@
             self.logger = logger
             self.allocator = allocator
 
-            self.wasmBinary = try await FileSystem.shared.withFileHandle(forReadingAt: moduleFilePath) {
+            let wasmBinary = try await FileSystem.shared.withFileHandle(forReadingAt: moduleFilePath) {
                 try await $0.readToEnd(maximumSizeAllowed: .unlimited)
             }
 
@@ -78,12 +78,14 @@
             let wasi = try WASIBridgeToHost()
             wasi.link(to: &imports, store: store)
 
-            self.debugger = try Debugger(module: parseWasm(bytes: .init(buffer: self.wasmBinary)), store: store, imports: imports)
+            self.debugger = try Debugger(module: parseWasm(bytes: .init(buffer: wasmBinary)), store: store, imports: imports)
             try self.debugger.stopAtEntrypoint()
             try self.debugger.run()
             guard case .stoppedAtBreakpoint = self.debugger.state else {
                 throw Error.stoppingAtEntrypointFailed
             }
+
+            self.memoryCache = DebuggerMemoryCache(allocator: allocator, wasmBinary: wasmBinary)
         }
 
         private func hexDump<I: FixedWidthInteger>(_ value: I, endianness: Endianness) -> String {
@@ -115,7 +117,7 @@
                 switch self.debugger.state {
                 case .stoppedAtBreakpoint(let breakpoint):
                     let pc = breakpoint.wasmPc
-                    let pcInHostAddressSpace = UInt64(pc) + codeOffset
+                    let pcInHostAddressSpace = UInt64(pc) + executableCodeOffset
                     result.append(("thread-pcs", self.hexDump(pcInHostAddressSpace, endianness: .big)))
                     result.append(("00", self.hexDump(pcInHostAddressSpace, endianness: .little)))
                     result.append(("reason", "trace"))
@@ -229,23 +231,23 @@
                 let argumentsArray = command.arguments.split(separator: ",")
                 guard
                     argumentsArray.count == 2,
-                    let address = UInt64(hexEncoded: argumentsArray[0]),
-                    var length = Int(hexEncoded: argumentsArray[1])
+                    let addressInProtocolSpace = UInt64(hexEncoded: argumentsArray[0]),
+                    let length = Int(hexEncoded: argumentsArray[1])
                 else { throw Error.unknownReadMemoryArguments }
 
-                let binaryOffset = Int(address - codeOffset)
-
-                if binaryOffset + length > wasmBinary.readableBytes {
-                    length = wasmBinary.readableBytes - binaryOffset
-                }
-
-                responseKind = .hexEncodedBinary(wasmBinary.readableBytesView[binaryOffset..<(binaryOffset + length)])
+                responseKind = .hexEncodedBinary(
+                    self.memoryCache.readMemory(
+                        debugger: self.debugger,
+                        addressInProtocolSpace: addressInProtocolSpace,
+                        length: length
+                    )
+                )
 
             case .wasmCallStack:
                 let callStack = self.debugger.currentCallStack
                 var buffer = self.allocator.buffer(capacity: callStack.count * 8)
                 for pc in callStack {
-                    buffer.writeInteger(UInt64(pc) + codeOffset, endianness: .little)
+                    buffer.writeInteger(UInt64(pc) + executableCodeOffset, endianness: .little)
                 }
                 responseKind = .hexEncodedBinary(buffer.readableBytesView)
 
@@ -260,6 +262,9 @@
                     throw Error.unknownThreadAction(threadActionString)
                 }
 
+                // Stack frames become invalid after running or stepping.
+                self.memoryCache.invalidate()
+
                 switch threadAction {
                 case .step:
                     try self.debugger.step()
@@ -270,6 +275,9 @@
                 responseKind = try self.currentThreadStopInfo
 
             case .continue:
+                // Stack frames become invalid after running or stepping.
+                self.memoryCache.invalidate()
+
                 try self.debugger.run()
 
                 responseKind = try self.currentThreadStopInfo
@@ -284,7 +292,7 @@
                             argumentsString: command.arguments,
                             separator: ",",
                             endianness: .big
-                        ) - codeOffset)
+                        ) - executableCodeOffset)
                 )
                 responseKind = .ok
 
@@ -295,9 +303,34 @@
                             argumentsString: command.arguments,
                             separator: ",",
                             endianness: .big
-                        ) - codeOffset)
+                        ) - executableCodeOffset)
                 )
                 responseKind = .ok
+
+            case .wasmLocal:
+                let arguments = command.arguments.split(separator: ";")
+                guard arguments.count == 2,
+                    let frameIndexString = arguments.first,
+                    let frameIndex = Int(frameIndexString),
+                    let localIndexString = arguments.last,
+                    let localIndex = Int(localIndexString)
+                else {
+                    throw Error.unknownWasmLocalArguments(command.arguments)
+                }
+
+                responseKind = .hexEncodedBinary(
+                    self.allocator.buffer(
+                        integer: try self.memoryCache.getAddressOfLocal(
+                            debugger: &self.debugger,
+                            frameIndex: frameIndex,
+                            localIndex: localIndex
+                        ),
+                        endianness: .little
+                    ).readableBytesView
+                )
+
+            case .memoryRegionInfo:
+                responseKind = .empty
 
             case .generalRegisters:
                 throw Error.hostCommandNotImplemented(command.kind)
