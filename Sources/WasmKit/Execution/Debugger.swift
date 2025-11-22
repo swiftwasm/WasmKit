@@ -270,10 +270,6 @@
             return result
         }
 
-        package var stackMemory: UnsafeRawBufferPointer {
-            UnsafeRawBufferPointer(self.execution.stackStart)
-        }
-
         deinit {
             self.valueStack.deallocate()
             self.endOfExecution.deallocate()

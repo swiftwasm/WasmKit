@@ -4,6 +4,7 @@
         private var buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 1, alignment: 8)
 
         package struct Layout {
+            /// Array of byte offsets from frame base address for each local at a given index.
             package fileprivate(set) var localOffsets = [Int]()
         }
 

@@ -9,10 +9,16 @@
         private let allocator: ByteBufferAllocator
         private let stackOffsetInProtocolSpace: UInt64
 
+        /// WebAssembly binary loaded into memory for execution
+        /// and for disassembly by the debugger.
         private let wasmBinary: ByteBuffer
 
-        /// Mapping from frame index to a buffer with packed representation of a frame with its layout.
-        private var stackFrames = [Int: (ByteBuffer, DebuggerStackFrame.Layout)]()
+        /// Cached packed stack frames that were previously requested.
+        private var stackFrames: ByteBuffer
+
+        /// Mapping from frame index to a base address of a frame in `stackFrames` buffer with
+        /// its corresponding layout.
+        private var stackFrameLayouts = [Int: (frameBase: Int, offsets: DebuggerStackFrame.Layout)]()
 
         init(allocator: ByteBufferAllocator, wasmBinary: ByteBuffer) {
             self.allocator = allocator
@@ -23,16 +29,17 @@
 
             self.stackOffsetInProtocolSpace = UInt64(stackOffset)
             self.wasmBinary = wasmBinary
+            self.stackFrames = allocator.buffer(capacity: 0)
         }
 
         mutating func getAddressOfLocal(debugger: inout Debugger, frameIndex: Int, localIndex: Int) throws -> UInt64 {
-            let (buffer, layout) = try debugger.packedStackFrame(frameIndex: frameIndex) { span, layout in
-                var buffer = self.allocator.buffer(capacity: span.byteCount)
-                buffer.writeBytes(span)
-                return (buffer, layout)
+            let (frameBase, layout) = try debugger.packedStackFrame(frameIndex: frameIndex) { span, layout in
+                self.stackFrames.writeBytes(span)
+                return (self.stackFrames.writerIndex, layout)
             }
 
-            self.stackFrames[frameIndex] = (buffer, layout)
+            self.stackFrameLayouts[frameIndex] = (frameBase, layout)
+
             // FIXME: adjust the address so that frame indices are accounted for
             let responseAddress = self.stackOffsetInProtocolSpace + UInt64(layout.localOffsets[localIndex])
             // let localPointer = try self.debugger.getLocalPointer(address: localAddress)
@@ -40,7 +47,6 @@
             // let responseAddress = self.stackOffsetInProtocolSpace + UInt64(localPointer - self.debugger.stackMemory.baseAddress!)
 
             return responseAddress
-
         }
 
         func readMemory(
@@ -54,13 +60,11 @@
                 print("stackMemory")
                 let stackAddress = Int(addressInProtocolSpace - self.stackOffsetInProtocolSpace)
                 print("stackAddress is \(stackAddress)")
-                if stackAddress + length > debugger.stackMemory.count {
-                    length = debugger.stackMemory.count - stackAddress
+                if stackAddress + length > self.stackFrames.readableBytes {
+                    length = self.stackFrames.readableBytes - stackAddress
                 }
 
-                return ByteBuffer(
-                    bytes: debugger.stackMemory[stackAddress..<(stackAddress + length)]
-                ).readableBytesView
+                return self.stackFrames.readableBytesView[stackAddress..<(stackAddress + length)]
             } else if addressInProtocolSpace >= executableCodeOffset {
                 print("wasmBinary")
                 let codeAddress = Int(addressInProtocolSpace - executableCodeOffset)
@@ -75,7 +79,8 @@
         }
 
         mutating func invalidate() {
-            self.stackFrames = [:]
+            self.stackFrames = self.allocator.buffer(capacity: 0)
+            self.stackFrameLayouts = [:]
         }
     }
 
