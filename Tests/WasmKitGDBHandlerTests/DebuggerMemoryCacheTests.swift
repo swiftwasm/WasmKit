@@ -1,10 +1,10 @@
 #if WasmDebuggingSupport
 
-import NIOCore
-import Testing
-import WAT
-import WasmKit
-import WasmKitGDBHandler
+    import NIOCore
+    import Testing
+    import WAT
+    import WasmKit
+    import WasmKitGDBHandler
 
     private let manyLocalsWAT = """
         (module
@@ -36,7 +36,7 @@ import WasmKitGDBHandler
 
             var memoryCache = DebuggerMemoryCache(allocator: .init(), wasmBinary: .init(bytes: bytes))
 
-            let breakpointAddress = try debugger.enableBreakpoint( module: module, function: 1)
+            let breakpointAddress = try debugger.enableBreakpoint(module: module, function: 1)
             try debugger.run()
 
             let localAddress = try memoryCache.getAddressOfLocal(debugger: &debugger, frameIndex: 0, localIndex: 0)
