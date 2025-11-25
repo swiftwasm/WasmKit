@@ -21,7 +21,7 @@
             case noInstructionMappingAvailable(Int)
             case noReverseInstructionMappingAvailable(UnsafeMutablePointer<UInt64>)
             case stackFrameIndexOOB(Int)
-            case stackLocalIndexOOB(UInt32)
+            case stackLocalIndexOOB(Int)
             case notStoppedAtBreakpoint
         }
 
@@ -150,6 +150,9 @@
             return wasm
         }
 
+        package mutating func enableBreakpoint(module: Module, function: Int) throws -> Int {
+            try self.enableBreakpoint(address: module.functions[function].code.originalAddress)
+        }
         /// Disables a breakpoint at a given Wasm address. If no breakpoint at a given address was previously set with
         /// `self.enableBreakpoint(address:), this function immediately returns.
         /// - Parameter address: byte offset of the Wasm instruction that was replaced with a breakpoint. The original

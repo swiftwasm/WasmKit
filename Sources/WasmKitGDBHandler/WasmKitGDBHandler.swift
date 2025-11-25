@@ -117,7 +117,7 @@
                 switch self.debugger.state {
                 case .stoppedAtBreakpoint(let breakpoint):
                     let pc = breakpoint.wasmPc
-                    let pcInHostAddressSpace = UInt64(pc) + executableCodeOffset
+                    let pcInHostAddressSpace = UInt64(pc) + DebuggerMemoryCache.executableCodeOffset
                     result.append(("thread-pcs", self.hexDump(pcInHostAddressSpace, endianness: .big)))
                     result.append(("00", self.hexDump(pcInHostAddressSpace, endianness: .little)))
                     result.append(("reason", "trace"))
@@ -247,7 +247,7 @@
                 let callStack = self.debugger.currentCallStack
                 var buffer = self.allocator.buffer(capacity: callStack.count * 8)
                 for pc in callStack {
-                    buffer.writeInteger(UInt64(pc) + executableCodeOffset, endianness: .little)
+                    buffer.writeInteger(UInt64(pc) + DebuggerMemoryCache.executableCodeOffset, endianness: .little)
                 }
                 responseKind = .hexEncodedBinary(buffer.readableBytesView)
 
@@ -292,7 +292,7 @@
                             argumentsString: command.arguments,
                             separator: ",",
                             endianness: .big
-                        ) - executableCodeOffset)
+                        ) - DebuggerMemoryCache.executableCodeOffset)
                 )
                 responseKind = .ok
 
@@ -303,7 +303,7 @@
                             argumentsString: command.arguments,
                             separator: ",",
                             endianness: .big
-                        ) - executableCodeOffset)
+                        ) - DebuggerMemoryCache.executableCodeOffset)
                 )
                 responseKind = .ok
 
@@ -311,9 +311,9 @@
                 let arguments = command.arguments.split(separator: ";")
                 guard arguments.count == 2,
                     let frameIndexString = arguments.first,
-                    let frameIndex = Int(frameIndexString),
+                    let frameIndex = UInt(frameIndexString),
                     let localIndexString = arguments.last,
-                    let localIndex = Int(localIndexString)
+                    let localIndex = UInt(localIndexString)
                 else {
                     throw Error.unknownWasmLocalArguments(command.arguments)
                 }
@@ -322,8 +322,8 @@
                     self.allocator.buffer(
                         integer: try self.memoryCache.getAddressOfLocal(
                             debugger: &self.debugger,
-                            frameIndex: frameIndex,
-                            localIndex: localIndex
+                            frameIndex: Int(frameIndex),
+                            localIndex: Int(localIndex)
                         ),
                         endianness: .little
                     ).readableBytesView
