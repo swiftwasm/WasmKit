@@ -20,6 +20,9 @@
             case unknownCurrentFunctionForResumedBreakpoint(UnsafeMutablePointer<UInt64>)
             case noInstructionMappingAvailable(Int)
             case noReverseInstructionMappingAvailable(UnsafeMutablePointer<UInt64>)
+            case stackFrameIndexOOB(Int)
+            case stackLocalIndexOOB(Int)
+            case notStoppedAtBreakpoint
         }
 
         private let valueStack: Sp
@@ -43,12 +46,15 @@
 
         package private(set) var state: State
 
-        private var pc = Pc.allocate(capacity: 1)
+        /// Pc ofthe final instruction that a successful program will execute, initialized with `Instruction.endofExecution`
+        private let endOfExecution = Pc.allocate(capacity: 1)
 
-        /// Addresses of functions in the original Wasm binary, used for looking up functions when a breakpoint
+        /// Addresses of functions in the original Wasm binary, used looking up functions when a breakpoint
         /// is enabled at an arbitrary address if it isn't present in ``InstructionMapping`` yet (i.e. the
         /// was not compiled yet in lazy compilation mode).
         private let functionAddresses: [(address: Int, instanceFunctionIndex: Int)]
+
+        private var stackFrame = DebuggerStackFrame()
 
         /// Initializes a new debugger state instance.
         /// - Parameters:
@@ -76,9 +82,13 @@
             self.entrypointFunction = entrypointFunction
             self.valueStack = UnsafeMutablePointer<StackSlot>.allocate(capacity: limit)
             self.store = store
-            self.execution = Execution(store: StoreRef(store), stackEnd: valueStack.advanced(by: limit))
+            self.execution = Execution(
+                store: StoreRef(store),
+                stackStart: .init(start: valueStack, count: limit),
+                stackEnd: valueStack.advanced(by: limit)
+            )
             self.threadingModel = store.engine.configuration.threadingModel
-            self.pc.pointee = Instruction.endOfExecution.headSlot(threadingModel: threadingModel)
+            self.endOfExecution.pointee = Instruction.endOfExecution.headSlot(threadingModel: threadingModel)
             self.state = .instantiated
         }
 
@@ -91,7 +101,7 @@
         /// Finds a Wasm address for the first instruction in a given function.
         /// - Parameter function: the Wasm function to find the first Wasm instruction address for.
         /// - Returns: byte offset of the first Wasm instruction of given function in the module it was parsed from.
-        private func originalAddress(function: Function) throws -> Int {
+        package func originalAddress(function: Function) throws -> Int {
             precondition(function.handle.isWasm)
 
             switch function.handle.wasm.code {
@@ -140,6 +150,9 @@
             return wasm
         }
 
+        package mutating func enableBreakpoint(module: Module, function: Int) throws -> Int {
+            try self.enableBreakpoint(address: module.functions[function].code.originalAddress)
+        }
         /// Disables a breakpoint at a given Wasm address. If no breakpoint at a given address was previously set with
         /// `self.enableBreakpoint(address:), this function immediately returns.
         /// - Parameter address: byte offset of the Wasm instruction that was replaced with a breakpoint. The original
@@ -206,7 +219,7 @@
                         type: self.entrypointFunction.type,
                         arguments: [],
                         sp: self.valueStack,
-                        pc: self.pc
+                        pc: self.endOfExecution
                     )
                     self.state = .entrypointReturned(result)
 
@@ -237,6 +250,14 @@
             try self.run()
         }
 
+        package mutating func packedStackFrame<T>(frameIndex: Int, reader: (RawSpan, DebuggerStackFrame.Layout) -> T) throws -> T {
+            guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
+                throw Error.notStoppedAtBreakpoint
+            }
+
+            return try self.stackFrame.withFrames(sp: breakpoint.iseq.sp, frameIndex: frameIndex, store: self.store, reader: reader)
+        }
+
         /// Array of addresses in the Wasm binary of executed instructions on the call stack.
         package var currentCallStack: [Int] {
             guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
@@ -254,7 +275,7 @@
 
         deinit {
             self.valueStack.deallocate()
-            self.pc.deallocate()
+            self.endOfExecution.deallocate()
         }
     }
 
