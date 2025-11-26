@@ -960,7 +960,7 @@ struct WASITests {
         try wasi.fd_close(fd: fd)
     }
 
-     @Test
+    @Test
     func stdioFileDescriptors() throws {
         let fs = try MemoryFileSystem(preopens: ["/": "/"])
         let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
@@ -1052,6 +1052,5 @@ struct WASITests {
             #expect(error == .EBADF)
         }
     }
-
 
 }
