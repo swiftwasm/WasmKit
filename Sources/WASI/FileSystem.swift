@@ -83,7 +83,7 @@ enum FdEntry {
             return directory
         }
     }
-    
+
     func asFile() -> (any WASIFile)? {
         if case .file(let entry) = self {
             return entry
@@ -140,16 +140,16 @@ public enum FileContent {
 public protocol FileSystemProvider {
     /// Adds a file to the file system with the given byte content.
     func addFile(at path: String, content: [UInt8]) throws
-    
+
     /// Adds a file to the file system with the given string content.
     func addFile(at path: String, content: String) throws
-    
+
     /// Adds a file to the file system backed by a file descriptor handle.
     func addFile(at path: String, handle: FileDescriptor) throws
-    
+
     /// Gets the content of a file at the specified path.
     func getFile(at path: String) throws -> FileContent
-    
+
     /// Removes a file from the file system.
     func removeFile(at path: String) throws
 }
@@ -161,10 +161,10 @@ public protocol FileSystemProvider {
 internal protocol FileSystem {
     /// Returns the list of pre-opened directory paths.
     func getPreopenPaths() -> [String]
-    
+
     /// Opens a directory and returns a WASIDir implementation.
     func openDirectory(at path: String) throws -> any WASIDir
-    
+
     /// Opens a file or directory from a directory file descriptor.
     func openAt(
         dirFd: any WASIDir,
@@ -175,7 +175,7 @@ internal protocol FileSystem {
         fdflags: WASIAbi.Fdflags,
         symlinkFollow: Bool
     ) throws -> FdEntry
-    
+
     /// Creates a standard I/O file entry for stdin/stdout/stderr.
     func createStdioFile(fd: FileDescriptor, accessMode: FileAccessMode) -> any WASIFile
 }

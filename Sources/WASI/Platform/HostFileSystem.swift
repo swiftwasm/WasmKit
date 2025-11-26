@@ -22,47 +22,47 @@ import SystemPackage
 /// with appropriate sandboxing through pre-opened directories.
 public final class HostFileSystem: FileSystemProvider, FileSystem {
     private let preopens: [String: String]
-    
+
     /// Creates a new host file system with the specified pre-opened directories.
     ///
     /// - Parameter preopens: Dictionary mapping guest paths to host paths
     public init(preopens: [String: String] = [:]) {
         self.preopens = preopens
     }
-    
+
     // MARK: - FileSystemProvider (Public API)
-    
+
     public func addFile(at path: String, content: [UInt8]) throws {
         throw WASIAbi.Errno.ENOTSUP
     }
-    
+
     public func addFile(at path: String, content: String) throws {
         throw WASIAbi.Errno.ENOTSUP
     }
-    
+
     public func addFile(at path: String, handle: FileDescriptor) throws {
         throw WASIAbi.Errno.ENOTSUP
     }
-    
+
     public func getFile(at path: String) throws -> FileContent {
         throw WASIAbi.Errno.ENOTSUP
     }
-    
+
     public func removeFile(at path: String) throws {
         throw WASIAbi.Errno.ENOTSUP
     }
-    
+
     // MARK: - FileSystem (Internal WASI API)
-    
+
     internal func getPreopenPaths() -> [String] {
         return Array(preopens.keys).sorted()
     }
-    
+
     internal func openDirectory(at path: String) throws -> any WASIDir {
         guard let hostPath = preopens[path] else {
             throw WASIAbi.Errno.ENOENT
         }
-        
+
         #if os(Windows) || os(WASI)
             let fd = try FileDescriptor.open(FilePath(hostPath), .readWrite)
         #else
@@ -75,14 +75,14 @@ public final class HostFileSystem: FileSystemProvider, FileSystem {
                 return FileDescriptor(rawValue: fd)
             }
         #endif
-        
+
         guard try fd.attributes().fileType.isDirectory else {
             throw WASIAbi.Errno.ENOTDIR
         }
-        
+
         return DirEntry(preopenPath: path, fd: fd)
     }
-    
+
     internal func openAt(
         dirFd: any WASIDir,
         path: String,
@@ -102,7 +102,7 @@ public final class HostFileSystem: FileSystemProvider, FileSystem {
             if fsRightsBase.contains(.FD_WRITE) {
                 accessMode.insert(.write)
             }
-            
+
             let hostFd = try dirFd.openFile(
                 symlinkFollow: symlinkFollow,
                 path: path,
@@ -110,12 +110,12 @@ public final class HostFileSystem: FileSystemProvider, FileSystem {
                 accessMode: accessMode,
                 fdflags: fdflags
             )
-            
+
             let actualFileType = try hostFd.attributes().fileType
             if oflags.contains(.DIRECTORY), actualFileType != .directory {
                 throw WASIAbi.Errno.ENOTDIR
             }
-            
+
             if actualFileType == .directory {
                 return .directory(DirEntry(preopenPath: nil, fd: hostFd))
             } else {
@@ -123,7 +123,7 @@ public final class HostFileSystem: FileSystemProvider, FileSystem {
             }
         #endif
     }
-    
+
     internal func createStdioFile(fd: FileDescriptor, accessMode: FileAccessMode) -> any WASIFile {
         return StdioFileEntry(fd: fd, accessMode: accessMode)
     }

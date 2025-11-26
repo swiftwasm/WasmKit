@@ -16,26 +16,26 @@ internal enum MemFSNodeType {
 internal final class MemoryDirectoryNode: MemFSNode {
     let type: MemFSNodeType = .directory
     private var children: [String: MemFSNode] = [:]
-    
+
     init() {}
-    
+
     func getChild(name: String) -> MemFSNode? {
         return children[name]
     }
-    
+
     func setChild(name: String, node: MemFSNode) {
         children[name] = node
     }
-    
+
     @discardableResult
     func removeChild(name: String) -> Bool {
         return children.removeValue(forKey: name) != nil
     }
-    
+
     func listChildren() -> [String] {
         return Array(children.keys).sorted()
     }
-    
+
     func childCount() -> Int {
         return children.count
     }
@@ -45,19 +45,19 @@ internal final class MemoryDirectoryNode: MemFSNode {
 internal final class MemoryFileNode: MemFSNode {
     let type: MemFSNodeType = .file
     var content: FileContent
-    
+
     init(content: FileContent) {
         self.content = content
     }
-    
+
     convenience init(bytes: [UInt8]) {
         self.init(content: .bytes(bytes))
     }
-    
+
     convenience init(handle: FileDescriptor) {
         self.init(content: .handle(handle))
     }
-    
+
     var size: Int {
         switch content {
         case .bytes(let bytes):
@@ -76,13 +76,13 @@ internal final class MemoryFileNode: MemFSNode {
 /// A character device node in the memory file system.
 internal final class MemoryCharacterDeviceNode: MemFSNode {
     let type: MemFSNodeType = .characterDevice
-    
+
     enum Kind {
         case null
     }
-    
+
     let kind: Kind
-    
+
     init(kind: Kind) {
         self.kind = kind
     }
@@ -92,14 +92,14 @@ internal final class MemoryCharacterDeviceNode: MemFSNode {
 internal final class MemoryCharacterDeviceEntry: WASIFile {
     let deviceNode: MemoryCharacterDeviceNode
     let accessMode: FileAccessMode
-    
+
     init(deviceNode: MemoryCharacterDeviceNode, accessMode: FileAccessMode) {
         self.deviceNode = deviceNode
         self.accessMode = accessMode
     }
-    
+
     // MARK: - WASIEntry
-    
+
     func attributes() throws -> WASIAbi.Filestat {
         return WASIAbi.Filestat(
             dev: 0, ino: 0, filetype: .CHARACTER_DEVICE,
@@ -107,34 +107,34 @@ internal final class MemoryCharacterDeviceEntry: WASIFile {
             atim: 0, mtim: 0, ctim: 0
         )
     }
-    
+
     func fileType() throws -> WASIAbi.FileType {
         return .CHARACTER_DEVICE
     }
-    
+
     func status() throws -> WASIAbi.Fdflags {
         return []
     }
-    
+
     func setTimes(
         atim: WASIAbi.Timestamp, mtim: WASIAbi.Timestamp,
         fstFlags: WASIAbi.FstFlags
     ) throws {
         // No-op for character devices
     }
-    
+
     func advise(
         offset: WASIAbi.FileSize, length: WASIAbi.FileSize, advice: WASIAbi.Advice
     ) throws {
         // No-op for character devices
     }
-    
+
     func close() throws {
         // No-op for character devices
     }
-    
+
     // MARK: - WASIFile
-    
+
     func fdStat() throws -> WASIAbi.FdStat {
         var fsRightsBase: WASIAbi.Rights = []
         if accessMode.contains(.read) {
@@ -143,7 +143,7 @@ internal final class MemoryCharacterDeviceEntry: WASIFile {
         if accessMode.contains(.write) {
             fsRightsBase.insert(.FD_WRITE)
         }
-        
+
         return WASIAbi.FdStat(
             fsFileType: .CHARACTER_DEVICE,
             fsFlags: [],
@@ -151,36 +151,36 @@ internal final class MemoryCharacterDeviceEntry: WASIFile {
             fsRightsInheriting: []
         )
     }
-    
+
     func setFdStatFlags(_ flags: WASIAbi.Fdflags) throws {
         // No-op for character devices
     }
-    
+
     func setFilestatSize(_ size: WASIAbi.FileSize) throws {
         throw WASIAbi.Errno.EINVAL
     }
-    
+
     func sync() throws {
         // No-op for character devices
     }
-    
+
     func datasync() throws {
         // No-op for character devices
     }
-    
+
     func tell() throws -> WASIAbi.FileSize {
         return 0
     }
-    
+
     func seek(offset: WASIAbi.FileDelta, whence: WASIAbi.Whence) throws -> WASIAbi.FileSize {
         throw WASIAbi.Errno.ESPIPE
     }
-    
+
     func write<Buffer: Sequence>(vectored buffer: Buffer) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
         guard accessMode.contains(.write) else {
             throw WASIAbi.Errno.EBADF
         }
-        
+
         switch deviceNode.kind {
         case .null:
             // /dev/null discards all writes but reports them as successful
@@ -193,23 +193,23 @@ internal final class MemoryCharacterDeviceEntry: WASIFile {
             return totalBytes
         }
     }
-    
+
     func pwrite<Buffer: Sequence>(vectored buffer: Buffer, offset: WASIAbi.FileSize) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
         throw WASIAbi.Errno.ESPIPE
     }
-    
+
     func read<Buffer: Sequence>(into buffer: Buffer) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
         guard accessMode.contains(.read) else {
             throw WASIAbi.Errno.EBADF
         }
-        
+
         switch deviceNode.kind {
         case .null:
             // /dev/null always returns EOF (0 bytes read)
             return 0
         }
     }
-    
+
     func pread<Buffer: Sequence>(into buffer: Buffer, offset: WASIAbi.FileSize) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
         throw WASIAbi.Errno.ESPIPE
     }
