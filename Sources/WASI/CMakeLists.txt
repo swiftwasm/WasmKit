@@ -17,7 +17,6 @@ add_wasmkit_library(WASI
   Clock.swift
   RandomBufferGenerator.swift
   WASI.swift
-  WASIBridgeToMemory.swift
 )
 
 target_link_wasmkit_libraries(WASI PUBLIC
