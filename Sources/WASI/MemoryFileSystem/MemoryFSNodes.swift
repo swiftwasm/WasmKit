@@ -87,3 +87,130 @@ internal final class MemoryCharacterDeviceNode: MemFSNode {
         self.kind = kind
     }
 }
+
+/// A WASIFile implementation for character devices like /dev/null
+internal final class MemoryCharacterDeviceEntry: WASIFile {
+    let deviceNode: MemoryCharacterDeviceNode
+    let accessMode: FileAccessMode
+    
+    init(deviceNode: MemoryCharacterDeviceNode, accessMode: FileAccessMode) {
+        self.deviceNode = deviceNode
+        self.accessMode = accessMode
+    }
+    
+    // MARK: - WASIEntry
+    
+    func attributes() throws -> WASIAbi.Filestat {
+        return WASIAbi.Filestat(
+            dev: 0, ino: 0, filetype: .CHARACTER_DEVICE,
+            nlink: 1, size: 0,
+            atim: 0, mtim: 0, ctim: 0
+        )
+    }
+    
+    func fileType() throws -> WASIAbi.FileType {
+        return .CHARACTER_DEVICE
+    }
+    
+    func status() throws -> WASIAbi.Fdflags {
+        return []
+    }
+    
+    func setTimes(
+        atim: WASIAbi.Timestamp, mtim: WASIAbi.Timestamp,
+        fstFlags: WASIAbi.FstFlags
+    ) throws {
+        // No-op for character devices
+    }
+    
+    func advise(
+        offset: WASIAbi.FileSize, length: WASIAbi.FileSize, advice: WASIAbi.Advice
+    ) throws {
+        // No-op for character devices
+    }
+    
+    func close() throws {
+        // No-op for character devices
+    }
+    
+    // MARK: - WASIFile
+    
+    func fdStat() throws -> WASIAbi.FdStat {
+        var fsRightsBase: WASIAbi.Rights = []
+        if accessMode.contains(.read) {
+            fsRightsBase.insert(.FD_READ)
+        }
+        if accessMode.contains(.write) {
+            fsRightsBase.insert(.FD_WRITE)
+        }
+        
+        return WASIAbi.FdStat(
+            fsFileType: .CHARACTER_DEVICE,
+            fsFlags: [],
+            fsRightsBase: fsRightsBase,
+            fsRightsInheriting: []
+        )
+    }
+    
+    func setFdStatFlags(_ flags: WASIAbi.Fdflags) throws {
+        // No-op for character devices
+    }
+    
+    func setFilestatSize(_ size: WASIAbi.FileSize) throws {
+        throw WASIAbi.Errno.EINVAL
+    }
+    
+    func sync() throws {
+        // No-op for character devices
+    }
+    
+    func datasync() throws {
+        // No-op for character devices
+    }
+    
+    func tell() throws -> WASIAbi.FileSize {
+        return 0
+    }
+    
+    func seek(offset: WASIAbi.FileDelta, whence: WASIAbi.Whence) throws -> WASIAbi.FileSize {
+        throw WASIAbi.Errno.ESPIPE
+    }
+    
+    func write<Buffer: Sequence>(vectored buffer: Buffer) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+        guard accessMode.contains(.write) else {
+            throw WASIAbi.Errno.EBADF
+        }
+        
+        switch deviceNode.kind {
+        case .null:
+            // /dev/null discards all writes but reports them as successful
+            var totalBytes: UInt32 = 0
+            for iovec in buffer {
+                iovec.withHostBufferPointer { bufferPtr in
+                    totalBytes += UInt32(bufferPtr.count)
+                }
+            }
+            return totalBytes
+        }
+    }
+    
+    func pwrite<Buffer: Sequence>(vectored buffer: Buffer, offset: WASIAbi.FileSize) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+        throw WASIAbi.Errno.ESPIPE
+    }
+    
+    func read<Buffer: Sequence>(into buffer: Buffer) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+        guard accessMode.contains(.read) else {
+            throw WASIAbi.Errno.EBADF
+        }
+        
+        switch deviceNode.kind {
+        case .null:
+            // /dev/null always returns EOF (0 bytes read)
+            return 0
+        }
+    }
+    
+    func pread<Buffer: Sequence>(into buffer: Buffer, offset: WASIAbi.FileSize) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+        throw WASIAbi.Errno.ESPIPE
+    }
+}

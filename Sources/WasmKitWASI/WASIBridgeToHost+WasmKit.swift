@@ -2,6 +2,7 @@ import WASI
 import WasmKit
 
 public typealias WASIBridgeToHost = WASI.WASIBridgeToHost
+public typealias MemoryFileSystem = WASI.MemoryFileSystem
 
 extension WASIBridgeToHost {
 

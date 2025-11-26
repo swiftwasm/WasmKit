@@ -18,7 +18,7 @@ import SystemPackage
 /// ```
 public final class MemoryFileSystem: FileSystemProvider, FileSystem {
     private static let rootPath = "/"
-    
+
     private var root: MemoryDirectoryNode
     private let preopenPaths: [String]
 
@@ -45,7 +45,7 @@ public final class MemoryFileSystem: FileSystemProvider, FileSystem {
     }
 
     // MARK: - FileSystemProvider (Public API)
-    
+
     /// Adds a file to the file system with the given byte content.
     ///
     /// - Parameters:
@@ -114,20 +114,20 @@ public final class MemoryFileSystem: FileSystemProvider, FileSystem {
     }
 
     // MARK: - FileSystem (Internal WASI API)
-    
+
     internal func getPreopenPaths() -> [String] {
         return preopenPaths
     }
-    
+
     internal func openDirectory(at path: String) throws -> any WASIDir {
         guard let node = lookup(at: path) else {
             throw WASIAbi.Errno.ENOENT
         }
-        
+
         guard let dirNode = node as? MemoryDirectoryNode else {
             throw WASIAbi.Errno.ENOTDIR
         }
-        
+
         return MemoryDirEntry(
             preopenPath: preopenPaths.contains(path) ? path : nil,
             dirNode: dirNode,
@@ -135,7 +135,7 @@ public final class MemoryFileSystem: FileSystemProvider, FileSystem {
             fileSystem: self
         )
     }
-    
+
     internal func openAt(
         dirFd: any WASIDir,
         path: String,
@@ -148,11 +148,11 @@ public final class MemoryFileSystem: FileSystemProvider, FileSystem {
         guard let memoryDir = dirFd as? MemoryDirEntry else {
             throw WASIAbi.Errno.EBADF
         }
-        
+
         let fullPath = memoryDir.path.hasSuffix("/") ? memoryDir.path + path : memoryDir.path + "/" + path
-        
+
         var node = resolve(from: memoryDir.dirNode, at: memoryDir.path, path: path)
-        
+
         if node != nil {
             if oflags.contains(.EXCL) && oflags.contains(.CREAT) {
                 throw WASIAbi.Errno.EEXIST
@@ -164,36 +164,41 @@ public final class MemoryFileSystem: FileSystemProvider, FileSystem {
                 throw WASIAbi.Errno.ENOENT
             }
         }
-        
+
         guard let resolvedNode = node else {
             throw WASIAbi.Errno.ENOENT
         }
-        
+
         if oflags.contains(.DIRECTORY) {
             guard resolvedNode.type == .directory else {
                 throw WASIAbi.Errno.ENOTDIR
             }
         }
-        
+
+        // Handle directory nodes
         if resolvedNode.type == .directory {
             guard let dirNode = resolvedNode as? MemoryDirectoryNode else {
                 throw WASIAbi.Errno.ENOTDIR
             }
-            return .directory(MemoryDirEntry(
-                preopenPath: nil,
-                dirNode: dirNode,
-                path: fullPath,
-                fileSystem: self
-            ))
-        } else if resolvedNode.type == .file {
+            return .directory(
+                MemoryDirEntry(
+                    preopenPath: nil,
+                    dirNode: dirNode,
+                    path: fullPath,
+                    fileSystem: self
+                ))
+        }
+
+        // Handle regular file nodes
+        if resolvedNode.type == .file {
             guard let fileNode = resolvedNode as? MemoryFileNode else {
                 throw WASIAbi.Errno.EBADF
             }
-            
+
             if oflags.contains(.TRUNC) && fsRightsBase.contains(.FD_WRITE) {
                 fileNode.content = .bytes([])
             }
-            
+
             var accessMode: FileAccessMode = []
             if fsRightsBase.contains(.FD_READ) {
                 accessMode.insert(.read)
@@ -201,13 +206,27 @@ public final class MemoryFileSystem: FileSystemProvider, FileSystem {
             if fsRightsBase.contains(.FD_WRITE) {
                 accessMode.insert(.write)
             }
-            
+
             return .file(MemoryFileEntry(fileNode: fileNode, accessMode: accessMode, position: 0))
-        } else {
-            throw WASIAbi.Errno.ENOTSUP
         }
+        if resolvedNode.type == .characterDevice {
+            guard let deviceNode = resolvedNode as? MemoryCharacterDeviceNode else {
+                throw WASIAbi.Errno.EBADF
+            }
+
+            var accessMode: FileAccessMode = []
+            if fsRightsBase.contains(.FD_READ) {
+                accessMode.insert(.read)
+            }
+            if fsRightsBase.contains(.FD_WRITE) {
+                accessMode.insert(.write)
+            }
+
+            return .file(MemoryCharacterDeviceEntry(deviceNode: deviceNode, accessMode: accessMode))
+        }
+        throw WASIAbi.Errno.ENOTSUP
     }
-    
+
     internal func createStdioFile(fd: FileDescriptor, accessMode: FileAccessMode) -> any WASIFile {
         return MemoryStdioFile(fd: fd, accessMode: accessMode)
     }
