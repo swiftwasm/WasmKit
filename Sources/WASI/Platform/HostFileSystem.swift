@@ -20,7 +20,8 @@ import SystemPackage
 ///
 /// This implementation provides access to actual files and directories on the host system,
 /// with appropriate sandboxing through pre-opened directories.
-public final class HostFileSystem: FileSystemProvider, FileSystem {
+public final class HostFileSystem: FileSystemProvider, FileSystemImplementation {
+
     private let preopens: [String: String]
 
     /// Creates a new host file system with the specified pre-opened directories.
@@ -32,7 +33,7 @@ public final class HostFileSystem: FileSystemProvider, FileSystem {
 
     // MARK: - FileSystemProvider (Public API)
 
-    public func addFile(at path: String, content: [UInt8]) throws {
+    public func addFile(at path: String, content: some Sequence<UInt8>) throws {
         throw WASIAbi.Errno.ENOTSUP
     }
 
@@ -52,13 +53,13 @@ public final class HostFileSystem: FileSystemProvider, FileSystem {
         throw WASIAbi.Errno.ENOTSUP
     }
 
-    // MARK: - FileSystem (Internal WASI API)
+    // MARK: - FileSystemImplementation (WASI API)
 
-    internal func getPreopenPaths() -> [String] {
+    var preopenPaths: [String] {
         return Array(preopens.keys).sorted()
     }
 
-    internal func openDirectory(at path: String) throws -> any WASIDir {
+    func openDirectory(at path: String) throws -> any WASIDir {
         guard let hostPath = preopens[path] else {
             throw WASIAbi.Errno.ENOENT
         }
@@ -83,7 +84,7 @@ public final class HostFileSystem: FileSystemProvider, FileSystem {
         return DirEntry(preopenPath: path, fd: fd)
     }
 
-    internal func openAt(
+    func openAt(
         dirFd: any WASIDir,
         path: String,
         oflags: WASIAbi.Oflags,
@@ -124,7 +125,7 @@ public final class HostFileSystem: FileSystemProvider, FileSystem {
         #endif
     }
 
-    internal func createStdioFile(fd: FileDescriptor, accessMode: FileAccessMode) -> any WASIFile {
+    func createStdioFile(fd: FileDescriptor, accessMode: FileAccessMode) -> any WASIFile {
         return StdioFileEntry(fd: fd, accessMode: accessMode)
     }
 }

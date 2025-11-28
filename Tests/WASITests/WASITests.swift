@@ -139,7 +139,7 @@ struct WASITests {
     func memoryFileSystem() throws {
         let fs = try MemoryFileSystem(preopens: ["/": "/"])
 
-        #expect(fs.getPreopenPaths() == ["/"])
+        #expect(fs.preopenPaths == ["/"])
         #expect(fs.lookup(at: "/") != nil)
         #expect(fs.lookup(at: "/dev/null") != nil)
 
@@ -329,7 +329,7 @@ struct WASITests {
             "/data": "/data",
         ])
 
-        let preopens = fs.getPreopenPaths()
+        let preopens = fs.preopenPaths
         #expect(preopens.count == 3)
         #expect(preopens.contains("/"))
         #expect(preopens.contains("/tmp"))

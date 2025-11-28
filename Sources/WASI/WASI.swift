@@ -1373,7 +1373,7 @@ public class WASIBridgeToHost: WASI {
     private let wallClock: WallClock
     private let monotonicClock: MonotonicClock
     private var randomGenerator: RandomBufferGenerator
-    private let fileSystem: FileSystem
+    private let fileSystem: FileSystemImplementation
 
     public init(
         args: [String] = [],
@@ -1390,7 +1390,7 @@ public class WASIBridgeToHost: WASI {
         self.args = args
         self.environment = environment
         if let provider = fileSystemProvider {
-            guard let fs = provider as? FileSystem else {
+            guard let fs = provider as? FileSystemImplementation else {
                 throw WASIError(description: "Invalid file system provider")
             }
             self.fileSystem = fs
@@ -1403,7 +1403,7 @@ public class WASIBridgeToHost: WASI {
         fdTable[1] = .file(self.fileSystem.createStdioFile(fd: stdout, accessMode: .write))
         fdTable[2] = .file(self.fileSystem.createStdioFile(fd: stderr, accessMode: .write))
 
-        for preopenPath in self.fileSystem.getPreopenPaths() {
+        for preopenPath in self.fileSystem.preopenPaths {
             let dirEntry = try self.fileSystem.openDirectory(at: preopenPath)
             _ = try fdTable.push(.directory(dirEntry))
         }

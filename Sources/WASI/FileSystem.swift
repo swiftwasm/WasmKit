@@ -137,9 +137,9 @@ public enum FileContent {
 /// Public protocol for file system providers that users interact with.
 ///
 /// This protocol exposes only user-facing methods for managing files and directories.
-public protocol FileSystemProvider {
+public protocol FileSystemProvider: ~Copyable {
     /// Adds a file to the file system with the given byte content.
-    func addFile(at path: String, content: [UInt8]) throws
+    func addFile(at path: String, content: some Sequence<UInt8>) throws
 
     /// Adds a file to the file system with the given string content.
     func addFile(at path: String, content: String) throws
@@ -158,9 +158,9 @@ public protocol FileSystemProvider {
 ///
 /// This protocol contains WASI-specific implementation details that should not
 /// be exposed to library users.
-internal protocol FileSystem {
+protocol FileSystemImplementation: ~Copyable {
     /// Returns the list of pre-opened directory paths.
-    func getPreopenPaths() -> [String]
+    var preopenPaths: [String] { get }
 
     /// Opens a directory and returns a WASIDir implementation.
     func openDirectory(at path: String) throws -> any WASIDir

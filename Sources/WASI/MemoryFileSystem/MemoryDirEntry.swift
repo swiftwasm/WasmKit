@@ -1,7 +1,7 @@
 import SystemPackage
 
 /// A WASIDir implementation backed by an in-memory directory node.
-internal struct MemoryDirEntry: WASIDir {
+struct MemoryDirEntry: WASIDir {
     let preopenPath: String?
     let dirNode: MemoryDirectoryNode
     let path: String

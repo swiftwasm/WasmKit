@@ -1,7 +1,7 @@
 import SystemPackage
 
 /// A WASIFile implementation for regular files in the memory file system.
-internal final class MemoryFileEntry: WASIFile {
+final class MemoryFileEntry: WASIFile {
     let fileNode: MemoryFileNode
     let accessMode: FileAccessMode
     var position: Int

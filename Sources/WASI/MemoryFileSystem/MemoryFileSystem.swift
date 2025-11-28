@@ -16,11 +16,11 @@ import SystemPackage
 /// let fd = try FileDescriptor.open("/path/to/file", .readOnly)
 /// try fs.addFile(at: "/mounted.txt", handle: fd)
 /// ```
-public final class MemoryFileSystem: FileSystemProvider, FileSystem {
+public final class MemoryFileSystem: FileSystemProvider, FileSystemImplementation {
     private static let rootPath = "/"
 
     private var root: MemoryDirectoryNode
-    private let preopenPaths: [String]
+    let preopenPaths: [String]
 
     /// Creates a new in-memory file system.
     ///
@@ -50,8 +50,8 @@ public final class MemoryFileSystem: FileSystemProvider, FileSystem {
     ///
     /// - Parameters:
     ///   - path: The path where the file should be created
-    ///   - content: The file content as byte array
-    public func addFile(at path: String, content: [UInt8]) throws {
+    ///   - content: The file content as a sequence of bytes
+    public func addFile(at path: String, content: some Sequence<UInt8>) throws {
         let normalized = normalizePath(path)
         let (parentPath, fileName) = try splitPath(normalized)
 
@@ -65,7 +65,7 @@ public final class MemoryFileSystem: FileSystemProvider, FileSystem {
     ///   - path: The path where the file should be created
     ///   - content: The file content as string (converted to UTF-8)
     public func addFile(at path: String, content: String) throws {
-        try addFile(at: path, content: Array(content.utf8))
+        try addFile(at: path, content: content.utf8)
     }
 
     /// Adds a file to the file system backed by a file descriptor.
@@ -113,13 +113,9 @@ public final class MemoryFileSystem: FileSystemProvider, FileSystem {
         }
     }
 
-    // MARK: - FileSystem (Internal WASI API)
+    // MARK: - FileSystemImplementation (WASI API)
 
-    internal func getPreopenPaths() -> [String] {
-        return preopenPaths
-    }
-
-    internal func openDirectory(at path: String) throws -> any WASIDir {
+    func openDirectory(at path: String) throws -> any WASIDir {
         guard let node = lookup(at: path) else {
             throw WASIAbi.Errno.ENOENT
         }
@@ -136,7 +132,7 @@ public final class MemoryFileSystem: FileSystemProvider, FileSystem {
         )
     }
 
-    internal func openAt(
+    func openAt(
         dirFd: any WASIDir,
         path: String,
         oflags: WASIAbi.Oflags,
@@ -227,13 +223,13 @@ public final class MemoryFileSystem: FileSystemProvider, FileSystem {
         throw WASIAbi.Errno.ENOTSUP
     }
 
-    internal func createStdioFile(fd: FileDescriptor, accessMode: FileAccessMode) -> any WASIFile {
+    func createStdioFile(fd: FileDescriptor, accessMode: FileAccessMode) -> any WASIFile {
         return MemoryStdioFile(fd: fd, accessMode: accessMode)
     }
 
-    // MARK: - Internal File Operations
+    // MARK: - File Operations
 
-    internal func lookup(at path: String) -> MemFSNode? {
+    func lookup(at path: String) -> MemFSNode? {
         let normalized = normalizePath(path)
 
         if normalized == Self.rootPath {
@@ -256,7 +252,7 @@ public final class MemoryFileSystem: FileSystemProvider, FileSystem {
         return current
     }
 
-    internal func resolve(from directory: MemoryDirectoryNode, at directoryPath: String, path relativePath: String) -> MemFSNode? {
+    func resolve(from directory: MemoryDirectoryNode, at directoryPath: String, path relativePath: String) -> MemFSNode? {
         if relativePath.isEmpty {
             return directory
         }
@@ -292,7 +288,7 @@ public final class MemoryFileSystem: FileSystemProvider, FileSystem {
     }
 
     @discardableResult
-    internal func ensureDirectory(at path: String) throws -> MemoryDirectoryNode {
+    func ensureDirectory(at path: String) throws -> MemoryDirectoryNode {
         let normalized = normalizePath(path)
 
         if normalized == Self.rootPath {
@@ -342,7 +338,7 @@ public final class MemoryFileSystem: FileSystemProvider, FileSystem {
     }
 
     @discardableResult
-    internal func createFile(in directory: MemoryDirectoryNode, at relativePath: String, oflags: WASIAbi.Oflags) throws -> MemoryFileNode {
+    func createFile(in directory: MemoryDirectoryNode, at relativePath: String, oflags: WASIAbi.Oflags) throws -> MemoryFileNode {
         try validateRelativePath(relativePath)
 
         let components = relativePath.split(separator: "/").map(String.init)
@@ -367,7 +363,7 @@ public final class MemoryFileSystem: FileSystemProvider, FileSystem {
         }
     }
 
-    internal func removeNode(in directory: MemoryDirectoryNode, at relativePath: String, mustBeDirectory: Bool) throws {
+    func removeNode(in directory: MemoryDirectoryNode, at relativePath: String, mustBeDirectory: Bool) throws {
         try validateRelativePath(relativePath)
 
         let components = relativePath.split(separator: "/").map(String.init)
@@ -403,7 +399,7 @@ public final class MemoryFileSystem: FileSystemProvider, FileSystem {
         current.removeChild(name: fileName)
     }
 
-    internal func rename(from sourcePath: String, in sourceDir: MemoryDirectoryNode, to destPath: String, in destDir: MemoryDirectoryNode) throws {
+    func rename(from sourcePath: String, in sourceDir: MemoryDirectoryNode, to destPath: String, in destDir: MemoryDirectoryNode) throws {
         guard let sourceNode = resolve(from: sourceDir, at: "", path: sourcePath) else {
             throw WASIAbi.Errno.ENOENT
         }

@@ -1,19 +1,19 @@
 import SystemPackage
 
 /// Base protocol for all file system nodes in memory.
-internal protocol MemFSNode: AnyObject {
+protocol MemFSNode: AnyObject {
     var type: MemFSNodeType { get }
 }
 
 /// Types of file system nodes.
-internal enum MemFSNodeType {
+enum MemFSNodeType {
     case directory
     case file
     case characterDevice
 }
 
 /// A directory node in the memory file system.
-internal final class MemoryDirectoryNode: MemFSNode {
+final class MemoryDirectoryNode: MemFSNode {
     let type: MemFSNodeType = .directory
     private var children: [String: MemFSNode] = [:]
 
@@ -42,7 +42,7 @@ internal final class MemoryDirectoryNode: MemFSNode {
 }
 
 /// A regular file node in the memory file system.
-internal final class MemoryFileNode: MemFSNode {
+final class MemoryFileNode: MemFSNode {
     let type: MemFSNodeType = .file
     var content: FileContent
 
@@ -50,8 +50,8 @@ internal final class MemoryFileNode: MemFSNode {
         self.content = content
     }
 
-    convenience init(bytes: [UInt8]) {
-        self.init(content: .bytes(bytes))
+    convenience init(bytes: some Sequence<UInt8>) {
+        self.init(content: .bytes(Array(bytes)))
     }
 
     convenience init(handle: FileDescriptor) {
@@ -74,7 +74,7 @@ internal final class MemoryFileNode: MemFSNode {
 }
 
 /// A character device node in the memory file system.
-internal final class MemoryCharacterDeviceNode: MemFSNode {
+final class MemoryCharacterDeviceNode: MemFSNode {
     let type: MemFSNodeType = .characterDevice
 
     enum Kind {
@@ -89,7 +89,7 @@ internal final class MemoryCharacterDeviceNode: MemFSNode {
 }
 
 /// A WASIFile implementation for character devices like /dev/null
-internal final class MemoryCharacterDeviceEntry: WASIFile {
+final class MemoryCharacterDeviceEntry: WASIFile {
     let deviceNode: MemoryCharacterDeviceNode
     let accessMode: FileAccessMode
 
