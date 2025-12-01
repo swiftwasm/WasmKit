@@ -32,7 +32,7 @@ let package = Package(
         .library(name: "_CabiShims", targets: ["_CabiShims"]),
     ],
     traits: [
-        .default(enabledTraits: ["WasmDebuggingSupport"]),
+        .default(enabledTraits: []),
         "WasmDebuggingSupport",
     ],
     targets: [
