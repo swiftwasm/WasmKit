@@ -51,13 +51,13 @@
 
                 for (i, type) in functionType.parameters.enumerated() {
                     // See ``FrameHeaderLayout`` documentation for offset calculation details.
-                    type.append(to: &span, frame, offset: i - max(functionType.parameters.count, functionType.results.count))
                     layout.localOffsets.append(span.byteCount)
+                    type.append(to: &span, frame, offset: i - 3 - max(functionType.parameters.count, functionType.results.count))
                 }
 
                 for (i, type) in wasm.locals.enumerated() {
-                    type.append(to: &span, frame, offset: i)
                     layout.localOffsets.append(span.byteCount)
+                    type.append(to: &span, frame, offset: i)
                 }
 
                 // FIXME: copy over actual stack values

@@ -195,6 +195,7 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
             name: "WasmKitGDBHandlerTests",
             dependencies: [
                 "WasmKitGDBHandler",
+                "WAT",
             ],
         ),
     ])

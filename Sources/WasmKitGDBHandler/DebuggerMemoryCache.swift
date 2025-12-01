@@ -47,6 +47,7 @@
                 let (base, layout) = try debugger.packedStackFrame(frameIndex: frameIndex) { span, layout in
                     let baseAddress = self.stackFrames.writerIndex
                     self.stackFrames.writeBytes(span)
+                    print("written to stackFrames: \(self.stackFrames.hexDump(format: .plain))")
                     return (baseAddress, layout)
                 }
 
@@ -67,9 +68,7 @@
             var length = length
 
             if addressInProtocolSpace >= self.stackOffsetInProtocolSpace {
-                print("stackMemory")
                 let stackAddress = Int(addressInProtocolSpace - self.stackOffsetInProtocolSpace)
-                print("stackAddress is \(stackAddress)")
                 if stackAddress + length > self.stackFrames.readableBytes {
                     length = self.stackFrames.readableBytes - stackAddress
                 }
@@ -88,7 +87,7 @@
             }
         }
 
-        mutating func invalidate() {
+        package mutating func invalidate() {
             self.stackFrames = self.allocator.buffer(capacity: 0)
             self.stackFrameLayouts = [:]
         }

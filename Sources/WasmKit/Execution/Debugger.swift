@@ -150,9 +150,14 @@
             return wasm
         }
 
-        package mutating func enableBreakpoint(module: Module, function: Int) throws -> Int {
-            try self.enableBreakpoint(address: module.functions[function].code.originalAddress)
+        package mutating func enableBreakpoint(
+            module: Module,
+            function: Int,
+            offsetWithinFunction: Int = 0
+        ) throws -> Int {
+            try self.enableBreakpoint(address: module.functions[function].code.originalAddress + offsetWithinFunction)
         }
+
         /// Disables a breakpoint at a given Wasm address. If no breakpoint at a given address was previously set with
         /// `self.enableBreakpoint(address:), this function immediately returns.
         /// - Parameter address: byte offset of the Wasm instruction that was replaced with a breakpoint. The original
