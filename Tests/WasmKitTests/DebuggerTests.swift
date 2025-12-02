@@ -36,30 +36,30 @@
         )
         """
 
-private let manyLocalsWAT = """
-    (module
-        (func (export "_start") (result i32) (local $x i32)
-            (i32.const 42)
-            (i32.const 0)
-            (i32.eqz)
-            (drop)
-            (local.set $x)
-            (local.get $x)
-            (call $f)
-            (call $g)
-        )
+    private let manyLocalsWAT = """
+        (module
+            (func (export "_start") (result i32) (local $x i32)
+                (i32.const 42)
+                (i32.const 0)
+                (i32.eqz)
+                (drop)
+                (local.set $x)
+                (local.get $x)
+                (call $f)
+                (call $g)
+            )
 
-        (func $f (param $a i32) (result i32)
-            (local.get $a)
-        )
+            (func $f (param $a i32) (result i32)
+                (local.get $a)
+            )
 
-        (func $g (param $a i32) (result i32) (local $x i32)
-            (i32.const 24)
-            (local.set $x)
-            (local.get $a)
+            (func $g (param $a i32) (result i32) (local $x i32)
+                (i32.const 24)
+                (local.set $x)
+                (local.get $a)
+            )
         )
-    )
-    """
+        """
 
     @Suite
     struct DebuggerTests {

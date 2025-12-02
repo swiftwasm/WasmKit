@@ -75,7 +75,7 @@
             debugger: borrowing Debugger,
             addressInProtocolSpace: UInt64,
             length: UInt
-        ) throws(Debugger.Error)-> ByteBufferView {
+        ) throws(Debugger.Error) -> ByteBufferView {
 
             if addressInProtocolSpace >= self.stackOffsetInProtocolSpace {
                 var length = Int(length)
