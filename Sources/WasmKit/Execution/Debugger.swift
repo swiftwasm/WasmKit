@@ -49,11 +49,12 @@
         /// Pc ofthe final instruction that a successful program will execute, initialized with `Instruction.endofExecution`
         private let endOfExecution = Pc.allocate(capacity: 1)
 
-        /// Addresses of functions in the original Wasm binary, used looking up functions when a breakpoint
+        /// Addresses of functions in the original Wasm binary, used for looking up functions when a breakpoint
         /// is enabled at an arbitrary address if it isn't present in ``InstructionMapping`` yet (i.e. the
         /// was not compiled yet in lazy compilation mode).
         private let functionAddresses: [(address: Int, instanceFunctionIndex: Int)]
 
+        /// Cache for stack frames that use debugger-friendly memory layout.
         private var stackFrame = DebuggerStackFrame()
 
         /// Initializes a new debugger state instance.

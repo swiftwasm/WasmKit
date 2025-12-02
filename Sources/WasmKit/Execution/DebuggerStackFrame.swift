@@ -1,5 +1,7 @@
 #if WasmDebuggingSupport
 
+    /// Encapsulates a caching buffer that stores a stack frame in debugger-friendly
+    /// memory layout that's distinct from WasmKit's iseq stack frame memory layout.
     package struct DebuggerStackFrame: ~Copyable {
         private var buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: 1, alignment: 8)
 
