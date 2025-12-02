@@ -219,8 +219,10 @@
                 if command.arguments.starts(with: "libraries:read:") {
                     responseKind = .string(
                         """
-                        l<library-list>
-                            <library name="\(self.moduleFilePath.string)"><section address="0x4000000000000000"/></library>
+                        l<library-list>\
+                        <library name="\(self.moduleFilePath.string)">\
+                        <section address="0x\(String(DebuggerMemoryCache.executableCodeOffset, radix: 16))"/>\
+                        </library>\
                         </library-list>
                         """)
                 } else {
@@ -232,11 +234,11 @@
                 guard
                     argumentsArray.count == 2,
                     let addressInProtocolSpace = UInt64(hexEncoded: argumentsArray[0]),
-                    let length = Int(hexEncoded: argumentsArray[1])
+                    let length = UInt(hexEncoded: argumentsArray[1])
                 else { throw Error.unknownReadMemoryArguments }
 
                 responseKind = .hexEncodedBinary(
-                    self.memoryCache.readMemory(
+                    try self.memoryCache.readMemory(
                         debugger: self.debugger,
                         addressInProtocolSpace: addressInProtocolSpace,
                         length: length
@@ -320,11 +322,7 @@
 
                 responseKind = .hexEncodedBinary(
                     self.allocator.buffer(
-                        integer: try self.memoryCache.getAddressOfLocal(
-                            debugger: &self.debugger,
-                            frameIndex: Int(frameIndex),
-                            localIndex: Int(localIndex)
-                        ),
+                        integer: try self.debugger.getLocal(localIndex: localIndex, frameIndex: frameIndex),
                         endianness: .little
                     ).readableBytesView
                 )

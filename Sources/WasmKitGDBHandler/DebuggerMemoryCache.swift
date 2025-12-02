@@ -44,11 +44,11 @@
             self.stackFrames = allocator.buffer(capacity: 0)
         }
 
-        package mutating func getAddressOfLocal(debugger: inout Debugger, frameIndex: Int, localIndex: Int) throws -> UInt64 {
+        package mutating func getAddressOfLocal(debugger: inout Debugger, frameIndex: UInt, localIndex: UInt) throws -> UInt64 {
             let frameBase: Int
             let frameLayout: DebuggerStackFrame.Layout
 
-            if let (base, layout) = self.stackFrameLayouts[frameIndex] {
+            if let (base, layout) = self.stackFrameLayouts[Int(frameIndex)] {
                 guard layout.localOffsets.count > localIndex else {
                     throw Debugger.Error.stackLocalIndexOOB(localIndex)
                 }
@@ -59,27 +59,26 @@
                 let (base, layout) = try debugger.packedStackFrame(frameIndex: frameIndex) { span, layout in
                     let baseAddress = self.stackFrames.writerIndex
                     self.stackFrames.writeBytes(span)
-                    print("written to stackFrames: \(self.stackFrames.hexDump(format: .plain))")
                     return (baseAddress, layout)
                 }
 
-                self.stackFrameLayouts[frameIndex] = (base, layout)
+                self.stackFrameLayouts[Int(frameIndex)] = (base, layout)
 
                 frameBase = base
                 frameLayout = layout
             }
 
-            return self.stackOffsetInProtocolSpace + UInt64(frameBase + frameLayout.localOffsets[localIndex])
+            return self.stackOffsetInProtocolSpace + UInt64(frameBase + frameLayout.localOffsets[Int(localIndex)])
         }
 
         package func readMemory(
             debugger: borrowing Debugger,
             addressInProtocolSpace: UInt64,
-            length: Int
-        ) -> ByteBufferView {
-            var length = length
+            length: UInt
+        ) throws(Debugger.Error)-> ByteBufferView {
 
             if addressInProtocolSpace >= self.stackOffsetInProtocolSpace {
+                var length = Int(length)
                 let stackAddress = Int(addressInProtocolSpace - self.stackOffsetInProtocolSpace)
                 if stackAddress + length > self.stackFrames.readableBytes {
                     length = self.stackFrames.readableBytes - stackAddress
@@ -87,7 +86,7 @@
 
                 return self.stackFrames.readableBytesView[stackAddress..<(stackAddress + length)]
             } else if addressInProtocolSpace >= Self.executableCodeOffset {
-                print("wasmBinary")
+                var length = Int(length)
                 let codeAddress = Int(addressInProtocolSpace - Self.executableCodeOffset)
                 if codeAddress + length > wasmBinary.readableBytes {
                     length = wasmBinary.readableBytes - codeAddress
@@ -95,7 +94,14 @@
 
                 return wasmBinary.readableBytesView[codeAddress..<(codeAddress + length)]
             } else {
-                fatalError("Linear memory reads are not implemented in the debugger yet.")
+                return try debugger.readLinearMemory(address: UInt(addressInProtocolSpace), length: length) { span in
+                    var buffer = self.allocator.buffer(capacity: span.byteCount)
+                    span.withUnsafeBytes {
+                        print(Array($0))
+                    }
+                    buffer.writeBytes(span)
+                    return buffer.readableBytesView
+                }
             }
         }
 

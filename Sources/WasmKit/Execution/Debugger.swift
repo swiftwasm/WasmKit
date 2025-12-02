@@ -20,9 +20,11 @@
             case unknownCurrentFunctionForResumedBreakpoint(UnsafeMutablePointer<UInt64>)
             case noInstructionMappingAvailable(Int)
             case noReverseInstructionMappingAvailable(UnsafeMutablePointer<UInt64>)
-            case stackFrameIndexOOB(Int)
-            case stackLocalIndexOOB(Int)
+            case stackFrameIndexOOB(UInt)
+            case stackLocalIndexOOB(UInt)
             case notStoppedAtBreakpoint
+            case linearMemoryNotInitialized
+            case linearMemoryOOB(Range<Int>)
         }
 
         private let valueStack: Sp
@@ -48,6 +50,9 @@
 
         /// Pc of the final instruction that a successful program will execute, initialized with `Instruction.endofExecution`
         private let endOfExecution = Pc.allocate(capacity: 1)
+
+        private var md: Md = nil
+        private var ms: Ms = 0
 
         /// Addresses of functions in the original Wasm binary, used for looking up functions when a breakpoint
         /// is enabled at an arbitrary address if it isn't present in ``InstructionMapping`` yet (i.e. the
@@ -189,8 +194,6 @@
                     let iseq = breakpoint.iseq
                     var sp = iseq.sp
                     var pc = iseq.pc
-                    var md: Md = nil
-                    var ms: Ms = 0
 
                     guard let currentFunction = sp.currentFunction else {
                         throw Error.unknownCurrentFunctionForResumedBreakpoint(sp)
@@ -256,12 +259,72 @@
             try self.run()
         }
 
-        package mutating func packedStackFrame<T>(frameIndex: Int, reader: (RawSpan, DebuggerStackFrame.Layout) -> T) throws -> T {
+        package mutating func packedStackFrame<T>(frameIndex: UInt, reader: (RawSpan, DebuggerStackFrame.Layout) -> T) throws -> T {
             guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
                 throw Error.notStoppedAtBreakpoint
             }
 
             return try self.stackFrame.withFrames(sp: breakpoint.iseq.sp, frameIndex: frameIndex, store: self.store, reader: reader)
+        }
+
+        package func getLocal(localIndex: UInt, frameIndex: UInt) throws -> UInt64 {
+            guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
+                throw Error.notStoppedAtBreakpoint
+            }
+
+            var i = 0
+            for frame in Execution.CallStack(sp: breakpoint.iseq.sp) {
+                guard frameIndex == i else {
+                    i += 1
+                    continue
+                }
+
+                guard let currentFunction = frame.sp.currentFunction else {
+                    throw Debugger.Error.unknownCurrentFunctionForResumedBreakpoint(frame.sp)
+                }
+
+                try currentFunction.ensureCompiled(store: StoreRef(store))
+
+                guard case .debuggable(let wasm, _) = currentFunction.code else {
+                    fatalError()
+                }
+
+                // Wasm function arguments are also addressed as locals.
+                let functionType = store.engine.funcTypeInterner.resolve(currentFunction.type)
+
+                let localsCount = functionType.parameters.count + wasm.locals.count
+
+                guard localIndex < localsCount else {
+                    throw Debugger.Error.stackLocalIndexOOB(localIndex)
+                }
+
+                if localIndex < functionType.parameters.count {
+                    let localIndex = Int(localIndex) - 3
+                    return frame.sp[localIndex].storage
+                } else {
+                    return frame.sp[localIndex].storage
+                }
+            }
+
+            throw Error.stackFrameIndexOOB(frameIndex)
+        }
+
+        package func readLinearMemory<T>(address: UInt, length: UInt, reader: (RawSpan) -> T) throws(Error) -> T {
+            guard let md, ms > 0 else {
+                throw Error.linearMemoryNotInitialized
+            }
+
+            let upperBound = address + length
+            let range = Int(address)..<Int(upperBound)
+
+            guard address + length < ms else {
+                throw Error.linearMemoryOOB(range)
+            }
+
+            let memory = UnsafeRawBufferPointer(start: md, count: ms)
+            print(Array(memory[range]))
+
+            return reader(UnsafeRawBufferPointer(rebasing: memory[range]).bytes)
         }
 
         /// Array of addresses in the Wasm binary of executed instructions on the call stack.

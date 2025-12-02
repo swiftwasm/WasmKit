@@ -14,7 +14,7 @@
             buffer.initializeMemory(as: Int.self, repeating: 0)
         }
 
-        mutating func withFrames<T>(sp: Sp, frameIndex: Int, store: Store, reader: (borrowing RawSpan, Layout) -> T) throws -> T {
+        mutating func withFrames<T>(sp: Sp, frameIndex: UInt, store: Store, reader: (borrowing RawSpan, Layout) -> T) throws -> T {
             self.buffer.initializeMemory(as: Int.self, repeating: 0)
 
             var i = 0

@@ -42,27 +42,25 @@
 
             var memoryCache = DebuggerMemoryCache(allocator: .init(), wasmBinary: .init(bytes: bytes))
 
-            var breakpointAddress = try debugger.enableBreakpoint(module: module, function: 1)
-            try debugger.enableBreakpoint(address: breakpointAddress)
+            _ = try debugger.enableBreakpoint(module: module, function: 1)
             try debugger.run()
 
             var localAddress = try memoryCache.getAddressOfLocal(debugger: &debugger, frameIndex: 0, localIndex: 0)
-            var buffer = ByteBuffer(memoryCache.readMemory(debugger: debugger, addressInProtocolSpace: localAddress, length: 4))
+            var buffer = ByteBuffer(try memoryCache.readMemory(debugger: debugger, addressInProtocolSpace: localAddress, length: 4))
             var value = buffer.readInteger(endianness: .little, as: UInt32.self)
             #expect(value == 42)
 
-            breakpointAddress = try debugger.enableBreakpoint(
+            _ = try debugger.enableBreakpoint(
                 module: module,
                 function: 2,
                 // i32.const 2 bytes + local.set 4 bytes
                 offsetWithinFunction: 6
             )
-            try debugger.enableBreakpoint(address: breakpointAddress)
             try debugger.run()
             memoryCache.invalidate()
 
             localAddress = try memoryCache.getAddressOfLocal(debugger: &debugger, frameIndex: 0, localIndex: 1)
-            buffer = ByteBuffer(memoryCache.readMemory(debugger: debugger, addressInProtocolSpace: localAddress, length: 4))
+            buffer = ByteBuffer(try memoryCache.readMemory(debugger: debugger, addressInProtocolSpace: localAddress, length: 4))
             value = buffer.readInteger(endianness: .little, as: UInt32.self)
             #expect(value == 24)
         }

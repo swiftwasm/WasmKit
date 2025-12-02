@@ -3,5 +3,6 @@
   "lineLength": 200,
   "indentation": {
     "spaces": 4
-  }
+  },
+  "ReturnVoidInsteadOfEmptyTuple": false
 }
