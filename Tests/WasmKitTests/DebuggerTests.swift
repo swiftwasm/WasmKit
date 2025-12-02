@@ -140,9 +140,9 @@
             )
 
             try debugger.run()
-            let firstLocal = try debugger.getLocal(localIndex: 0, frameIndex: 0)
+            let firstLocal = try debugger.getLocal(frameIndex: 0, localIndex: 0)
             #expect(firstLocal == 42)
-            let secondLocal = try debugger.getLocal(localIndex: 0, frameIndex: 1)
+            let secondLocal = try debugger.getLocal(frameIndex: 0, localIndex: 1)
             #expect(secondLocal == 24)
         }
     }

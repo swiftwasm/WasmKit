@@ -264,9 +264,6 @@
                     throw Error.unknownThreadAction(threadActionString)
                 }
 
-                // Stack frames become invalid after running or stepping.
-                self.memoryCache.invalidate()
-
                 switch threadAction {
                 case .step:
                     try self.debugger.step()
@@ -277,9 +274,6 @@
                 responseKind = try self.currentThreadStopInfo
 
             case .continue:
-                // Stack frames become invalid after running or stepping.
-                self.memoryCache.invalidate()
-
                 try self.debugger.run()
 
                 responseKind = try self.currentThreadStopInfo
@@ -322,7 +316,7 @@
 
                 responseKind = .hexEncodedBinary(
                     self.allocator.buffer(
-                        integer: try self.debugger.getLocal(localIndex: localIndex, frameIndex: frameIndex),
+                        integer: try self.debugger.getLocal(frameIndex: frameIndex, localIndex: localIndex),
                         endianness: .little
                     ).readableBytesView
                 )

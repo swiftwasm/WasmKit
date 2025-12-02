@@ -267,7 +267,7 @@
             return try self.stackFrame.withFrames(sp: breakpoint.iseq.sp, frameIndex: frameIndex, store: self.store, reader: reader)
         }
 
-        package func getLocal(localIndex: UInt, frameIndex: UInt) throws -> UInt64 {
+        package func getLocal(frameIndex: UInt, localIndex: UInt) throws -> UInt64 {
             guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
                 throw Error.notStoppedAtBreakpoint
             }
@@ -299,9 +299,10 @@
                 }
 
                 if localIndex < functionType.parameters.count {
-                    let localIndex = Int(localIndex) - 3
+                    let localIndex = Int(localIndex) - 4
                     return frame.sp[localIndex].storage
                 } else {
+                    let localIndex = Int(localIndex) - functionType.parameters.count
                     return frame.sp[localIndex].storage
                 }
             }

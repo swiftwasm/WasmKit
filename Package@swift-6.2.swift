@@ -191,13 +191,6 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
                 "GDBRemoteProtocol",
             ],
         ),
-        .testTarget(
-            name: "WasmKitGDBHandlerTests",
-            dependencies: [
-                "WasmKitGDBHandler",
-                "WAT",
-            ],
-        ),
     ])
 
     cliTarget.dependencies.append(contentsOf: [
