@@ -46,7 +46,7 @@
 
         package private(set) var state: State
 
-        /// Pc ofthe final instruction that a successful program will execute, initialized with `Instruction.endofExecution`
+        /// Pc of the final instruction that a successful program will execute, initialized with `Instruction.endofExecution`
         private let endOfExecution = Pc.allocate(capacity: 1)
 
         /// Addresses of functions in the original Wasm binary, used for looking up functions when a breakpoint
