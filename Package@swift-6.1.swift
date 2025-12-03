@@ -20,7 +20,7 @@ let cliTarget = Target.executableTarget(
 
 let package = Package(
     name: "WasmKit",
-    platforms: [.macOS(.v14), .iOS(.v12)],
+    platforms: [.macOS(.v14), .iOS(.v13)],
     products: [
         .executable(name: "wasmkit-cli", targets: ["CLI"]),
         .library(name: "WasmKit", targets: ["WasmKit"]),
