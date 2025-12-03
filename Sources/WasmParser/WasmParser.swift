@@ -160,7 +160,7 @@ public struct ExpressionParser {
     }
 
     @inlinable
-    public mutating func visit<V: InstructionVisitor>(visitor: inout V) throws -> Bool {
+    public mutating func visit(visitor: inout some InstructionVisitor & ~Copyable) throws -> Bool {
         isLastEnd = try parser.parseInstruction(visitor: &visitor)
         let shouldContinue = try !parser.stream.hasReachedEnd()
         if !shouldContinue {
@@ -751,7 +751,7 @@ extension Parser: BinaryInstructionDecoder {
     /// Returns: `true` if the parsed instruction is the block end instruction.
     @inline(__always)
     @inlinable
-    mutating func parseInstruction<V: InstructionVisitor>(visitor v: inout V) throws -> Bool {
+    mutating func parseInstruction(visitor v: inout some InstructionVisitor & ~Copyable) throws -> Bool {
         return try parseBinaryInstruction(visitor: &v, decoder: &self)
     }
 
