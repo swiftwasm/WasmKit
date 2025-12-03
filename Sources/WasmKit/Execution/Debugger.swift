@@ -59,9 +59,6 @@
         /// was not compiled yet in lazy compilation mode).
         private let functionAddresses: [(address: Int, instanceFunctionIndex: Int)]
 
-        /// Cache for stack frames that use debugger-friendly memory layout.
-        private var stackFrame = DebuggerStackFrame()
-
         /// Initializes a new debugger state instance.
         /// - Parameters:
         ///   - module: Wasm module to instantiate.
@@ -257,14 +254,6 @@
             // TODO: analyze actual instruction branching to set the breakpoint correctly.
             try self.enableBreakpoint(address: breakpoint.wasmPc + 1)
             try self.run()
-        }
-
-        package mutating func packedStackFrame<T>(frameIndex: UInt, reader: (RawSpan, DebuggerStackFrame.Layout) -> T) throws -> T {
-            guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
-                throw Error.notStoppedAtBreakpoint
-            }
-
-            return try self.stackFrame.withFrames(sp: breakpoint.iseq.sp, frameIndex: frameIndex, store: self.store, reader: reader)
         }
 
         package func getLocal(frameIndex: UInt, localIndex: UInt) throws -> UInt64 {
