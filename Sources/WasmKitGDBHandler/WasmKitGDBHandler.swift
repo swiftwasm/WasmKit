@@ -281,6 +281,14 @@
             case .kill:
                 throw Error.killRequestReceived
 
+            case .detach:
+                for address in self.debugger.breakpoints.keys {
+                    try self.debugger.disableBreakpoint(address: address)
+                }
+
+                try self.debugger.run()
+                throw Error.killRequestReceived
+
             case .insertSoftwareBreakpoint:
                 try self.debugger.enableBreakpoint(
                     address: Int(
