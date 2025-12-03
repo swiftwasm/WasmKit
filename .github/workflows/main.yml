@@ -137,8 +137,6 @@ jobs:
             wasi-swift-sdk-checksum: "b64dfad9e1c9ccdf06f35cf9b1a00317e000df0c0de0b3eb9f49d6db0fcba4d9"
             test-args: "--traits WasmDebuggingSupport --enable-code-coverage"
             build-dev-dashboard: true
-            # Disabled until a toolchain containing https://github.com/swiftlang/swift/commit/b219d4089c922ceb8b700424236ca97f6087a9a1
-            # is tagged.
           - swift: "swiftlang/swift:nightly-main-noble"
             development-toolchain-download: "https://download.swift.org/development/ubuntu2404/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a-ubuntu24.04.tar.gz"
             wasi-swift-sdk-download: "https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm.artifactbundle.tar.gz"

@@ -20,6 +20,11 @@
             case unknownCurrentFunctionForResumedBreakpoint(UnsafeMutablePointer<UInt64>)
             case noInstructionMappingAvailable(Int)
             case noReverseInstructionMappingAvailable(UnsafeMutablePointer<UInt64>)
+            case stackFrameIndexOOB(UInt)
+            case stackLocalIndexOOB(UInt)
+            case notStoppedAtBreakpoint
+            case linearMemoryNotInitialized
+            case linearMemoryOOB(Range<Int>)
         }
 
         private let valueStack: Sp
@@ -43,7 +48,11 @@
 
         package private(set) var state: State
 
-        private var pc = Pc.allocate(capacity: 1)
+        /// Pc of the final instruction that a successful program will execute, initialized with `Instruction.endofExecution`
+        private var endOfExecution: CodeSlot
+
+        private var md: Md = nil
+        private var ms: Ms = 0
 
         /// Addresses of functions in the original Wasm binary, used for looking up functions when a breakpoint
         /// is enabled at an arbitrary address if it isn't present in ``InstructionMapping`` yet (i.e. the
@@ -76,9 +85,12 @@
             self.entrypointFunction = entrypointFunction
             self.valueStack = UnsafeMutablePointer<StackSlot>.allocate(capacity: limit)
             self.store = store
-            self.execution = Execution(store: StoreRef(store), stackEnd: valueStack.advanced(by: limit))
+            self.execution = Execution(
+                store: StoreRef(store),
+                stackEnd: valueStack.advanced(by: limit)
+            )
             self.threadingModel = store.engine.configuration.threadingModel
-            self.pc.pointee = Instruction.endOfExecution.headSlot(threadingModel: threadingModel)
+            self.endOfExecution = Instruction.endOfExecution.headSlot(threadingModel: threadingModel)
             self.state = .instantiated
         }
 
@@ -91,7 +103,7 @@
         /// Finds a Wasm address for the first instruction in a given function.
         /// - Parameter function: the Wasm function to find the first Wasm instruction address for.
         /// - Returns: byte offset of the first Wasm instruction of given function in the module it was parsed from.
-        private func originalAddress(function: Function) throws -> Int {
+        package func originalAddress(function: Function) throws -> Int {
             precondition(function.handle.isWasm)
 
             switch function.handle.wasm.code {
@@ -140,6 +152,14 @@
             return wasm
         }
 
+        package mutating func enableBreakpoint(
+            module: Module,
+            function: Int,
+            offsetWithinFunction: Int = 0
+        ) throws -> Int {
+            try self.enableBreakpoint(address: module.functions[function].code.originalAddress + offsetWithinFunction)
+        }
+
         /// Disables a breakpoint at a given Wasm address. If no breakpoint at a given address was previously set with
         /// `self.enableBreakpoint(address:), this function immediately returns.
         /// - Parameter address: byte offset of the Wasm instruction that was replaced with a breakpoint. The original
@@ -170,8 +190,6 @@
                     let iseq = breakpoint.iseq
                     var sp = iseq.sp
                     var pc = iseq.pc
-                    var md: Md = nil
-                    var ms: Ms = 0
 
                     guard let currentFunction = sp.currentFunction else {
                         throw Error.unknownCurrentFunctionForResumedBreakpoint(sp)
@@ -206,7 +224,7 @@
                         type: self.entrypointFunction.type,
                         arguments: [],
                         sp: self.valueStack,
-                        pc: self.pc
+                        pc: &self.endOfExecution
                     )
                     self.state = .entrypointReturned(result)
 
@@ -237,6 +255,66 @@
             try self.run()
         }
 
+        package func getLocal(frameIndex: UInt, localIndex: UInt) throws -> UInt64 {
+            guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
+                throw Error.notStoppedAtBreakpoint
+            }
+
+            var i = 0
+            for frame in Execution.CallStack(sp: breakpoint.iseq.sp) {
+                guard frameIndex == i else {
+                    i += 1
+                    continue
+                }
+
+                guard let currentFunction = frame.sp.currentFunction else {
+                    throw Debugger.Error.unknownCurrentFunctionForResumedBreakpoint(frame.sp)
+                }
+
+                try currentFunction.ensureCompiled(store: StoreRef(store))
+
+                guard case .debuggable(let wasm, _) = currentFunction.code else {
+                    fatalError()
+                }
+
+                // Wasm function arguments are also addressed as locals.
+                let functionType = store.engine.funcTypeInterner.resolve(currentFunction.type)
+
+                let localsCount = functionType.parameters.count + wasm.locals.count
+
+                guard localIndex < localsCount else {
+                    throw Debugger.Error.stackLocalIndexOOB(localIndex)
+                }
+
+                if localIndex < functionType.parameters.count {
+                    let localIndex = Int(localIndex) - 4
+                    return frame.sp[localIndex].storage
+                } else {
+                    let localIndex = Int(localIndex) - functionType.parameters.count
+                    return frame.sp[localIndex].storage
+                }
+            }
+
+            throw Error.stackFrameIndexOOB(frameIndex)
+        }
+
+        package func readLinearMemory<T>(address: UInt, length: UInt, reader: (UnsafeRawBufferPointer) -> T) throws(Error) -> T {
+            guard let md, ms > 0 else {
+                throw Error.linearMemoryNotInitialized
+            }
+
+            let upperBound = address + length
+            let range = Int(address)..<Int(upperBound)
+
+            guard address + length < ms else {
+                throw Error.linearMemoryOOB(range)
+            }
+
+            let memory = UnsafeRawBufferPointer(start: md, count: ms)
+
+            return reader(UnsafeRawBufferPointer(rebasing: memory[range]))
+        }
+
         /// Array of addresses in the Wasm binary of executed instructions on the call stack.
         package var currentCallStack: [Int] {
             guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
@@ -254,7 +332,6 @@
 
         deinit {
             self.valueStack.deallocate()
-            self.pc.deallocate()
         }
     }
 

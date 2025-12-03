@@ -7,8 +7,9 @@ import _CWasmKit
 struct Execution: ~Copyable {
     /// The reference to the ``Store`` associated with the execution.
     let store: StoreRef
+
     /// The end of the VM stack space.
-    private var stackEnd: UnsafeMutablePointer<StackSlot>
+    private let stackEnd: UnsafeMutablePointer<StackSlot>
     /// The error trap thrown during execution.
     /// This property must not be assigned to be non-nil more than once.
     /// - Note: If the trap is set, it must be released manually.
@@ -42,36 +43,44 @@ struct Execution: ~Copyable {
         sp.currentInstance.unsafelyUnwrapped
     }
 
-    /// An iterator for the call frames in the VM stack.
-    struct FrameIterator: IteratorProtocol {
-        struct Element {
-            let pc: Pc
-            let function: EntityHandle<WasmFunctionEntity>?
-        }
-
-        /// The stack pointer currently traversed.
-        private var sp: Sp?
-
-        init(sp: Sp) {
-            self.sp = sp
-        }
-
-        mutating func next() -> Element? {
-            guard let sp = self.sp, let pc = sp.returnPC else {
-                // Reached the root frame, whose stack pointer is nil.
-                return nil
+    struct CallStack: Sequence {
+        /// An iterator for the call frames in the VM stack.
+        struct FrameIterator: IteratorProtocol {
+            struct Element {
+                let pc: Pc
+                let sp: Sp
             }
-            self.sp = sp.previousSP
-            return Element(pc: pc, function: sp.currentFunction)
+
+            /// The stack pointer currently traversed.
+            private var sp: Sp?
+
+            init(sp: Sp) {
+                self.sp = sp
+            }
+
+            mutating func next() -> Element? {
+                guard let sp = self.sp, let pc = sp.returnPC else {
+                    // Reached the root frame, whose stack pointer is nil.
+                    return nil
+                }
+                self.sp = sp.previousSP
+                return Element(pc: pc, sp: sp)
+            }
+        }
+
+        let sp: Sp
+
+        func makeIterator() -> FrameIterator {
+            FrameIterator(sp: self.sp)
         }
     }
 
     static func captureBacktrace(sp: Sp, store: Store) -> Backtrace {
-        var frames = FrameIterator(sp: sp)
+        let callStack = CallStack(sp: sp)
         var symbols: [Backtrace.Symbol] = []
 
-        while let frame = frames.next() {
-            guard let function = frame.function else {
+        for frame in callStack {
+            guard let function = frame.sp.currentFunction else {
                 symbols.append(.init(name: nil, address: frame.pc))
                 continue
             }

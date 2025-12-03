@@ -47,6 +47,8 @@ package struct GDBHostCommand: Equatable {
         case kill
         case insertSoftwareBreakpoint
         case removeSoftwareBreakpoint
+        case wasmLocal
+        case memoryRegionInfo
 
         case generalRegisters
 
@@ -97,6 +99,10 @@ package struct GDBHostCommand: Equatable {
                 self = .continue
             case "k":
                 self = .kill
+            case "qWasmLocal":
+                self = .wasmLocal
+            case "qMemoryRegionInfo":
+                self = .memoryRegionInfo
 
             default:
                 return nil

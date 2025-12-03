@@ -36,6 +36,31 @@
         )
         """
 
+    private let manyLocalsWAT = """
+        (module
+            (func (export "_start") (result i32) (local $x i32)
+                (i32.const 42)
+                (i32.const 0)
+                (i32.eqz)
+                (drop)
+                (local.set $x)
+                (local.get $x)
+                (call $f)
+                (call $g)
+            )
+
+            (func $f (param $a i32) (result i32)
+                (local.get $a)
+            )
+
+            (func $g (param $a i32) (result i32) (local $x i32)
+                (i32.const 24)
+                (local.set $x)
+                (local.get $a)
+            )
+        )
+        """
+
     @Suite
     struct DebuggerTests {
         @Test
@@ -98,6 +123,27 @@
 
             #expect([106, 110, 111].binarySearch(nextClosestTo: 107) == 110)
             #expect([106, 110, 111, 113, 119, 120, 122, 128, 136].binarySearch(nextClosestTo: 121) == 122)
+        }
+
+        @Test
+        func getLocal() throws {
+            let store = Store(engine: Engine())
+            let bytes = try wat2wasm(manyLocalsWAT)
+            let module = try parseWasm(bytes: bytes)
+            var debugger = try Debugger(module: module, store: store, imports: [:])
+
+            _ = try debugger.enableBreakpoint(
+                module: module,
+                function: 2,
+                // i32.const 2 bytes + local.set 4 bytes
+                offsetWithinFunction: 6
+            )
+
+            try debugger.run()
+            let firstLocal = try debugger.getLocal(frameIndex: 0, localIndex: 0)
+            #expect(firstLocal == 42)
+            let secondLocal = try debugger.getLocal(frameIndex: 0, localIndex: 1)
+            #expect(secondLocal == 24)
         }
     }
 

@@ -139,7 +139,7 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
     package.dependencies += [
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.5.1"),
         .package(url: "https://github.com/apple/swift-system", from: "1.5.0"),
-        .package(url: "https://github.com/apple/swift-nio", from: "2.86.2"),
+        .package(url: "https://github.com/apple/swift-nio", from: "2.90.0"),
         .package(url: "https://github.com/apple/swift-log", from: "1.6.4"),
     ]
 } else {
