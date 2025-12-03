@@ -248,6 +248,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - name: Free up disk space
+        run: ./CI/gha-free-disk-space.sh
       - name: Run Tests on Android emulator
         uses: skiptools/swift-android-action@v2
         with:
