@@ -44,7 +44,8 @@
         /// Threading model of the Wasm engine configuration, cached for a potentially hot path.
         private let threadingModel: EngineConfiguration.ThreadingModel
 
-        private(set) var breakpoints = [Int: CodeSlot]()
+        /// Mapping from a Wasm address of a breakpoint to a corresponding iseq code slot.
+        package private(set) var breakpoints = [Int: UInt64]()
 
         package private(set) var state: State
 
