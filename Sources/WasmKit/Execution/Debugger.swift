@@ -49,7 +49,7 @@
         package private(set) var state: State
 
         /// Pc of the final instruction that a successful program will execute, initialized with `Instruction.endofExecution`
-        private let endOfExecution = Pc.allocate(capacity: 1)
+        private var endOfExecution: CodeSlot
 
         private var md: Md = nil
         private var ms: Ms = 0
@@ -91,7 +91,7 @@
                 stackEnd: valueStack.advanced(by: limit)
             )
             self.threadingModel = store.engine.configuration.threadingModel
-            self.endOfExecution.pointee = Instruction.endOfExecution.headSlot(threadingModel: threadingModel)
+            self.endOfExecution = Instruction.endOfExecution.headSlot(threadingModel: threadingModel)
             self.state = .instantiated
         }
 
@@ -225,7 +225,7 @@
                         type: self.entrypointFunction.type,
                         arguments: [],
                         sp: self.valueStack,
-                        pc: self.endOfExecution
+                        pc: &self.endOfExecution
                     )
                     self.state = .entrypointReturned(result)
 
@@ -334,7 +334,6 @@
 
         deinit {
             self.valueStack.deallocate()
-            self.endOfExecution.deallocate()
         }
     }
 
