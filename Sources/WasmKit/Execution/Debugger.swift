@@ -299,7 +299,7 @@
             throw Error.stackFrameIndexOOB(frameIndex)
         }
 
-        package func readLinearMemory<T>(address: UInt, length: UInt, reader: (RawSpan) -> T) throws(Error) -> T {
+        package func readLinearMemory<T>(address: UInt, length: UInt, reader: (UnsafeRawBufferPointer) -> T) throws(Error) -> T {
             guard let md, ms > 0 else {
                 throw Error.linearMemoryNotInitialized
             }
@@ -312,9 +312,8 @@
             }
 
             let memory = UnsafeRawBufferPointer(start: md, count: ms)
-            print(Array(memory[range]))
 
-            return reader(UnsafeRawBufferPointer(rebasing: memory[range]).bytes)
+            return reader(UnsafeRawBufferPointer(rebasing: memory[range]))
         }
 
         /// Array of addresses in the Wasm binary of executed instructions on the call stack.

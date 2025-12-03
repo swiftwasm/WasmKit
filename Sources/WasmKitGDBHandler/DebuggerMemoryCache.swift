@@ -44,12 +44,9 @@
 
                 return wasmBinary.readableBytesView[codeAddress..<(codeAddress + length)]
             } else {
-                return try debugger.readLinearMemory(address: UInt(addressInProtocolSpace), length: length) { span in
-                    var buffer = self.allocator.buffer(capacity: span.byteCount)
-                    span.withUnsafeBytes {
-                        print(Array($0))
-                    }
-                    buffer.writeBytes(span)
+                return try debugger.readLinearMemory(address: UInt(addressInProtocolSpace), length: length) {
+                    var buffer = self.allocator.buffer(capacity: $0.count)
+                    buffer.writeBytes($0)
                     return buffer.readableBytesView
                 }
             }
