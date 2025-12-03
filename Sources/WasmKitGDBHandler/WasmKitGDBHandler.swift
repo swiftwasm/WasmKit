@@ -56,7 +56,7 @@
         private let allocator: ByteBufferAllocator
         private var debugger: Debugger
 
-        private var memoryCache: DebuggerMemoryCache
+        private var memoryView: DebuggerMemoryView
 
         package init(
             moduleFilePath: FilePath,
@@ -85,7 +85,7 @@
                 throw Error.stoppingAtEntrypointFailed
             }
 
-            self.memoryCache = DebuggerMemoryCache(allocator: allocator, wasmBinary: wasmBinary)
+            self.memoryView = DebuggerMemoryView(allocator: allocator, wasmBinary: wasmBinary)
         }
 
         private func hexDump<I: FixedWidthInteger>(_ value: I, endianness: Endianness) -> String {
@@ -117,7 +117,7 @@
                 switch self.debugger.state {
                 case .stoppedAtBreakpoint(let breakpoint):
                     let pc = breakpoint.wasmPc
-                    let pcInHostAddressSpace = UInt64(pc) + DebuggerMemoryCache.executableCodeOffset
+                    let pcInHostAddressSpace = UInt64(pc) + DebuggerMemoryView.executableCodeOffset
                     result.append(("thread-pcs", self.hexDump(pcInHostAddressSpace, endianness: .big)))
                     result.append(("00", self.hexDump(pcInHostAddressSpace, endianness: .little)))
                     result.append(("reason", "trace"))
@@ -221,7 +221,7 @@
                         """
                         l<library-list>\
                         <library name="\(self.moduleFilePath.string)">\
-                        <section address="0x\(String(DebuggerMemoryCache.executableCodeOffset, radix: 16))"/>\
+                        <section address="0x\(String(DebuggerMemoryView.executableCodeOffset, radix: 16))"/>\
                         </library>\
                         </library-list>
                         """)
@@ -238,7 +238,7 @@
                 else { throw Error.unknownReadMemoryArguments }
 
                 responseKind = .hexEncodedBinary(
-                    try self.memoryCache.readMemory(
+                    try self.memoryView.readMemory(
                         debugger: self.debugger,
                         addressInProtocolSpace: addressInProtocolSpace,
                         length: length
@@ -249,7 +249,7 @@
                 let callStack = self.debugger.currentCallStack
                 var buffer = self.allocator.buffer(capacity: callStack.count * 8)
                 for pc in callStack {
-                    buffer.writeInteger(UInt64(pc) + DebuggerMemoryCache.executableCodeOffset, endianness: .little)
+                    buffer.writeInteger(UInt64(pc) + DebuggerMemoryView.executableCodeOffset, endianness: .little)
                 }
                 responseKind = .hexEncodedBinary(buffer.readableBytesView)
 
@@ -288,7 +288,7 @@
                             argumentsString: command.arguments,
                             separator: ",",
                             endianness: .big
-                        ) - DebuggerMemoryCache.executableCodeOffset)
+                        ) - DebuggerMemoryView.executableCodeOffset)
                 )
                 responseKind = .ok
 
@@ -299,7 +299,7 @@
                             argumentsString: command.arguments,
                             separator: ",",
                             endianness: .big
-                        ) - DebuggerMemoryCache.executableCodeOffset)
+                        ) - DebuggerMemoryView.executableCodeOffset)
                 )
                 responseKind = .ok
 

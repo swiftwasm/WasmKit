@@ -15,7 +15,7 @@
     import NIOCore
     import WasmKit
 
-    package struct DebuggerMemoryCache: ~Copyable {
+    package struct DebuggerMemoryView: ~Copyable {
         package static let executableCodeOffset = UInt64(0x4000_0000_0000_0000)
 
         private let allocator: ByteBufferAllocator

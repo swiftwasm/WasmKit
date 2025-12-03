@@ -8,9 +8,6 @@ struct Execution: ~Copyable {
     /// The reference to the ``Store`` associated with the execution.
     let store: StoreRef
 
-    /// The start of the VM stack space, used for debugging purposes.
-    let stackStart: UnsafeBufferPointer<StackSlot>
-
     /// The end of the VM stack space.
     private let stackEnd: UnsafeMutablePointer<StackSlot>
     /// The error trap thrown during execution.
@@ -19,9 +16,8 @@ struct Execution: ~Copyable {
     private var trap: (error: UnsafeRawPointer, sp: Sp)? = nil
 
     #if WasmDebuggingSupport
-        package init(store: StoreRef, stackStart: UnsafeBufferPointer<StackSlot>, stackEnd: UnsafeMutablePointer<StackSlot>) {
+        package init(store: StoreRef, stackEnd: UnsafeMutablePointer<StackSlot>) {
             self.store = store
-            self.stackStart = stackStart
             self.stackEnd = stackEnd
         }
     #endif
@@ -37,7 +33,7 @@ struct Execution: ~Copyable {
         defer {
             valueStack.deallocate()
         }
-        var context = Execution(store: store, stackStart: .init(start: valueStack, count: limit), stackEnd: valueStack.advanced(by: limit))
+        var context = Execution(store: store, stackEnd: valueStack.advanced(by: limit))
         return try body(&context, valueStack)
     }
 

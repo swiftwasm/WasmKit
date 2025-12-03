@@ -87,7 +87,6 @@
             self.store = store
             self.execution = Execution(
                 store: StoreRef(store),
-                stackStart: .init(start: valueStack, count: limit),
                 stackEnd: valueStack.advanced(by: limit)
             )
             self.threadingModel = store.engine.configuration.threadingModel
