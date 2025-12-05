@@ -1053,4 +1053,87 @@ struct WASITests {
         }
     }
 
+    @Test
+    func memoryFileSystemFileTimestamps() throws {
+        let fs = try MemoryFileSystem(preopens: ["/": "/"])
+        try fs.addFile(at: "/file.txt", content: "test")
+
+        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let rootFd: WASIAbi.Fd = 3
+
+        let stat1 = try wasi.path_filestat_get(dirFd: rootFd, flags: [], path: "file.txt")
+        #expect(stat1.atim > 0)
+        #expect(stat1.mtim > 0)
+        #expect(stat1.ctim > 0)
+
+        let fd = try wasi.path_open(
+            dirFd: rootFd,
+            dirFlags: [],
+            path: "file.txt",
+            oflags: [],
+            fsRightsBase: [.FD_READ, .FD_WRITE],
+            fsRightsInheriting: [],
+            fdflags: []
+        )
+
+        let memory = TestSupport.TestGuestMemory()
+        let readVecs = memory.readIOVecs(sizes: [4])
+        _ = try wasi.fd_read(fd: fd, iovs: readVecs)
+
+        let stat2 = try wasi.fd_filestat_get(fd: fd)
+        #expect(stat2.atim >= stat1.atim)
+
+        let writeData = Array("more".utf8)
+        let writeVecs = memory.writeIOVecs([writeData])
+        _ = try wasi.fd_write(fileDescriptor: fd, ioVectors: writeVecs)
+
+        let stat3 = try wasi.fd_filestat_get(fd: fd)
+        #expect(stat3.mtim >= stat2.mtim)
+
+        try wasi.fd_close(fd: fd)
+    }
+
+    @Test
+    func memoryFileSystemDirectoryTimestamps() throws {
+        let fs = try MemoryFileSystem(preopens: ["/": "/"])
+
+        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let rootFd: WASIAbi.Fd = 3
+
+        try wasi.path_create_directory(dirFd: rootFd, path: "testdir")
+
+        let stat1 = try wasi.path_filestat_get(dirFd: rootFd, flags: [], path: "testdir")
+        #expect(stat1.atim > 0)
+        #expect(stat1.mtim > 0)
+
+        try fs.addFile(at: "/testdir/file.txt", content: [])
+
+        let stat2 = try wasi.path_filestat_get(dirFd: rootFd, flags: [], path: "testdir")
+        #expect(stat2.mtim >= stat1.mtim)
+    }
+
+    @Test
+    func memoryFileSystemSetTimes() throws {
+        let fs = try MemoryFileSystem(preopens: ["/": "/"])
+        try fs.addFile(at: "/file.txt", content: [])
+
+        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let rootFd: WASIAbi.Fd = 3
+
+        let specificTime: WASIAbi.Timestamp = 1_000_000_000_000_000_000
+
+        try wasi.path_filestat_set_times(
+            dirFd: rootFd,
+            flags: [],
+            path: "file.txt",
+            atim: specificTime,
+            mtim: specificTime,
+            fstFlags: [.ATIM, .MTIM]
+        )
+
+        let stat = try wasi.path_filestat_get(dirFd: rootFd, flags: [], path: "file.txt")
+        #expect(stat.atim == specificTime)
+        #expect(stat.mtim == specificTime)
+    }
+
 }

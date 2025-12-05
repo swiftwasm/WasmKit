@@ -1,5 +1,30 @@
 import SystemPackage
 
+#if canImport(Darwin)
+    import Darwin
+#elseif canImport(Glibc)
+    import Glibc
+#elseif canImport(Musl)
+    import Musl
+#elseif os(Windows)
+    import ucrt
+    import WinSDK
+#endif
+
+func currentTimestamp() -> WASIAbi.Timestamp {
+    #if os(Windows)
+        var ft = FILETIME()
+        GetSystemTimeAsFileTime(&ft)
+        let intervals = (Int64(ft.dwHighDateTime) << 32) | Int64(ft.dwLowDateTime)
+        let unixIntervals = intervals - 116_444_736_000_000_000
+        return WASIAbi.Timestamp(unixIntervals * 100)
+    #else
+        var ts = timespec()
+        clock_gettime(CLOCK_REALTIME, &ts)
+        return WASIAbi.Timestamp(ts.tv_sec) * 1_000_000_000 + WASIAbi.Timestamp(ts.tv_nsec)
+    #endif
+}
+
 /// Base protocol for all file system nodes in memory.
 protocol MemFSNode: AnyObject {
     var type: MemFSNodeType { get }
@@ -17,7 +42,41 @@ final class MemoryDirectoryNode: MemFSNode {
     let type: MemFSNodeType = .directory
     private var children: [String: MemFSNode] = [:]
 
-    init() {}
+    private var _atim: WASIAbi.Timestamp
+    private var _mtim: WASIAbi.Timestamp
+    private var _ctim: WASIAbi.Timestamp
+
+    init() {
+        let now = currentTimestamp()
+        self._atim = now
+        self._mtim = now
+        self._ctim = now
+    }
+
+    var timestamps: (atim: WASIAbi.Timestamp, mtim: WASIAbi.Timestamp, ctim: WASIAbi.Timestamp) {
+        return (_atim, _mtim, _ctim)
+    }
+
+    func touchAccessTime() {
+        _atim = currentTimestamp()
+    }
+
+    func touchModificationTime() {
+        let now = currentTimestamp()
+        _mtim = now
+        _ctim = now
+    }
+
+    func setTimes(atim: WASIAbi.Timestamp?, mtim: WASIAbi.Timestamp?) {
+        let now = currentTimestamp()
+        if let atim = atim {
+            _atim = atim
+        }
+        if let mtim = mtim {
+            _mtim = mtim
+        }
+        _ctim = now
+    }
 
     func getChild(name: String) -> MemFSNode? {
         return children[name]
@@ -25,14 +84,20 @@ final class MemoryDirectoryNode: MemFSNode {
 
     func setChild(name: String, node: MemFSNode) {
         children[name] = node
+        touchModificationTime()
     }
 
     @discardableResult
     func removeChild(name: String) -> Bool {
-        return children.removeValue(forKey: name) != nil
+        let removed = children.removeValue(forKey: name) != nil
+        if removed {
+            touchModificationTime()
+        }
+        return removed
     }
 
     func listChildren() -> [String] {
+        touchAccessTime()
         return Array(children.keys).sorted()
     }
 
@@ -46,8 +111,16 @@ final class MemoryFileNode: MemFSNode {
     let type: MemFSNodeType = .file
     var content: FileContent
 
+    private var _atim: WASIAbi.Timestamp
+    private var _mtim: WASIAbi.Timestamp
+    private var _ctim: WASIAbi.Timestamp
+
     init(content: FileContent) {
         self.content = content
+        let now = currentTimestamp()
+        self._atim = now
+        self._mtim = now
+        self._ctim = now
     }
 
     convenience init(bytes: some Sequence<UInt8>) {
@@ -69,6 +142,56 @@ final class MemoryFileNode: MemFSNode {
             } catch {
                 return 0
             }
+        }
+    }
+
+    var timestamps: (atim: WASIAbi.Timestamp, mtim: WASIAbi.Timestamp, ctim: WASIAbi.Timestamp) {
+        switch content {
+        case .bytes:
+            return (_atim, _mtim, _ctim)
+        case .handle(let fd):
+            do {
+                let attrs = try fd.attributes()
+                let atim =
+                    WASIAbi.Timestamp(attrs.accessTime.seconds) * 1_000_000_000
+                    + WASIAbi.Timestamp(attrs.accessTime.nanoseconds)
+                let mtim =
+                    WASIAbi.Timestamp(attrs.modificationTime.seconds) * 1_000_000_000
+                    + WASIAbi.Timestamp(attrs.modificationTime.nanoseconds)
+                let ctim =
+                    WASIAbi.Timestamp(attrs.creationTime.seconds) * 1_000_000_000
+                    + WASIAbi.Timestamp(attrs.creationTime.nanoseconds)
+                return (atim, mtim, ctim)
+            } catch {
+                return (0, 0, 0)
+            }
+        }
+    }
+
+    func touchAccessTime() {
+        if case .bytes = content {
+            _atim = currentTimestamp()
+        }
+    }
+
+    func touchModificationTime() {
+        if case .bytes = content {
+            let now = currentTimestamp()
+            _mtim = now
+            _ctim = now
+        }
+    }
+
+    func setTimes(atim: WASIAbi.Timestamp?, mtim: WASIAbi.Timestamp?) {
+        if case .bytes = content {
+            let now = currentTimestamp()
+            if let atim = atim {
+                _atim = atim
+            }
+            if let mtim = mtim {
+                _mtim = mtim
+            }
+            _ctim = now
         }
     }
 }
@@ -183,7 +306,6 @@ final class MemoryCharacterDeviceEntry: WASIFile {
 
         switch deviceNode.kind {
         case .null:
-            // /dev/null discards all writes but reports them as successful
             var totalBytes: UInt32 = 0
             for iovec in buffer {
                 iovec.withHostBufferPointer { bufferPtr in
@@ -205,7 +327,6 @@ final class MemoryCharacterDeviceEntry: WASIFile {
 
         switch deviceNode.kind {
         case .null:
-            // /dev/null always returns EOF (0 bytes read)
             return 0
         }
     }

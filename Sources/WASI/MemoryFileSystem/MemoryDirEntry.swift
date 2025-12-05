@@ -1,3 +1,4 @@
+import SystemExtras
 import SystemPackage
 
 /// A WASIDir implementation backed by an in-memory directory node.
@@ -8,10 +9,13 @@ struct MemoryDirEntry: WASIDir {
     let fileSystem: MemoryFileSystem
 
     func attributes() throws -> WASIAbi.Filestat {
+        let timestamps = dirNode.timestamps
         return WASIAbi.Filestat(
             dev: 0, ino: 0, filetype: .DIRECTORY,
             nlink: 1, size: 0,
-            atim: 0, mtim: 0, ctim: 0
+            atim: timestamps.atim,
+            mtim: timestamps.mtim,
+            ctim: timestamps.ctim
         )
     }
 
@@ -27,7 +31,26 @@ struct MemoryDirEntry: WASIDir {
         atim: WASIAbi.Timestamp, mtim: WASIAbi.Timestamp,
         fstFlags: WASIAbi.FstFlags
     ) throws {
-        // No-op for memory filesystem - timestamps not tracked
+        let now = currentTimestamp()
+        let newAtim: WASIAbi.Timestamp?
+        if fstFlags.contains(.ATIM) {
+            newAtim = atim
+        } else if fstFlags.contains(.ATIM_NOW) {
+            newAtim = now
+        } else {
+            newAtim = nil
+        }
+
+        let newMtim: WASIAbi.Timestamp?
+        if fstFlags.contains(.MTIM) {
+            newMtim = mtim
+        } else if fstFlags.contains(.MTIM_NOW) {
+            newMtim = now
+        } else {
+            newMtim = nil
+        }
+
+        dirNode.setTimes(atim: newAtim, mtim: newMtim)
     }
 
     func advise(
@@ -123,14 +146,27 @@ struct MemoryDirEntry: WASIDir {
 
         let fileType: WASIAbi.FileType
         var size: WASIAbi.FileSize = 0
+        var atim: WASIAbi.Timestamp = 0
+        var mtim: WASIAbi.Timestamp = 0
+        var ctim: WASIAbi.Timestamp = 0
 
         switch node.type {
         case .directory:
             fileType = .DIRECTORY
+            if let dirNode = node as? MemoryDirectoryNode {
+                let timestamps = dirNode.timestamps
+                atim = timestamps.atim
+                mtim = timestamps.mtim
+                ctim = timestamps.ctim
+            }
         case .file:
             fileType = .REGULAR_FILE
             if let fileNode = node as? MemoryFileNode {
                 size = WASIAbi.FileSize(fileNode.size)
+                let timestamps = fileNode.timestamps
+                atim = timestamps.atim
+                mtim = timestamps.mtim
+                ctim = timestamps.ctim
             }
         case .characterDevice:
             fileType = .CHARACTER_DEVICE
@@ -139,7 +175,7 @@ struct MemoryDirEntry: WASIDir {
         return WASIAbi.Filestat(
             dev: 0, ino: 0, filetype: fileType,
             nlink: 1, size: size,
-            atim: 0, mtim: 0, ctim: 0
+            atim: atim, mtim: mtim, ctim: ctim
         )
     }
 
@@ -148,6 +184,69 @@ struct MemoryDirEntry: WASIDir {
         atim: WASIAbi.Timestamp, mtim: WASIAbi.Timestamp,
         fstFlags: WASIAbi.FstFlags, symlinkFollow: Bool
     ) throws {
-        // No-op for memory filesystem - timestamps not tracked
+        let fullPath = self.path.hasSuffix("/") ? self.path + path : self.path + "/" + path
+        guard let node = fileSystem.lookup(at: fullPath) else {
+            throw WASIAbi.Errno.ENOENT
+        }
+
+        let now = currentTimestamp()
+        let newAtim: WASIAbi.Timestamp?
+        if fstFlags.contains(.ATIM) {
+            newAtim = atim
+        } else if fstFlags.contains(.ATIM_NOW) {
+            newAtim = now
+        } else {
+            newAtim = nil
+        }
+
+        let newMtim: WASIAbi.Timestamp?
+        if fstFlags.contains(.MTIM) {
+            newMtim = mtim
+        } else if fstFlags.contains(.MTIM_NOW) {
+            newMtim = now
+        } else {
+            newMtim = nil
+        }
+
+        if let dirNode = node as? MemoryDirectoryNode {
+            dirNode.setTimes(atim: newAtim, mtim: newMtim)
+            return
+        }
+
+        guard let fileNode = node as? MemoryFileNode else {
+            return
+        }
+
+        switch fileNode.content {
+        case .bytes:
+            fileNode.setTimes(atim: newAtim, mtim: newMtim)
+
+        case .handle(let handle):
+            let accessTime: FileTime
+            if fstFlags.contains(.ATIM) {
+                accessTime = FileTime(
+                    seconds: Int(atim / 1_000_000_000),
+                    nanoseconds: Int(atim % 1_000_000_000)
+                )
+            } else if fstFlags.contains(.ATIM_NOW) {
+                accessTime = .now
+            } else {
+                accessTime = .omit
+            }
+
+            let modTime: FileTime
+            if fstFlags.contains(.MTIM) {
+                modTime = FileTime(
+                    seconds: Int(mtim / 1_000_000_000),
+                    nanoseconds: Int(mtim % 1_000_000_000)
+                )
+            } else if fstFlags.contains(.MTIM_NOW) {
+                modTime = .now
+            } else {
+                modTime = .omit
+            }
+
+            try handle.setTimes(access: accessTime, modification: modTime)
+        }
     }
 }

@@ -1,3 +1,4 @@
+import SystemExtras
 import SystemPackage
 
 /// A WASIFile implementation for regular files in the memory file system.
@@ -15,10 +16,13 @@ final class MemoryFileEntry: WASIFile {
     // MARK: - WASIEntry
 
     func attributes() throws -> WASIAbi.Filestat {
+        let timestamps = fileNode.timestamps
         return WASIAbi.Filestat(
             dev: 0, ino: 0, filetype: .REGULAR_FILE,
             nlink: 1, size: WASIAbi.FileSize(fileNode.size),
-            atim: 0, mtim: 0, ctim: 0
+            atim: timestamps.atim,
+            mtim: timestamps.mtim,
+            ctim: timestamps.ctim
         )
     }
 
@@ -34,7 +38,56 @@ final class MemoryFileEntry: WASIFile {
         atim: WASIAbi.Timestamp, mtim: WASIAbi.Timestamp,
         fstFlags: WASIAbi.FstFlags
     ) throws {
-        // No-op for memory filesystem - timestamps not tracked
+        switch fileNode.content {
+        case .bytes:
+            let now = currentTimestamp()
+            let newAtim: WASIAbi.Timestamp?
+            if fstFlags.contains(.ATIM) {
+                newAtim = atim
+            } else if fstFlags.contains(.ATIM_NOW) {
+                newAtim = now
+            } else {
+                newAtim = nil
+            }
+
+            let newMtim: WASIAbi.Timestamp?
+            if fstFlags.contains(.MTIM) {
+                newMtim = mtim
+            } else if fstFlags.contains(.MTIM_NOW) {
+                newMtim = now
+            } else {
+                newMtim = nil
+            }
+
+            fileNode.setTimes(atim: newAtim, mtim: newMtim)
+
+        case .handle(let handle):
+            let accessTime: FileTime
+            if fstFlags.contains(.ATIM) {
+                accessTime = FileTime(
+                    seconds: Int(atim / 1_000_000_000),
+                    nanoseconds: Int(atim % 1_000_000_000)
+                )
+            } else if fstFlags.contains(.ATIM_NOW) {
+                accessTime = .now
+            } else {
+                accessTime = .omit
+            }
+
+            let modTime: FileTime
+            if fstFlags.contains(.MTIM) {
+                modTime = FileTime(
+                    seconds: Int(mtim / 1_000_000_000),
+                    nanoseconds: Int(mtim % 1_000_000_000)
+                )
+            } else if fstFlags.contains(.MTIM_NOW) {
+                modTime = .now
+            } else {
+                modTime = .omit
+            }
+
+            try handle.setTimes(access: accessTime, modification: modTime)
+        }
     }
 
     func advise(
@@ -82,6 +135,7 @@ final class MemoryFileEntry: WASIFile {
                 bytes.append(contentsOf: Array(repeating: 0, count: newSize - bytes.count))
             }
             fileNode.content = .bytes(bytes)
+            fileNode.touchModificationTime()
 
         case .handle(let handle):
             try handle.truncate(size: Int64(size))
@@ -167,6 +221,7 @@ final class MemoryFileEntry: WASIFile {
             }
             fileNode.content = .bytes(bytes)
             position = currentPosition
+            fileNode.touchModificationTime()
 
         case .handle(let handle):
             var currentOffset = Int64(position)
@@ -208,6 +263,7 @@ final class MemoryFileEntry: WASIFile {
                 }
             }
             fileNode.content = .bytes(bytes)
+            fileNode.touchModificationTime()
 
         case .handle(let handle):
             var currentOffset = Int64(offset)
@@ -250,6 +306,7 @@ final class MemoryFileEntry: WASIFile {
                 }
             }
             position = currentPosition
+            fileNode.touchAccessTime()
 
         case .handle(let handle):
             var currentOffset = Int64(position)
@@ -292,6 +349,7 @@ final class MemoryFileEntry: WASIFile {
                     totalRead += UInt32(toRead)
                 }
             }
+            fileNode.touchAccessTime()
 
         case .handle(let handle):
             var currentOffset = Int64(offset)
