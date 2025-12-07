@@ -254,27 +254,27 @@ jobs:
           android-api-level: 30
           swift-version: "${{ matrix.swift-version }}"
 
-  # build-windows:
-  #   runs-on: windows-latest
-  #   steps:
-  #     - uses: compnerd/gha-setup-swift@main
-  #       with:
-  #         swift-version: swift-6.2-release
-  #         swift-build: 6.2-RELEASE
-  #     - uses: actions/checkout@v4
-  #     - run: python3 ./Vendor/checkout-dependency
-  #     # FIXME: CMake build is failing on CI due to "link: extra operand '/OUT:lib\\libXXXX.a'" error
-  #     # # Check Windows build with CMake
-  #     # - uses: Cyberboss/install-winget@v1
-  #     # - run: winget install Ninja-build.Ninja Kitware.CMake --disable-interactivity --accept-source-agreements
-  #     # - run: |
-  #     #     echo "$env:LOCALAPPDATA\Microsoft\WinGet\Links" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-  #     #     echo "$env:ProgramFiles\CMake\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-  #     # - run: cmake -G Ninja -B .build/cmake
-  #     # - run: cmake --build .build/cmake
-  #     # Run tests with SwiftPM
-  #     - name: Run tests with SwiftPM
-  #       run: swift test
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: compnerd/gha-setup-swift@main
+        with:
+          swift-version: development
+          swift-build: swift-DEVELOPMENT-SNAPSHOT-2025-12-01-a
+      - uses: actions/checkout@v4
+      - run: python3 ./Vendor/checkout-dependency
+      # FIXME: CMake build is failing on CI due to "link: extra operand '/OUT:lib\\libXXXX.a'" error
+      # # Check Windows build with CMake
+      # - uses: Cyberboss/install-winget@v1
+      # - run: winget install Ninja-build.Ninja Kitware.CMake --disable-interactivity --accept-source-agreements
+      # - run: |
+      #     echo "$env:LOCALAPPDATA\Microsoft\WinGet\Links" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      #     echo "$env:ProgramFiles\CMake\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      # - run: cmake -G Ninja -B .build/cmake
+      # - run: cmake --build .build/cmake
+      # Run tests with SwiftPM
+      - name: Run tests with SwiftPM
+        run: swift test
 
   build-cmake:
     runs-on: ubuntu-24.04
