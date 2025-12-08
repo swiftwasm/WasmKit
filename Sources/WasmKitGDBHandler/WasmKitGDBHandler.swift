@@ -268,13 +268,13 @@
                 case .step:
                     try self.debugger.step()
                 case .continue:
-                    try self.debugger.run()
+                    try self.debugger.runPreservingCurrentBreakpoint()
                 }
 
                 responseKind = try self.currentThreadStopInfo
 
             case .continue:
-                try self.debugger.run()
+                try self.debugger.runPreservingCurrentBreakpoint()
 
                 responseKind = try self.currentThreadStopInfo
 
