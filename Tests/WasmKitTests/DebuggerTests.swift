@@ -61,6 +61,28 @@
         )
         """
 
+    private let factorialWAT = """
+        (module
+          (func (export "_start") (result i64)
+            (i64.const 3)
+            (call $factorial)
+          )
+
+          (func $factorial (param $arg i64) (result i64)
+            (if (result i64)
+              (i64.eqz (local.get $arg))
+              (then (i64.const 1))
+              (else
+                (i64.mul
+                  (local.get $arg)
+                  (call $factorial
+                    (i64.sub
+                      (local.get $arg)
+                      (i64.const 1)
+                    ))))))
+        )
+        """
+
     @Suite
     struct DebuggerTests {
         @Test
@@ -144,6 +166,41 @@
             #expect(firstLocal == 42)
             let secondLocal = try debugger.getLocal(frameIndex: 0, localIndex: 1)
             #expect(secondLocal == 24)
+        }
+
+        @Test
+        func runPreservingCurrentBreakpoint() throws {
+            let store = Store(engine: Engine())
+            let bytes = try wat2wasm(factorialWAT)
+            let module = try parseWasm(bytes: bytes)
+            var debugger = try Debugger(module: module, store: store, imports: [:])
+
+            _ = try debugger.enableBreakpoint(
+                module: module,
+                function: 1,
+                // if 1 byte + i64.const 2 bytes + i64.eqz 1 byte + local.set 4 bytes
+                offsetWithinFunction: 8
+            )
+
+            try debugger.run()
+            var local = try debugger.getLocal(frameIndex: 0, localIndex: 0)
+            #expect(local == 3)
+            try debugger.runPreservingCurrentBreakpoint()
+
+            local = try debugger.getLocal(frameIndex: 0, localIndex: 0)
+            #expect(local == 2)
+            try debugger.runPreservingCurrentBreakpoint()
+
+            local = try debugger.getLocal(frameIndex: 0, localIndex: 0)
+            #expect(local == 1)
+            try debugger.runPreservingCurrentBreakpoint()
+
+            guard case .entrypointReturned(let values) = debugger.state else {
+                Issue.record()
+                return
+            }
+
+            #expect(values == [.i64(6)])
         }
     }
 

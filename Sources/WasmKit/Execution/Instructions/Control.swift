@@ -52,7 +52,7 @@ extension Execution {
     }
 
     mutating func endOfExecution(sp: inout Sp, pc: Pc) throws -> (Pc, CodeSlot) {
-        throw EndOfExecution()
+        throw EndOfExecution(sp: sp)
     }
 
     @inline(__always)

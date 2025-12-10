@@ -410,7 +410,9 @@ extension Execution {
     }
 
     /// An ``Error`` thrown when the execution normally ends.
-    struct EndOfExecution: Error {}
+    struct EndOfExecution: Error, @unchecked Sendable {
+        let sp: Sp
+    }
 
     /// An ``Error`` thrown when a breakpoint is triggered.
     struct Breakpoint: Error, @unchecked Sendable {

@@ -209,12 +209,12 @@
                         case .token:
                             try self.execution.runTokenThreaded(sp: &sp, pc: &pc, md: &md, ms: &ms)
                         }
-                    } catch is Execution.EndOfExecution {
+                    } catch let end as Execution.EndOfExecution {
                         // The module successfully executed till the "end of execution" instruction.
-                        let type = self.store.engine.funcTypeInterner.resolve(currentFunction.type)
+                        let type = self.entrypointFunction.type
                         self.state = .entrypointReturned(
                             type.results.enumerated().map { (i, type) in
-                                sp[VReg(i)].cast(to: type)
+                                end.sp[VReg(i)].cast(to: type)
                             }
                         )
                     }
@@ -253,6 +253,21 @@
 
             // TODO: analyze actual instruction branching to set the breakpoint correctly.
             try self.enableBreakpoint(address: breakpoint.wasmPc + 1)
+            try self.run()
+        }
+
+        /// Resumes the module instantiated by the debugger stopped at a breakpoint. The breakpoint from which
+        /// the debugger resumes is preserved. If the module is current not stopped at a breakpoint, this function
+        /// returns immediately.
+        package mutating func runPreservingCurrentBreakpoint() throws {
+            guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
+                return
+            }
+
+            // TODO: analyze actual instruction branching to set the breakpoint correctly.
+            try self.enableBreakpoint(address: breakpoint.wasmPc + 1)
+            try self.run()
+            try self.enableBreakpoint(address: breakpoint.wasmPc)
             try self.run()
         }
 
