@@ -308,7 +308,7 @@ jobs:
       - name: Install jq
         run: apt-get update && apt-get install -y jq
       - name: Install Swift SDK
-        run: swift sdk install https://download.swift.org/swift-6.2.1-release/wasm-sdk/swift-6.2.1-RELEASE/swift-6.2.1-RELEASE_wasm.artifactbundle.tar.gz --checksum 482b9f95462b87bedfafca94a092cf9ec4496671ca13b43745097122d20f18af
+        run: swift sdk install https://download.swift.org/swift-6.2.2-release/wasm-sdk/swift-6.2.2-RELEASE/swift-6.2.2-RELEASE_wasm.artifactbundle.tar.gz --checksum 128fa003e0cad624897c2b1d5f07cedf400e3c8bd851d304e57440b591cbe606
       - name: Build with the Swift SDK
         run: swift build --swift-sdk "$(swiftc -print-target-info | jq -r '.swiftCompilerTag')_wasm" --product wasmkit-cli
 
