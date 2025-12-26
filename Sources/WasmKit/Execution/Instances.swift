@@ -39,7 +39,7 @@ import WasmParser
 /// This type is designed to eliminate ARC retain/release for entities
 /// known to be alive during a VM execution.
 @dynamicMemberLookup
-struct EntityHandle<T>: Equatable, Hashable {
+package struct EntityHandle<T>: Equatable, Hashable {
     private let pointer: UnsafeMutablePointer<T>
 
     init(unsafe pointer: UnsafeMutablePointer<T>) {
@@ -56,7 +56,7 @@ struct EntityHandle<T>: Equatable, Hashable {
     }
 
     @inline(__always)
-    func withValue<R>(_ body: (inout T) throws -> R) rethrows -> R {
+    package func withValue<R>(_ body: (inout T) throws -> R) rethrows -> R {
         return try body(&pointer.pointee)
     }
 
@@ -71,7 +71,7 @@ extension EntityHandle: ValidatableEntity where T: ValidatableEntity {
     }
 }
 
-struct InstanceEntity /* : ~Copyable */ {
+package struct InstanceEntity /* : ~Copyable */ {
     var types: [FunctionType]
     var functions: ImmutableArray<InternalFunction>
     var tables: ImmutableArray<InternalTable>
@@ -105,7 +105,7 @@ struct InstanceEntity /* : ~Copyable */ {
         )
     }
 
-    internal func compileAllFunctions(store: Store) throws {
+    package func compileAllFunctions(store: Store) throws {
         let store = StoreRef(store)
         for function in functions {
             guard function.isWasm else { continue }
@@ -114,7 +114,7 @@ struct InstanceEntity /* : ~Copyable */ {
     }
 }
 
-typealias InternalInstance = EntityHandle<InstanceEntity>
+package typealias InternalInstance = EntityHandle<InstanceEntity>
 
 /// A map of exported entities by name.
 public struct Exports: Sequence {
@@ -181,7 +181,7 @@ public struct Exports: Sequence {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#module-instances>
 public struct Instance {
-    let handle: InternalInstance
+    package let handle: InternalInstance
     let store: Store
 
     init(handle: InternalInstance, store: Store) {
@@ -202,7 +202,7 @@ public struct Instance {
     ///
     /// - Parameter name: The name of the exported function.
     /// - Returns: The address of the exported function if found, otherwise `nil`.
-    func exportedFunction(name: String) -> Function? {
+    package func exportedFunction(name: String) -> Function? {
         guard case .function(let function) = self.export(name) else { return nil }
         return function
     }

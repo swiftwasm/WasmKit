@@ -1,9 +1,8 @@
 import Foundation
 import SystemPackage
 import WAT
+import WasmKit
 import WasmParser
-
-@testable import WasmKit
 
 struct TestCase: CustomStringConvertible {
     enum Error: Swift.Error {
