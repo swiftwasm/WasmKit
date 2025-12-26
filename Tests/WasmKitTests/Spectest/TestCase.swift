@@ -3,7 +3,7 @@ import SystemPackage
 import WAT
 import WasmParser
 
-@testable import WasmKit
+import WasmKit
 
 struct TestCase: CustomStringConvertible {
     enum Error: Swift.Error {
