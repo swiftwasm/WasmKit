@@ -7,8 +7,8 @@ struct Assemble: ParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "Assemble WebAssembly text into a WebAssembly binary",
         discussion: """
-            This command parses a file in WebAssembly Text Format (`.wat`),
-            assembles it into a binary and writes the result to a given
+            This command parses a file in WebAssembly Text Format (`.wat`), \
+            assembles it into a binary and writes the result to a given \
             file path.
             """
     )
