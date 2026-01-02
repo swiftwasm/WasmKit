@@ -4,13 +4,13 @@ import WAT
 import WasmKit
 import WasmParser
 
-struct TestCase: CustomStringConvertible {
-    enum Error: Swift.Error {
+package struct TestCase: CustomStringConvertible {
+    package enum Error: Swift.Error {
         case invalidPath
     }
 
-    let path: String
-    var relativePath: String {
+    package let path: String
+    package var relativePath: String {
         // Relative path from the current working directory
         let currentDirectory = FileManager.default.currentDirectoryPath
         if path.hasPrefix(currentDirectory) {
@@ -19,11 +19,11 @@ struct TestCase: CustomStringConvertible {
         return path
     }
 
-    var description: String {
+    package var description: String {
         return relativePath
     }
 
-    static func load(include: [String], exclude: [String], in path: [String]) throws -> [TestCase] {
+    package static func load(include: [String], exclude: [String], in path: [String]) throws -> [TestCase] {
         let fileManager = FileManager.default
         var filePaths: [URL] = []
         for path in path {
