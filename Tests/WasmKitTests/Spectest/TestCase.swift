@@ -79,12 +79,12 @@ package struct TestCase: CustomStringConvertible {
     }
 }
 
-enum Result {
+package enum Result {
     case passed
     case failed(String)
     case skipped(String)
 
-    var banner: String {
+    package var banner: String {
         switch self {
         case .passed:
             return "[PASSED]"
@@ -96,9 +96,9 @@ enum Result {
     }
 }
 
-struct SpectestError: Error, CustomStringConvertible {
-    var description: String
-    init(_ description: String) {
+package struct SpectestError: Error, CustomStringConvertible {
+    package let description: String
+    package init(_ description: String) {
         self.description = description
     }
 }
