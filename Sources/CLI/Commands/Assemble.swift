@@ -44,17 +44,17 @@ struct Assemble: ParsableCommand {
     @Option(
         name: [.short, .long],
         help: """
-        Path to a WebAssembly Binary (`.wasm`) output file path. If already exists, \
-        previous content of this file is replaced with a new WebAssembly binary.
+            Path to a WebAssembly Binary (`.wasm`) output file path. If already exists, \
+            previous content of this file is replaced with a new WebAssembly binary.
 
-        If output file path is not provided via this option, output is written to a \
-        file with the same base name as the input text file, but with `.wasm` extension.
+            If output file path is not provided via this option, output is written to a \
+            file with the same base name as the input text file, but with `.wasm` extension.
 
-        E.g. `fib.wat` is assembled into a peer `fib.wasm` in the same directory as \
-        `fib.wat` if output path is not provided. If `fib.wasm` already exists, an \
-        error is thrown. Specify the output file path explicitly via this option \
-        to replace the existing file.
-        """
+            E.g. `fib.wat` is assembled into a peer `fib.wasm` in the same directory as \
+            `fib.wat` if output path is not provided. If `fib.wasm` already exists, an \
+            error is thrown. Specify the output file path explicitly via this option \
+            to replace the existing file.
+            """
     )
     var output: String?
 
@@ -76,12 +76,12 @@ struct Assemble: ParsableCommand {
         if let output {
             outputPath = FilePath(output)
         } else {
-           outputPath = filePath
-           outputPath.extension = "wasm"
+            outputPath = filePath
+            outputPath.extension = "wasm"
 
-           guard (try? FileDescriptor.open(outputPath, .readOnly)) == nil else {
-               throw Error.fileAlreadyExists(outputPath.string)
-           }
+            guard (try? FileDescriptor.open(outputPath, .readOnly)) == nil else {
+                throw Error.fileAlreadyExists(outputPath.string)
+            }
         }
 
         let outputHandle = try FileDescriptor.open(
