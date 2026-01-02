@@ -6,6 +6,6 @@ struct CLI: AsyncParsableCommand {
         commandName: "wasmkit",
         abstract: "WasmKit WebAssembly Runtime",
         version: "0.1.6",
-        subcommands: [Run.self, Explore.self]
+        subcommands: [Assemble.self, Run.self, Explore.self]
     )
 }
