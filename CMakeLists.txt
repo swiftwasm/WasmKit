@@ -57,7 +57,7 @@ if(NOT SwiftSystem_FOUND)
   message("-- Vending SwiftSystem")
   FetchContent_Declare(SwiftSystem
     GIT_REPOSITORY https://github.com/apple/swift-system
-    GIT_TAG 1.3.0
+    GIT_TAG 1.5.0
   )
   FetchContent_MakeAvailable(SwiftSystem)
 endif()
@@ -71,7 +71,7 @@ if(WASMKIT_BUILD_CLI)
     message("-- Vending ArgumentParser")
     FetchContent_Declare(ArgumentParser
             GIT_REPOSITORY https://github.com/apple/swift-argument-parser
-            GIT_TAG 1.2.2
+            GIT_TAG 1.6.1
     )
     FetchContent_MakeAvailable(ArgumentParser)
   endif()
