@@ -8,7 +8,7 @@ struct Assemble: ParsableCommand {
         abstract: "Assemble WebAssembly text into a WebAssembly binary",
         discussion: """
             This command parses a file in WebAssembly Text Format (`.wat`), \
-            assembles it into a binary and writes the result to a given \
+            assembles it into a binary, and writes the result to a given \
             file path.
             """
     )
