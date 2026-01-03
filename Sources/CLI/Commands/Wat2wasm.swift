@@ -3,7 +3,7 @@ import SystemPackage
 import WAT
 import WasmKit
 
-struct Assemble: ParsableCommand {
+struct Wat2wasm: ParsableCommand {
     static let configuration = CommandConfiguration(
         abstract: "Assemble WebAssembly text into a WebAssembly binary",
         discussion: """
@@ -66,8 +66,16 @@ struct Assemble: ParsableCommand {
 
         let size = try fileHandle.seek(offset: 0, from: .end)
 
-        let wat = try String(unsafeUninitializedCapacity: Int(size)) {
-            try fileHandle.read(fromAbsoluteOffset: 0, into: .init($0))
+        let wat: String
+        if #available(macOS 11.0, iOS 14.0, macCatalyst 14.0, tvOS 14.0, visionOS 1.0, watchOS 7.0, *) {
+            wat = try String(unsafeUninitializedCapacity: Int(size)) {
+                try fileHandle.read(fromAbsoluteOffset: 0, into: .init($0))
+            }
+        } else {
+            let watBuffer = try [UInt8](unsafeUninitializedCapacity: Int(size)) { buffer, count in
+                count = try fileHandle.read(fromAbsoluteOffset: 0, into: .init(buffer))
+            }
+            wat = String(decoding: watBuffer, as: UTF8.self)
         }
 
         let wasm = try wat2wasm(wat)
@@ -93,7 +101,5 @@ struct Assemble: ParsableCommand {
         defer { try? outputHandle.close() }
 
         try outputHandle.writeAll(wasm)
-
-        print("✅ Wasm binary successfully assembled and written to `\(outputPath.string)`.")
     }
 }
