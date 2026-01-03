@@ -1,6 +1,7 @@
 add_executable(wasmkit-cli
-    Commands/Run.swift
     Commands/Explore.swift
+    Commands/Run.swift
+    Commands/Wat2wasm.swift
     CLI.swift
 )
 
