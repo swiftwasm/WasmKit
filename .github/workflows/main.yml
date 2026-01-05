@@ -313,8 +313,8 @@ jobs:
       image: swift:6.2-noble
     steps:
       - uses: actions/checkout@v4
-      - name: Install Ninja
-        run: apt-get update && apt-get install -y ninja-build
+      - name: Install dependencies
+        run: apt-get update && apt-get install -y ninja-build python3
       - name: Install CMake
         run: |
           apt-get install -y curl
