@@ -268,8 +268,7 @@ extension WastRunContext {
             }
             return .passed
 
-        case .assertReturn(let execute, let results):
-            let expected = parseValues(args: results)
+        case .assertReturn(let execute, let expected):
             let actual = try wastExecute(execute: execute)
             guard actual.isTestEquivalent(to: expected) else {
                 return .failed("invoke result mismatch: expected: \(expected), actual: \(actual)")
@@ -346,7 +345,24 @@ extension WastRunContext {
         guard let function = instance.exportedFunction(name: call.name) else {
             throw SpectestError("function \(call.name) not exported")
         }
-        return try function.invoke(call.args)
+        let args = try call.args.map { arg -> Value in
+            switch arg {
+            case .i32(let value): return .i32(value)
+            case .i64(let value): return .i64(value)
+            case .f32(let value): return .f32(value)
+            case .f64(let value): return .f64(value)
+            case .refNull(let heapType):
+                switch heapType {
+                case .abstract(.funcRef): return .ref(.function(nil))
+                case .abstract(.externRef): return .ref(.extern(nil))
+                case .concrete:
+                    throw SpectestError("concrete ref.null is not supported yet")
+                }
+            case .refExtern(let value): return .ref(.extern(Int(value)))
+            case .refFunc(let value): return .ref(.function(Int(value)))
+            }
+        }
+        return try function.invoke(args)
     }
 
     private func deriveFeatureSet(rootPath: FilePath) -> WasmFeatureSet {
@@ -380,20 +396,10 @@ extension WastRunContext {
         let module = try parseWasm(bytes: binary, features: deriveFeatureSet(rootPath: rootPath))
         return module
     }
-
-    private func parseValues(args: [WastExpectValue]) -> [WasmKit.Value] {
-        return args.compactMap {
-            switch $0 {
-            case .value(let value): return value
-            case .f32CanonicalNaN, .f32ArithmeticNaN: return .f32(Float.nan.bitPattern)
-            case .f64CanonicalNaN, .f64ArithmeticNaN: return .f64(Double.nan.bitPattern)
-            }
-        }
-    }
 }
 
 extension Value {
-    func isTestEquivalent(to value: Self) -> Bool {
+    func isTestEquivalent(to value: WastExpectValue) -> Bool {
         switch (self, value) {
         case (.i32(let lhs), .i32(let rhs)):
             return lhs == rhs
@@ -407,10 +413,19 @@ extension Value {
             let lhs = Float64(bitPattern: lhs)
             let rhs = Float64(bitPattern: rhs)
             return lhs.isNaN && rhs.isNaN || lhs == rhs
-        case (.ref(.extern(let lhs)), .ref(.extern(let rhs))):
-            return lhs == rhs
-        case (.ref(.function(let lhs)), .ref(.function(let rhs))):
-            return lhs == rhs
+        case (.f64(let lhs), .f64ArithmeticNaN),
+            (.f64(let lhs), .f64CanonicalNaN):
+            return Float64(bitPattern: lhs).isNaN
+        case (.f32(let lhs), .f32ArithmeticNaN),
+            (.f32(let lhs), .f32CanonicalNaN):
+            return Float32(bitPattern: lhs).isNaN
+        case (.ref(.extern(let lhs?)), .refExtern(let rhs)):
+            return rhs.map { lhs == $0 } ?? true
+        case (.ref(.function(let lhs?)), .refFunc(let rhs)):
+            return rhs.map { lhs == $0 } ?? true
+        case (.ref(.extern(nil)), .refNull(.abstract(.externRef))),
+            (.ref(.function(nil)), .refNull(.abstract(.funcRef))):
+            return true
         default:
             return false
         }
@@ -418,7 +433,7 @@ extension Value {
 }
 
 extension Array where Element == Value {
-    func isTestEquivalent(to arrayOfValues: Self) -> Bool {
+    func isTestEquivalent(to arrayOfValues: [WastExpectValue]) -> Bool {
         guard count == arrayOfValues.count else {
             return false
         }
