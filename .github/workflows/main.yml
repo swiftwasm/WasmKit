@@ -329,7 +329,14 @@ jobs:
         run: |
           apt-get install -y curl
           curl -L https://github.com/Kitware/CMake/releases/download/v3.30.2/cmake-3.30.2-linux-${{ matrix.cmake-arch }}.tar.gz | tar xz --strip-component 1 -C /usr/local/
+      - name: Cache LLVM
+        id: cache-llvm
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/Vendor/llvm-project
+          key: llvm-${{ matrix.os }}-${{ matrix.llvm-target }}-swift-6.2.3
       - name: Build LLVM
+        if: steps.cache-llvm.outputs.cache-hit != 'true'
         run: |
           mkdir -p $GITHUB_WORKSPACE/Vendor/llvm-project
           curl -L https://github.com/swiftlang/llvm-project/archive/refs/tags/swift-6.2.3-RELEASE.tar.gz | tar xz --strip-component 1 -C $GITHUB_WORKSPACE/Vendor/llvm-project
