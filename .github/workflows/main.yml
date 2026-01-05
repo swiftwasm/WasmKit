@@ -313,8 +313,10 @@ jobs:
         include:
           - os: ubuntu-24.04
             llvm-target: X86
+            cmake-arch: x86_64
           - os: ubuntu-24.04-arm
             llvm-target: AArch64
+            cmake-arch: aarch64
           
     runs-on: ${{ matrix.os }}
     container:
@@ -326,7 +328,7 @@ jobs:
       - name: Install CMake
         run: |
           apt-get install -y curl
-          curl -L https://github.com/Kitware/CMake/releases/download/v3.30.2/cmake-3.30.2-linux-x86_64.tar.gz | tar xz --strip-component 1 -C /usr/local/
+          curl -L https://github.com/Kitware/CMake/releases/download/v3.30.2/cmake-3.30.2-linux-${{ matrix.cmake-arch }}.tar.gz | tar xz --strip-component 1 -C /usr/local/
       - name: Build LLVM
         run: |
           mkdir -p $GITHUB_WORKSPACE/Vendor/llvm-project
