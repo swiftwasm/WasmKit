@@ -305,7 +305,25 @@ jobs:
           curl -L https://github.com/Kitware/CMake/releases/download/v3.30.2/cmake-3.30.2-linux-x86_64.tar.gz | tar xz --strip-component 1 -C /usr/local/
       - run: cmake -G Ninja -B ./build
       - run: cmake --build ./build
-      - run: ./build/bin/wasmkit-cli --version
+      - run: ./build/bin/wasmkit --version
+
+  build-llvm:
+    runs-on: ubuntu-24.04
+    container:
+      image: swift:6.2-noble
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Ninja
+        run: apt-get update && apt-get install -y ninja-build
+      - name: Install CMake
+        run: |
+          apt-get install -y curl
+          curl -L https://github.com/Kitware/CMake/releases/download/v3.30.2/cmake-3.30.2-linux-x86_64.tar.gz | tar xz --strip-component 1 -C /usr/local/
+      - name: Build LLVM
+        run: |
+          curl -L https://github.com/swiftlang/llvm-project/archive/refs/tags/swift-6.2.3-RELEASE.tar.gz | tar xz -C $GITHUB_WORKSPACE/llvm-project
+      - run: |
+          ls $GITHUB_WORKSPACE/llvm-project
 
   build-wasi:
     runs-on: ubuntu-24.04
