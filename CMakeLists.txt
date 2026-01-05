@@ -1,24 +1,26 @@
-cmake_minimum_required(VERSION 3.19.6)
+cmake_minimum_required(VERSION 3.30)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules)
 
-project(WasmKit LANGUAGES C Swift)
+project(WasmKit LANGUAGES C CXX Swift)
 
-set(SWIFT_VERSION 5)
+set(SWIFT_VERSION 6)
 set(CMAKE_Swift_LANGUAGE_VERSION ${SWIFT_VERSION})
+
+set(min_supported_swift_version 6.2)
+if(CMAKE_Swift_COMPILER_VERSION VERSION_LESS "${min_supported_swift_version}")
+  message(
+    FATAL_ERROR
+    "Outdated Swift compiler: "
+    "Swift ${min_supported_swift_version} or newer is required."
+  )
+endif()
 
 # Enable whole module optimization for Release or RelWithDebInfo builds.
 if(POLICY CMP0157)
   set(CMAKE_Swift_COMPILATION_MODE $<IF:$<CONFIG:Release,RelWithDebInfo>,wholemodule,incremental>)
 else()
   add_compile_options($<$<AND:$<COMPILE_LANGUAGE:Swift>,$<CONFIG:Release,RelWithDebInfo>>:-wmo>)
-endif()
-
-if(CMAKE_VERSION VERSION_LESS 3.21)
-  get_property(parent_dir DIRECTORY PROPERTY PARENT_DIRECTORY)
-  if(NOT parent_dir)
-    set(PROJECT_IS_TOP_LEVEL TRUE)
-  endif()
 endif()
 
 # The subdirectory into which host libraries will be installed.
@@ -58,11 +60,13 @@ if(NOT SwiftSystem_FOUND)
   FetchContent_Declare(SwiftSystem
     GIT_REPOSITORY https://github.com/apple/swift-system
     GIT_TAG 1.5.0
+    GIT_SHALLOW TRUE
   )
   FetchContent_MakeAvailable(SwiftSystem)
 endif()
 
-option(WASMKIT_BUILD_CLI "Build wasmkit-cli" ON)
+option(WASMKIT_BUILD_CLI "Build WasmKit CLI" ON)
+option(WASMKIT_BUILD_LLVM_BACKEND "Build WasmKit LLVM backend (experimental)")
 
 if(WASMKIT_BUILD_CLI)
   set(BUILD_TESTING OFF) # disable ArgumentParser tests
@@ -72,6 +76,7 @@ if(WASMKIT_BUILD_CLI)
     FetchContent_Declare(ArgumentParser
             GIT_REPOSITORY https://github.com/apple/swift-argument-parser
             GIT_TAG 1.6.1
+            GIT_SHALLOW TRUE
     )
     FetchContent_MakeAvailable(ArgumentParser)
   endif()

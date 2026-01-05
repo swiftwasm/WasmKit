@@ -10,3 +10,12 @@ add_subdirectory(WAT)
 if(WASMKIT_BUILD_CLI)
   add_subdirectory(CLI)
 endif()
+
+if(WASMKIT_BUILD_LLVM_BACKEND)
+  add_subdirectory(LLVMInterop)
+  add_subdirectory(LLVMBackend)
+
+  if(WASMKIT_BUILD_CLI)
+    add_subdirectory(LLVMBackendCLI)
+  endif()
+endif()
