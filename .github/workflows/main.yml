@@ -321,12 +321,15 @@ jobs:
           curl -L https://github.com/Kitware/CMake/releases/download/v3.30.2/cmake-3.30.2-linux-x86_64.tar.gz | tar xz --strip-component 1 -C /usr/local/
       - name: Build LLVM
         run: |
-          mkdir -p $GITHUB_WORKSPACE/llvm-project
+          mkdir -p $GITHUB_WORKSPACE/Vendor/llvm-project
           curl -L https://github.com/swiftlang/llvm-project/archive/refs/tags/swift-6.2.3-RELEASE.tar.gz | tar xz --strip-component 1 -C $GITHUB_WORKSPACE/llvm-project
-          cd $GITHUB_WORKSPACE/llvm-project/llvm
-          # cmake -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_INCLUDE_TESTS=OFF -DCMAKE_BUILD_TYPE=Release -G Ninja -B build
-          # cmake --build build
-          ls $GITHUB_WORKSPACE
+          cmake -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_INCLUDE_TESTS=OFF -DCMAKE_BUILD_TYPE=Release -G Ninja -S $GITHUB_WORKSPACE/Vendor/llvm-project/llvm -B $GITHUB_WORKSPACE/Vendor/llvm-project/llvm/build
+          cmake --build $GITHUB_WORKSPACE/Vendor/llvm-project/llvm/build
+      - name: Build WasmKit with LLVM
+        run: |
+          LLVM_DIR="$GITHUB_WORKSPACE/Vendor/llvm-project/llvm/build/lib/cmake/llvm/" cmake -DWASMKIT_BUILD_LLVM_BACKEND=ON -DWASMKIT_BUILD_CLI=ON -G Ninja -B ./build
+          cmake --build ./build
+      - run: ./build/bin/LLVMBackendCLI --help
 
   # build-wasi:
   #   runs-on: ubuntu-24.04
