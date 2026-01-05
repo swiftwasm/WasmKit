@@ -27,7 +27,7 @@ target_include_directories(
 llvm_map_components_to_libnames(llvm_libs
   support
   core irreader mc passes targetparser target
-  aarch64codegen aarch64asmparser
+  ${WASMKIT_LLVM_BACKEND_TARGET}codegen ${WASMKIT_LLVM_BACKEND_TARGET}asmparser
 )
 
 target_link_libraries(LLVMInterop ${llvm_libs})

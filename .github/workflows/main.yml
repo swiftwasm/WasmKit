@@ -345,7 +345,7 @@ jobs:
           cmake --build $GITHUB_WORKSPACE/Vendor/llvm-project/llvm/build
       - name: Build WasmKit with LLVM
         run: |
-          LLVM_DIR="$GITHUB_WORKSPACE/Vendor/llvm-project/llvm/build/lib/cmake/llvm/" cmake -DWASMKIT_BUILD_LLVM_BACKEND=ON -DWASMKIT_BUILD_CLI=ON -G Ninja -B ./build
+          LLVM_DIR="$GITHUB_WORKSPACE/Vendor/llvm-project/llvm/build/lib/cmake/llvm/" cmake -DWASMKIT_BUILD_LLVM_BACKEND=ON -DWASMKIT_LLVM_BACKEND_TARGET=${{ matrix.llvm-target }} -DWASMKIT_BUILD_CLI=ON -G Ninja -B ./build
           cmake --build ./build
       - run: ./build/bin/LLVMBackendCLI --help
 

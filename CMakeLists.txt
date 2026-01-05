@@ -66,7 +66,8 @@ if(NOT SwiftSystem_FOUND)
 endif()
 
 option(WASMKIT_BUILD_CLI "Build WasmKit CLI" ON)
-option(WASMKIT_BUILD_LLVM_BACKEND "Build WasmKit LLVM backend (experimental)")
+option(WASMKIT_BUILD_LLVM_BACKEND "Build WasmKit LLVM backend (experimental)" OFF)
+option(WASMKIT_LLVM_BACKEND_TARGET "WasmKit LLVM backend target architecture" "aarch64")
 
 if(WASMKIT_BUILD_CLI)
   set(BUILD_TESTING OFF) # disable ArgumentParser tests
