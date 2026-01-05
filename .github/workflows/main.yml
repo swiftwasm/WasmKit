@@ -302,7 +302,7 @@ jobs:
       - name: Install CMake
         run: |
           apt-get install -y curl
-          curl -L https://github.com/Kitware/CMake/releases/download/v3.29.2/cmake-3.29.2-linux-x86_64.tar.gz | tar xz --strip-component 1 -C /usr/local/
+          curl -L https://github.com/Kitware/CMake/releases/download/v3.30.2/cmake-3.30.2-linux-x86_64.tar.gz | tar xz --strip-component 1 -C /usr/local/
       - run: cmake -G Ninja -B ./build
       - run: cmake --build ./build
       - run: ./build/bin/wasmkit-cli --version
