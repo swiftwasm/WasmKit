@@ -137,6 +137,9 @@ extension TrapReason.Message {
     static func exportedFunctionNotFound(name: String, instance: Instance) -> Self {
         Self("exported function \(name) not found in instance \(instance)")
     }
+    static func unimplemented(feature: String) -> Self {
+        Self("\(feature) is not implemented yet")
+    }
 }
 
 package struct ImportError: Error {
