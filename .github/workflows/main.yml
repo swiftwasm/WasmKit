@@ -322,9 +322,11 @@ jobs:
       - name: Build LLVM
         run: |
           mkdir -p $GITHUB_WORKSPACE/llvm-project
-          curl -L https://github.com/swiftlang/llvm-project/archive/refs/tags/swift-6.2.3-RELEASE.tar.gz | tar xz -C $GITHUB_WORKSPACE/llvm-project
-      - run: |
-          ls $GITHUB_WORKSPACE/llvm-project
+          curl -L https://github.com/swiftlang/llvm-project/archive/refs/tags/swift-6.2.3-RELEASE.tar.gz | tar xz --strip-component 1 -C $GITHUB_WORKSPACE/llvm-project
+          cd $GITHUB_WORKSPACE/llvm-project/llvm
+          cmake -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_INCLUDE_TESTS=OFF -DCMAKE_BUILD_TYPE=Release -G Ninja -B build
+          cmake --build build
+          ls $GITHUB_WORKSPACE
 
   # build-wasi:
   #   runs-on: ubuntu-24.04
