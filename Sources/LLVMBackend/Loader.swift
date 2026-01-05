@@ -1,12 +1,12 @@
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#elseif canImport(Musl)
-import Musl
-#endif
-
 import SystemPackage
+
+#if canImport(Darwin)
+    import Darwin
+#elseif canImport(Glibc)
+    import Glibc
+#elseif canImport(Musl)
+    import Musl
+#endif
 
 package protocol ImportedFunctionArguments {
     associatedtype ResultType
@@ -31,6 +31,7 @@ package struct U32Args2Result1: ImportedFunctionArguments {
 package struct Loader: ~Copyable {
     enum Error: Swift.Error {
         case symbolNotFound(String)
+        case dlopenFailed
     }
 
     package enum ClosureType {
@@ -48,7 +49,16 @@ package struct Loader: ~Copyable {
         entrypointSymbol: String,
         arguments: T
     ) throws -> T.ResultType {
-        let handle = dlopen(library.string, RTLD_LAZY)
+        #if canImport(Darwin)
+            let handle = dlopen(library.string, RTLD_LAZY)
+        #elseif canImport(Glibc) || canImport(Musl)
+            guard let handle = dlopen(library.string, RTLD_LAZY) else {
+                throw Error.dlopenFailed
+            }
+        #else
+            #error("Unsupported platform in dynamic loading code")
+        #endif
+
         defer { dlclose(handle) }
 
         guard let symbol = dlsym(handle, entrypointSymbol) else {

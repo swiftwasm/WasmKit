@@ -1,5 +1,3 @@
-import Darwin
-
 package struct Wasm32Memory: ~Copyable {
     // let memory: UnsafeMutableRawPointer
 

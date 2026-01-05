@@ -26,7 +26,7 @@ package enum Linker {
 
             return dylibPath
         #else
-            #error("Linking native binaries is currently only supported on macOS")
+            fatalError("Linking native binaries is currently only supported on macOS")
         #endif
     }
 }

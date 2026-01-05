@@ -59,11 +59,11 @@ struct IRFunctionVisitor: InstructionVisitor {
     private var nestedBlocks = [NestedWasmBlock]()
 
     mutating func push(_ value: IRValue) {
-        stack.append(value)
+        self.stack.append(value)
     }
 
     mutating func pop() -> IRValue {
-        stack.removeLast()
+        self.stack.removeLast()
     }
 
     init(name: String, type: FunctionType, locals: [ValueType], code: Code, ir: IRContext) throws {
@@ -279,7 +279,9 @@ struct IRFunctionVisitor: InstructionVisitor {
     mutating func visitLoop(blockType: BlockType) throws { fatalError() }
 
     mutating func visitIf(blockType: BlockType) throws {
-        let condition = self.ir.__bEqUnsafe(self.pop(), self.ir.__i32ValueUnsafe(1))
+        let stackTop = self.pop()
+        let conditionValue = self.ir.__i32ValueUnsafe(1)
+        let condition = self.ir.__bEqUnsafe(stackTop, conditionValue)
 
         switch blockType {
         case .funcType(let index):
