@@ -35,3 +35,10 @@ target_link_libraries(
 
 install(TARGETS wasmkit-llvm
   RUNTIME DESTINATION bin)
+
+if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  add_custom_command(TARGET wasmkit-llvm
+      POST_BUILD COMMAND
+      ${CMAKE_INSTALL_NAME_TOOL} -change "@rpath/libswiftCompatibilitySpan.dylib" "/Library/Developer/CommandLineTools/usr/lib/swift-6.2/macosx/libswiftCompatibilitySpan.dylib"
+      $<TARGET_FILE:wasmkit-llvm>)
+endif()
