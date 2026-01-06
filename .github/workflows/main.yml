@@ -325,9 +325,9 @@ jobs:
       - name: Install CMake
         run: |
           apt-get install -y curl
-          if [ "${{ matrix.llvm-target }}" == "AArch64" ]; then
+          if [[ "${{ matrix.llvm-target }}" == "AArch64" ]]; then
             export CMAKE_ARCH=aarch64
-          elif [ "${{ matrix.llvm-target }}" == "X86" ]; then
+          elif [[ "${{ matrix.llvm-target }}" == "X86" ]]; then
             export CMAKE_ARCH=x86_64
           else
             exit 1
@@ -363,7 +363,7 @@ jobs:
         include:
           - os: macos-15
             llvm-target: X86
-          - os: macos-15-arm64
+          - os: macos-15-large
             llvm-target: AArch64
 
     runs-on: ${{ matrix.os }}
