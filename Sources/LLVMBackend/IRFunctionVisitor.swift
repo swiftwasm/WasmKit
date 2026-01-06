@@ -343,15 +343,15 @@ struct IRFunctionVisitor: InstructionVisitor, ~Copyable {
     mutating func visitF64Const(value: IEEE754.Float64) throws { fatalError() }
 
     mutating func visitI32Eqz() throws {
-       let stackTop = self.pop()
-       let value = self.ir.__i32ValueUnsafe(0)
-       self.push(self.ir.__iEqUnsafe(stackTop, value))
+        let stackTop = self.pop()
+        let value = self.ir.__i32ValueUnsafe(0)
+        self.push(self.ir.__iEqUnsafe(stackTop, value))
     }
 
     mutating func visitI64Eqz() throws {
-       let stackTop = self.pop()
-       let value = self.ir.__i64ValueUnsafe(0)
-       self.push(self.ir.__iEqUnsafe(stackTop, value))
+        let stackTop = self.pop()
+        let value = self.ir.__i64ValueUnsafe(0)
+        self.push(self.ir.__iEqUnsafe(stackTop, value))
     }
 
     mutating func visitUnary(_ unary: Instruction.Unary) throws { fatalError() }
