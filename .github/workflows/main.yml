@@ -380,19 +380,19 @@ jobs:
       - name: Build LLVM
         if: steps.cache-llvm.outputs.cache-hit != 'true'
         run: |
+          sudo xcode-select -s /Applications/Xcode_26.1.app
           mkdir -p $GITHUB_WORKSPACE/Vendor/llvm-project
           curl -L https://github.com/swiftlang/llvm-project/archive/refs/tags/swift-DEVELOPMENT-SNAPSHOT-2026-01-04-a.tar.gz | tar xz --strip-component 1 -C $GITHUB_WORKSPACE/Vendor/llvm-project
           cmake -DLLVM_TARGETS_TO_BUILD=${{ matrix.llvm-target }} -DLLVM_INCLUDE_TESTS=OFF -DCMAKE_BUILD_TYPE=Release -G Ninja -S $GITHUB_WORKSPACE/Vendor/llvm-project/llvm -B $GITHUB_WORKSPACE/Vendor/llvm-project/llvm/build
           cmake --build $GITHUB_WORKSPACE/Vendor/llvm-project/llvm/build
       - name: Build WasmKit with LLVM
         run: |
-          cmake --version
-          # LLVM_DIR="$GITHUB_WORKSPACE/Vendor/llvm-project/llvm/build/lib/cmake/llvm/" cmake -DWASMKIT_BUILD_LLVM_BACKEND=ON -DWASMKIT_LLVM_BACKEND_TARGET=${{ matrix.llvm-target }} -DWASMKIT_BUILD_CLI=ON -G Ninja -B ./build
-          # cmake --build ./build
-      # - name: Run a smoke test
-      #   run: |
-      #     ./build/bin/wasmkit-llvm wat2wasm Examples/wasm/factorial.wat
-      #     ./build/bin/wasmkit-llvm run Examples/wasm/factorial.wasm 0 i64:5
+          LLVM_DIR="$GITHUB_WORKSPACE/Vendor/llvm-project/llvm/build/lib/cmake/llvm/" cmake -DWASMKIT_BUILD_LLVM_BACKEND=ON -DWASMKIT_LLVM_BACKEND_TARGET=${{ matrix.llvm-target }} -DWASMKIT_BUILD_CLI=ON -G Ninja -B ./build
+          cmake --build ./build
+      - name: Run a smoke test
+        run: |
+          ./build/bin/wasmkit-llvm wat2wasm Examples/wasm/factorial.wat
+          ./build/bin/wasmkit-llvm run Examples/wasm/factorial.wasm 0 i64:5
 
   build-wasi:
     runs-on: ubuntu-24.04
