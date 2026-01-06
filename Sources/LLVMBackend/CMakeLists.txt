@@ -56,11 +56,26 @@ if(NOT Subprocess_FOUND)
   FetchContent_MakeAvailable(Subprocess)
 endif()
 
+find_package(SwiftCollections CONFIG)
+if (NOT SwiftCollections FOUND)
 
-add_dependencies(LLVMInterop LLVM_Utils Subprocess ${WASMKIT_DEPENDENCIES})
+  message("-- Vending SwiftCollections")
+  FetchContent_Declare(
+    Subprocess
+    GIT_REPOSITORY https://github.com/apple/swift-collections
+    GIT_TAG 1.3.0
+    GIT_SHALLOW TRUE
+  )
+  FetchContent_MakeAvailable(SwiftCollections)
+endif()
+
+
+add_dependencies(LLVMInterop BasicContainers LLVM_Utils Subprocess ${WASMKIT_DEPENDENCIES})
 
 target_link_libraries(
   LLVMBackend
+
+  BasicContainers
   ${WASMKIT_DEPENDENCIES}
   LLVMInterop
   LLVM_Utils

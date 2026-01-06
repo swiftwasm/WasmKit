@@ -1,10 +1,10 @@
 add_executable(
-  LLVMBackendCLI
+  wasmkit-llvm
 
   Entrypoint.swift
 )
 target_compile_options(
-  LLVMBackendCLI
+  wasmkit-llvm
   PRIVATE
     -parse-as-library
     -package-name WasmKitPackage
@@ -22,11 +22,14 @@ if(NOT ArgumentParser_FOUND)
   FetchContent_MakeAvailable(ArgumentParser)
 endif()
 
-add_dependencies(LLVMBackendCLI ArgumentParser LLVMBackend)
+add_dependencies(wasmkit-llvm ArgumentParser LLVMBackend)
 
 target_link_libraries(
-  LLVMBackendCLI
+  wasmkit-llvm
 
   ArgumentParser
   LLVMBackend
 )
+
+install(TARGETS wasmkit-llvm
+  RUNTIME DESTINATION bin)
