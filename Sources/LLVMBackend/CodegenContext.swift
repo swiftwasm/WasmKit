@@ -79,13 +79,14 @@ package struct CodegenContext: ~Copyable {
                     // This will forward-declare all `llvm::Function` instances so that `call`
                     // LLVM IR instructions have these instances to refer to and are valid.
                     let name = "\(i)"
-                    try functionVisitors[i] = .init(
-                        name: name,
-                        type: type,
-                        locals: type.parameters + f.locals,
-                        code: f,
-                        ir: self.ir,
-                    )
+                    try functionVisitors.append(
+                        .init(
+                            name: name,
+                            type: type,
+                            locals: type.parameters + f.locals,
+                            code: f,
+                            ir: self.ir,
+                        ))
 
                     functionNames.append(name)
                 }
