@@ -2,7 +2,7 @@ import LLVMInterop
 import WasmParser
 import WasmTypes
 
-struct IRFunctionVisitor: InstructionVisitor {
+struct IRFunctionVisitor: InstructionVisitor, ~Copyable {
     enum Error: Swift.Error {
         case irFunctionUnknown(Int)
         case irFunctionCreationFailed

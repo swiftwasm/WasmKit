@@ -121,7 +121,7 @@ extension Code {
     /// }
     /// ````
     @inlinable
-    public func parseExpression<V: InstructionVisitor>(visitor: inout V) throws {
+    public func parseExpression(visitor: inout some InstructionVisitor & ~Copyable) throws {
         var parser = Parser(stream: StaticByteStream(bytes: self.expression), features: self.features)
         var lastIsEnd: Bool?
         while try !parser.stream.hasReachedEnd() {
@@ -803,7 +803,7 @@ extension Parser: BinaryInstructionDecoder {
     /// Returns: `true` if the parsed instruction is the block end instruction.
     @inline(__always)
     @inlinable
-    mutating func parseInstruction<V: InstructionVisitor>(visitor v: inout V) throws -> Bool {
+    mutating func parseInstruction(visitor v: inout some InstructionVisitor & ~Copyable) throws -> Bool {
         return try parseBinaryInstruction(visitor: &v, decoder: &self)
     }
 
