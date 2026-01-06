@@ -313,10 +313,12 @@ jobs:
         include:
           - os: ubuntu-24.04
             llvm-target: X86
-            cmake-arch: x86_64
           - os: ubuntu-24.04-arm
             llvm-target: AArch64
-            cmake-arch: aarch64
+          - os: macos-15
+            llvm-target: X86
+          - os: macos-15-arm64
+            llvm-target: AArch64
 
     runs-on: ${{ matrix.os }}
     container:
@@ -326,9 +328,18 @@ jobs:
       - name: Install dependencies
         run: apt-get update && apt-get install -y ninja-build python3
       - name: Install CMake
+        if: runner.os == 'Linux'
         run: |
           apt-get install -y curl
-          curl -L https://github.com/Kitware/CMake/releases/download/v3.30.2/cmake-3.30.2-linux-${{ matrix.cmake-arch }}.tar.gz | tar xz --strip-component 1 -C /usr/local/
+          if [ "${{ matrix.llvm-target }}" == "AArch64" ]; then
+            export CMAKE_ARCH=aarch64
+          elif [ "${{ matrix.llvm-target }}" == "X86" ]; then
+            export CMAKE_ARCH=x86_64
+          else
+            exit 1
+          endif
+
+          curl -L "https://github.com/Kitware/CMake/releases/download/v3.30.2/cmake-3.30.2-linux-${CMAKE_ARCH}.tar.gz" | tar xz --strip-component 1 -C /usr/local/
       - name: Cache LLVM
         id: cache-llvm
         uses: actions/cache@v4
