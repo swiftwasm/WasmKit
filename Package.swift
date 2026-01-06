@@ -24,7 +24,7 @@ let package = Package(
             name: "CLI",
             dependencies: [
                 "CLICommands",
-            ]
+            ],
             exclude: ["CMakeLists.txt"]
         ),
 
