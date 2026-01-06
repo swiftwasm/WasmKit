@@ -7,7 +7,7 @@ project(WasmKit LANGUAGES C CXX Swift)
 set(SWIFT_VERSION 6)
 set(CMAKE_Swift_LANGUAGE_VERSION ${SWIFT_VERSION})
 
-set(min_supported_swift_version 6.1)
+set(min_supported_swift_version 6.2)
 if(CMAKE_Swift_COMPILER_VERSION VERSION_LESS "${min_supported_swift_version}")
   message(
     FATAL_ERROR
