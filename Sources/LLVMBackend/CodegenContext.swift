@@ -1,3 +1,4 @@
+import BasicContainers
 import LLVMInterop
 import LLVM_Analysis
 import LLVM_Utils
@@ -27,12 +28,7 @@ package struct CodegenContext: ~Copyable {
 
         var types = [FunctionType]()
         var functionTypes = [TypeIndex]()
-        var functionVisitors: UnsafeMutableBufferPointer<IRFunctionVisitor>?
-        defer {
-            if let functionVisitors {
-                functionVisitors.deallocate()
-            }
-        }
+        var functionVisitors = RigidArray<IRFunctionVisitor>()
         var importedFunctions = [IRValue]()
         var functionNames = [String]()
         var memories = [Memory]()
@@ -76,14 +72,14 @@ package struct CodegenContext: ~Copyable {
                 }
 
             case .codeSection(let functions):
-                functionVisitors = .allocate(capacity: functions.count)
+                functionVisitors = RigidArray(capacity: functions.count)
                 for (i, f) in functions.enumerated() {
                     let type = types[Int(functionTypes[importedFunctions.count + i])]
                     // Create visitors first before actually visiting instructions.
                     // This will forward-declare all `llvm::Function` instances so that `call`
                     // LLVM IR instructions have these instances to refer to and are valid.
                     let name = "\(i)"
-                    try functionVisitors?[i] = .init(
+                    try functionVisitors[i] = .init(
                         name: name,
                         type: type,
                         locals: type.parameters + f.locals,
@@ -97,13 +93,11 @@ package struct CodegenContext: ~Copyable {
             }
         }
 
-        if let functionVisitors {
-            for i in 0..<functionVisitors.count {
-                try functionVisitors[i].visit(
-                    types, functionTypes, memories,
-                    importedFunctions: importedFunctions, functionNames: functionNames
-                )
-            }
+        for i in 0..<functionVisitors.count {
+            try functionVisitors[i].visit(
+                types, functionTypes, memories,
+                importedFunctions: importedFunctions, functionNames: functionNames
+            )
         }
 
         if self.isVerbose {

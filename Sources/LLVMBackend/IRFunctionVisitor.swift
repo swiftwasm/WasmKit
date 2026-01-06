@@ -1,4 +1,3 @@
-import BasicContainers
 import LLVMInterop
 import WasmParser
 import WasmTypes
