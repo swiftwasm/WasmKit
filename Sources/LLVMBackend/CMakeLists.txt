@@ -4,8 +4,6 @@ add_library(
   CodegenContext.swift
   IRContext+codegen.swift
   IRFunctionVisitor.swift
-  LLInstance.swift
-  LLStore.swift
   Linker.swift
   Loader.swift
   Wasm32Memory.swift
