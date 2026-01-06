@@ -364,7 +364,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: macos-15
+          - os: macos-26
             llvm-target: AArch64
 
     runs-on: ${{ matrix.os }}
@@ -380,7 +380,7 @@ jobs:
       - name: Build LLVM
         if: steps.cache-llvm.outputs.cache-hit != 'true'
         run: |
-          sudo xcode-select -s /Applications/Xcode_26.1.app
+          sudo xcode-select -s /Applications/Xcode_26.2.app
           mkdir -p $GITHUB_WORKSPACE/Vendor/llvm-project
           curl -L https://github.com/swiftlang/llvm-project/archive/refs/tags/swift-DEVELOPMENT-SNAPSHOT-2026-01-04-a.tar.gz | tar xz --strip-component 1 -C $GITHUB_WORKSPACE/Vendor/llvm-project
           cmake -DLLVM_TARGETS_TO_BUILD=${{ matrix.llvm-target }} -DLLVM_INCLUDE_TESTS=OFF -DCMAKE_BUILD_TYPE=Release -G Ninja -S $GITHUB_WORKSPACE/Vendor/llvm-project/llvm -B $GITHUB_WORKSPACE/Vendor/llvm-project/llvm/build
