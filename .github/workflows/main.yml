@@ -331,7 +331,7 @@ jobs:
             export CMAKE_ARCH=x86_64
           else
             exit 1
-          endif
+          fi
 
           curl -L "https://github.com/Kitware/CMake/releases/download/v3.30.2/cmake-3.30.2-linux-${CMAKE_ARCH}.tar.gz" | tar xz --strip-component 1 -C /usr/local/
       - name: Cache LLVM
