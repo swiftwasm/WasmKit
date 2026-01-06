@@ -57,11 +57,10 @@ if(NOT Subprocess_FOUND)
 endif()
 
 find_package(SwiftCollections CONFIG)
-if (NOT SwiftCollections FOUND)
-
+if(NOT SwiftCollections_FOUND)
   message("-- Vending SwiftCollections")
   FetchContent_Declare(
-    Subprocess
+    SwiftCollections
     GIT_REPOSITORY https://github.com/apple/swift-collections
     GIT_TAG 1.3.0
     GIT_SHALLOW TRUE
