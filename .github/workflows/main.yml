@@ -365,8 +365,6 @@ jobs:
       matrix:
         include:
           - os: macos-15
-            llvm-target: X86
-          - os: macos-14
             llvm-target: AArch64
 
     runs-on: ${{ matrix.os }}
