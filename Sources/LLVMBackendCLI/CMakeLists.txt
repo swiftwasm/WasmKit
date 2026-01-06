@@ -8,6 +8,7 @@ target_compile_options(
   PRIVATE
     -parse-as-library
     -package-name WasmKitPackage
+    -module-name LLVMBackendCLI
 )
 set(BUILD_TESTING OFF)
 
