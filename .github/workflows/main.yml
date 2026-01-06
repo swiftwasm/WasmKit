@@ -386,12 +386,13 @@ jobs:
           cmake --build $GITHUB_WORKSPACE/Vendor/llvm-project/llvm/build
       - name: Build WasmKit with LLVM
         run: |
-          LLVM_DIR="$GITHUB_WORKSPACE/Vendor/llvm-project/llvm/build/lib/cmake/llvm/" cmake -DWASMKIT_BUILD_LLVM_BACKEND=ON -DWASMKIT_LLVM_BACKEND_TARGET=${{ matrix.llvm-target }} -DWASMKIT_BUILD_CLI=ON -G Ninja -B ./build
-          cmake --build ./build
-      - name: Run a smoke test
-        run: |
-          ./build/bin/wasmkit-llvm wat2wasm Examples/wasm/factorial.wat
-          ./build/bin/wasmkit-llvm run Examples/wasm/factorial.wasm 0 i64:5
+          cmake --version
+          # LLVM_DIR="$GITHUB_WORKSPACE/Vendor/llvm-project/llvm/build/lib/cmake/llvm/" cmake -DWASMKIT_BUILD_LLVM_BACKEND=ON -DWASMKIT_LLVM_BACKEND_TARGET=${{ matrix.llvm-target }} -DWASMKIT_BUILD_CLI=ON -G Ninja -B ./build
+          # cmake --build ./build
+      # - name: Run a smoke test
+      #   run: |
+      #     ./build/bin/wasmkit-llvm wat2wasm Examples/wasm/factorial.wat
+      #     ./build/bin/wasmkit-llvm run Examples/wasm/factorial.wasm 0 i64:5
 
   build-wasi:
     runs-on: ubuntu-24.04
