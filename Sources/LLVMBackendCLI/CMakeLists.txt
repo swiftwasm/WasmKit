@@ -23,12 +23,13 @@ if(NOT ArgumentParser_FOUND)
   FetchContent_MakeAvailable(ArgumentParser)
 endif()
 
-add_dependencies(wasmkit-llvm ArgumentParser LLVMBackend)
+add_dependencies(wasmkit-llvm ArgumentParser CLICommands LLVMBackend)
 
 target_link_libraries(
   wasmkit-llvm
 
   ArgumentParser
+  CLICommands
   LLVMBackend
 )
 
