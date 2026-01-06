@@ -331,3 +331,27 @@ func parseWasm(filePath: FilePath) throws -> Module {
         return try WasmKit.parseWasm(filePath: filePath)
     }
 }
+
+extension Run {
+    package static func parseInvocation(arguments: [String]) -> (functionName: String?, parameters: [Value]) {
+        let functionName = arguments.first
+        let arguments = arguments.dropFirst()
+
+        var parameters: [Value] = []
+        for argument in arguments {
+            let parameter: Value
+            let type = argument.prefix { $0 != ":" }
+            let value = argument.drop { $0 != ":" }.dropFirst()
+            switch type {
+            case "i32": parameter = Value(signed: Int32(value)!)
+            case "i64": parameter = Value(signed: Int64(value)!)
+            case "f32": parameter = .f32(Float32(value)!.bitPattern)
+            case "f64": parameter = .f64(Float64(value)!.bitPattern)
+            default: fatalError("unknown type")
+            }
+            parameters.append(parameter)
+        }
+
+        return (functionName, parameters)
+    }
+}

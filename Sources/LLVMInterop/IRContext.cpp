@@ -93,8 +93,6 @@ bool IRContext::emitObjectFile(StringRef path) const {
   pass.run(*_module);
   dest.flush();
 
-  outs() << "Wrote " << path << "\n";
-
   return true;
 }
 

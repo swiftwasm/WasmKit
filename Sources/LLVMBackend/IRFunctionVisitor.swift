@@ -336,11 +336,24 @@ struct IRFunctionVisitor: InstructionVisitor, ~Copyable {
     mutating func visitStore(_ store: Instruction.Store, memarg: MemArg) throws { fatalError() }
     mutating func visitMemorySize(memory: UInt32) throws { fatalError() }
     mutating func visitMemoryGrow(memory: UInt32) throws { fatalError() }
-    mutating func visitI64Const(value: Int64) throws { fatalError() }
+    mutating func visitI64Const(value: Int64) throws {
+        self.push(self.ir.__i64ValueUnsafe(.init(bitPattern: value)))
+    }
     mutating func visitF32Const(value: IEEE754.Float32) throws { fatalError() }
     mutating func visitF64Const(value: IEEE754.Float64) throws { fatalError() }
-    mutating func visitI32Eqz() throws { fatalError() }
-    mutating func visitI64Eqz() throws { fatalError() }
+
+    mutating func visitI32Eqz() throws {
+       let stackTop = self.pop()
+       let value = self.ir.__i32ValueUnsafe(0)
+       self.push(self.ir.__iEqUnsafe(stackTop, value))
+    }
+
+    mutating func visitI64Eqz() throws {
+       let stackTop = self.pop()
+       let value = self.ir.__i64ValueUnsafe(0)
+       self.push(self.ir.__iEqUnsafe(stackTop, value))
+    }
+
     mutating func visitUnary(_ unary: Instruction.Unary) throws { fatalError() }
     mutating func visitConversion(_ conversion: Instruction.Conversion) throws { fatalError() }
     mutating func visitMemoryInit(dataIndex: UInt32) throws { fatalError() }
@@ -399,6 +412,18 @@ extension IRFunction: @retroactive CustomStringConvertible {
 }
 
 extension IRFunctionType: @retroactive CustomStringConvertible {
+    public var description: String {
+        .init(self.print())
+    }
+}
+
+extension IRType: @retroactive CustomStringConvertible {
+    public var description: String {
+        .init(self.print())
+    }
+}
+
+extension IRValue: @retroactive CustomStringConvertible {
     public var description: String {
         .init(self.print())
     }

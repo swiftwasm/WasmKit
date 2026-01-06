@@ -14,6 +14,34 @@ package protocol ImportedFunctionArguments {
     func apply(symbol: UnsafeMutableRawPointer) -> ResultType
 }
 
+package struct U64Args1Result1: ImportedFunctionArguments {
+    typealias CType = @convention(c) (UInt64) -> UInt64
+
+    private let args: UInt64
+
+    package init(_ first: UInt64) {
+        self.args = first
+    }
+
+    package func apply(symbol: UnsafeMutableRawPointer) -> UInt64 {
+        unsafeBitCast(symbol, to: CType.self)(self.args)
+    }
+}
+
+package struct U64Args2Result1: ImportedFunctionArguments {
+    typealias CType = @convention(c) (UInt64, UInt64) -> UInt64
+
+    private let args: (UInt64, UInt64)
+
+    package init(_ first: UInt64, _ second: UInt64) {
+        self.args = (first, second)
+    }
+
+    package func apply(symbol: UnsafeMutableRawPointer) -> UInt64 {
+        unsafeBitCast(symbol, to: CType.self)(self.args.0, self.args.1)
+    }
+}
+
 package struct U32Args2Result1: ImportedFunctionArguments {
     typealias CType = @convention(c) (UInt32, UInt32) -> UInt32
 

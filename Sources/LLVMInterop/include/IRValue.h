@@ -13,4 +13,12 @@ public:
 
   IRValue(Value *v) : _v(v) {}
   IRValue(IRPHINode phi) : _v(phi._n) {}
+
+  std::string print() const {
+    std::string string = "";
+    raw_string_ostream stream(string);
+
+    this->_v->print(stream);
+    return string;
+  }
 };
