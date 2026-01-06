@@ -318,6 +318,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     container:
       image: swift:6.2-noble
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
       - name: Install dependencies
@@ -363,7 +366,7 @@ jobs:
         include:
           - os: macos-15
             llvm-target: X86
-          - os: macos-15-large
+          - os: macos-14
             llvm-target: AArch64
 
     runs-on: ${{ matrix.os }}
