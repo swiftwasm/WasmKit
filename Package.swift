@@ -23,7 +23,7 @@ let package = Package(
         .executableTarget(
             name: "CLI",
             dependencies: [
-                "CLICommands",
+                "CLICommands"
             ],
             exclude: ["CMakeLists.txt"]
         ),
