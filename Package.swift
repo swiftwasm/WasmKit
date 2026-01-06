@@ -23,6 +23,14 @@ let package = Package(
         .executableTarget(
             name: "CLI",
             dependencies: [
+                "CLICommands",
+            ]
+            exclude: ["CMakeLists.txt"]
+        ),
+
+        .target(
+            name: "CLICommands",
+            dependencies: [
                 "WAT",
                 "WasmKit",
                 "WasmKitWASI",
