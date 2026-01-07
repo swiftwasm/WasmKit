@@ -6,8 +6,8 @@ import class Foundation.ProcessInfo
 
 let DarwinPlatforms: [Platform] = [.macOS, .iOS, .watchOS, .tvOS, .visionOS]
 
-let cliTarget = Target.executableTarget(
-    name: "CLI",
+let cliCommandsTarget = Target.target(
+    name: "CLICommands",
     dependencies: [
         "WAT",
         "WasmKit",
@@ -36,7 +36,12 @@ let package = Package(
         "WasmDebuggingSupport",
     ],
     targets: [
-        cliTarget,
+        cliCommandsTarget,
+        .executableTarget(
+            name: "CLI",
+            dependencies: ["CLICommands"],
+            exclude: ["CMakeLists.txt"]
+        ),
         .target(
             name: "WasmKit",
             dependencies: [
@@ -193,7 +198,7 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
         ),
     ])
 
-    cliTarget.dependencies.append(contentsOf: [
+    cliCommandsTarget.dependencies.append(contentsOf: [
         .product(name: "Logging", package: "swift-log", condition: .when(traits: ["WasmDebuggingSupport"])),
         .product(name: "NIOCore", package: "swift-nio", condition: .when(traits: ["WasmDebuggingSupport"])),
         .product(name: "NIOPosix", package: "swift-nio", condition: .when(traits: ["WasmDebuggingSupport"])),
