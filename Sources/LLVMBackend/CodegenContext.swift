@@ -77,10 +77,10 @@ package struct CodegenContext: ~Copyable {
             case .exportSection(let exports):
                 for e in exports {
                     switch e.descriptor {
-                        case .function(let functionIndex):
-                            functionNames[Int(functionIndex)] = e.name
+                    case .function(let functionIndex):
+                        functionNames[Int(functionIndex)] = e.name
 
-                        default:
+                    default:
                         throw Error.unsupportedExport(e)
                     }
                 }
