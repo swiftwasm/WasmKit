@@ -28,7 +28,7 @@ To use WasmKit in your package, add it as a [Swift Package Manager](https://www.
 Run the following commands in the same directory as your `Package.swift` manifest to add the dependency:
 
 ```
-swift package add-dependency https://github.com/swiftwasm/WasmKit --up-to-next-minor-from 0.1.6
+swift package add-dependency https://github.com/swiftwasm/WasmKit --up-to-next-minor-from 0.2.0
 swift package add-target-dependency WasmKit <your-package-target-name> --package WasmKit
 ```
 
@@ -37,7 +37,7 @@ You can also add the following snippet manually instead to your `Package.swift` 
 ```swift
 dependencies: [
     // ...other dependencies
-    .package(url: "https://github.com/swiftwasm/WasmKit.git", .upToNextMinor(from: "0.1.6")),
+    .package(url: "https://github.com/swiftwasm/WasmKit.git", .upToNextMinor(from: "0.2.0")),
 ],
 // ...other package configuration
 targets: [
