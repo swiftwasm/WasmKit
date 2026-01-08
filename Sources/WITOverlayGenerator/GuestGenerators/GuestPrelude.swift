@@ -138,10 +138,11 @@ let guestPrelude = """
     // TODO: use `@_expose(wasm)`
     // NOTE: multiple objects in a component can have cabi_realloc definition so use `@_weakLinked` here.
     #if canImport(WASILibc)
+    @_extern(c, "realloc") func realloc(_ old: UnsafeMutableRawPointer?, _ newSize: Int) -> UnsafeMutableRawPointer?
+
     @_weakLinked
     @_cdecl("cabi_realloc")
     func cabi_realloc(old: UnsafeMutableRawPointer?, oldSize: UInt, align: UInt, newSize: UInt) -> UnsafeMutableRawPointer? {
-        @_extern(c, "realloc") func realloc(_ old: UnsafeMutableRawPointer?, _ newSize: Int) -> UnsafeMutableRawPointer?
         return realloc(old, Int(newSize))
     }
     #endif
