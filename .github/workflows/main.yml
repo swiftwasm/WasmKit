@@ -26,6 +26,38 @@ jobs:
             echo "::error::The auto-generated code utilities changed some files. Please see \`Utilities/README.md\`, re-run the tools, and commit the changes."
             exit 1
           }
+
+  build-macos-snapshots:
+    runs-on: macos-26
+    strategy:
+      matrix:
+        include:
+          # Swift 6.3 snapshots
+          - development-toolchain-tag: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a
+            wasi-swift-sdk-download: "https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm.artifactbundle.tar.gz"
+            wasi-swift-sdk-id: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm
+            wasi-swift-sdk-checksum: "b64dfad9e1c9ccdf06f35cf9b1a00317e000df0c0de0b3eb9f49d6db0fcba4d9"
+            test-args: "--sanitize address --traits WasmDebuggingSupport"
+            toolchain: main-snapshot
+    steps:
+      - uses: actions/checkout@v4
+      - id: setup-development
+        run: |
+          curl -O https://download.swift.org/swiftly/darwin/swiftly.pkg && \
+            installer -pkg swiftly.pkg -target CurrentUserHomeDirectory && \
+            ~/.swiftly/bin/swiftly init --quiet-shell-followup && \
+            . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh" && \
+            hash -r
+
+      - name: Select toolchain
+        run: |
+          swiftly install ${{ matrix.toolchain }}
+          swiftly use ${{ matrix.toolchain }}
+          swift --version
+
+      - run: ./Vendor/checkout-dependency
+      - run: swift test ${{ matrix.test-args }}
+
   build-macos:
     strategy:
       matrix:
