@@ -16,7 +16,7 @@ import SystemPackage
 /// let fd = try FileDescriptor.open("/path/to/file", .readOnly)
 /// try fs.addFile(at: "/mounted.txt", handle: fd)
 /// ```
-public final class MemoryFileSystem: FileSystemProvider, FileSystemImplementation {
+public final class MemoryFileSystem: FileSystemImplementation {
     private static let rootPath = "/"
 
     private var root: MemoryDirectoryNode
@@ -44,7 +44,7 @@ public final class MemoryFileSystem: FileSystemProvider, FileSystemImplementatio
         devDir.setChild(name: "null", node: MemoryCharacterDeviceNode(kind: .null))
     }
 
-    // MARK: - FileSystemProvider (Public API)
+    // MARK: - Public API
 
     /// Adds a file to the file system with the given byte content.
     ///
@@ -221,10 +221,6 @@ public final class MemoryFileSystem: FileSystemProvider, FileSystemImplementatio
             return .file(MemoryCharacterDeviceEntry(deviceNode: deviceNode, accessMode: accessMode))
         }
         throw WASIAbi.Errno.ENOTSUP
-    }
-
-    func createStdioFile(fd: FileDescriptor, accessMode: FileAccessMode) -> any WASIFile {
-        return MemoryStdioFile(fd: fd, accessMode: accessMode)
     }
 
     // MARK: - File Operations

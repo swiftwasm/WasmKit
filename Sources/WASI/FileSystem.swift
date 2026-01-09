@@ -134,34 +134,10 @@ public enum FileContent {
     case handle(FileDescriptor)
 }
 
-/// Public protocol for file system providers that users interact with.
+/// Protocol for file system implementations used by WASI.
 ///
-/// This protocol exposes only user-facing methods for managing files and directories.
-public protocol FileSystemProvider: ~Copyable {
-    /// Adds a file to the file system with the given byte content.
-    func addFile(at path: String, content: some Sequence<UInt8>) throws
-
-    /// Adds a file to the file system with the given string content.
-    func addFile(at path: String, content: String) throws
-
-    /// Adds a file to the file system backed by a file descriptor handle.
-    func addFile(at path: String, handle: FileDescriptor) throws
-
-    /// Gets the content of a file at the specified path.
-    func getFile(at path: String) throws -> FileContent
-
-    /// Removes a file from the file system.
-    func removeFile(at path: String) throws
-}
-
-/// Internal protocol for file system implementations used by WASI.
-///
-/// This protocol contains WASI-specific implementation details that should not
-/// be exposed to library users.
+/// This protocol contains WASI-specific implementation details.
 protocol FileSystemImplementation: ~Copyable {
-    /// Returns the list of pre-opened directory paths.
-    var preopenPaths: [String] { get }
-
     /// Opens a directory and returns a WASIDir implementation.
     func openDirectory(at path: String) throws -> any WASIDir
 
@@ -175,7 +151,4 @@ protocol FileSystemImplementation: ~Copyable {
         fdflags: WASIAbi.Fdflags,
         symlinkFollow: Bool
     ) throws -> FdEntry
-
-    /// Creates a standard I/O file entry for stdin/stdout/stderr.
-    func createStdioFile(fd: FileDescriptor, accessMode: FileAccessMode) -> any WASIFile
 }
