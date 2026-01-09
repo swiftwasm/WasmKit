@@ -32,21 +32,8 @@ jobs:
     strategy:
       matrix:
         include:
-          # Swift 6.3 snapshots
-          - development-toolchain-tag: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a
-            wasi-swift-sdk-download: "https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm.artifactbundle.tar.gz"
-            wasi-swift-sdk-id: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm
-            wasi-swift-sdk-checksum: "b64dfad9e1c9ccdf06f35cf9b1a00317e000df0c0de0b3eb9f49d6db0fcba4d9"
-            test-args: "--sanitize address --traits WasmDebuggingSupport"
-            toolchain: 6.3-snapshot
-          
-          # Swift `main` snapshots
-          - development-toolchain-tag: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a
-            wasi-swift-sdk-download: "https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm.artifactbundle.tar.gz"
-            wasi-swift-sdk-id: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm
-            wasi-swift-sdk-checksum: "b64dfad9e1c9ccdf06f35cf9b1a00317e000df0c0de0b3eb9f49d6db0fcba4d9"
-            test-args: "--sanitize address --traits WasmDebuggingSupport"
-            toolchain: main-snapshot
+          - toolchain: 6.3-snapshot
+          - toolchain: main-snapshot
     steps:
       - uses: actions/checkout@v4
       - id: setup-development
@@ -54,19 +41,18 @@ jobs:
           curl -O https://download.swift.org/swiftly/darwin/swiftly.pkg && \
             installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
 
-      - name: Select toolchain
+      - name: Build with selected toolchain
         run: |
           ~/.swiftly/bin/swiftly init --quiet-shell-followup --skip-install && \
             . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh" && \
             hash -r
           swiftly install ${{ matrix.toolchain }}
           swiftly use ${{ matrix.toolchain }}
-          swift --version
 
-      - run: ./Vendor/checkout-dependency
-      - run: |
+          ./Vendor/checkout-dependency
+
           swift --version
-          swift test ${{ matrix.test-args }}
+          swift test --sanitize address --traits WasmDebuggingSupport
 
   build-macos:
     strategy:
