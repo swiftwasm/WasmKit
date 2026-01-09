@@ -52,13 +52,13 @@ jobs:
       - id: setup-development
         run: |
           curl -O https://download.swift.org/swiftly/darwin/swiftly.pkg && \
-            installer -pkg swiftly.pkg -target CurrentUserHomeDirectory && \
-            ~/.swiftly/bin/swiftly init --quiet-shell-followup && \
-            . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh" && \
-            hash -r
+            installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
 
       - name: Select toolchain
         run: |
+          ~/.swiftly/bin/swiftly init --quiet-shell-followup && \
+            . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh" && \
+            hash -r
           swiftly install ${{ matrix.toolchain }}
           swiftly use ${{ matrix.toolchain }}
           swift --version
