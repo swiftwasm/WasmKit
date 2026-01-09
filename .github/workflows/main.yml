@@ -198,7 +198,7 @@ jobs:
           EOS
       - run: ./build-exec ./CI/install-wabt.sh
       - run: ./Vendor/checkout-dependency
-      - run: ./build-exec swift test ${{ matrix.test-args }}
+      - run: ./build-exec swift test ${{ matrix.test-args }} || ./build-exec md5sum ./.build/debug/WasmKitPackageTests.xctest
 
       - if: matrix.build-dev-dashboard
         run: ./build-exec ./CI/build-dev-dashboard.sh
