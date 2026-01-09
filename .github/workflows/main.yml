@@ -65,8 +65,8 @@ jobs:
 
       - run: ./Vendor/checkout-dependency
       - run: |
-        swift --version
-        swift test ${{ matrix.test-args }}
+          swift --version
+          swift test ${{ matrix.test-args }}
 
   build-macos:
     strategy:
