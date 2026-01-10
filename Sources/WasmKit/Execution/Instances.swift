@@ -1,3 +1,4 @@
+import Synchronization
 import WasmParser
 
 @_exported import struct WasmParser.GlobalType
@@ -39,7 +40,7 @@ import WasmParser
 /// This type is designed to eliminate ARC retain/release for entities
 /// known to be alive during a VM execution.
 @dynamicMemberLookup
-package struct EntityHandle<T>: Equatable, Hashable {
+package struct EntityHandle<T: ~Copyable>: Equatable, Hashable, Copyable {
     private let pointer: UnsafeMutablePointer<T>
 
     init(unsafe pointer: UnsafeMutablePointer<T>) {
@@ -51,7 +52,7 @@ package struct EntityHandle<T>: Equatable, Hashable {
         self.pointer = pointer
     }
 
-    subscript<R>(dynamicMember keyPath: KeyPath<T, R>) -> R {
+    package subscript<R>(dynamicMember keyPath: KeyPath<T, R>) -> R {
         pointer.pointee[keyPath: keyPath]
     }
 
@@ -65,7 +66,7 @@ package struct EntityHandle<T>: Equatable, Hashable {
     }
 }
 
-extension EntityHandle: ValidatableEntity where T: ValidatableEntity {
+extension EntityHandle: ValidatableEntity where T: ValidatableEntity, T: ~Copyable {
     static func createOutOfBoundsError(index: Int, count: Int) -> Error {
         T.createOutOfBoundsError(index: index, count: count)
     }
@@ -456,7 +457,7 @@ public struct Table: Equatable {
     }
 }
 
-struct MemoryEntity /* : ~Copyable */ {
+struct MemoryEntity: ~Copyable {
     static let pageSize = 64 * 1024
 
     static func maxPageCount(isMemory64: Bool) -> UInt64 {
@@ -466,6 +467,7 @@ struct MemoryEntity /* : ~Copyable */ {
     var data: [UInt8]
     let maxPageCount: UInt64
     let limit: Limits
+    let sharedMutex: Mutex<Void>?
 
     init(_ memoryType: MemoryType, resourceLimiter: any ResourceLimiter) throws {
         let byteSize = Int(memoryType.min) * Self.pageSize
@@ -476,6 +478,7 @@ struct MemoryEntity /* : ~Copyable */ {
         let defaultMaxPageCount = Self.maxPageCount(isMemory64: memoryType.isMemory64)
         maxPageCount = memoryType.max ?? defaultMaxPageCount
         limit = memoryType
+        sharedMutex = memoryType.shared ? Mutex<Void>(()) : nil
     }
 
     /// > Note:
@@ -598,12 +601,12 @@ public struct Memory: Equatable {
 
     /// Returns a copy of the memory data.
     public var data: [UInt8] {
-        handle.data
+        handle.withValue { $0.data }
     }
 
     /// The type of the memory instance.
     public var type: MemoryType {
-        handle.limit
+        handle.withValue { $0.limit }
     }
 }
 

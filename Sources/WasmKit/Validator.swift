@@ -49,6 +49,10 @@ extension ValidationError.Message {
         Self("multiple memories are not permitted")
     }
 
+    static var multipleTablesNotPermitted: Self {
+        Self("multiple tables")
+    }
+
     static func startFunctionInvalidParameters() -> Self {
         Self("start function must have no parameters and no results")
     }
@@ -67,6 +71,14 @@ extension ValidationError.Message {
 
     static var referenceTypesFeatureRequiredForSharedMemories: Self {
         Self("reference-types feature is required for shared memories")
+    }
+
+    static var threadsFeatureRequiredForSharedMemories: Self {
+        Self("threads feature is required for shared memories")
+    }
+
+    static var sharedMemoryMustHaveMaximum: Self {
+        Self("shared memory must have maximum")
     }
 
     static var referenceTypesFeatureRequiredForNonFuncrefTables: Self {
@@ -259,6 +271,10 @@ struct ModuleValidator {
         if module.memoryTypes.count > 1 {
             throw ValidationError(.multipleMemoriesNotPermitted)
         }
+        // Multiple tables are allowed with reference types feature
+        if module.tableTypes.count > 1 && !module.features.contains(.referenceTypes) {
+            throw ValidationError(.multipleTablesNotPermitted)
+        }
         for memoryType in module.memoryTypes {
             try Self.checkMemoryType(memoryType, features: module.features)
         }
@@ -298,7 +314,10 @@ struct ModuleValidator {
 
         if type.shared {
             guard features.contains(.threads) else {
-                throw ValidationError(.referenceTypesFeatureRequiredForSharedMemories)
+                throw ValidationError(.threadsFeatureRequiredForSharedMemories)
+            }
+            guard type.max != nil else {
+                throw ValidationError(.sharedMemoryMustHaveMaximum)
             }
         }
     }

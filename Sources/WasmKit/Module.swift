@@ -211,11 +211,11 @@ public struct Module {
         // Step 16.
         for case .active(let data) in data {
             let memory = try instance.memories[validating: Int(data.index)]
-            let offsetValue = try data.offset.evaluate(
-                context: constEvalContext,
-                expectedType: .addressType(isMemory64: memory.limit.isMemory64)
-            )
             try memory.withValue { memory in
+                let offsetValue = try data.offset.evaluate(
+                    context: constEvalContext,
+                    expectedType: .addressType(isMemory64: memory.limit.isMemory64)
+                )
                 guard let offset = offsetValue.maybeAddressOffset(memory.limit.isMemory64) else {
                     throw ValidationError(
                         .unexpectedOffsetInitializer(expected: .addressType(isMemory64: memory.limit.isMemory64), got: offsetValue)

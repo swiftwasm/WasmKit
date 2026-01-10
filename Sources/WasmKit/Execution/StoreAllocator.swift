@@ -1,7 +1,7 @@
 import WasmParser
 
 /// A simple bump allocator for a single type.
-class BumpAllocator<T> {
+class BumpAllocator<T: ~Copyable> {
     private var pages: [UnsafeMutableBufferPointer<T>] = []
     private var currentPage: UnsafeMutableBufferPointer<T>
     private var currentOffset: Int = 0
@@ -36,7 +36,7 @@ class BumpAllocator<T> {
     ///
     /// - Parameter value: The value to initialize the allocated memory with.
     /// - Returns: A pointer to the allocated memory.
-    func allocate(initializing value: T) -> UnsafeMutablePointer<T> {
+    func allocate(initializing value: consuming T) -> UnsafeMutablePointer<T> {
         let pointer = allocate()
         pointer.initialize(to: value)
         return pointer
@@ -58,7 +58,7 @@ class BumpAllocator<T> {
     }
 }
 
-protocol ValidatableEntity {
+protocol ValidatableEntity: ~Copyable {
     /// Create an error for an out-of-bounds access to the entity.
     static func createOutOfBoundsError(index: Int, count: Int) -> any Error
 }
@@ -70,7 +70,7 @@ private class ImmutableArrayAllocator {
     /// Allocates a buffer for an immutable array of `T` with the given `count`.
     ///
     /// - Note: The element type `T` must be a trivial type.
-    func allocate<T>(count: Int) -> UnsafeMutableBufferPointer<T> {
+    func allocate<T: ~Copyable>(count: Int) -> UnsafeMutableBufferPointer<T> {
         // We only support trivial types for now. Otherwise, we have to track the element type
         // until the deallocation of this allocator.
         assert(_isPOD(T.self), "ImmutableArrayAllocator only supports trivial element types.")
@@ -292,8 +292,27 @@ extension StoreAllocator {
                 importedTables.append(table)
 
             case (.memory(let memoryType), .memory(let memory)):
-                if let max = memory.limit.max, max < memoryType.min {
-                    throw ImportError(.incompatibleMemoryType(importEntry, actual: memoryType, expected: memory.limit))
+                let limit = memory.withValue({ $0.limit })
+                // Check shared flag matches
+                guard memoryType.shared == limit.shared else {
+                    throw ImportError(.incompatibleMemoryType(importEntry, actual: memoryType, expected: limit))
+                }
+                // Check memory64 flag matches
+                guard memoryType.isMemory64 == limit.isMemory64 else {
+                    throw ImportError(.incompatibleMemoryType(importEntry, actual: memoryType, expected: limit))
+                }
+                // Check limits compatibility: provided memory must satisfy imported memory type requirements
+                // Get current memory size in pages (memory may have been grown)
+                let currentSizeInPages = UInt64(memory.withValue({ $0.data.count })) / UInt64(MemoryEntity.pageSize)
+                // The provided memory's current size must be at least as many pages as required
+                guard currentSizeInPages >= memoryType.min else {
+                    throw ImportError(.incompatibleMemoryType(importEntry, actual: memoryType, expected: limit))
+                }
+                // If imported memory type has a max, provided memory must have a max and it must not exceed imported max
+                if let importedMax = memoryType.max {
+                    guard let providedMax = limit.max, providedMax <= importedMax else {
+                        throw ImportError(.incompatibleMemoryType(importEntry, actual: memoryType, expected: limit))
+                    }
                 }
                 importedMemories.append(memory)
 
