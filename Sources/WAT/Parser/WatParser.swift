@@ -529,12 +529,22 @@ struct WatParser {
     }
 
     mutating func memoryUse() throws -> Parser.IndexOrId? {
-        var index: Parser.IndexOrId?
+        // Try full form: (memory idx)
         if try parser.takeParenBlockStart("memory") {
-            index = try parser.expectIndexOrId()
+            let index = try parser.expectIndexOrId()
             try parser.expect(.rightParen)
+            return index
         }
-        return index
+        // Try abbreviation: bare index (only if followed by something that looks like an offset)
+        // This is used in data segments: (data 0 (i32.const 10) ...)
+        let savedLexer = parser.lexer
+        if let bareIndex = try parser.takeIndexOrId(), try parser.peek(.leftParen) != nil {
+            // This is an abbreviation: bare index as memory index
+            return bareIndex
+        }
+        // Restore lexer state if it wasn't a memory index
+        parser.lexer = savedLexer
+        return nil
     }
 
     mutating func dataString() throws -> [UInt8] {
