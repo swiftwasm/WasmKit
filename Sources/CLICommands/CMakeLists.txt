@@ -5,4 +5,16 @@ add_wasmkit_library(CLICommands
 )
 
 target_link_wasmkit_libraries(CLICommands PUBLIC
-  ArgumentParser WAT WasmKitWASI)
+  WAT WasmKitWASI)
+
+add_dependencies(
+  CLICommands
+
+  ArgumentParser
+)
+
+target_link_libraries(CLICommands
+
+  PUBLIC
+  ArgumentParser
+)

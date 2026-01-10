@@ -52,6 +52,8 @@ add_compile_definitions(
 
 include(FetchContent)
 
+option(WASMKIT_BUILD_CLI "Build wasmkit-cli" ON)
+
 if(WASMKIT_BUILD_CLI)
   set(BUILD_TESTING OFF) # disable ArgumentParser tests
   find_package(ArgumentParser CONFIG)
@@ -75,7 +77,6 @@ if(NOT SwiftSystem_FOUND)
   FetchContent_MakeAvailable(SwiftSystem)
 endif()
 
-option(WASMKIT_BUILD_CLI "Build wasmkit-cli" ON)
 
 add_subdirectory(Sources)
 add_subdirectory(Tests)
