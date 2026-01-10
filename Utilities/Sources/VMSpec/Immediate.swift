@@ -217,6 +217,36 @@ extension VMGen.ImmediateLayout {
         $0.field(name: "input2", type: .VReg)
         $0.field(name: "result", type: .VReg)
     }
+
+    static let rmw = Self(name: "RmwOperand") {
+        $0.field(name: "offset", type: .UInt64)
+        $0.field(name: "pointer", type: .VReg)
+        $0.field(name: "value", type: .VReg)
+        $0.field(name: "result", type: .VReg)
+    }
+
+    static let cmpxchg = Self(name: "CmpxchgOperand") {
+        $0.field(name: "offset", type: .UInt64)
+        $0.field(name: "pointer", type: .VReg)
+        $0.field(name: "expected", type: .VReg)
+        $0.field(name: "replacement", type: .VReg)
+        $0.field(name: "result", type: .VReg)
+    }
+
+    static let atomicWait = Self(name: "AtomicWaitOperand") {
+        $0.field(name: "offset", type: .UInt64)
+        $0.field(name: "pointer", type: .VReg)
+        $0.field(name: "expected", type: .VReg)
+        $0.field(name: "timeout", type: .VReg)
+        $0.field(name: "result", type: .VReg)
+    }
+
+    static let atomicNotify = Self(name: "AtomicNotifyOperand") {
+        $0.field(name: "offset", type: .UInt64)
+        $0.field(name: "pointer", type: .VReg)
+        $0.field(name: "count", type: .VReg)
+        $0.field(name: "result", type: .VReg)
+    }
 }
 
 extension VMGen.PrimitiveType {

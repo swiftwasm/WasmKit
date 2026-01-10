@@ -86,7 +86,8 @@ struct SpectestRunner {
                       (func (export "print_f64_f64") (param f64 f64))
                     )
                 """
-            )
+            ),
+            features: [.referenceTypes]
         )
     }
 

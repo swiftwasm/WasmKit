@@ -70,7 +70,7 @@ private class ImmutableArrayAllocator {
     /// Allocates a buffer for an immutable array of `T` with the given `count`.
     ///
     /// - Note: The element type `T` must be a trivial type.
-    func allocate<T>(count: Int) -> UnsafeMutableBufferPointer<T> {
+    func allocate<T: ~Copyable>(count: Int) -> UnsafeMutableBufferPointer<T> {
         // We only support trivial types for now. Otherwise, we have to track the element type
         // until the deallocation of this allocator.
         assert(_isPOD(T.self), "ImmutableArrayAllocator only supports trivial element types.")
@@ -292,9 +292,27 @@ extension StoreAllocator {
                 importedTables.append(table)
 
             case (.memory(let memoryType), .memory(let memory)):
-                let expected = memory.withValue { $0.limit }
-                if let max = expected.max, max < memoryType.min {
-                    throw ImportError(.incompatibleMemoryType(importEntry, actual: memoryType, expected: expected))
+                let limit = memory.withValue { $0.limit }
+
+                // Check shared flag matches
+                guard memoryType.shared == limit.shared else {
+                    throw ImportError(.incompatibleMemoryType(importEntry, actual: memoryType, expected: limit))
+                }
+                // Check memory64 flag matches
+                guard memoryType.isMemory64 == limit.isMemory64 else {
+                    throw ImportError(.incompatibleMemoryType(importEntry, actual: memoryType, expected: limit))
+                }
+                // Check limits compatibility: provided memory must satisfy imported memory type requirements.
+                // Note: The memory may have grown already, so compare against the current size.
+                let currentSizeInPages = UInt64(memory.withValue { $0.byteCount }) / UInt64(MemoryEntity.pageSize)
+                guard currentSizeInPages >= memoryType.min else {
+                    throw ImportError(.incompatibleMemoryType(importEntry, actual: memoryType, expected: limit))
+                }
+                // If the imported memory type has a max, the provided memory must have a max and be <= imported max.
+                if let importedMax = memoryType.max {
+                    guard let providedMax = limit.max, providedMax <= importedMax else {
+                        throw ImportError(.incompatibleMemoryType(importEntry, actual: memoryType, expected: limit))
+                    }
                 }
                 importedMemories.append(memory)
 

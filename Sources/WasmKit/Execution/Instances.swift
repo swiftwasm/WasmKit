@@ -1,3 +1,4 @@
+import Synchronization
 import WasmParser
 
 @_exported import struct WasmParser.GlobalType
@@ -65,7 +66,7 @@ package struct EntityHandle<T: ~Copyable>: Equatable, Hashable, Copyable {
     }
 }
 
-extension EntityHandle: ValidatableEntity where T: ValidatableEntity {
+extension EntityHandle: ValidatableEntity where T: ValidatableEntity, T: ~Copyable {
     static func createOutOfBoundsError(index: Int, count: Int) -> Error {
         T.createOutOfBoundsError(index: index, count: count)
     }
@@ -467,6 +468,7 @@ struct MemoryEntity: ~Copyable {
     private var storage: UnsafeMutableBufferPointer<UInt8>
     let maxPageCount: UInt64
     let limit: Limits
+    let sharedMutex: Mutex<Void>?
 
     init(_ memoryType: MemoryType, resourceLimiter: any ResourceLimiter) throws {
         let byteSize = Int(memoryType.min) * Self.pageSize
@@ -480,6 +482,7 @@ struct MemoryEntity: ~Copyable {
         let defaultMaxPageCount = Self.maxPageCount(isMemory64: memoryType.isMemory64)
         maxPageCount = memoryType.max ?? defaultMaxPageCount
         limit = memoryType
+        sharedMutex = memoryType.shared ? Mutex<Void>(()) : nil
     }
 
     deinit {
