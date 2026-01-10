@@ -260,23 +260,7 @@ package struct Run: AsyncParsableCommand {
     }
 
     func instantiateNonWASI(module: Module, interceptor: EngineInterceptor?) throws -> (() throws -> Void)? {
-        let functionName = arguments.first
-        let arguments = arguments.dropFirst()
-
-        var parameters: [Value] = []
-        for argument in arguments {
-            let parameter: Value
-            let type = argument.prefix { $0 != ":" }
-            let value = argument.drop { $0 != ":" }.dropFirst()
-            switch type {
-            case "i32": parameter = Value(signed: Int32(value)!)
-            case "i64": parameter = Value(signed: Int64(value)!)
-            case "f32": parameter = .f32(Float32(value)!.bitPattern)
-            case "f64": parameter = .f64(Float64(value)!.bitPattern)
-            default: fatalError("unknown type")
-            }
-            parameters.append(parameter)
-        }
+        let (functionName, parameters) = Run.parseInvocation(arguments: self.arguments)
         guard let functionName else {
             log("Error: No function specified to run in a given module.")
             return nil
