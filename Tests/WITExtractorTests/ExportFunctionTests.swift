@@ -1,7 +1,8 @@
-import XCTest
+import Testing
 
-class ExportFunctionTests: XCTestCase {
-    func testNoParameter() throws {
+@Suite(TestEnvironmentTraits.witExtractorAvailability)
+struct ExportFunctionTests {
+    @Test func noParameter() throws {
         try TestSupport.assertTranslation(
             """
             @_spi(WIT) public func noParameter() {}
@@ -15,7 +16,7 @@ class ExportFunctionTests: XCTestCase {
             """)
     }
 
-    func testParameters() throws {
+    @Test func parameters() throws {
         try TestSupport.assertTranslation(
             """
             @_spi(WIT) public func withParameters(x: String, y: Int) {}
@@ -29,7 +30,7 @@ class ExportFunctionTests: XCTestCase {
             """)
     }
 
-    func testResult() throws {
+    @Test func result() throws {
         try TestSupport.assertTranslation(
             """
             @_spi(WIT) public func withResult() -> Int { return 0 }
@@ -43,7 +44,7 @@ class ExportFunctionTests: XCTestCase {
             """)
     }
 
-    func testMultipleResult() throws {
+    @Test func multipleResult() throws {
         try TestSupport.assertTranslation(
             """
             @_spi(WIT) public func withMultipleResult() -> (x: Int, y: Int) {
