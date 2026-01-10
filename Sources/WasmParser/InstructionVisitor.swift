@@ -246,6 +246,58 @@ public enum Instruction: Equatable {
     case `tableGrow`(table: UInt32)
     case `tableSize`(table: UInt32)
     case `atomicFence`
+    case `memoryAtomicNotify`(memarg: MemArg)
+    case `memoryAtomicWait32`(memarg: MemArg)
+    case `memoryAtomicWait64`(memarg: MemArg)
+    case `i32AtomicRmwAdd`(memarg: MemArg)
+    case `i64AtomicRmwAdd`(memarg: MemArg)
+    case `i32AtomicRmw8AddU`(memarg: MemArg)
+    case `i32AtomicRmw16AddU`(memarg: MemArg)
+    case `i64AtomicRmw8AddU`(memarg: MemArg)
+    case `i64AtomicRmw16AddU`(memarg: MemArg)
+    case `i64AtomicRmw32AddU`(memarg: MemArg)
+    case `i32AtomicRmwSub`(memarg: MemArg)
+    case `i64AtomicRmwSub`(memarg: MemArg)
+    case `i32AtomicRmw8SubU`(memarg: MemArg)
+    case `i32AtomicRmw16SubU`(memarg: MemArg)
+    case `i64AtomicRmw8SubU`(memarg: MemArg)
+    case `i64AtomicRmw16SubU`(memarg: MemArg)
+    case `i64AtomicRmw32SubU`(memarg: MemArg)
+    case `i32AtomicRmwAnd`(memarg: MemArg)
+    case `i64AtomicRmwAnd`(memarg: MemArg)
+    case `i32AtomicRmw8AndU`(memarg: MemArg)
+    case `i32AtomicRmw16AndU`(memarg: MemArg)
+    case `i64AtomicRmw8AndU`(memarg: MemArg)
+    case `i64AtomicRmw16AndU`(memarg: MemArg)
+    case `i64AtomicRmw32AndU`(memarg: MemArg)
+    case `i32AtomicRmwOr`(memarg: MemArg)
+    case `i64AtomicRmwOr`(memarg: MemArg)
+    case `i32AtomicRmw8OrU`(memarg: MemArg)
+    case `i32AtomicRmw16OrU`(memarg: MemArg)
+    case `i64AtomicRmw8OrU`(memarg: MemArg)
+    case `i64AtomicRmw16OrU`(memarg: MemArg)
+    case `i64AtomicRmw32OrU`(memarg: MemArg)
+    case `i32AtomicRmwXor`(memarg: MemArg)
+    case `i64AtomicRmwXor`(memarg: MemArg)
+    case `i32AtomicRmw8XorU`(memarg: MemArg)
+    case `i32AtomicRmw16XorU`(memarg: MemArg)
+    case `i64AtomicRmw8XorU`(memarg: MemArg)
+    case `i64AtomicRmw16XorU`(memarg: MemArg)
+    case `i64AtomicRmw32XorU`(memarg: MemArg)
+    case `i32AtomicRmwXchg`(memarg: MemArg)
+    case `i64AtomicRmwXchg`(memarg: MemArg)
+    case `i32AtomicRmw8XchgU`(memarg: MemArg)
+    case `i32AtomicRmw16XchgU`(memarg: MemArg)
+    case `i64AtomicRmw8XchgU`(memarg: MemArg)
+    case `i64AtomicRmw16XchgU`(memarg: MemArg)
+    case `i64AtomicRmw32XchgU`(memarg: MemArg)
+    case `i32AtomicRmwCmpxchg`(memarg: MemArg)
+    case `i64AtomicRmwCmpxchg`(memarg: MemArg)
+    case `i32AtomicRmw8CmpxchgU`(memarg: MemArg)
+    case `i32AtomicRmw16CmpxchgU`(memarg: MemArg)
+    case `i64AtomicRmw8CmpxchgU`(memarg: MemArg)
+    case `i64AtomicRmw16CmpxchgU`(memarg: MemArg)
+    case `i64AtomicRmw32CmpxchgU`(memarg: MemArg)
 }
 
 /// A visitor that visits all instructions by a single visit method.
@@ -313,6 +365,58 @@ extension AnyInstructionVisitor {
     public mutating func visitTableGrow(table: UInt32) throws { return try self.visit(.tableGrow(table: table)) }
     public mutating func visitTableSize(table: UInt32) throws { return try self.visit(.tableSize(table: table)) }
     public mutating func visitAtomicFence() throws { return try self.visit(.atomicFence) }
+    public mutating func visitMemoryAtomicNotify(memarg: MemArg) throws { return try self.visit(.memoryAtomicNotify(memarg: memarg)) }
+    public mutating func visitMemoryAtomicWait32(memarg: MemArg) throws { return try self.visit(.memoryAtomicWait32(memarg: memarg)) }
+    public mutating func visitMemoryAtomicWait64(memarg: MemArg) throws { return try self.visit(.memoryAtomicWait64(memarg: memarg)) }
+    public mutating func visitI32AtomicRmwAdd(memarg: MemArg) throws { return try self.visit(.i32AtomicRmwAdd(memarg: memarg)) }
+    public mutating func visitI64AtomicRmwAdd(memarg: MemArg) throws { return try self.visit(.i64AtomicRmwAdd(memarg: memarg)) }
+    public mutating func visitI32AtomicRmw8AddU(memarg: MemArg) throws { return try self.visit(.i32AtomicRmw8AddU(memarg: memarg)) }
+    public mutating func visitI32AtomicRmw16AddU(memarg: MemArg) throws { return try self.visit(.i32AtomicRmw16AddU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw8AddU(memarg: MemArg) throws { return try self.visit(.i64AtomicRmw8AddU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw16AddU(memarg: MemArg) throws { return try self.visit(.i64AtomicRmw16AddU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw32AddU(memarg: MemArg) throws { return try self.visit(.i64AtomicRmw32AddU(memarg: memarg)) }
+    public mutating func visitI32AtomicRmwSub(memarg: MemArg) throws { return try self.visit(.i32AtomicRmwSub(memarg: memarg)) }
+    public mutating func visitI64AtomicRmwSub(memarg: MemArg) throws { return try self.visit(.i64AtomicRmwSub(memarg: memarg)) }
+    public mutating func visitI32AtomicRmw8SubU(memarg: MemArg) throws { return try self.visit(.i32AtomicRmw8SubU(memarg: memarg)) }
+    public mutating func visitI32AtomicRmw16SubU(memarg: MemArg) throws { return try self.visit(.i32AtomicRmw16SubU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw8SubU(memarg: MemArg) throws { return try self.visit(.i64AtomicRmw8SubU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw16SubU(memarg: MemArg) throws { return try self.visit(.i64AtomicRmw16SubU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw32SubU(memarg: MemArg) throws { return try self.visit(.i64AtomicRmw32SubU(memarg: memarg)) }
+    public mutating func visitI32AtomicRmwAnd(memarg: MemArg) throws { return try self.visit(.i32AtomicRmwAnd(memarg: memarg)) }
+    public mutating func visitI64AtomicRmwAnd(memarg: MemArg) throws { return try self.visit(.i64AtomicRmwAnd(memarg: memarg)) }
+    public mutating func visitI32AtomicRmw8AndU(memarg: MemArg) throws { return try self.visit(.i32AtomicRmw8AndU(memarg: memarg)) }
+    public mutating func visitI32AtomicRmw16AndU(memarg: MemArg) throws { return try self.visit(.i32AtomicRmw16AndU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw8AndU(memarg: MemArg) throws { return try self.visit(.i64AtomicRmw8AndU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw16AndU(memarg: MemArg) throws { return try self.visit(.i64AtomicRmw16AndU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw32AndU(memarg: MemArg) throws { return try self.visit(.i64AtomicRmw32AndU(memarg: memarg)) }
+    public mutating func visitI32AtomicRmwOr(memarg: MemArg) throws { return try self.visit(.i32AtomicRmwOr(memarg: memarg)) }
+    public mutating func visitI64AtomicRmwOr(memarg: MemArg) throws { return try self.visit(.i64AtomicRmwOr(memarg: memarg)) }
+    public mutating func visitI32AtomicRmw8OrU(memarg: MemArg) throws { return try self.visit(.i32AtomicRmw8OrU(memarg: memarg)) }
+    public mutating func visitI32AtomicRmw16OrU(memarg: MemArg) throws { return try self.visit(.i32AtomicRmw16OrU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw8OrU(memarg: MemArg) throws { return try self.visit(.i64AtomicRmw8OrU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw16OrU(memarg: MemArg) throws { return try self.visit(.i64AtomicRmw16OrU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw32OrU(memarg: MemArg) throws { return try self.visit(.i64AtomicRmw32OrU(memarg: memarg)) }
+    public mutating func visitI32AtomicRmwXor(memarg: MemArg) throws { return try self.visit(.i32AtomicRmwXor(memarg: memarg)) }
+    public mutating func visitI64AtomicRmwXor(memarg: MemArg) throws { return try self.visit(.i64AtomicRmwXor(memarg: memarg)) }
+    public mutating func visitI32AtomicRmw8XorU(memarg: MemArg) throws { return try self.visit(.i32AtomicRmw8XorU(memarg: memarg)) }
+    public mutating func visitI32AtomicRmw16XorU(memarg: MemArg) throws { return try self.visit(.i32AtomicRmw16XorU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw8XorU(memarg: MemArg) throws { return try self.visit(.i64AtomicRmw8XorU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw16XorU(memarg: MemArg) throws { return try self.visit(.i64AtomicRmw16XorU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw32XorU(memarg: MemArg) throws { return try self.visit(.i64AtomicRmw32XorU(memarg: memarg)) }
+    public mutating func visitI32AtomicRmwXchg(memarg: MemArg) throws { return try self.visit(.i32AtomicRmwXchg(memarg: memarg)) }
+    public mutating func visitI64AtomicRmwXchg(memarg: MemArg) throws { return try self.visit(.i64AtomicRmwXchg(memarg: memarg)) }
+    public mutating func visitI32AtomicRmw8XchgU(memarg: MemArg) throws { return try self.visit(.i32AtomicRmw8XchgU(memarg: memarg)) }
+    public mutating func visitI32AtomicRmw16XchgU(memarg: MemArg) throws { return try self.visit(.i32AtomicRmw16XchgU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw8XchgU(memarg: MemArg) throws { return try self.visit(.i64AtomicRmw8XchgU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw16XchgU(memarg: MemArg) throws { return try self.visit(.i64AtomicRmw16XchgU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw32XchgU(memarg: MemArg) throws { return try self.visit(.i64AtomicRmw32XchgU(memarg: memarg)) }
+    public mutating func visitI32AtomicRmwCmpxchg(memarg: MemArg) throws { return try self.visit(.i32AtomicRmwCmpxchg(memarg: memarg)) }
+    public mutating func visitI64AtomicRmwCmpxchg(memarg: MemArg) throws { return try self.visit(.i64AtomicRmwCmpxchg(memarg: memarg)) }
+    public mutating func visitI32AtomicRmw8CmpxchgU(memarg: MemArg) throws { return try self.visit(.i32AtomicRmw8CmpxchgU(memarg: memarg)) }
+    public mutating func visitI32AtomicRmw16CmpxchgU(memarg: MemArg) throws { return try self.visit(.i32AtomicRmw16CmpxchgU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw8CmpxchgU(memarg: MemArg) throws { return try self.visit(.i64AtomicRmw8CmpxchgU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw16CmpxchgU(memarg: MemArg) throws { return try self.visit(.i64AtomicRmw16CmpxchgU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw32CmpxchgU(memarg: MemArg) throws { return try self.visit(.i64AtomicRmw32CmpxchgU(memarg: memarg)) }
 }
 
 /// A visitor for WebAssembly instructions.
@@ -439,6 +543,110 @@ public protocol InstructionVisitor {
     mutating func visitTableSize(table: UInt32) throws
     /// Visiting `atomic.fence` instruction.
     mutating func visitAtomicFence() throws
+    /// Visiting `memory.atomic.notify` instruction.
+    mutating func visitMemoryAtomicNotify(memarg: MemArg) throws
+    /// Visiting `memory.atomic.wait32` instruction.
+    mutating func visitMemoryAtomicWait32(memarg: MemArg) throws
+    /// Visiting `memory.atomic.wait64` instruction.
+    mutating func visitMemoryAtomicWait64(memarg: MemArg) throws
+    /// Visiting `i32.atomic.rmw.add` instruction.
+    mutating func visitI32AtomicRmwAdd(memarg: MemArg) throws
+    /// Visiting `i64.atomic.rmw.add` instruction.
+    mutating func visitI64AtomicRmwAdd(memarg: MemArg) throws
+    /// Visiting `i32.atomic.rmw8.add_u` instruction.
+    mutating func visitI32AtomicRmw8AddU(memarg: MemArg) throws
+    /// Visiting `i32.atomic.rmw16.add_u` instruction.
+    mutating func visitI32AtomicRmw16AddU(memarg: MemArg) throws
+    /// Visiting `i64.atomic.rmw8.add_u` instruction.
+    mutating func visitI64AtomicRmw8AddU(memarg: MemArg) throws
+    /// Visiting `i64.atomic.rmw16.add_u` instruction.
+    mutating func visitI64AtomicRmw16AddU(memarg: MemArg) throws
+    /// Visiting `i64.atomic.rmw32.add_u` instruction.
+    mutating func visitI64AtomicRmw32AddU(memarg: MemArg) throws
+    /// Visiting `i32.atomic.rmw.sub` instruction.
+    mutating func visitI32AtomicRmwSub(memarg: MemArg) throws
+    /// Visiting `i64.atomic.rmw.sub` instruction.
+    mutating func visitI64AtomicRmwSub(memarg: MemArg) throws
+    /// Visiting `i32.atomic.rmw8.sub_u` instruction.
+    mutating func visitI32AtomicRmw8SubU(memarg: MemArg) throws
+    /// Visiting `i32.atomic.rmw16.sub_u` instruction.
+    mutating func visitI32AtomicRmw16SubU(memarg: MemArg) throws
+    /// Visiting `i64.atomic.rmw8.sub_u` instruction.
+    mutating func visitI64AtomicRmw8SubU(memarg: MemArg) throws
+    /// Visiting `i64.atomic.rmw16.sub_u` instruction.
+    mutating func visitI64AtomicRmw16SubU(memarg: MemArg) throws
+    /// Visiting `i64.atomic.rmw32.sub_u` instruction.
+    mutating func visitI64AtomicRmw32SubU(memarg: MemArg) throws
+    /// Visiting `i32.atomic.rmw.and` instruction.
+    mutating func visitI32AtomicRmwAnd(memarg: MemArg) throws
+    /// Visiting `i64.atomic.rmw.and` instruction.
+    mutating func visitI64AtomicRmwAnd(memarg: MemArg) throws
+    /// Visiting `i32.atomic.rmw8.and_u` instruction.
+    mutating func visitI32AtomicRmw8AndU(memarg: MemArg) throws
+    /// Visiting `i32.atomic.rmw16.and_u` instruction.
+    mutating func visitI32AtomicRmw16AndU(memarg: MemArg) throws
+    /// Visiting `i64.atomic.rmw8.and_u` instruction.
+    mutating func visitI64AtomicRmw8AndU(memarg: MemArg) throws
+    /// Visiting `i64.atomic.rmw16.and_u` instruction.
+    mutating func visitI64AtomicRmw16AndU(memarg: MemArg) throws
+    /// Visiting `i64.atomic.rmw32.and_u` instruction.
+    mutating func visitI64AtomicRmw32AndU(memarg: MemArg) throws
+    /// Visiting `i32.atomic.rmw.or` instruction.
+    mutating func visitI32AtomicRmwOr(memarg: MemArg) throws
+    /// Visiting `i64.atomic.rmw.or` instruction.
+    mutating func visitI64AtomicRmwOr(memarg: MemArg) throws
+    /// Visiting `i32.atomic.rmw8.or_u` instruction.
+    mutating func visitI32AtomicRmw8OrU(memarg: MemArg) throws
+    /// Visiting `i32.atomic.rmw16.or_u` instruction.
+    mutating func visitI32AtomicRmw16OrU(memarg: MemArg) throws
+    /// Visiting `i64.atomic.rmw8.or_u` instruction.
+    mutating func visitI64AtomicRmw8OrU(memarg: MemArg) throws
+    /// Visiting `i64.atomic.rmw16.or_u` instruction.
+    mutating func visitI64AtomicRmw16OrU(memarg: MemArg) throws
+    /// Visiting `i64.atomic.rmw32.or_u` instruction.
+    mutating func visitI64AtomicRmw32OrU(memarg: MemArg) throws
+    /// Visiting `i32.atomic.rmw.xor` instruction.
+    mutating func visitI32AtomicRmwXor(memarg: MemArg) throws
+    /// Visiting `i64.atomic.rmw.xor` instruction.
+    mutating func visitI64AtomicRmwXor(memarg: MemArg) throws
+    /// Visiting `i32.atomic.rmw8.xor_u` instruction.
+    mutating func visitI32AtomicRmw8XorU(memarg: MemArg) throws
+    /// Visiting `i32.atomic.rmw16.xor_u` instruction.
+    mutating func visitI32AtomicRmw16XorU(memarg: MemArg) throws
+    /// Visiting `i64.atomic.rmw8.xor_u` instruction.
+    mutating func visitI64AtomicRmw8XorU(memarg: MemArg) throws
+    /// Visiting `i64.atomic.rmw16.xor_u` instruction.
+    mutating func visitI64AtomicRmw16XorU(memarg: MemArg) throws
+    /// Visiting `i64.atomic.rmw32.xor_u` instruction.
+    mutating func visitI64AtomicRmw32XorU(memarg: MemArg) throws
+    /// Visiting `i32.atomic.rmw.xchg` instruction.
+    mutating func visitI32AtomicRmwXchg(memarg: MemArg) throws
+    /// Visiting `i64.atomic.rmw.xchg` instruction.
+    mutating func visitI64AtomicRmwXchg(memarg: MemArg) throws
+    /// Visiting `i32.atomic.rmw8.xchg_u` instruction.
+    mutating func visitI32AtomicRmw8XchgU(memarg: MemArg) throws
+    /// Visiting `i32.atomic.rmw16.xchg_u` instruction.
+    mutating func visitI32AtomicRmw16XchgU(memarg: MemArg) throws
+    /// Visiting `i64.atomic.rmw8.xchg_u` instruction.
+    mutating func visitI64AtomicRmw8XchgU(memarg: MemArg) throws
+    /// Visiting `i64.atomic.rmw16.xchg_u` instruction.
+    mutating func visitI64AtomicRmw16XchgU(memarg: MemArg) throws
+    /// Visiting `i64.atomic.rmw32.xchg_u` instruction.
+    mutating func visitI64AtomicRmw32XchgU(memarg: MemArg) throws
+    /// Visiting `i32.atomic.rmw.cmpxchg` instruction.
+    mutating func visitI32AtomicRmwCmpxchg(memarg: MemArg) throws
+    /// Visiting `i64.atomic.rmw.cmpxchg` instruction.
+    mutating func visitI64AtomicRmwCmpxchg(memarg: MemArg) throws
+    /// Visiting `i32.atomic.rmw8.cmpxchg_u` instruction.
+    mutating func visitI32AtomicRmw8CmpxchgU(memarg: MemArg) throws
+    /// Visiting `i32.atomic.rmw16.cmpxchg_u` instruction.
+    mutating func visitI32AtomicRmw16CmpxchgU(memarg: MemArg) throws
+    /// Visiting `i64.atomic.rmw8.cmpxchg_u` instruction.
+    mutating func visitI64AtomicRmw8CmpxchgU(memarg: MemArg) throws
+    /// Visiting `i64.atomic.rmw16.cmpxchg_u` instruction.
+    mutating func visitI64AtomicRmw16CmpxchgU(memarg: MemArg) throws
+    /// Visiting `i64.atomic.rmw32.cmpxchg_u` instruction.
+    mutating func visitI64AtomicRmw32CmpxchgU(memarg: MemArg) throws
     /// Returns: `true` if the parser should silently proceed parsing.
     mutating func visitUnknown(_ opcode: [UInt8]) throws -> Bool
 }
@@ -505,6 +713,58 @@ extension InstructionVisitor {
         case let .tableGrow(table): return try visitTableGrow(table: table)
         case let .tableSize(table): return try visitTableSize(table: table)
         case .atomicFence: return try visitAtomicFence()
+        case let .memoryAtomicNotify(memarg): return try visitMemoryAtomicNotify(memarg: memarg)
+        case let .memoryAtomicWait32(memarg): return try visitMemoryAtomicWait32(memarg: memarg)
+        case let .memoryAtomicWait64(memarg): return try visitMemoryAtomicWait64(memarg: memarg)
+        case let .i32AtomicRmwAdd(memarg): return try visitI32AtomicRmwAdd(memarg: memarg)
+        case let .i64AtomicRmwAdd(memarg): return try visitI64AtomicRmwAdd(memarg: memarg)
+        case let .i32AtomicRmw8AddU(memarg): return try visitI32AtomicRmw8AddU(memarg: memarg)
+        case let .i32AtomicRmw16AddU(memarg): return try visitI32AtomicRmw16AddU(memarg: memarg)
+        case let .i64AtomicRmw8AddU(memarg): return try visitI64AtomicRmw8AddU(memarg: memarg)
+        case let .i64AtomicRmw16AddU(memarg): return try visitI64AtomicRmw16AddU(memarg: memarg)
+        case let .i64AtomicRmw32AddU(memarg): return try visitI64AtomicRmw32AddU(memarg: memarg)
+        case let .i32AtomicRmwSub(memarg): return try visitI32AtomicRmwSub(memarg: memarg)
+        case let .i64AtomicRmwSub(memarg): return try visitI64AtomicRmwSub(memarg: memarg)
+        case let .i32AtomicRmw8SubU(memarg): return try visitI32AtomicRmw8SubU(memarg: memarg)
+        case let .i32AtomicRmw16SubU(memarg): return try visitI32AtomicRmw16SubU(memarg: memarg)
+        case let .i64AtomicRmw8SubU(memarg): return try visitI64AtomicRmw8SubU(memarg: memarg)
+        case let .i64AtomicRmw16SubU(memarg): return try visitI64AtomicRmw16SubU(memarg: memarg)
+        case let .i64AtomicRmw32SubU(memarg): return try visitI64AtomicRmw32SubU(memarg: memarg)
+        case let .i32AtomicRmwAnd(memarg): return try visitI32AtomicRmwAnd(memarg: memarg)
+        case let .i64AtomicRmwAnd(memarg): return try visitI64AtomicRmwAnd(memarg: memarg)
+        case let .i32AtomicRmw8AndU(memarg): return try visitI32AtomicRmw8AndU(memarg: memarg)
+        case let .i32AtomicRmw16AndU(memarg): return try visitI32AtomicRmw16AndU(memarg: memarg)
+        case let .i64AtomicRmw8AndU(memarg): return try visitI64AtomicRmw8AndU(memarg: memarg)
+        case let .i64AtomicRmw16AndU(memarg): return try visitI64AtomicRmw16AndU(memarg: memarg)
+        case let .i64AtomicRmw32AndU(memarg): return try visitI64AtomicRmw32AndU(memarg: memarg)
+        case let .i32AtomicRmwOr(memarg): return try visitI32AtomicRmwOr(memarg: memarg)
+        case let .i64AtomicRmwOr(memarg): return try visitI64AtomicRmwOr(memarg: memarg)
+        case let .i32AtomicRmw8OrU(memarg): return try visitI32AtomicRmw8OrU(memarg: memarg)
+        case let .i32AtomicRmw16OrU(memarg): return try visitI32AtomicRmw16OrU(memarg: memarg)
+        case let .i64AtomicRmw8OrU(memarg): return try visitI64AtomicRmw8OrU(memarg: memarg)
+        case let .i64AtomicRmw16OrU(memarg): return try visitI64AtomicRmw16OrU(memarg: memarg)
+        case let .i64AtomicRmw32OrU(memarg): return try visitI64AtomicRmw32OrU(memarg: memarg)
+        case let .i32AtomicRmwXor(memarg): return try visitI32AtomicRmwXor(memarg: memarg)
+        case let .i64AtomicRmwXor(memarg): return try visitI64AtomicRmwXor(memarg: memarg)
+        case let .i32AtomicRmw8XorU(memarg): return try visitI32AtomicRmw8XorU(memarg: memarg)
+        case let .i32AtomicRmw16XorU(memarg): return try visitI32AtomicRmw16XorU(memarg: memarg)
+        case let .i64AtomicRmw8XorU(memarg): return try visitI64AtomicRmw8XorU(memarg: memarg)
+        case let .i64AtomicRmw16XorU(memarg): return try visitI64AtomicRmw16XorU(memarg: memarg)
+        case let .i64AtomicRmw32XorU(memarg): return try visitI64AtomicRmw32XorU(memarg: memarg)
+        case let .i32AtomicRmwXchg(memarg): return try visitI32AtomicRmwXchg(memarg: memarg)
+        case let .i64AtomicRmwXchg(memarg): return try visitI64AtomicRmwXchg(memarg: memarg)
+        case let .i32AtomicRmw8XchgU(memarg): return try visitI32AtomicRmw8XchgU(memarg: memarg)
+        case let .i32AtomicRmw16XchgU(memarg): return try visitI32AtomicRmw16XchgU(memarg: memarg)
+        case let .i64AtomicRmw8XchgU(memarg): return try visitI64AtomicRmw8XchgU(memarg: memarg)
+        case let .i64AtomicRmw16XchgU(memarg): return try visitI64AtomicRmw16XchgU(memarg: memarg)
+        case let .i64AtomicRmw32XchgU(memarg): return try visitI64AtomicRmw32XchgU(memarg: memarg)
+        case let .i32AtomicRmwCmpxchg(memarg): return try visitI32AtomicRmwCmpxchg(memarg: memarg)
+        case let .i64AtomicRmwCmpxchg(memarg): return try visitI64AtomicRmwCmpxchg(memarg: memarg)
+        case let .i32AtomicRmw8CmpxchgU(memarg): return try visitI32AtomicRmw8CmpxchgU(memarg: memarg)
+        case let .i32AtomicRmw16CmpxchgU(memarg): return try visitI32AtomicRmw16CmpxchgU(memarg: memarg)
+        case let .i64AtomicRmw8CmpxchgU(memarg): return try visitI64AtomicRmw8CmpxchgU(memarg: memarg)
+        case let .i64AtomicRmw16CmpxchgU(memarg): return try visitI64AtomicRmw16CmpxchgU(memarg: memarg)
+        case let .i64AtomicRmw32CmpxchgU(memarg): return try visitI64AtomicRmw32CmpxchgU(memarg: memarg)
         }
     }
 }
@@ -569,6 +829,58 @@ extension InstructionVisitor {
     public mutating func visitTableGrow(table: UInt32) throws {}
     public mutating func visitTableSize(table: UInt32) throws {}
     public mutating func visitAtomicFence() throws {}
+    public mutating func visitMemoryAtomicNotify(memarg: MemArg) throws {}
+    public mutating func visitMemoryAtomicWait32(memarg: MemArg) throws {}
+    public mutating func visitMemoryAtomicWait64(memarg: MemArg) throws {}
+    public mutating func visitI32AtomicRmwAdd(memarg: MemArg) throws {}
+    public mutating func visitI64AtomicRmwAdd(memarg: MemArg) throws {}
+    public mutating func visitI32AtomicRmw8AddU(memarg: MemArg) throws {}
+    public mutating func visitI32AtomicRmw16AddU(memarg: MemArg) throws {}
+    public mutating func visitI64AtomicRmw8AddU(memarg: MemArg) throws {}
+    public mutating func visitI64AtomicRmw16AddU(memarg: MemArg) throws {}
+    public mutating func visitI64AtomicRmw32AddU(memarg: MemArg) throws {}
+    public mutating func visitI32AtomicRmwSub(memarg: MemArg) throws {}
+    public mutating func visitI64AtomicRmwSub(memarg: MemArg) throws {}
+    public mutating func visitI32AtomicRmw8SubU(memarg: MemArg) throws {}
+    public mutating func visitI32AtomicRmw16SubU(memarg: MemArg) throws {}
+    public mutating func visitI64AtomicRmw8SubU(memarg: MemArg) throws {}
+    public mutating func visitI64AtomicRmw16SubU(memarg: MemArg) throws {}
+    public mutating func visitI64AtomicRmw32SubU(memarg: MemArg) throws {}
+    public mutating func visitI32AtomicRmwAnd(memarg: MemArg) throws {}
+    public mutating func visitI64AtomicRmwAnd(memarg: MemArg) throws {}
+    public mutating func visitI32AtomicRmw8AndU(memarg: MemArg) throws {}
+    public mutating func visitI32AtomicRmw16AndU(memarg: MemArg) throws {}
+    public mutating func visitI64AtomicRmw8AndU(memarg: MemArg) throws {}
+    public mutating func visitI64AtomicRmw16AndU(memarg: MemArg) throws {}
+    public mutating func visitI64AtomicRmw32AndU(memarg: MemArg) throws {}
+    public mutating func visitI32AtomicRmwOr(memarg: MemArg) throws {}
+    public mutating func visitI64AtomicRmwOr(memarg: MemArg) throws {}
+    public mutating func visitI32AtomicRmw8OrU(memarg: MemArg) throws {}
+    public mutating func visitI32AtomicRmw16OrU(memarg: MemArg) throws {}
+    public mutating func visitI64AtomicRmw8OrU(memarg: MemArg) throws {}
+    public mutating func visitI64AtomicRmw16OrU(memarg: MemArg) throws {}
+    public mutating func visitI64AtomicRmw32OrU(memarg: MemArg) throws {}
+    public mutating func visitI32AtomicRmwXor(memarg: MemArg) throws {}
+    public mutating func visitI64AtomicRmwXor(memarg: MemArg) throws {}
+    public mutating func visitI32AtomicRmw8XorU(memarg: MemArg) throws {}
+    public mutating func visitI32AtomicRmw16XorU(memarg: MemArg) throws {}
+    public mutating func visitI64AtomicRmw8XorU(memarg: MemArg) throws {}
+    public mutating func visitI64AtomicRmw16XorU(memarg: MemArg) throws {}
+    public mutating func visitI64AtomicRmw32XorU(memarg: MemArg) throws {}
+    public mutating func visitI32AtomicRmwXchg(memarg: MemArg) throws {}
+    public mutating func visitI64AtomicRmwXchg(memarg: MemArg) throws {}
+    public mutating func visitI32AtomicRmw8XchgU(memarg: MemArg) throws {}
+    public mutating func visitI32AtomicRmw16XchgU(memarg: MemArg) throws {}
+    public mutating func visitI64AtomicRmw8XchgU(memarg: MemArg) throws {}
+    public mutating func visitI64AtomicRmw16XchgU(memarg: MemArg) throws {}
+    public mutating func visitI64AtomicRmw32XchgU(memarg: MemArg) throws {}
+    public mutating func visitI32AtomicRmwCmpxchg(memarg: MemArg) throws {}
+    public mutating func visitI64AtomicRmwCmpxchg(memarg: MemArg) throws {}
+    public mutating func visitI32AtomicRmw8CmpxchgU(memarg: MemArg) throws {}
+    public mutating func visitI32AtomicRmw16CmpxchgU(memarg: MemArg) throws {}
+    public mutating func visitI64AtomicRmw8CmpxchgU(memarg: MemArg) throws {}
+    public mutating func visitI64AtomicRmw16CmpxchgU(memarg: MemArg) throws {}
+    public mutating func visitI64AtomicRmw32CmpxchgU(memarg: MemArg) throws {}
     public mutating func visitUnknown(_ opcode: [UInt8]) throws -> Bool { false }
 }
 

@@ -796,6 +796,58 @@ extension Parser: BinaryInstructionDecoder {
     @inlinable mutating func visitTableSize() throws -> UInt32 {
         try parseUnsigned()
     }
+    @inlinable mutating func visitMemoryAtomicNotify() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitMemoryAtomicWait32() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitMemoryAtomicWait64() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmwAdd() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmwAdd() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw8AddU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw16AddU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw8AddU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw16AddU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw32AddU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmwSub() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmwSub() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw8SubU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw16SubU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw8SubU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw16SubU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw32SubU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmwAnd() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmwAnd() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw8AndU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw16AndU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw8AndU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw16AndU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw32AndU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmwOr() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmwOr() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw8OrU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw16OrU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw8OrU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw16OrU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw32OrU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmwXor() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmwXor() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw8XorU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw16XorU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw8XorU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw16XorU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw32XorU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmwXchg() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmwXchg() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw8XchgU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw16XchgU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw8XchgU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw16XchgU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw32XchgU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmwCmpxchg() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmwCmpxchg() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw8CmpxchgU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw16CmpxchgU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw8CmpxchgU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw16CmpxchgU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw32CmpxchgU() throws -> MemArg { try parseMemarg() }
     @inlinable func claimNextByte() throws -> UInt8 {
         return try stream.consumeAny()
     }
