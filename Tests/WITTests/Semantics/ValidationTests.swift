@@ -1,10 +1,15 @@
-import XCTest
+import Testing
 
 @testable import WIT
 
-class ValidationTests: XCTestCase {
+@Suite
+struct ValidationTests {
 
-    func assertDiagnostics(_ text: String, expected: [String], line: UInt = #line) throws {
+    func assertDiagnostics(
+        _ text: String,
+        expected: [String],
+        sourceLocation: SourceLocation = #_sourceLocation
+    ) throws {
         let packageResolver = PackageResolver()
         var lexer = Lexer(cursor: .init(input: text))
         let sourceFile = try SourceFileSyntax.parse(lexer: &lexer, fileName: "test.wit")
@@ -13,10 +18,10 @@ class ValidationTests: XCTestCase {
 
         let diagnostics = try context.validate(package: pkg)
 
-        XCTAssertEqual(diagnostics.flatMap(\.value).map(\.message), expected, line: line)
+        #expect(diagnostics.flatMap(\.value).map(\.message) == expected, sourceLocation: sourceLocation)
     }
 
-    func testInvalidTypeReferences() throws {
+    @Test func invalidTypeReferences() throws {
         try assertDiagnostics(
             """
             package foo:bar
@@ -34,7 +39,7 @@ class ValidationTests: XCTestCase {
         )
     }
 
-    func testInvalidTypeReferencesInTypeDefinitions() throws {
+    @Test func invalidTypeReferencesInTypeDefinitions() throws {
         try assertDiagnostics(
             """
             package foo:bar
@@ -61,7 +66,7 @@ class ValidationTests: XCTestCase {
         )
     }
 
-    func testInvalidTypeReferencesInFunctions() throws {
+    @Test func invalidTypeReferencesInFunctions() throws {
         try assertDiagnostics(
             """
             package foo:bar
@@ -83,7 +88,7 @@ class ValidationTests: XCTestCase {
         )
     }
 
-    func testInvalidTypeReferencesInUse() throws {
+    @Test func invalidTypeReferencesInUse() throws {
         try assertDiagnostics(
             """
             package foo:bar
@@ -102,7 +107,7 @@ class ValidationTests: XCTestCase {
         )
     }
 
-    func testValidateInlineInterface() throws {
+    @Test func validateInlineInterface() throws {
         try assertDiagnostics(
             """
             package foo:bar
@@ -141,7 +146,7 @@ class ValidationTests: XCTestCase {
         )
     }
 
-    func testValidateImportExport() throws {
+    @Test func validateImportExport() throws {
         try assertDiagnostics(
             """
             package foo:bar
@@ -161,7 +166,7 @@ class ValidationTests: XCTestCase {
         )
     }
 
-    func testInvalidTopLevelUse() throws {
+    @Test func invalidTopLevelUse() throws {
         try assertDiagnostics(
             """
             package foo:bar
@@ -179,7 +184,7 @@ class ValidationTests: XCTestCase {
         )
     }
 
-    func testRecordRedeclaration() throws {
+    @Test func recordRedeclaration() throws {
         try assertDiagnostics(
             """
             package foo:bar
@@ -199,7 +204,7 @@ class ValidationTests: XCTestCase {
         )
     }
 
-    func testVariantRedeclaration() throws {
+    @Test func variantRedeclaration() throws {
         try assertDiagnostics(
             """
             package foo:bar

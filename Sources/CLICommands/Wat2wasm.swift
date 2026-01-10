@@ -3,8 +3,8 @@ import SystemPackage
 import WAT
 import WasmKit
 
-struct Wat2wasm: ParsableCommand {
-    static let configuration = CommandConfiguration(
+package struct Wat2wasm: ParsableCommand {
+    package static let configuration = CommandConfiguration(
         abstract: "Assemble WebAssembly text into a WebAssembly binary",
         discussion: """
             Parse a file in WebAssembly Text Format (`.wat`), \
@@ -58,7 +58,9 @@ struct Wat2wasm: ParsableCommand {
     )
     var output: String?
 
-    func run() throws {
+    package init() {}
+
+    package func run() throws {
         let filePath = FilePath(path)
         guard filePath.extension == "wat" else { throw Error.unknownFileExtension(filePath.extension) }
         let fileHandle = try FileDescriptor.open(filePath, .readOnly)

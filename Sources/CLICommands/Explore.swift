@@ -2,9 +2,9 @@ import ArgumentParser
 import SystemPackage
 @_spi(OnlyForCLI) import WasmKit
 
-struct Explore: ParsableCommand {
+package struct Explore: ParsableCommand {
 
-    static let configuration = CommandConfiguration(
+    package static let configuration = CommandConfiguration(
         abstract: "Explore the compiled functions of a WebAssembly module",
         discussion: """
             This command will parse a WebAssembly module and dump the compiled functions.
@@ -22,7 +22,9 @@ struct Explore: ParsableCommand {
         }
     }
 
-    func run() throws {
+    package init() {}
+
+    package func run() throws {
         let module = try parseWasm(filePath: FilePath(path))
         // Instruction dumping requires token threading model for now
         let configuration = EngineConfiguration(threadingModel: .token)

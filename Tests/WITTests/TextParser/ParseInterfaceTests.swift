@@ -1,8 +1,9 @@
-import XCTest
+import Testing
 
 @testable import WIT
 
-class ParseInterfaceTests: XCTestCase {
+@Suite
+struct ParseInterfaceTests {
 
     func parse(_ text: String) throws -> SyntaxNode<InterfaceSyntax> {
         var lexer = Lexer(cursor: .init(input: text))
@@ -12,13 +13,13 @@ class ParseInterfaceTests: XCTestCase {
         )
     }
 
-    func testEmpty() throws {
+    @Test func empty() throws {
         let iface = try parse("interface empty {}")
-        XCTAssertEqual(iface.name.text, "empty")
-        XCTAssertEqual(iface.items.count, 0)
+        #expect(iface.name.text == "empty")
+        #expect(iface.items.count == 0)
     }
 
-    func testMultipleItems() throws {
+    @Test func multipleItems() throws {
         let iface = try parse(
             """
             interface x {
@@ -27,11 +28,11 @@ class ParseInterfaceTests: XCTestCase {
             }
             """
         )
-        XCTAssertEqual(iface.name.text, "x")
-        XCTAssertEqual(iface.items.count, 2)
+        #expect(iface.name.text == "x")
+        #expect(iface.items.count == 2)
     }
 
-    func testWithComment() throws {
+    @Test func withComment() throws {
         let iface = try parse(
             """
             interface x {
@@ -40,21 +41,23 @@ class ParseInterfaceTests: XCTestCase {
             }
             """
         )
-        XCTAssertEqual(iface.name.text, "x")
-        XCTAssertEqual(iface.items.count, 1)
+        #expect(iface.name.text == "x")
+        #expect(iface.items.count == 1)
         let item = iface.items[0]
         guard case .function(let function) = item else {
-            XCTFail("unexpected item type: \(item)")
+            Issue.record("unexpected item type: \(item)")
             return
         }
-        XCTAssertEqual(function.documents.comments.count, 1)
+        #expect(function.documents.comments.count == 1)
     }
 
-    func testInvalidItem() throws {
-        XCTAssertThrowsError(try parse("interface x { . }"))
+    @Test func invalidItem() throws {
+        #expect(throws: (any Error).self) {
+            try parse("interface x { . }")
+        }
     }
 
-    func testItemType() throws {
+    @Test func itemType() throws {
         let iface = try parse(
             """
             interface x {
@@ -62,16 +65,16 @@ class ParseInterfaceTests: XCTestCase {
             }
             """
         )
-        XCTAssertEqual(iface.items.count, 1)
+        #expect(iface.items.count == 1)
         let item = iface.items[0]
         guard case .typeDef(let typeDef) = item else {
-            XCTFail("unexpected item type: \(item)")
+            Issue.record("unexpected item type: \(item)")
             return
         }
-        XCTAssertEqual(typeDef.name.text, "t1")
+        #expect(typeDef.name.text == "t1")
     }
 
-    func testItemFlags() throws {
+    @Test func itemFlags() throws {
         let iface = try parse(
             """
             interface x {
@@ -81,16 +84,16 @@ class ParseInterfaceTests: XCTestCase {
             }
             """
         )
-        XCTAssertEqual(iface.items.count, 1)
+        #expect(iface.items.count == 1)
         let item = iface.items[0]
         guard case .typeDef(let typeDef) = item else {
-            XCTFail("unexpected item type: \(item)")
+            Issue.record("unexpected item type: \(item)")
             return
         }
-        XCTAssertEqual(typeDef.name.text, "f1")
+        #expect(typeDef.name.text == "f1")
     }
 
-    func testItemEnum() throws {
+    @Test func itemEnum() throws {
         let iface = try parse(
             """
             interface x {
@@ -100,16 +103,16 @@ class ParseInterfaceTests: XCTestCase {
             }
             """
         )
-        XCTAssertEqual(iface.items.count, 1)
+        #expect(iface.items.count == 1)
         let item = iface.items[0]
         guard case .typeDef(let typeDef) = item else {
-            XCTFail("unexpected item type: \(item)")
+            Issue.record("unexpected item type: \(item)")
             return
         }
-        XCTAssertEqual(typeDef.name.text, "e1")
+        #expect(typeDef.name.text == "e1")
     }
 
-    func testItemVariant() throws {
+    @Test func itemVariant() throws {
         let iface = try parse(
             """
             interface x {
@@ -119,16 +122,16 @@ class ParseInterfaceTests: XCTestCase {
             }
             """
         )
-        XCTAssertEqual(iface.items.count, 1)
+        #expect(iface.items.count == 1)
         let item = iface.items[0]
         guard case .typeDef(let typeDef) = item else {
-            XCTFail("unexpected item type: \(item)")
+            Issue.record("unexpected item type: \(item)")
             return
         }
-        XCTAssertEqual(typeDef.name.text, "v1")
+        #expect(typeDef.name.text == "v1")
     }
 
-    func testItemResource() throws {
+    @Test func itemResource() throws {
         let iface = try parse(
             """
             interface x {
@@ -136,16 +139,16 @@ class ParseInterfaceTests: XCTestCase {
             }
             """
         )
-        XCTAssertEqual(iface.items.count, 1)
+        #expect(iface.items.count == 1)
         let item = iface.items[0]
         guard case .typeDef(let typeDef) = item else {
-            XCTFail("unexpected item type: \(item)")
+            Issue.record("unexpected item type: \(item)")
             return
         }
-        XCTAssertEqual(typeDef.name.text, "rs1")
+        #expect(typeDef.name.text == "rs1")
     }
 
-    func testItemRecord() throws {
+    @Test func itemRecord() throws {
         let iface = try parse(
             """
             interface x {
@@ -155,16 +158,16 @@ class ParseInterfaceTests: XCTestCase {
             }
             """
         )
-        XCTAssertEqual(iface.items.count, 1)
+        #expect(iface.items.count == 1)
         let item = iface.items[0]
         guard case .typeDef(let typeDef) = item else {
-            XCTFail("unexpected item type: \(item)")
+            Issue.record("unexpected item type: \(item)")
             return
         }
-        XCTAssertEqual(typeDef.name.text, "rc1")
+        #expect(typeDef.name.text == "rc1")
     }
 
-    func testItemUnion() throws {
+    @Test func itemUnion() throws {
         let iface = try parse(
             """
             interface x {
@@ -175,16 +178,16 @@ class ParseInterfaceTests: XCTestCase {
             }
             """
         )
-        XCTAssertEqual(iface.items.count, 1)
+        #expect(iface.items.count == 1)
         let item = iface.items[0]
         guard case .typeDef(let typeDef) = item else {
-            XCTFail("unexpected item type: \(item)")
+            Issue.record("unexpected item type: \(item)")
             return
         }
-        XCTAssertEqual(typeDef.name.text, "u1")
+        #expect(typeDef.name.text == "u1")
     }
 
-    func testItemFunction() throws {
+    @Test func itemFunction() throws {
         let iface = try parse(
             """
             interface x {
@@ -192,16 +195,16 @@ class ParseInterfaceTests: XCTestCase {
             }
             """
         )
-        XCTAssertEqual(iface.items.count, 1)
+        #expect(iface.items.count == 1)
         let item = iface.items[0]
         guard case .function(let function) = item else {
-            XCTFail("unexpected item type: \(item)")
+            Issue.record("unexpected item type: \(item)")
             return
         }
-        XCTAssertEqual(function.name.text, "f1")
+        #expect(function.name.text == "f1")
     }
 
-    func testItemUse() throws {
+    @Test func itemUse() throws {
         let iface = try parse(
             """
             interface x {
@@ -209,12 +212,12 @@ class ParseInterfaceTests: XCTestCase {
             }
             """
         )
-        XCTAssertEqual(iface.items.count, 1)
+        #expect(iface.items.count == 1)
         let item = iface.items[0]
         guard case .use(let use) = item else {
-            XCTFail("unexpected item type: \(item)")
+            Issue.record("unexpected item type: \(item)")
             return
         }
-        XCTAssertEqual(use.from.name.text, "pkg1")
+        #expect(use.from.name.text == "pkg1")
     }
 }

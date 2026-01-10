@@ -1,30 +1,31 @@
-import XCTest
+import Testing
 
 @testable import WIT
 
-class ParseTopTests: XCTestCase {
+@Suite
+struct ParseTopTests {
 
-    func testASTEmpty() throws {
+    @Test func aSTEmpty() throws {
         var lexer = Lexer(cursor: .init(input: ""))
         let ast = try SourceFileSyntax.parse(lexer: &lexer)
-        XCTAssertNil(ast.packageId)
-        XCTAssertEqual(ast.items.count, 0)
+        #expect(ast.packageId == nil)
+        #expect(ast.items.count == 0)
     }
 
-    func testASTEndingWithNewline() throws {
+    @Test func aSTEndingWithNewline() throws {
         var lexer = Lexer(cursor: .init(input: "\n"))
         let ast = try SourceFileSyntax.parse(lexer: &lexer)
-        XCTAssertNil(ast.packageId)
-        XCTAssertEqual(ast.items.count, 0)
+        #expect(ast.packageId == nil)
+        #expect(ast.items.count == 0)
     }
 
-    func testASTWithPackageId() throws {
+    @Test func aSTWithPackageId() throws {
         var lexer = Lexer(cursor: .init(input: "package foo:bar"))
         let ast = try SourceFileSyntax.parse(lexer: &lexer)
-        XCTAssertNotNil(ast.packageId)
+        #expect(ast.packageId != nil)
     }
 
-    func testASTWithItem() throws {
+    @Test func aSTWithItem() throws {
         var lexer = Lexer(
             cursor: .init(
                 input: """
@@ -33,12 +34,14 @@ class ParseTopTests: XCTestCase {
                     use z
                     """))
         let ast = try SourceFileSyntax.parse(lexer: &lexer)
-        XCTAssertEqual(ast.items.count, 3)
+        #expect(ast.items.count == 3)
     }
 
-    func testASTWithInvalidItem() throws {
+    @Test func aSTWithInvalidItem() throws {
         var lexer = Lexer(cursor: .init(input: "."))
-        XCTAssertThrowsError(try SourceFileSyntax.parse(lexer: &lexer))
+        #expect(throws: (any Error).self) {
+            try SourceFileSyntax.parse(lexer: &lexer)
+        }
     }
 
     func parsePackageName(_ text: String) throws -> PackageNameSyntax {
@@ -46,41 +49,45 @@ class ParseTopTests: XCTestCase {
         return try PackageNameSyntax.parse(lexer: &lexer)
     }
 
-    func testPackageName() throws {
+    @Test func packageName() throws {
         let packageId = try parsePackageName("package foo:bar")
-        XCTAssertEqual(packageId.namespace.text, "foo")
-        XCTAssertEqual(packageId.name.text, "bar")
+        #expect(packageId.namespace.text == "foo")
+        #expect(packageId.name.text == "bar")
     }
 
-    func testPackageNameWithVersion() throws {
+    @Test func packageNameWithVersion() throws {
         let packageId = try parsePackageName("package foo:bar@1.0.0")
-        XCTAssertEqual(packageId.namespace.text, "foo")
-        XCTAssertEqual(packageId.name.text, "bar")
+        #expect(packageId.namespace.text == "foo")
+        #expect(packageId.name.text == "bar")
     }
 
-    func testIdentifier() throws {
+    @Test func identifier() throws {
         var lexer = Lexer(cursor: .init(input: "xyz"))
         let id = try Identifier.parse(lexer: &lexer)
-        XCTAssertEqual(id.text, "xyz")
+        #expect(id.text == "xyz")
     }
 
-    func testIdentifierEmpty() throws {
+    @Test func identifierEmpty() throws {
         var lexer = Lexer(cursor: .init(input: ""))
-        XCTAssertThrowsError(try Identifier.parse(lexer: &lexer))
+        #expect(throws: (any Error).self) {
+            try Identifier.parse(lexer: &lexer)
+        }
     }
 
-    func testIdentifierExplicit() throws {
+    @Test func identifierExplicit() throws {
         var lexer = Lexer(cursor: .init(input: "%abcd"))
         let id = try Identifier.parse(lexer: &lexer)
-        XCTAssertEqual(id.text, "abcd")
+        #expect(id.text == "abcd")
     }
 
-    func testIdentifierWithInvalidToken() throws {
+    @Test func identifierWithInvalidToken() throws {
         var lexer = Lexer(cursor: .init(input: "."))
-        XCTAssertThrowsError(try Identifier.parse(lexer: &lexer))
+        #expect(throws: (any Error).self) {
+            try Identifier.parse(lexer: &lexer)
+        }
     }
 
-    func testDocuments() throws {
+    @Test func documents() throws {
         var lexer = Lexer(
             cursor: .init(
                 input: """
@@ -89,10 +96,9 @@ class ParseTopTests: XCTestCase {
                     comment */
                     """))
         let docs = try DocumentsSyntax.parse(lexer: &lexer)
-        XCTAssertEqual(docs.comments.count, 2)
-        XCTAssertEqual(
-            docs.comments,
-            [
+        #expect(docs.comments.count == 2)
+        #expect(
+            docs.comments == [
                 "// comment here\n",
                 """
                 /* multi-line
@@ -101,48 +107,48 @@ class ParseTopTests: XCTestCase {
             ])
     }
 
-    func testDocumentsEmpty() throws {
+    @Test func documentsEmpty() throws {
         var lexer = Lexer(cursor: .init(input: ""))
         let docs = try DocumentsSyntax.parse(lexer: &lexer)
-        XCTAssertEqual(docs.comments.count, 0)
+        #expect(docs.comments.count == 0)
     }
 
-    func testTopLevelUseAs() throws {
+    @Test func topLevelUseAs() throws {
         var lexer = Lexer(cursor: .init(input: "use abc as xyz"))
         let use = try TopLevelUseSyntax.parse(lexer: &lexer, documents: .init(comments: []), attributes: [])
-        XCTAssertEqual(use.item.name.text, "abc")
-        XCTAssertEqual(use.asName?.text, "xyz")
+        #expect(use.item.name.text == "abc")
+        #expect(use.asName?.text == "xyz")
     }
 
-    func testUse() throws {
+    @Test func use() throws {
         var lexer = Lexer(cursor: .init(input: "use abc.{x, y, z}"))
         let use = try UseSyntax.parse(lexer: &lexer)
-        XCTAssertEqual(use.from.name.text, "abc")
-        XCTAssertEqual(use.names.map(\.name.text), ["x", "y", "z"])
-        XCTAssertEqual(use.names.map(\.asName?.text), [nil, nil, nil])
+        #expect(use.from.name.text == "abc")
+        #expect(use.names.map(\.name.text) == ["x", "y", "z"])
+        #expect(use.names.map(\.asName?.text) == [nil, nil, nil])
     }
 
-    func testUseAs() throws {
+    @Test func useAs() throws {
         var lexer = Lexer(cursor: .init(input: "use abc.{x as d, y as e, z}"))
         let use = try UseSyntax.parse(lexer: &lexer)
-        XCTAssertEqual(use.from.name.text, "abc")
-        XCTAssertEqual(use.names.map(\.name.text), ["x", "y", "z"])
-        XCTAssertEqual(use.names.map(\.asName?.text), ["d", "e", nil])
+        #expect(use.from.name.text == "abc")
+        #expect(use.names.map(\.name.text) == ["x", "y", "z"])
+        #expect(use.names.map(\.asName?.text) == ["d", "e", nil])
     }
 
-    func testUsePath() throws {
+    @Test func usePath() throws {
         var lexer = Lexer(cursor: .init(input: "use ns1:pkg1/item1@1.0.0"))
         let use = try TopLevelUseSyntax.parse(lexer: &lexer, documents: .init(comments: []), attributes: [])
-        XCTAssertEqual(use.item.name.text, "item1")
+        #expect(use.item.name.text == "item1")
         guard case .package(let id, _) = use.item else {
-            XCTFail("expected package but got \(use.item)")
+            Issue.record("expected package but got \(use.item)")
             return
         }
-        XCTAssertEqual(id.namespace.text, "ns1")
-        XCTAssertEqual(id.name.text, "pkg1")
+        #expect(id.namespace.text == "ns1")
+        #expect(id.name.text == "pkg1")
     }
 
-    func testAttributeSince() throws {
+    @Test func attributeSince() throws {
         var lexer = Lexer(
             cursor: .init(
                 input: """
@@ -152,47 +158,47 @@ class ParseTopTests: XCTestCase {
             ))
         let attributes = try AttributeSyntax.parseItems(lexer: &lexer)
         guard attributes.count == 2 else {
-            XCTFail("expected 2 attributes but got \(attributes)")
+            Issue.record("expected 2 attributes but got \(attributes)")
             return
         }
         do {
             guard case .since(let attribute) = attributes[0] else {
-                XCTFail("expected since but got \(attributes[0])")
+                Issue.record("expected since but got \(attributes[0])")
                 return
             }
-            XCTAssertEqual(attribute.version.description, "1.0.0")
-            XCTAssertEqual(attribute.feature?.text, nil)
+            #expect(attribute.version.description == "1.0.0")
+            #expect(attribute.feature?.text == nil)
         }
         do {
             guard case .since(let attribute) = attributes[1] else {
-                XCTFail("expected since but got \(attributes[1])")
+                Issue.record("expected since but got \(attributes[1])")
                 return
             }
-            XCTAssertEqual(attribute.version.description, "1.0.0")
-            XCTAssertEqual(attribute.feature?.text, "foo-bar")
+            #expect(attribute.version.description == "1.0.0")
+            #expect(attribute.feature?.text == "foo-bar")
         }
     }
 
-    func testAttributeUnstable() throws {
+    @Test func attributeUnstable() throws {
         var lexer = Lexer(cursor: .init(input: "@unstable(feature = foo)"))
         let attributes = try AttributeSyntax.parseItems(lexer: &lexer)
-        XCTAssertEqual(attributes.count, 1)
+        #expect(attributes.count == 1)
         guard case .unstable(let attribute) = attributes.first else {
-            XCTFail("expected since but got \(attributes)")
+            Issue.record("expected since but got \(attributes)")
             return
         }
-        XCTAssertEqual(attribute.feature.text, "foo")
+        #expect(attribute.feature.text == "foo")
     }
 
-    func testAttributeDeprecated() throws {
+    @Test func attributeDeprecated() throws {
         var lexer = Lexer(cursor: .init(input: "@deprecated(version = 1.0.3)"))
         let attributes = try AttributeSyntax.parseItems(lexer: &lexer)
-        XCTAssertEqual(attributes.count, 1)
+        #expect(attributes.count == 1)
         guard case .deprecated(let attribute) = attributes.first else {
-            XCTFail("expected since but got \(attributes)")
+            Issue.record("expected since but got \(attributes)")
             return
         }
-        XCTAssertEqual(attribute.version.description, "1.0.3")
+        #expect(attribute.version.description == "1.0.3")
     }
 }
 
