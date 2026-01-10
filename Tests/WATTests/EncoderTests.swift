@@ -62,7 +62,7 @@ struct EncoderTests {
 
     private func parseWastFile(
         wast: URL,
-        stats: inout CompatibilityTestStats,
+        stats: inout CompatibilityTestStats
     ) throws -> [ModuleDirective] {
         func recordFail() {
             stats.failed.insert(wast.lastPathComponent)
@@ -83,7 +83,7 @@ struct EncoderTests {
                     module: module,
                     message: message,
                     wast: wast,
-                    recordFail: recordFail,
+                    recordFail: recordFail
                 )
             default:
                 break
@@ -126,7 +126,7 @@ struct EncoderTests {
         moduleBinaryFiles: [(binary: URL, name: String?)],
         wast: URL,
         tempDir: String,
-        stats: inout CompatibilityTestStats,
+        stats: inout CompatibilityTestStats
     ) throws {
         func recordFail() {
             stats.failed.insert(wast.lastPathComponent)
@@ -336,7 +336,7 @@ struct EncoderTests {
                         moduleBinaryFiles: moduleBinaryFiles,
                         wast: wastFile,
                         tempDir: tempDir,
-                        stats: &stats,
+                        stats: &stats
                     )
                 } catch {
                     stats.failed.insert(wastFile.lastPathComponent)
