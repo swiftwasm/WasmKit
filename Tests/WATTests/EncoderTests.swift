@@ -47,11 +47,12 @@ struct EncoderTests {
     /// Prints WAST file context if error contains line number information
     private static func record(wastFile: URL, error: Error) {
         if let error = error as? WatParserError, let location = error.location {
-            Issue.record("""
-            --- \(wastFile.path):\(error.description) ---
-            \(dumpWastFileContext(wastFile: wastFile, location: location))
-            --- End of context ---
-            """)
+            Issue.record(
+                """
+                --- \(wastFile.path):\(error.description) ---
+                \(dumpWastFileContext(wastFile: wastFile, location: location))
+                --- End of context ---
+                """)
         } else {
             Issue.record("\(wastFile.path): unknown error: \(error)")
         }
@@ -154,7 +155,7 @@ struct EncoderTests {
                     wast: wast,
                     recordFail: recordFail
                 )
-                
+
                 // Encode and compare module bytes
                 let moduleBytes = try encodeModule(watModule: watModule)
                 try Self.compareModuleBytes(
@@ -181,7 +182,7 @@ struct EncoderTests {
         recordFail: () -> Void
     ) throws {
         let (line, column) = watModule.location.computeLineAndColumn()
-        
+
         // Check size first
         #expect(actual.count == expected.count)
         guard actual.count == expected.count else {
@@ -198,7 +199,7 @@ struct EncoderTests {
             )
             return
         }
-        
+
         // Check bytes
         #expect(actual == expected)
         guard actual == expected else {
@@ -230,11 +231,12 @@ struct EncoderTests {
         guard lhs == rhs else {
             recordFail()
             let (line, column) = watModule.location.computeLineAndColumn()
-            Issue.record("""
-            --- \(wast.path):\(line):\(column): \(description) mismatch (expected: \(rhs), actual: \(lhs)) ---
-            \(Self.dumpWastFileContext(wastFile: wast, location: watModule.location))
-            --- End of context ---
-            """)
+            Issue.record(
+                """
+                --- \(wast.path):\(line):\(column): \(description) mismatch (expected: \(rhs), actual: \(lhs)) ---
+                \(Self.dumpWastFileContext(wastFile: wast, location: watModule.location))
+                --- End of context ---
+                """)
             return
         }
     }
@@ -253,35 +255,38 @@ struct EncoderTests {
         let timestamp = Int(Date().timeIntervalSince1970)
         let expectedFile = URL(fileURLWithPath: tempDir).appendingPathComponent("expected-\(moduleId)-\(line)-\(timestamp).wasm")
         let actualFile = URL(fileURLWithPath: tempDir).appendingPathComponent("actual-\(moduleId)-\(line)-\(timestamp).wasm")
-        
+
         do {
             try Data(expected).write(to: expectedFile)
             try Data(actual).write(to: actualFile)
-            
-            Issue.record("""
-            --- \(wast.path):\(line):\(column): \(description) ---
-            Expected binary: \(expectedFile.path)
-            Actual binary: \(actualFile.path)
-            \(Self.dumpWastFileContext(wastFile: wast, location: watModule.location))
-            --- End of context ---
-            """)
+
+            Issue.record(
+                """
+                --- \(wast.path):\(line):\(column): \(description) ---
+                Expected binary: \(expectedFile.path)
+                Actual binary: \(actualFile.path)
+                \(Self.dumpWastFileContext(wastFile: wast, location: watModule.location))
+                --- End of context ---
+                """)
         } catch {
-            Issue.record("""
-            --- \(wast.path):\(line):\(column): \(description) ---
-            Failed to save binary files: \(error)
-            \(Self.dumpWastFileContext(wastFile: wast, location: watModule.location))
-            --- End of context ---
-            """)
+            Issue.record(
+                """
+                --- \(wast.path):\(line):\(column): \(description) ---
+                Failed to save binary files: \(error)
+                \(Self.dumpWastFileContext(wastFile: wast, location: watModule.location))
+                --- End of context ---
+                """)
         }
     }
 
     private static func recordError(error: Error, watModule: ModuleDirective, wast: URL) {
         let (line, column) = watModule.location.computeLineAndColumn()
-        Issue.record("""
-        --- \(wast.path):\(line):\(column): \(error) ---
-        \(Self.dumpWastFileContext(wastFile: wast, location: watModule.location))
-        --- End of context ---
-        """)
+        Issue.record(
+            """
+            --- \(wast.path):\(line):\(column): \(error) ---
+            \(Self.dumpWastFileContext(wastFile: wast, location: watModule.location))
+            --- End of context ---
+            """)
     }
 
     // MARK: - Module Encoding
