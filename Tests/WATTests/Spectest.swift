@@ -24,6 +24,7 @@ enum Spectest {
                 testsuitePath,
                 testsuitePath.appendingPathComponent("proposals/memory64"),
                 testsuitePath.appendingPathComponent("proposals/tail-call"),
+                testsuitePath.appendingPathComponent("proposals/threads"),
                 rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite"),
             ].flatMap {
                 try! FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil)
@@ -46,6 +47,9 @@ enum Spectest {
         var features = WasmFeatureSet.default
         if wast.deletingLastPathComponent().path.hasSuffix("proposals/memory64") {
             features.insert(.memory64)
+        }
+        if wast.deletingLastPathComponent().path.hasSuffix("proposals/threads") {
+            features.insert(.threads)
         }
         return features
     }
