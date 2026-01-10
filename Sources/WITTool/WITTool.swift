@@ -65,10 +65,10 @@ struct GenerateOverlay: ParsableCommand {
         case host
     }
 
-    @Option
+    @Option(help: "Whether bindings should be generated for a Wasm guest component or a host Wasm runtime. Possible values: `guest`, `host`. ")
     var target: Target
 
-    @Argument
+    @Argument(help: "Path to a `wit` directory or a `.wit` file.")
     var path: String
 
     @Option(name: .shortAndLong)

@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: |
           VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')
-          echo "{WASMKIT_VERSION}={$VERSION}" >> "$GITHUB_ENV"
+          echo "WASMKIT_VERSION=${VERSION}" >> "$GITHUB_ENV"
       - run: ./Utilities/build-release.py -o wasmkit-x86_64-apple-macos.tar.gz -s $WASMKIT_VERSION -- --triple x86_64-apple-macos
       - run: ./Utilities/build-release.py -o wasmkit-arm64-apple-macos.tar.gz  -s $WASMKIT_VERSION -- --triple arm64-apple-macos
       - uses: actions/upload-artifact@v6
@@ -46,7 +46,7 @@ jobs:
 
       - run: |
           VERSION=$(echo ${{ github.ref_name }} | sed 's/^v//')
-          echo "{WASMKIT_VERSION}={$VERSION}" >> "$GITHUB_ENV"
+          echo "WASMKIT_VERSION=${VERSION}" >> "$GITHUB_ENV"
       - run: ./build-exec ./Utilities/build-release.py -o wasmkit-x86_64-swift-linux-musl.tar.gz  -s $WASMKIT_VERSION -- --swift-sdk x86_64-swift-linux-musl
       - run: ./build-exec ./Utilities/build-release.py -o wasmkit-aarch64-swift-linux-musl.tar.gz -s $WASMKIT_VERSION -- --swift-sdk aarch64-swift-linux-musl
       - uses: actions/upload-artifact@v6

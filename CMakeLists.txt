@@ -54,20 +54,33 @@ add_compile_definitions(
 
 include(FetchContent)
 
+option(WASMKIT_BUILD_CLI "Build WasmKit CLI" ON)
+option(WASMKIT_BUILD_LLVM_BACKEND "Build WasmKit LLVM backend (experimental)" OFF)
+option(WASMKIT_LLVM_BACKEND_TARGET "WasmKit LLVM backend target architecture" "aarch64")
+
+if(WASMKIT_BUILD_CLI)
+  set(BUILD_TESTING OFF) # disable ArgumentParser tests
+  find_package(ArgumentParser CONFIG)
+  if(NOT ArgumentParser_FOUND)
+    message("-- Vending ArgumentParser")
+    FetchContent_Declare(ArgumentParser
+            GIT_REPOSITORY https://github.com/apple/swift-argument-parser
+            GIT_TAG 1.6.1
+    )
+    FetchContent_MakeAvailable(ArgumentParser)
+  endif()
+endif()
+
 find_package(SwiftSystem CONFIG)
 if(NOT SwiftSystem_FOUND)
   message("-- Vending SwiftSystem")
   FetchContent_Declare(SwiftSystem
     GIT_REPOSITORY https://github.com/apple/swift-system
     GIT_TAG 1.5.0
-    GIT_SHALLOW TRUE
   )
   FetchContent_MakeAvailable(SwiftSystem)
 endif()
 
-option(WASMKIT_BUILD_CLI "Build WasmKit CLI" ON)
-option(WASMKIT_BUILD_LLVM_BACKEND "Build WasmKit LLVM backend (experimental)" OFF)
-option(WASMKIT_LLVM_BACKEND_TARGET "WasmKit LLVM backend target architecture" "aarch64")
 
 add_subdirectory(Sources)
 add_subdirectory(Tests)
