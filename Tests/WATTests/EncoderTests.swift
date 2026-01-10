@@ -118,6 +118,7 @@ struct EncoderTests {
                         wastFile.path,
                         "--enable-memory64",
                         "--enable-tail-call",
+                        "--enable-threads",
                         "-o", json.path,
                     ]
                 )
