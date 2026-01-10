@@ -1,5 +1,4 @@
 import Foundation
-import XCTest
 
 struct TestSupport {
     struct Configuration: Codable {
@@ -52,10 +51,10 @@ struct TestSupport {
 
 func assertSwiftPackage(fixturePackage: String, _ trailingArguments: [String]) throws -> String {
     #if os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
-        throw XCTSkip("WITExtractor does not support platforms where Foundation.Process is unavailable")
+        fatalError("WITExtractor does not support platforms where Foundation.Process is unavailable")
     #else
         guard let config = TestSupport.Configuration.default else {
-            throw XCTSkip("Please create 'Tests/default.json'")
+            fatalError("Please create 'Tests/default.json'")
         }
         let swiftExecutable = config.hostSwiftExecutablePath
         let packagePath = URL(fileURLWithPath: #filePath)
