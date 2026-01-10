@@ -9,4 +9,5 @@ add_subdirectory(WAT)
 
 if(WASMKIT_BUILD_CLI)
   add_subdirectory(CLI)
+  add_subdirectory(CLICommands)
 endif()
