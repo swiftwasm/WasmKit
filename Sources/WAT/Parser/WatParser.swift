@@ -433,11 +433,14 @@ struct WatParser {
             if let refType = try takeRefType() {
                 indices = .elementExprList(parser.lexer)
                 type = refType
-            } else if try parser.takeKeyword("func") || table == nil {
+            } else if try parser.takeKeyword("func") {
                 indices = .functionList(parser.lexer)
                 type = UnresolvedType(.funcRef)
             } else {
-                throw WatParserError("expected element list", location: parser.lexer.location())
+                // Try to parse as function list (abbreviated form)
+                // This works even with a table use, as long as no ref type is specified
+                indices = .functionList(parser.lexer)
+                type = UnresolvedType(.funcRef)
             }
 
             try parser.skipParenBlock()
@@ -520,12 +523,22 @@ struct WatParser {
     }
 
     mutating func takeTableUse() throws -> Parser.IndexOrId? {
-        var index: Parser.IndexOrId?
+        // Try full form: (table idx)
         if try parser.takeParenBlockStart("table") {
-            index = try parser.expectIndexOrId()
+            let index = try parser.expectIndexOrId()
             try parser.expect(.rightParen)
+            return index
         }
-        return index
+        // Try abbreviation: bare index (only if followed by something that looks like an offset)
+        // This is used in element segments: (elem 0 (i32.const 1) ...)
+        let savedLexer = parser.lexer
+        if let bareIndex = try parser.takeIndexOrId(), try parser.peek(.leftParen) != nil {
+            // This is an abbreviation: bare index as table index
+            return bareIndex
+        }
+        // Restore lexer state if it wasn't a table index
+        parser.lexer = savedLexer
+        return nil
     }
 
     mutating func memoryUse() throws -> Parser.IndexOrId? {
