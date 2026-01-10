@@ -98,6 +98,110 @@ protocol BinaryInstructionDecoder {
     @inlinable mutating func visitTableGrow() throws -> UInt32
     /// Decode `table.size` immediates
     @inlinable mutating func visitTableSize() throws -> UInt32
+    /// Decode `memory.atomic.notify` immediates
+    @inlinable mutating func visitMemoryAtomicNotify() throws -> MemArg
+    /// Decode `memory.atomic.wait32` immediates
+    @inlinable mutating func visitMemoryAtomicWait32() throws -> MemArg
+    /// Decode `memory.atomic.wait64` immediates
+    @inlinable mutating func visitMemoryAtomicWait64() throws -> MemArg
+    /// Decode `i32.atomic.rmw.add` immediates
+    @inlinable mutating func visitI32AtomicRmwAdd() throws -> MemArg
+    /// Decode `i64.atomic.rmw.add` immediates
+    @inlinable mutating func visitI64AtomicRmwAdd() throws -> MemArg
+    /// Decode `i32.atomic.rmw8.add_u` immediates
+    @inlinable mutating func visitI32AtomicRmw8AddU() throws -> MemArg
+    /// Decode `i32.atomic.rmw16.add_u` immediates
+    @inlinable mutating func visitI32AtomicRmw16AddU() throws -> MemArg
+    /// Decode `i64.atomic.rmw8.add_u` immediates
+    @inlinable mutating func visitI64AtomicRmw8AddU() throws -> MemArg
+    /// Decode `i64.atomic.rmw16.add_u` immediates
+    @inlinable mutating func visitI64AtomicRmw16AddU() throws -> MemArg
+    /// Decode `i64.atomic.rmw32.add_u` immediates
+    @inlinable mutating func visitI64AtomicRmw32AddU() throws -> MemArg
+    /// Decode `i32.atomic.rmw.sub` immediates
+    @inlinable mutating func visitI32AtomicRmwSub() throws -> MemArg
+    /// Decode `i64.atomic.rmw.sub` immediates
+    @inlinable mutating func visitI64AtomicRmwSub() throws -> MemArg
+    /// Decode `i32.atomic.rmw8.sub_u` immediates
+    @inlinable mutating func visitI32AtomicRmw8SubU() throws -> MemArg
+    /// Decode `i32.atomic.rmw16.sub_u` immediates
+    @inlinable mutating func visitI32AtomicRmw16SubU() throws -> MemArg
+    /// Decode `i64.atomic.rmw8.sub_u` immediates
+    @inlinable mutating func visitI64AtomicRmw8SubU() throws -> MemArg
+    /// Decode `i64.atomic.rmw16.sub_u` immediates
+    @inlinable mutating func visitI64AtomicRmw16SubU() throws -> MemArg
+    /// Decode `i64.atomic.rmw32.sub_u` immediates
+    @inlinable mutating func visitI64AtomicRmw32SubU() throws -> MemArg
+    /// Decode `i32.atomic.rmw.and` immediates
+    @inlinable mutating func visitI32AtomicRmwAnd() throws -> MemArg
+    /// Decode `i64.atomic.rmw.and` immediates
+    @inlinable mutating func visitI64AtomicRmwAnd() throws -> MemArg
+    /// Decode `i32.atomic.rmw8.and_u` immediates
+    @inlinable mutating func visitI32AtomicRmw8AndU() throws -> MemArg
+    /// Decode `i32.atomic.rmw16.and_u` immediates
+    @inlinable mutating func visitI32AtomicRmw16AndU() throws -> MemArg
+    /// Decode `i64.atomic.rmw8.and_u` immediates
+    @inlinable mutating func visitI64AtomicRmw8AndU() throws -> MemArg
+    /// Decode `i64.atomic.rmw16.and_u` immediates
+    @inlinable mutating func visitI64AtomicRmw16AndU() throws -> MemArg
+    /// Decode `i64.atomic.rmw32.and_u` immediates
+    @inlinable mutating func visitI64AtomicRmw32AndU() throws -> MemArg
+    /// Decode `i32.atomic.rmw.or` immediates
+    @inlinable mutating func visitI32AtomicRmwOr() throws -> MemArg
+    /// Decode `i64.atomic.rmw.or` immediates
+    @inlinable mutating func visitI64AtomicRmwOr() throws -> MemArg
+    /// Decode `i32.atomic.rmw8.or_u` immediates
+    @inlinable mutating func visitI32AtomicRmw8OrU() throws -> MemArg
+    /// Decode `i32.atomic.rmw16.or_u` immediates
+    @inlinable mutating func visitI32AtomicRmw16OrU() throws -> MemArg
+    /// Decode `i64.atomic.rmw8.or_u` immediates
+    @inlinable mutating func visitI64AtomicRmw8OrU() throws -> MemArg
+    /// Decode `i64.atomic.rmw16.or_u` immediates
+    @inlinable mutating func visitI64AtomicRmw16OrU() throws -> MemArg
+    /// Decode `i64.atomic.rmw32.or_u` immediates
+    @inlinable mutating func visitI64AtomicRmw32OrU() throws -> MemArg
+    /// Decode `i32.atomic.rmw.xor` immediates
+    @inlinable mutating func visitI32AtomicRmwXor() throws -> MemArg
+    /// Decode `i64.atomic.rmw.xor` immediates
+    @inlinable mutating func visitI64AtomicRmwXor() throws -> MemArg
+    /// Decode `i32.atomic.rmw8.xor_u` immediates
+    @inlinable mutating func visitI32AtomicRmw8XorU() throws -> MemArg
+    /// Decode `i32.atomic.rmw16.xor_u` immediates
+    @inlinable mutating func visitI32AtomicRmw16XorU() throws -> MemArg
+    /// Decode `i64.atomic.rmw8.xor_u` immediates
+    @inlinable mutating func visitI64AtomicRmw8XorU() throws -> MemArg
+    /// Decode `i64.atomic.rmw16.xor_u` immediates
+    @inlinable mutating func visitI64AtomicRmw16XorU() throws -> MemArg
+    /// Decode `i64.atomic.rmw32.xor_u` immediates
+    @inlinable mutating func visitI64AtomicRmw32XorU() throws -> MemArg
+    /// Decode `i32.atomic.rmw.xchg` immediates
+    @inlinable mutating func visitI32AtomicRmwXchg() throws -> MemArg
+    /// Decode `i64.atomic.rmw.xchg` immediates
+    @inlinable mutating func visitI64AtomicRmwXchg() throws -> MemArg
+    /// Decode `i32.atomic.rmw8.xchg_u` immediates
+    @inlinable mutating func visitI32AtomicRmw8XchgU() throws -> MemArg
+    /// Decode `i32.atomic.rmw16.xchg_u` immediates
+    @inlinable mutating func visitI32AtomicRmw16XchgU() throws -> MemArg
+    /// Decode `i64.atomic.rmw8.xchg_u` immediates
+    @inlinable mutating func visitI64AtomicRmw8XchgU() throws -> MemArg
+    /// Decode `i64.atomic.rmw16.xchg_u` immediates
+    @inlinable mutating func visitI64AtomicRmw16XchgU() throws -> MemArg
+    /// Decode `i64.atomic.rmw32.xchg_u` immediates
+    @inlinable mutating func visitI64AtomicRmw32XchgU() throws -> MemArg
+    /// Decode `i32.atomic.rmw.cmpxchg` immediates
+    @inlinable mutating func visitI32AtomicRmwCmpxchg() throws -> MemArg
+    /// Decode `i64.atomic.rmw.cmpxchg` immediates
+    @inlinable mutating func visitI64AtomicRmwCmpxchg() throws -> MemArg
+    /// Decode `i32.atomic.rmw8.cmpxchg_u` immediates
+    @inlinable mutating func visitI32AtomicRmw8CmpxchgU() throws -> MemArg
+    /// Decode `i32.atomic.rmw16.cmpxchg_u` immediates
+    @inlinable mutating func visitI32AtomicRmw16CmpxchgU() throws -> MemArg
+    /// Decode `i64.atomic.rmw8.cmpxchg_u` immediates
+    @inlinable mutating func visitI64AtomicRmw8CmpxchgU() throws -> MemArg
+    /// Decode `i64.atomic.rmw16.cmpxchg_u` immediates
+    @inlinable mutating func visitI64AtomicRmw16CmpxchgU() throws -> MemArg
+    /// Decode `i64.atomic.rmw32.cmpxchg_u` immediates
+    @inlinable mutating func visitI64AtomicRmw32CmpxchgU() throws -> MemArg
 }
 
 @inlinable
@@ -596,6 +700,15 @@ func parseBinaryInstruction(visitor: inout some InstructionVisitor, decoder: ino
 
         let opcode1 = try decoder.claimNextByte()
         switch opcode1 {
+        case 0x00:
+            let (memarg) = try decoder.visitMemoryAtomicNotify()
+            try visitor.visitMemoryAtomicNotify(memarg: memarg)
+        case 0x01:
+            let (memarg) = try decoder.visitMemoryAtomicWait32()
+            try visitor.visitMemoryAtomicWait32(memarg: memarg)
+        case 0x02:
+            let (memarg) = try decoder.visitMemoryAtomicWait64()
+            try visitor.visitMemoryAtomicWait64(memarg: memarg)
         case 0x03:
 
             let opcode2 = try decoder.claimNextByte()
@@ -647,6 +760,153 @@ func parseBinaryInstruction(visitor: inout some InstructionVisitor, decoder: ino
         case 0x1D:
             let (memarg) = try decoder.visitStore(.i64AtomicStore32)
             try visitor.visitStore(.i64AtomicStore32, memarg: memarg)
+        case 0x1E:
+            let (memarg) = try decoder.visitI32AtomicRmwAdd()
+            try visitor.visitI32AtomicRmwAdd(memarg: memarg)
+        case 0x1F:
+            let (memarg) = try decoder.visitI64AtomicRmwAdd()
+            try visitor.visitI64AtomicRmwAdd(memarg: memarg)
+        case 0x20:
+            let (memarg) = try decoder.visitI32AtomicRmw8AddU()
+            try visitor.visitI32AtomicRmw8AddU(memarg: memarg)
+        case 0x21:
+            let (memarg) = try decoder.visitI32AtomicRmw16AddU()
+            try visitor.visitI32AtomicRmw16AddU(memarg: memarg)
+        case 0x22:
+            let (memarg) = try decoder.visitI64AtomicRmw8AddU()
+            try visitor.visitI64AtomicRmw8AddU(memarg: memarg)
+        case 0x23:
+            let (memarg) = try decoder.visitI64AtomicRmw16AddU()
+            try visitor.visitI64AtomicRmw16AddU(memarg: memarg)
+        case 0x24:
+            let (memarg) = try decoder.visitI64AtomicRmw32AddU()
+            try visitor.visitI64AtomicRmw32AddU(memarg: memarg)
+        case 0x25:
+            let (memarg) = try decoder.visitI32AtomicRmwSub()
+            try visitor.visitI32AtomicRmwSub(memarg: memarg)
+        case 0x26:
+            let (memarg) = try decoder.visitI64AtomicRmwSub()
+            try visitor.visitI64AtomicRmwSub(memarg: memarg)
+        case 0x27:
+            let (memarg) = try decoder.visitI32AtomicRmw8SubU()
+            try visitor.visitI32AtomicRmw8SubU(memarg: memarg)
+        case 0x28:
+            let (memarg) = try decoder.visitI32AtomicRmw16SubU()
+            try visitor.visitI32AtomicRmw16SubU(memarg: memarg)
+        case 0x29:
+            let (memarg) = try decoder.visitI64AtomicRmw8SubU()
+            try visitor.visitI64AtomicRmw8SubU(memarg: memarg)
+        case 0x2A:
+            let (memarg) = try decoder.visitI64AtomicRmw16SubU()
+            try visitor.visitI64AtomicRmw16SubU(memarg: memarg)
+        case 0x2B:
+            let (memarg) = try decoder.visitI64AtomicRmw32SubU()
+            try visitor.visitI64AtomicRmw32SubU(memarg: memarg)
+        case 0x2C:
+            let (memarg) = try decoder.visitI32AtomicRmwAnd()
+            try visitor.visitI32AtomicRmwAnd(memarg: memarg)
+        case 0x2D:
+            let (memarg) = try decoder.visitI64AtomicRmwAnd()
+            try visitor.visitI64AtomicRmwAnd(memarg: memarg)
+        case 0x2E:
+            let (memarg) = try decoder.visitI32AtomicRmw8AndU()
+            try visitor.visitI32AtomicRmw8AndU(memarg: memarg)
+        case 0x2F:
+            let (memarg) = try decoder.visitI32AtomicRmw16AndU()
+            try visitor.visitI32AtomicRmw16AndU(memarg: memarg)
+        case 0x30:
+            let (memarg) = try decoder.visitI64AtomicRmw8AndU()
+            try visitor.visitI64AtomicRmw8AndU(memarg: memarg)
+        case 0x31:
+            let (memarg) = try decoder.visitI64AtomicRmw16AndU()
+            try visitor.visitI64AtomicRmw16AndU(memarg: memarg)
+        case 0x32:
+            let (memarg) = try decoder.visitI64AtomicRmw32AndU()
+            try visitor.visitI64AtomicRmw32AndU(memarg: memarg)
+        case 0x33:
+            let (memarg) = try decoder.visitI32AtomicRmwOr()
+            try visitor.visitI32AtomicRmwOr(memarg: memarg)
+        case 0x34:
+            let (memarg) = try decoder.visitI64AtomicRmwOr()
+            try visitor.visitI64AtomicRmwOr(memarg: memarg)
+        case 0x35:
+            let (memarg) = try decoder.visitI32AtomicRmw8OrU()
+            try visitor.visitI32AtomicRmw8OrU(memarg: memarg)
+        case 0x36:
+            let (memarg) = try decoder.visitI32AtomicRmw16OrU()
+            try visitor.visitI32AtomicRmw16OrU(memarg: memarg)
+        case 0x37:
+            let (memarg) = try decoder.visitI64AtomicRmw8OrU()
+            try visitor.visitI64AtomicRmw8OrU(memarg: memarg)
+        case 0x38:
+            let (memarg) = try decoder.visitI64AtomicRmw16OrU()
+            try visitor.visitI64AtomicRmw16OrU(memarg: memarg)
+        case 0x39:
+            let (memarg) = try decoder.visitI64AtomicRmw32OrU()
+            try visitor.visitI64AtomicRmw32OrU(memarg: memarg)
+        case 0x3A:
+            let (memarg) = try decoder.visitI32AtomicRmwXor()
+            try visitor.visitI32AtomicRmwXor(memarg: memarg)
+        case 0x3B:
+            let (memarg) = try decoder.visitI64AtomicRmwXor()
+            try visitor.visitI64AtomicRmwXor(memarg: memarg)
+        case 0x3C:
+            let (memarg) = try decoder.visitI32AtomicRmw8XorU()
+            try visitor.visitI32AtomicRmw8XorU(memarg: memarg)
+        case 0x3D:
+            let (memarg) = try decoder.visitI32AtomicRmw16XorU()
+            try visitor.visitI32AtomicRmw16XorU(memarg: memarg)
+        case 0x3E:
+            let (memarg) = try decoder.visitI64AtomicRmw8XorU()
+            try visitor.visitI64AtomicRmw8XorU(memarg: memarg)
+        case 0x3F:
+            let (memarg) = try decoder.visitI64AtomicRmw16XorU()
+            try visitor.visitI64AtomicRmw16XorU(memarg: memarg)
+        case 0x40:
+            let (memarg) = try decoder.visitI64AtomicRmw32XorU()
+            try visitor.visitI64AtomicRmw32XorU(memarg: memarg)
+        case 0x41:
+            let (memarg) = try decoder.visitI32AtomicRmwXchg()
+            try visitor.visitI32AtomicRmwXchg(memarg: memarg)
+        case 0x42:
+            let (memarg) = try decoder.visitI64AtomicRmwXchg()
+            try visitor.visitI64AtomicRmwXchg(memarg: memarg)
+        case 0x43:
+            let (memarg) = try decoder.visitI32AtomicRmw8XchgU()
+            try visitor.visitI32AtomicRmw8XchgU(memarg: memarg)
+        case 0x44:
+            let (memarg) = try decoder.visitI32AtomicRmw16XchgU()
+            try visitor.visitI32AtomicRmw16XchgU(memarg: memarg)
+        case 0x45:
+            let (memarg) = try decoder.visitI64AtomicRmw8XchgU()
+            try visitor.visitI64AtomicRmw8XchgU(memarg: memarg)
+        case 0x46:
+            let (memarg) = try decoder.visitI64AtomicRmw16XchgU()
+            try visitor.visitI64AtomicRmw16XchgU(memarg: memarg)
+        case 0x47:
+            let (memarg) = try decoder.visitI64AtomicRmw32XchgU()
+            try visitor.visitI64AtomicRmw32XchgU(memarg: memarg)
+        case 0x48:
+            let (memarg) = try decoder.visitI32AtomicRmwCmpxchg()
+            try visitor.visitI32AtomicRmwCmpxchg(memarg: memarg)
+        case 0x49:
+            let (memarg) = try decoder.visitI64AtomicRmwCmpxchg()
+            try visitor.visitI64AtomicRmwCmpxchg(memarg: memarg)
+        case 0x4A:
+            let (memarg) = try decoder.visitI32AtomicRmw8CmpxchgU()
+            try visitor.visitI32AtomicRmw8CmpxchgU(memarg: memarg)
+        case 0x4B:
+            let (memarg) = try decoder.visitI32AtomicRmw16CmpxchgU()
+            try visitor.visitI32AtomicRmw16CmpxchgU(memarg: memarg)
+        case 0x4C:
+            let (memarg) = try decoder.visitI64AtomicRmw8CmpxchgU()
+            try visitor.visitI64AtomicRmw8CmpxchgU(memarg: memarg)
+        case 0x4D:
+            let (memarg) = try decoder.visitI64AtomicRmw16CmpxchgU()
+            try visitor.visitI64AtomicRmw16CmpxchgU(memarg: memarg)
+        case 0x4E:
+            let (memarg) = try decoder.visitI64AtomicRmw32CmpxchgU()
+            try visitor.visitI64AtomicRmw32CmpxchgU(memarg: memarg)
         default:
             if try !visitor.visitUnknown([opcode0, opcode1]) { try decoder.throwUnknown([opcode0, opcode1]) }
         }

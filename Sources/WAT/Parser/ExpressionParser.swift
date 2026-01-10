@@ -517,6 +517,162 @@ extension ExpressionParser {
     mutating func visitStore(_ store: Instruction.Store, wat: inout Wat) throws -> MemArg {
         return try visitStore(defaultAlign: UInt32(store.naturalAlignment))
     }
+    mutating func visitMemoryAtomicNotify(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 2)
+    }
+    mutating func visitMemoryAtomicWait32(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 2)
+    }
+    mutating func visitMemoryAtomicWait64(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 3)
+    }
+    mutating func visitI32AtomicRmwAdd(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 2)
+    }
+    mutating func visitI64AtomicRmwAdd(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 3)
+    }
+    mutating func visitI32AtomicRmw8AddU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 0)
+    }
+    mutating func visitI32AtomicRmw16AddU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 1)
+    }
+    mutating func visitI64AtomicRmw8AddU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 0)
+    }
+    mutating func visitI64AtomicRmw16AddU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 1)
+    }
+    mutating func visitI64AtomicRmw32AddU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 2)
+    }
+    mutating func visitI32AtomicRmwSub(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 2)
+    }
+    mutating func visitI64AtomicRmwSub(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 3)
+    }
+    mutating func visitI32AtomicRmw8SubU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 0)
+    }
+    mutating func visitI32AtomicRmw16SubU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 1)
+    }
+    mutating func visitI64AtomicRmw8SubU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 0)
+    }
+    mutating func visitI64AtomicRmw16SubU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 1)
+    }
+    mutating func visitI64AtomicRmw32SubU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 2)
+    }
+    mutating func visitI32AtomicRmwAnd(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 2)
+    }
+    mutating func visitI64AtomicRmwAnd(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 3)
+    }
+    mutating func visitI32AtomicRmw8AndU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 0)
+    }
+    mutating func visitI32AtomicRmw16AndU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 1)
+    }
+    mutating func visitI64AtomicRmw8AndU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 0)
+    }
+    mutating func visitI64AtomicRmw16AndU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 1)
+    }
+    mutating func visitI64AtomicRmw32AndU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 2)
+    }
+    mutating func visitI32AtomicRmwOr(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 2)
+    }
+    mutating func visitI64AtomicRmwOr(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 3)
+    }
+    mutating func visitI32AtomicRmw8OrU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 0)
+    }
+    mutating func visitI32AtomicRmw16OrU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 1)
+    }
+    mutating func visitI64AtomicRmw8OrU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 0)
+    }
+    mutating func visitI64AtomicRmw16OrU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 1)
+    }
+    mutating func visitI64AtomicRmw32OrU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 2)
+    }
+    mutating func visitI32AtomicRmwXor(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 2)
+    }
+    mutating func visitI64AtomicRmwXor(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 3)
+    }
+    mutating func visitI32AtomicRmw8XorU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 0)
+    }
+    mutating func visitI32AtomicRmw16XorU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 1)
+    }
+    mutating func visitI64AtomicRmw8XorU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 0)
+    }
+    mutating func visitI64AtomicRmw16XorU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 1)
+    }
+    mutating func visitI64AtomicRmw32XorU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 2)
+    }
+    mutating func visitI32AtomicRmwXchg(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 2)
+    }
+    mutating func visitI64AtomicRmwXchg(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 3)
+    }
+    mutating func visitI32AtomicRmw8XchgU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 0)
+    }
+    mutating func visitI32AtomicRmw16XchgU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 1)
+    }
+    mutating func visitI64AtomicRmw8XchgU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 0)
+    }
+    mutating func visitI64AtomicRmw16XchgU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 1)
+    }
+    mutating func visitI64AtomicRmw32XchgU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 2)
+    }
+    mutating func visitI32AtomicRmwCmpxchg(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 2)
+    }
+    mutating func visitI64AtomicRmwCmpxchg(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 3)
+    }
+    mutating func visitI32AtomicRmw8CmpxchgU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 0)
+    }
+    mutating func visitI32AtomicRmw16CmpxchgU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 1)
+    }
+    mutating func visitI64AtomicRmw8CmpxchgU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 0)
+    }
+    mutating func visitI64AtomicRmw16CmpxchgU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 1)
+    }
+    mutating func visitI64AtomicRmw32CmpxchgU(wat: inout Wat) throws -> MemArg {
+        return try visitLoad(defaultAlign: 2)
+    }
     mutating func visitMemorySize(wat: inout Wat) throws -> UInt32 {
         return try memoryIndex(wat: &wat)
     }
