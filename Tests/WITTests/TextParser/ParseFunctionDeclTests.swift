@@ -1,8 +1,10 @@
-import XCTest
+import Testing
 
 @testable import WIT
 
-class ParseFunctionDeclTests: XCTestCase {
+@Suite
+
+struct ParseFunctionDeclTests {
 
     func parse(_ text: String) throws -> ResourceFunctionSyntax {
         var lexer = Lexer(cursor: .init(input: text))
@@ -13,51 +15,51 @@ class ParseFunctionDeclTests: XCTestCase {
         )
     }
 
-    func testFunction() throws {
+    @Test func function() throws {
         var lexer = Lexer(cursor: .init(input: "func(x: u8) -> u16"))
         let f = try FunctionSyntax.parse(lexer: &lexer)
-        XCTAssertEqual(f.parameters.count, 1)
+        #expect(f.parameters.count == 1)
         guard case .anon(.u16) = f.results else {
-            XCTFail("expected anon but got \(f.results)")
+            Issue.record("expected anon but got \(f.results)")
             return
         }
     }
 
-    func testFunctionNamedReturn() throws {
+    @Test func functionNamedReturn() throws {
         var lexer = Lexer(cursor: .init(input: "func() -> (a: u8, b: u16)"))
         let f = try FunctionSyntax.parse(lexer: &lexer)
         guard case .named(let results) = f.results else {
-            XCTFail("expected anon but got \(f.results)")
+            Issue.record("expected anon but got \(f.results)")
             return
         }
-        XCTAssertEqual(results.count, 2)
+        #expect(results.count == 2)
     }
 
-    func testResourceFunction() throws {
+    @Test func resourceFunction() throws {
         let f = try parse("%foo: func() -> bool")
         guard case .method(let method) = f else {
-            XCTFail("expected method but got \(f)")
+            Issue.record("expected method but got \(f)")
             return
         }
-        XCTAssertEqual(method.name.text, "foo")
+        #expect(method.name.text == "foo")
     }
 
-    func testResourceFunctionStatic() throws {
+    @Test func resourceFunctionStatic() throws {
         let f = try parse("foo: static func() -> bool")
         guard case .static(let method) = f else {
-            XCTFail("expected method but got \(f)")
+            Issue.record("expected method but got \(f)")
             return
         }
-        XCTAssertEqual(method.name.text, "foo")
+        #expect(method.name.text == "foo")
     }
 
-    func testResourceFunctionConstructor() throws {
+    @Test func resourceFunctionConstructor() throws {
         let f = try parse("constructor(a: u8, b: u16)")
         guard case .constructor(let ctor) = f else {
-            XCTFail("expected method but got \(f)")
+            Issue.record("expected method but got \(f)")
             return
         }
-        XCTAssertEqual(ctor.name.text, "constructor")
-        XCTAssertEqual(ctor.function.parameters.count, 2)
+        #expect(ctor.name.text == "constructor")
+        #expect(ctor.function.parameters.count == 2)
     }
 }

@@ -1,9 +1,10 @@
-import XCTest
+import Testing
 
 @testable import WIT
 
-class ParseTestsTests: XCTestCase {
-    func testTypeUseAll() throws {
+@Suite
+struct ParseTestsTests {
+    @Test func typeUseAll() throws {
         var lexer = Lexer(
             cursor: .init(
                 input: """
@@ -49,19 +50,23 @@ class ParseTestsTests: XCTestCase {
             )
         )
         let interface = try InterfaceSyntax.parse(lexer: &lexer, documents: .init(comments: []), attributes: [])
-        XCTAssertEqual(interface.items.count, 30)
+        #expect(interface.items.count == 30)
     }
 
-    func testTypeUseInvalid() throws {
+    @Test func typeUseInvalid() throws {
         func parse(_ text: String) throws -> TypeReprSyntax {
             var lexer = Lexer(cursor: .init(input: text))
             return try .parse(lexer: &lexer)
         }
-        XCTAssertThrowsError(try parse(""))
-        XCTAssertThrowsError(try parse("1"))
+        #expect(throws: (any Error).self) {
+            try parse("")
+        }
+        #expect(throws: (any Error).self) {
+            try parse("1")
+        }
     }
 
-    func testTypeDefResource() throws {
+    @Test func typeDefResource() throws {
         var lexer = Lexer(
             cursor: .init(
                 input: """
@@ -73,15 +78,15 @@ class ParseTestsTests: XCTestCase {
             )
         )
         let typeDef = try TypeDefSyntax.parseResource(lexer: &lexer, documents: .init(comments: []), attributes: [])
-        XCTAssertEqual(typeDef.name.text, "r1")
+        #expect(typeDef.name.text == "r1")
         guard case .resource(let resource) = typeDef.body else {
-            XCTFail("unexpected type kind: \(typeDef.body)")
+            Issue.record("unexpected type kind: \(typeDef.body)")
             return
         }
-        XCTAssertEqual(resource.functions.count, 1)
+        #expect(resource.functions.count == 1)
     }
 
-    func testTypeDefVariant() throws {
+    @Test func typeDefVariant() throws {
         var lexer = Lexer(
             cursor: .init(
                 input: """
@@ -94,11 +99,11 @@ class ParseTestsTests: XCTestCase {
             )
         )
         let typeDef = try TypeDefSyntax.parseVariant(lexer: &lexer, documents: .init(comments: []), attributes: [])
-        XCTAssertEqual(typeDef.name.text, "r1")
+        #expect(typeDef.name.text == "r1")
         guard case .variant(let variant) = typeDef.body else {
-            XCTFail("unexpected type kind: \(typeDef.body)")
+            Issue.record("unexpected type kind: \(typeDef.body)")
             return
         }
-        XCTAssertEqual(variant.cases.count, 3)
+        #expect(variant.cases.count == 3)
     }
 }

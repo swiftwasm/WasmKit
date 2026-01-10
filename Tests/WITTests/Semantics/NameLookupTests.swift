@@ -1,8 +1,9 @@
-import XCTest
+import Testing
 
 @testable import WIT
 
-class NameLookupTests: XCTestCase {
+@Suite
+struct NameLookupTests {
     func buildPackages(_ packages: [[String]]) throws -> PackageResolver {
         let packageResolver = PackageResolver()
         for pkgFiles in packages {
@@ -46,7 +47,7 @@ class NameLookupTests: XCTestCase {
 
     func lookupType(_ source: [[String]], namespace: String, package: String, interfaceName: String, typeName: String) throws -> WITType {
         let packageResolver = try buildPackages(source)
-        let packageUnit = try XCTUnwrap(packageResolver.findPackage(namespace: namespace, package: package, version: nil))
+        let packageUnit = try #require(packageResolver.findPackage(namespace: namespace, package: package, version: nil))
         let context = SemanticsContext(rootPackage: packageUnit, packageResolver: packageResolver)
         let (interface, sourceFile) = try context.lookupInterface(name: interfaceName, contextPackage: packageUnit)
         let lookup = TypeNameLookup(
@@ -60,12 +61,18 @@ class NameLookupTests: XCTestCase {
         return try lookup.lookup()
     }
 
-    func assertLookup(_ source: String, interfaceName: String, typeName: String, expected: WITType, line: UInt = #line) throws {
+    func assertLookup(
+        _ source: String,
+        interfaceName: String,
+        typeName: String,
+        expected: WITType,
+        sourceLocation: SourceLocation = #_sourceLocation
+    ) throws {
         let type = try lookupType(source, interfaceName: interfaceName, typeName: typeName)
-        XCTAssertEqual(type, expected, line: line)
+        #expect(type == expected, sourceLocation: sourceLocation)
     }
 
-    func testLookupAliasPrimitiveType() throws {
+    @Test func lookupAliasPrimitiveType() throws {
         try assertLookup(
             """
             package foo:bar
@@ -79,7 +86,7 @@ class NameLookupTests: XCTestCase {
         )
     }
 
-    func testLookupAliasDefinedType() throws {
+    @Test func lookupAliasDefinedType() throws {
         let type = try lookupType(
             """
             package foo:bar
@@ -92,13 +99,13 @@ class NameLookupTests: XCTestCase {
             typeName: "my-type"
         )
         guard case .record(let record) = type else {
-            XCTFail("expected record but got \(type)")
+            Issue.record("expected record but got \(type)")
             return
         }
-        XCTAssertEqual(record.fields, [])
+        #expect(record.fields == [])
     }
 
-    func testLookupThroughUse() throws {
+    @Test func lookupThroughUse() throws {
         let type = try lookupType(
             """
             package foo:bar
@@ -116,13 +123,13 @@ class NameLookupTests: XCTestCase {
             typeName: "my-type"
         )
         guard case .record(let record) = type else {
-            XCTFail("expected record but got \(type)")
+            Issue.record("expected record but got \(type)")
             return
         }
-        XCTAssertEqual(record.fields, [])
+        #expect(record.fields == [])
     }
 
-    func testLookupExternalType() throws {
+    @Test func lookupExternalType() throws {
         let type = try lookupType(
             [
                 [
@@ -148,13 +155,13 @@ class NameLookupTests: XCTestCase {
             namespace: "foo", package: "root", interfaceName: "x", typeName: "my-type"
         )
         guard case .record(let record) = type else {
-            XCTFail("expected record but got \(type)")
+            Issue.record("expected record but got \(type)")
             return
         }
-        XCTAssertEqual(record.fields, [])
+        #expect(record.fields == [])
     }
 
-    func testLookupTopLevelUsedInterface() throws {
+    @Test func lookupTopLevelUsedInterface() throws {
         let type = try lookupType(
             [
                 [
@@ -181,14 +188,14 @@ class NameLookupTests: XCTestCase {
             namespace: "foo", package: "root", interfaceName: "x", typeName: "my-type"
         )
         guard case .record(let record) = type else {
-            XCTFail("expected record but got \(type)")
+            Issue.record("expected record but got \(type)")
             return
         }
-        XCTAssertEqual(record.fields, [])
+        #expect(record.fields == [])
     }
 
-    func testLookupTopLevelUseIsExternallyInvisible() throws {
-        XCTAssertThrowsError(
+    @Test func lookupTopLevelUseIsExternallyInvisible() throws {
+        #expect(throws: (any Error).self) {
             try lookupType(
                 [
                     [
@@ -219,10 +226,11 @@ class NameLookupTests: XCTestCase {
                     ],
                 ],
                 namespace: "foo", package: "root", interfaceName: "x", typeName: "my-type"
-            ))
+            )
+        }
     }
 
-    func testLookupTopLevelUseWithBareIdentifier() throws {
+    @Test func lookupTopLevelUseWithBareIdentifier() throws {
         try assertLookup(
             """
             package foo:bar
@@ -238,7 +246,7 @@ class NameLookupTests: XCTestCase {
         )
     }
 
-    func testLookupInInterfaceInWorld() throws {
+    @Test func lookupInInterfaceInWorld() throws {
         let packageResolver = try buildPackages(
             [
                 [
@@ -265,20 +273,20 @@ class NameLookupTests: XCTestCase {
                 ],
             ]
         )
-        let rootPkg = try XCTUnwrap(packageResolver.findPackage(namespace: "foo", package: "root", version: nil))
-        let world = try XCTUnwrap(
+        let rootPkg = try #require(packageResolver.findPackage(namespace: "foo", package: "root", version: nil))
+        let world = try #require(
             rootPkg.sourceFiles[0].items.compactMap {
                 switch $0 {
                 case .world(let world): return world
                 default: return nil
                 }
             }.first)
-        guard case .import(let importItem) = try XCTUnwrap(world.items.first) else {
-            XCTFail("expected import item but got \(String(describing: world.items.first))")
+        guard case .import(let importItem) = try #require(world.items.first) else {
+            Issue.record("expected import item but got \(String(describing: world.items.first))")
             return
         }
         guard case .interface(let name, let items) = importItem.kind else {
-            XCTFail("expected inline interface but got \(importItem.kind)")
+            Issue.record("expected inline interface but got \(importItem.kind)")
             return
         }
 
@@ -297,6 +305,6 @@ class NameLookupTests: XCTestCase {
             name: "t2",
             evaluator: evaluator
         )
-        XCTAssertEqual(try lookup.lookup(), .u8)
+        #expect(try lookup.lookup() == .u8)
     }
 }
