@@ -137,7 +137,7 @@ let package = Package(
             ]
         ),
         .testTarget(name: "GDBRemoteProtocolTests", dependencies: ["GDBRemoteProtocol"]),
-    ],
+    ]
 )
 
 if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
@@ -194,7 +194,7 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
                 "WasmKit",
                 "WasmKitWASI",
                 "GDBRemoteProtocol",
-            ],
+            ]
         ),
     ])
 
