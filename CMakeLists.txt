@@ -71,6 +71,43 @@ if(WASMKIT_BUILD_CLI)
   endif()
 endif()
 
+if(WASMKIT_BUILD_LLVM_BACKEND)
+  FetchContent_Declare(
+    SwiftLLVMBindings
+    GIT_REPOSITORY "https://github.com/swiftlang/swift-llvm-bindings.git"
+    GIT_TAG c1fffb92d4f9d7cb98800762631cfa354869fb46
+    GIT_SHALLOW TRUE
+    GIT_PROGRESS ON
+  )
+
+  FetchContent_MakeAvailable(SwiftLLVMBindings)
+
+  find_package(Subprocess CONFIG)
+
+  if(NOT Subprocess_FOUND)
+    message("-- Vending Subprocess")
+    FetchContent_Declare(
+      Subprocess
+      GIT_REPOSITORY https://github.com/swiftlang/swift-subprocess
+      GIT_TAG 0.2.1
+      GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(Subprocess)
+  endif()
+
+  find_package(SwiftCollections CONFIG)
+  if(NOT SwiftCollections_FOUND)
+    message("-- Vending SwiftCollections")
+    FetchContent_Declare(
+      SwiftCollections
+      GIT_REPOSITORY https://github.com/apple/swift-collections
+      GIT_TAG 1.3.0
+      GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(SwiftCollections)
+  endif()
+endif()
+
 find_package(SwiftSystem CONFIG)
 if(NOT SwiftSystem_FOUND)
   message("-- Vending SwiftSystem")
