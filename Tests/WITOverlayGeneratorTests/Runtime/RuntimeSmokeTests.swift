@@ -1,10 +1,11 @@
+import Testing
 import WIT
-import XCTest
 
 @testable import WITOverlayGenerator
 
-class RuntimeSmokeTests: XCTestCase {
-    func testCallExportByGuest() throws {
+@Suite(TestEnvironmentTraits.runtimeAvailability)
+struct RuntimeSmokeTests {
+    @Test func callExportByGuest() throws {
         var harness = try RuntimeTestHarness(fixture: "Smoke")
         try harness.build(link: SmokeTestWorld.link) { (instance) in
             let component = SmokeTestWorld(instance: instance)

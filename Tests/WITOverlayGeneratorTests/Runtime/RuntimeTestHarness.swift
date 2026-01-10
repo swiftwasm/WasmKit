@@ -1,8 +1,8 @@
 import Foundation
+import Testing
 import WIT
 import WasmKit
 import WasmKitWASI
-import XCTest
 
 @testable import WITOverlayGenerator
 
@@ -52,17 +52,18 @@ struct RuntimeTestHarness {
         self.fixturePath = RuntimeTestHarness.testsDirectory
             .appendingPathComponent("Fixtures").appendingPathComponent(fixture)
         guard let configuration else {
-            throw XCTSkip(
-                """
-                Please create 'Tests/default.json' with this or similar contents:
-                {
-                    "swiftExecutablePath": "$HOME/Library/Developer/Toolchains/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a.xctoolchain/usr/bin/swift",
-                    "wasiSwiftSDKPath": "$HOME/Library/org.swift.swiftpm/swift-sdks/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi.artifactbundle/DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi/wasm32-unknown-wasi"
-                }
+            throw Error(
+                description:
+                    """
+                    Please create 'Tests/default.json' with this or similar contents:
+                    {
+                        "swiftExecutablePath": "$HOME/Library/Developer/Toolchains/swift-DEVELOPMENT-SNAPSHOT-2024-07-08-a.xctoolchain/usr/bin/swift",
+                        "wasiSwiftSDKPath": "$HOME/Library/org.swift.swiftpm/swift-sdks/swift-wasm-DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi.artifactbundle/DEVELOPMENT-SNAPSHOT-2024-07-09-a-wasm32-unknown-wasi/wasm32-unknown-wasi"
+                    }
 
 
-                or specify `configuration` parameter in your test code.
-                """)
+                    or specify `configuration` parameter in your test code.
+                    """)
         }
         self.configuration = configuration
         self.fileManager = fileManager
@@ -190,7 +191,7 @@ struct RuntimeTestHarness {
     /// Compile the given input Swift source files into core Wasm module
     func compile(inputFiles: [String], arguments: [String]) throws -> URL {
         #if os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
-            throw XCTSkip("WITOverlayGenerator test requires Foundation.Process")
+            throw Error(description: "WITOverlayGenerator tests require Foundation.Process, which is unavailable on this platform.")
         #else
             let outputPath = Self.testsDirectory
                 .appendingPathComponent("Compiled")
@@ -236,7 +237,7 @@ struct RuntimeTestHarness {
     /// Compile the given input Swift source files into an object file
     func compileToObj(cInputFiles: [String], arguments: [String], outputPath: URL) throws {
         #if os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
-            throw XCTSkip("WITOverlayGenerator test requires Foundation.Process")
+            throw Error(description: "WITOverlayGenerator tests require Foundation.Process, which is unavailable on this platform.")
         #else
             let process = Process()
             // Assume that clang is placed alongside swiftc
