@@ -50,43 +50,42 @@ jobs:
           echo 'docker exec -i build-container "$@"' > ./build-exec
           chmod +x ./build-exec
 
-      - name: Install Development toolchain
-        id: setup-development
-        run: |
-          toolchain_path="/opt/swiftwasm"
-          ./build-exec mkdir -p "$toolchain_path"
-          curl -L ${{ matrix.development-toolchain-download }} | ./build-exec tar xz --strip-component 1 -C "$toolchain_path"
-          echo "toolchain-path=$toolchain_path" >> $GITHUB_OUTPUT
-          ./build-exec "$toolchain_path/usr/bin/swift" sdk install "${{ matrix.wasi-swift-sdk-download }}" --checksum "${{ matrix.wasi-swift-sdk-checksum }}"
-          wasi_sdk_path=$(./build-exec "$toolchain_path/usr/bin/swift" sdk configure --show-configuration "${{ matrix.wasi-swift-sdk-id }}" wasm32-unknown-wasi | grep sdkRootPath: | cut -d: -f2)
-          echo "wasi-swift-sdk-path=$(dirname $wasi_sdk_path)" >> $GITHUB_OUTPUT
-
-      - name: Configure Tests/default.json
-        run: |
-          cat <<EOS > Tests/default.json
-          {
-            "swiftExecutablePath": "${{ steps.setup-development.outputs.toolchain-path }}/usr/bin/swift",
-            "wasiSwiftSDKPath": "${{ steps.setup-development.outputs.wasi-swift-sdk-path }}",
-            "hostSwiftExecutablePath": "/usr/bin/swift"
-          }
-          EOS
+      # - name: Install Development toolchain
+      #   id: setup-development
+      #   run: |
+      #     toolchain_path="/opt/swiftwasm"
+      #     ./build-exec mkdir -p "$toolchain_path"
+      #     curl -L ${{ matrix.development-toolchain-download }} | ./build-exec tar xz --strip-component 1 -C "$toolchain_path"
+      #     echo "toolchain-path=$toolchain_path" >> $GITHUB_OUTPUT
+      #     ./build-exec "$toolchain_path/usr/bin/swift" sdk install "${{ matrix.wasi-swift-sdk-download }}" --checksum "${{ matrix.wasi-swift-sdk-checksum }}"
+      #     wasi_sdk_path=$(./build-exec "$toolchain_path/usr/bin/swift" sdk configure --show-configuration "${{ matrix.wasi-swift-sdk-id }}" wasm32-unknown-wasi | grep sdkRootPath: | cut -d: -f2)
+      #     echo "wasi-swift-sdk-path=$(dirname $wasi_sdk_path)" >> $GITHUB_OUTPUT
+      #
+      # - name: Configure Tests/default.json
+      #   run: |
+      #     cat <<EOS > Tests/default.json
+      #     {
+      #       "swiftExecutablePath": "${{ steps.setup-development.outputs.toolchain-path }}/usr/bin/swift",
+      #       "wasiSwiftSDKPath": "${{ steps.setup-development.outputs.wasi-swift-sdk-path }}",
+      #       "hostSwiftExecutablePath": "/usr/bin/swift"
+      #     }
+      #     EOS
       - run: ./build-exec ./CI/install-wabt.sh
       - run: ./Vendor/checkout-dependency
       - run: |
-          ./build-exec md5sum ./Vendor/testsuite/proposals/memory64/table.wast
-          ./build-exec swift test ${{ matrix.test-args }} --filter encodeFloat
+          ./build-exec swift test ${{ matrix.test-args }} --filter spectest
 
-      - if: matrix.build-dev-dashboard
-        run: ./build-exec ./CI/build-dev-dashboard.sh
-      - if: matrix.build-dev-dashboard
-        name: Relax artifact permissions
-        run: sudo chown -R $USER .build/html
-      - if: matrix.build-dev-dashboard
-        id: deployment
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: .build/html
-
+      # - if: matrix.build-dev-dashboard
+      #   run: ./build-exec ./CI/build-dev-dashboard.sh
+      # - if: matrix.build-dev-dashboard
+      #   name: Relax artifact permissions
+      #   run: sudo chown -R $USER .build/html
+      # - if: matrix.build-dev-dashboard
+      #   id: deployment
+      #   uses: actions/upload-pages-artifact@v4
+      #   with:
+      #     path: .build/html
+      #
   # deploy-dev-dashboard:
   #   environment:
   #     name: github-pages

@@ -16,7 +16,6 @@ let package = Package(
         .library(name: "WASI", targets: ["WASI"]),
         .library(name: "WasmParser", targets: ["WasmParser"]),
         .library(name: "WAT", targets: ["WAT"]),
-        .library(name: "WIT", targets: ["WIT"]),
         .library(name: "_CabiShims", targets: ["_CabiShims"]),
     ],
     targets: [
@@ -108,24 +107,6 @@ let package = Package(
 
         .target(name: "CSystemExtras"),
 
-        .executableTarget(
-            name: "WITTool",
-            dependencies: [
-                "WIT",
-                "WITOverlayGenerator",
-                "WITExtractor",
-                .product(name: "ArgumentParser", package: "swift-argument-parser"),
-            ]
-        ),
-
-        .target(name: "WIT"),
-        .testTarget(name: "WITTests", dependencies: ["WIT"]),
-
-        .target(name: "WITOverlayGenerator", dependencies: ["WIT"]),
-        .target(name: "_CabiShims"),
-
-        .target(name: "WITExtractor"),
-        .testTarget(name: "WITExtractorTests", dependencies: ["WITExtractor", "WIT"]),
     ]
 )
 
@@ -140,34 +121,3 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
         .package(path: "../swift-system"),
     ]
 }
-
-#if !os(Windows)
-    // Add build tool plugins only for non-Windows platforms
-    package.products.append(contentsOf: [
-        .plugin(name: "WITOverlayPlugin", targets: ["WITOverlayPlugin"]),
-        .plugin(name: "WITExtractorPlugin", targets: ["WITExtractorPlugin"]),
-    ])
-
-    package.targets.append(contentsOf: [
-        .plugin(name: "WITOverlayPlugin", capability: .buildTool(), dependencies: ["WITTool"]),
-        .plugin(name: "GenerateOverlayForTesting", capability: .buildTool(), dependencies: ["WITTool"]),
-        .testTarget(
-            name: "WITOverlayGeneratorTests",
-            dependencies: ["WITOverlayGenerator", "WasmKit", "WasmKitWASI"],
-            exclude: ["Fixtures", "Compiled", "Generated", "EmbeddedSupport"],
-            plugins: [.plugin(name: "GenerateOverlayForTesting")]
-        ),
-        .plugin(
-            name: "WITExtractorPlugin",
-            capability: .command(
-                intent: .custom(verb: "extract-wit", description: "Extract WIT definition from Swift module"),
-                permissions: []
-            ),
-            dependencies: ["WITTool"]
-        ),
-        .testTarget(
-            name: "WITExtractorPluginTests",
-            exclude: ["Fixtures"]
-        ),
-    ])
-#endif
