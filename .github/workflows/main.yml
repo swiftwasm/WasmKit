@@ -196,7 +196,7 @@ jobs:
             "hostSwiftExecutablePath": "/usr/bin/swift"
           }
           EOS
-      # - run: ./build-exec ./CI/install-wabt.sh
+      - run: ./build-exec ./CI/install-wabt.sh
       - run: ./Vendor/checkout-dependency
       - run: |
           ./build-exec md5sum ./Vendor/testsuite/proposals/memory64/table.wast
