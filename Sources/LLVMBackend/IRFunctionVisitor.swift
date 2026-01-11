@@ -24,7 +24,7 @@ struct IRFunctionVisitor: InstructionVisitor, ~Copyable {
     private(set) var stack = [IRValue]()
     private(set) var types = [FunctionType]()
     private(set) var functionTypes = [TypeIndex]()
-    private(set) var functionNames = [String]()
+    private(set) var functionNames = [Int: String]()
     private(set) var importedFunctions = [IRValue]()
     private(set) var memories = [Memory]()
 
@@ -111,7 +111,7 @@ struct IRFunctionVisitor: InstructionVisitor, ~Copyable {
         _ functionTypes: [TypeIndex],
         _ memories: [Memory],
         importedFunctions: [IRValue],
-        functionNames: [String]
+        functionNames: [Int: String]
     ) throws {
         self.types = types
         self.functionTypes = functionTypes
@@ -153,7 +153,7 @@ struct IRFunctionVisitor: InstructionVisitor, ~Copyable {
 
         guard
             self.functionNames.count > functionIndex,
-            let f = self.functionNames[functionIndex].withStringRef({ ir.getFunction($0) }).value
+            let f = self.functionNames[functionIndex]?.withStringRef({ ir.getFunction($0) }).value
         else {
             throw Error.irFunctionUnknown(functionIndex)
         }
