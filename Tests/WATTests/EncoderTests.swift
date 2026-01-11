@@ -18,8 +18,8 @@ struct EncoderTests {
     ) throws {
         var stats = parentStats
         defer { parentStats = stats }
-        func recordFail() {
-            stats.failed.insert(wast.lastPathComponent)
+        func recordFail(wasmBinaryName: String? = nil) {
+            stats.failed.insert(wasmBinaryName ?? wast.lastPathComponent)
         }
         func assertEqual<T: Equatable>(_ lhs: T, _ rhs: T, sourceLocation: SourceLocation = #_sourceLocation) {
             #expect(lhs == rhs, sourceLocation: sourceLocation)
@@ -67,7 +67,7 @@ struct EncoderTests {
             func assertEqual<T: Equatable>(_ lhs: T, _ rhs: T, sourceLocation: SourceLocation = #_sourceLocation) {
                 #expect(lhs == rhs, sourceLocation: sourceLocation)
                 if lhs != rhs {
-                    recordFail()
+                    recordFail(wasmBinaryName: moduleBinaryFile.lastPathComponent)
                 }
             }
             stats.run += 1
@@ -101,6 +101,7 @@ struct EncoderTests {
     #if !(os(iOS) || os(watchOS) || os(tvOS) || os(visionOS))
         @Test(
             arguments: Spectest.wastFiles(include: [], exclude: [])
+            arguments: Spectest.wastFiles(include: ["const.wast"], exclude: [])
         )
         func spectest(wastFile: URL) throws {
             guard let wast2json = TestSupport.lookupExecutable("wast2json") else {
