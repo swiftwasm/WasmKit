@@ -103,7 +103,8 @@ struct EncoderTests {
             arguments: Spectest.wastFiles(include: ["const.wast"], exclude: [])
         )
         func spectest(wastFile: URL) throws {
-            guard let wast2json = TestSupport.lookupExecutable("wast2json") else {
+            let wast2json = URL(fileURLWithPath: "/Users/mdesiatov/bin/bin/wast2json")
+            guard FileManager.default.fileExists(atPath: wast2json.path) else {
                 return  // Skip the test if wast2json is not found in PATH
             }
 
@@ -170,5 +171,25 @@ struct EncoderTests {
             return
         }
         #expect(functionNames == [0: "foo", 2: "bar"])
+    }
+
+    @Test
+    func encodeFloat() throws {
+        let wat = """
+            (module
+              (type (;0;) (func (result f32)))
+              (export "f" (func 0))
+              (func (;0;) (type 0) (result f32)
+                f32.const 0x1.p-149
+              )
+            )
+            """
+
+        let module = try wat2wasm(wat)
+
+        #expect(module == [
+            0x0, 0x61, 0x73, 0x6d, 0x1, 0x0, 0x0, 0x0, 0x1, 0x5, 0x1, 0x60, 0x0, 0x1, 0x7d, 0x3, 0x2, 0x1,
+            0x0, 0x7, 0x5, 0x1, 0x1, 0x66, 0x0, 0x0, 0xa, 0x9, 0x1, 0x7, 0x0, 0x43, 0x1, 0x0, 0x0, 0x0, 0xb
+        ])
     }
 }
