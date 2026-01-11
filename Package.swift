@@ -16,7 +16,6 @@ let package = Package(
         .library(name: "WASI", targets: ["WASI"]),
         .library(name: "WasmParser", targets: ["WasmParser"]),
         .library(name: "WAT", targets: ["WAT"]),
-        .library(name: "_CabiShims", targets: ["_CabiShims"]),
     ],
     targets: [
         .executableTarget(
