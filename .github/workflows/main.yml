@@ -73,7 +73,7 @@ jobs:
       - run: ./build-exec ./CI/install-wabt.sh
       - run: ./Vendor/checkout-dependency
       - run: |
-          ./build-exec swift test ${{ matrix.test-args }} --filter spectest
+          ./build-exec swift test ${{ matrix.test-args }} --filter EncoderTests
 
       # - if: matrix.build-dev-dashboard
       #   run: ./build-exec ./CI/build-dev-dashboard.sh
