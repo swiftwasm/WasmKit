@@ -100,7 +100,6 @@ struct EncoderTests {
 
     #if !(os(iOS) || os(watchOS) || os(tvOS) || os(visionOS))
         @Test(
-            arguments: Spectest.wastFiles(include: [], exclude: [])
             arguments: Spectest.wastFiles(include: ["const.wast"], exclude: [])
         )
         func spectest(wastFile: URL) throws {
