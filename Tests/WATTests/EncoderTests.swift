@@ -103,7 +103,8 @@ struct EncoderTests {
             arguments: Spectest.wastFiles(include: ["const.wast"], exclude: [])
         )
         func spectest(wastFile: URL) throws {
-            guard let wast2json = TestSupport.lookupExecutable("wast2json") else {
+            let wast2json = URL(fileURLWithPath: "/Users/mdesiatov/bin/bin/wast2json")
+            guard FileManager.default.fileExists(atPath: wast2json.path) else {
                 return  // Skip the test if wast2json is not found in PATH
             }
 
