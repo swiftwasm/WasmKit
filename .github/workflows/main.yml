@@ -38,6 +38,7 @@ jobs:
       - uses: actions/checkout@v4
       - id: setup-development
         run: |
+          brew install wabt
           curl -O https://download.swift.org/swiftly/darwin/swiftly.pkg && \
             installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
 
