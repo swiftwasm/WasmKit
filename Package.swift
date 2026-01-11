@@ -10,7 +10,6 @@ let package = Package(
     name: "WasmKit",
     platforms: [.macOS(.v10_13), .iOS(.v12)],
     products: [
-        .executable(name: "wasmkit-cli", targets: ["CLI"]),
         .library(name: "WasmKit", targets: ["WasmKit"]),
         .library(name: "WasmKitWASI", targets: ["WasmKitWASI"]),
         .library(name: "WASI", targets: ["WASI"]),
@@ -18,26 +17,6 @@ let package = Package(
         .library(name: "WAT", targets: ["WAT"]),
     ],
     targets: [
-        .executableTarget(
-            name: "CLI",
-            dependencies: [
-                "CLICommands"
-            ],
-            exclude: ["CMakeLists.txt"]
-        ),
-
-        .target(
-            name: "CLICommands",
-            dependencies: [
-                "WAT",
-                "WasmKit",
-                "WasmKitWASI",
-                .product(name: "ArgumentParser", package: "swift-argument-parser"),
-                .product(name: "SystemPackage", package: "swift-system"),
-            ],
-            exclude: ["CMakeLists.txt"]
-        ),
-
         .target(
             name: "WasmKit",
             dependencies: [
@@ -111,12 +90,10 @@ let package = Package(
 
 if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
     package.dependencies += [
-        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.5.1"),
         .package(url: "https://github.com/apple/swift-system", from: "1.5.0"),
     ]
 } else {
     package.dependencies += [
-        .package(path: "../swift-argument-parser"),
         .package(path: "../swift-system"),
     ]
 }
