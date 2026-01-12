@@ -26,6 +26,35 @@ jobs:
             echo "::error::The auto-generated code utilities changed some files. Please see \`Utilities/README.md\`, re-run the tools, and commit the changes."
             exit 1
           }
+
+  build-macos-snapshots:
+    runs-on: macos-26
+    strategy:
+      matrix:
+        include:
+          - toolchain: 6.3-snapshot
+          - toolchain: main-snapshot
+    steps:
+      - uses: actions/checkout@v4
+      - id: setup-development
+        run: |
+          brew install wabt
+          curl -O https://download.swift.org/swiftly/darwin/swiftly.pkg && \
+            installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
+
+      - name: Build with selected toolchain
+        run: |
+          ~/.swiftly/bin/swiftly init --quiet-shell-followup --skip-install && \
+            . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh" && \
+            hash -r
+          swiftly install ${{ matrix.toolchain }}
+          swiftly use ${{ matrix.toolchain }}
+
+          ./Vendor/checkout-dependency
+
+          swift --version
+          swift test --sanitize address --traits WasmDebuggingSupport
+
   build-macos:
     strategy:
       matrix:
