@@ -24,19 +24,19 @@ struct ComponentWatParser {
         var originalParser = parser
         guard (try parser.peek(.leftParen)) != nil else { return nil }
         try parser.consume()
-//        guard try WastDirective.peek(wastParser: self) else {
-//            if try peekModuleField() {
-//                // Parse inline module, which doesn't include surrounding (module)
-//                let location = originalParser.lexer.location()
-//                return .module(
-//                    ModuleDirective(
-//                        source: .text(try parseWAT(&originalParser, features: features)), id: nil, location: location
-//                    ))
-//            }
-//            throw WatParserError("unexpected wast directive token", location: parser.lexer.location())
-//        }
-//        let directive = try WastDirective.parse(wastParser: &self)
-//        return directive
+        //        guard try WastDirective.peek(wastParser: self) else {
+        //            if try peekModuleField() {
+        //                // Parse inline module, which doesn't include surrounding (module)
+        //                let location = originalParser.lexer.location()
+        //                return .module(
+        //                    ModuleDirective(
+        //                        source: .text(try parseWAT(&originalParser, features: features)), id: nil, location: location
+        //                    ))
+        //            }
+        //            throw WatParserError("unexpected wast directive token", location: parser.lexer.location())
+        //        }
+        //        let directive = try WastDirective.parse(wastParser: &self)
+        //        return directive
         return nil
     }
 }
