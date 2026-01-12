@@ -31,7 +31,7 @@ struct MemoryDirEntry: WASIDir {
         atim: WASIAbi.Timestamp, mtim: WASIAbi.Timestamp,
         fstFlags: WASIAbi.FstFlags
     ) throws {
-        let now = currentTimestamp()
+        let now = WASIAbi.Timestamp.currentWallClock()
         let newAtim: WASIAbi.Timestamp?
         if fstFlags.contains(.ATIM) {
             newAtim = atim
@@ -189,7 +189,7 @@ struct MemoryDirEntry: WASIDir {
             throw WASIAbi.Errno.ENOENT
         }
 
-        let now = currentTimestamp()
+        let now = WASIAbi.Timestamp.currentWallClock()
         let newAtim: WASIAbi.Timestamp?
         if fstFlags.contains(.ATIM) {
             newAtim = atim

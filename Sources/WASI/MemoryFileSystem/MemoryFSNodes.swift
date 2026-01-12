@@ -1,32 +1,5 @@
 import SystemPackage
 
-#if canImport(Darwin)
-    import Darwin
-#elseif canImport(Glibc)
-    import Glibc
-#elseif canImport(Musl)
-    import Musl
-#elseif os(Windows)
-    import ucrt
-    import WinSDK
-#elseif os(WASI)
-    import WASILibc
-#endif
-
-func currentTimestamp() -> WASIAbi.Timestamp {
-    #if os(Windows)
-        var ft = FILETIME()
-        GetSystemTimeAsFileTime(&ft)
-        let intervals = (Int64(ft.dwHighDateTime) << 32) | Int64(ft.dwLowDateTime)
-        let unixIntervals = intervals - 116_444_736_000_000_000
-        return WASIAbi.Timestamp(unixIntervals * 100)
-    #else
-        var ts = timespec()
-        clock_gettime(CLOCK_REALTIME, &ts)
-        return WASIAbi.Timestamp(ts.tv_sec) * 1_000_000_000 + WASIAbi.Timestamp(ts.tv_nsec)
-    #endif
-}
-
 /// Base protocol for all file system nodes in memory.
 protocol MemFSNode: AnyObject {
     var type: MemFSNodeType { get }
@@ -49,7 +22,7 @@ final class MemoryDirectoryNode: MemFSNode {
     private var _ctim: WASIAbi.Timestamp
 
     init() {
-        let now = currentTimestamp()
+        let now = WASIAbi.Timestamp.currentWallClock()
         self._atim = now
         self._mtim = now
         self._ctim = now
@@ -60,17 +33,17 @@ final class MemoryDirectoryNode: MemFSNode {
     }
 
     func touchAccessTime() {
-        _atim = currentTimestamp()
+        _atim = WASIAbi.Timestamp.currentWallClock()
     }
 
     func touchModificationTime() {
-        let now = currentTimestamp()
+        let now = WASIAbi.Timestamp.currentWallClock()
         _mtim = now
         _ctim = now
     }
 
     func setTimes(atim: WASIAbi.Timestamp?, mtim: WASIAbi.Timestamp?) {
-        let now = currentTimestamp()
+        let now = WASIAbi.Timestamp.currentWallClock()
         if let atim = atim {
             _atim = atim
         }
@@ -119,7 +92,7 @@ final class MemoryFileNode: MemFSNode {
 
     init(content: FileContent) {
         self.content = content
-        let now = currentTimestamp()
+        let now = WASIAbi.Timestamp.currentWallClock()
         self._atim = now
         self._mtim = now
         self._ctim = now
@@ -172,13 +145,13 @@ final class MemoryFileNode: MemFSNode {
 
     func touchAccessTime() {
         if case .bytes = content {
-            _atim = currentTimestamp()
+            _atim = WASIAbi.Timestamp.currentWallClock()
         }
     }
 
     func touchModificationTime() {
         if case .bytes = content {
-            let now = currentTimestamp()
+            let now = WASIAbi.Timestamp.currentWallClock()
             _mtim = now
             _ctim = now
         }
@@ -186,7 +159,7 @@ final class MemoryFileNode: MemFSNode {
 
     func setTimes(atim: WASIAbi.Timestamp?, mtim: WASIAbi.Timestamp?) {
         if case .bytes = content {
-            let now = currentTimestamp()
+            let now = WASIAbi.Timestamp.currentWallClock()
             if let atim = atim {
                 _atim = atim
             }

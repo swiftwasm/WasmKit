@@ -40,7 +40,7 @@ final class MemoryFileEntry: WASIFile {
     ) throws {
         switch fileNode.content {
         case .bytes:
-            let now = currentTimestamp()
+            let now = WASIAbi.Timestamp.currentWallClock()
             let newAtim: WASIAbi.Timestamp?
             if fstFlags.contains(.ATIM) {
                 newAtim = atim

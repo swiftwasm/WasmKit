@@ -138,6 +138,10 @@ internal var _CLOCK_MONOTONIC_RAW: CInterop.ClockId { CLOCK_MONOTONIC_RAW }
 @_alwaysEmitIntoClient
 internal var _CLOCK_MONOTONIC: CInterop.ClockId { CLOCK_MONOTONIC }
 #endif
+#if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(OpenBSD) || os(FreeBSD)
+@_alwaysEmitIntoClient
+internal var _CLOCK_REALTIME: CInterop.ClockId { CLOCK_REALTIME }
+#endif
 #if SYSTEM_PACKAGE_DARWIN
 @_alwaysEmitIntoClient
 internal var _CLOCK_UPTIME_RAW: CInterop.ClockId { CLOCK_UPTIME_RAW }
