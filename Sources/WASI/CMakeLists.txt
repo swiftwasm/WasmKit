@@ -11,12 +11,12 @@ add_wasmkit_library(WASI
   MemoryFileSystem/MemoryFSNodes.swift
   MemoryFileSystem/MemoryDirEntry.swift
   MemoryFileSystem/MemoryFileEntry.swift
-  MemoryFileSystem/MemoryStdioFile.swift
   FileSystem.swift
   GuestMemorySupport.swift
   Clock.swift
   RandomBufferGenerator.swift
   WASI.swift
+  WASIBridgeToHost.swift
 )
 
 target_link_wasmkit_libraries(WASI PUBLIC
