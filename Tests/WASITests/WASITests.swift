@@ -26,12 +26,12 @@ struct WASITests {
             try t.createSymlink(at: "Sandbox/link-loop.txt", to: "link-loop.txt")
 
             let wasi = try WASIBridgeToHost(
-                preopens: ["/Sandbox": t.url.appendingPathComponent("Sandbox").path]
+                fileSystem: .host(preopens: ["/Sandbox": t.url.appendingPathComponent("Sandbox").path])
             )
             let mntFd: WASIAbi.Fd = 3
 
             func assertResolve(_ path: String, followSymlink: Bool, directory: Bool = false) throws {
-                let fd = try wasi.path_open(
+                let fd = try wasi.underlying.path_open(
                     dirFd: mntFd,
                     dirFlags: followSymlink ? [.SYMLINK_FOLLOW] : [],
                     path: path,
@@ -40,7 +40,7 @@ struct WASITests {
                     fsRightsInheriting: .DIRECTORY_INHERITING_RIGHTS,
                     fdflags: []
                 )
-                try wasi.fd_close(fd: fd)
+                try wasi.underlying.fd_close(fd: fd)
             }
 
             func assertNotResolve(
@@ -51,7 +51,7 @@ struct WASITests {
                 _ checkError: ((WASIAbi.Errno) throws -> Void)?
             ) throws {
                 do {
-                    _ = try wasi.path_open(
+                    _ = try wasi.underlying.path_open(
                         dirFd: mntFd,
                         dirFlags: followSymlink ? [.SYMLINK_FOLLOW] : [],
                         path: path,
@@ -178,7 +178,7 @@ struct WASITests {
         try fs.addFile(at: "/test.txt", content: Array("Test Content".utf8))
         try fs.ensureDirectory(at: "/testdir")
 
-        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let wasi = try WASIBridgeToHost(fileSystem: .memory(fs)).underlying
 
         let rootFd: WASIAbi.Fd = 3
 
@@ -204,7 +204,7 @@ struct WASITests {
         let fs = try MemoryFileSystem(preopens: ["/": "/"])
         try fs.addFile(at: "/readwrite.txt", content: Array("Initial".utf8))
 
-        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let wasi = try WASIBridgeToHost(fileSystem: .memory(fs)).underlying
         let rootFd: WASIAbi.Fd = 3
 
         let fd = try wasi.path_open(
@@ -230,7 +230,7 @@ struct WASITests {
     func memoryFileSystemDirectories() throws {
         let fs = try MemoryFileSystem(preopens: ["/": "/"])
 
-        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let wasi = try WASIBridgeToHost(fileSystem: .memory(fs)).underlying
         let rootFd: WASIAbi.Fd = 3
 
         try wasi.path_create_directory(dirFd: rootFd, path: "newdir")
@@ -263,7 +263,7 @@ struct WASITests {
     func memoryFileSystemCreateAndTruncate() throws {
         let fs = try MemoryFileSystem(preopens: ["/": "/"])
 
-        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let wasi = try WASIBridgeToHost(fileSystem: .memory(fs)).underlying
         let rootFd: WASIAbi.Fd = 3
 
         let fd1 = try wasi.path_open(
@@ -302,7 +302,7 @@ struct WASITests {
         let fs = try MemoryFileSystem(preopens: ["/": "/"])
         try fs.addFile(at: "/existing.txt", content: [])
 
-        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let wasi = try WASIBridgeToHost(fileSystem: .memory(fs)).underlying
         let rootFd: WASIAbi.Fd = 3
 
         do {
@@ -345,7 +345,7 @@ struct WASITests {
             "/sandbox": "/sandbox"
         ])
 
-        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let wasi = try WASIBridgeToHost(fileSystem: .memory(fs)).underlying
 
         let prestat = try wasi.fd_prestat_get(fd: 3)
         guard case .dir(let pathLen) = prestat else {
@@ -406,7 +406,7 @@ struct WASITests {
             let fs = try MemoryFileSystem(preopens: ["/": "/"])
             try fs.addFile(at: "/mounted.txt", handle: fd)
 
-            let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+            let wasi = try WASIBridgeToHost(fileSystem: .memory(fs)).underlying
             let rootFd: WASIAbi.Fd = 3
 
             let openedFd = try wasi.path_open(
@@ -435,8 +435,8 @@ struct WASITests {
 
             // Using default host filesystem
             let wasi = try WASIBridgeToHost(
-                preopens: ["/sandbox": tempDir.url.path]
-            )
+                fileSystem: .host(preopens: ["/sandbox": tempDir.url.path])
+            ).underlying
 
             let sandboxFd: WASIAbi.Fd = 3
             let fd = try wasi.path_open(
@@ -463,7 +463,7 @@ struct WASITests {
         try memFS.addFile(at: "/memory.txt", content: "Memory content")
 
         // Using memory filesystem through unified bridge
-        let wasi = try WASIBridgeToHost(fileSystemProvider: memFS)
+        let wasi = try WASIBridgeToHost(fileSystem: .memory(memFS)).underlying
 
         let rootFd: WASIAbi.Fd = 3
         let fd = try wasi.path_open(
@@ -488,7 +488,7 @@ struct WASITests {
         let fs = try MemoryFileSystem(preopens: ["/": "/"])
         try fs.addFile(at: "/positions.txt", content: Array("0123456789".utf8))
 
-        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let wasi = try WASIBridgeToHost(fileSystem: .memory(fs)).underlying
         let rootFd: WASIAbi.Fd = 3
 
         let fd = try wasi.path_open(
@@ -521,7 +521,7 @@ struct WASITests {
         let fs = try MemoryFileSystem(preopens: ["/": "/"])
         try fs.addFile(at: "/file.txt", content: Array("test".utf8))
 
-        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let wasi = try WASIBridgeToHost(fileSystem: .memory(fs)).underlying
         let rootFd: WASIAbi.Fd = 3
 
         let readOnlyFd = try wasi.path_open(
@@ -614,7 +614,7 @@ struct WASITests {
         let fs = try MemoryFileSystem(preopens: ["/": "/"])
         try fs.addFile(at: "/truncate.txt", content: Array("Long content here".utf8))
 
-        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let wasi = try WASIBridgeToHost(fileSystem: .memory(fs)).underlying
         let rootFd: WASIAbi.Fd = 3
 
         let fd = try wasi.path_open(
@@ -647,7 +647,7 @@ struct WASITests {
         let fs = try MemoryFileSystem(preopens: ["/": "/"])
         try fs.addFile(at: "/expand.txt", content: Array("Hi".utf8))
 
-        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let wasi = try WASIBridgeToHost(fileSystem: .memory(fs)).underlying
         let rootFd: WASIAbi.Fd = 3
 
         let fd = try wasi.path_open(
@@ -684,7 +684,7 @@ struct WASITests {
         let fs = try MemoryFileSystem(preopens: ["/": "/"])
         try fs.addFile(at: "/old.txt", content: Array("Content".utf8))
 
-        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let wasi = try WASIBridgeToHost(fileSystem: .memory(fs)).underlying
         let rootFd: WASIAbi.Fd = 3
 
         try wasi.path_rename(
@@ -711,7 +711,7 @@ struct WASITests {
         try fs.addFile(at: "/file.txt", content: Array("test".utf8))
         try fs.ensureDirectory(at: "/subdir")
 
-        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let wasi = try WASIBridgeToHost(fileSystem: .memory(fs)).underlying
         let rootFd: WASIAbi.Fd = 3
 
         try wasi.path_rename(
@@ -730,7 +730,7 @@ struct WASITests {
         let fs = try MemoryFileSystem(preopens: ["/": "/"])
         try fs.ensureDirectory(at: "/emptydir")
 
-        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let wasi = try WASIBridgeToHost(fileSystem: .memory(fs)).underlying
         let rootFd: WASIAbi.Fd = 3
 
         try wasi.path_remove_directory(dirFd: rootFd, path: "emptydir")
@@ -743,7 +743,7 @@ struct WASITests {
         try fs.ensureDirectory(at: "/nonempty")
         try fs.addFile(at: "/nonempty/file.txt", content: [])
 
-        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let wasi = try WASIBridgeToHost(fileSystem: .memory(fs)).underlying
         let rootFd: WASIAbi.Fd = 3
 
         do {
@@ -761,7 +761,7 @@ struct WASITests {
         let fs = try MemoryFileSystem(preopens: ["/": "/"])
         try fs.addFile(at: "/sync.txt", content: [])
 
-        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let wasi = try WASIBridgeToHost(fileSystem: .memory(fs)).underlying
         let rootFd: WASIAbi.Fd = 3
 
         let fd = try wasi.path_open(
@@ -785,7 +785,7 @@ struct WASITests {
         let fs = try MemoryFileSystem(preopens: ["/": "/"])
         try fs.addFile(at: "/test.txt", content: [])
 
-        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let wasi = try WASIBridgeToHost(fileSystem: .memory(fs)).underlying
         let rootFd: WASIAbi.Fd = 3
 
         let fd = try wasi.path_open(
@@ -822,7 +822,7 @@ struct WASITests {
         let fs = try MemoryFileSystem(preopens: ["/": "/"])
         try fs.addFile(at: "/readonly.txt", content: Array("Read only".utf8))
 
-        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let wasi = try WASIBridgeToHost(fileSystem: .memory(fs)).underlying
         let rootFd: WASIAbi.Fd = 3
 
         let fd = try wasi.path_open(
@@ -854,7 +854,7 @@ struct WASITests {
         let fs = try MemoryFileSystem(preopens: ["/": "/"])
         try fs.addFile(at: "/writeonly.txt", content: [])
 
-        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let wasi = try WASIBridgeToHost(fileSystem: .memory(fs)).underlying
         let rootFd: WASIAbi.Fd = 3
 
         let fd = try wasi.path_open(
@@ -899,7 +899,7 @@ struct WASITests {
             let fs = try MemoryFileSystem(preopens: ["/": "/"])
             try fs.addFile(at: "/handle.txt", handle: fd)
 
-            let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+            let wasi = try WASIBridgeToHost(fileSystem: .memory(fs)).underlying
             let rootFd: WASIAbi.Fd = 3
 
             let openedFd = try wasi.path_open(
@@ -931,7 +931,7 @@ struct WASITests {
         let fs = try MemoryFileSystem(preopens: ["/": "/"])
         try fs.addFile(at: "/small.txt", content: Array("Small".utf8))
 
-        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let wasi = try WASIBridgeToHost(fileSystem: .memory(fs)).underlying
         let rootFd: WASIAbi.Fd = 3
 
         let fd = try wasi.path_open(
@@ -963,7 +963,7 @@ struct WASITests {
     @Test
     func stdioFileDescriptors() throws {
         let fs = try MemoryFileSystem(preopens: ["/": "/"])
-        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let wasi = try WASIBridgeToHost(fileSystem: .memory(fs)).underlying
 
         let stdinStat = try wasi.fd_fdstat_get(fileDescriptor: 0)
         #expect(stdinStat.fsRightsBase.contains(.FD_READ))
@@ -981,7 +981,7 @@ struct WASITests {
     @Test
     func stdoutWrite() throws {
         let fs = try MemoryFileSystem(preopens: ["/": "/"])
-        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let wasi = try WASIBridgeToHost(fileSystem: .memory(fs)).underlying
 
         let memory = TestSupport.TestGuestMemory()
         let writeData = Array("Hello, stdout!".utf8)
@@ -994,7 +994,7 @@ struct WASITests {
     @Test
     func stderrWrite() throws {
         let fs = try MemoryFileSystem(preopens: ["/": "/"])
-        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let wasi = try WASIBridgeToHost(fileSystem: .memory(fs)).underlying
 
         let memory = TestSupport.TestGuestMemory()
         let writeData = Array("Error message".utf8)
@@ -1007,7 +1007,7 @@ struct WASITests {
     @Test
     func stdinCannotWrite() throws {
         let fs = try MemoryFileSystem(preopens: ["/": "/"])
-        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let wasi = try WASIBridgeToHost(fileSystem: .memory(fs)).underlying
 
         let memory = TestSupport.TestGuestMemory()
         let writeData = Array("Should fail".utf8)
@@ -1024,7 +1024,7 @@ struct WASITests {
     @Test
     func stdoutCannotRead() throws {
         let fs = try MemoryFileSystem(preopens: ["/": "/"])
-        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let wasi = try WASIBridgeToHost(fileSystem: .memory(fs)).underlying
 
         let memory = TestSupport.TestGuestMemory()
         let iovecs = memory.readIOVecs(sizes: [10])
@@ -1040,7 +1040,7 @@ struct WASITests {
     @Test
     func stderrCannotRead() throws {
         let fs = try MemoryFileSystem(preopens: ["/": "/"])
-        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let wasi = try WASIBridgeToHost(fileSystem: .memory(fs)).underlying
 
         let memory = TestSupport.TestGuestMemory()
         let iovecs = memory.readIOVecs(sizes: [10])
@@ -1058,7 +1058,7 @@ struct WASITests {
         let fs = try MemoryFileSystem(preopens: ["/": "/"])
         try fs.addFile(at: "/file.txt", content: "test")
 
-        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let wasi = try WASIBridgeToHost(fileSystem: .memory(fs)).underlying
         let rootFd: WASIAbi.Fd = 3
 
         let stat1 = try wasi.path_filestat_get(dirFd: rootFd, flags: [], path: "file.txt")
@@ -1097,7 +1097,7 @@ struct WASITests {
     func memoryFileSystemDirectoryTimestamps() throws {
         let fs = try MemoryFileSystem(preopens: ["/": "/"])
 
-        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let wasi = try WASIBridgeToHost(fileSystem: .memory(fs)).underlying
         let rootFd: WASIAbi.Fd = 3
 
         try wasi.path_create_directory(dirFd: rootFd, path: "testdir")
@@ -1117,7 +1117,7 @@ struct WASITests {
         let fs = try MemoryFileSystem(preopens: ["/": "/"])
         try fs.addFile(at: "/file.txt", content: [])
 
-        let wasi = try WASIBridgeToHost(fileSystemProvider: fs)
+        let wasi = try WASIBridgeToHost(fileSystem: .memory(fs)).underlying
         let rootFd: WASIAbi.Fd = 3
 
         let specificTime: WASIAbi.Timestamp = 1_000_000_000_000_000_000

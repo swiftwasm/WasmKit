@@ -16,7 +16,7 @@ import SystemPackage
 /// )
 /// ```
 public final class WASIBridgeToHost {
-    private let underlying: WASIImplementation
+    internal let underlying: WASIImplementation
 
     /// Configuration options for the file system implementation used by WASI.
     ///
