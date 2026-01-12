@@ -110,6 +110,12 @@ let package = Package(
 
         .target(name: "CSystemExtras"),
 
+        // Component Model
+
+        .target(
+            name: "ComponentModel"
+        ),
+
         .executableTarget(
             name: "WITTool",
             dependencies: [
