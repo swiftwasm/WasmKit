@@ -2,7 +2,7 @@
 
 # WasmKit
 
-**WasmKit** is a standalone and embeddable [WebAssembly](https://webassembly.org) runtime (virtual machine) implementation and related tooling written in Swift. Starting with Swift 6.2, WasmKit CLI executable is included in [Swift toolchains distributed at swift.org](https://swift.org/install) for Linux and macOS. 
+**WasmKit** is a standalone and embeddable [WebAssembly](https://webassembly.org) runtime (virtual machine) implementation and related tooling written in Swift. Starting with Swift 6.2, WasmKit CLI executable is included in [Swift toolchains distributed at swift.org](https://swift.org/install) for Linux and macOS.
 
 ## Usage
 

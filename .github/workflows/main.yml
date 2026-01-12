@@ -303,8 +303,8 @@ jobs:
     steps:
       - uses: compnerd/gha-setup-swift@main
         with:
-          swift-version: swift-6.2-release
-          swift-build: 6.2-RELEASE
+          swift-version: development
+          swift-build: DEVELOPMENT-SNAPSHOT-2025-12-01-a
       - uses: actions/checkout@v4
       - run: python3 ./Vendor/checkout-dependency
       # FIXME: CMake build is failing on CI due to "link: extra operand '/OUT:lib\\libXXXX.a'" error

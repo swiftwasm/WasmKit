@@ -423,7 +423,7 @@ extension AnyInstructionVisitor {
 ///
 /// The visitor pattern is used while parsing WebAssembly expressions to allow for easy extensibility.
 /// See the expression parsing method ``Code/parseExpression(visitor:)``
-public protocol InstructionVisitor {
+public protocol InstructionVisitor: ~Copyable {
     /// Current offset in visitor's instruction stream.
     var binaryOffset: Int { get set }
 
@@ -651,7 +651,7 @@ public protocol InstructionVisitor {
     mutating func visitUnknown(_ opcode: [UInt8]) throws -> Bool
 }
 
-extension InstructionVisitor {
+extension InstructionVisitor where Self: ~Copyable {
     /// Visits an instruction.
     public mutating func visit(_ instruction: Instruction) throws {
         switch instruction {
@@ -770,7 +770,7 @@ extension InstructionVisitor {
 }
 
 // MARK: - Placeholder implementations
-extension InstructionVisitor {
+extension InstructionVisitor where Self: ~Copyable {
     public mutating func visitUnreachable() throws {}
     public mutating func visitNop() throws {}
     public mutating func visitBlock(blockType: BlockType) throws {}
