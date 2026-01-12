@@ -9,6 +9,8 @@ import SystemPackage
 #elseif os(Windows)
     import ucrt
     import WinSDK
+#elseif os(WASI)
+    import WASILibc
 #endif
 
 func currentTimestamp() -> WASIAbi.Timestamp {
