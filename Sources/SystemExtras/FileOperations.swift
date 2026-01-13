@@ -249,7 +249,10 @@ extension FileDescriptor {
 
     @_alwaysEmitIntoClient
     public var device: UInt64 {
-      UInt64(rawValue.st_dev)
+      if (rawValue.st_dev < 0) {
+        return UInt64(bitPattern: Int64(rawValue.st_dev))
+      }
+      return UInt64(rawValue.st_dev)
     }
 
     @_alwaysEmitIntoClient
