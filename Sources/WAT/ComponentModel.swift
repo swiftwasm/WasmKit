@@ -5,7 +5,7 @@ package struct ComponentWat {
     let functionsMap: NameMapping<ComponentWatParser.FunctionDecl>
     let valuesMap: NameMapping<ComponentWatParser.ValueDecl>
     let typesMap: NameMapping<ComponentWatParser.TypeDecl>
-    let componentTnstancesMap: NameMapping<ComponentWatParser.InstanceDecl>
+    let componentInstancesMap: NameMapping<ComponentWatParser.InstanceDecl>
     let componentsMap: NameMapping<ComponentWatParser.ComponentDecl>
     let modulesMap: NameMapping<ComponentWatParser.ModuleDecl>
     let moduleInstancesMap: NameMapping<ComponentWatParser.ModuleInstanceDecl>
@@ -17,7 +17,7 @@ struct ComponentWatParser {
 
     struct Field {
         enum Kind {
-            case component(Name?, [ComponentDecl.Kind])
+            case component(Name?, [ComponentDecl])
         }
         let location: Location
         let kind: Kind
@@ -40,18 +40,28 @@ struct ComponentWatParser {
         case "component":
             let id = try parser.takeId()
 
-            var componentDecls = [ComponentDecl.Kind]()
+            var componentDecls = [ComponentDecl]()
             while try parser.take(.leftParen) {
-                let coreKeyword = try parser.peekKeyword()
-                switch coreKeyword {
+                switch try parser.expectKeyword() {
                 case "core":
                     try parser.consume()
 
-                    let declKeyword = try parser.expectKeyword()
-                    switch declKeyword {
+                    switch try parser.expectKeyword() {
                     case "module":
+                        let moduleID = try parser.takeId()
                         let wat = try parseWAT(&parser, features: features)
-                        componentDecls.append(.coreModule(wat))
+                        componentDecls.append(.init(id: moduleID, kind: .coreModule(wat)))
+
+                    case "instance":
+                        let instanceID = try parser.takeId()
+                        try parser.expect(.leftParen)
+
+                        switch try parser.expectKeyword() {
+                        case "instantiate":
+                        default:
+                            fatalError()
+                        }
+
                     default:
                         fatalError()
                     }
