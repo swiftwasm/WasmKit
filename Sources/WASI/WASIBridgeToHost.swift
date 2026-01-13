@@ -23,29 +23,15 @@ public final class WASIBridgeToHost {
     /// This structure allows you to choose between different file system backends
     /// (host file system or in-memory file system) and configure standard I/O streams.
     public struct FileSystemOptions {
-        internal let factory: () throws -> (FileSystemImplementation, (inout FdTable) throws -> Void)
+        internal let factory: () throws -> FileSystemImplementation
+        internal var initializeStdio: ((inout FdTable) throws -> Void)?
+        internal var initializePreopens: ((FileSystemImplementation, inout FdTable) throws -> Void)?
 
         /// Creates file system options that use the host operating system's file system.
         ///
-        /// - Parameter preopens: A dictionary mapping guest paths to host paths. The keys are
-        ///   paths as seen by the WASI module, and the values are actual host file system paths.
-        ///   These directories will be pre-opened and made accessible to the WebAssembly module.
         /// - Returns: A configured `FileSystemOptions` instance using the host file system.
-        public static func host(preopens: [String: String] = [:]) -> FileSystemOptions {
-            return FileSystemOptions(
-                factory: { () in
-                    let fileSystem = HostFileSystem(preopens: preopens)
-                    return (
-                        fileSystem,
-                        { fdTable in
-                            for preopenPath in preopens.keys {
-                                let dirEntry = try fileSystem.openDirectory(at: preopenPath)
-                                _ = try fdTable.push(.directory(dirEntry))
-                            }
-                        }
-                    )
-                }
-            )
+        public static func host() -> FileSystemOptions {
+            return FileSystemOptions(factory: { HostFileSystem() })
         }
 
         /// Creates file system options that use an in-memory file system.
@@ -53,9 +39,7 @@ public final class WASIBridgeToHost {
         /// - Parameter fileSystem: A pre-configured `MemoryFileSystem` instance.
         /// - Returns: A configured `FileSystemOptions` instance using the memory file system.
         public static func memory(_ fileSystem: MemoryFileSystem) -> FileSystemOptions {
-            return FileSystemOptions(factory: {
-                return (fileSystem, { _ in })
-            })
+            return FileSystemOptions(factory: { fileSystem })
         }
 
         /// Configures the file system options with custom standard I/O streams.
@@ -73,18 +57,30 @@ public final class WASIBridgeToHost {
             stdout: FileDescriptor = .standardOutput,
             stderr: FileDescriptor = .standardError
         ) -> FileSystemOptions {
-            return FileSystemOptions(factory: {
-                let (fileSystem, initializeFdTable) = try self.factory()
-                return (
-                    fileSystem,
-                    { fdTable in
-                        fdTable[0] = .file(StdioFileEntry(fd: stdin, accessMode: .read))
-                        fdTable[1] = .file(StdioFileEntry(fd: stdout, accessMode: .write))
-                        fdTable[2] = .file(StdioFileEntry(fd: stderr, accessMode: .write))
-                        try initializeFdTable(&fdTable)
-                    }
-                )
-            })
+            var options = self
+            options.initializeStdio = { fdTable in
+                fdTable[0] = .file(StdioFileEntry(fd: stdin, accessMode: .read))
+                fdTable[1] = .file(StdioFileEntry(fd: stdout, accessMode: .write))
+                fdTable[2] = .file(StdioFileEntry(fd: stderr, accessMode: .write))
+            }
+            return options
+        }
+
+        /// Configures the file system options with preopens.
+        ///
+        /// - Parameter preopens: A dictionary mapping guest paths to host paths. The keys are
+        ///   paths as seen by the WASI module, and the values are actual host file system paths.
+        ///   These directories will be pre-opened and made accessible to the WebAssembly module.
+        /// - Returns: A new `FileSystemOptions` instance with the configured preopens.
+        public func withPreopens(_ preopens: [String: String]) -> FileSystemOptions {
+            var options = self
+            options.initializePreopens = { fileSystem, fdTable in
+                for (guestPath, hostPath) in preopens {
+                    let dirEntry = try fileSystem.preopenDirectory(guestPath: guestPath, hostPath: hostPath)
+                    _ = try fdTable.push(.directory(dirEntry))
+                }
+            }
+            return options
         }
     }
 
@@ -125,7 +121,7 @@ public final class WASIBridgeToHost {
         try self.init(
             args: args,
             environment: environment,
-            fileSystem: .host(preopens: preopens).withStdio(stdin: stdin, stdout: stdout, stderr: stderr),
+            fileSystem: .host().withStdio(stdin: stdin, stdout: stdout, stderr: stderr).withPreopens(preopens),
             wallClock: wallClock,
             monotonicClock: monotonicClock,
             randomGenerator: randomGenerator
@@ -148,12 +144,12 @@ public final class WASIBridgeToHost {
     public init(
         args: [String] = [],
         environment: [String: String] = [:],
-        fileSystem: FileSystemOptions = .host(),
+        fileSystem fileSystemOptions: FileSystemOptions = .host(),
         wallClock: WallClock = SystemWallClock(),
         monotonicClock: MonotonicClock = SystemMonotonicClock(),
         randomGenerator: RandomBufferGenerator = SystemRandomNumberGenerator()
     ) throws {
-        let (fileSystem, initializeFdTable) = try fileSystem.factory()
+        let fileSystem = try fileSystemOptions.factory()
         self.underlying = try WASIImplementation(
             args: args,
             environment: environment,
@@ -162,6 +158,7 @@ public final class WASIBridgeToHost {
             monotonicClock: monotonicClock,
             randomGenerator: randomGenerator
         )
-        try initializeFdTable(&underlying.fdTable)
+        try fileSystemOptions.initializeStdio?(&underlying.fdTable)
+        try fileSystemOptions.initializePreopens?(fileSystem, &underlying.fdTable)
     }
 }

@@ -9,7 +9,8 @@ import SystemPackage
 ///
 /// Example usage:
 /// ```swift
-/// let fs = try MemoryFileSystem(preopens: ["/": "/"])
+/// let fs = try MemoryFileSystem()
+/// try fs.ensureDirectory(at: "/")
 /// try fs.addFile(at: "/hello.txt", content: "Hello, world!")
 ///
 /// // Or add a file handle
@@ -20,28 +21,10 @@ public final class MemoryFileSystem: FileSystemImplementation {
     private static let rootPath = "/"
 
     private var root: MemoryDirectoryNode
-    let preopenPaths: [String]
 
     /// Creates a new in-memory file system.
-    ///
-    /// - Parameter preopens: Dictionary mapping guest paths to host paths.
-    ///   Since this is a memory file system, host paths are ignored and only
-    ///   guest paths are used to determine pre-opened directories.
-    public init(preopens: [String: String]? = nil) throws {
+    public init() throws {
         self.root = MemoryDirectoryNode()
-
-        if let preopens = preopens {
-            self.preopenPaths = Array(preopens.keys).sorted()
-        } else {
-            self.preopenPaths = [Self.rootPath]
-        }
-
-        for guestPath in self.preopenPaths {
-            try ensureDirectory(at: guestPath)
-        }
-
-        let devDir = try ensureDirectory(at: "/dev")
-        devDir.setChild(name: "null", node: MemoryCharacterDeviceNode(kind: .null))
     }
 
     // MARK: - Public API
@@ -115,19 +98,13 @@ public final class MemoryFileSystem: FileSystemImplementation {
 
     // MARK: - FileSystemImplementation (WASI API)
 
-    func openDirectory(at path: String) throws -> any WASIDir {
-        guard let node = lookup(at: path) else {
-            throw WASIAbi.Errno.ENOENT
-        }
-
-        guard let dirNode = node as? MemoryDirectoryNode else {
-            throw WASIAbi.Errno.ENOTDIR
-        }
+    func preopenDirectory(guestPath: String, hostPath: String) throws -> any WASIDir {
+        let node = try ensureDirectory(at: guestPath)
 
         return MemoryDirEntry(
-            preopenPath: preopenPaths.contains(path) ? path : nil,
-            dirNode: dirNode,
-            path: path,
+            preopenPath: guestPath,
+            dirNode: node,
+            path: guestPath,
             fileSystem: self
         )
     }

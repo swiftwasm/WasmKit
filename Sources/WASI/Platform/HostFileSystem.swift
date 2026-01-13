@@ -18,26 +18,16 @@ import SystemPackage
 
 /// A file system implementation that directly accesses the host operating system's file system.
 ///
-/// This implementation provides access to actual files and directories on the host system,
-/// with appropriate sandboxing through pre-opened directories.
+/// This implementation provides access to actual files and directories on the host system.
 final class HostFileSystem: FileSystemImplementation {
 
-    private let preopens: [String: String]
-
-    /// Creates a new host file system with the specified pre-opened directories.
-    ///
-    /// - Parameter preopens: Dictionary mapping guest paths to host paths
-    init(preopens: [String: String] = [:]) {
-        self.preopens = preopens
+    /// Creates a new host file system.
+    init() {
     }
 
     // MARK: - FileSystemImplementation (WASI API)
 
-    func openDirectory(at path: String) throws -> any WASIDir {
-        guard let hostPath = preopens[path] else {
-            throw WASIAbi.Errno.ENOENT
-        }
-
+    func preopenDirectory(guestPath: String, hostPath: String) throws -> any WASIDir {
         #if os(Windows) || os(WASI)
             let fd = try FileDescriptor.open(FilePath(hostPath), .readWrite)
         #else
@@ -55,7 +45,7 @@ final class HostFileSystem: FileSystemImplementation {
             throw WASIAbi.Errno.ENOTDIR
         }
 
-        return DirEntry(preopenPath: path, fd: fd)
+        return DirEntry(preopenPath: guestPath, fd: fd)
     }
 
     func openAt(
