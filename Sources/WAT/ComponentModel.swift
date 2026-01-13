@@ -16,8 +16,8 @@ struct ComponentWatParser {
     let features: WasmFeatureSet
 
     struct Field {
-        enum Kind: Equatable {
-            case component(Name?)
+        enum Kind {
+            case component(Name?, [ComponentDecl.Kind])
         }
         let location: Location
         let kind: Kind
@@ -39,11 +39,33 @@ struct ComponentWatParser {
         switch keyword {
         case "component":
             let id = try parser.takeId()
-            try parser.expect(.rightParen)
-            field = .init(location: location, kind: .component(id))
+
+            var componentDecls = [ComponentDecl.Kind]()
+            while try parser.take(.leftParen) {
+                let coreKeyword = try parser.peekKeyword()
+                switch coreKeyword {
+                case "core":
+                    try parser.consume()
+
+                    let declKeyword = try parser.expectKeyword()
+                    switch declKeyword {
+                    case "module":
+                        let wat = try parseWAT(&parser, features: features)
+                        componentDecls.append(.coreModule(wat))
+                    default:
+                        fatalError()
+                    }
+                default:
+                    fatalError()
+                }
+                try parser.expect(.rightParen)
+            }
+            field = .init(location: location, kind: .component(id, componentDecls))
         default:
             fatalError()
         }
+
+        try parser.expect(.rightParen)
 
         return field
     }
@@ -67,7 +89,12 @@ extension ComponentWatParser {
     }
 
     struct ComponentDecl: NamedModuleFieldDecl {
+        enum Kind {
+            case coreModule(Wat)
+        }
+
         var id: Name?
+        let kind: Kind
     }
 
     struct ModuleDecl: NamedModuleFieldDecl {
