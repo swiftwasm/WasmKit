@@ -127,15 +127,9 @@ final class MemoryFileNode: MemFSNode {
         case .handle(let fd):
             do {
                 let attrs = try fd.attributes()
-                let atim =
-                    WASIAbi.Timestamp(attrs.accessTime.seconds) * 1_000_000_000
-                    + WASIAbi.Timestamp(attrs.accessTime.nanoseconds)
-                let mtim =
-                    WASIAbi.Timestamp(attrs.modificationTime.seconds) * 1_000_000_000
-                    + WASIAbi.Timestamp(attrs.modificationTime.nanoseconds)
-                let ctim =
-                    WASIAbi.Timestamp(attrs.creationTime.seconds) * 1_000_000_000
-                    + WASIAbi.Timestamp(attrs.creationTime.nanoseconds)
+                let atim = WASIAbi.Timestamp(platformTimeSpec: attrs.accessTime)
+                let mtim = WASIAbi.Timestamp(platformTimeSpec: attrs.modificationTime)
+                let ctim = WASIAbi.Timestamp(platformTimeSpec: attrs.creationTime)
                 return (atim, mtim, ctim)
             } catch {
                 return (0, 0, 0)
