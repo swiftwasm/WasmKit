@@ -52,7 +52,7 @@ public enum BlockType: Equatable {
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#limits>
-public struct Limits: Equatable {
+public struct Limits: Equatable, Sendable {
     public var min: UInt64
     public var max: UInt64?
     public var isMemory64: Bool
@@ -72,7 +72,7 @@ public typealias MemoryType = Limits
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#table-types>
-public struct TableType: Equatable {
+public struct TableType: Equatable, Sendable {
     public var elementType: ReferenceType
     public var limits: Limits
 
@@ -84,14 +84,14 @@ public struct TableType: Equatable {
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#global-types>
-public enum Mutability: Equatable {
+public enum Mutability: Equatable, Sendable {
     case constant
     case variable
 }
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#global-types>
-public struct GlobalType: Equatable {
+public struct GlobalType: Equatable, Sendable {
     public let mutability: Mutability
     public let valueType: ValueType
 
@@ -282,7 +282,7 @@ public enum ExportDescriptor: Equatable {
 /// Import entity in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#imports>
-public struct Import: Equatable {
+public struct Import: Equatable, Sendable {
     /// Module name imported from
     public let module: String
     /// Name of the import
@@ -298,7 +298,7 @@ public struct Import: Equatable {
 }
 
 /// Import descriptor
-public enum ImportDescriptor: Equatable {
+public enum ImportDescriptor: Equatable, Sendable {
     /// Function import
     case function(TypeIndex)
     /// Table import
