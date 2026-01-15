@@ -5,8 +5,8 @@ package struct ComponentWat {
     let functionsMap: NameMapping<ComponentWatParser.FunctionDef>
     let valuesMap: NameMapping<ComponentWatParser.ValueDef>
     let typesMap: NameMapping<ComponentWatParser.TypeDef>
-    let componentInstancesMap: NameMapping<ComponentWatParser.InstanceDecl>
+    let componentInstancesMap: NameMapping<ComponentWatParser.ComponentInstanceDef>
     let componentsMap: NameMapping<ComponentWatParser.ComponentDef>
     let modulesMap: NameMapping<ComponentWatParser.ModuleDef>
-    let moduleInstancesMap: NameMapping<ComponentWatParser.ModuleInstanceDef>
+    let coreInstancesMap: NameMapping<ComponentWatParser.CoreInstanceDef>
 }

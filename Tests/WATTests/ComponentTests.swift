@@ -24,6 +24,7 @@ struct ComponentTests {
                 (func (export "c") (result f32) f32.const 0)
                 (func (export "d") (result f64) f64.const 0)
               )
+              (core instance $M1 (instantiate $m1 (with "c" (instance $d))))
             )
             """#, features: .default)
 
