@@ -73,6 +73,9 @@ struct UntypedValue: Equatable, Hashable {
         case .i64(let value): self = .i64(value)
         case .f32(let value): self = .rawF32(value)
         case .f64(let value): self = .rawF64(value)
+        case .v128:
+            assertionFailure("v128 cannot be represented in UntypedValue; use stack-slot based storage")
+            storage = 0
         case .ref(.function(let value)), .ref(.extern(let value)):
             storage = encodeOptionalInt(value)
         }

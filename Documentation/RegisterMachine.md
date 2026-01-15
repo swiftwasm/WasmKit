@@ -173,7 +173,40 @@ Basically, the stack frame consists of four parts: frame header, locals, dynamic
 4. The dynamic stack part contains the dynamic stack values, which are the intermediate values produced by the WebAssembly instructions.
     - The size of the dynamic stack is the maximum height of the stack determined by the translation pass and is fixed at the end of the translation process.
 
-Value slots in the frame header, locals, dynamic stack, and constant pool are all accessible by the register index.
+#### Slots vs values
+
+WasmKit’s runtime stack is indexed in **64-bit slots** (`StackSlot == UInt64`). Most Wasm value types occupy one slot, but `v128` occupies **two consecutive slots**:
+
+- `i32/i64/f32/f64/ref`: 1 slot
+- `v128`: 2 slots (`lo` then `hi`)
+
+Register indices always refer to the **first slot** of a value (for `v128`, `reg` is the `lo` slot and `reg+1` is the `hi` slot).
+
+This affects:
+
+- Frame header sizing (parameters/results are sized in slots, not “number of values”)
+- Local layout (locals are laid out in slots; `v128` locals reserve 2 slots)
+- Dynamic stack height (computed in slots)
+
+#### Example layout (with `v128`)
+
+For a function with `(param i32 v128) (result v128)` and one local `i64`, the slot layout looks like:
+
+| Slot offset | Description |
+|---:|---|
+| `-(H)+0` | Param/Result region (`i32` param0) |
+| `-(H)+1` | Param/Result region (`v128` param1 lo / result0 lo) |
+| `-(H)+2` | Param/Result region (`v128` param1 hi / result0 hi) |
+| `-3` | Saved Instance |
+| `-2` | Saved PC |
+| `-1` | Saved SP |
+| `0` | Local 0 (`i64`) |
+| `1` | Const pool (first constant slot, if any) |
+| `…` | Dynamic stack (slot-addressed) |
+
+Where `H` is the total frame header size in slots (param/result region + saving slots).
+
+Value slots in the frame header, locals, dynamic stack, and constant pool are all accessible by the register index (slot index).
 
 ### Instruction encoding
 
