@@ -126,6 +126,8 @@ public enum Value: Hashable, Sendable {
     case f32(UInt32)
     /// Value of a 64-bit IEEE 754 floating-point number.
     case f64(UInt64)
+    /// 128-bit vector of packed integer or floating-point data.
+    case v128(V128)
     /// Reference value.
     case ref(Reference)
 }

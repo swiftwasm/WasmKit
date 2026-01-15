@@ -3,12 +3,29 @@
 extension Execution {
     mutating func globalGet(sp: Sp, immediate: Instruction.GlobalAndVRegOperand) {
         immediate.global.withValue {
-            sp[immediate.reg] = $0.rawValue
+            switch $0.storage {
+            case .scalar(let raw):
+                sp[immediate.reg] = raw
+            case .v128(let v):
+                sp[immediate.reg] = UntypedValue(storage: v.lo)
+                let regHi = LLVReg(storage: immediate.reg.value + Int64(MemoryLayout<StackSlot>.size))
+                sp[regHi] = UntypedValue(storage: v.hi)
+            }
         }
     }
     mutating func globalSet(sp: Sp, immediate: Instruction.GlobalAndVRegOperand) {
-        let value = sp[immediate.reg]
-        immediate.global.withValue { $0.rawValue = value }
+        immediate.global.withValue {
+            switch $0.globalType.valueType {
+            case .v128:
+                let lo = sp[immediate.reg].i64
+                let regHi = LLVReg(storage: immediate.reg.value + Int64(MemoryLayout<StackSlot>.size))
+                let hi = sp[regHi].i64
+                $0.storage = .v128(V128Storage(lo: lo, hi: hi))
+            case .i32, .i64, .f32, .f64, .ref:
+                let value = sp[immediate.reg]
+                $0.storage = .scalar(value)
+            }
+        }
     }
 
     mutating func copyStack(sp: Sp, immediate: Instruction.CopyStackOperand) {

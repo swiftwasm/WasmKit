@@ -356,6 +356,7 @@ extension Value {
         case (.i64, .i64): return
         case (.f32, .f32): return
         case (.f64, .f64): return
+        case (.v128, .v128): return
         case (.ref(let ref), .ref(let refType)):
             try ref.checkType(refType)
         default:
