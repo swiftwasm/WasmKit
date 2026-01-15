@@ -8,6 +8,11 @@ struct MemoryDirEntry: WASIDir {
     let path: String
     let fileSystem: MemoryFileSystem
 
+    func readlink(atPath path: String) throws -> [UInt8] {
+        // Symlinks are not supported in the memory filesystem.
+        throw WASIAbi.Errno.ENOTSUP
+    }
+
     func attributes() throws -> WASIAbi.Filestat {
         let timestamps = dirNode.timestamps
         return WASIAbi.Filestat(

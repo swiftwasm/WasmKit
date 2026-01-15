@@ -1607,7 +1607,21 @@ final class WASIImplementation {
 
     /// Read the contents of a symbolic link.
     func path_readlink(fd: WASIAbi.Fd, path: String, buffer: UnsafeGuestBufferPointer<UInt8>) throws -> WASIAbi.Size {
-        throw WASIAbi.Errno.ENOTSUP
+        guard case .directory(let dirEntry) = fdTable[fd] else {
+            throw WASIAbi.Errno.ENOTDIR
+        }
+
+        let linkBytes = try dirEntry.readlink(atPath: path)
+        let bytesWritten = min(Int(buffer.count), linkBytes.count)
+        if bytesWritten > 0 {
+            try buffer.withHostPointer { hostBuffer in
+                linkBytes.withUnsafeBytes { linkBytes in
+                    guard let source = linkBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
+                    hostBuffer.baseAddress?.assign(from: source, count: bytesWritten)
+                }
+            }
+        }
+        return WASIAbi.Size(bytesWritten)
     }
 
     /// Remove a directory.

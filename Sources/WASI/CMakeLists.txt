@@ -1,5 +1,6 @@
 add_wasmkit_library(WASI
   Platform/SandboxPrimitives/Open.swift
+  Platform/SandboxPrimitives/Readlink.swift
   Platform/SandboxPrimitives/OpenParent.swift
   Platform/Directory.swift
   Platform/Entry.swift

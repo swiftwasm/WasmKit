@@ -106,7 +106,6 @@ struct IntegrationTests {
                     "stdio",
                     "remove_directory_trailing_slashes",
                     "symlink_create",
-                    "readlink",
                     "sched_yield",
                 ],
                 "WASI C tests": [
