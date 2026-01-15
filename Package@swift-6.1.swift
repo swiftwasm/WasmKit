@@ -69,7 +69,7 @@ let package = Package(
             name: "WAT",
             dependencies: [
                 "ComponentModel",
-                "WasmParser"
+                "WasmParser",
             ],
             exclude: ["CMakeLists.txt"]
         ),
