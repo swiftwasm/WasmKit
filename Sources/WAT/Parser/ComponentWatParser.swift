@@ -1,23 +1,12 @@
 import WasmParser
 
-/// https://github.com/WebAssembly/component-model/blob/main/design/mvp/Explainer.md#index-spaces
-package struct ComponentWat {
-    let functionsMap: NameMapping<ComponentWatParser.FunctionDecl>
-    let valuesMap: NameMapping<ComponentWatParser.ValueDecl>
-    let typesMap: NameMapping<ComponentWatParser.TypeDecl>
-    let componentInstancesMap: NameMapping<ComponentWatParser.InstanceDecl>
-    let componentsMap: NameMapping<ComponentWatParser.ComponentDecl>
-    let modulesMap: NameMapping<ComponentWatParser.ModuleDecl>
-    let moduleInstancesMap: NameMapping<ComponentWatParser.ModuleInstanceDecl>
-}
-
 struct ComponentWatParser {
     var parser: Parser
     let features: WasmFeatureSet
 
     struct Field {
         enum Kind {
-            case component(Name?, [ComponentDecl])
+            case component(Name?, [ComponentDef])
         }
         let location: Location
         let kind: Kind
@@ -40,7 +29,7 @@ struct ComponentWatParser {
         case "component":
             let id = try parser.takeId()
 
-            var componentDecls = [ComponentDecl]()
+            var componentDecls = [ComponentDef]()
             while try parser.take(.leftParen) {
                 switch try parser.expectKeyword() {
                 case "core":
@@ -58,6 +47,8 @@ struct ComponentWatParser {
 
                         switch try parser.expectKeyword() {
                         case "instantiate":
+                            let instantiatedModuleID = try parser.takeId()
+//                            componentDecls.append(.init(id: instantiatedModuleID, kind: <#T##ComponentDecl.Kind#>))
                         default:
                             fatalError()
                         }
@@ -98,9 +89,13 @@ extension ComponentWatParser {
         var id: Name?
     }
 
-    struct ComponentDecl: NamedModuleFieldDecl {
+    struct ComponentDef: NamedModuleFieldDecl {
         enum Kind {
             case coreModule(Wat)
+            case coreInstance(ModuleInstanceDef)
+            case coreType(WatParser.FunctionType)
+            indirect case component(ComponentDef)
+            case instance(InstanceDecl)
         }
 
         var id: Name?
@@ -111,7 +106,7 @@ extension ComponentWatParser {
         var id: Name?
     }
 
-    struct ModuleInstanceDecl: NamedModuleFieldDecl {
+    struct ModuleInstanceDef: NamedModuleFieldDecl {
         var id: Name?
     }
 }
