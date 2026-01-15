@@ -54,7 +54,7 @@ struct ComponentWatParser {
                             while try parser.take(.leftParen) {
                                 try parser.expectKeyword("with")
                                 let exportName = try parser.expectString()
-//                                instantiateArguments.append(.)
+                                //                                instantiateArguments.append(.)
                                 try parser.expect(.rightParen)
                             }
                             componentDecls.append(
