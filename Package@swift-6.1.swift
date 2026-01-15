@@ -67,7 +67,10 @@ let package = Package(
 
         .target(
             name: "WAT",
-            dependencies: ["WasmParser"],
+            dependencies: [
+                "ComponentModel",
+                "WasmParser"
+            ],
             exclude: ["CMakeLists.txt"]
         ),
         .testTarget(name: "WATTests", dependencies: ["WAT"]),
@@ -115,7 +118,7 @@ let package = Package(
         .target(
             name: "ComponentModel"
         ),
-        
+
         .executableTarget(
             name: "WITTool",
             dependencies: [
