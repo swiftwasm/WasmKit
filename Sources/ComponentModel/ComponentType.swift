@@ -22,7 +22,7 @@ public struct ModuleInstanceIndex: RawRepresentable, Equatable {
     public let rawValue: UInt32
 }
 
-public enum CoreDeclSort {
+public enum CoreDeclSort: String {
     case `func`
     case table
     case memory

@@ -7,7 +7,7 @@ struct ComponentWatParser {
 
     struct Field {
         enum Kind {
-            case component(Name?, [ComponentDef])
+            case component(Name?, [ComponentDefField])
         }
         let location: Location
         let kind: Kind
@@ -17,6 +17,7 @@ struct ComponentWatParser {
         self.parser = Parser(input)
         self.features = features
     }
+
 
     mutating func next() throws -> Field? {
         // If we have reached the end of the (component ...) block, return nil
@@ -30,52 +31,50 @@ struct ComponentWatParser {
         case "component":
             let id = try parser.takeId()
 
-            var componentDecls = [ComponentDef]()
+            var componentDefs = [ComponentDefField]()
             while try parser.take(.leftParen) {
-                switch try parser.expectKeyword() {
+                let componentDefKeyword = try parser.expectKeyword()
+                switch componentDefKeyword {
                 case "core":
-                    try parser.consume()
-
-                    switch try parser.expectKeyword() {
+                    let coreKeyword = try parser.expectKeyword()
+                    switch coreKeyword {
                     case "module":
-                        let moduleID = try parser.takeId()
-                        let wat = try parseWAT(&parser, features: features)
-                        componentDecls.append(.init(id: moduleID, kind: .coreModule(wat)))
+                        componentDefs.append(.coreModule(try self.parseModuleDef()))
 
                     case "instance":
-                        let instanceID = try parser.takeId()
+                        let instanceId = try parser.takeId()
                         try parser.expect(.leftParen)
 
-                        switch try parser.expectKeyword() {
-                        case "instantiate":
-                            let instantiatedModuleID = try parser.takeId()
-                            var instantiateArguments = [ModuleInstanceDef.Argument]()
+                        try parser.expectKeyword("instantiate")
+                        let instantiatedModuleId = try parser.expectIndexOrId()
+                        var instantiateArguments = [CoreInstanceDef.Argument]()
 
-                            while try parser.take(.leftParen) {
-                                try parser.expectKeyword("with")
-                                let exportName = try parser.expectString()
-                                //                                instantiateArguments.append(.)
-                                try parser.expect(.rightParen)
-                            }
-                            componentDecls.append(
-                                .init(
-                                    id: instantiatedModuleID,
-                                    kind: .coreInstance(.init(id: instantiatedModuleID, arguments: instantiateArguments))
-                                )
-                            )
-                        default:
-                            fatalError()
+                        while try parser.take(.leftParen) {
+                            instantiateArguments.append(try self.parseModuleInstanceArguments())
+                            try parser.expect(.rightParen)
                         }
+                        componentDefs.append(
+                            .coreInstance(
+                            CoreInstanceDef(
+                                id: instanceId,
+                                moduleId: instantiatedModuleId,
+                                arguments: instantiateArguments ) ) )
 
                     default:
-                        fatalError()
+                        throw WatParserError(
+                            "Unknown core definition keyword \(coreKeyword)",
+                            location: parser.lexer.location()
+                        )
                     }
                 default:
-                    fatalError()
+                    throw WatParserError(
+                        "Unknown component definition keyword \(componentDefKeyword)",
+                        location: parser.lexer.location()
+                    )
                 }
                 try parser.expect(.rightParen)
             }
-            field = .init(location: location, kind: .component(id, componentDecls))
+            field = .init(location: location, kind: .component(id, componentDefs))
         default:
             fatalError()
         }
@@ -84,9 +83,52 @@ struct ComponentWatParser {
 
         return field
     }
+
+    private mutating func parseModuleDef() throws -> ModuleDef {
+        let moduleID = try parser.takeId()
+        let wat = try parseWAT(&parser, features: features)
+        return .init(id: moduleID, wat: wat)
+    }
+
+    private mutating func parseModuleInstanceArguments() throws -> CoreInstanceDef.Argument {
+        try parser.expectKeyword("with")
+        let importName = try parser.expectString()
+        try parser.expect(.leftParen)
+
+        let result: CoreInstanceDef.Argument.Kind
+        if try parser.takeKeyword("instance") {
+            let instanceID = try parser.expectIndexOrId()
+            result = .instance(instanceID)
+        } else {
+            throw WatParserError("Core instance inline exports not supported yet", location: parser.lexer.location())
+        }
+        try parser.expect(.rightParen)
+        return .init(importName: importName, kind: result)
+    }
+
+
+    private mutating func parseCoreSort() throws -> CoreDeclSort {
+        let rawKeyword = try parser.expectKeyword()
+        guard let keyword = CoreDeclSort(rawValue: rawKeyword) else {
+            throw WatParserError(
+                "Unexpected core declaration sort `\(rawKeyword)",
+                location: parser.lexer.location()
+            )
+        }
+
+        return keyword
+    }
 }
 
 extension ComponentWatParser {
+    enum ComponentDefField {
+        case coreModule(ModuleDef)
+        case coreInstance(CoreInstanceDef)
+        case coreType(WatParser.FunctionType)
+        case component(ComponentDef)
+        case instance(ComponentInstanceDef)
+    }
+
     struct FunctionDef: NamedModuleFieldDecl {
         var id: Name?
     }
@@ -99,39 +141,38 @@ extension ComponentWatParser {
         var id: Name?
     }
 
-    struct ComponentInstanceDef {
+    struct ComponentInstanceDef: NamedModuleFieldDecl {
         var id: Name?
     }
 
     struct ComponentDef: NamedModuleFieldDecl {
-        enum Kind {
-            case coreModule(Wat)
-            case coreInstance(ModuleInstanceDef)
-            case coreType(WatParser.FunctionType)
-            indirect case component(ComponentDef)
-            case instance(ComponentInstanceDef)
-        }
-
         var id: Name?
-        let kind: Kind
+        let fields: [ComponentDefField]
     }
 
     struct ModuleDef: NamedModuleFieldDecl {
         var id: Name?
+        let wat: Wat
     }
 
-    struct ModuleInstanceDef: NamedModuleFieldDecl {
-        enum Argument {
-            struct Export {
-                let name: String
-                let sort: CoreDeclSort
-                let index: UInt32
+    struct CoreInstanceDef: NamedModuleFieldDecl {
+        struct Argument {
+            enum Kind {
+                struct Export {
+                    let name: String
+                    let sort: CoreDeclSort
+                    let index: UInt32
+                }
+                case instance(Parser.IndexOrId)
+                case exports([Export])
             }
-            case instance(Name, ModuleInstanceIndex)
-            case exports([Export])
+
+            let importName: String
+            let kind: Kind
         }
 
         var id: Name?
+        var moduleId: Parser.IndexOrId
         var arguments: [Argument]
     }
 }
