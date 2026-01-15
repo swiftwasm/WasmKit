@@ -7,25 +7,25 @@ struct ComponentTests {
     @Test
     func parseComponent() throws {
         var parser = ComponentWatParser(
-        #"""
-        (component)
-        (component $foo)
-        (component
-          (core module)
-          (core module)
-          (core module)
-        )
-        (component $bar
-          (core module $m1
-            (func (export "a") (result i32) i32.const 0)
-            (func (export "b") (result i64) i64.const 0)
-          )
-          (core module $m2
-            (func (export "c") (result f32) f32.const 0)
-            (func (export "d") (result f64) f64.const 0)
-          )
-        )
-        """#, features: .default)
+            #"""
+            (component)
+            (component $foo)
+            (component
+              (core module)
+              (core module)
+              (core module)
+            )
+            (component $bar
+              (core module $m1
+                (func (export "a") (result i32) i32.const 0)
+                (func (export "b") (result i64) i64.const 0)
+              )
+              (core module $m2
+                (func (export "c") (result f32) f32.const 0)
+                (func (export "d") (result f64) f64.const 0)
+              )
+            )
+            """#, features: .default)
 
         var accummulated = [String?]()
         while let field = try parser.next() {

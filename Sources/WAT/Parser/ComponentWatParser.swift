@@ -1,3 +1,4 @@
+import ComponentModel
 import WasmParser
 
 struct ComponentWatParser {
@@ -48,7 +49,20 @@ struct ComponentWatParser {
                         switch try parser.expectKeyword() {
                         case "instantiate":
                             let instantiatedModuleID = try parser.takeId()
-//                            componentDecls.append(.init(id: instantiatedModuleID, kind: <#T##ComponentDecl.Kind#>))
+                            var instantiateArguments = [ModuleInstanceDef.Argument]()
+
+                            while try parser.take(.leftParen) {
+                                try parser.expectKeyword("with")
+                                let exportName = try parser.expectString()
+//                                instantiateArguments.append(.)
+                                try parser.expect(.rightParen)
+                            }
+                            componentDecls.append(
+                                .init(
+                                    id: instantiatedModuleID,
+                                    kind: .coreInstance(.init(id: instantiatedModuleID, arguments: instantiateArguments))
+                                )
+                            )
                         default:
                             fatalError()
                         }
@@ -73,19 +87,19 @@ struct ComponentWatParser {
 }
 
 extension ComponentWatParser {
-    struct FunctionDecl: NamedModuleFieldDecl {
+    struct FunctionDef: NamedModuleFieldDecl {
         var id: Name?
     }
 
-    struct ValueDecl: NamedModuleFieldDecl {
+    struct ValueDef: NamedModuleFieldDecl {
         var id: Name?
     }
 
-    struct TypeDecl: NamedModuleFieldDecl {
+    struct TypeDef: NamedModuleFieldDecl {
         var id: Name?
     }
 
-    struct InstanceDecl: NamedModuleFieldDecl {
+    struct ComponentInstanceDef {
         var id: Name?
     }
 
@@ -95,18 +109,29 @@ extension ComponentWatParser {
             case coreInstance(ModuleInstanceDef)
             case coreType(WatParser.FunctionType)
             indirect case component(ComponentDef)
-            case instance(InstanceDecl)
+            case instance(ComponentInstanceDef)
         }
 
         var id: Name?
         let kind: Kind
     }
 
-    struct ModuleDecl: NamedModuleFieldDecl {
+    struct ModuleDef: NamedModuleFieldDecl {
         var id: Name?
     }
 
     struct ModuleInstanceDef: NamedModuleFieldDecl {
+        enum Argument {
+            struct Export {
+                let name: String
+                let sort: CoreDeclSort
+                let index: UInt32
+            }
+            case instance(Name, ModuleInstanceIndex)
+            case exports([Export])
+        }
+
         var id: Name?
+        var arguments: [Argument]
     }
 }

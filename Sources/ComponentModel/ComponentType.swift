@@ -2,7 +2,7 @@ public struct ComponentTypeIndex: RawRepresentable, Equatable {
     public init(rawValue: UInt32) {
         self.rawValue = rawValue
     }
-    
+
     public let rawValue: UInt32
 }
 
@@ -12,6 +12,24 @@ public struct ComponentFuncIndex: RawRepresentable, Equatable {
     }
 
     public let rawValue: UInt32
+}
+
+public struct ModuleInstanceIndex: RawRepresentable, Equatable {
+    public init(rawValue: UInt32) {
+        self.rawValue = rawValue
+    }
+
+    public let rawValue: UInt32
+}
+
+public enum CoreDeclSort {
+    case `func`
+    case table
+    case memory
+    case global
+    case type
+    case module
+    case instance
 }
 
 public enum ComponentType: Equatable {
@@ -29,8 +47,8 @@ public enum ComponentType: Equatable {
     case char
     case string
     case list(ComponentTypeIndex)
-//    case handleOwn(ResourceSyntax)
-//    case handleBorrow(ResourceSyntax)
+    //    case handleOwn(ResourceSyntax)
+    //    case handleBorrow(ResourceSyntax)
     case tuple([ComponentTypeIndex])
     case option(ComponentTypeIndex)
     case result(ok: ComponentTypeIndex?, error: ComponentTypeIndex?)
