@@ -22,13 +22,22 @@ public struct ModuleInstanceIndex: RawRepresentable, Equatable {
     public let rawValue: UInt32
 }
 
-public enum CoreDeclSort: String {
+public enum CoreDefSort: String {
     case `func`
     case table
     case memory
     case global
     case type
     case module
+    case instance
+}
+
+public enum ComponentDefSort {
+    case core(CoreDefSort)
+    case `func`
+    case value
+    case type
+    case component
     case instance
 }
 

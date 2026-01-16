@@ -107,9 +107,9 @@ struct ComponentWatParser {
     }
 
 
-    private mutating func parseCoreSort() throws -> CoreDeclSort {
+    private mutating func parseCoreDefSort() throws -> CoreDefSort {
         let rawKeyword = try parser.expectKeyword()
-        guard let keyword = CoreDeclSort(rawValue: rawKeyword) else {
+        guard let keyword = CoreDefSort(rawValue: rawKeyword) else {
             throw WatParserError(
                 "Unexpected core declaration sort `\(rawKeyword)",
                 location: parser.lexer.location()
@@ -117,6 +117,26 @@ struct ComponentWatParser {
         }
 
         return keyword
+    }
+
+    private mutating func parseComponentDefSort() throws -> ComponentDefSort {
+        let rawKeyword = try parser.expectKeyword()
+        switch rawKeyword {
+        case "core":
+            return .core(try parseCoreDefSort())
+
+        case "func": return .func
+        case "value": return .value
+        case "type": return .type
+        case "component": return .component
+        case "instance": return .instance
+            
+        default:
+            throw WatParserError(
+                "Unexpected component declaration sort `\(rawKeyword)",
+                location: parser.lexer.location()
+            )
+        }
     }
 }
 
