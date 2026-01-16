@@ -220,9 +220,9 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
             importFactories.append {
                 return Result { () throws(WatParserError) in
                     Import(
-                    module: importNames.module, name: importNames.name,
-                    descriptor: try makeDescriptor()
-                )
+                        module: importNames.module, name: importNames.name,
+                        descriptor: try makeDescriptor()
+                    )
                 }
             }
         }
@@ -325,7 +325,7 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
     }
 
     let imports = try importFactories.map { factory throws(WatParserError) in try factory().get() }
-    let startIndex = try start.map { use throws(WatParserError) in  try FunctionIndex(functionsMap.resolveIndex(use: use)) }
+    let startIndex = try start.map { use throws(WatParserError) in try FunctionIndex(functionsMap.resolveIndex(use: use)) }
 
     parser = watParser.parser
 

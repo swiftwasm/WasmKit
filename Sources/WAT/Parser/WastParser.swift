@@ -238,13 +238,13 @@ public enum WastDirective {
             return .assertMalformed(module: module, message: message)
         case "assert_return":
             try wastParser.parser.consume()
-            let execute = try wastParser.parens { wastParser throws(WatParserError) in  try WastExecute.parse(wastParser: &wastParser) }
+            let execute = try wastParser.parens { wastParser throws(WatParserError) in try WastExecute.parse(wastParser: &wastParser) }
             let results = try wastParser.expectationValues()
             try wastParser.parser.expect(.rightParen)
             return .assertReturn(execute: execute, results: results)
         case "assert_trap":
             try wastParser.parser.consume()
-            let execute = try wastParser.parens { wastParser throws(WatParserError) in  try WastExecute.parse(wastParser: &wastParser) }
+            let execute = try wastParser.parens { wastParser throws(WatParserError) in try WastExecute.parse(wastParser: &wastParser) }
             let message = try wastParser.parser.expectString()
             try wastParser.parser.expect(.rightParen)
             return .assertTrap(execute: execute, message: message)
