@@ -69,6 +69,30 @@ public enum ValueType: Equatable, Hashable, Sendable {
     case ref(ReferenceType)
 }
 
+/// A 128-bit vector value, represented by its raw bytes.
+public struct V128: Equatable, Hashable, Sendable {
+    public static let byteCount = 16
+
+    public let bytes: [UInt8]
+
+    public init(bytes: [UInt8]) {
+        precondition(bytes.count == Self.byteCount, "V128 must be exactly \(Self.byteCount) bytes")
+        self.bytes = bytes
+    }
+}
+
+/// The 16 lane indices used by `i8x16.shuffle`.
+public struct V128ShuffleMask: Equatable, Hashable, Sendable {
+    public static let laneCount = 16
+
+    public let lanes: [UInt8]
+
+    public init(lanes: [UInt8]) {
+        precondition(lanes.count == Self.laneCount, "V128ShuffleMask must be exactly \(Self.laneCount) bytes")
+        self.lanes = lanes
+    }
+}
+
 /// Runtime representation of a WebAssembly function reference.
 public typealias FunctionAddress = Int
 /// Runtime representation of an external entity reference.

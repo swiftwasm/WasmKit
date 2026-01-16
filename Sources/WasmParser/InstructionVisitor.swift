@@ -27,6 +27,19 @@ public enum Instruction: Equatable {
         case i64AtomicLoad8U
         case i64AtomicLoad16U
         case i64AtomicLoad32U
+        case v128Load
+        case v128Load8X8S
+        case v128Load8X8U
+        case v128Load16X4S
+        case v128Load16X4U
+        case v128Load32X2S
+        case v128Load32X2U
+        case v128Load8Splat
+        case v128Load16Splat
+        case v128Load32Splat
+        case v128Load64Splat
+        case v128Load32Zero
+        case v128Load64Zero
     }
     public enum Store: Equatable {
         case i32Store
@@ -45,6 +58,7 @@ public enum Instruction: Equatable {
         case i64AtomicStore8
         case i64AtomicStore16
         case i64AtomicStore32
+        case v128Store
     }
     public enum Cmp: Equatable {
         case i32Eq
@@ -188,6 +202,232 @@ public enum Instruction: Equatable {
         case i64TruncSatF64S
         case i64TruncSatF64U
     }
+    public enum Simd: Equatable {
+        case i8x16Swizzle
+        case i8x16Splat
+        case i16x8Splat
+        case i32x4Splat
+        case i64x2Splat
+        case f32x4Splat
+        case f64x2Splat
+        case i8x16Eq
+        case i8x16Ne
+        case i8x16LtS
+        case i8x16LtU
+        case i8x16GtS
+        case i8x16GtU
+        case i8x16LeS
+        case i8x16LeU
+        case i8x16GeS
+        case i8x16GeU
+        case i16x8Eq
+        case i16x8Ne
+        case i16x8LtS
+        case i16x8LtU
+        case i16x8GtS
+        case i16x8GtU
+        case i16x8LeS
+        case i16x8LeU
+        case i16x8GeS
+        case i16x8GeU
+        case i32x4Eq
+        case i32x4Ne
+        case i32x4LtS
+        case i32x4LtU
+        case i32x4GtS
+        case i32x4GtU
+        case i32x4LeS
+        case i32x4LeU
+        case i32x4GeS
+        case i32x4GeU
+        case f32x4Eq
+        case f32x4Ne
+        case f32x4Lt
+        case f32x4Gt
+        case f32x4Le
+        case f32x4Ge
+        case f64x2Eq
+        case f64x2Ne
+        case f64x2Lt
+        case f64x2Gt
+        case f64x2Le
+        case f64x2Ge
+        case v128Not
+        case v128And
+        case v128Andnot
+        case v128Or
+        case v128Xor
+        case v128Bitselect
+        case i8x16Abs
+        case i8x16Neg
+        case i8x16AllTrue
+        case i8x16Bitmask
+        case i8x16NarrowI16X8S
+        case i8x16NarrowI16X8U
+        case i8x16Shl
+        case i8x16ShrS
+        case i8x16ShrU
+        case i8x16Add
+        case i8x16AddSatS
+        case i8x16AddSatU
+        case i8x16Sub
+        case i8x16SubSatS
+        case i8x16SubSatU
+        case i8x16MinS
+        case i8x16MinU
+        case i8x16MaxS
+        case i8x16MaxU
+        case i8x16AvgrU
+        case i16x8Abs
+        case i16x8Neg
+        case i16x8AllTrue
+        case i16x8Bitmask
+        case i16x8NarrowI32X4S
+        case i16x8NarrowI32X4U
+        case i16x8ExtendLowI8X16S
+        case i16x8ExtendHighI8X16S
+        case i16x8ExtendLowI8X16U
+        case i16x8ExtendHighI8X16U
+        case i16x8Shl
+        case i16x8ShrS
+        case i16x8ShrU
+        case i16x8Add
+        case i16x8AddSatS
+        case i16x8AddSatU
+        case i16x8Sub
+        case i16x8SubSatS
+        case i16x8SubSatU
+        case i16x8Mul
+        case i16x8MinS
+        case i16x8MinU
+        case i16x8MaxS
+        case i16x8MaxU
+        case i16x8AvgrU
+        case i32x4Abs
+        case i32x4Neg
+        case i32x4AllTrue
+        case i32x4Bitmask
+        case i32x4ExtendLowI16X8S
+        case i32x4ExtendHighI16X8S
+        case i32x4ExtendLowI16X8U
+        case i32x4ExtendHighI16X8U
+        case i32x4Shl
+        case i32x4ShrS
+        case i32x4ShrU
+        case i32x4Add
+        case i32x4Sub
+        case i32x4Mul
+        case i32x4MinS
+        case i32x4MinU
+        case i32x4MaxS
+        case i32x4MaxU
+        case i32x4DotI16X8S
+        case i64x2Abs
+        case i64x2Neg
+        case i64x2Bitmask
+        case i64x2ExtendLowI32X4S
+        case i64x2ExtendHighI32X4S
+        case i64x2ExtendLowI32X4U
+        case i64x2ExtendHighI32X4U
+        case i64x2Shl
+        case i64x2ShrS
+        case i64x2ShrU
+        case i64x2Add
+        case i64x2Sub
+        case i64x2Mul
+        case f32x4Ceil
+        case f32x4Floor
+        case f32x4Trunc
+        case f32x4Nearest
+        case f64x2Ceil
+        case f64x2Floor
+        case f64x2Trunc
+        case f64x2Nearest
+        case f32x4Abs
+        case f32x4Neg
+        case f32x4Sqrt
+        case f32x4Add
+        case f32x4Sub
+        case f32x4Mul
+        case f32x4Div
+        case f32x4Min
+        case f32x4Max
+        case f32x4Pmin
+        case f32x4Pmax
+        case f64x2Abs
+        case f64x2Neg
+        case f64x2Sqrt
+        case f64x2Add
+        case f64x2Sub
+        case f64x2Mul
+        case f64x2Div
+        case f64x2Min
+        case f64x2Max
+        case f64x2Pmin
+        case f64x2Pmax
+        case i32x4TruncSatF32X4S
+        case i32x4TruncSatF32X4U
+        case f32x4ConvertI32X4S
+        case f32x4ConvertI32X4U
+        case i16x8ExtmulLowI8X16S
+        case i16x8ExtmulHighI8X16S
+        case i16x8ExtmulLowI8X16U
+        case i16x8ExtmulHighI8X16U
+        case i32x4ExtmulLowI16X8S
+        case i32x4ExtmulHighI16X8S
+        case i32x4ExtmulLowI16X8U
+        case i32x4ExtmulHighI16X8U
+        case i64x2ExtmulLowI32X4S
+        case i64x2ExtmulHighI32X4S
+        case i64x2ExtmulLowI32X4U
+        case i64x2ExtmulHighI32X4U
+        case i16x8Q15MulrSatS
+        case v128AnyTrue
+        case i64x2Eq
+        case i64x2Ne
+        case i64x2LtS
+        case i64x2GtS
+        case i64x2LeS
+        case i64x2GeS
+        case i64x2AllTrue
+        case f64x2ConvertLowI32X4S
+        case f64x2ConvertLowI32X4U
+        case i32x4TruncSatF64X2SZero
+        case i32x4TruncSatF64X2UZero
+        case f32x4DemoteF64X2Zero
+        case f64x2PromoteLowF32X4
+        case i8x16Popcnt
+        case i16x8ExtaddPairwiseI8X16S
+        case i16x8ExtaddPairwiseI8X16U
+        case i32x4ExtaddPairwiseI16X8S
+        case i32x4ExtaddPairwiseI16X8U
+    }
+    public enum SimdLane: Equatable {
+        case i8x16ExtractLaneS
+        case i8x16ExtractLaneU
+        case i8x16ReplaceLane
+        case i16x8ExtractLaneS
+        case i16x8ExtractLaneU
+        case i16x8ReplaceLane
+        case i32x4ExtractLane
+        case i32x4ReplaceLane
+        case i64x2ExtractLane
+        case i64x2ReplaceLane
+        case f32x4ExtractLane
+        case f32x4ReplaceLane
+        case f64x2ExtractLane
+        case f64x2ReplaceLane
+    }
+    public enum SimdMemLane: Equatable {
+        case v128Load8Lane
+        case v128Load16Lane
+        case v128Load32Lane
+        case v128Load64Lane
+        case v128Store8Lane
+        case v128Store16Lane
+        case v128Store32Lane
+        case v128Store64Lane
+    }
     case `unreachable`
     case `nop`
     case `block`(blockType: BlockType)
@@ -298,6 +538,11 @@ public enum Instruction: Equatable {
     case `i64AtomicRmw8CmpxchgU`(memarg: MemArg)
     case `i64AtomicRmw16CmpxchgU`(memarg: MemArg)
     case `i64AtomicRmw32CmpxchgU`(memarg: MemArg)
+    case `v128Const`(value: V128)
+    case `i8x16Shuffle`(lanes: V128ShuffleMask)
+    case `simd`(Instruction.Simd)
+    case `simdLane`(Instruction.SimdLane, lane: UInt8)
+    case `simdMemLane`(Instruction.SimdMemLane, memarg: MemArg, lane: UInt8)
 }
 
 /// A visitor that visits all instructions by a single visit method.
@@ -417,6 +662,11 @@ extension AnyInstructionVisitor {
     public mutating func visitI64AtomicRmw8CmpxchgU(memarg: MemArg) throws { return try self.visit(.i64AtomicRmw8CmpxchgU(memarg: memarg)) }
     public mutating func visitI64AtomicRmw16CmpxchgU(memarg: MemArg) throws { return try self.visit(.i64AtomicRmw16CmpxchgU(memarg: memarg)) }
     public mutating func visitI64AtomicRmw32CmpxchgU(memarg: MemArg) throws { return try self.visit(.i64AtomicRmw32CmpxchgU(memarg: memarg)) }
+    public mutating func visitV128Const(value: V128) throws { return try self.visit(.v128Const(value: value)) }
+    public mutating func visitI8x16Shuffle(lanes: V128ShuffleMask) throws { return try self.visit(.i8x16Shuffle(lanes: lanes)) }
+    public mutating func visitSimd(_ simd: Instruction.Simd) throws { return try self.visit(.simd(simd)) }
+    public mutating func visitSimdLane(_ simdLane: Instruction.SimdLane, lane: UInt8) throws { return try self.visit(.simdLane(simdLane, lane: lane)) }
+    public mutating func visitSimdMemLane(_ simdMemLane: Instruction.SimdMemLane, memarg: MemArg, lane: UInt8) throws { return try self.visit(.simdMemLane(simdMemLane, memarg: memarg, lane: lane)) }
 }
 
 /// A visitor for WebAssembly instructions.
@@ -647,6 +897,16 @@ public protocol InstructionVisitor {
     mutating func visitI64AtomicRmw16CmpxchgU(memarg: MemArg) throws
     /// Visiting `i64.atomic.rmw32.cmpxchg_u` instruction.
     mutating func visitI64AtomicRmw32CmpxchgU(memarg: MemArg) throws
+    /// Visiting `v128.const` instruction.
+    mutating func visitV128Const(value: V128) throws
+    /// Visiting `i8x16.shuffle` instruction.
+    mutating func visitI8x16Shuffle(lanes: V128ShuffleMask) throws
+    /// Visiting `simd` category instruction.
+    mutating func visitSimd(_: Instruction.Simd) throws
+    /// Visiting `simdLane` category instruction.
+    mutating func visitSimdLane(_: Instruction.SimdLane, lane: UInt8) throws
+    /// Visiting `simdMemLane` category instruction.
+    mutating func visitSimdMemLane(_: Instruction.SimdMemLane, memarg: MemArg, lane: UInt8) throws
     /// Returns: `true` if the parser should silently proceed parsing.
     mutating func visitUnknown(_ opcode: [UInt8]) throws -> Bool
 }
@@ -765,6 +1025,11 @@ extension InstructionVisitor {
         case let .i64AtomicRmw8CmpxchgU(memarg): return try visitI64AtomicRmw8CmpxchgU(memarg: memarg)
         case let .i64AtomicRmw16CmpxchgU(memarg): return try visitI64AtomicRmw16CmpxchgU(memarg: memarg)
         case let .i64AtomicRmw32CmpxchgU(memarg): return try visitI64AtomicRmw32CmpxchgU(memarg: memarg)
+        case let .v128Const(value): return try visitV128Const(value: value)
+        case let .i8x16Shuffle(lanes): return try visitI8x16Shuffle(lanes: lanes)
+        case let .simd(simd): return try visitSimd(simd)
+        case let .simdLane(simdLane, lane): return try visitSimdLane(simdLane, lane: lane)
+        case let .simdMemLane(simdMemLane, memarg, lane): return try visitSimdMemLane(simdMemLane, memarg: memarg, lane: lane)
         }
     }
 }
@@ -881,6 +1146,11 @@ extension InstructionVisitor {
     public mutating func visitI64AtomicRmw8CmpxchgU(memarg: MemArg) throws {}
     public mutating func visitI64AtomicRmw16CmpxchgU(memarg: MemArg) throws {}
     public mutating func visitI64AtomicRmw32CmpxchgU(memarg: MemArg) throws {}
+    public mutating func visitV128Const(value: V128) throws {}
+    public mutating func visitI8x16Shuffle(lanes: V128ShuffleMask) throws {}
+    public mutating func visitSimd(_ simd: Instruction.Simd) throws {}
+    public mutating func visitSimdLane(_ simdLane: Instruction.SimdLane, lane: UInt8) throws {}
+    public mutating func visitSimdMemLane(_ simdMemLane: Instruction.SimdMemLane, memarg: MemArg, lane: UInt8) throws {}
     public mutating func visitUnknown(_ opcode: [UInt8]) throws -> Bool { false }
 }
 

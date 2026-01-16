@@ -17,6 +17,8 @@ protocol BinaryInstructionEncoder: InstructionVisitor {
     mutating func encodeImmediates(elemIndex: UInt32) throws
     mutating func encodeImmediates(functionIndex: UInt32) throws
     mutating func encodeImmediates(globalIndex: UInt32) throws
+    mutating func encodeImmediates(lane: UInt8) throws
+    mutating func encodeImmediates(lanes: V128ShuffleMask) throws
     mutating func encodeImmediates(localIndex: UInt32) throws
     mutating func encodeImmediates(memarg: MemArg) throws
     mutating func encodeImmediates(memory: UInt32) throws
@@ -30,9 +32,11 @@ protocol BinaryInstructionEncoder: InstructionVisitor {
     mutating func encodeImmediates(value: IEEE754.Float64) throws
     mutating func encodeImmediates(value: Int32) throws
     mutating func encodeImmediates(value: Int64) throws
+    mutating func encodeImmediates(value: V128) throws
     mutating func encodeImmediates(dstMem: UInt32, srcMem: UInt32) throws
     mutating func encodeImmediates(dstTable: UInt32, srcTable: UInt32) throws
     mutating func encodeImmediates(elemIndex: UInt32, table: UInt32) throws
+    mutating func encodeImmediates(memarg: MemArg, lane: UInt8) throws
     mutating func encodeImmediates(typeIndex: UInt32, tableIndex: UInt32) throws
 }
 
@@ -141,6 +145,19 @@ extension BinaryInstructionEncoder {
         case .i64AtomicLoad8U: opcode = [0xFE, 0x14]
         case .i64AtomicLoad16U: opcode = [0xFE, 0x15]
         case .i64AtomicLoad32U: opcode = [0xFE, 0x16]
+        case .v128Load: opcode = [0xFD, 0x00]
+        case .v128Load8X8S: opcode = [0xFD, 0x01]
+        case .v128Load8X8U: opcode = [0xFD, 0x02]
+        case .v128Load16X4S: opcode = [0xFD, 0x03]
+        case .v128Load16X4U: opcode = [0xFD, 0x04]
+        case .v128Load32X2S: opcode = [0xFD, 0x05]
+        case .v128Load32X2U: opcode = [0xFD, 0x06]
+        case .v128Load8Splat: opcode = [0xFD, 0x07]
+        case .v128Load16Splat: opcode = [0xFD, 0x08]
+        case .v128Load32Splat: opcode = [0xFD, 0x09]
+        case .v128Load64Splat: opcode = [0xFD, 0x0A]
+        case .v128Load32Zero: opcode = [0xFD, 0x5C]
+        case .v128Load64Zero: opcode = [0xFD, 0x5D]
         }
 
         try encodeInstruction(opcode)
@@ -165,6 +182,7 @@ extension BinaryInstructionEncoder {
         case .i64AtomicStore8: opcode = [0xFE, 0x1B]
         case .i64AtomicStore16: opcode = [0xFE, 0x1C]
         case .i64AtomicStore32: opcode = [0xFE, 0x1D]
+        case .v128Store: opcode = [0xFD, 0x0B]
         }
 
         try encodeInstruction(opcode)
@@ -632,5 +650,256 @@ extension BinaryInstructionEncoder {
     mutating func visitI64AtomicRmw32CmpxchgU(memarg: MemArg) throws {
         try encodeInstruction([0xFE, 0x4E])
         try encodeImmediates(memarg: memarg)
+    }
+    mutating func visitV128Const(value: V128) throws {
+        try encodeInstruction([0xFD, 0x0C])
+        try encodeImmediates(value: value)
+    }
+    mutating func visitI8x16Shuffle(lanes: V128ShuffleMask) throws {
+        try encodeInstruction([0xFD, 0x0D])
+        try encodeImmediates(lanes: lanes)
+    }
+    mutating func visitSimd(_ simd: Instruction.Simd) throws {
+        let opcode: [UInt8]
+        switch simd {
+        case .i8x16Swizzle: opcode = [0xFD, 0x0E]
+        case .i8x16Splat: opcode = [0xFD, 0x0F]
+        case .i16x8Splat: opcode = [0xFD, 0x10]
+        case .i32x4Splat: opcode = [0xFD, 0x11]
+        case .i64x2Splat: opcode = [0xFD, 0x12]
+        case .f32x4Splat: opcode = [0xFD, 0x13]
+        case .f64x2Splat: opcode = [0xFD, 0x14]
+        case .i8x16Eq: opcode = [0xFD, 0x23]
+        case .i8x16Ne: opcode = [0xFD, 0x24]
+        case .i8x16LtS: opcode = [0xFD, 0x25]
+        case .i8x16LtU: opcode = [0xFD, 0x26]
+        case .i8x16GtS: opcode = [0xFD, 0x27]
+        case .i8x16GtU: opcode = [0xFD, 0x28]
+        case .i8x16LeS: opcode = [0xFD, 0x29]
+        case .i8x16LeU: opcode = [0xFD, 0x2A]
+        case .i8x16GeS: opcode = [0xFD, 0x2B]
+        case .i8x16GeU: opcode = [0xFD, 0x2C]
+        case .i16x8Eq: opcode = [0xFD, 0x2D]
+        case .i16x8Ne: opcode = [0xFD, 0x2E]
+        case .i16x8LtS: opcode = [0xFD, 0x2F]
+        case .i16x8LtU: opcode = [0xFD, 0x30]
+        case .i16x8GtS: opcode = [0xFD, 0x31]
+        case .i16x8GtU: opcode = [0xFD, 0x32]
+        case .i16x8LeS: opcode = [0xFD, 0x33]
+        case .i16x8LeU: opcode = [0xFD, 0x34]
+        case .i16x8GeS: opcode = [0xFD, 0x35]
+        case .i16x8GeU: opcode = [0xFD, 0x36]
+        case .i32x4Eq: opcode = [0xFD, 0x37]
+        case .i32x4Ne: opcode = [0xFD, 0x38]
+        case .i32x4LtS: opcode = [0xFD, 0x39]
+        case .i32x4LtU: opcode = [0xFD, 0x3A]
+        case .i32x4GtS: opcode = [0xFD, 0x3B]
+        case .i32x4GtU: opcode = [0xFD, 0x3C]
+        case .i32x4LeS: opcode = [0xFD, 0x3D]
+        case .i32x4LeU: opcode = [0xFD, 0x3E]
+        case .i32x4GeS: opcode = [0xFD, 0x3F]
+        case .i32x4GeU: opcode = [0xFD, 0x40]
+        case .f32x4Eq: opcode = [0xFD, 0x41]
+        case .f32x4Ne: opcode = [0xFD, 0x42]
+        case .f32x4Lt: opcode = [0xFD, 0x43]
+        case .f32x4Gt: opcode = [0xFD, 0x44]
+        case .f32x4Le: opcode = [0xFD, 0x45]
+        case .f32x4Ge: opcode = [0xFD, 0x46]
+        case .f64x2Eq: opcode = [0xFD, 0x47]
+        case .f64x2Ne: opcode = [0xFD, 0x48]
+        case .f64x2Lt: opcode = [0xFD, 0x49]
+        case .f64x2Gt: opcode = [0xFD, 0x4A]
+        case .f64x2Le: opcode = [0xFD, 0x4B]
+        case .f64x2Ge: opcode = [0xFD, 0x4C]
+        case .v128Not: opcode = [0xFD, 0x4D]
+        case .v128And: opcode = [0xFD, 0x4E]
+        case .v128Andnot: opcode = [0xFD, 0x4F]
+        case .v128Or: opcode = [0xFD, 0x50]
+        case .v128Xor: opcode = [0xFD, 0x51]
+        case .v128Bitselect: opcode = [0xFD, 0x52]
+        case .i8x16Abs: opcode = [0xFD, 0x60]
+        case .i8x16Neg: opcode = [0xFD, 0x61]
+        case .i8x16AllTrue: opcode = [0xFD, 0x63]
+        case .i8x16Bitmask: opcode = [0xFD, 0x64]
+        case .i8x16NarrowI16X8S: opcode = [0xFD, 0x65]
+        case .i8x16NarrowI16X8U: opcode = [0xFD, 0x66]
+        case .i8x16Shl: opcode = [0xFD, 0x6B]
+        case .i8x16ShrS: opcode = [0xFD, 0x6C]
+        case .i8x16ShrU: opcode = [0xFD, 0x6D]
+        case .i8x16Add: opcode = [0xFD, 0x6E]
+        case .i8x16AddSatS: opcode = [0xFD, 0x6F]
+        case .i8x16AddSatU: opcode = [0xFD, 0x70]
+        case .i8x16Sub: opcode = [0xFD, 0x71]
+        case .i8x16SubSatS: opcode = [0xFD, 0x72]
+        case .i8x16SubSatU: opcode = [0xFD, 0x73]
+        case .i8x16MinS: opcode = [0xFD, 0x76]
+        case .i8x16MinU: opcode = [0xFD, 0x77]
+        case .i8x16MaxS: opcode = [0xFD, 0x78]
+        case .i8x16MaxU: opcode = [0xFD, 0x79]
+        case .i8x16AvgrU: opcode = [0xFD, 0x7B]
+        case .i16x8Abs: opcode = [0xFD, 0x80, 0x01]
+        case .i16x8Neg: opcode = [0xFD, 0x81, 0x01]
+        case .i16x8AllTrue: opcode = [0xFD, 0x83, 0x01]
+        case .i16x8Bitmask: opcode = [0xFD, 0x84, 0x01]
+        case .i16x8NarrowI32X4S: opcode = [0xFD, 0x85, 0x01]
+        case .i16x8NarrowI32X4U: opcode = [0xFD, 0x86, 0x01]
+        case .i16x8ExtendLowI8X16S: opcode = [0xFD, 0x87, 0x01]
+        case .i16x8ExtendHighI8X16S: opcode = [0xFD, 0x88, 0x01]
+        case .i16x8ExtendLowI8X16U: opcode = [0xFD, 0x89, 0x01]
+        case .i16x8ExtendHighI8X16U: opcode = [0xFD, 0x8A, 0x01]
+        case .i16x8Shl: opcode = [0xFD, 0x8B, 0x01]
+        case .i16x8ShrS: opcode = [0xFD, 0x8C, 0x01]
+        case .i16x8ShrU: opcode = [0xFD, 0x8D, 0x01]
+        case .i16x8Add: opcode = [0xFD, 0x8E, 0x01]
+        case .i16x8AddSatS: opcode = [0xFD, 0x8F, 0x01]
+        case .i16x8AddSatU: opcode = [0xFD, 0x90, 0x01]
+        case .i16x8Sub: opcode = [0xFD, 0x91, 0x01]
+        case .i16x8SubSatS: opcode = [0xFD, 0x92, 0x01]
+        case .i16x8SubSatU: opcode = [0xFD, 0x93, 0x01]
+        case .i16x8Mul: opcode = [0xFD, 0x95, 0x01]
+        case .i16x8MinS: opcode = [0xFD, 0x96, 0x01]
+        case .i16x8MinU: opcode = [0xFD, 0x97, 0x01]
+        case .i16x8MaxS: opcode = [0xFD, 0x98, 0x01]
+        case .i16x8MaxU: opcode = [0xFD, 0x99, 0x01]
+        case .i16x8AvgrU: opcode = [0xFD, 0x9B, 0x01]
+        case .i32x4Abs: opcode = [0xFD, 0xA0, 0x01]
+        case .i32x4Neg: opcode = [0xFD, 0xA1, 0x01]
+        case .i32x4AllTrue: opcode = [0xFD, 0xA3, 0x01]
+        case .i32x4Bitmask: opcode = [0xFD, 0xA4, 0x01]
+        case .i32x4ExtendLowI16X8S: opcode = [0xFD, 0xA7, 0x01]
+        case .i32x4ExtendHighI16X8S: opcode = [0xFD, 0xA8, 0x01]
+        case .i32x4ExtendLowI16X8U: opcode = [0xFD, 0xA9, 0x01]
+        case .i32x4ExtendHighI16X8U: opcode = [0xFD, 0xAA, 0x01]
+        case .i32x4Shl: opcode = [0xFD, 0xAB, 0x01]
+        case .i32x4ShrS: opcode = [0xFD, 0xAC, 0x01]
+        case .i32x4ShrU: opcode = [0xFD, 0xAD, 0x01]
+        case .i32x4Add: opcode = [0xFD, 0xAE, 0x01]
+        case .i32x4Sub: opcode = [0xFD, 0xB1, 0x01]
+        case .i32x4Mul: opcode = [0xFD, 0xB5, 0x01]
+        case .i32x4MinS: opcode = [0xFD, 0xB6, 0x01]
+        case .i32x4MinU: opcode = [0xFD, 0xB7, 0x01]
+        case .i32x4MaxS: opcode = [0xFD, 0xB8, 0x01]
+        case .i32x4MaxU: opcode = [0xFD, 0xB9, 0x01]
+        case .i32x4DotI16X8S: opcode = [0xFD, 0xBA, 0x01]
+        case .i64x2Abs: opcode = [0xFD, 0xC0, 0x01]
+        case .i64x2Neg: opcode = [0xFD, 0xC1, 0x01]
+        case .i64x2Bitmask: opcode = [0xFD, 0xC4, 0x01]
+        case .i64x2ExtendLowI32X4S: opcode = [0xFD, 0xC7, 0x01]
+        case .i64x2ExtendHighI32X4S: opcode = [0xFD, 0xC8, 0x01]
+        case .i64x2ExtendLowI32X4U: opcode = [0xFD, 0xC9, 0x01]
+        case .i64x2ExtendHighI32X4U: opcode = [0xFD, 0xCA, 0x01]
+        case .i64x2Shl: opcode = [0xFD, 0xCB, 0x01]
+        case .i64x2ShrS: opcode = [0xFD, 0xCC, 0x01]
+        case .i64x2ShrU: opcode = [0xFD, 0xCD, 0x01]
+        case .i64x2Add: opcode = [0xFD, 0xCE, 0x01]
+        case .i64x2Sub: opcode = [0xFD, 0xD1, 0x01]
+        case .i64x2Mul: opcode = [0xFD, 0xD5, 0x01]
+        case .f32x4Ceil: opcode = [0xFD, 0x67]
+        case .f32x4Floor: opcode = [0xFD, 0x68]
+        case .f32x4Trunc: opcode = [0xFD, 0x69]
+        case .f32x4Nearest: opcode = [0xFD, 0x6A]
+        case .f64x2Ceil: opcode = [0xFD, 0x74]
+        case .f64x2Floor: opcode = [0xFD, 0x75]
+        case .f64x2Trunc: opcode = [0xFD, 0x7A]
+        case .f64x2Nearest: opcode = [0xFD, 0x94, 0x01]
+        case .f32x4Abs: opcode = [0xFD, 0xE0, 0x01]
+        case .f32x4Neg: opcode = [0xFD, 0xE1, 0x01]
+        case .f32x4Sqrt: opcode = [0xFD, 0xE3, 0x01]
+        case .f32x4Add: opcode = [0xFD, 0xE4, 0x01]
+        case .f32x4Sub: opcode = [0xFD, 0xE5, 0x01]
+        case .f32x4Mul: opcode = [0xFD, 0xE6, 0x01]
+        case .f32x4Div: opcode = [0xFD, 0xE7, 0x01]
+        case .f32x4Min: opcode = [0xFD, 0xE8, 0x01]
+        case .f32x4Max: opcode = [0xFD, 0xE9, 0x01]
+        case .f32x4Pmin: opcode = [0xFD, 0xEA, 0x01]
+        case .f32x4Pmax: opcode = [0xFD, 0xEB, 0x01]
+        case .f64x2Abs: opcode = [0xFD, 0xEC, 0x01]
+        case .f64x2Neg: opcode = [0xFD, 0xED, 0x01]
+        case .f64x2Sqrt: opcode = [0xFD, 0xEF, 0x01]
+        case .f64x2Add: opcode = [0xFD, 0xF0, 0x01]
+        case .f64x2Sub: opcode = [0xFD, 0xF1, 0x01]
+        case .f64x2Mul: opcode = [0xFD, 0xF2, 0x01]
+        case .f64x2Div: opcode = [0xFD, 0xF3, 0x01]
+        case .f64x2Min: opcode = [0xFD, 0xF4, 0x01]
+        case .f64x2Max: opcode = [0xFD, 0xF5, 0x01]
+        case .f64x2Pmin: opcode = [0xFD, 0xF6, 0x01]
+        case .f64x2Pmax: opcode = [0xFD, 0xF7, 0x01]
+        case .i32x4TruncSatF32X4S: opcode = [0xFD, 0xF8, 0x01]
+        case .i32x4TruncSatF32X4U: opcode = [0xFD, 0xF9, 0x01]
+        case .f32x4ConvertI32X4S: opcode = [0xFD, 0xFA, 0x01]
+        case .f32x4ConvertI32X4U: opcode = [0xFD, 0xFB, 0x01]
+        case .i16x8ExtmulLowI8X16S: opcode = [0xFD, 0x9C, 0x01]
+        case .i16x8ExtmulHighI8X16S: opcode = [0xFD, 0x9D, 0x01]
+        case .i16x8ExtmulLowI8X16U: opcode = [0xFD, 0x9E, 0x01]
+        case .i16x8ExtmulHighI8X16U: opcode = [0xFD, 0x9F, 0x01]
+        case .i32x4ExtmulLowI16X8S: opcode = [0xFD, 0xBC, 0x01]
+        case .i32x4ExtmulHighI16X8S: opcode = [0xFD, 0xBD, 0x01]
+        case .i32x4ExtmulLowI16X8U: opcode = [0xFD, 0xBE, 0x01]
+        case .i32x4ExtmulHighI16X8U: opcode = [0xFD, 0xBF, 0x01]
+        case .i64x2ExtmulLowI32X4S: opcode = [0xFD, 0xDC, 0x01]
+        case .i64x2ExtmulHighI32X4S: opcode = [0xFD, 0xDD, 0x01]
+        case .i64x2ExtmulLowI32X4U: opcode = [0xFD, 0xDE, 0x01]
+        case .i64x2ExtmulHighI32X4U: opcode = [0xFD, 0xDF, 0x01]
+        case .i16x8Q15MulrSatS: opcode = [0xFD, 0x82, 0x01]
+        case .v128AnyTrue: opcode = [0xFD, 0x53]
+        case .i64x2Eq: opcode = [0xFD, 0xD6, 0x01]
+        case .i64x2Ne: opcode = [0xFD, 0xD7, 0x01]
+        case .i64x2LtS: opcode = [0xFD, 0xD8, 0x01]
+        case .i64x2GtS: opcode = [0xFD, 0xD9, 0x01]
+        case .i64x2LeS: opcode = [0xFD, 0xDA, 0x01]
+        case .i64x2GeS: opcode = [0xFD, 0xDB, 0x01]
+        case .i64x2AllTrue: opcode = [0xFD, 0xC3, 0x01]
+        case .f64x2ConvertLowI32X4S: opcode = [0xFD, 0xFE, 0x01]
+        case .f64x2ConvertLowI32X4U: opcode = [0xFD, 0xFF, 0x01]
+        case .i32x4TruncSatF64X2SZero: opcode = [0xFD, 0xFC, 0x01]
+        case .i32x4TruncSatF64X2UZero: opcode = [0xFD, 0xFD, 0x01]
+        case .f32x4DemoteF64X2Zero: opcode = [0xFD, 0x5E]
+        case .f64x2PromoteLowF32X4: opcode = [0xFD, 0x5F]
+        case .i8x16Popcnt: opcode = [0xFD, 0x62]
+        case .i16x8ExtaddPairwiseI8X16S: opcode = [0xFD, 0x7C]
+        case .i16x8ExtaddPairwiseI8X16U: opcode = [0xFD, 0x7D]
+        case .i32x4ExtaddPairwiseI16X8S: opcode = [0xFD, 0x7E]
+        case .i32x4ExtaddPairwiseI16X8U: opcode = [0xFD, 0x7F]
+        }
+
+        try encodeInstruction(opcode)
+    }
+    mutating func visitSimdLane(_ simdLane: Instruction.SimdLane, lane: UInt8) throws {
+        let opcode: [UInt8]
+        switch simdLane {
+        case .i8x16ExtractLaneS: opcode = [0xFD, 0x15]
+        case .i8x16ExtractLaneU: opcode = [0xFD, 0x16]
+        case .i8x16ReplaceLane: opcode = [0xFD, 0x17]
+        case .i16x8ExtractLaneS: opcode = [0xFD, 0x18]
+        case .i16x8ExtractLaneU: opcode = [0xFD, 0x19]
+        case .i16x8ReplaceLane: opcode = [0xFD, 0x1A]
+        case .i32x4ExtractLane: opcode = [0xFD, 0x1B]
+        case .i32x4ReplaceLane: opcode = [0xFD, 0x1C]
+        case .i64x2ExtractLane: opcode = [0xFD, 0x1D]
+        case .i64x2ReplaceLane: opcode = [0xFD, 0x1E]
+        case .f32x4ExtractLane: opcode = [0xFD, 0x1F]
+        case .f32x4ReplaceLane: opcode = [0xFD, 0x20]
+        case .f64x2ExtractLane: opcode = [0xFD, 0x21]
+        case .f64x2ReplaceLane: opcode = [0xFD, 0x22]
+        }
+
+        try encodeInstruction(opcode)
+        try encodeImmediates(lane: lane)
+    }
+    mutating func visitSimdMemLane(_ simdMemLane: Instruction.SimdMemLane, memarg: MemArg, lane: UInt8) throws {
+        let opcode: [UInt8]
+        switch simdMemLane {
+        case .v128Load8Lane: opcode = [0xFD, 0x54]
+        case .v128Load16Lane: opcode = [0xFD, 0x55]
+        case .v128Load32Lane: opcode = [0xFD, 0x56]
+        case .v128Load64Lane: opcode = [0xFD, 0x57]
+        case .v128Store8Lane: opcode = [0xFD, 0x58]
+        case .v128Store16Lane: opcode = [0xFD, 0x59]
+        case .v128Store32Lane: opcode = [0xFD, 0x5A]
+        case .v128Store64Lane: opcode = [0xFD, 0x5B]
+        }
+
+        try encodeInstruction(opcode)
+        try encodeImmediates(memarg: memarg, lane: lane)
     }
 }

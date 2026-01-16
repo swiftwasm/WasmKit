@@ -709,6 +709,8 @@ struct WatParser {
             return UnresolvedType(.f32)
         } else if try parser.takeKeyword("f64") {
             return UnresolvedType(.f64)
+        } else if try parser.takeKeyword("v128") {
+            return UnresolvedType(.v128)
         } else if let refType = try takeRefType() {
             return refType.map { .ref($0) }
         } else {
