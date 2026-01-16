@@ -68,7 +68,7 @@ let package = Package(
         .target(
             name: "WAT",
             dependencies: [
-                "ComponentModel",
+                .target(name: "ComponentModel", condition: .when(traits: ["ComponentModel"])),
                 "WasmParser",
             ],
             exclude: ["CMakeLists.txt"]
