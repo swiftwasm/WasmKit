@@ -1,3 +1,5 @@
+#if ComponentModel
+
 import WasmParser
 
 /// https://github.com/WebAssembly/component-model/blob/main/design/mvp/Explainer.md#index-spaces
@@ -10,3 +12,5 @@ package struct ComponentWat {
     let modulesMap: NameMapping<ComponentWatParser.ModuleDef>
     let coreInstancesMap: NameMapping<ComponentWatParser.CoreInstanceDef>
 }
+
+#endif

@@ -25,6 +25,7 @@ struct ComponentTests {
                 (func (export "d") (result f64) f64.const 0)
               )
               (core instance $M1 (instantiate $m1 (with "c" (instance $d))))
+              (func (export "a") (canon lift (core func $m "")))
             )
             """#, features: .default)
 
