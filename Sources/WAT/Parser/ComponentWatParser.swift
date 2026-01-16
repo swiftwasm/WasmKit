@@ -44,26 +44,7 @@ struct ComponentWatParser {
                         componentDefs.append(.coreModule(try self.parseModuleDef()))
 
                     case "instance":
-                        let instanceId = try parser.takeId()
-                        try parser.expect(.leftParen)
-
-                        try parser.expectKeyword("instantiate")
-                        let instantiatedModuleId = try parser.expectIndexOrId()
-                        var instantiateArguments = [CoreInstanceDef.Argument]()
-
-                        while try parser.take(.leftParen) {
-                            instantiateArguments.append(try self.parseModuleInstanceArguments())
-                            try parser.expect(.rightParen)
-                        }
-
-                        try parser.expect(.rightParen)
-
-                        componentDefs.append(
-                            .coreInstance(
-                            CoreInstanceDef(
-                                id: instanceId,
-                                moduleId: instantiatedModuleId,
-                                arguments: instantiateArguments ) ) )
+                        componentDefs.append(.coreInstance(try self.parseCoreInstanceDef()))
 
                     default:
                         throw WatParserError(
@@ -72,9 +53,7 @@ struct ComponentWatParser {
                         )
                     }
                 case "func":
-                    print("got func!")
-                    let id = try parser.takeId()
-                    componentDefs.append(.function(FunctionDef(id: id)))
+                    componentDefs.append(contentsOf: try parseComponentFunction())
                 default:
                     throw WatParserError(
                         "Unknown component definition keyword \(componentDefKeyword)",
@@ -150,6 +129,97 @@ struct ComponentWatParser {
             )
         }
     }
+
+    private mutating func parseCoreInstanceDef() throws -> CoreInstanceDef {
+        let instanceId = try parser.takeId()
+        try parser.expect(.leftParen)
+
+        try parser.expectKeyword("instantiate")
+        let instantiatedModuleId = try parser.expectIndexOrId()
+        var instantiateArguments = [CoreInstanceDef.Argument]()
+
+        while try parser.take(.leftParen) {
+            instantiateArguments.append(try self.parseModuleInstanceArguments())
+            try parser.expect(.rightParen)
+        }
+
+        try parser.expect(.rightParen)
+
+        return CoreInstanceDef(
+            id: instanceId,
+            moduleId: instantiatedModuleId,
+            arguments: instantiateArguments
+        )
+    }
+
+    private mutating func parseComponentFunction() throws -> [ComponentDefField] {
+        var result = [ComponentDefField]()
+        let id = try parser.takeId()
+        try parser.expect(.leftParen)
+        let keyword = try parser.expectKeyword()
+        switch keyword {
+        case "export":
+        case "import":
+        case "canon":
+            try parser.expectKeyword("lift")
+            let coreFunctionIndex = try parseCoreFunctionIndex()
+            var options = [CanonDef.Option]()
+            while try parser.take(.leftParen) {
+                options.append(try parseCanonOpt())
+                try parser.expect(.rightParen)
+            }
+            result.append(
+                .canon(.init(
+                    id: id,
+                    kind: .lift,
+                    functionIndex: coreFunctionIndex,
+                    options: options
+                ))
+            )
+
+        default:
+            throw WatParserError(
+                "Unknown component function keyword \(keyword)",
+                location: parser.lexer.location()
+            )
+        }
+        try parser.expectKeyword("export")
+        let exportName = try parser.takeString()
+        try parser.expect(.rightParen)
+        return result
+    }
+
+    private mutating func parseCanonOpt() throws -> CanonDef.Option {
+        let keyword = try parser.expectKeyword()
+        switch keyword {
+        case "memory":
+            return .memory(try parser.expectIndexOrId())
+        case "realloc":
+            return .realloc(try parseCoreFunctionIndex())
+        case "post-return":
+            return .postReturn(try parseCoreFunctionIndex())
+        case "async":
+            return .async
+        case "callback":
+            return .callback(try parseCoreFunctionIndex())
+        default:
+            throw WatParserError(
+                "Unknown canon options keyword \(keyword)",
+                location: parser.lexer.location()
+            )
+        }
+    }
+
+    private mutating func parseCoreFunctionIndex() throws -> FuncIndex {
+            try parser.expect(.leftParen)
+            try parser.expectKeyword("core")
+            try parser.expectKeyword("func")
+            let instanceId = try parser.expectIndexOrId()
+            let exportName = try parser.expectString()
+            try parser.expect(.rightParen)
+
+        return .init(instance: instanceId, exportName: exportName)
+    }
 }
 
 extension ComponentWatParser {
@@ -159,11 +229,7 @@ extension ComponentWatParser {
         case coreType(WatParser.FunctionType)
         case component(ComponentDef)
         case instance(ComponentInstanceDef)
-        case function(FunctionDef)
-    }
-
-    struct FunctionDef: NamedModuleFieldDecl {
-        var id: Name?
+        case canon(CanonDef)
     }
 
     struct ValueDef: NamedModuleFieldDecl {
@@ -207,6 +273,36 @@ extension ComponentWatParser {
         var id: Name?
         var moduleId: Parser.IndexOrId
         var arguments: [Argument]
+    }
+
+    struct FuncIndex {
+        var instance: Parser.IndexOrId
+        var exportName: String
+    }
+
+    struct CanonDef: NamedModuleFieldDecl {
+        enum Option {
+            enum Encoding {
+                case utf8
+                case utf16
+                case latin1UTF16
+            }
+            case stringEncoding(Encoding)
+            case memory(Parser.IndexOrId)
+            case realloc(FuncIndex)
+            case postReturn(FuncIndex)
+            case `async`
+            case callback(FuncIndex)
+        }
+
+        enum Kind {
+            case lower
+            case lift
+        }
+        var id: Name?
+        let kind: Kind
+        let functionIndex: FuncIndex
+        let options: [Option]
     }
 }
 
