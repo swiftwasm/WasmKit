@@ -73,11 +73,23 @@ public protocol MonotonicClock {
 
         public func now() throws -> WallClock.Duration {
             var fileTime = FILETIME()
-            GetSystemTimeAsFileTime(&fileTime)
-            // > the number of 100-nanosecond intervals since January 1, 1601 (UTC).
+            // Use GetSystemTimePreciseAsFileTime for better precision
+            // https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getsystemtimepreciseasfiletime
+            GetSystemTimePreciseAsFileTime(&fileTime)
+            // FILETIME is 100-nanosecond intervals since 1601-01-01
             // https://learn.microsoft.com/en-us/windows/win32/api/minwinbase/ns-minwinbase-filetime
-            let time = (UInt64(fileTime.dwLowDateTime) | UInt64(fileTime.dwHighDateTime) << 32) / 10
-            return (seconds: time / 1_000_000_000, nanoseconds: UInt32(time % 1_000_000_000))
+            let intervals = (UInt64(fileTime.dwHighDateTime) << 32) | UInt64(fileTime.dwLowDateTime)
+            // Convert from Windows epoch (1601) to Unix epoch (1970)
+            // Epoch offset: 11_644_473_600 seconds * 10_000_000 (100ns intervals per second) = 116_444_736_000_000_000
+            let unixEpochOffset: UInt64 = 116_444_736_000_000_000  // 100ns intervals between epochs
+            guard intervals >= unixEpochOffset else {
+                // Handle pre-1970 dates (return 0)
+                return (seconds: 0, nanoseconds: 0)
+            }
+            let unixIntervals = intervals - unixEpochOffset
+            // Convert 100ns intervals to nanoseconds, then to seconds/nanoseconds
+            let totalNanoseconds = unixIntervals * 100
+            return (seconds: totalNanoseconds / 1_000_000_000, nanoseconds: UInt32((totalNanoseconds % 1_000_000_000)))
         }
 
         public func resolution() throws -> WallClock.Duration {
@@ -123,15 +135,7 @@ public protocol MonotonicClock {
     /// A wall clock that uses the system's wall clock.
     public struct SystemWallClock: WallClock {
         private var underlying: SystemExtras.Clock {
-            #if os(Linux) || os(Android)
-                return .boottime
-            #elseif os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
-                return .rawMonotonic
-            #elseif os(OpenBSD) || os(FreeBSD) || os(WASI)
-                return .monotonic
-            #else
-                #error("Unsupported platform")
-            #endif
+            return .realtime
         }
 
         public init() {}
@@ -140,15 +144,37 @@ public protocol MonotonicClock {
             let timeSpec = try WASIAbi.Errno.translatingPlatformErrno {
                 try underlying.currentTime()
             }
-            return (seconds: UInt64(timeSpec.seconds), nanoseconds: UInt32(timeSpec.nanoseconds))
+            // Handle potential negative tv_sec (pre-1970 dates)
+            let seconds = timeSpec.seconds >= 0 ? UInt64(timeSpec.seconds) : 0
+            let nanoseconds = timeSpec.nanoseconds >= 0 ? UInt32(timeSpec.nanoseconds) : 0
+            return (seconds: seconds, nanoseconds: nanoseconds)
         }
 
         public func resolution() throws -> WallClock.Duration {
             let timeSpec = try WASIAbi.Errno.translatingPlatformErrno {
                 try underlying.resolution()
             }
-            return (seconds: UInt64(timeSpec.seconds), nanoseconds: UInt32(timeSpec.nanoseconds))
+            let seconds = timeSpec.seconds >= 0 ? UInt64(timeSpec.seconds) : 0
+            let nanoseconds = timeSpec.nanoseconds >= 0 ? UInt32(timeSpec.nanoseconds) : 0
+            return (seconds: seconds, nanoseconds: nanoseconds)
         }
     }
 
 #endif
+
+// MARK: - Internal Helper
+
+extension WASIAbi.Timestamp {
+    /// Get the current wall clock time in nanoseconds since Unix epoch.
+    /// This is an internal helper for use within the WASI module.
+    internal static func currentWallClock() -> WASIAbi.Timestamp {
+        let clock = SystemWallClock()
+        do {
+            let duration = try clock.now()
+            return WASIAbi.Timestamp(wallClockDuration: duration)
+        } catch {
+            // Fallback: return 0 on error
+            return 0
+        }
+    }
+}

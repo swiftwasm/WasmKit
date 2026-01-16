@@ -54,6 +54,16 @@ extension Clock {
   public static var monotonic: Clock { Clock(rawValue: csystemextras_monotonic_clockid()) }
   #endif
 
+  #if SYSTEM_PACKAGE_DARWIN || os(Linux) || os(Android) || os(OpenBSD) || os(FreeBSD)
+  @_alwaysEmitIntoClient
+  public static var realtime: Clock { Clock(rawValue: _CLOCK_REALTIME) }
+  #endif
+
+  #if os(WASI)
+  @_alwaysEmitIntoClient
+  public static var realtime: Clock { Clock(rawValue: csystemextras_realtime_clockid()) }
+  #endif
+
   #if os(OpenBSD) || os(FreeBSD)
   @_alwaysEmitIntoClient
   public static var uptime: Clock { Clock(rawValue: _CLOCK_UPTIME) }

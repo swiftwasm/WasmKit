@@ -691,6 +691,98 @@ extension ExpressionParser {
     mutating func visitF64Const(wat: inout Wat) throws -> IEEE754.Float64 {
         return try parser.expectFloat64()
     }
+    mutating func visitV128Const(wat: inout Wat) throws -> V128 {
+        func expectFloat32Lane() throws -> IEEE754.Float32 {
+            if try parser.takeKeyword("nan:canonical") {
+                return IEEE754.Float32(bitPattern: 0x7FC0_0000)
+            }
+            if try parser.takeKeyword("nan:arithmetic") {
+                return IEEE754.Float32(bitPattern: 0x7FC0_0000)
+            }
+            return try parser.expectFloat32()
+        }
+        func expectFloat64Lane() throws -> IEEE754.Float64 {
+            if try parser.takeKeyword("nan:canonical") {
+                return IEEE754.Float64(bitPattern: 0x7FF8_0000_0000_0000)
+            }
+            if try parser.takeKeyword("nan:arithmetic") {
+                return IEEE754.Float64(bitPattern: 0x7FF8_0000_0000_0000)
+            }
+            return try parser.expectFloat64()
+        }
+
+        func appendLittleEndianBytes<T: FixedWidthInteger>(_ value: T, into bytes: inout [UInt8]) {
+            var value = value
+            for _ in 0..<(T.bitWidth / 8) {
+                bytes.append(UInt8(truncatingIfNeeded: value))
+                value >>= 8
+            }
+        }
+
+        let shape = try parser.expectKeyword()
+        var bytes: [UInt8] = []
+        bytes.reserveCapacity(V128.byteCount)
+
+        switch shape {
+        case "i8x16":
+            for _ in 0..<16 {
+                let lane: Int8 = try parser.expectSignedInt(fromBitPattern: Int8.init(bitPattern:))
+                bytes.append(UInt8(bitPattern: lane))
+            }
+        case "i16x8":
+            for _ in 0..<8 {
+                let lane: Int16 = try parser.expectSignedInt(fromBitPattern: Int16.init(bitPattern:))
+                appendLittleEndianBytes(UInt16(bitPattern: lane), into: &bytes)
+            }
+        case "i32x4":
+            for _ in 0..<4 {
+                let lane: Int32 = try parser.expectSignedInt(fromBitPattern: Int32.init(bitPattern:))
+                appendLittleEndianBytes(UInt32(bitPattern: lane), into: &bytes)
+            }
+        case "i64x2":
+            for _ in 0..<2 {
+                let lane: Int64 = try parser.expectSignedInt(fromBitPattern: Int64.init(bitPattern:))
+                appendLittleEndianBytes(UInt64(bitPattern: lane), into: &bytes)
+            }
+        case "f32x4":
+            for _ in 0..<4 {
+                let lane = try expectFloat32Lane()
+                appendLittleEndianBytes(lane.bitPattern, into: &bytes)
+            }
+        case "f64x2":
+            for _ in 0..<2 {
+                let lane = try expectFloat64Lane()
+                appendLittleEndianBytes(lane.bitPattern, into: &bytes)
+            }
+        default:
+            throw WatParserError("expected v128 shape type", location: parser.lexer.location())
+        }
+
+        return V128(bytes: bytes)
+    }
+    mutating func visitI8x16Shuffle(wat: inout Wat) throws -> V128ShuffleMask {
+        var lanes: [UInt8] = []
+        lanes.reserveCapacity(V128ShuffleMask.laneCount)
+        for _ in 0..<V128ShuffleMask.laneCount {
+            lanes.append(try parser.expectUnsignedInt(UInt8.self))
+        }
+        return V128ShuffleMask(lanes: lanes)
+    }
+    mutating func visitSimdLane(_: Instruction.SimdLane, wat: inout Wat) throws -> UInt8 {
+        return try parser.expectUnsignedInt(UInt8.self)
+    }
+    mutating func visitSimdMemLane(_ op: Instruction.SimdMemLane, wat: inout Wat) throws -> (memarg: MemArg, lane: UInt8) {
+        let defaultAlign: UInt32
+        switch op {
+        case .v128Load8Lane, .v128Store8Lane: defaultAlign = 0
+        case .v128Load16Lane, .v128Store16Lane: defaultAlign = 1
+        case .v128Load32Lane, .v128Store32Lane: defaultAlign = 2
+        case .v128Load64Lane, .v128Store64Lane: defaultAlign = 3
+        }
+        let memarg = try memArg(defaultAlign: defaultAlign)
+        let lane = try parser.expectUnsignedInt(UInt8.self)
+        return (memarg: memarg, lane: lane)
+    }
     mutating func visitRefNull(wat: inout Wat) throws -> HeapType {
         return try heapType(wat: &wat)
     }

@@ -33,7 +33,9 @@ jobs:
       matrix:
         include:
           - toolchain: 6.3-snapshot
+            test-args: ""
           - toolchain: main-snapshot
+            test-args: "-Xswiftc -DWASMKIT_CI_TOOLCHAIN_MAIN_NIGHTLY"
     steps:
       - uses: actions/checkout@v4
       - id: setup-development
@@ -53,7 +55,7 @@ jobs:
           ./Vendor/checkout-dependency
 
           swift --version
-          swift test --sanitize address --traits WasmDebuggingSupport
+          swift test --sanitize address --traits WasmDebuggingSupport ${{ matrix.test-args }}
 
   build-macos:
     strategy:
@@ -185,13 +187,13 @@ jobs:
             wasi-swift-sdk-download: "https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm.artifactbundle.tar.gz"
             wasi-swift-sdk-id: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm
             wasi-swift-sdk-checksum: "b64dfad9e1c9ccdf06f35cf9b1a00317e000df0c0de0b3eb9f49d6db0fcba4d9"
-            test-args: "--traits WasmDebuggingSupport -Xswiftc -DWASMKIT_CI_TOOLCHAIN_NIGHTLY"
+            test-args: "--traits WasmDebuggingSupport -Xswiftc -DWASMKIT_CI_TOOLCHAIN_NIGHTLY -Xswiftc -DWASMKIT_CI_TOOLCHAIN_MAIN_NIGHTLY"
           - swift: "swiftlang/swift:nightly-main-noble"
             development-toolchain-download: "https://download.swift.org/development/ubuntu2404/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a-ubuntu24.04.tar.gz"
             wasi-swift-sdk-download: "https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm.artifactbundle.tar.gz"
             wasi-swift-sdk-id: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm
             wasi-swift-sdk-checksum: "b64dfad9e1c9ccdf06f35cf9b1a00317e000df0c0de0b3eb9f49d6db0fcba4d9"
-            test-args: "--traits WasmDebuggingSupport -Xswiftc -DWASMKIT_CI_TOOLCHAIN_NIGHTLY --build-system swiftbuild"
+            test-args: "--traits WasmDebuggingSupport -Xswiftc -DWASMKIT_CI_TOOLCHAIN_NIGHTLY -Xswiftc -DWASMKIT_CI_TOOLCHAIN_MAIN_NIGHTLY --build-system swiftbuild"
             label: " --build-system swiftbuild"
 
     runs-on: ubuntu-24.04
@@ -348,4 +350,3 @@ jobs:
         run: swift sdk install https://download.swift.org/swift-6.2.3-release/wasm-sdk/swift-6.2.3-RELEASE/swift-6.2.3-RELEASE_wasm.artifactbundle.tar.gz --checksum 394040ecd5260e68bb02f6c20aeede733b9b90702c2204e178f3e42413edad2a
       - name: Build with the Swift SDK
         run: swift build --swift-sdk "$(swiftc -print-target-info | jq -r '.swiftCompilerTag')_wasm" --product wasmkit-cli
-

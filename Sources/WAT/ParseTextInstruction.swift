@@ -544,6 +544,318 @@ func parseTextInstruction<V: InstructionVisitor>(keyword: String, expressionPars
     case "i64.atomic.rmw32.cmpxchg_u":
         let (memarg) = try expressionParser.visitI64AtomicRmw32CmpxchgU(wat: &wat)
         return { return try $0.visitI64AtomicRmw32CmpxchgU(memarg: memarg) }
+    case "v128.load":
+        let (memarg) = try expressionParser.visitLoad(.v128Load, wat: &wat)
+        return { return try $0.visitLoad(.v128Load, memarg: memarg) }
+    case "v128.load8x8_s":
+        let (memarg) = try expressionParser.visitLoad(.v128Load8X8S, wat: &wat)
+        return { return try $0.visitLoad(.v128Load8X8S, memarg: memarg) }
+    case "v128.load8x8_u":
+        let (memarg) = try expressionParser.visitLoad(.v128Load8X8U, wat: &wat)
+        return { return try $0.visitLoad(.v128Load8X8U, memarg: memarg) }
+    case "v128.load16x4_s":
+        let (memarg) = try expressionParser.visitLoad(.v128Load16X4S, wat: &wat)
+        return { return try $0.visitLoad(.v128Load16X4S, memarg: memarg) }
+    case "v128.load16x4_u":
+        let (memarg) = try expressionParser.visitLoad(.v128Load16X4U, wat: &wat)
+        return { return try $0.visitLoad(.v128Load16X4U, memarg: memarg) }
+    case "v128.load32x2_s":
+        let (memarg) = try expressionParser.visitLoad(.v128Load32X2S, wat: &wat)
+        return { return try $0.visitLoad(.v128Load32X2S, memarg: memarg) }
+    case "v128.load32x2_u":
+        let (memarg) = try expressionParser.visitLoad(.v128Load32X2U, wat: &wat)
+        return { return try $0.visitLoad(.v128Load32X2U, memarg: memarg) }
+    case "v128.load8_splat":
+        let (memarg) = try expressionParser.visitLoad(.v128Load8Splat, wat: &wat)
+        return { return try $0.visitLoad(.v128Load8Splat, memarg: memarg) }
+    case "v128.load16_splat":
+        let (memarg) = try expressionParser.visitLoad(.v128Load16Splat, wat: &wat)
+        return { return try $0.visitLoad(.v128Load16Splat, memarg: memarg) }
+    case "v128.load32_splat":
+        let (memarg) = try expressionParser.visitLoad(.v128Load32Splat, wat: &wat)
+        return { return try $0.visitLoad(.v128Load32Splat, memarg: memarg) }
+    case "v128.load64_splat":
+        let (memarg) = try expressionParser.visitLoad(.v128Load64Splat, wat: &wat)
+        return { return try $0.visitLoad(.v128Load64Splat, memarg: memarg) }
+    case "v128.store":
+        let (memarg) = try expressionParser.visitStore(.v128Store, wat: &wat)
+        return { return try $0.visitStore(.v128Store, memarg: memarg) }
+    case "v128.const":
+        let (value) = try expressionParser.visitV128Const(wat: &wat)
+        return { return try $0.visitV128Const(value: value) }
+    case "i8x16.shuffle":
+        let (lanes) = try expressionParser.visitI8x16Shuffle(wat: &wat)
+        return { return try $0.visitI8x16Shuffle(lanes: lanes) }
+    case "i8x16.swizzle": return { return try $0.visitSimd(.i8x16Swizzle) }
+    case "i8x16.splat": return { return try $0.visitSimd(.i8x16Splat) }
+    case "i16x8.splat": return { return try $0.visitSimd(.i16x8Splat) }
+    case "i32x4.splat": return { return try $0.visitSimd(.i32x4Splat) }
+    case "i64x2.splat": return { return try $0.visitSimd(.i64x2Splat) }
+    case "f32x4.splat": return { return try $0.visitSimd(.f32x4Splat) }
+    case "f64x2.splat": return { return try $0.visitSimd(.f64x2Splat) }
+    case "i8x16.extract_lane_s":
+        let (lane) = try expressionParser.visitSimdLane(.i8x16ExtractLaneS, wat: &wat)
+        return { return try $0.visitSimdLane(.i8x16ExtractLaneS, lane: lane) }
+    case "i8x16.extract_lane_u":
+        let (lane) = try expressionParser.visitSimdLane(.i8x16ExtractLaneU, wat: &wat)
+        return { return try $0.visitSimdLane(.i8x16ExtractLaneU, lane: lane) }
+    case "i8x16.replace_lane":
+        let (lane) = try expressionParser.visitSimdLane(.i8x16ReplaceLane, wat: &wat)
+        return { return try $0.visitSimdLane(.i8x16ReplaceLane, lane: lane) }
+    case "i16x8.extract_lane_s":
+        let (lane) = try expressionParser.visitSimdLane(.i16x8ExtractLaneS, wat: &wat)
+        return { return try $0.visitSimdLane(.i16x8ExtractLaneS, lane: lane) }
+    case "i16x8.extract_lane_u":
+        let (lane) = try expressionParser.visitSimdLane(.i16x8ExtractLaneU, wat: &wat)
+        return { return try $0.visitSimdLane(.i16x8ExtractLaneU, lane: lane) }
+    case "i16x8.replace_lane":
+        let (lane) = try expressionParser.visitSimdLane(.i16x8ReplaceLane, wat: &wat)
+        return { return try $0.visitSimdLane(.i16x8ReplaceLane, lane: lane) }
+    case "i32x4.extract_lane":
+        let (lane) = try expressionParser.visitSimdLane(.i32x4ExtractLane, wat: &wat)
+        return { return try $0.visitSimdLane(.i32x4ExtractLane, lane: lane) }
+    case "i32x4.replace_lane":
+        let (lane) = try expressionParser.visitSimdLane(.i32x4ReplaceLane, wat: &wat)
+        return { return try $0.visitSimdLane(.i32x4ReplaceLane, lane: lane) }
+    case "i64x2.extract_lane":
+        let (lane) = try expressionParser.visitSimdLane(.i64x2ExtractLane, wat: &wat)
+        return { return try $0.visitSimdLane(.i64x2ExtractLane, lane: lane) }
+    case "i64x2.replace_lane":
+        let (lane) = try expressionParser.visitSimdLane(.i64x2ReplaceLane, wat: &wat)
+        return { return try $0.visitSimdLane(.i64x2ReplaceLane, lane: lane) }
+    case "f32x4.extract_lane":
+        let (lane) = try expressionParser.visitSimdLane(.f32x4ExtractLane, wat: &wat)
+        return { return try $0.visitSimdLane(.f32x4ExtractLane, lane: lane) }
+    case "f32x4.replace_lane":
+        let (lane) = try expressionParser.visitSimdLane(.f32x4ReplaceLane, wat: &wat)
+        return { return try $0.visitSimdLane(.f32x4ReplaceLane, lane: lane) }
+    case "f64x2.extract_lane":
+        let (lane) = try expressionParser.visitSimdLane(.f64x2ExtractLane, wat: &wat)
+        return { return try $0.visitSimdLane(.f64x2ExtractLane, lane: lane) }
+    case "f64x2.replace_lane":
+        let (lane) = try expressionParser.visitSimdLane(.f64x2ReplaceLane, wat: &wat)
+        return { return try $0.visitSimdLane(.f64x2ReplaceLane, lane: lane) }
+    case "i8x16.eq": return { return try $0.visitSimd(.i8x16Eq) }
+    case "i8x16.ne": return { return try $0.visitSimd(.i8x16Ne) }
+    case "i8x16.lt_s": return { return try $0.visitSimd(.i8x16LtS) }
+    case "i8x16.lt_u": return { return try $0.visitSimd(.i8x16LtU) }
+    case "i8x16.gt_s": return { return try $0.visitSimd(.i8x16GtS) }
+    case "i8x16.gt_u": return { return try $0.visitSimd(.i8x16GtU) }
+    case "i8x16.le_s": return { return try $0.visitSimd(.i8x16LeS) }
+    case "i8x16.le_u": return { return try $0.visitSimd(.i8x16LeU) }
+    case "i8x16.ge_s": return { return try $0.visitSimd(.i8x16GeS) }
+    case "i8x16.ge_u": return { return try $0.visitSimd(.i8x16GeU) }
+    case "i16x8.eq": return { return try $0.visitSimd(.i16x8Eq) }
+    case "i16x8.ne": return { return try $0.visitSimd(.i16x8Ne) }
+    case "i16x8.lt_s": return { return try $0.visitSimd(.i16x8LtS) }
+    case "i16x8.lt_u": return { return try $0.visitSimd(.i16x8LtU) }
+    case "i16x8.gt_s": return { return try $0.visitSimd(.i16x8GtS) }
+    case "i16x8.gt_u": return { return try $0.visitSimd(.i16x8GtU) }
+    case "i16x8.le_s": return { return try $0.visitSimd(.i16x8LeS) }
+    case "i16x8.le_u": return { return try $0.visitSimd(.i16x8LeU) }
+    case "i16x8.ge_s": return { return try $0.visitSimd(.i16x8GeS) }
+    case "i16x8.ge_u": return { return try $0.visitSimd(.i16x8GeU) }
+    case "i32x4.eq": return { return try $0.visitSimd(.i32x4Eq) }
+    case "i32x4.ne": return { return try $0.visitSimd(.i32x4Ne) }
+    case "i32x4.lt_s": return { return try $0.visitSimd(.i32x4LtS) }
+    case "i32x4.lt_u": return { return try $0.visitSimd(.i32x4LtU) }
+    case "i32x4.gt_s": return { return try $0.visitSimd(.i32x4GtS) }
+    case "i32x4.gt_u": return { return try $0.visitSimd(.i32x4GtU) }
+    case "i32x4.le_s": return { return try $0.visitSimd(.i32x4LeS) }
+    case "i32x4.le_u": return { return try $0.visitSimd(.i32x4LeU) }
+    case "i32x4.ge_s": return { return try $0.visitSimd(.i32x4GeS) }
+    case "i32x4.ge_u": return { return try $0.visitSimd(.i32x4GeU) }
+    case "f32x4.eq": return { return try $0.visitSimd(.f32x4Eq) }
+    case "f32x4.ne": return { return try $0.visitSimd(.f32x4Ne) }
+    case "f32x4.lt": return { return try $0.visitSimd(.f32x4Lt) }
+    case "f32x4.gt": return { return try $0.visitSimd(.f32x4Gt) }
+    case "f32x4.le": return { return try $0.visitSimd(.f32x4Le) }
+    case "f32x4.ge": return { return try $0.visitSimd(.f32x4Ge) }
+    case "f64x2.eq": return { return try $0.visitSimd(.f64x2Eq) }
+    case "f64x2.ne": return { return try $0.visitSimd(.f64x2Ne) }
+    case "f64x2.lt": return { return try $0.visitSimd(.f64x2Lt) }
+    case "f64x2.gt": return { return try $0.visitSimd(.f64x2Gt) }
+    case "f64x2.le": return { return try $0.visitSimd(.f64x2Le) }
+    case "f64x2.ge": return { return try $0.visitSimd(.f64x2Ge) }
+    case "v128.not": return { return try $0.visitSimd(.v128Not) }
+    case "v128.and": return { return try $0.visitSimd(.v128And) }
+    case "v128.andnot": return { return try $0.visitSimd(.v128Andnot) }
+    case "v128.or": return { return try $0.visitSimd(.v128Or) }
+    case "v128.xor": return { return try $0.visitSimd(.v128Xor) }
+    case "v128.bitselect": return { return try $0.visitSimd(.v128Bitselect) }
+    case "i8x16.abs": return { return try $0.visitSimd(.i8x16Abs) }
+    case "i8x16.neg": return { return try $0.visitSimd(.i8x16Neg) }
+    case "i8x16.all_true": return { return try $0.visitSimd(.i8x16AllTrue) }
+    case "i8x16.bitmask": return { return try $0.visitSimd(.i8x16Bitmask) }
+    case "i8x16.narrow_i16x8_s": return { return try $0.visitSimd(.i8x16NarrowI16X8S) }
+    case "i8x16.narrow_i16x8_u": return { return try $0.visitSimd(.i8x16NarrowI16X8U) }
+    case "i8x16.shl": return { return try $0.visitSimd(.i8x16Shl) }
+    case "i8x16.shr_s": return { return try $0.visitSimd(.i8x16ShrS) }
+    case "i8x16.shr_u": return { return try $0.visitSimd(.i8x16ShrU) }
+    case "i8x16.add": return { return try $0.visitSimd(.i8x16Add) }
+    case "i8x16.add_sat_s": return { return try $0.visitSimd(.i8x16AddSatS) }
+    case "i8x16.add_sat_u": return { return try $0.visitSimd(.i8x16AddSatU) }
+    case "i8x16.sub": return { return try $0.visitSimd(.i8x16Sub) }
+    case "i8x16.sub_sat_s": return { return try $0.visitSimd(.i8x16SubSatS) }
+    case "i8x16.sub_sat_u": return { return try $0.visitSimd(.i8x16SubSatU) }
+    case "i8x16.min_s": return { return try $0.visitSimd(.i8x16MinS) }
+    case "i8x16.min_u": return { return try $0.visitSimd(.i8x16MinU) }
+    case "i8x16.max_s": return { return try $0.visitSimd(.i8x16MaxS) }
+    case "i8x16.max_u": return { return try $0.visitSimd(.i8x16MaxU) }
+    case "i8x16.avgr_u": return { return try $0.visitSimd(.i8x16AvgrU) }
+    case "i16x8.abs": return { return try $0.visitSimd(.i16x8Abs) }
+    case "i16x8.neg": return { return try $0.visitSimd(.i16x8Neg) }
+    case "i16x8.all_true": return { return try $0.visitSimd(.i16x8AllTrue) }
+    case "i16x8.bitmask": return { return try $0.visitSimd(.i16x8Bitmask) }
+    case "i16x8.narrow_i32x4_s": return { return try $0.visitSimd(.i16x8NarrowI32X4S) }
+    case "i16x8.narrow_i32x4_u": return { return try $0.visitSimd(.i16x8NarrowI32X4U) }
+    case "i16x8.extend_low_i8x16_s": return { return try $0.visitSimd(.i16x8ExtendLowI8X16S) }
+    case "i16x8.extend_high_i8x16_s": return { return try $0.visitSimd(.i16x8ExtendHighI8X16S) }
+    case "i16x8.extend_low_i8x16_u": return { return try $0.visitSimd(.i16x8ExtendLowI8X16U) }
+    case "i16x8.extend_high_i8x16_u": return { return try $0.visitSimd(.i16x8ExtendHighI8X16U) }
+    case "i16x8.shl": return { return try $0.visitSimd(.i16x8Shl) }
+    case "i16x8.shr_s": return { return try $0.visitSimd(.i16x8ShrS) }
+    case "i16x8.shr_u": return { return try $0.visitSimd(.i16x8ShrU) }
+    case "i16x8.add": return { return try $0.visitSimd(.i16x8Add) }
+    case "i16x8.add_sat_s": return { return try $0.visitSimd(.i16x8AddSatS) }
+    case "i16x8.add_sat_u": return { return try $0.visitSimd(.i16x8AddSatU) }
+    case "i16x8.sub": return { return try $0.visitSimd(.i16x8Sub) }
+    case "i16x8.sub_sat_s": return { return try $0.visitSimd(.i16x8SubSatS) }
+    case "i16x8.sub_sat_u": return { return try $0.visitSimd(.i16x8SubSatU) }
+    case "i16x8.mul": return { return try $0.visitSimd(.i16x8Mul) }
+    case "i16x8.min_s": return { return try $0.visitSimd(.i16x8MinS) }
+    case "i16x8.min_u": return { return try $0.visitSimd(.i16x8MinU) }
+    case "i16x8.max_s": return { return try $0.visitSimd(.i16x8MaxS) }
+    case "i16x8.max_u": return { return try $0.visitSimd(.i16x8MaxU) }
+    case "i16x8.avgr_u": return { return try $0.visitSimd(.i16x8AvgrU) }
+    case "i32x4.abs": return { return try $0.visitSimd(.i32x4Abs) }
+    case "i32x4.neg": return { return try $0.visitSimd(.i32x4Neg) }
+    case "i32x4.all_true": return { return try $0.visitSimd(.i32x4AllTrue) }
+    case "i32x4.bitmask": return { return try $0.visitSimd(.i32x4Bitmask) }
+    case "i32x4.extend_low_i16x8_s": return { return try $0.visitSimd(.i32x4ExtendLowI16X8S) }
+    case "i32x4.extend_high_i16x8_s": return { return try $0.visitSimd(.i32x4ExtendHighI16X8S) }
+    case "i32x4.extend_low_i16x8_u": return { return try $0.visitSimd(.i32x4ExtendLowI16X8U) }
+    case "i32x4.extend_high_i16x8_u": return { return try $0.visitSimd(.i32x4ExtendHighI16X8U) }
+    case "i32x4.shl": return { return try $0.visitSimd(.i32x4Shl) }
+    case "i32x4.shr_s": return { return try $0.visitSimd(.i32x4ShrS) }
+    case "i32x4.shr_u": return { return try $0.visitSimd(.i32x4ShrU) }
+    case "i32x4.add": return { return try $0.visitSimd(.i32x4Add) }
+    case "i32x4.sub": return { return try $0.visitSimd(.i32x4Sub) }
+    case "i32x4.mul": return { return try $0.visitSimd(.i32x4Mul) }
+    case "i32x4.min_s": return { return try $0.visitSimd(.i32x4MinS) }
+    case "i32x4.min_u": return { return try $0.visitSimd(.i32x4MinU) }
+    case "i32x4.max_s": return { return try $0.visitSimd(.i32x4MaxS) }
+    case "i32x4.max_u": return { return try $0.visitSimd(.i32x4MaxU) }
+    case "i32x4.dot_i16x8_s": return { return try $0.visitSimd(.i32x4DotI16X8S) }
+    case "i64x2.abs": return { return try $0.visitSimd(.i64x2Abs) }
+    case "i64x2.neg": return { return try $0.visitSimd(.i64x2Neg) }
+    case "i64x2.bitmask": return { return try $0.visitSimd(.i64x2Bitmask) }
+    case "i64x2.extend_low_i32x4_s": return { return try $0.visitSimd(.i64x2ExtendLowI32X4S) }
+    case "i64x2.extend_high_i32x4_s": return { return try $0.visitSimd(.i64x2ExtendHighI32X4S) }
+    case "i64x2.extend_low_i32x4_u": return { return try $0.visitSimd(.i64x2ExtendLowI32X4U) }
+    case "i64x2.extend_high_i32x4_u": return { return try $0.visitSimd(.i64x2ExtendHighI32X4U) }
+    case "i64x2.shl": return { return try $0.visitSimd(.i64x2Shl) }
+    case "i64x2.shr_s": return { return try $0.visitSimd(.i64x2ShrS) }
+    case "i64x2.shr_u": return { return try $0.visitSimd(.i64x2ShrU) }
+    case "i64x2.add": return { return try $0.visitSimd(.i64x2Add) }
+    case "i64x2.sub": return { return try $0.visitSimd(.i64x2Sub) }
+    case "i64x2.mul": return { return try $0.visitSimd(.i64x2Mul) }
+    case "f32x4.ceil": return { return try $0.visitSimd(.f32x4Ceil) }
+    case "f32x4.floor": return { return try $0.visitSimd(.f32x4Floor) }
+    case "f32x4.trunc": return { return try $0.visitSimd(.f32x4Trunc) }
+    case "f32x4.nearest": return { return try $0.visitSimd(.f32x4Nearest) }
+    case "f64x2.ceil": return { return try $0.visitSimd(.f64x2Ceil) }
+    case "f64x2.floor": return { return try $0.visitSimd(.f64x2Floor) }
+    case "f64x2.trunc": return { return try $0.visitSimd(.f64x2Trunc) }
+    case "f64x2.nearest": return { return try $0.visitSimd(.f64x2Nearest) }
+    case "f32x4.abs": return { return try $0.visitSimd(.f32x4Abs) }
+    case "f32x4.neg": return { return try $0.visitSimd(.f32x4Neg) }
+    case "f32x4.sqrt": return { return try $0.visitSimd(.f32x4Sqrt) }
+    case "f32x4.add": return { return try $0.visitSimd(.f32x4Add) }
+    case "f32x4.sub": return { return try $0.visitSimd(.f32x4Sub) }
+    case "f32x4.mul": return { return try $0.visitSimd(.f32x4Mul) }
+    case "f32x4.div": return { return try $0.visitSimd(.f32x4Div) }
+    case "f32x4.min": return { return try $0.visitSimd(.f32x4Min) }
+    case "f32x4.max": return { return try $0.visitSimd(.f32x4Max) }
+    case "f32x4.pmin": return { return try $0.visitSimd(.f32x4Pmin) }
+    case "f32x4.pmax": return { return try $0.visitSimd(.f32x4Pmax) }
+    case "f64x2.abs": return { return try $0.visitSimd(.f64x2Abs) }
+    case "f64x2.neg": return { return try $0.visitSimd(.f64x2Neg) }
+    case "f64x2.sqrt": return { return try $0.visitSimd(.f64x2Sqrt) }
+    case "f64x2.add": return { return try $0.visitSimd(.f64x2Add) }
+    case "f64x2.sub": return { return try $0.visitSimd(.f64x2Sub) }
+    case "f64x2.mul": return { return try $0.visitSimd(.f64x2Mul) }
+    case "f64x2.div": return { return try $0.visitSimd(.f64x2Div) }
+    case "f64x2.min": return { return try $0.visitSimd(.f64x2Min) }
+    case "f64x2.max": return { return try $0.visitSimd(.f64x2Max) }
+    case "f64x2.pmin": return { return try $0.visitSimd(.f64x2Pmin) }
+    case "f64x2.pmax": return { return try $0.visitSimd(.f64x2Pmax) }
+    case "i32x4.trunc_sat_f32x4_s": return { return try $0.visitSimd(.i32x4TruncSatF32X4S) }
+    case "i32x4.trunc_sat_f32x4_u": return { return try $0.visitSimd(.i32x4TruncSatF32X4U) }
+    case "f32x4.convert_i32x4_s": return { return try $0.visitSimd(.f32x4ConvertI32X4S) }
+    case "f32x4.convert_i32x4_u": return { return try $0.visitSimd(.f32x4ConvertI32X4U) }
+    case "v128.load32_zero":
+        let (memarg) = try expressionParser.visitLoad(.v128Load32Zero, wat: &wat)
+        return { return try $0.visitLoad(.v128Load32Zero, memarg: memarg) }
+    case "v128.load64_zero":
+        let (memarg) = try expressionParser.visitLoad(.v128Load64Zero, wat: &wat)
+        return { return try $0.visitLoad(.v128Load64Zero, memarg: memarg) }
+    case "i16x8.extmul_low_i8x16_s": return { return try $0.visitSimd(.i16x8ExtmulLowI8X16S) }
+    case "i16x8.extmul_high_i8x16_s": return { return try $0.visitSimd(.i16x8ExtmulHighI8X16S) }
+    case "i16x8.extmul_low_i8x16_u": return { return try $0.visitSimd(.i16x8ExtmulLowI8X16U) }
+    case "i16x8.extmul_high_i8x16_u": return { return try $0.visitSimd(.i16x8ExtmulHighI8X16U) }
+    case "i32x4.extmul_low_i16x8_s": return { return try $0.visitSimd(.i32x4ExtmulLowI16X8S) }
+    case "i32x4.extmul_high_i16x8_s": return { return try $0.visitSimd(.i32x4ExtmulHighI16X8S) }
+    case "i32x4.extmul_low_i16x8_u": return { return try $0.visitSimd(.i32x4ExtmulLowI16X8U) }
+    case "i32x4.extmul_high_i16x8_u": return { return try $0.visitSimd(.i32x4ExtmulHighI16X8U) }
+    case "i64x2.extmul_low_i32x4_s": return { return try $0.visitSimd(.i64x2ExtmulLowI32X4S) }
+    case "i64x2.extmul_high_i32x4_s": return { return try $0.visitSimd(.i64x2ExtmulHighI32X4S) }
+    case "i64x2.extmul_low_i32x4_u": return { return try $0.visitSimd(.i64x2ExtmulLowI32X4U) }
+    case "i64x2.extmul_high_i32x4_u": return { return try $0.visitSimd(.i64x2ExtmulHighI32X4U) }
+    case "i16x8.q15mulr_sat_s": return { return try $0.visitSimd(.i16x8Q15MulrSatS) }
+    case "v128.any_true": return { return try $0.visitSimd(.v128AnyTrue) }
+    case "v128.load8_lane":
+        let (memarg, lane) = try expressionParser.visitSimdMemLane(.v128Load8Lane, wat: &wat)
+        return { return try $0.visitSimdMemLane(.v128Load8Lane, memarg: memarg, lane: lane) }
+    case "v128.load16_lane":
+        let (memarg, lane) = try expressionParser.visitSimdMemLane(.v128Load16Lane, wat: &wat)
+        return { return try $0.visitSimdMemLane(.v128Load16Lane, memarg: memarg, lane: lane) }
+    case "v128.load32_lane":
+        let (memarg, lane) = try expressionParser.visitSimdMemLane(.v128Load32Lane, wat: &wat)
+        return { return try $0.visitSimdMemLane(.v128Load32Lane, memarg: memarg, lane: lane) }
+    case "v128.load64_lane":
+        let (memarg, lane) = try expressionParser.visitSimdMemLane(.v128Load64Lane, wat: &wat)
+        return { return try $0.visitSimdMemLane(.v128Load64Lane, memarg: memarg, lane: lane) }
+    case "v128.store8_lane":
+        let (memarg, lane) = try expressionParser.visitSimdMemLane(.v128Store8Lane, wat: &wat)
+        return { return try $0.visitSimdMemLane(.v128Store8Lane, memarg: memarg, lane: lane) }
+    case "v128.store16_lane":
+        let (memarg, lane) = try expressionParser.visitSimdMemLane(.v128Store16Lane, wat: &wat)
+        return { return try $0.visitSimdMemLane(.v128Store16Lane, memarg: memarg, lane: lane) }
+    case "v128.store32_lane":
+        let (memarg, lane) = try expressionParser.visitSimdMemLane(.v128Store32Lane, wat: &wat)
+        return { return try $0.visitSimdMemLane(.v128Store32Lane, memarg: memarg, lane: lane) }
+    case "v128.store64_lane":
+        let (memarg, lane) = try expressionParser.visitSimdMemLane(.v128Store64Lane, wat: &wat)
+        return { return try $0.visitSimdMemLane(.v128Store64Lane, memarg: memarg, lane: lane) }
+    case "i64x2.eq": return { return try $0.visitSimd(.i64x2Eq) }
+    case "i64x2.ne": return { return try $0.visitSimd(.i64x2Ne) }
+    case "i64x2.lt_s": return { return try $0.visitSimd(.i64x2LtS) }
+    case "i64x2.gt_s": return { return try $0.visitSimd(.i64x2GtS) }
+    case "i64x2.le_s": return { return try $0.visitSimd(.i64x2LeS) }
+    case "i64x2.ge_s": return { return try $0.visitSimd(.i64x2GeS) }
+    case "i64x2.all_true": return { return try $0.visitSimd(.i64x2AllTrue) }
+    case "f64x2.convert_low_i32x4_s": return { return try $0.visitSimd(.f64x2ConvertLowI32X4S) }
+    case "f64x2.convert_low_i32x4_u": return { return try $0.visitSimd(.f64x2ConvertLowI32X4U) }
+    case "i32x4.trunc_sat_f64x2_s_zero": return { return try $0.visitSimd(.i32x4TruncSatF64X2SZero) }
+    case "i32x4.trunc_sat_f64x2_u_zero": return { return try $0.visitSimd(.i32x4TruncSatF64X2UZero) }
+    case "f32x4.demote_f64x2_zero": return { return try $0.visitSimd(.f32x4DemoteF64X2Zero) }
+    case "f64x2.promote_low_f32x4": return { return try $0.visitSimd(.f64x2PromoteLowF32X4) }
+    case "i8x16.popcnt": return { return try $0.visitSimd(.i8x16Popcnt) }
+    case "i16x8.extadd_pairwise_i8x16_s": return { return try $0.visitSimd(.i16x8ExtaddPairwiseI8X16S) }
+    case "i16x8.extadd_pairwise_i8x16_u": return { return try $0.visitSimd(.i16x8ExtaddPairwiseI8X16U) }
+    case "i32x4.extadd_pairwise_i16x8_s": return { return try $0.visitSimd(.i32x4ExtaddPairwiseI16X8S) }
+    case "i32x4.extadd_pairwise_i16x8_u": return { return try $0.visitSimd(.i32x4ExtaddPairwiseI16X8U) }
     default: return nil
     }
 }

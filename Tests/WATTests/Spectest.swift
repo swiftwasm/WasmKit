@@ -33,6 +33,10 @@ enum Spectest {
                     return nil
                 }
                 guard !filePath.lastPathComponent.starts(with: "simd_") else { return nil }
+                #if WASMKIT_CI_TOOLCHAIN_MAIN_NIGHTLY
+                    // https://github.com/swiftwasm/WasmKit/issues/242
+                    guard !filePath.path.hasSuffix("Vendor/testsuite/const.wast") else { return nil }
+                #endif
                 if !include.isEmpty {
                     guard include.contains(filePath.lastPathComponent) else { return nil }
                 } else {

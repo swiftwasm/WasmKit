@@ -33,6 +33,10 @@ struct ValidationError: Error, CustomStringConvertible {
 }
 
 extension ValidationError.Message {
+    static var simdNotSupported: Self {
+        Self("SIMD is not supported")
+    }
+
     static func invalidMemArgAlignment(memarg: MemArg, naturalAlignment: Int) -> Self {
         Self("alignment 2**\(memarg.align) is out of limit \(naturalAlignment)")
     }

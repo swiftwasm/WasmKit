@@ -196,11 +196,14 @@ public struct WasmFeatureSet: OptionSet, Sendable {
     /// The WebAssembly tail-call proposal
     @_alwaysEmitIntoClient
     public static var tailCall: WasmFeatureSet { WasmFeatureSet(rawValue: 1 << 3) }
+    /// The WebAssembly SIMD proposal
+    @_alwaysEmitIntoClient
+    public static var simd: WasmFeatureSet { WasmFeatureSet(rawValue: 1 << 4) }
 
     /// The default feature set
     public static let `default`: WasmFeatureSet = [.referenceTypes]
     /// The feature set with all features enabled
-    public static let all: WasmFeatureSet = [.memory64, .referenceTypes, .threads, .tailCall]
+    public static let all: WasmFeatureSet = [.memory64, .referenceTypes, .threads, .tailCall, .simd]
 }
 
 /// An error that occurs during parsing of a WebAssembly binary
@@ -447,7 +450,7 @@ extension Parser {
         case 0x7E: return .i64
         case 0x7D: return .f32
         case 0x7C: return .f64
-        case 0x7B: return .f64
+        case 0x7B: return .v128
         default:
             guard let refType = try parseReferenceType(byte: b) else {
                 throw makeError(.malformedValueType(b))
@@ -848,6 +851,20 @@ extension Parser: BinaryInstructionDecoder {
     @inlinable mutating func visitI64AtomicRmw8CmpxchgU() throws -> MemArg { try parseMemarg() }
     @inlinable mutating func visitI64AtomicRmw16CmpxchgU() throws -> MemArg { try parseMemarg() }
     @inlinable mutating func visitI64AtomicRmw32CmpxchgU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitV128Const() throws -> V128 {
+        return V128(bytes: Array(try stream.consume(count: V128.byteCount)))
+    }
+    @inlinable mutating func visitI8x16Shuffle() throws -> V128ShuffleMask {
+        return V128ShuffleMask(lanes: Array(try stream.consume(count: V128ShuffleMask.laneCount)))
+    }
+    @inlinable mutating func visitSimdLane(_: Instruction.SimdLane) throws -> UInt8 {
+        return try stream.consumeAny()
+    }
+    @inlinable mutating func visitSimdMemLane(_: Instruction.SimdMemLane) throws -> (memarg: MemArg, lane: UInt8) {
+        let memarg = try parseMemarg()
+        let lane = try stream.consumeAny()
+        return (memarg: memarg, lane: lane)
+    }
     @inlinable func claimNextByte() throws -> UInt8 {
         return try stream.consumeAny()
     }

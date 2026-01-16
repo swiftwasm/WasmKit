@@ -244,9 +244,7 @@ package struct Run: AsyncParsableCommand {
         let environment = environment.reduce(into: [String: String]()) {
             $0[$1.key] = $1.value
         }
-        let preopens = directories.reduce(into: [String: String]()) {
-            $0[$1] = $1
-        }
+        let preopens = directories.map { WASIBridgeToHost.Preopen(guestPath: $0, hostPath: $0) }
         let wasi = try WASIBridgeToHost(args: [path] + arguments, environment: environment, preopens: preopens)
         let engine = Engine(configuration: deriveRuntimeConfiguration(), interceptor: interceptor)
         let store = Store(engine: engine)

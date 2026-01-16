@@ -522,6 +522,14 @@ struct ExpressionEncoder: BinaryInstructionEncoder {
         encodeUnsigned(UInt(memarg.align))
         encodeUnsigned(memarg.offset)
     }
+    mutating func encodeImmediates(lane: UInt8) throws { encoder.output.append(lane) }
+    mutating func encodeImmediates(memarg: WasmParser.MemArg, lane: UInt8) throws {
+        try encodeImmediates(memarg: memarg)
+        try encodeImmediates(lane: lane)
+    }
+    mutating func encodeImmediates(lanes: WasmTypes.V128ShuffleMask) throws {
+        encoder.output.append(contentsOf: lanes.lanes)
+    }
     mutating func encodeImmediates(memory: UInt32) throws { encodeUnsigned(memory) }
     mutating func encodeImmediates(relativeDepth: UInt32) throws { encodeUnsigned(relativeDepth) }
     mutating func encodeImmediates(table: UInt32) throws { encodeUnsigned(table) }
@@ -535,6 +543,7 @@ struct ExpressionEncoder: BinaryInstructionEncoder {
     mutating func encodeImmediates(type: WasmTypes.HeapType) throws { encoder.encode(type) }
     mutating func encodeImmediates(value: Int32) throws { encodeSigned(value) }
     mutating func encodeImmediates(value: Int64) throws { encodeSigned(value) }
+    mutating func encodeImmediates(value: WasmTypes.V128) throws { encoder.output.append(contentsOf: value.bytes) }
     mutating func encodeImmediates(value: WasmParser.IEEE754.Float32) throws { encodeFixedWidth(value.bitPattern) }
     mutating func encodeImmediates(value: WasmParser.IEEE754.Float64) throws { encodeFixedWidth(value.bitPattern) }
     mutating func encodeImmediates(dstMem: UInt32, srcMem: UInt32) throws {
