@@ -32,7 +32,8 @@ let package = Package(
         .library(name: "_CabiShims", targets: ["_CabiShims"]),
     ],
     traits: [
-        .default(enabledTraits: []),
+        .default(enabledTraits: ["ComponentModel"]),
+        "ComponentModel",
         "WasmDebuggingSupport",
     ],
     targets: [
@@ -68,7 +69,7 @@ let package = Package(
         .target(
             name: "WAT",
             dependencies: [
-                "ComponentModel",
+                .target(name: "ComponentModel", condition: .when(traits: ["ComponentModel"])),
                 "WasmParser",
             ],
             exclude: ["CMakeLists.txt"]

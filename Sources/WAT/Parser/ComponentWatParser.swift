@@ -1,3 +1,5 @@
+#if ComponentModel
+
 import ComponentModel
 import WasmParser
 
@@ -53,6 +55,9 @@ struct ComponentWatParser {
                             instantiateArguments.append(try self.parseModuleInstanceArguments())
                             try parser.expect(.rightParen)
                         }
+
+                        try parser.expect(.rightParen)
+
                         componentDefs.append(
                             .coreInstance(
                             CoreInstanceDef(
@@ -66,6 +71,10 @@ struct ComponentWatParser {
                             location: parser.lexer.location()
                         )
                     }
+                case "func":
+                    print("got func!")
+                    let id = try parser.takeId()
+                    componentDefs.append(.function(FunctionDef(id: id)))
                 default:
                     throw WatParserError(
                         "Unknown component definition keyword \(componentDefKeyword)",
@@ -79,7 +88,10 @@ struct ComponentWatParser {
             fatalError()
         }
 
-        try parser.expect(.rightParen)
+        // Check if the parser has reached the end of the function body
+        guard try parser.isEndOfParen() else {
+            throw WatParserError("unexpected token", location: parser.lexer.location())
+        }
 
         return field
     }
@@ -130,7 +142,7 @@ struct ComponentWatParser {
         case "type": return .type
         case "component": return .component
         case "instance": return .instance
-            
+
         default:
             throw WatParserError(
                 "Unexpected component declaration sort `\(rawKeyword)",
@@ -147,6 +159,7 @@ extension ComponentWatParser {
         case coreType(WatParser.FunctionType)
         case component(ComponentDef)
         case instance(ComponentInstanceDef)
+        case function(FunctionDef)
     }
 
     struct FunctionDef: NamedModuleFieldDecl {
@@ -172,7 +185,7 @@ extension ComponentWatParser {
 
     struct ModuleDef: NamedModuleFieldDecl {
         var id: Name?
-        let wat: Wat
+        var wat: Wat
     }
 
     struct CoreInstanceDef: NamedModuleFieldDecl {
@@ -180,7 +193,7 @@ extension ComponentWatParser {
             enum Kind {
                 struct Export {
                     let name: String
-                    let sort: CoreDeclSort
+                    let sort: CoreDefSort
                     let index: UInt32
                 }
                 case instance(Parser.IndexOrId)
@@ -196,3 +209,5 @@ extension ComponentWatParser {
         var arguments: [Argument]
     }
 }
+
+#endif
