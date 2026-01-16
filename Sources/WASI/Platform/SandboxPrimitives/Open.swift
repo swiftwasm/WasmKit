@@ -26,6 +26,7 @@ struct PathResolution {
     private let options: FileDescriptor.OpenOptions
     private let permissions: FilePermissions
 
+    private let startFd: FileDescriptor
     private var baseFd: FileDescriptor
     private let path: FilePath
     private var openDirectories: [FileDescriptor]
@@ -52,6 +53,7 @@ struct PathResolution {
         permissions: FilePermissions,
         path: FilePath
     ) {
+        self.startFd = baseDirFd
         self.baseFd = baseDirFd
         self.mode = mode
         self.options = options
@@ -59,6 +61,29 @@ struct PathResolution {
         self.path = path
         self.openDirectories = []
         self.components = FilePath.ComponentView(path.components.reversed())
+    }
+
+    mutating func cleanup(keeping keptFd: FileDescriptor?) {
+        var keepRawValues = Set<CInt>()
+        keepRawValues.insert(startFd.rawValue)
+        if let keptFd {
+            keepRawValues.insert(keptFd.rawValue)
+        }
+
+        var closedRawValues = Set<CInt>()
+        func closeIfNeeded(_ fd: FileDescriptor) {
+            let rawValue = fd.rawValue
+            guard !keepRawValues.contains(rawValue) else { return }
+            guard !closedRawValues.contains(rawValue) else { return }
+            closedRawValues.insert(rawValue)
+            try? fd.close()
+        }
+
+        closeIfNeeded(baseFd)
+        for fd in openDirectories {
+            closeIfNeeded(fd)
+        }
+        openDirectories.removeAll(keepingCapacity: false)
     }
 
     mutating func parentDirectory() throws {
@@ -182,6 +207,9 @@ struct PathResolution {
     #endif
 
     mutating func resolve() throws -> FileDescriptor {
+        var resultFd: FileDescriptor? = nil
+        defer { cleanup(keeping: resultFd) }
+
         if path.isAbsolute {
             // POSIX openat(2) interprets absolute path ignoring base directory fd
             // but it leads sandbox-escaping, so reject absolute path here.
@@ -197,6 +225,7 @@ struct PathResolution {
             case .regular: try regular(component: component)
             }
         }
+        resultFd = self.baseFd
         return self.baseFd
     }
 }

@@ -26,6 +26,9 @@ extension SandboxPrimitives {
         #if os(Windows) || os(WASI)
             throw WASIAbi.Errno.ENOTSUP
         #else
+            let initialBufferCapacity = 256
+            let maxBufferCapacity = max(initialBufferCapacity, Int(PATH_MAX))
+
             let (dir, basename) = try openParent(start: start, path: path)
             defer {
                 if dir.rawValue != start.rawValue {
@@ -34,7 +37,7 @@ extension SandboxPrimitives {
             }
 
             return try basename.withCString { cBasename in
-                var capacity = 256
+                var capacity = min(initialBufferCapacity, maxBufferCapacity)
                 while true {
                     var buffer = [UInt8](repeating: 0, count: capacity)
                     let count = try buffer.withUnsafeMutableBytes { rawBuffer -> Int in
@@ -49,13 +52,12 @@ extension SandboxPrimitives {
                         return written
                     }
 
-                    if count < capacity || capacity >= 65536 {
+                    if count < capacity || capacity == maxBufferCapacity {
                         return Array(buffer.prefix(count))
                     }
-                    capacity &*= 2
+                    capacity = min(capacity * 2, maxBufferCapacity)
                 }
             }
         #endif
     }
 }
-
