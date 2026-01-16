@@ -191,12 +191,17 @@ struct IntegrationTests {
 
         let suitePath = path.deletingLastPathComponent()
 
+        let preopens = (manifest.dirs ?? []).map {
+            WASIBridgeToHost.Preopen(
+                guestPath: $0,
+                hostPath: suitePath.appendingPathComponent($0).path
+            )
+        }
+
         let wasi = try WASIBridgeToHost(
             args: [path.path] + (manifest.args ?? []),
             environment: manifest.env ?? [:],
-            preopens: (manifest.dirs ?? []).reduce(into: [String: String]()) {
-                $0[$1] = suitePath.appendingPathComponent($1).path
-            }
+            preopens: preopens
         )
         let engine = Engine()
         let store = Store(engine: engine)

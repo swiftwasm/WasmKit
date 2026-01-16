@@ -12,11 +12,24 @@ import SystemPackage
 /// let bridge = try WASIBridgeToHost(
 ///     args: ["program", "--flag"],
 ///     environment: ["PATH": "/usr/bin"],
-///     preopens: ["/sandbox": "/real/path"]
+///     preopens: [WASIBridgeToHost.Preopen(guestPath: "/sandbox", hostPath: "/real/path")]
 /// )
 /// ```
 public final class WASIBridgeToHost {
     internal let underlying: WASIImplementation
+
+    /// A preopened directory mapping from a guest path to a host path.
+    ///
+    /// The order of preopens can be observable via file descriptor assignment (starting at 3).
+    public struct Preopen: Sendable {
+        public let guestPath: String
+        public let hostPath: String
+
+        public init(guestPath: String, hostPath: String) {
+            self.guestPath = guestPath
+            self.hostPath = hostPath
+        }
+    }
 
     /// Configuration options for the file system implementation used by WASI.
     ///
@@ -68,15 +81,14 @@ public final class WASIBridgeToHost {
 
         /// Configures the file system options with preopens.
         ///
-        /// - Parameter preopens: A dictionary mapping guest paths to host paths. The keys are
-        ///   paths as seen by the WASI module, and the values are actual host file system paths.
-        ///   These directories will be pre-opened and made accessible to the WebAssembly module.
+        /// - Parameter preopens: An ordered list mapping guest paths to host paths. These
+        ///   directories will be pre-opened and made accessible to the WebAssembly module.
         /// - Returns: A new `FileSystemOptions` instance with the configured preopens.
-        public func withPreopens(_ preopens: [String: String]) -> FileSystemOptions {
+        public func withPreopens(_ preopens: [Preopen]) -> FileSystemOptions {
             var options = self
             options.initializePreopens = { fileSystem, fdTable in
-                for (guestPath, hostPath) in preopens {
-                    let dirEntry = try fileSystem.preopenDirectory(guestPath: guestPath, hostPath: hostPath)
+                for preopen in preopens {
+                    let dirEntry = try fileSystem.preopenDirectory(guestPath: preopen.guestPath, hostPath: preopen.hostPath)
                     _ = try fdTable.push(.directory(dirEntry))
                 }
             }
@@ -107,10 +119,52 @@ public final class WASIBridgeToHost {
     ///   - monotonicClock: Clock for monotonic time queries. Defaults to `SystemMonotonicClock()`.
     ///   - randomGenerator: Random number generator. Defaults to `SystemRandomNumberGenerator()`.
     /// - Throws: An error if the file system or preopens cannot be initialized.
+    @available(*, deprecated, message: "Use the ordered `preopens: [WASIBridgeToHost.Preopen]` initializer instead.")
     public convenience init(
         args: [String] = [],
         environment: [String: String] = [:],
         preopens: [String: String] = [:],
+        stdin: FileDescriptor = .standardInput,
+        stdout: FileDescriptor = .standardOutput,
+        stderr: FileDescriptor = .standardError,
+        wallClock: WallClock = SystemWallClock(),
+        monotonicClock: MonotonicClock = SystemMonotonicClock(),
+        randomGenerator: RandomBufferGenerator = SystemRandomNumberGenerator()
+    ) throws {
+        let preopens = preopens.map { Preopen(guestPath: $0.key, hostPath: $0.value) }
+        try self.init(
+            args: args,
+            environment: environment,
+            preopens: preopens,
+            stdin: stdin,
+            stdout: stdout,
+            stderr: stderr,
+            wallClock: wallClock,
+            monotonicClock: monotonicClock,
+            randomGenerator: randomGenerator
+        )
+    }
+
+    /// Creates a new WASI bridge with host file system access.
+    ///
+    /// This initializer takes an ordered list of preopens. The order can be observable
+    /// via file descriptor assignment (starting at 3).
+    ///
+    /// - Parameters:
+    ///   - args: Command-line arguments to pass to the WASI module. Defaults to an empty array.
+    ///   - environment: Environment variables to expose to the WASI module. Defaults to an empty dictionary.
+    ///   - preopens: Pre-opened directories mapping guest paths to host paths. Defaults to an empty array.
+    ///   - stdin: File descriptor for standard input. Defaults to `.standardInput`.
+    ///   - stdout: File descriptor for standard output. Defaults to `.standardOutput`.
+    ///   - stderr: File descriptor for standard error. Defaults to `.standardError`.
+    ///   - wallClock: Clock for wall-clock time queries. Defaults to `SystemWallClock()`.
+    ///   - monotonicClock: Clock for monotonic time queries. Defaults to `SystemMonotonicClock()`.
+    ///   - randomGenerator: Random number generator. Defaults to `SystemRandomNumberGenerator()`.
+    /// - Throws: An error if the file system or preopens cannot be initialized.
+    public convenience init(
+        args: [String] = [],
+        environment: [String: String] = [:],
+        preopens: [Preopen] = [],
         stdin: FileDescriptor = .standardInput,
         stdout: FileDescriptor = .standardOutput,
         stderr: FileDescriptor = .standardError,
