@@ -53,6 +53,10 @@ package struct TestCase: CustomStringConvertible {
             guard fileName != "names.wast" else { return false }
             // FIXME: Skip SIMD proposal tests for now
             guard !fileName.starts(with: "simd_") else { return false }
+            #if WASMKIT_CI_TOOLCHAIN_MAIN_NIGHTLY
+                // https://github.com/swiftwasm/WasmKit/issues/242
+                guard !filePath.path.hasSuffix("Vendor/testsuite/const.wast") else { return false }
+            #endif
 
             let patternPredicate = { pattern in filePath.path.hasSuffix(pattern) }
             if !include.isEmpty {
