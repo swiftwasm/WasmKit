@@ -49,6 +49,8 @@ protocol WASIDir: WASIEntry {
 
     var preopenPath: String? { get }
 
+    func readlink(atPath path: String) throws -> [UInt8]
+
     func openFile(
         symlinkFollow: Bool,
         path: String,

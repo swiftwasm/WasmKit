@@ -6,6 +6,14 @@ struct DirEntry {
 }
 
 extension DirEntry: WASIDir, FdWASIEntry {
+    func readlink(atPath path: String) throws -> [UInt8] {
+        #if os(Windows) || os(WASI)
+            throw WASIAbi.Errno.ENOTSUP
+        #else
+            return try SandboxPrimitives.readlinkAt(start: fd, path: path)
+        #endif
+    }
+
     func openFile(
         symlinkFollow: Bool,
         path: String,
