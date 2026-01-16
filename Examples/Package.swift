@@ -17,6 +17,10 @@ let package = Package(
             .product(name: "WasmKit", package: "WasmKit"),
             .product(name: "WAT", package: "WasmKit")
         ]),
+        .executableTarget(name: "StringPassing", dependencies: [
+            .product(name: "WasmKit", package: "WasmKit"),
+            .product(name: "WAT", package: "WasmKit")
+        ]),
         .executableTarget(name: "WASI-Hello", dependencies: [
             .product(name: "WasmKit", package: "WasmKit"),
             .product(name: "WasmKitWASI", package: "WasmKit"),
