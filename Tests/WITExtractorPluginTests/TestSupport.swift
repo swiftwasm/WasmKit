@@ -64,11 +64,6 @@ func assertSwiftPackage(fixturePackage: String, _ trailingArguments: [String]) t
             ([executable.path] + arguments).joined(separator: " ")
         }
 
-        func preview(_ string: String, limit: Int = 2_000) -> String {
-            if string.count <= limit { return string }
-            return String(string.prefix(limit)) + "\n… (truncated, total \(string.count) chars)"
-        }
-
         let swiftExecutable = config.hostSwiftExecutablePath
         let packagePath = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -100,10 +95,10 @@ func assertSwiftPackage(fixturePackage: String, _ trailingArguments: [String]) t
                     description: """
                     Failed to execute: \(command)
                     terminationStatus: \(process.terminationStatus)
-                    stdout (lossy utf8, first 2000 chars):
-                    \(preview(lossyUTF8(stdoutBytes)))
-                    stderr (lossy utf8, first 2000 chars):
-                    \(preview(lossyUTF8(stderrBytes)))
+                    stdout (lossy utf8):
+                    \(lossyUTF8(stdoutBytes))
+                    stderr (lossy utf8):
+                    \(lossyUTF8(stderrBytes))
                     """
                 )
             }
@@ -119,10 +114,10 @@ func assertSwiftPackage(fixturePackage: String, _ trailingArguments: [String]) t
                     description: """
                     Failed to decode JSON from swift stdout for: \(command)
                     decode error: \(error)
-                    stdout (lossy utf8, first 2000 chars):
-                    \(preview(lossyUTF8(stdoutBytes)))
-                    stderr (lossy utf8, first 2000 chars):
-                    \(preview(lossyUTF8(stderrBytes)))
+                    stdout (lossy utf8):
+                    \(lossyUTF8(stdoutBytes))
+                    stderr (lossy utf8):
+                    \(lossyUTF8(stderrBytes))
                     """
                 )
             }
