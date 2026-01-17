@@ -550,7 +550,7 @@ extension Parser {
         case 0x40:
             _ = try stream.consumeAny()
             return .empty
-        case 0x7C...0x7F, 0x70, 0x6F:
+        case 0x7B...0x7F, 0x70, 0x6F:
             return try .type(parseValueType())
         default:
             let rawIndex = try stream.parseVarSigned33()
