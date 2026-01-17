@@ -93,13 +93,13 @@ func assertSwiftPackage(fixturePackage: String, _ trailingArguments: [String]) t
             guard process.terminationStatus == 0 else {
                 throw TestSupport.Error(
                     description: """
-                    Failed to execute: \(command)
-                    terminationStatus: \(process.terminationStatus)
-                    stdout (lossy utf8):
-                    \(lossyUTF8(stdoutBytes))
-                    stderr (lossy utf8):
-                    \(lossyUTF8(stderrBytes))
-                    """
+                        Failed to execute: \(command)
+                        terminationStatus: \(process.terminationStatus)
+                        stdout (lossy utf8):
+                        \(lossyUTF8(stdoutBytes))
+                        stderr (lossy utf8):
+                        \(lossyUTF8(stderrBytes))
+                        """
                 )
             }
             struct Output: Codable {
@@ -112,13 +112,13 @@ func assertSwiftPackage(fixturePackage: String, _ trailingArguments: [String]) t
             } catch {
                 throw TestSupport.Error(
                     description: """
-                    Failed to decode JSON from swift stdout for: \(command)
-                    decode error: \(error)
-                    stdout (lossy utf8):
-                    \(lossyUTF8(stdoutBytes))
-                    stderr (lossy utf8):
-                    \(lossyUTF8(stderrBytes))
-                    """
+                        Failed to decode JSON from swift stdout for: \(command)
+                        decode error: \(error)
+                        stdout (lossy utf8):
+                        \(lossyUTF8(stdoutBytes))
+                        stderr (lossy utf8):
+                        \(lossyUTF8(stderrBytes))
+                        """
                 )
             }
             return try String(contentsOfFile: jsonOutput.witOutputPath)
