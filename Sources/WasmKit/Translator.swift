@@ -1823,11 +1823,11 @@ struct InstructionTranslator: InstructionVisitor {
 
         let value = ensureOnVReg(op)
         guard try controlStack.currentFrame().reachable else { return }
-        if !isTee, iseqBuilder.relinkLastInstructionResult(result) {
+        if type != .v128, !isTee, iseqBuilder.relinkLastInstructionResult(result) {
             // Good news, copyStack is optimized out :)
             return
         }
-        emitCopyStack(from: value, to: result)
+        emitCopyValueSlots(type, from: value, to: result)
     }
     mutating func visitLocalSet(localIndex: UInt32) throws -> Output {
         try visitLocalSetOrTee(localIndex: localIndex, isTee: false)
@@ -1930,6 +1930,23 @@ struct InstructionTranslator: InstructionVisitor {
             })
     }
 
+    private mutating func pop3PushEmit(
+        _ pops: (ValueType, ValueType, ValueType),
+        _ push: ValueType,
+        _ instruction: @escaping (_ popped: (VReg, VReg, VReg), _ result: VReg) -> Instruction
+    ) throws {
+        guard let pop1 = try popVRegOperand(pops.0),
+            let pop2 = try popVRegOperand(pops.1),
+            let pop3 = try popVRegOperand(pops.2)
+        else { return }
+        let result = valueStack.push(push)
+        emit(
+            instruction((pop1, pop2, pop3), result),
+            resultRelink: { result in
+                instruction((pop1, pop2, pop3), result)
+            })
+    }
+
     private mutating func visitLoad(
         _ memarg: MemArg,
         _ type: ValueType,
@@ -1977,7 +1994,23 @@ struct InstructionTranslator: InstructionVisitor {
         case .v128Load, .v128Load8X8S, .v128Load8X8U, .v128Load16X4S, .v128Load16X4U,
             .v128Load32X2S, .v128Load32X2U, .v128Load8Splat, .v128Load16Splat, .v128Load32Splat,
             .v128Load64Splat, .v128Load32Zero, .v128Load64Zero:
-            throw ValidationError(.simdNotSupported)
+            let isMemory64 = try module.isMemory64(memoryIndex: 0)
+            try validator.validateMemArg(memarg, naturalAlignment: load.naturalAlignment)
+            guard let opcode = SIMDOpcode.fromLoad(load) else { preconditionFailure("missing SIMDOpcode mapping: \(load)") }
+            try popPushEmit(.address(isMemory64: isMemory64), .v128) { pointer, result in
+                .simd(
+                    Instruction.SimdOperand(
+                        opcode: opcode.rawValue,
+                        lane: 0,
+                        reserved: 0,
+                        offset: memarg.offset,
+                        input0: pointer,
+                        input1: 0,
+                        input2: 0,
+                        result: result
+                    ))
+            }
+            return
         case .i32Load8S: instruction = Instruction.i32Load8S
         case .i32Load8U: instruction = Instruction.i32Load8U
         case .i32Load16S: instruction = Instruction.i32Load16S
@@ -2008,7 +2041,26 @@ struct InstructionTranslator: InstructionVisitor {
         case .f32Store: instruction = Instruction.f32Store
         case .f64Store: instruction = Instruction.f64Store
         case .v128Store:
-            throw ValidationError(.simdNotSupported)
+            let isMemory64 = try module.isMemory64(memoryIndex: 0)
+            try validator.validateMemArg(memarg, naturalAlignment: store.naturalAlignment)
+            guard let opcode = SIMDOpcode.fromStore(store) else { preconditionFailure("missing SIMDOpcode mapping: \(store)") }
+            let value = try popVRegOperand(.v128)
+            let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
+            if let value = value, let pointer = pointer {
+                emit(
+                    .simd(
+                        Instruction.SimdOperand(
+                            opcode: opcode.rawValue,
+                            lane: 0,
+                            reserved: 0,
+                            offset: memarg.offset,
+                            input0: pointer,
+                            input1: value,
+                            input2: 0,
+                            result: 0
+                        )))
+            }
+            return
         case .i32Store8: instruction = Instruction.i32Store8
         case .i32Store16: instruction = Instruction.i32Store16
         case .i64Store8: instruction = Instruction.i64Store8
@@ -2026,23 +2078,226 @@ struct InstructionTranslator: InstructionVisitor {
     }
 
     mutating func visitV128Const(value: V128) throws {
-        throw ValidationError(.simdNotSupported)
+        let storage = V128Storage(value)
+        pushEmit(.v128) { result in
+            .v128Const(.init(lo: storage.lo, hi: storage.hi, result: result))
+        }
     }
 
     mutating func visitI8x16Shuffle(lanes: V128ShuffleMask) throws {
-        throw ValidationError(.simdNotSupported)
+        for lane in lanes.lanes where lane >= 32 {
+            throw ValidationError(.invalidLaneIndex(lane: lane, laneCount: 32))
+        }
+        try pop2PushEmit((.v128, .v128), .v128) { popped, result in
+            let rhs = popped.0
+            let lhs = popped.1
+            let ls = lanes.lanes
+            precondition(ls.count == 16)
+            return .i8x16Shuffle(
+                .init(
+                    lane0: ls[0], lane1: ls[1], lane2: ls[2], lane3: ls[3],
+                    lane4: ls[4], lane5: ls[5], lane6: ls[6], lane7: ls[7],
+                    lane8: ls[8], lane9: ls[9], lane10: ls[10], lane11: ls[11],
+                    lane12: ls[12], lane13: ls[13], lane14: ls[14], lane15: ls[15],
+                    lhs: lhs, rhs: rhs, result: result
+                ))
+        }
     }
 
     mutating func visitSimd(_ simd: WasmParser.Instruction.Simd) throws {
-        throw ValidationError(.simdNotSupported)
+        guard let opcode = SIMDOpcode.fromSimd(simd) else { preconditionFailure("missing SIMDOpcode mapping: \(simd)") }
+        func emitUnaryV128() throws {
+            try popPushEmit(.v128, .v128) { v0, result in
+                .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: v0, input1: 0, input2: 0, result: result))
+            }
+        }
+        func emitBinaryV128() throws {
+            try pop2PushEmit((.v128, .v128), .v128) { popped, result in
+                let rhs = popped.0
+                let lhs = popped.1
+                return .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: lhs, input1: rhs, input2: 0, result: result))
+            }
+        }
+        func emitTernaryV128() throws {
+            try pop3PushEmit((.v128, .v128, .v128), .v128) { popped, result in
+                let mask = popped.0
+                let b = popped.1
+                let a = popped.2
+                return .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: a, input1: b, input2: mask, result: result))
+            }
+        }
+        func emitUnaryI32() throws {
+            try popPushEmit(.v128, .i32) { v0, result in
+                .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: v0, input1: 0, input2: 0, result: result))
+            }
+        }
+        func emitShift() throws {
+            try pop2PushEmit((.i32, .v128), .v128) { popped, result in
+                let shift = popped.0
+                let vec = popped.1
+                return .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: vec, input1: shift, input2: 0, result: result))
+            }
+        }
+
+        switch simd {
+        case .i8x16Splat, .i16x8Splat, .i32x4Splat:
+            try popPushEmit(.i32, .v128) { scalar, result in
+                .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: scalar, input1: 0, input2: 0, result: result))
+            }
+        case .i64x2Splat:
+            try popPushEmit(.i64, .v128) { scalar, result in
+                .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: scalar, input1: 0, input2: 0, result: result))
+            }
+        case .f32x4Splat:
+            try popPushEmit(.f32, .v128) { scalar, result in
+                .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: scalar, input1: 0, input2: 0, result: result))
+            }
+        case .f64x2Splat:
+            try popPushEmit(.f64, .v128) { scalar, result in
+                .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: scalar, input1: 0, input2: 0, result: result))
+            }
+
+        case .v128Bitselect:
+            try emitTernaryV128()
+
+        case .v128AnyTrue, .i8x16AllTrue, .i8x16Bitmask, .i16x8AllTrue, .i16x8Bitmask, .i32x4AllTrue, .i32x4Bitmask, .i64x2AllTrue, .i64x2Bitmask:
+            try emitUnaryI32()
+
+        case .i8x16Shl, .i8x16ShrS, .i8x16ShrU,
+            .i16x8Shl, .i16x8ShrS, .i16x8ShrU,
+            .i32x4Shl, .i32x4ShrS, .i32x4ShrU,
+            .i64x2Shl, .i64x2ShrS, .i64x2ShrU:
+            try emitShift()
+
+        case .v128Not,
+            .i8x16Abs, .i8x16Neg,
+            .i16x8Abs, .i16x8Neg,
+            .i32x4Abs, .i32x4Neg,
+            .i64x2Abs, .i64x2Neg,
+            .f32x4Ceil, .f32x4Floor, .f32x4Trunc, .f32x4Nearest,
+            .f64x2Ceil, .f64x2Floor, .f64x2Trunc, .f64x2Nearest,
+            .f32x4Abs, .f32x4Neg, .f32x4Sqrt,
+            .f64x2Abs, .f64x2Neg, .f64x2Sqrt,
+            .i32x4TruncSatF32X4S, .i32x4TruncSatF32X4U,
+            .f32x4ConvertI32X4S, .f32x4ConvertI32X4U,
+            .f64x2ConvertLowI32X4S, .f64x2ConvertLowI32X4U,
+            .i32x4TruncSatF64X2SZero, .i32x4TruncSatF64X2UZero,
+            .f32x4DemoteF64X2Zero, .f64x2PromoteLowF32X4,
+            .i8x16Popcnt,
+            .i16x8ExtaddPairwiseI8X16S, .i16x8ExtaddPairwiseI8X16U,
+            .i32x4ExtaddPairwiseI16X8S, .i32x4ExtaddPairwiseI16X8U,
+            .i16x8ExtendLowI8X16S, .i16x8ExtendHighI8X16S, .i16x8ExtendLowI8X16U, .i16x8ExtendHighI8X16U,
+            .i32x4ExtendLowI16X8S, .i32x4ExtendHighI16X8S, .i32x4ExtendLowI16X8U, .i32x4ExtendHighI16X8U,
+            .i64x2ExtendLowI32X4S, .i64x2ExtendHighI32X4S, .i64x2ExtendLowI32X4U, .i64x2ExtendHighI32X4U:
+            try emitUnaryV128()
+
+        case .v128And, .v128Andnot, .v128Or, .v128Xor,
+            .i8x16Swizzle,
+            .i8x16Eq, .i8x16Ne, .i8x16LtS, .i8x16LtU, .i8x16GtS, .i8x16GtU, .i8x16LeS, .i8x16LeU, .i8x16GeS, .i8x16GeU,
+            .i16x8Eq, .i16x8Ne, .i16x8LtS, .i16x8LtU, .i16x8GtS, .i16x8GtU, .i16x8LeS, .i16x8LeU, .i16x8GeS, .i16x8GeU,
+            .i32x4Eq, .i32x4Ne, .i32x4LtS, .i32x4LtU, .i32x4GtS, .i32x4GtU, .i32x4LeS, .i32x4LeU, .i32x4GeS, .i32x4GeU,
+            .i64x2Eq, .i64x2Ne, .i64x2LtS, .i64x2GtS, .i64x2LeS, .i64x2GeS,
+            .f32x4Eq, .f32x4Ne, .f32x4Lt, .f32x4Gt, .f32x4Le, .f32x4Ge,
+            .f64x2Eq, .f64x2Ne, .f64x2Lt, .f64x2Gt, .f64x2Le, .f64x2Ge,
+            .i8x16NarrowI16X8S, .i8x16NarrowI16X8U,
+            .i16x8NarrowI32X4S, .i16x8NarrowI32X4U,
+            .i8x16Add, .i8x16AddSatS, .i8x16AddSatU, .i8x16Sub, .i8x16SubSatS, .i8x16SubSatU, .i8x16MinS, .i8x16MinU, .i8x16MaxS, .i8x16MaxU, .i8x16AvgrU,
+            .i16x8Add, .i16x8AddSatS, .i16x8AddSatU, .i16x8Sub, .i16x8SubSatS, .i16x8SubSatU, .i16x8Mul, .i16x8MinS, .i16x8MinU, .i16x8MaxS, .i16x8MaxU, .i16x8AvgrU,
+            .i32x4Add, .i32x4Sub, .i32x4Mul, .i32x4MinS, .i32x4MinU, .i32x4MaxS, .i32x4MaxU,
+            .i64x2Add, .i64x2Sub, .i64x2Mul,
+            .f32x4Add, .f32x4Sub, .f32x4Mul, .f32x4Div, .f32x4Min, .f32x4Max, .f32x4Pmin, .f32x4Pmax,
+            .f64x2Add, .f64x2Sub, .f64x2Mul, .f64x2Div, .f64x2Min, .f64x2Max, .f64x2Pmin, .f64x2Pmax,
+            .i32x4DotI16X8S,
+            .i16x8ExtmulLowI8X16S, .i16x8ExtmulHighI8X16S, .i16x8ExtmulLowI8X16U, .i16x8ExtmulHighI8X16U,
+            .i32x4ExtmulLowI16X8S, .i32x4ExtmulHighI16X8S, .i32x4ExtmulLowI16X8U, .i32x4ExtmulHighI16X8U,
+            .i64x2ExtmulLowI32X4S, .i64x2ExtmulHighI32X4S, .i64x2ExtmulLowI32X4U, .i64x2ExtmulHighI32X4U,
+            .i16x8Q15MulrSatS:
+            try emitBinaryV128()
+        }
     }
 
     mutating func visitSimdLane(_ simdLane: WasmParser.Instruction.SimdLane, lane: UInt8) throws {
-        throw ValidationError(.simdNotSupported)
+        guard let opcode = SIMDOpcode.fromSimdLane(simdLane) else { preconditionFailure("missing SIMDOpcode mapping: \(simdLane)") }
+        let laneCount: UInt8
+        switch simdLane {
+        case .i8x16ExtractLaneS, .i8x16ExtractLaneU, .i8x16ReplaceLane: laneCount = 16
+        case .i16x8ExtractLaneS, .i16x8ExtractLaneU, .i16x8ReplaceLane: laneCount = 8
+        case .i32x4ExtractLane, .i32x4ReplaceLane, .f32x4ExtractLane, .f32x4ReplaceLane: laneCount = 4
+        case .i64x2ExtractLane, .i64x2ReplaceLane, .f64x2ExtractLane, .f64x2ReplaceLane: laneCount = 2
+        }
+        if lane >= laneCount {
+            throw ValidationError(.invalidLaneIndex(lane: lane, laneCount: laneCount))
+        }
+        switch simdLane {
+        case .i8x16ExtractLaneS, .i8x16ExtractLaneU, .i16x8ExtractLaneS, .i16x8ExtractLaneU, .i32x4ExtractLane:
+            try popPushEmit(.v128, .i32) { vec, result in
+                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: vec, input1: 0, input2: 0, result: result))
+            }
+        case .i64x2ExtractLane:
+            try popPushEmit(.v128, .i64) { vec, result in
+                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: vec, input1: 0, input2: 0, result: result))
+            }
+        case .f32x4ExtractLane:
+            try popPushEmit(.v128, .f32) { vec, result in
+                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: vec, input1: 0, input2: 0, result: result))
+            }
+        case .f64x2ExtractLane:
+            try popPushEmit(.v128, .f64) { vec, result in
+                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: vec, input1: 0, input2: 0, result: result))
+            }
+        case .i8x16ReplaceLane:
+            try pop2PushEmit((.i32, .v128), .v128) { popped, result in
+                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: popped.1, input1: popped.0, input2: 0, result: result))
+            }
+        case .i16x8ReplaceLane, .i32x4ReplaceLane:
+            try pop2PushEmit((.i32, .v128), .v128) { popped, result in
+                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: popped.1, input1: popped.0, input2: 0, result: result))
+            }
+        case .i64x2ReplaceLane:
+            try pop2PushEmit((.i64, .v128), .v128) { popped, result in
+                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: popped.1, input1: popped.0, input2: 0, result: result))
+            }
+        case .f32x4ReplaceLane:
+            try pop2PushEmit((.f32, .v128), .v128) { popped, result in
+                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: popped.1, input1: popped.0, input2: 0, result: result))
+            }
+        case .f64x2ReplaceLane:
+            try pop2PushEmit((.f64, .v128), .v128) { popped, result in
+                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: popped.1, input1: popped.0, input2: 0, result: result))
+            }
+        }
     }
 
     mutating func visitSimdMemLane(_ simdMemLane: WasmParser.Instruction.SimdMemLane, memarg: MemArg, lane: UInt8) throws {
-        throw ValidationError(.simdNotSupported)
+        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        guard let opcode = SIMDOpcode.fromSimdMemLane(simdMemLane) else { preconditionFailure("missing SIMDOpcode mapping: \(simdMemLane)") }
+        let naturalAlignment: Int
+        let laneCount: UInt8
+        switch simdMemLane {
+        case .v128Load8Lane, .v128Store8Lane: (naturalAlignment, laneCount) = (0, 16)
+        case .v128Load16Lane, .v128Store16Lane: (naturalAlignment, laneCount) = (1, 8)
+        case .v128Load32Lane, .v128Store32Lane: (naturalAlignment, laneCount) = (2, 4)
+        case .v128Load64Lane, .v128Store64Lane: (naturalAlignment, laneCount) = (3, 2)
+        }
+        if lane >= laneCount {
+            throw ValidationError(.invalidLaneIndex(lane: lane, laneCount: laneCount))
+        }
+        try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
+
+        switch simdMemLane {
+        case .v128Load8Lane, .v128Load16Lane, .v128Load32Lane, .v128Load64Lane:
+            try pop2PushEmit((.v128, .address(isMemory64: isMemory64)), .v128) { popped, result in
+                let vec = popped.0
+                let ptr = popped.1
+                return .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: memarg.offset, input0: ptr, input1: vec, input2: 0, result: result))
+            }
+        case .v128Store8Lane, .v128Store16Lane, .v128Store32Lane, .v128Store64Lane:
+            let vec = try popVRegOperand(.v128)
+            let ptr = try popVRegOperand(.address(isMemory64: isMemory64))
+            if let vec = vec, let ptr = ptr {
+                emit(.simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: memarg.offset, input0: ptr, input1: vec, input2: 0, result: 0)))
+            }
+        }
     }
 
     mutating func visitMemorySize(memory: UInt32) throws -> Output {

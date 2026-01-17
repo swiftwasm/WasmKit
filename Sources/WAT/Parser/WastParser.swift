@@ -62,6 +62,7 @@ struct WastParser {
         mutating func visitI64Const(value: Int64) throws(WatParserError) { addValue(.i64(UInt64(bitPattern: value))) }
         mutating func visitF32Const(value: IEEE754.Float32) throws(WatParserError) { addValue(.f32(value.bitPattern)) }
         mutating func visitF64Const(value: IEEE754.Float64) throws(WatParserError) { addValue(.f64(value.bitPattern)) }
+        mutating func visitV128Const(value: V128) throws(WatParserError) { addValue(.v128(value)) }
         mutating func visitRefFunc(functionIndex: UInt32) throws(WatParserError) {
             addValue(.refFunc(functionIndex: functionIndex))
         }
@@ -91,6 +92,7 @@ struct WastParser {
             case .i64(let v): value = .i64(v)
             case .f32(let v): value = .f32(v)
             case .f64(let v): value = .f64(v)
+            case .v128(let v): value = .v128(v)
             case .refNull(let heapTy): value = .refNull(heapTy)
             case .refFunc(let index): value = .refFunc(functionIndex: index)
             case .refExtern(let v): value = .refExtern(value: v)
@@ -101,6 +103,7 @@ struct WastParser {
         while true {
             if let expectValue = try exprParser.parseWastExpectValue() {
                 values.append(expectValue)
+                continue
             }
             if try exprParser.parseWastConstInstruction(visitor: &collector) {
                 continue
@@ -150,6 +153,7 @@ public enum WastConstValue {
     case i64(UInt64)
     case f32(UInt32)
     case f64(UInt64)
+    case v128(V128)
     case refNull(HeapType)
     case refFunc(functionIndex: UInt32)
     case refExtern(value: UInt32)
@@ -171,11 +175,32 @@ public struct WastInvoke {
     }
 }
 
+public struct V128Expectation: Equatable {
+    public enum Shape: Equatable {
+        case f32x4
+        case f64x2
+    }
+
+    public let shape: Shape?
+    public let bytes: [UInt8]
+    /// Bit i indicates the i-th float lane expects any NaN.
+    public let nanLaneMask: UInt8
+
+    public init(shape: Shape?, bytes: [UInt8], nanLaneMask: UInt8) {
+        precondition(bytes.count == V128.byteCount, "V128Expectation must be exactly \(V128.byteCount) bytes")
+        self.shape = shape
+        self.bytes = bytes
+        self.nanLaneMask = nanLaneMask
+    }
+}
+
 public enum WastExpectValue {
     case i32(UInt32)
     case i64(UInt64)
     case f32(UInt32)
     case f64(UInt64)
+    case v128(V128)
+    case v128Pattern(V128Expectation)
 
     /// A value that is expected to be a null reference,
     /// optionally with a specific type.
