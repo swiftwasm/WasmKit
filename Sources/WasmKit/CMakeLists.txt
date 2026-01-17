@@ -34,6 +34,7 @@ add_wasmkit_library(WasmKit
   Execution/StoreAllocator.swift
   Execution/UntypedValue.swift
   Execution/Value.swift
+  Execution/V128Storage.swift
 )
 
 target_link_wasmkit_libraries(WasmKit PUBLIC
