@@ -26,55 +26,55 @@ struct Plugin: CommandPlugin {
             throw PluginError(description: "Failed to build \(target): \(buildResult.logText)")
         }
         // TODO: Add proper API to PackagePlugin to get data directory
-        let dataPath = context.pluginWorkDirectory // output
-            .removingLastComponent() // WITExtractorPlugin
-            .removingLastComponent() // plugins
-            .removingLastComponent() // .build (by default)
+        let dataPath = context.pluginWorkDirectoryURL // output
+            .deletingLastPathComponent() // WITExtractorPlugin
+            .deletingLastPathComponent() // plugins
+            .deletingLastPathComponent() // .build (by default)
 
-        let buildPath = dataPath.appending([parameters.configuration.rawValue])
-        let llbuildManifest = dataPath.appending([parameters.configuration.rawValue + ".yaml"])
+        let buildPath = dataPath.appendingPathComponent(parameters.configuration.rawValue)
+        let llbuildManifest = dataPath.appendingPathComponent(parameters.configuration.rawValue + ".yaml")
         guard let swiftcExecutable = ProcessInfo.processInfo.environment["WIT_EXTRACTOR_SWIFTC_PATH"]
                 ?? inferSwiftcExecutablePath(llbuildManifest: llbuildManifest) else {
             throw PluginError(description: "Cloudn't infer `swiftc` command path from build directory. Please specify WIT_EXTRACTOR_SWIFTC_PATH")
         }
-        let digesterExecutable = Path(swiftcExecutable).removingLastComponent().appending(["swift-api-digester"])
+        let digesterExecutable = URL(fileURLWithPath: swiftcExecutable).deletingLastPathComponent().appendingPathComponent("swift-api-digester")
 
-        let witOutputPath = context.pluginWorkDirectory.appending([target + ".wit"])
-        let swiftOutputPath = context.pluginWorkDirectory.appending([target + "_WITOverlay.swift"])
+        let witOutputPath = context.pluginWorkDirectoryURL.appendingPathComponent(target + ".wit")
+        let swiftOutputPath = context.pluginWorkDirectoryURL.appendingPathComponent(target + "_WITOverlay.swift")
 
         let tool = try context.tool(named: "WITTool")
         var arguments =  [
             "extract-wit",
-            "--swift-api-digester", digesterExecutable.string,
+            "--swift-api-digester", digesterExecutable.path,
             "--module-name", target,
             "--package-name", context.package.displayName,
-            "--wit-output-path", witOutputPath.string,
-            "--swift-output-path", swiftOutputPath.string,
-            "-I", buildPath.appending(["Modules"]).string,
+            "--wit-output-path", witOutputPath.path,
+            "--swift-output-path", swiftOutputPath.path,
+            "-I", buildPath.appendingPathComponent("Modules").path,
         ]
 
         #if compiler(<6.0)
         // Swift 5.10 and earlier emit module files under the per-configuration build directory
         // instead of the Modules directory.
         arguments += [
-            "-I", buildPath.string,
+            "-I", buildPath.path,
         ]
         #endif
         if let sdk {
             arguments += ["-sdk", sdk]
         }
-        let process = try Process.run(URL(fileURLWithPath: tool.path.string), arguments: arguments)
+        let process = try Process.run(tool.url, arguments: arguments)
         process.waitUntilExit()
         guard process.terminationStatus == 0 else {
             throw PluginError(
-                description: "Failed to run \(([tool.path.string] + arguments).joined(separator: " "))"
+                description: "Failed to run \(([tool.url.path] + arguments).joined(separator: " "))"
             )
         }
 
         let outputMapping = """
         {
-        "witOutputPath": "\(witOutputPath)",
-        "swiftOutputPath": "\(swiftOutputPath)"
+            "witOutputPath": "\(witOutputPath.path)",
+            "swiftOutputPath": "\(swiftOutputPath.path)"
         }
         """
         if let outputMappingPath {
@@ -84,9 +84,9 @@ struct Plugin: CommandPlugin {
         }
     }
 
-    func inferSwiftcExecutablePath(llbuildManifest: Path) -> String? {
+    func inferSwiftcExecutablePath(llbuildManifest: URL) -> String? {
         // FIXME: This is completely not the right way but there is no right way for now...
-        guard let contents = try? String(contentsOfFile: llbuildManifest.string, encoding: .utf8) else {
+        guard let contents = try? String(contentsOfFile: llbuildManifest.path, encoding: .utf8) else {
             return nil
         }
         for line in contents.split(separator: "\n") {

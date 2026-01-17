@@ -180,7 +180,9 @@ struct PathResolution {
                 guard length >= 0 else {
                     throw try WASIAbi.Errno(platformErrno: errno)
                 }
-                return FilePath(String(cString: buffer))
+                // Ensure null termination for platformString initializer
+                buffer[length] = 0
+                return buffer.withUnsafeBufferPointer { FilePath(platformString: $0.baseAddress!) }
             }
 
             guard resolvedSymlinks < Self.MAX_SYMLINKS else {
