@@ -37,6 +37,10 @@ extension ValidationError.Message {
         Self("SIMD is not supported")
     }
 
+    static func invalidLaneIndex(lane: UInt8, laneCount: UInt8) -> Self {
+        Self("invalid lane index \(lane) (laneCount: \(laneCount))")
+    }
+
     static func invalidMemArgAlignment(memarg: MemArg, naturalAlignment: Int) -> Self {
         Self("alignment 2**\(memarg.align) is out of limit \(naturalAlignment)")
     }

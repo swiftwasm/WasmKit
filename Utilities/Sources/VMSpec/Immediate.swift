@@ -191,6 +191,32 @@ extension VMGen.ImmediateLayout {
         $0.field(name: "rawCallee", type: .UInt64)
         $0.field(name: "spAddend", type: .VReg)
     }
+
+    static let v128Const = Self(name: "V128ConstOperand") {
+        $0.field(name: "lo", type: .UInt64)
+        $0.field(name: "hi", type: .UInt64)
+        $0.field(name: "result", type: .VReg)
+    }
+
+    static let i8x16Shuffle = Self(name: "I8x16ShuffleOperand") {
+        for i in 0..<16 {
+            $0.field(name: "lane\(i)", type: .UInt8)
+        }
+        $0.field(name: "lhs", type: .VReg)
+        $0.field(name: "rhs", type: .VReg)
+        $0.field(name: "result", type: .VReg)
+    }
+
+    static let simd = Self(name: "SimdOperand") {
+        $0.field(name: "opcode", type: .UInt16)
+        $0.field(name: "lane", type: .UInt8)
+        $0.field(name: "reserved", type: .UInt8)
+        $0.field(name: "offset", type: .UInt64)
+        $0.field(name: "input0", type: .VReg)
+        $0.field(name: "input1", type: .VReg)
+        $0.field(name: "input2", type: .VReg)
+        $0.field(name: "result", type: .VReg)
+    }
 }
 
 extension VMGen.PrimitiveType {
