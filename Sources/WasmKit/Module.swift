@@ -210,15 +210,16 @@ public struct Module {
 
         // Step 16.
         for case .active(let data) in data {
-            let memory = try instance.memories[validating: Int(data.index)]
+            let memory = try instance.memories[validating: Int(data.index), MemoryEntity.createOutOfBoundsError]
+            let isMemory64 = memory.withValue { $0.limit.isMemory64 }
             let offsetValue = try data.offset.evaluate(
                 context: constEvalContext,
-                expectedType: .addressType(isMemory64: memory.limit.isMemory64)
+                expectedType: .addressType(isMemory64: isMemory64)
             )
             try memory.withValue { memory in
-                guard let offset = offsetValue.maybeAddressOffset(memory.limit.isMemory64) else {
+                guard let offset = offsetValue.maybeAddressOffset(isMemory64) else {
                     throw ValidationError(
-                        .unexpectedOffsetInitializer(expected: .addressType(isMemory64: memory.limit.isMemory64), got: offsetValue)
+                        .unexpectedOffsetInitializer(expected: .addressType(isMemory64: isMemory64), got: offsetValue)
                     )
                 }
                 try memory.write(offset: Int(offset), bytes: data.initializer)

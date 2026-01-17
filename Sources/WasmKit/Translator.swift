@@ -60,7 +60,8 @@ extension InternalInstance {
         return try self.globals[validating: Int(index)].globalType.valueType
     }
     func isMemory64(memoryIndex index: MemoryIndex) throws -> Bool {
-        return try self.memories[validating: Int(index)].limit.isMemory64
+        let memory = try self.memories[validating: Int(index), MemoryEntity.createOutOfBoundsError]
+        return memory.withValue { $0.limit.isMemory64 }
     }
     func isMemory64(tableIndex index: TableIndex) throws -> Bool {
         return try self.tables[validating: Int(index)].limits.isMemory64

@@ -375,8 +375,8 @@ extension Execution {
         /// Assigns the current memory to the given memory entity.
         @inline(__always)
         static func assign(md: inout Md, ms: inout Ms, memory: inout MemoryEntity) {
-            md = UnsafeMutableRawPointer(memory.data._baseAddressIfContiguous)
-            ms = memory.data.count
+            md = memory.baseAddress
+            ms = memory.byteCount
         }
 
         /// Assigns the current memory to nil.

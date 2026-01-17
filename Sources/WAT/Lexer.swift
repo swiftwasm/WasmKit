@@ -72,7 +72,7 @@ struct Lexer {
             self.nextIndex = offset
         }
 
-        func peek(at offset: Int = 0) throws -> Unicode.Scalar? {
+        func peek(at offset: Int = 0) -> Unicode.Scalar? {
             precondition(offset >= 0)
             guard self.input.index(self.nextIndex, offsetBy: offset) < self.input.endIndex else {
                 return nil
@@ -81,21 +81,21 @@ struct Lexer {
             return self.input[index]
         }
 
-        mutating func next() throws -> Unicode.Scalar? {
+        mutating func next() -> Unicode.Scalar? {
             guard self.nextIndex < self.input.endIndex else { return nil }
             defer { self.nextIndex = self.input.index(after: self.nextIndex) }
             return self.input[self.nextIndex]
         }
 
-        mutating func eat(_ expected: Unicode.Scalar) throws -> Bool {
-            if try peek() == expected {
-                _ = try next()
+        mutating func eat(_ expected: Unicode.Scalar) -> Bool {
+            if peek() == expected {
+                _ = next()
                 return true
             }
             return false
         }
 
-        mutating func eat(_ expected: String) throws -> Bool {
+        mutating func eat(_ expected: String) -> Bool {
             var index = self.nextIndex
             for char in expected.unicodeScalars {
                 guard index < self.input.endIndex, self.input[index] == char else {
@@ -107,11 +107,11 @@ struct Lexer {
             return true
         }
 
-        mutating func eatOneOf(_ expectedSet: [Unicode.Scalar]) throws -> Unicode.Scalar? {
-            guard let ch = try peek() else { return nil }
+        mutating func eatOneOf(_ expectedSet: [Unicode.Scalar]) -> Unicode.Scalar? {
+            guard let ch = peek() else { return nil }
             for expected in expectedSet {
                 if ch == expected {
-                    _ = try next()
+                    _ = next()
                     return ch
                 }
             }
@@ -123,7 +123,7 @@ struct Lexer {
         ///   - expected: The expected string
         ///   - eof: Whether if EOF is expected after the string
         /// - Returns: `true` if the next characters match the expected string
-        func match(_ expected: String, eof: Bool = false) throws -> Bool {
+        func match(_ expected: String, eof: Bool = false) -> Bool {
             var index = self.nextIndex
             for char in expected.unicodeScalars {
                 guard index < self.input.endIndex, self.input[index] == char else {
@@ -165,7 +165,7 @@ struct Lexer {
 
     /// Lex the next meaningful token
     /// - Returns: The next meaningful token or `nil` if EOF
-    mutating func lex() throws -> Token? {
+    mutating func lex() throws(WatParserError) -> Token? {
         while true {
             guard let token = try rawLex() else { return nil }
             guard token.kind.isMeaningful else { continue }
@@ -174,8 +174,8 @@ struct Lexer {
     }
 
     /// Lex the next token without skipping comments
-    mutating func rawLex() throws -> Token? {
-        guard let (start, initialChar) = try peekNonWhitespaceChar() else {
+    mutating func rawLex() throws(WatParserError) -> Token? {
+        guard let (start, initialChar) = peekNonWhitespaceChar() else {
             return nil
         }
         guard let kind = try classifyToken(initialChar) else { return nil }
@@ -187,30 +187,30 @@ struct Lexer {
         return cursor.currentSourceLocation()
     }
 
-    private mutating func classifyToken(_ initialChar: Unicode.Scalar) throws -> TokenKind? {
+    private mutating func classifyToken(_ initialChar: Unicode.Scalar) throws(WatParserError) -> TokenKind? {
         switch initialChar {
         case "(":
-            _ = try cursor.next()
-            switch try cursor.peek() {
+            _ = cursor.next()
+            switch cursor.peek() {
             case ";":
-                _ = try cursor.next()
+                _ = cursor.next()
                 return try lexBlockComment()
             default: return .leftParen
             }
         case ")":
-            _ = try cursor.next()
+            _ = cursor.next()
             return .rightParen
         case ";":
-            _ = try cursor.next()
+            _ = cursor.next()
             // Lex ";; ..." line comment
-            guard try cursor.eat(";") else {
+            guard cursor.eat(";") else {
                 throw cursor.createError("Expected ';' after ';' line comment")
             }
-            while let char = try cursor.next() {
+            while let char = cursor.next() {
                 switch char {
                 case "\r":
-                    if try cursor.peek() == "\n" {
-                        _ = try cursor.next()
+                    if cursor.peek() == "\n" {
+                        _ = cursor.next()
                     }
                     return .lineComment
                 case "\n":
@@ -232,34 +232,34 @@ struct Lexer {
                     // Try to parse as integer or float
                     var numberSource = Cursor(input: String.UnicodeScalarView(text))
                     var sign: FloatingPointSign? = nil
-                    if let maybeSign = try numberSource.peek(),
+                    if let maybeSign = numberSource.peek(),
                         let (found, _) = [(FloatingPointSign.plus, "+"), (FloatingPointSign.minus, "-")].first(where: { $1 == maybeSign })
                     {
                         sign = found
-                        _ = try numberSource.next()
+                        _ = numberSource.next()
                     }
-                    if try numberSource.match("inf", eof: true) {
+                    if numberSource.match("inf", eof: true) {
                         return .float(sign, .inf)
                     }
-                    if try numberSource.match("nan", eof: true) {
+                    if numberSource.match("nan", eof: true) {
                         return .float(sign, .nan(hexPattern: nil))
                     }
-                    if try numberSource.eat("nan:0x") {
+                    if numberSource.eat("nan:0x") {
                         return .float(sign, .nan(hexPattern: try numberSource.parseHexNumber()))
                     }
                     var pattern: String
-                    let parseFraction: () throws -> String
+                    let parseFraction: () throws(WatParserError) -> String
                     let makeFloatToken: (String) -> FloatToken
-                    if try numberSource.eat("0x") {
+                    if numberSource.eat("0x") {
                         pattern = try numberSource.parseHexNumber()
                         if numberSource.isEOF {
                             return .integer(sign, .hexPattern(pattern))
                         }
-                        parseFraction = { try numberSource.parseHexNumber() }
+                        parseFraction = { () throws(WatParserError) in try numberSource.parseHexNumber() }
                         makeFloatToken = { FloatToken.hexPattern($0) }
                     } else {
                         pattern = try numberSource.parseDecimalNumber()
-                        parseFraction = { try numberSource.parseDecimalNumber() }
+                        parseFraction = { () throws(WatParserError) in try numberSource.parseDecimalNumber() }
                         makeFloatToken = { FloatToken.decimalPattern($0) }
                     }
                     if !pattern.isEmpty {
@@ -269,15 +269,15 @@ struct Lexer {
                             return .integer(sign, .decimalPattern(pattern))
                         }
                         // Still might be a float
-                        if try numberSource.eat(".") {
+                        if numberSource.eat(".") {
                             let fraction = try parseFraction()
                             pattern += "." + fraction
                         }
-                        if let expCh = try numberSource.eatOneOf(["e", "E", "p", "P"]) {
+                        if let expCh = numberSource.eatOneOf(["e", "E", "p", "P"]) {
                             pattern += String(expCh)
-                            if try numberSource.eat("+") {
+                            if numberSource.eat("+") {
                                 pattern += "+"
-                            } else if try numberSource.eat("-") {
+                            } else if numberSource.eat("-") {
                                 pattern += "-"
                             }
                             let exponent = try numberSource.parseDecimalNumber()
@@ -298,27 +298,27 @@ struct Lexer {
                 return .unknown
             }
         default:
-            _ = try cursor.next()
+            _ = cursor.next()
             return .unknown
         }
     }
 
-    private mutating func lexBlockComment() throws -> TokenKind {
+    private mutating func lexBlockComment() throws(WatParserError) -> TokenKind {
         var level = 1
         while true {
-            guard let char = try cursor.next() else {
+            guard let char = cursor.next() else {
                 throw cursor.unexpectedEof()
             }
             switch char {
             case "(":
-                if try cursor.peek() == ";" {
+                if cursor.peek() == ";" {
                     // Nested comment block
                     level += 1
                 }
             case ";":
-                if try cursor.peek() == ")" {
+                if cursor.peek() == ")" {
                     level -= 1
-                    _ = try cursor.next()
+                    _ = cursor.next()
                     if level == 0 {
                         return .blockComment
                     }
@@ -328,15 +328,15 @@ struct Lexer {
         }
     }
 
-    private mutating func peekNonWhitespaceChar() throws -> (index: Lexer.Index, byte: Unicode.Scalar)? {
-        guard var char = try cursor.peek() else { return nil }
+    private mutating func peekNonWhitespaceChar() -> (index: Lexer.Index, byte: Unicode.Scalar)? {
+        guard var char = cursor.peek() else { return nil }
         var start: Lexer.Index = cursor.nextIndex
         // https://webassembly.github.io/spec/core/text/lexical.html#white-space
         let whitespaces: [Unicode.Scalar] = [" ", "\n", "\t", "\r"]
         while whitespaces.contains(char) {
-            _ = try cursor.next()
+            _ = cursor.next()
             start = cursor.nextIndex
-            guard let newChar = try cursor.peek() else { return nil }
+            guard let newChar = cursor.peek() else { return nil }
             char = newChar
         }
         return (start, char)
@@ -362,7 +362,7 @@ struct Lexer {
         case unknown
     }
 
-    private mutating func lexReservedChars(initial: Unicode.Scalar) throws -> (ReservedKind, String.UnicodeScalarView.SubSequence) {
+    private mutating func lexReservedChars(initial: Unicode.Scalar) throws(WatParserError) -> (ReservedKind, String.UnicodeScalarView.SubSequence) {
         let start = cursor.nextIndex
         var numberOfIdChars: Int = 0
         var strings: [[UInt8]] = []
@@ -370,15 +370,15 @@ struct Lexer {
 
         while true {
             if isIdChar(char) {
-                _ = try cursor.next()
+                _ = cursor.next()
                 numberOfIdChars += 1
             } else if char == "\"" {
-                _ = try cursor.next()
+                _ = cursor.next()
                 strings.append(try readString())
             } else {
                 break
             }
-            guard let new = try cursor.peek() else { break }
+            guard let new = cursor.peek() else { break }
             char = new
         }
         let text = cursor.input[start..<cursor.nextIndex]
@@ -392,18 +392,18 @@ struct Lexer {
         return (.unknown, text)
     }
 
-    private mutating func readString() throws -> [UInt8] {
+    private mutating func readString() throws(WatParserError) -> [UInt8] {
         var copyingBuffer: [UInt8] = []
         func append(_ char: Unicode.Scalar) {
             copyingBuffer.append(contentsOf: String(char).utf8)
         }
 
-        while let char = try cursor.next() {
+        while let char = cursor.next() {
             if char == "\"" {
                 break
             }
             if char == "\\" {
-                guard let nextChar = try cursor.next() else {
+                guard let nextChar = cursor.next() else {
                     throw cursor.unexpectedEof()
                 }
                 switch nextChar {
@@ -414,14 +414,14 @@ struct Lexer {
                 case "r": append("\r")
                 case "u":
                     // Unicode escape sequence \u{XXXX}
-                    guard try cursor.eat("{") else {
+                    guard cursor.eat("{") else {
                         throw cursor.createError("Expected '{' after \\u unicode escape sequence")
                     }
                     let codePointString = try cursor.parseHexNumber()
                     guard let codePoint = UInt32(codePointString, radix: 16) else {
                         throw cursor.createError("Cannot parse code point in \\u unicode escape sequence as 32-bit unsigned hex integer")
                     }
-                    guard try cursor.eat("}") else {
+                    guard cursor.eat("}") else {
                         throw cursor.createError("No closing '}' after \\u unicode escape sequence")
                     }
                     // Allocate copying buffer if not already allocated
@@ -430,7 +430,7 @@ struct Lexer {
                     }
                     append(scalar)
                 case let nChar where nChar.properties.isASCIIHexDigit:
-                    guard let mChar = try cursor.next() else {
+                    guard let mChar = cursor.next() else {
                         throw cursor.unexpectedEof()
                     }
                     guard mChar.properties.isASCIIHexDigit else {
@@ -451,7 +451,7 @@ struct Lexer {
     }
 }
 
-func parseHexDigit(_ char: Unicode.Scalar) throws -> UInt8? {
+func parseHexDigit(_ char: Unicode.Scalar) throws(WatParserError) -> UInt8? {
     let base: Unicode.Scalar
     let addend: UInt8
     if ("0"..."9").contains(char) {
@@ -470,21 +470,21 @@ func parseHexDigit(_ char: Unicode.Scalar) throws -> UInt8? {
 }
 
 extension Lexer.Cursor {
-    mutating func parseHexNumber() throws -> String {
+    mutating func parseHexNumber() throws(WatParserError) -> String {
         return try parseUnderscoredChars(continueParsing: \.properties.isASCIIHexDigit)
     }
 
-    mutating func parseDecimalNumber() throws -> String {
+    mutating func parseDecimalNumber() throws(WatParserError) -> String {
         return try parseUnderscoredChars(continueParsing: { "0"..."9" ~= $0 })
     }
 
     /// Parse underscore-separated characters
     /// - Parameter continueParsing: A closure that returns `true` if the parsing should continue
     /// - Returns: The parsed string without underscores
-    mutating func parseUnderscoredChars(continueParsing: (Unicode.Scalar) -> Bool) throws -> String {
+    mutating func parseUnderscoredChars(continueParsing: (Unicode.Scalar) -> Bool) throws(WatParserError) -> String {
         var value = String.UnicodeScalarView()
         var lastParsedChar: Unicode.Scalar?
-        while let char = try peek() {
+        while let char = peek() {
             if char == "_" {
                 guard let lastChar = lastParsedChar else {
                     throw createError("Invalid hex number, leading underscore")
@@ -493,13 +493,13 @@ extension Lexer.Cursor {
                     throw createError("Invalid hex number, consecutive underscores")
                 }
                 lastParsedChar = char
-                _ = try next()
+                _ = next()
                 continue
             }
             guard continueParsing(char) else { break }
             lastParsedChar = char
             value.append(char)
-            _ = try next()
+            _ = next()
         }
         if lastParsedChar == "_" {
             throw createError("Invalid hex number, trailing underscore")

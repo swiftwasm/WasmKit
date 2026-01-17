@@ -878,6 +878,9 @@ extension Parser: BinaryInstructionDecoder {
 
     @usableFromInline
     struct InstructionFactory: AnyInstructionVisitor {
+        @usableFromInline
+        typealias VisitorError = Never
+
         @usableFromInline var binaryOffset: Int = 0
 
         @usableFromInline var insts: [Instruction] = []
@@ -885,7 +888,7 @@ extension Parser: BinaryInstructionDecoder {
         @inlinable init() {}
 
         @inlinable
-        mutating func visit(_ instruction: Instruction) throws {
+        mutating func visit(_ instruction: Instruction) {
             insts.append(instruction)
         }
     }

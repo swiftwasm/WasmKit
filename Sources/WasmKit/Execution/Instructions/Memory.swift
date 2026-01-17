@@ -38,9 +38,11 @@ extension Execution {
     mutating func memorySize(sp: Sp, immediate: Instruction.MemorySizeOperand) {
         let memory = currentInstance(sp: sp).memories[Int(immediate.memoryIndex)]
 
-        let pageCount = memory.data.count / MemoryEntity.pageSize
-        let value: Value = memory.limit.isMemory64 ? .i64(UInt64(pageCount)) : .i32(UInt32(pageCount))
-        sp[immediate.result] = UntypedValue(value)
+        memory.withValue { memory in
+            let pageCount = memory.byteCount / MemoryEntity.pageSize
+            let value: Value = memory.limit.isMemory64 ? .i64(UInt64(pageCount)) : .i32(UInt32(pageCount))
+            sp[immediate.result] = UntypedValue(value)
+        }
     }
 
     mutating func memoryGrow(sp: Sp, md: inout Md, ms: inout Ms, immediate: Instruction.MemoryGrowOperand) throws {
@@ -89,17 +91,10 @@ extension Execution {
             let value = sp[immediate.value].i32
             let destinationIndex = Int(sp[immediate.destOffset].asAddressOffset(isMemory64))
 
-            guard
-                !destinationIndex.addingReportingOverflow(copyCounter).overflow
-                    && memoryInstance.data.count >= destinationIndex + copyCounter
-            else {
+            guard !destinationIndex.addingReportingOverflow(copyCounter).overflow else {
                 throw Trap(.memoryOutOfBounds)
             }
-
-            memoryInstance.data.replaceSubrange(
-                destinationIndex..<destinationIndex + copyCounter,
-                with: [UInt8](repeating: value.littleEndianBytes[0], count: copyCounter)
-            )
+            try memoryInstance.fill(offset: destinationIndex, value: value.littleEndianBytes[0], count: copyCounter)
         }
     }
 }
