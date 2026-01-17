@@ -37,6 +37,10 @@ extension ValidationError.Message {
         Self("SIMD is not supported")
     }
 
+    static func invalidLaneIndex(lane: UInt8, laneCount: UInt8) -> Self {
+        Self("invalid lane index \(lane) (laneCount: \(laneCount))")
+    }
+
     static func invalidMemArgAlignment(memarg: MemArg, naturalAlignment: Int) -> Self {
         Self("alignment 2**\(memarg.align) is out of limit \(naturalAlignment)")
     }
@@ -356,6 +360,7 @@ extension Value {
         case (.i64, .i64): return
         case (.f32, .f32): return
         case (.f64, .f64): return
+        case (.v128, .v128): return
         case (.ref(let ref), .ref(let refType)):
             try ref.checkType(refType)
         default:

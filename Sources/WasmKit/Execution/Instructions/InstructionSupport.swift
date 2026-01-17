@@ -329,6 +329,8 @@ struct InstructionPrintingContext {
             target.write("global.set \(global(op.global)), \(reg(op.reg))")
         case .const32(let op):
             target.write("\(reg(op.result)) = \(hex(op.value))")
+        case .v128Const(let op):
+            target.write("\(reg(op.result)) = v128.const lo:\(hex(op.lo)) hi:\(hex(op.hi))")
         case .call(let op):
             target.write("call \(callee(op.callee)), sp: +\(op.spAddend)")
         case .callIndirect(let op):
@@ -341,6 +343,17 @@ struct InstructionPrintingContext {
         case .i64Load(let op): load("i64.load", op)
         case .f32Load(let op): load("f32.load", op)
         case .f64Load(let op): load("f64.load", op)
+        case .i8x16Shuffle(let op):
+            let lanes = [
+                op.lane0, op.lane1, op.lane2, op.lane3,
+                op.lane4, op.lane5, op.lane6, op.lane7,
+                op.lane8, op.lane9, op.lane10, op.lane11,
+                op.lane12, op.lane13, op.lane14, op.lane15,
+            ]
+            target.write("\(reg(op.result)) = i8x16.shuffle \(reg(op.lhs)), \(reg(op.rhs)), \(lanes)")
+        case .simd(let op):
+            let name = SIMDOpcode(rawValue: op.opcode).map { "\($0)" } ?? "unknown(\(op.opcode))"
+            target.write("\(reg(op.result)) = simd.\(name) lane:\(op.lane) \(reg(op.input0)), \(reg(op.input1)), \(reg(op.input2)) offset:\(offset(op.offset))")
         case .i32Add(let op): binop("i32.add", op)
         case .i32Sub(let op): binop("i32.sub", op)
         case .i32Mul(let op): binop("i32.mul", op)

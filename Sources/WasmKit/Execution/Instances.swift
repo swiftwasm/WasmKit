@@ -229,12 +229,13 @@ public struct Instance {
                 fatalError("Already compiled!?")
             }
             try function.wasm.ensureCompiled(store: StoreRef(store))
-            let (iseq, locals, _) = function.assumeCompiled()
+            let (iseq, _, _) = function.assumeCompiled()
 
             // Print slot space information
+            let localTypes = code.withValue { $0.locals }
             let stackLayout = try StackLayout(
                 type: store.engine.funcTypeInterner.resolve(function.type),
-                numberOfLocals: locals,
+                locals: localTypes,
                 codeSize: code.expression.count
             )
             stackLayout.dump(to: &target, iseq: iseq)
@@ -690,16 +691,40 @@ extension Memory: GuestMemory {
 
 /// An entity representing a WebAssembly `global` instance storage.
 struct GlobalEntity /* : ~Copyable */ {
-    var rawValue: UntypedValue
+    enum Storage {
+        case scalar(UntypedValue)
+        case v128(V128Storage)
+    }
+
+    var storage: Storage
     var value: Value {
-        get { rawValue.cast(to: globalType.valueType) }
-        set { rawValue = UntypedValue(newValue) }
+        get {
+            switch storage {
+            case .scalar(let raw):
+                return raw.cast(to: globalType.valueType)
+            case .v128(let v):
+                return .v128(v.value)
+            }
+        }
+        set {
+            switch newValue {
+            case .v128(let v):
+                storage = .v128(V128Storage(v))
+            case .i32, .i64, .f32, .f64, .ref:
+                storage = .scalar(UntypedValue(newValue))
+            }
+        }
     }
     let globalType: GlobalType
 
     init(globalType: GlobalType, initialValue: Value) throws {
         try initialValue.checkType(globalType.valueType)
-        rawValue = UntypedValue(initialValue)
+        switch initialValue {
+        case .v128(let v):
+            storage = .v128(V128Storage(v))
+        case .i32, .i64, .f32, .f64, .ref:
+            storage = .scalar(UntypedValue(initialValue))
+        }
         self.globalType = globalType
     }
 }
@@ -733,6 +758,7 @@ public struct Global: Equatable {
             guard global.globalType.mutability == .variable else {
                 throw Trap(.cannotAssignToImmutableGlobal)
             }
+            try value.checkType(global.globalType.valueType)
             global.value = value
         }
     }
