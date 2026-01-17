@@ -39,7 +39,7 @@ import WasmParser
 /// This type is designed to eliminate ARC retain/release for entities
 /// known to be alive during a VM execution.
 @dynamicMemberLookup
-package struct EntityHandle<T>: Equatable, Hashable {
+package struct EntityHandle<T: ~Copyable>: Equatable, Hashable, Copyable {
     private let pointer: UnsafeMutablePointer<T>
 
     init(unsafe pointer: UnsafeMutablePointer<T>) {
@@ -51,8 +51,8 @@ package struct EntityHandle<T>: Equatable, Hashable {
         self.pointer = pointer
     }
 
-    subscript<R>(dynamicMember keyPath: KeyPath<T, R>) -> R {
-        pointer.pointee[keyPath: keyPath]
+    package subscript<R>(dynamicMember keyPath: KeyPath<T, R>) -> R where T: Copyable {
+        withValue { $0[keyPath: keyPath] }
     }
 
     @inline(__always)
@@ -456,14 +456,14 @@ public struct Table: Equatable {
     }
 }
 
-struct MemoryEntity /* : ~Copyable */ {
+struct MemoryEntity: ~Copyable {
     static let pageSize = 64 * 1024
 
     static func maxPageCount(isMemory64: Bool) -> UInt64 {
         isMemory64 ? UInt64.max : UInt64(1 << 32) / UInt64(pageSize)
     }
 
-    var data: [UInt8]
+    private var storage: UnsafeMutableBufferPointer<UInt8>
     let maxPageCount: UInt64
     let limit: Limits
 
@@ -472,16 +472,35 @@ struct MemoryEntity /* : ~Copyable */ {
         guard try resourceLimiter.limitMemoryGrowth(to: byteSize) else {
             throw Trap(.initialMemorySizeExceedsLimit(byteSize: byteSize))
         }
-        data = Array(repeating: 0, count: byteSize)
+        storage = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: byteSize)
+        if byteSize > 0 {
+            storage.initialize(repeating: 0)
+        }
         let defaultMaxPageCount = Self.maxPageCount(isMemory64: memoryType.isMemory64)
         maxPageCount = memoryType.max ?? defaultMaxPageCount
         limit = memoryType
     }
 
+    deinit {
+        storage.deallocate()
+    }
+
+    var data: UnsafeBufferPointer<UInt8> {
+        UnsafeBufferPointer(storage)
+    }
+
+    var baseAddress: UnsafeMutableRawPointer? {
+        UnsafeMutableRawPointer(storage.baseAddress)
+    }
+
+    var byteCount: Int {
+        storage.count
+    }
+
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#grow-mem>
     mutating func grow(by pageCount: Int, resourceLimiter: any ResourceLimiter) throws -> Value {
-        let newPageCount = data.count / Self.pageSize + pageCount
+        let newPageCount = storage.count / Self.pageSize + pageCount
 
         guard newPageCount <= maxPageCount else {
             return limit.isMemory64 ? .i64((-1 as Int64).unsigned) : .i32((-1 as Int32).unsigned)
@@ -490,8 +509,17 @@ struct MemoryEntity /* : ~Copyable */ {
             return limit.isMemory64 ? .i64((-1 as Int64).unsigned) : .i32((-1 as Int32).unsigned)
         }
 
-        let result = Int32(data.count / MemoryEntity.pageSize).unsigned
-        data.append(contentsOf: Array(repeating: 0, count: Int(pageCount) * MemoryEntity.pageSize))
+        let result = Int32(storage.count / MemoryEntity.pageSize).unsigned
+        let oldStorage = storage
+        let newByteCount = newPageCount * MemoryEntity.pageSize
+        storage = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: newByteCount)
+        if newByteCount > 0 {
+            storage.initialize(repeating: 0)
+        }
+        if oldStorage.count > 0 {
+            storage.baseAddress!.update(from: oldStorage.baseAddress!, count: oldStorage.count)
+        }
+        oldStorage.deallocate()
 
         return limit.isMemory64 ? .i64(UInt64(result)) : .i32(result)
     }
@@ -500,16 +528,24 @@ struct MemoryEntity /* : ~Copyable */ {
         let (destinationEnd, destinationOverflow) = destination.addingReportingOverflow(count)
         let (sourceEnd, sourceOverflow) = source.addingReportingOverflow(count)
 
-        guard !destinationOverflow, destinationEnd <= data.count,
-            !sourceOverflow, sourceEnd <= data.count
+        guard !destinationOverflow, destinationEnd <= storage.count,
+            !sourceOverflow, sourceEnd <= storage.count
         else {
             throw Trap(.memoryOutOfBounds)
         }
-        data.withUnsafeMutableBufferPointer {
-            guard let base = UnsafeMutableRawPointer($0.baseAddress) else { return }
-            let dest = base.advanced(by: Int(destination))
-            let src = base.advanced(by: Int(source))
-            dest.copyMemory(from: src, byteCount: Int(count))
+        let count = Int(count)
+        guard count > 0 else { return }
+        guard let baseAddress = storage.baseAddress else { return }
+        let destination = Int(destination)
+        let source = Int(source)
+        if destination < source {
+            for i in 0..<count {
+                baseAddress[destination + i] = baseAddress[source + i]
+            }
+        } else if destination > source {
+            for i in stride(from: count - 1, through: 0, by: -1) {
+                baseAddress[destination + i] = baseAddress[source + i]
+            }
         }
     }
 
@@ -517,30 +553,40 @@ struct MemoryEntity /* : ~Copyable */ {
         let (destinationEnd, destinationOverflow) = destination.addingReportingOverflow(UInt64(count))
         let (sourceEnd, sourceOverflow) = source.addingReportingOverflow(count)
 
-        guard !destinationOverflow, destinationEnd <= data.count,
+        guard !destinationOverflow, destinationEnd <= storage.count,
             !sourceOverflow, sourceEnd <= segment.data.count
         else {
             throw Trap(.memoryOutOfBounds)
         }
-        data.withUnsafeMutableBufferPointer { memory in
-            segment.data.withUnsafeBufferPointer { segment in
-                guard
-                    let memory = UnsafeMutableRawPointer(memory.baseAddress),
-                    let segment = UnsafeRawPointer(segment.baseAddress)
-                else { return }
-                let dest = memory.advanced(by: Int(destination))
-                let src = segment.advanced(by: Int(source))
-                dest.copyMemory(from: src, byteCount: Int(count))
-            }
+        segment.data.withUnsafeBufferPointer { segment in
+            guard
+                let memory = UnsafeMutableRawPointer(storage.baseAddress),
+                let segment = UnsafeRawPointer(segment.baseAddress)
+            else { return }
+            let dest = memory.advanced(by: Int(destination))
+            let src = segment.advanced(by: Int(source))
+            dest.copyMemory(from: src, byteCount: Int(count))
         }
     }
 
     mutating func write(offset: Int, bytes: ArraySlice<UInt8>) throws {
         let endOffset = offset + bytes.count
-        guard endOffset <= data.count else {
+        guard endOffset <= storage.count else {
             throw Trap(.memoryOutOfBounds)
         }
-        data[offset..<endOffset] = bytes
+        guard bytes.count > 0 else { return }
+        bytes.withUnsafeBufferPointer { source in
+            storage.baseAddress!.advanced(by: offset).update(from: source.baseAddress!, count: bytes.count)
+        }
+    }
+
+    mutating func fill(offset: Int, value: UInt8, count: Int) throws {
+        let endOffset = offset + count
+        guard endOffset <= storage.count else {
+            throw Trap(.memoryOutOfBounds)
+        }
+        guard count > 0 else { return }
+        storage.baseAddress!.advanced(by: offset).update(repeating: value, count: count)
     }
 }
 
@@ -597,27 +643,47 @@ public struct Memory: Equatable {
     }
 
     /// Returns a copy of the memory data.
+    @available(*, deprecated, message: "Use `withUnsafeBufferPointer(offset:count:_:)` or `withUnsafeMutableBufferPointer(offset:count:_:)` instead")
     public var data: [UInt8] {
-        handle.data
+        handle.withValue { Array($0.data) }
     }
 
     /// The type of the memory instance.
     public var type: MemoryType {
-        handle.limit
+        handle.withValue { $0.limit }
     }
 }
 
 extension Memory: GuestMemory {
+    /// Executes the given closure with an immutable buffer pointer to the host memory region mapped as guest memory.
+    public func withUnsafeBufferPointer<T>(
+        offset: UInt,
+        count: Int,
+        _ body: (UnsafeRawBufferPointer) throws -> T
+    ) rethrows -> T {
+        return try handle.withValue { memory in
+            precondition(Int(offset) + count <= memory.byteCount, "Memory access out of bounds")
+            guard let base = memory.baseAddress else {
+                preconditionFailure("Memory has no base address")
+            }
+            let start = base.advanced(by: Int(offset))
+            return try body(UnsafeRawBufferPointer(start: UnsafeRawPointer(start), count: count))
+        }
+    }
+
     /// Executes the given closure with a mutable buffer pointer to the host memory region mapped as guest memory.
     public func withUnsafeMutableBufferPointer<T>(
         offset: UInt,
         count: Int,
         _ body: (UnsafeMutableRawBufferPointer) throws -> T
     ) rethrows -> T {
-        try handle.withValue { memory in
-            try memory.data.withUnsafeMutableBufferPointer { buffer in
-                try body(UnsafeMutableRawBufferPointer(start: buffer.baseAddress! + Int(offset), count: count))
+        return try handle.withValue { memory in
+            precondition(Int(offset) + count <= memory.byteCount, "Memory access out of bounds")
+            guard let base = memory.baseAddress else {
+                preconditionFailure("Memory has no base address")
             }
+            let start = base.advanced(by: Int(offset))
+            return try body(UnsafeMutableRawBufferPointer(start: start, count: count))
         }
     }
 }
