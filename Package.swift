@@ -62,7 +62,7 @@ let package = Package(
         .testTarget(
             name: "WasmKitTests",
             dependencies: ["WasmKit", "WAT", "WasmKitFuzzing"],
-            exclude: ["ExtraSuite"]
+            exclude: ["ExtraSuite", "CMakeLists.txt"]
         ),
 
         .target(
@@ -134,9 +134,14 @@ let package = Package(
             dependencies: [
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "NIOCore", package: "swift-nio"),
-            ]
+            ],
+            exclude: ["LICENSE.txt"]
         ),
-        .testTarget(name: "GDBRemoteProtocolTests", dependencies: ["GDBRemoteProtocol"]),
+        .testTarget(
+            name: "GDBRemoteProtocolTests",
+            dependencies: ["GDBRemoteProtocol"],
+            exclude: ["LICENSE.txt"]
+        ),
     ]
 )
 
@@ -194,7 +199,8 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
                 "WasmKit",
                 "WasmKitWASI",
                 "GDBRemoteProtocol",
-            ]
+            ],
+            exclude: ["LICENSE.txt"]
         ),
     ])
 

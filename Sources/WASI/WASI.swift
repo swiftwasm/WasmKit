@@ -1614,10 +1614,10 @@ final class WASIImplementation {
         let linkBytes = try dirEntry.readlink(atPath: path)
         let bytesWritten = min(Int(buffer.count), linkBytes.count)
         if bytesWritten > 0 {
-            try buffer.withHostPointer { hostBuffer in
+            buffer.withHostPointer { hostBuffer in
                 linkBytes.withUnsafeBytes { linkBytes in
                     guard let source = linkBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
-                    hostBuffer.baseAddress?.assign(from: source, count: bytesWritten)
+                    hostBuffer.baseAddress?.update(from: source, count: bytesWritten)
                 }
             }
         }

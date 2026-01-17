@@ -459,7 +459,9 @@ extension Execution {
         #else
             var pc = pc
             let handler = pc.read(wasmkit_tc_exec.self)
-            wasmkit_tc_start(handler, sp, pc, md, ms, &self)
+            withUnsafeMutablePointer(to: &self) { selfPtr in
+                wasmkit_tc_start(handler, sp, pc, md, ms, selfPtr)
+            }
             if let (rawError, trappingSp) = self.trap {
                 let error = unsafeBitCast(rawError, to: Error.self)
                 // Manually release the error object because the trap is caught in C and
