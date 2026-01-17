@@ -83,7 +83,7 @@ struct WatParser {
         let location: Location
     }
 
-    struct LocalDecl: NamedModuleFieldDecl {
+    struct LocalDecl: NamedFieldDecl {
         var id: Name?
         var type: UnresolvedType<ValueType>
 
@@ -91,12 +91,12 @@ struct WatParser {
             try ResolvedLocalDecl(id: id, type: type.resolve(typeMap))
         }
     }
-    struct ResolvedLocalDecl: NamedModuleFieldDecl {
+    struct ResolvedLocalDecl: NamedFieldDecl {
         var id: Name?
         var type: ValueType
     }
 
-    struct FunctionDecl: NamedModuleFieldDecl, ImportableModuleFieldDecl {
+    struct FunctionDecl: NamedFieldDecl, ImportableModuleFieldDecl {
         var id: Name?
         var exports: [String]
         var typeUse: TypeUse
@@ -131,12 +131,12 @@ struct WatParser {
         }
     }
 
-    struct FunctionTypeDecl: NamedModuleFieldDecl {
+    struct FunctionTypeDecl: NamedFieldDecl {
         let id: Name?
         let type: UnresolvedType<FunctionType>
     }
 
-    struct TableDecl: NamedModuleFieldDecl, ImportableModuleFieldDecl {
+    struct TableDecl: NamedFieldDecl, ImportableModuleFieldDecl {
         var id: Name?
         var exports: [String]
         var type: UnresolvedType<TableType>
@@ -144,7 +144,7 @@ struct WatParser {
         var inlineElement: ElementDecl?
     }
 
-    struct ElementDecl: NamedModuleFieldDecl {
+    struct ElementDecl: NamedFieldDecl {
         enum Offset {
             case expression(Lexer)
             case singleInstruction(Lexer)
@@ -174,7 +174,7 @@ struct WatParser {
         var kind: ExternalKind
     }
 
-    struct GlobalDecl: NamedModuleFieldDecl, ImportableModuleFieldDecl {
+    struct GlobalDecl: NamedFieldDecl, ImportableModuleFieldDecl {
         var id: Name?
         var exports: [String]
         var type: UnresolvedType<GlobalType>
@@ -188,7 +188,7 @@ struct WatParser {
         }
     }
 
-    struct MemoryDecl: NamedModuleFieldDecl, ImportableModuleFieldDecl {
+    struct MemoryDecl: NamedFieldDecl, ImportableModuleFieldDecl {
         var id: Name?
         var exports: [String]
         var type: MemoryType
@@ -196,7 +196,7 @@ struct WatParser {
         var inlineData: DataSegmentDecl?
     }
 
-    struct DataSegmentDecl: NamedModuleFieldDecl {
+    struct DataSegmentDecl: NamedFieldDecl {
         var id: Name?
         var memory: Parser.IndexOrId?
         enum Offset {

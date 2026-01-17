@@ -55,6 +55,7 @@ public enum ComponentType: Equatable {
     case float64
     case char
     case string
+    case errorContext
     case list(ComponentTypeIndex)
     //    case handleOwn(ResourceSyntax)
     //    case handleBorrow(ResourceSyntax)
