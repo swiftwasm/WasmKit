@@ -20,7 +20,7 @@
             self.features = features
         }
 
-        mutating func next() throws -> Field? {
+        mutating func next() throws(WatParserError) -> Field? {
             // If we have reached the end of the (component ...) block, return nil
             guard try !parser.isEndOfParen() else { return nil }
             try parser.expect(.leftParen)
@@ -74,13 +74,13 @@
             return field
         }
 
-        private mutating func parseModuleDef() throws -> ModuleDef {
+        private mutating func parseModuleDef() throws(WatParserError) -> ModuleDef {
             let moduleID = try parser.takeId()
             let wat = try parseWAT(&parser, features: features)
             return .init(id: moduleID, wat: wat)
         }
 
-        private mutating func parseModuleInstanceArguments() throws -> CoreInstanceDef.Argument {
+        private mutating func parseModuleInstanceArguments() throws(WatParserError) -> CoreInstanceDef.Argument {
             try parser.expectKeyword("with")
             let importName = try parser.expectString()
             try parser.expect(.leftParen)
@@ -96,7 +96,7 @@
             return .init(importName: importName, kind: result)
         }
 
-        private mutating func parseCoreDefSort() throws -> CoreDefSort {
+        private mutating func parseCoreDefSort() throws(WatParserError) -> CoreDefSort {
             let rawKeyword = try parser.expectKeyword()
             guard let keyword = CoreDefSort(rawValue: rawKeyword) else {
                 throw WatParserError(
@@ -108,7 +108,7 @@
             return keyword
         }
 
-        private mutating func parseComponentDefSort() throws -> ComponentDefSort {
+        private mutating func parseComponentDefSort() throws(WatParserError) -> ComponentDefSort {
             let rawKeyword = try parser.expectKeyword()
             switch rawKeyword {
             case "core":
@@ -128,7 +128,7 @@
             }
         }
 
-        private mutating func parseCoreInstanceDef() throws -> CoreInstanceDef {
+        private mutating func parseCoreInstanceDef() throws(WatParserError) -> CoreInstanceDef {
             let instanceId = try parser.takeId()
             try parser.expect(.leftParen)
 
@@ -150,7 +150,7 @@
             )
         }
 
-        private mutating func parseComponentFunction() throws -> [ComponentDefField] {
+        private mutating func parseComponentFunction() throws(WatParserError) -> [ComponentDefField] {
             var result = [ComponentDefField]()
             let id = try parser.takeId()
             try parser.expect(.leftParen)
@@ -188,7 +188,7 @@
             return result
         }
 
-        private mutating func parseCanonOpt() throws -> CanonDef.Option {
+        private mutating func parseCanonOpt() throws(WatParserError) -> CanonDef.Option {
             let keyword = try parser.expectKeyword()
             switch keyword {
             case "memory":
@@ -209,7 +209,7 @@
             }
         }
 
-        private mutating func parseCoreFunctionIndex() throws -> FuncIndex {
+        private mutating func parseCoreFunctionIndex() throws(WatParserError) -> FuncIndex {
             try parser.expect(.leftParen)
             try parser.expectKeyword("core")
             try parser.expectKeyword("func")
