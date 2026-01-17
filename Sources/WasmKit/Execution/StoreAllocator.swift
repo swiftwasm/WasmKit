@@ -359,7 +359,7 @@ extension StoreAllocator {
         let memories = try allocateEntities(
             imports: importedMemories,
             internals: module.internalMemories,
-            allocateHandle: { m, _ in try allocate(memoryType: m, resourceLimiter: resourceLimiter) }
+            allocateHandle: { m, _ in try allocate(memoryType: m, engineConfiguration: engine.configuration, resourceLimiter: resourceLimiter) }
         )
 
         var functionRefs: Set<InternalFunction> = []
@@ -502,8 +502,8 @@ extension StoreAllocator {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-mem>
-    func allocate(memoryType: MemoryType, resourceLimiter: any ResourceLimiter) throws -> InternalMemory {
-        let pointer = try memories.allocate(initializing: MemoryEntity(memoryType, resourceLimiter: resourceLimiter))
+    func allocate(memoryType: MemoryType, engineConfiguration: EngineConfiguration, resourceLimiter: any ResourceLimiter) throws -> InternalMemory {
+        let pointer = try memories.allocate(initializing: MemoryEntity(memoryType, engineConfiguration: engineConfiguration, resourceLimiter: resourceLimiter))
         return InternalMemory(unsafe: pointer)
     }
 

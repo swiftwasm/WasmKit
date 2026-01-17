@@ -463,44 +463,118 @@ struct MemoryEntity: ~Copyable {
         isMemory64 ? UInt64.max : UInt64(1 << 32) / UInt64(pageSize)
     }
 
-    private var storage: UnsafeMutableBufferPointer<UInt8>
+    #if WASMKIT_MPROTECT_BOUND_CHECKING && !os(WASI)
+        private enum Storage {
+            case mprotect(MprotectLinearMemory)
+            case malloc(UnsafeMutableBufferPointer<UInt8>)
+        }
+        private var storage: Storage
+    #else
+        private var storage: UnsafeMutableBufferPointer<UInt8>
+    #endif
     let maxPageCount: UInt64
     let limit: Limits
 
-    init(_ memoryType: MemoryType, resourceLimiter: any ResourceLimiter) throws {
+    init(_ memoryType: MemoryType, engineConfiguration: EngineConfiguration, resourceLimiter: any ResourceLimiter) throws {
         let byteSize = Int(memoryType.min) * Self.pageSize
         guard try resourceLimiter.limitMemoryGrowth(to: byteSize) else {
             throw Trap(.initialMemorySizeExceedsLimit(byteSize: byteSize))
         }
-        storage = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: byteSize)
-        if byteSize > 0 {
-            storage.initialize(repeating: 0)
-        }
+        #if WASMKIT_MPROTECT_BOUND_CHECKING && !os(WASI)
+            if !memoryType.isMemory64, engineConfiguration.memoryBoundsChecking != .software {
+                let reservationSize = MprotectLinearMemory.wasm32ReservationSize(offsetGuardSize: engineConfiguration.memoryOffsetGuardSize)
+                do {
+                    storage = .mprotect(try MprotectLinearMemory(committedSize: byteSize, reservationSize: reservationSize))
+                } catch {
+                    // Best-effort: fall back to software bounds checks if we cannot reserve/mprotect.
+                    let storage = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: byteSize)
+                    if byteSize > 0 { storage.initialize(repeating: 0) }
+                    self.storage = .malloc(storage)
+                }
+            } else {
+                let storage = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: byteSize)
+                if byteSize > 0 { storage.initialize(repeating: 0) }
+                self.storage = .malloc(storage)
+            }
+        #else
+            storage = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: byteSize)
+            if byteSize > 0 {
+                storage.initialize(repeating: 0)
+            }
+        #endif
         let defaultMaxPageCount = Self.maxPageCount(isMemory64: memoryType.isMemory64)
         maxPageCount = memoryType.max ?? defaultMaxPageCount
         limit = memoryType
     }
 
     deinit {
-        storage.deallocate()
+        #if WASMKIT_MPROTECT_BOUND_CHECKING && !os(WASI)
+            switch storage {
+            case .mprotect(let memory):
+                memory.deallocate()
+            case .malloc(let buffer):
+                buffer.deallocate()
+            }
+        #else
+            storage.deallocate()
+        #endif
     }
 
     var data: UnsafeBufferPointer<UInt8> {
-        UnsafeBufferPointer(storage)
+        #if WASMKIT_MPROTECT_BOUND_CHECKING && !os(WASI)
+            switch storage {
+            case .mprotect(let memory):
+                return memory.makeBufferPointer()
+            case .malloc(let buffer):
+                return UnsafeBufferPointer(buffer)
+            }
+        #else
+            return UnsafeBufferPointer(storage)
+        #endif
     }
 
     var baseAddress: UnsafeMutableRawPointer? {
-        UnsafeMutableRawPointer(storage.baseAddress)
+        #if WASMKIT_MPROTECT_BOUND_CHECKING && !os(WASI)
+            switch storage {
+            case .mprotect(let memory):
+                return memory.baseAddress
+            case .malloc(let buffer):
+                return UnsafeMutableRawPointer(buffer.baseAddress)
+            }
+        #else
+            return UnsafeMutableRawPointer(storage.baseAddress)
+        #endif
     }
 
     var byteCount: Int {
-        storage.count
+        #if WASMKIT_MPROTECT_BOUND_CHECKING && !os(WASI)
+            switch storage {
+            case .mprotect(let memory):
+                return memory.committedSize
+            case .malloc(let buffer):
+                return buffer.count
+            }
+        #else
+            return storage.count
+        #endif
+    }
+
+    var trapGuardReservationSize: Int {
+        #if WASMKIT_MPROTECT_BOUND_CHECKING && !os(WASI)
+            if case .mprotect(let memory) = storage {
+                return memory.reservationSize
+            }
+            return 0
+        #else
+            return 0
+        #endif
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#grow-mem>
     mutating func grow(by pageCount: Int, resourceLimiter: any ResourceLimiter) throws -> Value {
-        let newPageCount = storage.count / Self.pageSize + pageCount
+        let currentByteCount = byteCount
+        let newPageCount = currentByteCount / Self.pageSize + pageCount
 
         guard newPageCount <= maxPageCount else {
             return limit.isMemory64 ? .i64((-1 as Int64).unsigned) : .i32((-1 as Int32).unsigned)
@@ -509,17 +583,33 @@ struct MemoryEntity: ~Copyable {
             return limit.isMemory64 ? .i64((-1 as Int64).unsigned) : .i32((-1 as Int32).unsigned)
         }
 
-        let result = Int32(storage.count / MemoryEntity.pageSize).unsigned
-        let oldStorage = storage
+        let result = Int32(currentByteCount / MemoryEntity.pageSize).unsigned
         let newByteCount = newPageCount * MemoryEntity.pageSize
-        storage = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: newByteCount)
-        if newByteCount > 0 {
-            storage.initialize(repeating: 0)
-        }
-        if oldStorage.count > 0 {
-            storage.baseAddress!.update(from: oldStorage.baseAddress!, count: oldStorage.count)
-        }
-        oldStorage.deallocate()
+        #if WASMKIT_MPROTECT_BOUND_CHECKING && !os(WASI)
+            switch storage {
+            case .mprotect(var memory):
+                try memory.grow(to: newByteCount)
+                storage = .mprotect(memory)
+            case .malloc(let oldStorage):
+                var storage = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: newByteCount)
+                if newByteCount > 0 { storage.initialize(repeating: 0) }
+                if oldStorage.count > 0 {
+                    storage.baseAddress!.update(from: oldStorage.baseAddress!, count: oldStorage.count)
+                }
+                oldStorage.deallocate()
+                self.storage = .malloc(storage)
+            }
+        #else
+            let oldStorage = storage
+            storage = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: newByteCount)
+            if newByteCount > 0 {
+                storage.initialize(repeating: 0)
+            }
+            if oldStorage.count > 0 {
+                storage.baseAddress!.update(from: oldStorage.baseAddress!, count: oldStorage.count)
+            }
+            oldStorage.deallocate()
+        #endif
 
         return limit.isMemory64 ? .i64(UInt64(result)) : .i32(result)
     }
@@ -528,14 +618,15 @@ struct MemoryEntity: ~Copyable {
         let (destinationEnd, destinationOverflow) = destination.addingReportingOverflow(count)
         let (sourceEnd, sourceOverflow) = source.addingReportingOverflow(count)
 
-        guard !destinationOverflow, destinationEnd <= storage.count,
-            !sourceOverflow, sourceEnd <= storage.count
+        let byteCount = byteCount
+        guard !destinationOverflow, destinationEnd <= byteCount,
+            !sourceOverflow, sourceEnd <= byteCount
         else {
             throw Trap(.memoryOutOfBounds)
         }
         let count = Int(count)
         guard count > 0 else { return }
-        guard let baseAddress = storage.baseAddress else { return }
+        guard let baseAddress = baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
         let destination = Int(destination)
         let source = Int(source)
         if destination < source {
@@ -553,14 +644,15 @@ struct MemoryEntity: ~Copyable {
         let (destinationEnd, destinationOverflow) = destination.addingReportingOverflow(UInt64(count))
         let (sourceEnd, sourceOverflow) = source.addingReportingOverflow(count)
 
-        guard !destinationOverflow, destinationEnd <= storage.count,
+        let byteCount = byteCount
+        guard !destinationOverflow, destinationEnd <= byteCount,
             !sourceOverflow, sourceEnd <= segment.data.count
         else {
             throw Trap(.memoryOutOfBounds)
         }
         segment.data.withUnsafeBufferPointer { segment in
             guard
-                let memory = UnsafeMutableRawPointer(storage.baseAddress),
+                let memory = baseAddress,
                 let segment = UnsafeRawPointer(segment.baseAddress)
             else { return }
             let dest = memory.advanced(by: Int(destination))
@@ -571,22 +663,22 @@ struct MemoryEntity: ~Copyable {
 
     mutating func write(offset: Int, bytes: ArraySlice<UInt8>) throws {
         let endOffset = offset + bytes.count
-        guard endOffset <= storage.count else {
+        guard endOffset <= byteCount else {
             throw Trap(.memoryOutOfBounds)
         }
         guard bytes.count > 0 else { return }
         bytes.withUnsafeBufferPointer { source in
-            storage.baseAddress!.advanced(by: offset).update(from: source.baseAddress!, count: bytes.count)
+            baseAddress!.advanced(by: offset).assumingMemoryBound(to: UInt8.self).update(from: source.baseAddress!, count: bytes.count)
         }
     }
 
     mutating func fill(offset: Int, value: UInt8, count: Int) throws {
         let endOffset = offset + count
-        guard endOffset <= storage.count else {
+        guard endOffset <= byteCount else {
             throw Trap(.memoryOutOfBounds)
         }
         guard count > 0 else { return }
-        storage.baseAddress!.advanced(by: offset).update(repeating: value, count: count)
+        baseAddress!.advanced(by: offset).assumingMemoryBound(to: UInt8.self).update(repeating: value, count: count)
     }
 }
 
@@ -637,7 +729,7 @@ public struct Memory: Equatable {
         try ModuleValidator.checkMemoryType(type, features: store.engine.configuration.features)
 
         self.init(
-            handle: try store.allocator.allocate(memoryType: type, resourceLimiter: store.resourceLimiter),
+            handle: try store.allocator.allocate(memoryType: type, engineConfiguration: store.engine.configuration, resourceLimiter: store.resourceLimiter),
             allocator: store.allocator
         )
     }
