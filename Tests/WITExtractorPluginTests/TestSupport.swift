@@ -56,6 +56,19 @@ func assertSwiftPackage(fixturePackage: String, _ trailingArguments: [String]) t
         guard let config = TestSupport.Configuration.default else {
             fatalError("Please create 'Tests/default.json'")
         }
+        func lossyUTF8(_ data: Data) -> String {
+            String(decoding: data, as: UTF8.self)
+        }
+
+        func commandLine(_ executable: URL, _ arguments: [String]) -> String {
+            ([executable.path] + arguments).joined(separator: " ")
+        }
+
+        func preview(_ string: String, limit: Int = 2_000) -> String {
+            if string.count <= limit { return string }
+            return String(string.prefix(limit)) + "\n… (truncated, total \(string.count) chars)"
+        }
+
         let swiftExecutable = config.hostSwiftExecutablePath
         let packagePath = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -69,24 +82,50 @@ func assertSwiftPackage(fixturePackage: String, _ trailingArguments: [String]) t
             }
             arguments += trailingArguments
             let stdoutPipe = Pipe()
+            let stderrPipe = Pipe()
             let process = Process()
             process.executableURL = URL(fileURLWithPath: swiftExecutable.path)
             process.arguments = arguments
             process.standardOutput = stdoutPipe
+            process.standardError = stderrPipe
             try process.run()
             process.waitUntilExit()
 
+            let stdoutBytes = try stdoutPipe.fileHandleForReading.readToEnd() ?? Data()
+            let stderrBytes = try stderrPipe.fileHandleForReading.readToEnd() ?? Data()
+
+            let command = commandLine(swiftExecutable, arguments)
             guard process.terminationStatus == 0 else {
                 throw TestSupport.Error(
-                    description: "Failed to execute \(([swiftExecutable.path] + arguments).joined(separator: " "))"
+                    description: """
+                    Failed to execute: \(command)
+                    terminationStatus: \(process.terminationStatus)
+                    stdout (lossy utf8, first 2000 chars):
+                    \(preview(lossyUTF8(stdoutBytes)))
+                    stderr (lossy utf8, first 2000 chars):
+                    \(preview(lossyUTF8(stderrBytes)))
+                    """
                 )
             }
-            guard let stdoutBytes = try stdoutPipe.fileHandleForReading.readToEnd() else { return "" }
             struct Output: Codable {
                 let witOutputPath: String
                 let swiftOutputPath: String
             }
-            let jsonOutput = try JSONDecoder().decode(Output.self, from: stdoutBytes)
+            let jsonOutput: Output
+            do {
+                jsonOutput = try JSONDecoder().decode(Output.self, from: stdoutBytes)
+            } catch {
+                throw TestSupport.Error(
+                    description: """
+                    Failed to decode JSON from swift stdout for: \(command)
+                    decode error: \(error)
+                    stdout (lossy utf8, first 2000 chars):
+                    \(preview(lossyUTF8(stdoutBytes)))
+                    stderr (lossy utf8, first 2000 chars):
+                    \(preview(lossyUTF8(stderrBytes)))
+                    """
+                )
+            }
             return try String(contentsOfFile: jsonOutput.witOutputPath)
         }
     #endif
