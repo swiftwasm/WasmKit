@@ -60,9 +60,20 @@ let package = Package(
                     condition: .when(traits: ["ComponentModel"])
                 ),
             ],
-            exclude: ["CMakeLists.txt"]
+            exclude: ["CMakeLists.txt"],
+            cSettings: [
+                .define("WASMKIT_MPROTECT_BOUND_CHECKING", .when(platforms: [.macOS, .linux]))
+            ],
+            swiftSettings: [
+                .define("WASMKIT_MPROTECT_BOUND_CHECKING", .when(platforms: [.macOS, .linux]))
+            ]
         ),
-        .target(name: "_CWasmKit"),
+        .target(
+            name: "_CWasmKit",
+            cSettings: [
+                .define("WASMKIT_MPROTECT_BOUND_CHECKING", .when(platforms: [.macOS, .linux]))
+            ]
+        ),
         .target(
             name: "WasmKitFuzzing",
             dependencies: ["WasmKit"],
