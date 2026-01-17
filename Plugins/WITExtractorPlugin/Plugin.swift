@@ -7,15 +7,17 @@ struct Plugin: CommandPlugin {
         var argumentExtractor = ArgumentExtractor(arguments)
         let targets = argumentExtractor.extractOption(named: "target")
         let sdk = argumentExtractor.extractOption(named: "sdk").last
+        let outputMappingPath = argumentExtractor.extractOption(named: "output-mapping").last
         let parameters = PackageManager.BuildParameters()
         for target in targets {
-            try extractFromTarget(target: target, sdk: sdk, parameters: parameters, context: context)
+            try extractFromTarget(target: target, sdk: sdk, outputMappingPath: outputMappingPath, parameters: parameters, context: context)
         }
     }
 
     func extractFromTarget(
         target: String,
         sdk: String?,
+        outputMappingPath: String?,
         parameters: PackageManager.BuildParameters,
         context: PluginContext
     ) throws {
@@ -68,12 +70,18 @@ struct Plugin: CommandPlugin {
                 description: "Failed to run \(([tool.path.string] + arguments).joined(separator: " "))"
             )
         }
-        print("""
+
+        let outputMapping = """
         {
-            "witOutputPath": "\(witOutputPath)",
-            "swiftOutputPath": "\(swiftOutputPath)"
+        "witOutputPath": "\(witOutputPath)",
+        "swiftOutputPath": "\(swiftOutputPath)"
         }
-        """)
+        """
+        if let outputMappingPath {
+            try outputMapping.write(to: URL(fileURLWithPath: outputMappingPath), atomically: true, encoding: .utf8)
+        } else {
+            print(outputMapping)
+        }
     }
 
     func inferSwiftcExecutablePath(llbuildManifest: Path) -> String? {

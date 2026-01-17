@@ -71,10 +71,12 @@ func assertSwiftPackage(fixturePackage: String, _ trailingArguments: [String]) t
             .appendingPathComponent(fixturePackage)
 
         return try TestSupport.withTemporaryDirectory { buildDir in
-            var arguments = ["package", "--package-path", packagePath.path, "--scratch-path", buildDir]
+            var arguments = ["package", "--package-path", packagePath.path, "--scratch-path", buildDir, "extract-wit"]
             if let sdkRootPath = config.hostSdkRootPath {
                 arguments += ["--sdk", sdkRootPath]
             }
+            let outputMappingPath = URL(fileURLWithPath: buildDir).appendingPathComponent("output-mapping.json").path
+            arguments += ["--output-mapping", outputMappingPath]
             arguments += trailingArguments
             let stdoutPipe = Pipe()
             let stderrPipe = Pipe()
@@ -108,7 +110,8 @@ func assertSwiftPackage(fixturePackage: String, _ trailingArguments: [String]) t
             }
             let jsonOutput: Output
             do {
-                jsonOutput = try JSONDecoder().decode(Output.self, from: stdoutBytes)
+                let jsonData = try Data(contentsOf: URL(fileURLWithPath: outputMappingPath))
+                jsonOutput = try JSONDecoder().decode(Output.self, from: jsonData)
             } catch {
                 throw TestSupport.Error(
                     description: """

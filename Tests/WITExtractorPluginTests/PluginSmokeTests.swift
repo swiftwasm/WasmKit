@@ -18,7 +18,7 @@ import Testing
         func extractPlugin() throws {
             let stdout = try assertSwiftPackage(
                 fixturePackage: "PluginSmokePackage",
-                ["extract-wit", "--target", "PluginSmokeModule"]
+                ["--target", "PluginSmokeModule"]
             )
             #expect(
                 stdout == """
