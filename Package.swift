@@ -69,8 +69,16 @@ let package = Package(
         .target(
             name: "WAT",
             dependencies: [
-                .target(name: "ComponentModel", condition: .when(traits: ["ComponentModel"])),
                 "WasmParser",
+                .product(
+                    name: "BasicContainers",
+                    package: "swift-collections",
+                    condition: .when(traits: ["ComponentModel"])
+                ),
+                .target(
+                    name: "ComponentModel",
+                    condition: .when(traits: ["ComponentModel"])
+                ),
             ],
             exclude: ["CMakeLists.txt"]
         ),
@@ -153,6 +161,7 @@ let package = Package(
 if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
     package.dependencies += [
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.5.1"),
+        .package(url: "https://github.com/apple/swift-collections", from: "1.3.0"),
         .package(url: "https://github.com/apple/swift-system", from: "1.5.0"),
         .package(url: "https://github.com/apple/swift-nio", from: "2.90.0"),
         .package(url: "https://github.com/apple/swift-log", from: "1.7.1"),
@@ -160,6 +169,7 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
 } else {
     package.dependencies += [
         .package(path: "../swift-argument-parser"),
+        .package(path: "../swift-collections"),
         .package(path: "../swift-system"),
         .package(path: "../swift-nio"),
         .package(path: "../swift-log"),

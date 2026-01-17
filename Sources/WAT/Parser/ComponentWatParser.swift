@@ -1,15 +1,25 @@
 #if ComponentModel
 
+    import BasicContainers
     import ComponentModel
     import WasmParser
+    import WasmTypes
 
-    struct ComponentWatParser {
+    struct ComponentWatParser: ~Copyable {
+        /// Component tree being parsed.
+        var wat = ComponentWat()
+
+        /// Underlying WAT parser to delegate to.
         var parser: Parser
+
+        /// Indices in a parsed component tree used for access to currently-parsed component.
+        var currentNestingLevel = UniqueArray<ComponentIndex>()
+
         let features: WasmFeatureSet
 
         struct Field {
             enum Kind {
-                case component(Name?, [ComponentDefField])
+                case component(Int)
             }
             let location: Location
             let kind: Kind
@@ -20,9 +30,11 @@
             self.features = features
         }
 
-        mutating func next() throws(WatParserError) -> Field? {
+        /// Parses a single top-level definition and updates in-progress parsing result stored in `self.wat`.
+        /// - Returns: `true` if no more tokens to parse.
+        mutating func next() throws(WatParserError) -> Bool {
             // If we have reached the end of the (component ...) block, return nil
-            guard try !parser.isEndOfParen() else { return nil }
+            guard try !parser.isEndOfParen() else { return false }
             try parser.expect(.leftParen)
             let location = parser.lexer.location()
             let keyword = try parser.expectKeyword()
@@ -61,7 +73,8 @@
                     }
                     try parser.expect(.rightParen)
                 }
-                field = .init(location: location, kind: .component(id, componentDefs))
+                let componentIndex = try self.wat.componentsMap.add(.init(id: id, fields: componentDefs))
+                self.wat.fields.append(.init(location: location, kind: .component(componentIndex)))
             default:
                 fatalError()
             }
@@ -71,7 +84,7 @@
                 throw WatParserError("unexpected token", location: parser.lexer.location())
             }
 
-            return field
+            return false
         }
 
         private mutating func parseModuleDef() throws(WatParserError) -> ModuleDef {
@@ -150,41 +163,92 @@
             )
         }
 
+        private mutating func parseComponentType() throws(WatParserError) -> ComponentType {
+            let keyword = try parser.peekKeyword()
+
+            if let keyword {
+                switch keyword {
+                case "bool": return .bool
+                case "u8": return .u8
+                case "u16": return .u16
+                case "u32": return .u32
+                case "u64": return .u64
+                case "s8": return .s8
+                case "s16": return .s16
+                case "s32": return .s32
+                case "s64": return .s64
+                case "float32": return .float32
+                case "float64": return .float64
+                case "char": return .char
+                case "string": return .string
+                default:
+                    throw WatParserError(
+                        "Unexpected component type keyword `\(keyword)",
+                        location: parser.lexer.location()
+                    )
+                }
+            } else {
+                try parser.expect(.leftParen)
+                switch parser.expectKeyword() {
+
+                }
+            }
+        }
+
         private mutating func parseComponentFunction() throws(WatParserError) -> [ComponentDefField] {
             var result = [ComponentDefField]()
             let id = try parser.takeId()
-            try parser.expect(.leftParen)
-            let keyword = try parser.expectKeyword()
-            switch keyword {
-            case "export":
-            case "import":
-            case "canon":
-                try parser.expectKeyword("lift")
-                let coreFunctionIndex = try parseCoreFunctionIndex()
-                var options = [CanonDef.Option]()
-                while try parser.take(.leftParen) {
-                    options.append(try parseCanonOpt())
-                    try parser.expect(.rightParen)
-                }
-                result.append(
-                    .canon(
-                        .init(
-                            id: id,
-                            kind: .lift,
-                            functionIndex: coreFunctionIndex,
-                            options: options
-                        ))
-                )
+            var paramTypes = [ComponentType]()
+            var resultType: ComponentType?
+            var type: Parser.IndexOrId?
 
-            default:
-                throw WatParserError(
-                    "Unknown component function keyword \(keyword)",
-                    location: parser.lexer.location()
-                )
+            while try parser.take(.leftParen) {
+                let keyword = try parser.expectKeyword()
+                switch keyword {
+                case "param":
+                    paramTypes.append(try parseComponentType())
+
+                case "export":
+                    let id = self.wat.componentFunctions.add(.init(id: id, linking: <#T##ComponentFuncDef.Linking?#>, params: <#T##[(String, ComponentType)]#>, result: <#T##ComponentType#>))
+                    let exportName = try parser.expectString()
+                    result.append(
+                        .exportDef(.init(exportName: exportName))
+                    )
+
+                case "import":
+                    let importModuleName = try parser.expectString()
+                    let importName = try parser.expectString()
+                    result.append(
+                        .importDef(.init(importModuleName: importModuleName, importName: importName))
+                    )
+
+                case "canon":
+                    try parser.expectKeyword("lift")
+                    let coreFunctionIndex = try parseCoreFunctionIndex()
+                    var options = [CanonDef.Option]()
+                    while try parser.take(.leftParen) {
+                        options.append(try parseCanonOpt())
+                        try parser.expect(.rightParen)
+                    }
+                    result.append(
+                        .canon(
+                            .init(
+                                id: id,
+                                kind: .lift,
+                                functionIndex: coreFunctionIndex,
+                                options: options
+                            ))
+                    )
+
+                default:
+                    throw WatParserError(
+                        "Unknown component function keyword \(keyword)",
+                        location: parser.lexer.location()
+                    )
+                }
+
+                try parser.expect(.rightParen)
             }
-            try parser.expectKeyword("export")
-            let exportName = try parser.takeString()
-            try parser.expect(.rightParen)
             return result
         }
 
@@ -229,31 +293,29 @@
             case component(ComponentDef)
             case instance(ComponentInstanceDef)
             case canon(CanonDef)
+            case exportDef(ExportDef)
+            case importDef(ImportDef)
         }
 
-        struct ValueDef: NamedModuleFieldDecl {
+        struct ValueDef: NamedFieldDecl {
             var id: Name?
         }
 
-        struct TypeDef: NamedModuleFieldDecl {
+        struct ComponentInstanceDef: NamedFieldDecl {
             var id: Name?
         }
 
-        struct ComponentInstanceDef: NamedModuleFieldDecl {
-            var id: Name?
-        }
-
-        struct ComponentDef: NamedModuleFieldDecl {
+        struct ComponentDef: NamedFieldDecl {
             var id: Name?
             let fields: [ComponentDefField]
         }
 
-        struct ModuleDef: NamedModuleFieldDecl {
+        struct ModuleDef: NamedFieldDecl {
             var id: Name?
             var wat: Wat
         }
 
-        struct CoreInstanceDef: NamedModuleFieldDecl {
+        struct CoreInstanceDef: NamedFieldDecl {
             struct Argument {
                 enum Kind {
                     struct Export {
@@ -274,12 +336,17 @@
             var arguments: [Argument]
         }
 
+        struct CoreTypeDef: NamedFieldDecl {
+            var id: Name?
+            let type: FunctionType
+        }
+
         struct FuncIndex {
             var instance: Parser.IndexOrId
             var exportName: String
         }
 
-        struct CanonDef: NamedModuleFieldDecl {
+        struct CanonDef: NamedFieldDecl {
             enum Option {
                 enum Encoding {
                     case utf8
@@ -295,13 +362,42 @@
             }
 
             enum Kind {
-                case lower
-                case lift
+                case lower(ComponentFuncIndex)
+                case lift(FunctionIndex)
             }
             var id: Name?
             let kind: Kind
             let functionIndex: FuncIndex
             let options: [Option]
+        }
+
+        enum ExternDesc {
+            case module(Parser.IndexOrId)
+            case function(Parser.IndexOrId)
+            case value(Parser.IndexOrId)
+            case type(Parser.IndexOrId)
+            case component(Parser.IndexOrId)
+            case instance(Parser.IndexOrId)
+        }
+
+        struct ExportDef {
+            let exportName: String
+            let descriptor: ExternDesc
+        }
+
+        struct ImportDef {
+            let importModuleName: String
+            let importName: String
+            let descriptor: ExternDesc
+        }
+
+        struct ComponentFuncDef: NamedFieldDecl {
+            var id: Name?
+            let type: Parser.IndexOrId
+        }
+
+        struct ComponentTypeDef: NamedFieldDecl {
+            var id: Name?
         }
     }
 
