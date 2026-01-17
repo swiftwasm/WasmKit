@@ -97,6 +97,52 @@ enum Instruction: Equatable {
     case i64Store16(Instruction.StoreOperand)
     /// WebAssembly Core Instruction `i64.store32`
     case i64Store32(Instruction.StoreOperand)
+    /// Unchecked variant of `i32.load`
+    case i32LoadUnchecked(Instruction.LoadOperand)
+    /// Unchecked variant of `i64.load`
+    case i64LoadUnchecked(Instruction.LoadOperand)
+    /// Unchecked variant of `f32.load`
+    case f32LoadUnchecked(Instruction.LoadOperand)
+    /// Unchecked variant of `f64.load`
+    case f64LoadUnchecked(Instruction.LoadOperand)
+    /// Unchecked variant of `i32.load8_s`
+    case i32Load8SUnchecked(Instruction.LoadOperand)
+    /// Unchecked variant of `i32.load8_u`
+    case i32Load8UUnchecked(Instruction.LoadOperand)
+    /// Unchecked variant of `i32.load16_s`
+    case i32Load16SUnchecked(Instruction.LoadOperand)
+    /// Unchecked variant of `i32.load16_u`
+    case i32Load16UUnchecked(Instruction.LoadOperand)
+    /// Unchecked variant of `i64.load8_s`
+    case i64Load8SUnchecked(Instruction.LoadOperand)
+    /// Unchecked variant of `i64.load8_u`
+    case i64Load8UUnchecked(Instruction.LoadOperand)
+    /// Unchecked variant of `i64.load16_s`
+    case i64Load16SUnchecked(Instruction.LoadOperand)
+    /// Unchecked variant of `i64.load16_u`
+    case i64Load16UUnchecked(Instruction.LoadOperand)
+    /// Unchecked variant of `i64.load32_s`
+    case i64Load32SUnchecked(Instruction.LoadOperand)
+    /// Unchecked variant of `i64.load32_u`
+    case i64Load32UUnchecked(Instruction.LoadOperand)
+    /// Unchecked variant of `i32.store`
+    case i32StoreUnchecked(Instruction.StoreOperand)
+    /// Unchecked variant of `i64.store`
+    case i64StoreUnchecked(Instruction.StoreOperand)
+    /// Unchecked variant of `f32.store`
+    case f32StoreUnchecked(Instruction.StoreOperand)
+    /// Unchecked variant of `f64.store`
+    case f64StoreUnchecked(Instruction.StoreOperand)
+    /// Unchecked variant of `i32.store8`
+    case i32Store8Unchecked(Instruction.StoreOperand)
+    /// Unchecked variant of `i32.store16`
+    case i32Store16Unchecked(Instruction.StoreOperand)
+    /// Unchecked variant of `i64.store8`
+    case i64Store8Unchecked(Instruction.StoreOperand)
+    /// Unchecked variant of `i64.store16`
+    case i64Store16Unchecked(Instruction.StoreOperand)
+    /// Unchecked variant of `i64.store32`
+    case i64Store32Unchecked(Instruction.StoreOperand)
     /// WebAssembly Core Instruction `memory.size`
     case memorySize(Instruction.MemorySizeOperand)
     /// WebAssembly Core Instruction `memory.grow`
@@ -936,6 +982,29 @@ extension Instruction {
         case .i64Store8(let immediate): return immediate
         case .i64Store16(let immediate): return immediate
         case .i64Store32(let immediate): return immediate
+        case .i32LoadUnchecked(let immediate): return immediate
+        case .i64LoadUnchecked(let immediate): return immediate
+        case .f32LoadUnchecked(let immediate): return immediate
+        case .f64LoadUnchecked(let immediate): return immediate
+        case .i32Load8SUnchecked(let immediate): return immediate
+        case .i32Load8UUnchecked(let immediate): return immediate
+        case .i32Load16SUnchecked(let immediate): return immediate
+        case .i32Load16UUnchecked(let immediate): return immediate
+        case .i64Load8SUnchecked(let immediate): return immediate
+        case .i64Load8UUnchecked(let immediate): return immediate
+        case .i64Load16SUnchecked(let immediate): return immediate
+        case .i64Load16UUnchecked(let immediate): return immediate
+        case .i64Load32SUnchecked(let immediate): return immediate
+        case .i64Load32UUnchecked(let immediate): return immediate
+        case .i32StoreUnchecked(let immediate): return immediate
+        case .i64StoreUnchecked(let immediate): return immediate
+        case .f32StoreUnchecked(let immediate): return immediate
+        case .f64StoreUnchecked(let immediate): return immediate
+        case .i32Store8Unchecked(let immediate): return immediate
+        case .i32Store16Unchecked(let immediate): return immediate
+        case .i64Store8Unchecked(let immediate): return immediate
+        case .i64Store16Unchecked(let immediate): return immediate
+        case .i64Store32Unchecked(let immediate): return immediate
         case .memorySize(let immediate): return immediate
         case .memoryGrow(let immediate): return immediate
         case .memoryInit(let immediate): return immediate
@@ -1159,179 +1228,202 @@ extension Instruction {
         case .i64Store8: return 38
         case .i64Store16: return 39
         case .i64Store32: return 40
-        case .memorySize: return 41
-        case .memoryGrow: return 42
-        case .memoryInit: return 43
-        case .memoryDataDrop: return 44
-        case .memoryCopy: return 45
-        case .memoryFill: return 46
-        case .const32: return 47
-        case .const64: return 48
-        case .i32Add: return 49
-        case .i64Add: return 50
-        case .i32Sub: return 51
-        case .i64Sub: return 52
-        case .i32Mul: return 53
-        case .i64Mul: return 54
-        case .i32And: return 55
-        case .i64And: return 56
-        case .i32Or: return 57
-        case .i64Or: return 58
-        case .i32Xor: return 59
-        case .i64Xor: return 60
-        case .i32Shl: return 61
-        case .i64Shl: return 62
-        case .i32ShrS: return 63
-        case .i64ShrS: return 64
-        case .i32ShrU: return 65
-        case .i64ShrU: return 66
-        case .i32Rotl: return 67
-        case .i64Rotl: return 68
-        case .i32Rotr: return 69
-        case .i64Rotr: return 70
-        case .i32DivS: return 71
-        case .i64DivS: return 72
-        case .i32DivU: return 73
-        case .i64DivU: return 74
-        case .i32RemS: return 75
-        case .i64RemS: return 76
-        case .i32RemU: return 77
-        case .i64RemU: return 78
-        case .i32Eq: return 79
-        case .i64Eq: return 80
-        case .i32Ne: return 81
-        case .i64Ne: return 82
-        case .i32LtS: return 83
-        case .i64LtS: return 84
-        case .i32LtU: return 85
-        case .i64LtU: return 86
-        case .i32GtS: return 87
-        case .i64GtS: return 88
-        case .i32GtU: return 89
-        case .i64GtU: return 90
-        case .i32LeS: return 91
-        case .i64LeS: return 92
-        case .i32LeU: return 93
-        case .i64LeU: return 94
-        case .i32GeS: return 95
-        case .i64GeS: return 96
-        case .i32GeU: return 97
-        case .i64GeU: return 98
-        case .i32Clz: return 99
-        case .i64Clz: return 100
-        case .i32Ctz: return 101
-        case .i64Ctz: return 102
-        case .i32Popcnt: return 103
-        case .i64Popcnt: return 104
-        case .i32Eqz: return 105
-        case .i64Eqz: return 106
-        case .i32WrapI64: return 107
-        case .i64ExtendI32S: return 108
-        case .i64ExtendI32U: return 109
-        case .i32Extend8S: return 110
-        case .i64Extend8S: return 111
-        case .i32Extend16S: return 112
-        case .i64Extend16S: return 113
-        case .i64Extend32S: return 114
-        case .i32TruncF32S: return 115
-        case .i32TruncF32U: return 116
-        case .i32TruncSatF32S: return 117
-        case .i32TruncSatF32U: return 118
-        case .i32TruncF64S: return 119
-        case .i32TruncF64U: return 120
-        case .i32TruncSatF64S: return 121
-        case .i32TruncSatF64U: return 122
-        case .i64TruncF32S: return 123
-        case .i64TruncF32U: return 124
-        case .i64TruncSatF32S: return 125
-        case .i64TruncSatF32U: return 126
-        case .i64TruncF64S: return 127
-        case .i64TruncF64U: return 128
-        case .i64TruncSatF64S: return 129
-        case .i64TruncSatF64U: return 130
-        case .f32ConvertI32S: return 131
-        case .f32ConvertI32U: return 132
-        case .f32ConvertI64S: return 133
-        case .f32ConvertI64U: return 134
-        case .f64ConvertI32S: return 135
-        case .f64ConvertI32U: return 136
-        case .f64ConvertI64S: return 137
-        case .f64ConvertI64U: return 138
-        case .f32ReinterpretI32: return 139
-        case .f64ReinterpretI64: return 140
-        case .i32ReinterpretF32: return 141
-        case .i64ReinterpretF64: return 142
-        case .f32Add: return 143
-        case .f64Add: return 144
-        case .f32Sub: return 145
-        case .f64Sub: return 146
-        case .f32Mul: return 147
-        case .f64Mul: return 148
-        case .f32Div: return 149
-        case .f64Div: return 150
-        case .f32Min: return 151
-        case .f64Min: return 152
-        case .f32Max: return 153
-        case .f64Max: return 154
-        case .f32CopySign: return 155
-        case .f64CopySign: return 156
-        case .f32Eq: return 157
-        case .f64Eq: return 158
-        case .f32Ne: return 159
-        case .f64Ne: return 160
-        case .f32Lt: return 161
-        case .f64Lt: return 162
-        case .f32Gt: return 163
-        case .f64Gt: return 164
-        case .f32Le: return 165
-        case .f64Le: return 166
-        case .f32Ge: return 167
-        case .f64Ge: return 168
-        case .f32Abs: return 169
-        case .f64Abs: return 170
-        case .f32Neg: return 171
-        case .f64Neg: return 172
-        case .f32Ceil: return 173
-        case .f64Ceil: return 174
-        case .f32Floor: return 175
-        case .f64Floor: return 176
-        case .f32Trunc: return 177
-        case .f64Trunc: return 178
-        case .f32Nearest: return 179
-        case .f64Nearest: return 180
-        case .f32Sqrt: return 181
-        case .f64Sqrt: return 182
-        case .f64PromoteF32: return 183
-        case .f32DemoteF64: return 184
-        case .select: return 185
-        case .refNull: return 186
-        case .refIsNull: return 187
-        case .refFunc: return 188
-        case .tableGet: return 189
-        case .tableSet: return 190
-        case .tableSize: return 191
-        case .tableGrow: return 192
-        case .tableFill: return 193
-        case .tableCopy: return 194
-        case .tableInit: return 195
-        case .tableElementDrop: return 196
-        case .onEnter: return 197
-        case .onExit: return 198
-        case .breakpoint: return 199
-        case .i32AtomicLoad: return 200
-        case .i64AtomicLoad: return 201
-        case .i32AtomicLoad8U: return 202
-        case .i32AtomicLoad16U: return 203
-        case .i64AtomicLoad8U: return 204
-        case .i64AtomicLoad16U: return 205
-        case .i64AtomicLoad32U: return 206
-        case .i32AtomicStore: return 207
-        case .i64AtomicStore: return 208
-        case .i32AtomicStore8: return 209
-        case .i32AtomicStore16: return 210
-        case .i64AtomicStore8: return 211
-        case .i64AtomicStore16: return 212
-        case .i64AtomicStore32: return 213
+        case .i32LoadUnchecked: return 41
+        case .i64LoadUnchecked: return 42
+        case .f32LoadUnchecked: return 43
+        case .f64LoadUnchecked: return 44
+        case .i32Load8SUnchecked: return 45
+        case .i32Load8UUnchecked: return 46
+        case .i32Load16SUnchecked: return 47
+        case .i32Load16UUnchecked: return 48
+        case .i64Load8SUnchecked: return 49
+        case .i64Load8UUnchecked: return 50
+        case .i64Load16SUnchecked: return 51
+        case .i64Load16UUnchecked: return 52
+        case .i64Load32SUnchecked: return 53
+        case .i64Load32UUnchecked: return 54
+        case .i32StoreUnchecked: return 55
+        case .i64StoreUnchecked: return 56
+        case .f32StoreUnchecked: return 57
+        case .f64StoreUnchecked: return 58
+        case .i32Store8Unchecked: return 59
+        case .i32Store16Unchecked: return 60
+        case .i64Store8Unchecked: return 61
+        case .i64Store16Unchecked: return 62
+        case .i64Store32Unchecked: return 63
+        case .memorySize: return 64
+        case .memoryGrow: return 65
+        case .memoryInit: return 66
+        case .memoryDataDrop: return 67
+        case .memoryCopy: return 68
+        case .memoryFill: return 69
+        case .const32: return 70
+        case .const64: return 71
+        case .i32Add: return 72
+        case .i64Add: return 73
+        case .i32Sub: return 74
+        case .i64Sub: return 75
+        case .i32Mul: return 76
+        case .i64Mul: return 77
+        case .i32And: return 78
+        case .i64And: return 79
+        case .i32Or: return 80
+        case .i64Or: return 81
+        case .i32Xor: return 82
+        case .i64Xor: return 83
+        case .i32Shl: return 84
+        case .i64Shl: return 85
+        case .i32ShrS: return 86
+        case .i64ShrS: return 87
+        case .i32ShrU: return 88
+        case .i64ShrU: return 89
+        case .i32Rotl: return 90
+        case .i64Rotl: return 91
+        case .i32Rotr: return 92
+        case .i64Rotr: return 93
+        case .i32DivS: return 94
+        case .i64DivS: return 95
+        case .i32DivU: return 96
+        case .i64DivU: return 97
+        case .i32RemS: return 98
+        case .i64RemS: return 99
+        case .i32RemU: return 100
+        case .i64RemU: return 101
+        case .i32Eq: return 102
+        case .i64Eq: return 103
+        case .i32Ne: return 104
+        case .i64Ne: return 105
+        case .i32LtS: return 106
+        case .i64LtS: return 107
+        case .i32LtU: return 108
+        case .i64LtU: return 109
+        case .i32GtS: return 110
+        case .i64GtS: return 111
+        case .i32GtU: return 112
+        case .i64GtU: return 113
+        case .i32LeS: return 114
+        case .i64LeS: return 115
+        case .i32LeU: return 116
+        case .i64LeU: return 117
+        case .i32GeS: return 118
+        case .i64GeS: return 119
+        case .i32GeU: return 120
+        case .i64GeU: return 121
+        case .i32Clz: return 122
+        case .i64Clz: return 123
+        case .i32Ctz: return 124
+        case .i64Ctz: return 125
+        case .i32Popcnt: return 126
+        case .i64Popcnt: return 127
+        case .i32Eqz: return 128
+        case .i64Eqz: return 129
+        case .i32WrapI64: return 130
+        case .i64ExtendI32S: return 131
+        case .i64ExtendI32U: return 132
+        case .i32Extend8S: return 133
+        case .i64Extend8S: return 134
+        case .i32Extend16S: return 135
+        case .i64Extend16S: return 136
+        case .i64Extend32S: return 137
+        case .i32TruncF32S: return 138
+        case .i32TruncF32U: return 139
+        case .i32TruncSatF32S: return 140
+        case .i32TruncSatF32U: return 141
+        case .i32TruncF64S: return 142
+        case .i32TruncF64U: return 143
+        case .i32TruncSatF64S: return 144
+        case .i32TruncSatF64U: return 145
+        case .i64TruncF32S: return 146
+        case .i64TruncF32U: return 147
+        case .i64TruncSatF32S: return 148
+        case .i64TruncSatF32U: return 149
+        case .i64TruncF64S: return 150
+        case .i64TruncF64U: return 151
+        case .i64TruncSatF64S: return 152
+        case .i64TruncSatF64U: return 153
+        case .f32ConvertI32S: return 154
+        case .f32ConvertI32U: return 155
+        case .f32ConvertI64S: return 156
+        case .f32ConvertI64U: return 157
+        case .f64ConvertI32S: return 158
+        case .f64ConvertI32U: return 159
+        case .f64ConvertI64S: return 160
+        case .f64ConvertI64U: return 161
+        case .f32ReinterpretI32: return 162
+        case .f64ReinterpretI64: return 163
+        case .i32ReinterpretF32: return 164
+        case .i64ReinterpretF64: return 165
+        case .f32Add: return 166
+        case .f64Add: return 167
+        case .f32Sub: return 168
+        case .f64Sub: return 169
+        case .f32Mul: return 170
+        case .f64Mul: return 171
+        case .f32Div: return 172
+        case .f64Div: return 173
+        case .f32Min: return 174
+        case .f64Min: return 175
+        case .f32Max: return 176
+        case .f64Max: return 177
+        case .f32CopySign: return 178
+        case .f64CopySign: return 179
+        case .f32Eq: return 180
+        case .f64Eq: return 181
+        case .f32Ne: return 182
+        case .f64Ne: return 183
+        case .f32Lt: return 184
+        case .f64Lt: return 185
+        case .f32Gt: return 186
+        case .f64Gt: return 187
+        case .f32Le: return 188
+        case .f64Le: return 189
+        case .f32Ge: return 190
+        case .f64Ge: return 191
+        case .f32Abs: return 192
+        case .f64Abs: return 193
+        case .f32Neg: return 194
+        case .f64Neg: return 195
+        case .f32Ceil: return 196
+        case .f64Ceil: return 197
+        case .f32Floor: return 198
+        case .f64Floor: return 199
+        case .f32Trunc: return 200
+        case .f64Trunc: return 201
+        case .f32Nearest: return 202
+        case .f64Nearest: return 203
+        case .f32Sqrt: return 204
+        case .f64Sqrt: return 205
+        case .f64PromoteF32: return 206
+        case .f32DemoteF64: return 207
+        case .select: return 208
+        case .refNull: return 209
+        case .refIsNull: return 210
+        case .refFunc: return 211
+        case .tableGet: return 212
+        case .tableSet: return 213
+        case .tableSize: return 214
+        case .tableGrow: return 215
+        case .tableFill: return 216
+        case .tableCopy: return 217
+        case .tableInit: return 218
+        case .tableElementDrop: return 219
+        case .onEnter: return 220
+        case .onExit: return 221
+        case .breakpoint: return 222
+        case .i32AtomicLoad: return 223
+        case .i64AtomicLoad: return 224
+        case .i32AtomicLoad8U: return 225
+        case .i32AtomicLoad16U: return 226
+        case .i64AtomicLoad8U: return 227
+        case .i64AtomicLoad16U: return 228
+        case .i64AtomicLoad32U: return 229
+        case .i32AtomicStore: return 230
+        case .i64AtomicStore: return 231
+        case .i32AtomicStore8: return 232
+        case .i32AtomicStore16: return 233
+        case .i64AtomicStore8: return 234
+        case .i64AtomicStore16: return 235
+        case .i64AtomicStore32: return 236
         }
     }
 }
@@ -1384,179 +1476,202 @@ extension Instruction {
         case 38: return .i64Store8(Instruction.StoreOperand.load(from: &pc))
         case 39: return .i64Store16(Instruction.StoreOperand.load(from: &pc))
         case 40: return .i64Store32(Instruction.StoreOperand.load(from: &pc))
-        case 41: return .memorySize(Instruction.MemorySizeOperand.load(from: &pc))
-        case 42: return .memoryGrow(Instruction.MemoryGrowOperand.load(from: &pc))
-        case 43: return .memoryInit(Instruction.MemoryInitOperand.load(from: &pc))
-        case 44: return .memoryDataDrop(Instruction.MemoryDataDropOperand.load(from: &pc))
-        case 45: return .memoryCopy(Instruction.MemoryCopyOperand.load(from: &pc))
-        case 46: return .memoryFill(Instruction.MemoryFillOperand.load(from: &pc))
-        case 47: return .const32(Instruction.Const32Operand.load(from: &pc))
-        case 48: return .const64(Instruction.Const64Operand.load(from: &pc))
-        case 49: return .i32Add(Instruction.BinaryOperand.load(from: &pc))
-        case 50: return .i64Add(Instruction.BinaryOperand.load(from: &pc))
-        case 51: return .i32Sub(Instruction.BinaryOperand.load(from: &pc))
-        case 52: return .i64Sub(Instruction.BinaryOperand.load(from: &pc))
-        case 53: return .i32Mul(Instruction.BinaryOperand.load(from: &pc))
-        case 54: return .i64Mul(Instruction.BinaryOperand.load(from: &pc))
-        case 55: return .i32And(Instruction.BinaryOperand.load(from: &pc))
-        case 56: return .i64And(Instruction.BinaryOperand.load(from: &pc))
-        case 57: return .i32Or(Instruction.BinaryOperand.load(from: &pc))
-        case 58: return .i64Or(Instruction.BinaryOperand.load(from: &pc))
-        case 59: return .i32Xor(Instruction.BinaryOperand.load(from: &pc))
-        case 60: return .i64Xor(Instruction.BinaryOperand.load(from: &pc))
-        case 61: return .i32Shl(Instruction.BinaryOperand.load(from: &pc))
-        case 62: return .i64Shl(Instruction.BinaryOperand.load(from: &pc))
-        case 63: return .i32ShrS(Instruction.BinaryOperand.load(from: &pc))
-        case 64: return .i64ShrS(Instruction.BinaryOperand.load(from: &pc))
-        case 65: return .i32ShrU(Instruction.BinaryOperand.load(from: &pc))
-        case 66: return .i64ShrU(Instruction.BinaryOperand.load(from: &pc))
-        case 67: return .i32Rotl(Instruction.BinaryOperand.load(from: &pc))
-        case 68: return .i64Rotl(Instruction.BinaryOperand.load(from: &pc))
-        case 69: return .i32Rotr(Instruction.BinaryOperand.load(from: &pc))
-        case 70: return .i64Rotr(Instruction.BinaryOperand.load(from: &pc))
-        case 71: return .i32DivS(Instruction.BinaryOperand.load(from: &pc))
-        case 72: return .i64DivS(Instruction.BinaryOperand.load(from: &pc))
-        case 73: return .i32DivU(Instruction.BinaryOperand.load(from: &pc))
-        case 74: return .i64DivU(Instruction.BinaryOperand.load(from: &pc))
-        case 75: return .i32RemS(Instruction.BinaryOperand.load(from: &pc))
-        case 76: return .i64RemS(Instruction.BinaryOperand.load(from: &pc))
-        case 77: return .i32RemU(Instruction.BinaryOperand.load(from: &pc))
-        case 78: return .i64RemU(Instruction.BinaryOperand.load(from: &pc))
-        case 79: return .i32Eq(Instruction.BinaryOperand.load(from: &pc))
-        case 80: return .i64Eq(Instruction.BinaryOperand.load(from: &pc))
-        case 81: return .i32Ne(Instruction.BinaryOperand.load(from: &pc))
-        case 82: return .i64Ne(Instruction.BinaryOperand.load(from: &pc))
-        case 83: return .i32LtS(Instruction.BinaryOperand.load(from: &pc))
-        case 84: return .i64LtS(Instruction.BinaryOperand.load(from: &pc))
-        case 85: return .i32LtU(Instruction.BinaryOperand.load(from: &pc))
-        case 86: return .i64LtU(Instruction.BinaryOperand.load(from: &pc))
-        case 87: return .i32GtS(Instruction.BinaryOperand.load(from: &pc))
-        case 88: return .i64GtS(Instruction.BinaryOperand.load(from: &pc))
-        case 89: return .i32GtU(Instruction.BinaryOperand.load(from: &pc))
-        case 90: return .i64GtU(Instruction.BinaryOperand.load(from: &pc))
-        case 91: return .i32LeS(Instruction.BinaryOperand.load(from: &pc))
-        case 92: return .i64LeS(Instruction.BinaryOperand.load(from: &pc))
-        case 93: return .i32LeU(Instruction.BinaryOperand.load(from: &pc))
-        case 94: return .i64LeU(Instruction.BinaryOperand.load(from: &pc))
-        case 95: return .i32GeS(Instruction.BinaryOperand.load(from: &pc))
-        case 96: return .i64GeS(Instruction.BinaryOperand.load(from: &pc))
-        case 97: return .i32GeU(Instruction.BinaryOperand.load(from: &pc))
-        case 98: return .i64GeU(Instruction.BinaryOperand.load(from: &pc))
-        case 99: return .i32Clz(Instruction.UnaryOperand.load(from: &pc))
-        case 100: return .i64Clz(Instruction.UnaryOperand.load(from: &pc))
-        case 101: return .i32Ctz(Instruction.UnaryOperand.load(from: &pc))
-        case 102: return .i64Ctz(Instruction.UnaryOperand.load(from: &pc))
-        case 103: return .i32Popcnt(Instruction.UnaryOperand.load(from: &pc))
-        case 104: return .i64Popcnt(Instruction.UnaryOperand.load(from: &pc))
-        case 105: return .i32Eqz(Instruction.UnaryOperand.load(from: &pc))
-        case 106: return .i64Eqz(Instruction.UnaryOperand.load(from: &pc))
-        case 107: return .i32WrapI64(Instruction.UnaryOperand.load(from: &pc))
-        case 108: return .i64ExtendI32S(Instruction.UnaryOperand.load(from: &pc))
-        case 109: return .i64ExtendI32U(Instruction.UnaryOperand.load(from: &pc))
-        case 110: return .i32Extend8S(Instruction.UnaryOperand.load(from: &pc))
-        case 111: return .i64Extend8S(Instruction.UnaryOperand.load(from: &pc))
-        case 112: return .i32Extend16S(Instruction.UnaryOperand.load(from: &pc))
-        case 113: return .i64Extend16S(Instruction.UnaryOperand.load(from: &pc))
-        case 114: return .i64Extend32S(Instruction.UnaryOperand.load(from: &pc))
-        case 115: return .i32TruncF32S(Instruction.UnaryOperand.load(from: &pc))
-        case 116: return .i32TruncF32U(Instruction.UnaryOperand.load(from: &pc))
-        case 117: return .i32TruncSatF32S(Instruction.UnaryOperand.load(from: &pc))
-        case 118: return .i32TruncSatF32U(Instruction.UnaryOperand.load(from: &pc))
-        case 119: return .i32TruncF64S(Instruction.UnaryOperand.load(from: &pc))
-        case 120: return .i32TruncF64U(Instruction.UnaryOperand.load(from: &pc))
-        case 121: return .i32TruncSatF64S(Instruction.UnaryOperand.load(from: &pc))
-        case 122: return .i32TruncSatF64U(Instruction.UnaryOperand.load(from: &pc))
-        case 123: return .i64TruncF32S(Instruction.UnaryOperand.load(from: &pc))
-        case 124: return .i64TruncF32U(Instruction.UnaryOperand.load(from: &pc))
-        case 125: return .i64TruncSatF32S(Instruction.UnaryOperand.load(from: &pc))
-        case 126: return .i64TruncSatF32U(Instruction.UnaryOperand.load(from: &pc))
-        case 127: return .i64TruncF64S(Instruction.UnaryOperand.load(from: &pc))
-        case 128: return .i64TruncF64U(Instruction.UnaryOperand.load(from: &pc))
-        case 129: return .i64TruncSatF64S(Instruction.UnaryOperand.load(from: &pc))
-        case 130: return .i64TruncSatF64U(Instruction.UnaryOperand.load(from: &pc))
-        case 131: return .f32ConvertI32S(Instruction.UnaryOperand.load(from: &pc))
-        case 132: return .f32ConvertI32U(Instruction.UnaryOperand.load(from: &pc))
-        case 133: return .f32ConvertI64S(Instruction.UnaryOperand.load(from: &pc))
-        case 134: return .f32ConvertI64U(Instruction.UnaryOperand.load(from: &pc))
-        case 135: return .f64ConvertI32S(Instruction.UnaryOperand.load(from: &pc))
-        case 136: return .f64ConvertI32U(Instruction.UnaryOperand.load(from: &pc))
-        case 137: return .f64ConvertI64S(Instruction.UnaryOperand.load(from: &pc))
-        case 138: return .f64ConvertI64U(Instruction.UnaryOperand.load(from: &pc))
-        case 139: return .f32ReinterpretI32(Instruction.UnaryOperand.load(from: &pc))
-        case 140: return .f64ReinterpretI64(Instruction.UnaryOperand.load(from: &pc))
-        case 141: return .i32ReinterpretF32(Instruction.UnaryOperand.load(from: &pc))
-        case 142: return .i64ReinterpretF64(Instruction.UnaryOperand.load(from: &pc))
-        case 143: return .f32Add(Instruction.BinaryOperand.load(from: &pc))
-        case 144: return .f64Add(Instruction.BinaryOperand.load(from: &pc))
-        case 145: return .f32Sub(Instruction.BinaryOperand.load(from: &pc))
-        case 146: return .f64Sub(Instruction.BinaryOperand.load(from: &pc))
-        case 147: return .f32Mul(Instruction.BinaryOperand.load(from: &pc))
-        case 148: return .f64Mul(Instruction.BinaryOperand.load(from: &pc))
-        case 149: return .f32Div(Instruction.BinaryOperand.load(from: &pc))
-        case 150: return .f64Div(Instruction.BinaryOperand.load(from: &pc))
-        case 151: return .f32Min(Instruction.BinaryOperand.load(from: &pc))
-        case 152: return .f64Min(Instruction.BinaryOperand.load(from: &pc))
-        case 153: return .f32Max(Instruction.BinaryOperand.load(from: &pc))
-        case 154: return .f64Max(Instruction.BinaryOperand.load(from: &pc))
-        case 155: return .f32CopySign(Instruction.BinaryOperand.load(from: &pc))
-        case 156: return .f64CopySign(Instruction.BinaryOperand.load(from: &pc))
-        case 157: return .f32Eq(Instruction.BinaryOperand.load(from: &pc))
-        case 158: return .f64Eq(Instruction.BinaryOperand.load(from: &pc))
-        case 159: return .f32Ne(Instruction.BinaryOperand.load(from: &pc))
-        case 160: return .f64Ne(Instruction.BinaryOperand.load(from: &pc))
-        case 161: return .f32Lt(Instruction.BinaryOperand.load(from: &pc))
-        case 162: return .f64Lt(Instruction.BinaryOperand.load(from: &pc))
-        case 163: return .f32Gt(Instruction.BinaryOperand.load(from: &pc))
-        case 164: return .f64Gt(Instruction.BinaryOperand.load(from: &pc))
-        case 165: return .f32Le(Instruction.BinaryOperand.load(from: &pc))
-        case 166: return .f64Le(Instruction.BinaryOperand.load(from: &pc))
-        case 167: return .f32Ge(Instruction.BinaryOperand.load(from: &pc))
-        case 168: return .f64Ge(Instruction.BinaryOperand.load(from: &pc))
-        case 169: return .f32Abs(Instruction.UnaryOperand.load(from: &pc))
-        case 170: return .f64Abs(Instruction.UnaryOperand.load(from: &pc))
-        case 171: return .f32Neg(Instruction.UnaryOperand.load(from: &pc))
-        case 172: return .f64Neg(Instruction.UnaryOperand.load(from: &pc))
-        case 173: return .f32Ceil(Instruction.UnaryOperand.load(from: &pc))
-        case 174: return .f64Ceil(Instruction.UnaryOperand.load(from: &pc))
-        case 175: return .f32Floor(Instruction.UnaryOperand.load(from: &pc))
-        case 176: return .f64Floor(Instruction.UnaryOperand.load(from: &pc))
-        case 177: return .f32Trunc(Instruction.UnaryOperand.load(from: &pc))
-        case 178: return .f64Trunc(Instruction.UnaryOperand.load(from: &pc))
-        case 179: return .f32Nearest(Instruction.UnaryOperand.load(from: &pc))
-        case 180: return .f64Nearest(Instruction.UnaryOperand.load(from: &pc))
-        case 181: return .f32Sqrt(Instruction.UnaryOperand.load(from: &pc))
-        case 182: return .f64Sqrt(Instruction.UnaryOperand.load(from: &pc))
-        case 183: return .f64PromoteF32(Instruction.UnaryOperand.load(from: &pc))
-        case 184: return .f32DemoteF64(Instruction.UnaryOperand.load(from: &pc))
-        case 185: return .select(Instruction.SelectOperand.load(from: &pc))
-        case 186: return .refNull(Instruction.RefNullOperand.load(from: &pc))
-        case 187: return .refIsNull(Instruction.RefIsNullOperand.load(from: &pc))
-        case 188: return .refFunc(Instruction.RefFuncOperand.load(from: &pc))
-        case 189: return .tableGet(Instruction.TableGetOperand.load(from: &pc))
-        case 190: return .tableSet(Instruction.TableSetOperand.load(from: &pc))
-        case 191: return .tableSize(Instruction.TableSizeOperand.load(from: &pc))
-        case 192: return .tableGrow(Instruction.TableGrowOperand.load(from: &pc))
-        case 193: return .tableFill(Instruction.TableFillOperand.load(from: &pc))
-        case 194: return .tableCopy(Instruction.TableCopyOperand.load(from: &pc))
-        case 195: return .tableInit(Instruction.TableInitOperand.load(from: &pc))
-        case 196: return .tableElementDrop(Instruction.TableElementDropOperand.load(from: &pc))
-        case 197: return .onEnter(Instruction.OnEnterOperand.load(from: &pc))
-        case 198: return .onExit(Instruction.OnExitOperand.load(from: &pc))
-        case 199: return .breakpoint
-        case 200: return .i32AtomicLoad(Instruction.LoadOperand.load(from: &pc))
-        case 201: return .i64AtomicLoad(Instruction.LoadOperand.load(from: &pc))
-        case 202: return .i32AtomicLoad8U(Instruction.LoadOperand.load(from: &pc))
-        case 203: return .i32AtomicLoad16U(Instruction.LoadOperand.load(from: &pc))
-        case 204: return .i64AtomicLoad8U(Instruction.LoadOperand.load(from: &pc))
-        case 205: return .i64AtomicLoad16U(Instruction.LoadOperand.load(from: &pc))
-        case 206: return .i64AtomicLoad32U(Instruction.LoadOperand.load(from: &pc))
-        case 207: return .i32AtomicStore(Instruction.StoreOperand.load(from: &pc))
-        case 208: return .i64AtomicStore(Instruction.StoreOperand.load(from: &pc))
-        case 209: return .i32AtomicStore8(Instruction.StoreOperand.load(from: &pc))
-        case 210: return .i32AtomicStore16(Instruction.StoreOperand.load(from: &pc))
-        case 211: return .i64AtomicStore8(Instruction.StoreOperand.load(from: &pc))
-        case 212: return .i64AtomicStore16(Instruction.StoreOperand.load(from: &pc))
-        case 213: return .i64AtomicStore32(Instruction.StoreOperand.load(from: &pc))
+        case 41: return .i32LoadUnchecked(Instruction.LoadOperand.load(from: &pc))
+        case 42: return .i64LoadUnchecked(Instruction.LoadOperand.load(from: &pc))
+        case 43: return .f32LoadUnchecked(Instruction.LoadOperand.load(from: &pc))
+        case 44: return .f64LoadUnchecked(Instruction.LoadOperand.load(from: &pc))
+        case 45: return .i32Load8SUnchecked(Instruction.LoadOperand.load(from: &pc))
+        case 46: return .i32Load8UUnchecked(Instruction.LoadOperand.load(from: &pc))
+        case 47: return .i32Load16SUnchecked(Instruction.LoadOperand.load(from: &pc))
+        case 48: return .i32Load16UUnchecked(Instruction.LoadOperand.load(from: &pc))
+        case 49: return .i64Load8SUnchecked(Instruction.LoadOperand.load(from: &pc))
+        case 50: return .i64Load8UUnchecked(Instruction.LoadOperand.load(from: &pc))
+        case 51: return .i64Load16SUnchecked(Instruction.LoadOperand.load(from: &pc))
+        case 52: return .i64Load16UUnchecked(Instruction.LoadOperand.load(from: &pc))
+        case 53: return .i64Load32SUnchecked(Instruction.LoadOperand.load(from: &pc))
+        case 54: return .i64Load32UUnchecked(Instruction.LoadOperand.load(from: &pc))
+        case 55: return .i32StoreUnchecked(Instruction.StoreOperand.load(from: &pc))
+        case 56: return .i64StoreUnchecked(Instruction.StoreOperand.load(from: &pc))
+        case 57: return .f32StoreUnchecked(Instruction.StoreOperand.load(from: &pc))
+        case 58: return .f64StoreUnchecked(Instruction.StoreOperand.load(from: &pc))
+        case 59: return .i32Store8Unchecked(Instruction.StoreOperand.load(from: &pc))
+        case 60: return .i32Store16Unchecked(Instruction.StoreOperand.load(from: &pc))
+        case 61: return .i64Store8Unchecked(Instruction.StoreOperand.load(from: &pc))
+        case 62: return .i64Store16Unchecked(Instruction.StoreOperand.load(from: &pc))
+        case 63: return .i64Store32Unchecked(Instruction.StoreOperand.load(from: &pc))
+        case 64: return .memorySize(Instruction.MemorySizeOperand.load(from: &pc))
+        case 65: return .memoryGrow(Instruction.MemoryGrowOperand.load(from: &pc))
+        case 66: return .memoryInit(Instruction.MemoryInitOperand.load(from: &pc))
+        case 67: return .memoryDataDrop(Instruction.MemoryDataDropOperand.load(from: &pc))
+        case 68: return .memoryCopy(Instruction.MemoryCopyOperand.load(from: &pc))
+        case 69: return .memoryFill(Instruction.MemoryFillOperand.load(from: &pc))
+        case 70: return .const32(Instruction.Const32Operand.load(from: &pc))
+        case 71: return .const64(Instruction.Const64Operand.load(from: &pc))
+        case 72: return .i32Add(Instruction.BinaryOperand.load(from: &pc))
+        case 73: return .i64Add(Instruction.BinaryOperand.load(from: &pc))
+        case 74: return .i32Sub(Instruction.BinaryOperand.load(from: &pc))
+        case 75: return .i64Sub(Instruction.BinaryOperand.load(from: &pc))
+        case 76: return .i32Mul(Instruction.BinaryOperand.load(from: &pc))
+        case 77: return .i64Mul(Instruction.BinaryOperand.load(from: &pc))
+        case 78: return .i32And(Instruction.BinaryOperand.load(from: &pc))
+        case 79: return .i64And(Instruction.BinaryOperand.load(from: &pc))
+        case 80: return .i32Or(Instruction.BinaryOperand.load(from: &pc))
+        case 81: return .i64Or(Instruction.BinaryOperand.load(from: &pc))
+        case 82: return .i32Xor(Instruction.BinaryOperand.load(from: &pc))
+        case 83: return .i64Xor(Instruction.BinaryOperand.load(from: &pc))
+        case 84: return .i32Shl(Instruction.BinaryOperand.load(from: &pc))
+        case 85: return .i64Shl(Instruction.BinaryOperand.load(from: &pc))
+        case 86: return .i32ShrS(Instruction.BinaryOperand.load(from: &pc))
+        case 87: return .i64ShrS(Instruction.BinaryOperand.load(from: &pc))
+        case 88: return .i32ShrU(Instruction.BinaryOperand.load(from: &pc))
+        case 89: return .i64ShrU(Instruction.BinaryOperand.load(from: &pc))
+        case 90: return .i32Rotl(Instruction.BinaryOperand.load(from: &pc))
+        case 91: return .i64Rotl(Instruction.BinaryOperand.load(from: &pc))
+        case 92: return .i32Rotr(Instruction.BinaryOperand.load(from: &pc))
+        case 93: return .i64Rotr(Instruction.BinaryOperand.load(from: &pc))
+        case 94: return .i32DivS(Instruction.BinaryOperand.load(from: &pc))
+        case 95: return .i64DivS(Instruction.BinaryOperand.load(from: &pc))
+        case 96: return .i32DivU(Instruction.BinaryOperand.load(from: &pc))
+        case 97: return .i64DivU(Instruction.BinaryOperand.load(from: &pc))
+        case 98: return .i32RemS(Instruction.BinaryOperand.load(from: &pc))
+        case 99: return .i64RemS(Instruction.BinaryOperand.load(from: &pc))
+        case 100: return .i32RemU(Instruction.BinaryOperand.load(from: &pc))
+        case 101: return .i64RemU(Instruction.BinaryOperand.load(from: &pc))
+        case 102: return .i32Eq(Instruction.BinaryOperand.load(from: &pc))
+        case 103: return .i64Eq(Instruction.BinaryOperand.load(from: &pc))
+        case 104: return .i32Ne(Instruction.BinaryOperand.load(from: &pc))
+        case 105: return .i64Ne(Instruction.BinaryOperand.load(from: &pc))
+        case 106: return .i32LtS(Instruction.BinaryOperand.load(from: &pc))
+        case 107: return .i64LtS(Instruction.BinaryOperand.load(from: &pc))
+        case 108: return .i32LtU(Instruction.BinaryOperand.load(from: &pc))
+        case 109: return .i64LtU(Instruction.BinaryOperand.load(from: &pc))
+        case 110: return .i32GtS(Instruction.BinaryOperand.load(from: &pc))
+        case 111: return .i64GtS(Instruction.BinaryOperand.load(from: &pc))
+        case 112: return .i32GtU(Instruction.BinaryOperand.load(from: &pc))
+        case 113: return .i64GtU(Instruction.BinaryOperand.load(from: &pc))
+        case 114: return .i32LeS(Instruction.BinaryOperand.load(from: &pc))
+        case 115: return .i64LeS(Instruction.BinaryOperand.load(from: &pc))
+        case 116: return .i32LeU(Instruction.BinaryOperand.load(from: &pc))
+        case 117: return .i64LeU(Instruction.BinaryOperand.load(from: &pc))
+        case 118: return .i32GeS(Instruction.BinaryOperand.load(from: &pc))
+        case 119: return .i64GeS(Instruction.BinaryOperand.load(from: &pc))
+        case 120: return .i32GeU(Instruction.BinaryOperand.load(from: &pc))
+        case 121: return .i64GeU(Instruction.BinaryOperand.load(from: &pc))
+        case 122: return .i32Clz(Instruction.UnaryOperand.load(from: &pc))
+        case 123: return .i64Clz(Instruction.UnaryOperand.load(from: &pc))
+        case 124: return .i32Ctz(Instruction.UnaryOperand.load(from: &pc))
+        case 125: return .i64Ctz(Instruction.UnaryOperand.load(from: &pc))
+        case 126: return .i32Popcnt(Instruction.UnaryOperand.load(from: &pc))
+        case 127: return .i64Popcnt(Instruction.UnaryOperand.load(from: &pc))
+        case 128: return .i32Eqz(Instruction.UnaryOperand.load(from: &pc))
+        case 129: return .i64Eqz(Instruction.UnaryOperand.load(from: &pc))
+        case 130: return .i32WrapI64(Instruction.UnaryOperand.load(from: &pc))
+        case 131: return .i64ExtendI32S(Instruction.UnaryOperand.load(from: &pc))
+        case 132: return .i64ExtendI32U(Instruction.UnaryOperand.load(from: &pc))
+        case 133: return .i32Extend8S(Instruction.UnaryOperand.load(from: &pc))
+        case 134: return .i64Extend8S(Instruction.UnaryOperand.load(from: &pc))
+        case 135: return .i32Extend16S(Instruction.UnaryOperand.load(from: &pc))
+        case 136: return .i64Extend16S(Instruction.UnaryOperand.load(from: &pc))
+        case 137: return .i64Extend32S(Instruction.UnaryOperand.load(from: &pc))
+        case 138: return .i32TruncF32S(Instruction.UnaryOperand.load(from: &pc))
+        case 139: return .i32TruncF32U(Instruction.UnaryOperand.load(from: &pc))
+        case 140: return .i32TruncSatF32S(Instruction.UnaryOperand.load(from: &pc))
+        case 141: return .i32TruncSatF32U(Instruction.UnaryOperand.load(from: &pc))
+        case 142: return .i32TruncF64S(Instruction.UnaryOperand.load(from: &pc))
+        case 143: return .i32TruncF64U(Instruction.UnaryOperand.load(from: &pc))
+        case 144: return .i32TruncSatF64S(Instruction.UnaryOperand.load(from: &pc))
+        case 145: return .i32TruncSatF64U(Instruction.UnaryOperand.load(from: &pc))
+        case 146: return .i64TruncF32S(Instruction.UnaryOperand.load(from: &pc))
+        case 147: return .i64TruncF32U(Instruction.UnaryOperand.load(from: &pc))
+        case 148: return .i64TruncSatF32S(Instruction.UnaryOperand.load(from: &pc))
+        case 149: return .i64TruncSatF32U(Instruction.UnaryOperand.load(from: &pc))
+        case 150: return .i64TruncF64S(Instruction.UnaryOperand.load(from: &pc))
+        case 151: return .i64TruncF64U(Instruction.UnaryOperand.load(from: &pc))
+        case 152: return .i64TruncSatF64S(Instruction.UnaryOperand.load(from: &pc))
+        case 153: return .i64TruncSatF64U(Instruction.UnaryOperand.load(from: &pc))
+        case 154: return .f32ConvertI32S(Instruction.UnaryOperand.load(from: &pc))
+        case 155: return .f32ConvertI32U(Instruction.UnaryOperand.load(from: &pc))
+        case 156: return .f32ConvertI64S(Instruction.UnaryOperand.load(from: &pc))
+        case 157: return .f32ConvertI64U(Instruction.UnaryOperand.load(from: &pc))
+        case 158: return .f64ConvertI32S(Instruction.UnaryOperand.load(from: &pc))
+        case 159: return .f64ConvertI32U(Instruction.UnaryOperand.load(from: &pc))
+        case 160: return .f64ConvertI64S(Instruction.UnaryOperand.load(from: &pc))
+        case 161: return .f64ConvertI64U(Instruction.UnaryOperand.load(from: &pc))
+        case 162: return .f32ReinterpretI32(Instruction.UnaryOperand.load(from: &pc))
+        case 163: return .f64ReinterpretI64(Instruction.UnaryOperand.load(from: &pc))
+        case 164: return .i32ReinterpretF32(Instruction.UnaryOperand.load(from: &pc))
+        case 165: return .i64ReinterpretF64(Instruction.UnaryOperand.load(from: &pc))
+        case 166: return .f32Add(Instruction.BinaryOperand.load(from: &pc))
+        case 167: return .f64Add(Instruction.BinaryOperand.load(from: &pc))
+        case 168: return .f32Sub(Instruction.BinaryOperand.load(from: &pc))
+        case 169: return .f64Sub(Instruction.BinaryOperand.load(from: &pc))
+        case 170: return .f32Mul(Instruction.BinaryOperand.load(from: &pc))
+        case 171: return .f64Mul(Instruction.BinaryOperand.load(from: &pc))
+        case 172: return .f32Div(Instruction.BinaryOperand.load(from: &pc))
+        case 173: return .f64Div(Instruction.BinaryOperand.load(from: &pc))
+        case 174: return .f32Min(Instruction.BinaryOperand.load(from: &pc))
+        case 175: return .f64Min(Instruction.BinaryOperand.load(from: &pc))
+        case 176: return .f32Max(Instruction.BinaryOperand.load(from: &pc))
+        case 177: return .f64Max(Instruction.BinaryOperand.load(from: &pc))
+        case 178: return .f32CopySign(Instruction.BinaryOperand.load(from: &pc))
+        case 179: return .f64CopySign(Instruction.BinaryOperand.load(from: &pc))
+        case 180: return .f32Eq(Instruction.BinaryOperand.load(from: &pc))
+        case 181: return .f64Eq(Instruction.BinaryOperand.load(from: &pc))
+        case 182: return .f32Ne(Instruction.BinaryOperand.load(from: &pc))
+        case 183: return .f64Ne(Instruction.BinaryOperand.load(from: &pc))
+        case 184: return .f32Lt(Instruction.BinaryOperand.load(from: &pc))
+        case 185: return .f64Lt(Instruction.BinaryOperand.load(from: &pc))
+        case 186: return .f32Gt(Instruction.BinaryOperand.load(from: &pc))
+        case 187: return .f64Gt(Instruction.BinaryOperand.load(from: &pc))
+        case 188: return .f32Le(Instruction.BinaryOperand.load(from: &pc))
+        case 189: return .f64Le(Instruction.BinaryOperand.load(from: &pc))
+        case 190: return .f32Ge(Instruction.BinaryOperand.load(from: &pc))
+        case 191: return .f64Ge(Instruction.BinaryOperand.load(from: &pc))
+        case 192: return .f32Abs(Instruction.UnaryOperand.load(from: &pc))
+        case 193: return .f64Abs(Instruction.UnaryOperand.load(from: &pc))
+        case 194: return .f32Neg(Instruction.UnaryOperand.load(from: &pc))
+        case 195: return .f64Neg(Instruction.UnaryOperand.load(from: &pc))
+        case 196: return .f32Ceil(Instruction.UnaryOperand.load(from: &pc))
+        case 197: return .f64Ceil(Instruction.UnaryOperand.load(from: &pc))
+        case 198: return .f32Floor(Instruction.UnaryOperand.load(from: &pc))
+        case 199: return .f64Floor(Instruction.UnaryOperand.load(from: &pc))
+        case 200: return .f32Trunc(Instruction.UnaryOperand.load(from: &pc))
+        case 201: return .f64Trunc(Instruction.UnaryOperand.load(from: &pc))
+        case 202: return .f32Nearest(Instruction.UnaryOperand.load(from: &pc))
+        case 203: return .f64Nearest(Instruction.UnaryOperand.load(from: &pc))
+        case 204: return .f32Sqrt(Instruction.UnaryOperand.load(from: &pc))
+        case 205: return .f64Sqrt(Instruction.UnaryOperand.load(from: &pc))
+        case 206: return .f64PromoteF32(Instruction.UnaryOperand.load(from: &pc))
+        case 207: return .f32DemoteF64(Instruction.UnaryOperand.load(from: &pc))
+        case 208: return .select(Instruction.SelectOperand.load(from: &pc))
+        case 209: return .refNull(Instruction.RefNullOperand.load(from: &pc))
+        case 210: return .refIsNull(Instruction.RefIsNullOperand.load(from: &pc))
+        case 211: return .refFunc(Instruction.RefFuncOperand.load(from: &pc))
+        case 212: return .tableGet(Instruction.TableGetOperand.load(from: &pc))
+        case 213: return .tableSet(Instruction.TableSetOperand.load(from: &pc))
+        case 214: return .tableSize(Instruction.TableSizeOperand.load(from: &pc))
+        case 215: return .tableGrow(Instruction.TableGrowOperand.load(from: &pc))
+        case 216: return .tableFill(Instruction.TableFillOperand.load(from: &pc))
+        case 217: return .tableCopy(Instruction.TableCopyOperand.load(from: &pc))
+        case 218: return .tableInit(Instruction.TableInitOperand.load(from: &pc))
+        case 219: return .tableElementDrop(Instruction.TableElementDropOperand.load(from: &pc))
+        case 220: return .onEnter(Instruction.OnEnterOperand.load(from: &pc))
+        case 221: return .onExit(Instruction.OnExitOperand.load(from: &pc))
+        case 222: return .breakpoint
+        case 223: return .i32AtomicLoad(Instruction.LoadOperand.load(from: &pc))
+        case 224: return .i64AtomicLoad(Instruction.LoadOperand.load(from: &pc))
+        case 225: return .i32AtomicLoad8U(Instruction.LoadOperand.load(from: &pc))
+        case 226: return .i32AtomicLoad16U(Instruction.LoadOperand.load(from: &pc))
+        case 227: return .i64AtomicLoad8U(Instruction.LoadOperand.load(from: &pc))
+        case 228: return .i64AtomicLoad16U(Instruction.LoadOperand.load(from: &pc))
+        case 229: return .i64AtomicLoad32U(Instruction.LoadOperand.load(from: &pc))
+        case 230: return .i32AtomicStore(Instruction.StoreOperand.load(from: &pc))
+        case 231: return .i64AtomicStore(Instruction.StoreOperand.load(from: &pc))
+        case 232: return .i32AtomicStore8(Instruction.StoreOperand.load(from: &pc))
+        case 233: return .i32AtomicStore16(Instruction.StoreOperand.load(from: &pc))
+        case 234: return .i64AtomicStore8(Instruction.StoreOperand.load(from: &pc))
+        case 235: return .i64AtomicStore16(Instruction.StoreOperand.load(from: &pc))
+        case 236: return .i64AtomicStore32(Instruction.StoreOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -1612,179 +1727,202 @@ extension Instruction {
         case 38: return "i64Store8"
         case 39: return "i64Store16"
         case 40: return "i64Store32"
-        case 41: return "memorySize"
-        case 42: return "memoryGrow"
-        case 43: return "memoryInit"
-        case 44: return "memoryDataDrop"
-        case 45: return "memoryCopy"
-        case 46: return "memoryFill"
-        case 47: return "const32"
-        case 48: return "const64"
-        case 49: return "i32Add"
-        case 50: return "i64Add"
-        case 51: return "i32Sub"
-        case 52: return "i64Sub"
-        case 53: return "i32Mul"
-        case 54: return "i64Mul"
-        case 55: return "i32And"
-        case 56: return "i64And"
-        case 57: return "i32Or"
-        case 58: return "i64Or"
-        case 59: return "i32Xor"
-        case 60: return "i64Xor"
-        case 61: return "i32Shl"
-        case 62: return "i64Shl"
-        case 63: return "i32ShrS"
-        case 64: return "i64ShrS"
-        case 65: return "i32ShrU"
-        case 66: return "i64ShrU"
-        case 67: return "i32Rotl"
-        case 68: return "i64Rotl"
-        case 69: return "i32Rotr"
-        case 70: return "i64Rotr"
-        case 71: return "i32DivS"
-        case 72: return "i64DivS"
-        case 73: return "i32DivU"
-        case 74: return "i64DivU"
-        case 75: return "i32RemS"
-        case 76: return "i64RemS"
-        case 77: return "i32RemU"
-        case 78: return "i64RemU"
-        case 79: return "i32Eq"
-        case 80: return "i64Eq"
-        case 81: return "i32Ne"
-        case 82: return "i64Ne"
-        case 83: return "i32LtS"
-        case 84: return "i64LtS"
-        case 85: return "i32LtU"
-        case 86: return "i64LtU"
-        case 87: return "i32GtS"
-        case 88: return "i64GtS"
-        case 89: return "i32GtU"
-        case 90: return "i64GtU"
-        case 91: return "i32LeS"
-        case 92: return "i64LeS"
-        case 93: return "i32LeU"
-        case 94: return "i64LeU"
-        case 95: return "i32GeS"
-        case 96: return "i64GeS"
-        case 97: return "i32GeU"
-        case 98: return "i64GeU"
-        case 99: return "i32Clz"
-        case 100: return "i64Clz"
-        case 101: return "i32Ctz"
-        case 102: return "i64Ctz"
-        case 103: return "i32Popcnt"
-        case 104: return "i64Popcnt"
-        case 105: return "i32Eqz"
-        case 106: return "i64Eqz"
-        case 107: return "i32WrapI64"
-        case 108: return "i64ExtendI32S"
-        case 109: return "i64ExtendI32U"
-        case 110: return "i32Extend8S"
-        case 111: return "i64Extend8S"
-        case 112: return "i32Extend16S"
-        case 113: return "i64Extend16S"
-        case 114: return "i64Extend32S"
-        case 115: return "i32TruncF32S"
-        case 116: return "i32TruncF32U"
-        case 117: return "i32TruncSatF32S"
-        case 118: return "i32TruncSatF32U"
-        case 119: return "i32TruncF64S"
-        case 120: return "i32TruncF64U"
-        case 121: return "i32TruncSatF64S"
-        case 122: return "i32TruncSatF64U"
-        case 123: return "i64TruncF32S"
-        case 124: return "i64TruncF32U"
-        case 125: return "i64TruncSatF32S"
-        case 126: return "i64TruncSatF32U"
-        case 127: return "i64TruncF64S"
-        case 128: return "i64TruncF64U"
-        case 129: return "i64TruncSatF64S"
-        case 130: return "i64TruncSatF64U"
-        case 131: return "f32ConvertI32S"
-        case 132: return "f32ConvertI32U"
-        case 133: return "f32ConvertI64S"
-        case 134: return "f32ConvertI64U"
-        case 135: return "f64ConvertI32S"
-        case 136: return "f64ConvertI32U"
-        case 137: return "f64ConvertI64S"
-        case 138: return "f64ConvertI64U"
-        case 139: return "f32ReinterpretI32"
-        case 140: return "f64ReinterpretI64"
-        case 141: return "i32ReinterpretF32"
-        case 142: return "i64ReinterpretF64"
-        case 143: return "f32Add"
-        case 144: return "f64Add"
-        case 145: return "f32Sub"
-        case 146: return "f64Sub"
-        case 147: return "f32Mul"
-        case 148: return "f64Mul"
-        case 149: return "f32Div"
-        case 150: return "f64Div"
-        case 151: return "f32Min"
-        case 152: return "f64Min"
-        case 153: return "f32Max"
-        case 154: return "f64Max"
-        case 155: return "f32CopySign"
-        case 156: return "f64CopySign"
-        case 157: return "f32Eq"
-        case 158: return "f64Eq"
-        case 159: return "f32Ne"
-        case 160: return "f64Ne"
-        case 161: return "f32Lt"
-        case 162: return "f64Lt"
-        case 163: return "f32Gt"
-        case 164: return "f64Gt"
-        case 165: return "f32Le"
-        case 166: return "f64Le"
-        case 167: return "f32Ge"
-        case 168: return "f64Ge"
-        case 169: return "f32Abs"
-        case 170: return "f64Abs"
-        case 171: return "f32Neg"
-        case 172: return "f64Neg"
-        case 173: return "f32Ceil"
-        case 174: return "f64Ceil"
-        case 175: return "f32Floor"
-        case 176: return "f64Floor"
-        case 177: return "f32Trunc"
-        case 178: return "f64Trunc"
-        case 179: return "f32Nearest"
-        case 180: return "f64Nearest"
-        case 181: return "f32Sqrt"
-        case 182: return "f64Sqrt"
-        case 183: return "f64PromoteF32"
-        case 184: return "f32DemoteF64"
-        case 185: return "select"
-        case 186: return "refNull"
-        case 187: return "refIsNull"
-        case 188: return "refFunc"
-        case 189: return "tableGet"
-        case 190: return "tableSet"
-        case 191: return "tableSize"
-        case 192: return "tableGrow"
-        case 193: return "tableFill"
-        case 194: return "tableCopy"
-        case 195: return "tableInit"
-        case 196: return "tableElementDrop"
-        case 197: return "onEnter"
-        case 198: return "onExit"
-        case 199: return "breakpoint"
-        case 200: return "i32AtomicLoad"
-        case 201: return "i64AtomicLoad"
-        case 202: return "i32AtomicLoad8U"
-        case 203: return "i32AtomicLoad16U"
-        case 204: return "i64AtomicLoad8U"
-        case 205: return "i64AtomicLoad16U"
-        case 206: return "i64AtomicLoad32U"
-        case 207: return "i32AtomicStore"
-        case 208: return "i64AtomicStore"
-        case 209: return "i32AtomicStore8"
-        case 210: return "i32AtomicStore16"
-        case 211: return "i64AtomicStore8"
-        case 212: return "i64AtomicStore16"
-        case 213: return "i64AtomicStore32"
+        case 41: return "i32LoadUnchecked"
+        case 42: return "i64LoadUnchecked"
+        case 43: return "f32LoadUnchecked"
+        case 44: return "f64LoadUnchecked"
+        case 45: return "i32Load8SUnchecked"
+        case 46: return "i32Load8UUnchecked"
+        case 47: return "i32Load16SUnchecked"
+        case 48: return "i32Load16UUnchecked"
+        case 49: return "i64Load8SUnchecked"
+        case 50: return "i64Load8UUnchecked"
+        case 51: return "i64Load16SUnchecked"
+        case 52: return "i64Load16UUnchecked"
+        case 53: return "i64Load32SUnchecked"
+        case 54: return "i64Load32UUnchecked"
+        case 55: return "i32StoreUnchecked"
+        case 56: return "i64StoreUnchecked"
+        case 57: return "f32StoreUnchecked"
+        case 58: return "f64StoreUnchecked"
+        case 59: return "i32Store8Unchecked"
+        case 60: return "i32Store16Unchecked"
+        case 61: return "i64Store8Unchecked"
+        case 62: return "i64Store16Unchecked"
+        case 63: return "i64Store32Unchecked"
+        case 64: return "memorySize"
+        case 65: return "memoryGrow"
+        case 66: return "memoryInit"
+        case 67: return "memoryDataDrop"
+        case 68: return "memoryCopy"
+        case 69: return "memoryFill"
+        case 70: return "const32"
+        case 71: return "const64"
+        case 72: return "i32Add"
+        case 73: return "i64Add"
+        case 74: return "i32Sub"
+        case 75: return "i64Sub"
+        case 76: return "i32Mul"
+        case 77: return "i64Mul"
+        case 78: return "i32And"
+        case 79: return "i64And"
+        case 80: return "i32Or"
+        case 81: return "i64Or"
+        case 82: return "i32Xor"
+        case 83: return "i64Xor"
+        case 84: return "i32Shl"
+        case 85: return "i64Shl"
+        case 86: return "i32ShrS"
+        case 87: return "i64ShrS"
+        case 88: return "i32ShrU"
+        case 89: return "i64ShrU"
+        case 90: return "i32Rotl"
+        case 91: return "i64Rotl"
+        case 92: return "i32Rotr"
+        case 93: return "i64Rotr"
+        case 94: return "i32DivS"
+        case 95: return "i64DivS"
+        case 96: return "i32DivU"
+        case 97: return "i64DivU"
+        case 98: return "i32RemS"
+        case 99: return "i64RemS"
+        case 100: return "i32RemU"
+        case 101: return "i64RemU"
+        case 102: return "i32Eq"
+        case 103: return "i64Eq"
+        case 104: return "i32Ne"
+        case 105: return "i64Ne"
+        case 106: return "i32LtS"
+        case 107: return "i64LtS"
+        case 108: return "i32LtU"
+        case 109: return "i64LtU"
+        case 110: return "i32GtS"
+        case 111: return "i64GtS"
+        case 112: return "i32GtU"
+        case 113: return "i64GtU"
+        case 114: return "i32LeS"
+        case 115: return "i64LeS"
+        case 116: return "i32LeU"
+        case 117: return "i64LeU"
+        case 118: return "i32GeS"
+        case 119: return "i64GeS"
+        case 120: return "i32GeU"
+        case 121: return "i64GeU"
+        case 122: return "i32Clz"
+        case 123: return "i64Clz"
+        case 124: return "i32Ctz"
+        case 125: return "i64Ctz"
+        case 126: return "i32Popcnt"
+        case 127: return "i64Popcnt"
+        case 128: return "i32Eqz"
+        case 129: return "i64Eqz"
+        case 130: return "i32WrapI64"
+        case 131: return "i64ExtendI32S"
+        case 132: return "i64ExtendI32U"
+        case 133: return "i32Extend8S"
+        case 134: return "i64Extend8S"
+        case 135: return "i32Extend16S"
+        case 136: return "i64Extend16S"
+        case 137: return "i64Extend32S"
+        case 138: return "i32TruncF32S"
+        case 139: return "i32TruncF32U"
+        case 140: return "i32TruncSatF32S"
+        case 141: return "i32TruncSatF32U"
+        case 142: return "i32TruncF64S"
+        case 143: return "i32TruncF64U"
+        case 144: return "i32TruncSatF64S"
+        case 145: return "i32TruncSatF64U"
+        case 146: return "i64TruncF32S"
+        case 147: return "i64TruncF32U"
+        case 148: return "i64TruncSatF32S"
+        case 149: return "i64TruncSatF32U"
+        case 150: return "i64TruncF64S"
+        case 151: return "i64TruncF64U"
+        case 152: return "i64TruncSatF64S"
+        case 153: return "i64TruncSatF64U"
+        case 154: return "f32ConvertI32S"
+        case 155: return "f32ConvertI32U"
+        case 156: return "f32ConvertI64S"
+        case 157: return "f32ConvertI64U"
+        case 158: return "f64ConvertI32S"
+        case 159: return "f64ConvertI32U"
+        case 160: return "f64ConvertI64S"
+        case 161: return "f64ConvertI64U"
+        case 162: return "f32ReinterpretI32"
+        case 163: return "f64ReinterpretI64"
+        case 164: return "i32ReinterpretF32"
+        case 165: return "i64ReinterpretF64"
+        case 166: return "f32Add"
+        case 167: return "f64Add"
+        case 168: return "f32Sub"
+        case 169: return "f64Sub"
+        case 170: return "f32Mul"
+        case 171: return "f64Mul"
+        case 172: return "f32Div"
+        case 173: return "f64Div"
+        case 174: return "f32Min"
+        case 175: return "f64Min"
+        case 176: return "f32Max"
+        case 177: return "f64Max"
+        case 178: return "f32CopySign"
+        case 179: return "f64CopySign"
+        case 180: return "f32Eq"
+        case 181: return "f64Eq"
+        case 182: return "f32Ne"
+        case 183: return "f64Ne"
+        case 184: return "f32Lt"
+        case 185: return "f64Lt"
+        case 186: return "f32Gt"
+        case 187: return "f64Gt"
+        case 188: return "f32Le"
+        case 189: return "f64Le"
+        case 190: return "f32Ge"
+        case 191: return "f64Ge"
+        case 192: return "f32Abs"
+        case 193: return "f64Abs"
+        case 194: return "f32Neg"
+        case 195: return "f64Neg"
+        case 196: return "f32Ceil"
+        case 197: return "f64Ceil"
+        case 198: return "f32Floor"
+        case 199: return "f64Floor"
+        case 200: return "f32Trunc"
+        case 201: return "f64Trunc"
+        case 202: return "f32Nearest"
+        case 203: return "f64Nearest"
+        case 204: return "f32Sqrt"
+        case 205: return "f64Sqrt"
+        case 206: return "f64PromoteF32"
+        case 207: return "f32DemoteF64"
+        case 208: return "select"
+        case 209: return "refNull"
+        case 210: return "refIsNull"
+        case 211: return "refFunc"
+        case 212: return "tableGet"
+        case 213: return "tableSet"
+        case 214: return "tableSize"
+        case 215: return "tableGrow"
+        case 216: return "tableFill"
+        case 217: return "tableCopy"
+        case 218: return "tableInit"
+        case 219: return "tableElementDrop"
+        case 220: return "onEnter"
+        case 221: return "onExit"
+        case 222: return "breakpoint"
+        case 223: return "i32AtomicLoad"
+        case 224: return "i64AtomicLoad"
+        case 225: return "i32AtomicLoad8U"
+        case 226: return "i32AtomicLoad16U"
+        case 227: return "i64AtomicLoad8U"
+        case 228: return "i64AtomicLoad16U"
+        case 229: return "i64AtomicLoad32U"
+        case 230: return "i32AtomicStore"
+        case 231: return "i64AtomicStore"
+        case 232: return "i32AtomicStore8"
+        case 233: return "i32AtomicStore16"
+        case 234: return "i64AtomicStore8"
+        case 235: return "i64AtomicStore16"
+        case 236: return "i64AtomicStore32"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }
