@@ -77,7 +77,7 @@ let package = Package(
         .target(
             name: "WAT",
             dependencies: [
-                "WasmParser",
+                "WasmParserCore",
                 .target(
                     name: "ComponentModel",
                     condition: .when(traits: ["ComponentModel"])
@@ -96,10 +96,17 @@ let package = Package(
             ]
         ),
 
+
+        .target(
+            name: "WasmParserCore",
+            dependencies: [
+                "WasmTypes",
+            ]
+        ),
         .target(
             name: "WasmParser",
             dependencies: [
-                "WasmTypes",
+                "WasmParserCore",
                 .product(name: "SystemPackage", package: "swift-system"),
                 .target(
                     name: "ComponentModel",
