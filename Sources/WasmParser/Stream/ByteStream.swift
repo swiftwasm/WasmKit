@@ -35,7 +35,7 @@ public final class StaticByteStream: ByteStream {
     @discardableResult
     public func consumeAny() throws(WasmParserError) -> UInt8 {
         guard bytes.indices.contains(currentIndex) else {
-            throw WasmParserError.unexpectedEnd(expected: nil)
+            throw WasmParserError(kind: .unexpectedEnd(expected: nil), offset: self.currentIndex)
         }
 
         let consumed = bytes[currentIndex]
@@ -46,12 +46,16 @@ public final class StaticByteStream: ByteStream {
     @discardableResult
     public func consume(_ expected: Set<UInt8>) throws(WasmParserError) -> UInt8 {
         guard bytes.indices.contains(currentIndex) else {
-            throw WasmParserError.unexpectedEnd(expected: Set(expected))
+            throw WasmParserError(kind: .unexpectedEnd(expected: Set(expected)), offset: currentIndex)
         }
 
         let consumed = bytes[currentIndex]
         guard expected.contains(consumed) else {
-            throw WasmParserError.unexpectedByte(consumed, index: currentIndex, expected: Set(expected))
+            throw WasmParserError(kind: .unexpectedByte(
+                consumed,
+                index: currentIndex,
+                expected: Set(expected)
+            ), offset: currentIndex)
         }
 
         currentIndex = bytes.index(after: currentIndex)
@@ -63,7 +67,7 @@ public final class StaticByteStream: ByteStream {
         let updatedIndex = currentIndex + count
 
         guard bytes.indices.contains(updatedIndex - 1) else {
-            throw WasmParserError.unexpectedEnd(expected: nil)
+            throw WasmParserError(kind: .unexpectedEnd(expected: nil), offset: currentIndex)
         }
 
         defer { currentIndex = updatedIndex }
