@@ -85,19 +85,21 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
     }
 
     guard typeIndices.count == codes.count else {
-        throw .unclassified(ValidationError(
-            .inconsistentFunctionAndCodeLength(
-                functionCount: typeIndices.count,
-                codeCount: codes.count
-            )))
+        throw .unclassified(
+            ValidationError(
+                .inconsistentFunctionAndCodeLength(
+                    functionCount: typeIndices.count,
+                    codeCount: codes.count
+                )))
     }
 
     if let dataCount = dataCount, dataCount != UInt32(data.count) {
-        throw .unclassified(ValidationError(
-            .inconsistentDataCountAndDataSectionLength(
-                dataCount: dataCount,
-                dataSection: data.count
-            )))
+        throw .unclassified(
+            ValidationError(
+                .inconsistentDataCountAndDataSectionLength(
+                    dataCount: dataCount,
+                    dataSection: data.count
+                )))
     }
 
     let functions = try codes.enumerated().map { index, code throws(WasmParserError) in
