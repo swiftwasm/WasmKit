@@ -1,5 +1,4 @@
-@usableFromInline
-enum LEBError: Swift.Error, Equatable {
+public enum LEBError: Swift.Error, Equatable {
     case overflow
     case integerRepresentationTooLong
     case insufficientBytes
@@ -8,7 +7,7 @@ enum LEBError: Swift.Error, Equatable {
 @inlinable
 func decodeLEB128<IntType, Stream>(
     stream: Stream
-) throws -> IntType where IntType: FixedWidthInteger, IntType: UnsignedInteger, Stream: ByteStream {
+) throws(WasmParserError) -> IntType where IntType: FixedWidthInteger, IntType: UnsignedInteger, Stream: ByteStream {
     let firstByte = try stream.consumeAny()
     var result: IntType = IntType(firstByte & 0b0111_1111)
     if _fastPath(firstByte & 0b1000_0000 == 0) {
@@ -22,7 +21,7 @@ func decodeLEB128<IntType, Stream>(
         let slice = IntType(byte & 0b0111_1111)
         let nextShift = shift + 7
         if nextShift >= IntType.bitWidth, (byte >> (UInt(IntType.bitWidth) - shift)) != 0 {
-            throw LEBError.integerRepresentationTooLong
+            throw .leb(LEBError.integerRepresentationTooLong)
         }
         result |= slice << shift
         shift = nextShift
@@ -36,7 +35,7 @@ func decodeLEB128<IntType, Stream>(
 @inlinable
 func decodeLEB128<IntType, Stream>(
     stream: Stream, bitWidth: Int = IntType.bitWidth
-) throws -> IntType where IntType: FixedWidthInteger, IntType: RawSignedInteger, Stream: ByteStream {
+) throws(WasmParserError) -> IntType where IntType: FixedWidthInteger, IntType: RawSignedInteger, Stream: ByteStream {
     let firstByte = try stream.consumeAny()
     var result = IntType.Unsigned(firstByte & 0b0111_1111)
     if _fastPath(firstByte & 0b1000_0000 == 0) {
@@ -59,13 +58,13 @@ func decodeLEB128<IntType, Stream>(
             let continuationBit = (byte & 0b1000_0000) != 0
             // When a next byte is expected
             if continuationBit {
-                throw LEBError.integerRepresentationTooLong
+                throw .leb(LEBError.integerRepresentationTooLong)
             }
 
             let signAndDiscardingBits = Int8(bitPattern: byte << 1) >> remainingBitWidth
             // When meaningful bits are discarded
             if signAndDiscardingBits != 0 && signAndDiscardingBits != -1 {
-                throw LEBError.overflow
+                throw .leb(LEBError.overflow)
             }
             return IntType(bitPattern: result)
         }

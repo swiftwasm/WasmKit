@@ -121,7 +121,9 @@ extension Code {
     /// }
     /// ````
     @inlinable
-    public func parseExpression<V: InstructionVisitor>(visitor: inout V) throws {
+    public func parseExpression<V: InstructionVisitor>(
+        visitor: inout V
+    ) throws(WasmParserError) where V.VisitorError == WasmParserError {
         var parser = Parser(stream: StaticByteStream(bytes: self.expression), features: self.features)
         var lastIsEnd: Bool?
         while try !parser.stream.hasReachedEnd() {
@@ -131,6 +133,11 @@ extension Code {
             throw parser.makeError(.endOpcodeExpected)
         }
     }
+}
+
+public enum EitherError<E1: Sendable, E2: Sendable>: Error {
+    case left(E1)
+    case right(E2)
 }
 
 @_documentation(visibility: internal)
@@ -160,8 +167,14 @@ public struct ExpressionParser {
     }
 
     @inlinable
-    public mutating func visit<V: InstructionVisitor>(visitor: inout V) throws -> Bool {
-        isLastEnd = try parser.parseInstruction(visitor: &visitor)
+    public mutating func visit<V: InstructionVisitor>(
+        visitor: inout V
+    ) throws(WasmParserError) -> Bool {
+        do {
+            isLastEnd = try parser.parseInstruction(visitor: &visitor)
+        } catch {
+            throw .unclassified(error)
+        }
         let shouldContinue = try !parser.stream.hasReachedEnd()
         if !shouldContinue {
             guard isLastEnd == true else {
@@ -271,6 +284,8 @@ extension WasmParserError: CustomStringConvertible {
             return result
         case .unclassified(let error):
             return "\(error)"
+        case .leb(let error):
+            return "\(error)"
         }
     }
 }
@@ -379,7 +394,7 @@ extension WasmParserError.Message {
 /// <https://webassembly.github.io/spec/core/binary/conventions.html#vectors>
 extension ByteStream {
     @inlinable
-    func parseVector<Content>(content parser: () throws -> Content) throws -> [Content] {
+    func parseVector<Content>(content parser: () throws(WasmParserError) -> Content) throws(WasmParserError) -> [Content] {
         var contents = [Content]()
         let count: UInt32 = try parseUnsigned()
         for _ in 0..<count {
@@ -393,17 +408,17 @@ extension ByteStream {
 /// <https://webassembly.github.io/spec/core/binary/values.html#integers>
 extension ByteStream {
     @inlinable
-    func parseUnsigned<T: RawUnsignedInteger>(_: T.Type = T.self) throws -> T {
+    func parseUnsigned<T: RawUnsignedInteger>(_: T.Type = T.self) throws(WasmParserError) -> T {
         try decodeLEB128(stream: self)
     }
 
     @inlinable
-    func parseSigned<T: FixedWidthInteger & RawSignedInteger>() throws -> T {
+    func parseSigned<T: FixedWidthInteger & RawSignedInteger>() throws(WasmParserError) -> T {
         try decodeLEB128(stream: self)
     }
 
     @usableFromInline
-    func parseVarSigned33() throws -> Int64 {
+    func parseVarSigned33() throws(WasmParserError) -> Int64 {
         try decodeLEB128(stream: self, bitWidth: 33)
     }
 }
@@ -411,8 +426,8 @@ extension ByteStream {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/values.html#names>
 extension ByteStream {
-    fileprivate func parseName() throws -> String {
-        let bytes = try parseVector { () -> UInt8 in
+    fileprivate func parseName() throws(WasmParserError) -> String {
+        let bytes = try parseVector { () throws(WasmParserError) -> UInt8 in
             try consumeAny()
         }
 
@@ -435,23 +450,23 @@ extension ByteStream {
 
 extension Parser {
     @inlinable
-    func parseVector<Content>(content parser: () throws -> Content) throws -> [Content] {
+    func parseVector<Content>(content parser: () throws(WasmParserError) -> Content) throws(WasmParserError) -> [Content] {
         try stream.parseVector(content: parser)
     }
 
     @inline(__always)
     @inlinable
-    func parseUnsigned<T: RawUnsignedInteger>(_: T.Type = T.self) throws -> T {
+    func parseUnsigned<T: RawUnsignedInteger>(_: T.Type = T.self) throws(WasmParserError) -> T {
         try stream.parseUnsigned(T.self)
     }
 
     @inlinable
-    func parseInteger<T: RawUnsignedInteger>() throws -> T {
+    func parseInteger<T: RawUnsignedInteger>() throws(WasmParserError) -> T {
         let signed: T.Signed = try stream.parseSigned()
         return T(bitPattern: signed)
     }
 
-    func parseName() throws -> String {
+    func parseName() throws(WasmParserError) -> String {
         try stream.parseName()
     }
 }
@@ -460,7 +475,7 @@ extension Parser {
 /// <https://webassembly.github.io/spec/core/binary/values.html#floating-point>
 extension Parser {
     @usableFromInline
-    func parseFloat() throws -> UInt32 {
+    func parseFloat() throws(WasmParserError) -> UInt32 {
         let consumedLittleEndian = try stream.consume(count: 4).reversed()
         let bitPattern = consumedLittleEndian.reduce(UInt32(0)) { acc, byte in
             acc << 8 + UInt32(byte)
@@ -469,7 +484,7 @@ extension Parser {
     }
 
     @usableFromInline
-    func parseDouble() throws -> UInt64 {
+    func parseDouble() throws(WasmParserError) -> UInt64 {
         let consumedLittleEndian = try stream.consume(count: 8).reversed()
         let bitPattern = consumedLittleEndian.reduce(UInt64(0)) { acc, byte in
             acc << 8 + UInt64(byte)
@@ -484,7 +499,7 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/types.html#value-types>
     @usableFromInline
-    func parseValueType() throws -> ValueType {
+    func parseValueType() throws(WasmParserError) -> ValueType {
         let b = try stream.consumeAny()
 
         switch b {
@@ -505,7 +520,7 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/function-references/core/binary/types.html#reference-types>
     @usableFromInline
-    func parseReferenceType(byte: UInt8) throws -> ReferenceType? {
+    func parseReferenceType(byte: UInt8) throws(WasmParserError) -> ReferenceType? {
         switch byte {
         case 0x63: return try ReferenceType(isNullable: true, heapType: parseHeapType())
         case 0x64: return try ReferenceType(isNullable: false, heapType: parseHeapType())
@@ -518,7 +533,7 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/function-references/core/binary/types.html#heap-types>
     @usableFromInline
-    func parseHeapType() throws -> HeapType {
+    func parseHeapType() throws(WasmParserError) -> HeapType {
         let b = try stream.peek()
         switch b {
         case 0x6F:
@@ -539,7 +554,7 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/types.html#result-types>
     @inlinable
-    func parseResultType() throws -> BlockType {
+    func parseResultType() throws(WasmParserError) -> BlockType {
         guard let nextByte = try stream.peek() else {
             throw makeError(.unexpectedEnd)
         }
@@ -561,7 +576,7 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/types.html#function-types>
     @inlinable
-    func parseFunctionType() throws -> FunctionType {
+    func parseFunctionType() throws(WasmParserError) -> FunctionType {
         let opcode = try stream.consumeAny()
 
         // XXX: spectest expects the first byte should be parsed as a LEB128 with 1 byte limit
@@ -573,15 +588,15 @@ extension Parser {
             throw makeError(.malformedFunctionType(opcode))
         }
 
-        let parameters = try parseVector { try parseValueType() }
-        let results = try parseVector { try parseValueType() }
+        let parameters = try parseVector { () throws(WasmParserError) in try parseValueType() }
+        let results = try parseVector { () throws(WasmParserError) in try parseValueType() }
         return FunctionType(parameters: parameters, results: results)
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/types.html#limits>
     @usableFromInline
-    func parseLimits() throws -> Limits {
+    func parseLimits() throws(WasmParserError) -> Limits {
         let b = try stream.consumeAny()
         let sharedMask: UInt8 = 0b0010
         let isMemory64Mask: UInt8 = 0b0100
@@ -620,14 +635,14 @@ extension Parser {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/types.html#memory-types>
-    func parseMemoryType() throws -> MemoryType {
+    func parseMemoryType() throws(WasmParserError) -> MemoryType {
         return try parseLimits()
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/types.html#table-types>
     @inlinable
-    func parseTableType() throws -> TableType {
+    func parseTableType() throws(WasmParserError) -> TableType {
         let elementType: ReferenceType
         let b = try stream.consumeAny()
 
@@ -650,14 +665,14 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/types.html#global-types>
     @inlinable
-    func parseGlobalType() throws -> GlobalType {
+    func parseGlobalType() throws(WasmParserError) -> GlobalType {
         let valueType = try parseValueType()
         let mutability = try parseMutability()
         return GlobalType(mutability: mutability, valueType: valueType)
     }
 
     @inlinable
-    func parseMutability() throws -> Mutability {
+    func parseMutability() throws(WasmParserError) -> Mutability {
         let b = try stream.consumeAny()
         switch b {
         case 0x00:
@@ -672,13 +687,13 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/instructions.html#memory-instructions>
     @inlinable
-    func parseMemarg() throws -> MemArg {
+    func parseMemarg() throws(WasmParserError) -> MemArg {
         let align: UInt32 = try parseUnsigned()
         let offset: UInt64 = try features.contains(.memory64) ? parseUnsigned(UInt64.self) : UInt64(parseUnsigned(UInt32.self))
         return MemArg(offset: offset, align: align)
     }
 
-    @inlinable func parseVectorBytes() throws -> ArraySlice<UInt8> {
+    @inlinable func parseVectorBytes() throws(WasmParserError) -> ArraySlice<UInt8> {
         let count: UInt32 = try parseUnsigned()
         return try stream.consume(count: Int(count))
     }
@@ -687,7 +702,10 @@ extension Parser {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/instructions.html>
 extension Parser: BinaryInstructionDecoder {
-    @inlinable func parseMemoryIndex() throws -> UInt32 {
+    @usableFromInline
+    typealias DecoderError = WasmParserError
+
+    @inlinable func parseMemoryIndex() throws(WasmParserError) -> UInt32 {
         let zero = try stream.consumeAny()
         guard zero == 0x00 else {
             throw makeError(.zeroExpected(actual: zero))
@@ -695,34 +713,36 @@ extension Parser: BinaryInstructionDecoder {
         return 0
     }
 
-    @inlinable func throwUnknown(_ opcode: [UInt8]) throws -> Never {
+    @inlinable func throwUnknown(_ opcode: [UInt8]) throws(WasmParserError) -> Never {
         throw makeError(.illegalOpcode(opcode))
     }
 
-    @inlinable func visitUnknown(_ opcode: [UInt8]) throws -> Bool {
+    @inlinable func visitUnknown(_ opcode: [UInt8]) throws(WasmParserError) -> Bool {
         try throwUnknown(opcode)
     }
 
-    @inlinable mutating func visitBlock() throws -> BlockType { try parseResultType() }
-    @inlinable mutating func visitLoop() throws -> BlockType { try parseResultType() }
-    @inlinable mutating func visitIf() throws -> BlockType { try parseResultType() }
-    @inlinable mutating func visitBr() throws -> UInt32 { try parseUnsigned() }
-    @inlinable mutating func visitBrIf() throws -> UInt32 { try parseUnsigned() }
-    @inlinable mutating func visitBrTable() throws -> BrTable {
-        let labelIndices: [UInt32] = try parseVector { try parseUnsigned() }
+    @inlinable mutating func visitBlock() throws(WasmParserError) -> BlockType { try parseResultType() }
+    @inlinable mutating func visitLoop() throws(WasmParserError) -> BlockType { try parseResultType() }
+    @inlinable mutating func visitIf() throws(WasmParserError) -> BlockType { try parseResultType() }
+    @inlinable mutating func visitBr() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitBrIf() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitBrTable() throws(WasmParserError) -> BrTable {
+        let labelIndices: [UInt32] = try parseVector { () throws(WasmParserError) in try parseUnsigned() }
         let labelIndex: UInt32 = try parseUnsigned()
         return BrTable(labelIndices: labelIndices, defaultIndex: labelIndex)
     }
-    @inlinable mutating func visitCall() throws -> UInt32 { try parseUnsigned() }
-    @inlinable mutating func visitCallRef() throws -> UInt32 {
+    @inlinable mutating func visitCall() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitCallRef() throws(WasmParserError) -> UInt32 {
         // TODO reference types checks
         // traps on nil
         try parseUnsigned()
     }
 
-    @inlinable mutating func visitCallIndirect() throws -> (typeIndex: UInt32, tableIndex: UInt32) {
+    @inlinable mutating func visitCallIndirect() throws(WasmParserError) -> (typeIndex: UInt32, tableIndex: UInt32) {
         let typeIndex: TypeIndex = try parseUnsigned()
-        if try !features.contains(.referenceTypes) && stream.peek() != 0 {
+        let peek = try stream.peek()
+
+        if !features.contains(.referenceTypes) && peek != 0 {
             // Check that reserved byte is zero when reference-types is disabled
             throw makeError(.malformedIndirectCall)
         }
@@ -730,85 +750,85 @@ extension Parser: BinaryInstructionDecoder {
         return (typeIndex, tableIndex)
     }
 
-    @inlinable mutating func visitReturnCall() throws -> UInt32 {
+    @inlinable mutating func visitReturnCall() throws(WasmParserError) -> UInt32 {
         try parseUnsigned()
     }
 
-    @inlinable mutating func visitReturnCallIndirect() throws -> (typeIndex: UInt32, tableIndex: UInt32) {
+    @inlinable mutating func visitReturnCallIndirect() throws(WasmParserError) -> (typeIndex: UInt32, tableIndex: UInt32) {
         let typeIndex: TypeIndex = try parseUnsigned()
         let tableIndex: TableIndex = try parseUnsigned()
         return (typeIndex, tableIndex)
     }
 
-    @inlinable mutating func visitReturnCallRef() throws -> UInt32 {
+    @inlinable mutating func visitReturnCallRef() throws(WasmParserError) -> UInt32 {
         return 0
     }
 
-    @inlinable mutating func visitTypedSelect() throws -> WasmTypes.ValueType {
-        let results = try parseVector { try parseValueType() }
+    @inlinable mutating func visitTypedSelect() throws(WasmParserError) -> WasmTypes.ValueType {
+        let results = try parseVector { () throws(WasmParserError) in try parseValueType() }
         guard results.count == 1 else {
             throw makeError(.invalidResultArity(expected: 1, actual: results.count))
         }
         return results[0]
     }
 
-    @inlinable mutating func visitLocalGet() throws -> UInt32 { try parseUnsigned() }
-    @inlinable mutating func visitLocalSet() throws -> UInt32 { try parseUnsigned() }
-    @inlinable mutating func visitLocalTee() throws -> UInt32 { try parseUnsigned() }
-    @inlinable mutating func visitGlobalGet() throws -> UInt32 { try parseUnsigned() }
-    @inlinable mutating func visitGlobalSet() throws -> UInt32 { try parseUnsigned() }
-    @inlinable mutating func visitLoad(_: Instruction.Load) throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitStore(_: Instruction.Store) throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitMemorySize() throws -> UInt32 {
+    @inlinable mutating func visitLocalGet() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitLocalSet() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitLocalTee() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitGlobalGet() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitGlobalSet() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitLoad(_: Instruction.Load) throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitStore(_: Instruction.Store) throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitMemorySize() throws(WasmParserError) -> UInt32 {
         try parseMemoryIndex()
     }
-    @inlinable mutating func visitMemoryGrow() throws -> UInt32 {
+    @inlinable mutating func visitMemoryGrow() throws(WasmParserError) -> UInt32 {
         try parseMemoryIndex()
     }
-    @inlinable mutating func visitI32Const() throws -> Int32 {
+    @inlinable mutating func visitI32Const() throws(WasmParserError) -> Int32 {
         let n: UInt32 = try parseInteger()
         return Int32(bitPattern: n)
     }
-    @inlinable mutating func visitI64Const() throws -> Int64 {
+    @inlinable mutating func visitI64Const() throws(WasmParserError) -> Int64 {
         let n: UInt64 = try parseInteger()
         return Int64(bitPattern: n)
     }
-    @inlinable mutating func visitF32Const() throws -> IEEE754.Float32 {
+    @inlinable mutating func visitF32Const() throws(WasmParserError) -> IEEE754.Float32 {
         let n = try parseFloat()
         return IEEE754.Float32(bitPattern: n)
     }
-    @inlinable mutating func visitF64Const() throws -> IEEE754.Float64 {
+    @inlinable mutating func visitF64Const() throws(WasmParserError) -> IEEE754.Float64 {
         let n = try parseDouble()
         return IEEE754.Float64(bitPattern: n)
     }
-    @inlinable mutating func visitRefNull() throws -> WasmTypes.HeapType {
+    @inlinable mutating func visitRefNull() throws(WasmParserError) -> WasmTypes.HeapType {
         return try parseHeapType()
     }
-    @inlinable mutating func visitBrOnNull() throws -> UInt32 {
+    @inlinable mutating func visitBrOnNull() throws(WasmParserError) -> UInt32 {
         return 0
     }
-    @inlinable mutating func visitBrOnNonNull() throws -> UInt32 {
+    @inlinable mutating func visitBrOnNonNull() throws(WasmParserError) -> UInt32 {
         return 0
     }
 
-    @inlinable mutating func visitRefFunc() throws -> UInt32 { try parseUnsigned() }
-    @inlinable mutating func visitMemoryInit() throws -> UInt32 {
+    @inlinable mutating func visitRefFunc() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitMemoryInit() throws(WasmParserError) -> UInt32 {
         let dataIndex: DataIndex = try parseUnsigned()
         _ = try parseMemoryIndex()
         return dataIndex
     }
 
-    @inlinable mutating func visitDataDrop() throws -> UInt32 {
+    @inlinable mutating func visitDataDrop() throws(WasmParserError) -> UInt32 {
         try parseUnsigned()
     }
 
-    @inlinable mutating func visitMemoryCopy() throws -> (dstMem: UInt32, srcMem: UInt32) {
+    @inlinable mutating func visitMemoryCopy() throws(WasmParserError) -> (dstMem: UInt32, srcMem: UInt32) {
         _ = try parseMemoryIndex()
         _ = try parseMemoryIndex()
         return (0, 0)
     }
 
-    @inlinable mutating func visitMemoryFill() throws -> UInt32 {
+    @inlinable mutating func visitMemoryFill() throws(WasmParserError) -> UInt32 {
         let zero = try stream.consumeAny()
         guard zero == 0x00 else {
             throw makeError(.zeroExpected(actual: zero))
@@ -816,115 +836,117 @@ extension Parser: BinaryInstructionDecoder {
         return 0
     }
 
-    @inlinable mutating func visitTableInit() throws -> (elemIndex: UInt32, table: UInt32) {
+    @inlinable mutating func visitTableInit() throws(WasmParserError) -> (elemIndex: UInt32, table: UInt32) {
         let elementIndex: ElementIndex = try parseUnsigned()
         let tableIndex: TableIndex = try parseUnsigned()
         return (elementIndex, tableIndex)
     }
-    @inlinable mutating func visitElemDrop() throws -> UInt32 {
+    @inlinable mutating func visitElemDrop() throws(WasmParserError) -> UInt32 {
         try parseUnsigned()
     }
-    @inlinable mutating func visitTableCopy() throws -> (dstTable: UInt32, srcTable: UInt32) {
+    @inlinable mutating func visitTableCopy() throws(WasmParserError) -> (dstTable: UInt32, srcTable: UInt32) {
         let destination: TableIndex = try parseUnsigned()
         let source: TableIndex = try parseUnsigned()
         return (destination, source)
     }
-    @inlinable mutating func visitTableFill() throws -> UInt32 {
+    @inlinable mutating func visitTableFill() throws(WasmParserError) -> UInt32 {
         try parseUnsigned()
     }
-    @inlinable mutating func visitTableGet() throws -> UInt32 {
+    @inlinable mutating func visitTableGet() throws(WasmParserError) -> UInt32 {
         try parseUnsigned()
     }
-    @inlinable mutating func visitTableSet() throws -> UInt32 {
+    @inlinable mutating func visitTableSet() throws(WasmParserError) -> UInt32 {
         try parseUnsigned()
     }
-    @inlinable mutating func visitTableGrow() throws -> UInt32 {
+    @inlinable mutating func visitTableGrow() throws(WasmParserError) -> UInt32 {
         try parseUnsigned()
     }
-    @inlinable mutating func visitTableSize() throws -> UInt32 {
+    @inlinable mutating func visitTableSize() throws(WasmParserError) -> UInt32 {
         try parseUnsigned()
     }
-    @inlinable mutating func visitMemoryAtomicNotify() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitMemoryAtomicWait32() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitMemoryAtomicWait64() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI32AtomicRmwAdd() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI64AtomicRmwAdd() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI32AtomicRmw8AddU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI32AtomicRmw16AddU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI64AtomicRmw8AddU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI64AtomicRmw16AddU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI64AtomicRmw32AddU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI32AtomicRmwSub() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI64AtomicRmwSub() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI32AtomicRmw8SubU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI32AtomicRmw16SubU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI64AtomicRmw8SubU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI64AtomicRmw16SubU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI64AtomicRmw32SubU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI32AtomicRmwAnd() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI64AtomicRmwAnd() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI32AtomicRmw8AndU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI32AtomicRmw16AndU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI64AtomicRmw8AndU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI64AtomicRmw16AndU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI64AtomicRmw32AndU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI32AtomicRmwOr() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI64AtomicRmwOr() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI32AtomicRmw8OrU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI32AtomicRmw16OrU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI64AtomicRmw8OrU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI64AtomicRmw16OrU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI64AtomicRmw32OrU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI32AtomicRmwXor() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI64AtomicRmwXor() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI32AtomicRmw8XorU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI32AtomicRmw16XorU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI64AtomicRmw8XorU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI64AtomicRmw16XorU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI64AtomicRmw32XorU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI32AtomicRmwXchg() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI64AtomicRmwXchg() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI32AtomicRmw8XchgU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI32AtomicRmw16XchgU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI64AtomicRmw8XchgU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI64AtomicRmw16XchgU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI64AtomicRmw32XchgU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI32AtomicRmwCmpxchg() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI64AtomicRmwCmpxchg() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI32AtomicRmw8CmpxchgU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI32AtomicRmw16CmpxchgU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI64AtomicRmw8CmpxchgU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI64AtomicRmw16CmpxchgU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitI64AtomicRmw32CmpxchgU() throws -> MemArg { try parseMemarg() }
-    @inlinable mutating func visitV128Const() throws -> V128 {
+    @inlinable mutating func visitMemoryAtomicNotify() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitMemoryAtomicWait32() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitMemoryAtomicWait64() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmwAdd() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmwAdd() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw8AddU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw16AddU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw8AddU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw16AddU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw32AddU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmwSub() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmwSub() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw8SubU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw16SubU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw8SubU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw16SubU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw32SubU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmwAnd() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmwAnd() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw8AndU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw16AndU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw8AndU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw16AndU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw32AndU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmwOr() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmwOr() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw8OrU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw16OrU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw8OrU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw16OrU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw32OrU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmwXor() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmwXor() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw8XorU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw16XorU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw8XorU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw16XorU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw32XorU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmwXchg() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmwXchg() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw8XchgU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw16XchgU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw8XchgU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw16XchgU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw32XchgU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmwCmpxchg() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmwCmpxchg() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw8CmpxchgU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw16CmpxchgU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw8CmpxchgU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw16CmpxchgU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw32CmpxchgU() throws(WasmParserError) -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitV128Const() throws(WasmParserError) -> V128 {
         return V128(bytes: Array(try stream.consume(count: V128.byteCount)))
     }
-    @inlinable mutating func visitI8x16Shuffle() throws -> V128ShuffleMask {
+    @inlinable mutating func visitI8x16Shuffle() throws(WasmParserError) -> V128ShuffleMask {
         return V128ShuffleMask(lanes: Array(try stream.consume(count: V128ShuffleMask.laneCount)))
     }
-    @inlinable mutating func visitSimdLane(_: Instruction.SimdLane) throws -> UInt8 {
+    @inlinable mutating func visitSimdLane(_: Instruction.SimdLane) throws(WasmParserError) -> UInt8 {
         return try stream.consumeAny()
     }
-    @inlinable mutating func visitSimdMemLane(_: Instruction.SimdMemLane) throws -> (memarg: MemArg, lane: UInt8) {
+    @inlinable mutating func visitSimdMemLane(_: Instruction.SimdMemLane) throws(WasmParserError) -> (memarg: MemArg, lane: UInt8) {
         let memarg = try parseMemarg()
         let lane = try stream.consumeAny()
         return (memarg: memarg, lane: lane)
     }
-    @inlinable func claimNextByte() throws -> UInt8 {
+    @inlinable func claimNextByte() throws(WasmParserError) -> UInt8 {
         return try stream.consumeAny()
     }
 
     /// Returns: `true` if the parsed instruction is the block end instruction.
     @inline(__always)
     @inlinable
-    mutating func parseInstruction<V: InstructionVisitor>(visitor v: inout V) throws -> Bool {
+    mutating func parseInstruction<V: InstructionVisitor>(
+        visitor v: inout V
+    ) throws(EitherError<V.VisitorError, WasmParserError>) -> Bool {
         return try parseBinaryInstruction(visitor: &v, decoder: &self)
     }
 
     @usableFromInline
     struct InstructionFactory: AnyInstructionVisitor {
         @usableFromInline
-        typealias VisitorError = Never
+        typealias VisitorError = WasmParserError
 
         @usableFromInline var binaryOffset: Int = 0
 
@@ -939,7 +961,7 @@ extension Parser: BinaryInstructionDecoder {
     }
 
     @usableFromInline
-    mutating func parseConstExpression() throws -> ConstExpression {
+    mutating func parseConstExpression() throws(WasmParserError) -> ConstExpression {
         var factory = InstructionFactory()
         var isEnd: Bool
         repeat {
@@ -955,7 +977,7 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#custom-section>
     @usableFromInline
-    func parseCustomSection(size: UInt32) throws -> CustomSection {
+    func parseCustomSection(size: UInt32) throws(WasmParserError) -> CustomSection {
         let preNameIndex = stream.currentIndex
         let name = try parseName()
         let nameSize = stream.currentIndex - preNameIndex
@@ -973,15 +995,15 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#type-section>
     @inlinable
-    func parseTypeSection() throws -> [FunctionType] {
-        return try parseVector { try parseFunctionType() }
+    func parseTypeSection() throws(WasmParserError) -> [FunctionType] {
+        return try parseVector { () throws(WasmParserError) in try parseFunctionType() }
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#import-section>
     @usableFromInline
-    func parseImportSection() throws -> [Import] {
-        return try parseVector {
+    func parseImportSection() throws(WasmParserError) -> [Import] {
+        return try parseVector { () throws(WasmParserError) in
             let module = try parseName()
             let name = try parseName()
             let descriptor = try parseImportDescriptor()
@@ -991,7 +1013,7 @@ extension Parser {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-importdesc>
-    func parseImportDescriptor() throws -> ImportDescriptor {
+    func parseImportDescriptor() throws(WasmParserError) -> ImportDescriptor {
         let b = try stream.consume(Set(0x00...0x03))
         switch b {
         case 0x00: return try .function(parseUnsigned())
@@ -1006,29 +1028,29 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#function-section>
     @inlinable
-    func parseFunctionSection() throws -> [TypeIndex] {
-        return try parseVector { try parseUnsigned() }
+    func parseFunctionSection() throws(WasmParserError) -> [TypeIndex] {
+        return try parseVector { () throws(WasmParserError) in try parseUnsigned() }
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#table-section>
     @usableFromInline
-    func parseTableSection() throws -> [Table] {
-        return try parseVector { try Table(type: parseTableType()) }
+    func parseTableSection() throws(WasmParserError) -> [Table] {
+        return try parseVector { () throws(WasmParserError) in try Table(type: parseTableType()) }
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#memory-section>
     @usableFromInline
-    func parseMemorySection() throws -> [Memory] {
-        return try parseVector { try Memory(type: parseLimits()) }
+    func parseMemorySection() throws(WasmParserError) -> [Memory] {
+        return try parseVector { () throws(WasmParserError) in try Memory(type: parseLimits()) }
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#global-section>
     @usableFromInline
-    mutating func parseGlobalSection() throws -> [Global] {
-        return try parseVector {
+    mutating func parseGlobalSection() throws(WasmParserError) -> [Global] {
+        return try parseVector { () throws(WasmParserError) in
             let type = try parseGlobalType()
             let expression = try parseConstExpression()
             return Global(type: type, initializer: expression)
@@ -1038,8 +1060,8 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#export-section>
     @usableFromInline
-    func parseExportSection() throws -> [Export] {
-        return try parseVector {
+    func parseExportSection() throws(WasmParserError) -> [Export] {
+        return try parseVector { () throws(WasmParserError) in
             let name = try parseName()
             let descriptor = try parseExportDescriptor()
             return Export(name: name, descriptor: descriptor)
@@ -1048,7 +1070,7 @@ extension Parser {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-exportdesc>
-    func parseExportDescriptor() throws -> ExportDescriptor {
+    func parseExportDescriptor() throws(WasmParserError) -> ExportDescriptor {
         let b = try stream.consume(Set(0x00...0x03))
         switch b {
         case 0x00: return try .function(parseUnsigned())
@@ -1063,15 +1085,15 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#start-section>
     @usableFromInline
-    func parseStartSection() throws -> FunctionIndex {
+    func parseStartSection() throws(WasmParserError) -> FunctionIndex {
         return try parseUnsigned()
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#element-section>
     @inlinable
-    mutating func parseElementSection() throws -> [ElementSegment] {
-        return try parseVector {
+    mutating func parseElementSection() throws(WasmParserError) -> [ElementSegment] {
+        return try parseVector { () throws(WasmParserError) in
             let flag = try ElementSegment.Flag(rawValue: parseUnsigned())
 
             let type: ReferenceType
@@ -1118,9 +1140,9 @@ extension Parser {
             }
 
             if flag.contains(.usesExpressions) {
-                initializer = try parseVector { try parseConstExpression() }
+                initializer = try parseVector { () throws(WasmParserError) in try parseConstExpression() }
             } else {
-                initializer = try parseVector {
+                initializer = try parseVector { () throws(WasmParserError) in
                     try [Instruction.refFunc(functionIndex: parseUnsigned() as UInt32)]
                 }
             }
@@ -1132,11 +1154,11 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#code-section>
     @inlinable
-    func parseCodeSection() throws -> [Code] {
-        return try parseVector {
+    func parseCodeSection() throws(WasmParserError) -> [Code] {
+        return try parseVector { () throws(WasmParserError) in
             let size = try parseUnsigned() as UInt32
             let bodyStart = stream.currentIndex
-            let localTypes = try parseVector { () -> (n: UInt32, type: ValueType) in
+            let localTypes = try parseVector { () throws(WasmParserError) -> (n: UInt32, type: ValueType) in
                 let n: UInt32 = try parseUnsigned()
                 let t = try parseValueType()
                 return (n, t)
@@ -1163,8 +1185,8 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#data-section>
     @inlinable
-    mutating func parseDataSection() throws -> [DataSegment] {
-        return try parseVector {
+    mutating func parseDataSection() throws(WasmParserError) -> [DataSegment] {
+        return try parseVector { () throws(WasmParserError) in
             let kind: UInt32 = try parseUnsigned()
             switch kind {
             case 0:
@@ -1189,7 +1211,7 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#data-count-section>
     @usableFromInline
-    func parseDataCountSection() throws -> UInt32 {
+    func parseDataCountSection() throws(WasmParserError) -> UInt32 {
         return try parseUnsigned()
     }
 }
@@ -1217,7 +1239,7 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-magic>
     @usableFromInline
-    func parseMagicNumber() throws {
+    func parseMagicNumber() throws(WasmParserError) {
         let magicNumber = try stream.consume(count: 4)
         guard magicNumber.elementsEqual(WASM_MAGIC) else {
             throw makeError(.invalidMagicNumber(.init(magicNumber)))
@@ -1227,7 +1249,7 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-version>
     @usableFromInline
-    func parseVersion() throws -> [UInt8] {
+    func parseVersion() throws(WasmParserError) -> [UInt8] {
         let version = try Array(stream.consume(count: 4))
         guard version == [0x01, 0x00, 0x00, 0x00] else {
             throw makeError(.unknownVersion(.init(version)))
@@ -1259,7 +1281,7 @@ extension Parser {
         var last: Order = .initial
 
         @inlinable
-        mutating func track(order: Order, parser: Parser) throws {
+        mutating func track(order: Order, parser: Parser) throws(WasmParserError) {
             guard last.rawValue < order.rawValue else {
                 throw parser.makeError(.sectionOutOfOrder)
             }
@@ -1296,7 +1318,7 @@ extension Parser {
     /// }
     /// ```
     @inlinable
-    public mutating func parseNext() throws -> ParsingPayload? {
+    public mutating func parseNext() throws(WasmParserError) -> ParsingPayload? {
         switch nextParseTarget {
         case .header:
             try parseMagicNumber()
@@ -1391,7 +1413,7 @@ public struct NameSectionParser<Stream: ByteStream> {
     ///
     /// - Throws: If the stream is malformed or the section is invalid.
     /// - Returns: A list of parsed names.
-    public func parseAll() throws -> [ParsedNames] {
+    public func parseAll() throws(WasmParserError) -> [ParsedNames] {
         var results: [ParsedNames] = []
         while try !stream.hasReachedEnd() {
             let id = try stream.consumeAny()
@@ -1403,7 +1425,7 @@ public struct NameSectionParser<Stream: ByteStream> {
         return results
     }
 
-    func parseNameSubsection(type: UInt8) throws -> ParsedNames? {
+    func parseNameSubsection(type: UInt8) throws(WasmParserError) -> ParsedNames? {
         let size = try stream.parseUnsigned(UInt32.self)
         switch type {
         case 1:  // function names
@@ -1417,9 +1439,9 @@ public struct NameSectionParser<Stream: ByteStream> {
         }
     }
 
-    func parseNameMap() throws -> NameMap {
+    func parseNameMap() throws(WasmParserError) -> NameMap {
         var nameMap: NameMap = [:]
-        _ = try stream.parseVector {
+        _ = try stream.parseVector { () throws(WasmParserError) in
             let index = try stream.parseUnsigned(UInt32.self)
             let name = try stream.parseName()
             nameMap[index] = name
