@@ -540,14 +540,16 @@ enum WasmGen {
 
         @usableFromInline
         protocol BinaryInstructionDecoder {
+            associatedtype DecoderError: Error
+
             /// Current offset in the decoded Wasm binary.
             var offset: Int { get }
 
             /// Claim the next byte to be decoded
-            @inlinable func claimNextByte() throws -> UInt8
+            @inlinable func claimNextByte() throws(DecoderError) -> UInt8
 
             /// Throw an error due to unknown opcode.
-            func throwUnknown(_ opcode: [UInt8]) throws -> Never
+            func throwUnknown(_ opcode: [UInt8]) throws(DecoderError) -> Never
 
         """
         for instruction in instructions.categorized {
@@ -557,7 +559,7 @@ enum WasmGen {
             if let categoryType = instruction.categoryTypeName {
                 code += "_: Instruction.\(categoryType)"
             }
-            code += ") throws -> "
+            code += ") throws(DecoderError) -> "
             if instruction.immediates.count == 1 {
                 code += "\(instruction.immediates[0].type)"
             } else {
@@ -573,7 +575,9 @@ enum WasmGen {
         code += """
 
         @inlinable
-        func parseBinaryInstruction(visitor: inout some InstructionVisitor, decoder: inout some BinaryInstructionDecoder) throws -> Bool {
+        func parseBinaryInstruction<V: InstructionVisitor, D: BinaryInstructionDecoder>(
+            visitor: inout V, decoder: inout D
+        ) throws(V.VisitorError) -> Bool where V.VisitorError == D.DecoderError {
             visitor.binaryOffset = decoder.offset
         """
 

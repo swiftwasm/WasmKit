@@ -6,214 +6,218 @@ import WasmTypes
 
 @usableFromInline
 protocol BinaryInstructionDecoder {
+    associatedtype DecoderError: Error
+
     /// Current offset in the decoded Wasm binary.
     var offset: Int { get }
 
     /// Claim the next byte to be decoded
-    @inlinable func claimNextByte() throws -> UInt8
+    @inlinable func claimNextByte() throws(DecoderError) -> UInt8
 
     /// Throw an error due to unknown opcode.
-    func throwUnknown(_ opcode: [UInt8]) throws -> Never
+    func throwUnknown(_ opcode: [UInt8]) throws(DecoderError) -> Never
     /// Decode `block` immediates
-    @inlinable mutating func visitBlock() throws -> BlockType
+    @inlinable mutating func visitBlock() throws(DecoderError) -> BlockType
     /// Decode `loop` immediates
-    @inlinable mutating func visitLoop() throws -> BlockType
+    @inlinable mutating func visitLoop() throws(DecoderError) -> BlockType
     /// Decode `if` immediates
-    @inlinable mutating func visitIf() throws -> BlockType
+    @inlinable mutating func visitIf() throws(DecoderError) -> BlockType
     /// Decode `br` immediates
-    @inlinable mutating func visitBr() throws -> UInt32
+    @inlinable mutating func visitBr() throws(DecoderError) -> UInt32
     /// Decode `br_if` immediates
-    @inlinable mutating func visitBrIf() throws -> UInt32
+    @inlinable mutating func visitBrIf() throws(DecoderError) -> UInt32
     /// Decode `br_table` immediates
-    @inlinable mutating func visitBrTable() throws -> BrTable
+    @inlinable mutating func visitBrTable() throws(DecoderError) -> BrTable
     /// Decode `call` immediates
-    @inlinable mutating func visitCall() throws -> UInt32
+    @inlinable mutating func visitCall() throws(DecoderError) -> UInt32
     /// Decode `call_indirect` immediates
-    @inlinable mutating func visitCallIndirect() throws -> (typeIndex: UInt32, tableIndex: UInt32)
+    @inlinable mutating func visitCallIndirect() throws(DecoderError) -> (typeIndex: UInt32, tableIndex: UInt32)
     /// Decode `return_call` immediates
-    @inlinable mutating func visitReturnCall() throws -> UInt32
+    @inlinable mutating func visitReturnCall() throws(DecoderError) -> UInt32
     /// Decode `return_call_indirect` immediates
-    @inlinable mutating func visitReturnCallIndirect() throws -> (typeIndex: UInt32, tableIndex: UInt32)
+    @inlinable mutating func visitReturnCallIndirect() throws(DecoderError) -> (typeIndex: UInt32, tableIndex: UInt32)
     /// Decode `call_ref` immediates
-    @inlinable mutating func visitCallRef() throws -> UInt32
+    @inlinable mutating func visitCallRef() throws(DecoderError) -> UInt32
     /// Decode `return_call_ref` immediates
-    @inlinable mutating func visitReturnCallRef() throws -> UInt32
+    @inlinable mutating func visitReturnCallRef() throws(DecoderError) -> UInt32
     /// Decode `typedSelect` immediates
-    @inlinable mutating func visitTypedSelect() throws -> ValueType
+    @inlinable mutating func visitTypedSelect() throws(DecoderError) -> ValueType
     /// Decode `local.get` immediates
-    @inlinable mutating func visitLocalGet() throws -> UInt32
+    @inlinable mutating func visitLocalGet() throws(DecoderError) -> UInt32
     /// Decode `local.set` immediates
-    @inlinable mutating func visitLocalSet() throws -> UInt32
+    @inlinable mutating func visitLocalSet() throws(DecoderError) -> UInt32
     /// Decode `local.tee` immediates
-    @inlinable mutating func visitLocalTee() throws -> UInt32
+    @inlinable mutating func visitLocalTee() throws(DecoderError) -> UInt32
     /// Decode `global.get` immediates
-    @inlinable mutating func visitGlobalGet() throws -> UInt32
+    @inlinable mutating func visitGlobalGet() throws(DecoderError) -> UInt32
     /// Decode `global.set` immediates
-    @inlinable mutating func visitGlobalSet() throws -> UInt32
+    @inlinable mutating func visitGlobalSet() throws(DecoderError) -> UInt32
     /// Decode `load` category immediates
-    @inlinable mutating func visitLoad(_: Instruction.Load) throws -> MemArg
+    @inlinable mutating func visitLoad(_: Instruction.Load) throws(DecoderError) -> MemArg
     /// Decode `store` category immediates
-    @inlinable mutating func visitStore(_: Instruction.Store) throws -> MemArg
+    @inlinable mutating func visitStore(_: Instruction.Store) throws(DecoderError) -> MemArg
     /// Decode `memory.size` immediates
-    @inlinable mutating func visitMemorySize() throws -> UInt32
+    @inlinable mutating func visitMemorySize() throws(DecoderError) -> UInt32
     /// Decode `memory.grow` immediates
-    @inlinable mutating func visitMemoryGrow() throws -> UInt32
+    @inlinable mutating func visitMemoryGrow() throws(DecoderError) -> UInt32
     /// Decode `i32.const` immediates
-    @inlinable mutating func visitI32Const() throws -> Int32
+    @inlinable mutating func visitI32Const() throws(DecoderError) -> Int32
     /// Decode `i64.const` immediates
-    @inlinable mutating func visitI64Const() throws -> Int64
+    @inlinable mutating func visitI64Const() throws(DecoderError) -> Int64
     /// Decode `f32.const` immediates
-    @inlinable mutating func visitF32Const() throws -> IEEE754.Float32
+    @inlinable mutating func visitF32Const() throws(DecoderError) -> IEEE754.Float32
     /// Decode `f64.const` immediates
-    @inlinable mutating func visitF64Const() throws -> IEEE754.Float64
+    @inlinable mutating func visitF64Const() throws(DecoderError) -> IEEE754.Float64
     /// Decode `ref.null` immediates
-    @inlinable mutating func visitRefNull() throws -> HeapType
+    @inlinable mutating func visitRefNull() throws(DecoderError) -> HeapType
     /// Decode `ref.func` immediates
-    @inlinable mutating func visitRefFunc() throws -> UInt32
+    @inlinable mutating func visitRefFunc() throws(DecoderError) -> UInt32
     /// Decode `br_on_null` immediates
-    @inlinable mutating func visitBrOnNull() throws -> UInt32
+    @inlinable mutating func visitBrOnNull() throws(DecoderError) -> UInt32
     /// Decode `br_on_non_null` immediates
-    @inlinable mutating func visitBrOnNonNull() throws -> UInt32
+    @inlinable mutating func visitBrOnNonNull() throws(DecoderError) -> UInt32
     /// Decode `memory.init` immediates
-    @inlinable mutating func visitMemoryInit() throws -> UInt32
+    @inlinable mutating func visitMemoryInit() throws(DecoderError) -> UInt32
     /// Decode `data.drop` immediates
-    @inlinable mutating func visitDataDrop() throws -> UInt32
+    @inlinable mutating func visitDataDrop() throws(DecoderError) -> UInt32
     /// Decode `memory.copy` immediates
-    @inlinable mutating func visitMemoryCopy() throws -> (dstMem: UInt32, srcMem: UInt32)
+    @inlinable mutating func visitMemoryCopy() throws(DecoderError) -> (dstMem: UInt32, srcMem: UInt32)
     /// Decode `memory.fill` immediates
-    @inlinable mutating func visitMemoryFill() throws -> UInt32
+    @inlinable mutating func visitMemoryFill() throws(DecoderError) -> UInt32
     /// Decode `table.init` immediates
-    @inlinable mutating func visitTableInit() throws -> (elemIndex: UInt32, table: UInt32)
+    @inlinable mutating func visitTableInit() throws(DecoderError) -> (elemIndex: UInt32, table: UInt32)
     /// Decode `elem.drop` immediates
-    @inlinable mutating func visitElemDrop() throws -> UInt32
+    @inlinable mutating func visitElemDrop() throws(DecoderError) -> UInt32
     /// Decode `table.copy` immediates
-    @inlinable mutating func visitTableCopy() throws -> (dstTable: UInt32, srcTable: UInt32)
+    @inlinable mutating func visitTableCopy() throws(DecoderError) -> (dstTable: UInt32, srcTable: UInt32)
     /// Decode `table.fill` immediates
-    @inlinable mutating func visitTableFill() throws -> UInt32
+    @inlinable mutating func visitTableFill() throws(DecoderError) -> UInt32
     /// Decode `table.get` immediates
-    @inlinable mutating func visitTableGet() throws -> UInt32
+    @inlinable mutating func visitTableGet() throws(DecoderError) -> UInt32
     /// Decode `table.set` immediates
-    @inlinable mutating func visitTableSet() throws -> UInt32
+    @inlinable mutating func visitTableSet() throws(DecoderError) -> UInt32
     /// Decode `table.grow` immediates
-    @inlinable mutating func visitTableGrow() throws -> UInt32
+    @inlinable mutating func visitTableGrow() throws(DecoderError) -> UInt32
     /// Decode `table.size` immediates
-    @inlinable mutating func visitTableSize() throws -> UInt32
+    @inlinable mutating func visitTableSize() throws(DecoderError) -> UInt32
     /// Decode `memory.atomic.notify` immediates
-    @inlinable mutating func visitMemoryAtomicNotify() throws -> MemArg
+    @inlinable mutating func visitMemoryAtomicNotify() throws(DecoderError) -> MemArg
     /// Decode `memory.atomic.wait32` immediates
-    @inlinable mutating func visitMemoryAtomicWait32() throws -> MemArg
+    @inlinable mutating func visitMemoryAtomicWait32() throws(DecoderError) -> MemArg
     /// Decode `memory.atomic.wait64` immediates
-    @inlinable mutating func visitMemoryAtomicWait64() throws -> MemArg
+    @inlinable mutating func visitMemoryAtomicWait64() throws(DecoderError) -> MemArg
     /// Decode `i32.atomic.rmw.add` immediates
-    @inlinable mutating func visitI32AtomicRmwAdd() throws -> MemArg
+    @inlinable mutating func visitI32AtomicRmwAdd() throws(DecoderError) -> MemArg
     /// Decode `i64.atomic.rmw.add` immediates
-    @inlinable mutating func visitI64AtomicRmwAdd() throws -> MemArg
+    @inlinable mutating func visitI64AtomicRmwAdd() throws(DecoderError) -> MemArg
     /// Decode `i32.atomic.rmw8.add_u` immediates
-    @inlinable mutating func visitI32AtomicRmw8AddU() throws -> MemArg
+    @inlinable mutating func visitI32AtomicRmw8AddU() throws(DecoderError) -> MemArg
     /// Decode `i32.atomic.rmw16.add_u` immediates
-    @inlinable mutating func visitI32AtomicRmw16AddU() throws -> MemArg
+    @inlinable mutating func visitI32AtomicRmw16AddU() throws(DecoderError) -> MemArg
     /// Decode `i64.atomic.rmw8.add_u` immediates
-    @inlinable mutating func visitI64AtomicRmw8AddU() throws -> MemArg
+    @inlinable mutating func visitI64AtomicRmw8AddU() throws(DecoderError) -> MemArg
     /// Decode `i64.atomic.rmw16.add_u` immediates
-    @inlinable mutating func visitI64AtomicRmw16AddU() throws -> MemArg
+    @inlinable mutating func visitI64AtomicRmw16AddU() throws(DecoderError) -> MemArg
     /// Decode `i64.atomic.rmw32.add_u` immediates
-    @inlinable mutating func visitI64AtomicRmw32AddU() throws -> MemArg
+    @inlinable mutating func visitI64AtomicRmw32AddU() throws(DecoderError) -> MemArg
     /// Decode `i32.atomic.rmw.sub` immediates
-    @inlinable mutating func visitI32AtomicRmwSub() throws -> MemArg
+    @inlinable mutating func visitI32AtomicRmwSub() throws(DecoderError) -> MemArg
     /// Decode `i64.atomic.rmw.sub` immediates
-    @inlinable mutating func visitI64AtomicRmwSub() throws -> MemArg
+    @inlinable mutating func visitI64AtomicRmwSub() throws(DecoderError) -> MemArg
     /// Decode `i32.atomic.rmw8.sub_u` immediates
-    @inlinable mutating func visitI32AtomicRmw8SubU() throws -> MemArg
+    @inlinable mutating func visitI32AtomicRmw8SubU() throws(DecoderError) -> MemArg
     /// Decode `i32.atomic.rmw16.sub_u` immediates
-    @inlinable mutating func visitI32AtomicRmw16SubU() throws -> MemArg
+    @inlinable mutating func visitI32AtomicRmw16SubU() throws(DecoderError) -> MemArg
     /// Decode `i64.atomic.rmw8.sub_u` immediates
-    @inlinable mutating func visitI64AtomicRmw8SubU() throws -> MemArg
+    @inlinable mutating func visitI64AtomicRmw8SubU() throws(DecoderError) -> MemArg
     /// Decode `i64.atomic.rmw16.sub_u` immediates
-    @inlinable mutating func visitI64AtomicRmw16SubU() throws -> MemArg
+    @inlinable mutating func visitI64AtomicRmw16SubU() throws(DecoderError) -> MemArg
     /// Decode `i64.atomic.rmw32.sub_u` immediates
-    @inlinable mutating func visitI64AtomicRmw32SubU() throws -> MemArg
+    @inlinable mutating func visitI64AtomicRmw32SubU() throws(DecoderError) -> MemArg
     /// Decode `i32.atomic.rmw.and` immediates
-    @inlinable mutating func visitI32AtomicRmwAnd() throws -> MemArg
+    @inlinable mutating func visitI32AtomicRmwAnd() throws(DecoderError) -> MemArg
     /// Decode `i64.atomic.rmw.and` immediates
-    @inlinable mutating func visitI64AtomicRmwAnd() throws -> MemArg
+    @inlinable mutating func visitI64AtomicRmwAnd() throws(DecoderError) -> MemArg
     /// Decode `i32.atomic.rmw8.and_u` immediates
-    @inlinable mutating func visitI32AtomicRmw8AndU() throws -> MemArg
+    @inlinable mutating func visitI32AtomicRmw8AndU() throws(DecoderError) -> MemArg
     /// Decode `i32.atomic.rmw16.and_u` immediates
-    @inlinable mutating func visitI32AtomicRmw16AndU() throws -> MemArg
+    @inlinable mutating func visitI32AtomicRmw16AndU() throws(DecoderError) -> MemArg
     /// Decode `i64.atomic.rmw8.and_u` immediates
-    @inlinable mutating func visitI64AtomicRmw8AndU() throws -> MemArg
+    @inlinable mutating func visitI64AtomicRmw8AndU() throws(DecoderError) -> MemArg
     /// Decode `i64.atomic.rmw16.and_u` immediates
-    @inlinable mutating func visitI64AtomicRmw16AndU() throws -> MemArg
+    @inlinable mutating func visitI64AtomicRmw16AndU() throws(DecoderError) -> MemArg
     /// Decode `i64.atomic.rmw32.and_u` immediates
-    @inlinable mutating func visitI64AtomicRmw32AndU() throws -> MemArg
+    @inlinable mutating func visitI64AtomicRmw32AndU() throws(DecoderError) -> MemArg
     /// Decode `i32.atomic.rmw.or` immediates
-    @inlinable mutating func visitI32AtomicRmwOr() throws -> MemArg
+    @inlinable mutating func visitI32AtomicRmwOr() throws(DecoderError) -> MemArg
     /// Decode `i64.atomic.rmw.or` immediates
-    @inlinable mutating func visitI64AtomicRmwOr() throws -> MemArg
+    @inlinable mutating func visitI64AtomicRmwOr() throws(DecoderError) -> MemArg
     /// Decode `i32.atomic.rmw8.or_u` immediates
-    @inlinable mutating func visitI32AtomicRmw8OrU() throws -> MemArg
+    @inlinable mutating func visitI32AtomicRmw8OrU() throws(DecoderError) -> MemArg
     /// Decode `i32.atomic.rmw16.or_u` immediates
-    @inlinable mutating func visitI32AtomicRmw16OrU() throws -> MemArg
+    @inlinable mutating func visitI32AtomicRmw16OrU() throws(DecoderError) -> MemArg
     /// Decode `i64.atomic.rmw8.or_u` immediates
-    @inlinable mutating func visitI64AtomicRmw8OrU() throws -> MemArg
+    @inlinable mutating func visitI64AtomicRmw8OrU() throws(DecoderError) -> MemArg
     /// Decode `i64.atomic.rmw16.or_u` immediates
-    @inlinable mutating func visitI64AtomicRmw16OrU() throws -> MemArg
+    @inlinable mutating func visitI64AtomicRmw16OrU() throws(DecoderError) -> MemArg
     /// Decode `i64.atomic.rmw32.or_u` immediates
-    @inlinable mutating func visitI64AtomicRmw32OrU() throws -> MemArg
+    @inlinable mutating func visitI64AtomicRmw32OrU() throws(DecoderError) -> MemArg
     /// Decode `i32.atomic.rmw.xor` immediates
-    @inlinable mutating func visitI32AtomicRmwXor() throws -> MemArg
+    @inlinable mutating func visitI32AtomicRmwXor() throws(DecoderError) -> MemArg
     /// Decode `i64.atomic.rmw.xor` immediates
-    @inlinable mutating func visitI64AtomicRmwXor() throws -> MemArg
+    @inlinable mutating func visitI64AtomicRmwXor() throws(DecoderError) -> MemArg
     /// Decode `i32.atomic.rmw8.xor_u` immediates
-    @inlinable mutating func visitI32AtomicRmw8XorU() throws -> MemArg
+    @inlinable mutating func visitI32AtomicRmw8XorU() throws(DecoderError) -> MemArg
     /// Decode `i32.atomic.rmw16.xor_u` immediates
-    @inlinable mutating func visitI32AtomicRmw16XorU() throws -> MemArg
+    @inlinable mutating func visitI32AtomicRmw16XorU() throws(DecoderError) -> MemArg
     /// Decode `i64.atomic.rmw8.xor_u` immediates
-    @inlinable mutating func visitI64AtomicRmw8XorU() throws -> MemArg
+    @inlinable mutating func visitI64AtomicRmw8XorU() throws(DecoderError) -> MemArg
     /// Decode `i64.atomic.rmw16.xor_u` immediates
-    @inlinable mutating func visitI64AtomicRmw16XorU() throws -> MemArg
+    @inlinable mutating func visitI64AtomicRmw16XorU() throws(DecoderError) -> MemArg
     /// Decode `i64.atomic.rmw32.xor_u` immediates
-    @inlinable mutating func visitI64AtomicRmw32XorU() throws -> MemArg
+    @inlinable mutating func visitI64AtomicRmw32XorU() throws(DecoderError) -> MemArg
     /// Decode `i32.atomic.rmw.xchg` immediates
-    @inlinable mutating func visitI32AtomicRmwXchg() throws -> MemArg
+    @inlinable mutating func visitI32AtomicRmwXchg() throws(DecoderError) -> MemArg
     /// Decode `i64.atomic.rmw.xchg` immediates
-    @inlinable mutating func visitI64AtomicRmwXchg() throws -> MemArg
+    @inlinable mutating func visitI64AtomicRmwXchg() throws(DecoderError) -> MemArg
     /// Decode `i32.atomic.rmw8.xchg_u` immediates
-    @inlinable mutating func visitI32AtomicRmw8XchgU() throws -> MemArg
+    @inlinable mutating func visitI32AtomicRmw8XchgU() throws(DecoderError) -> MemArg
     /// Decode `i32.atomic.rmw16.xchg_u` immediates
-    @inlinable mutating func visitI32AtomicRmw16XchgU() throws -> MemArg
+    @inlinable mutating func visitI32AtomicRmw16XchgU() throws(DecoderError) -> MemArg
     /// Decode `i64.atomic.rmw8.xchg_u` immediates
-    @inlinable mutating func visitI64AtomicRmw8XchgU() throws -> MemArg
+    @inlinable mutating func visitI64AtomicRmw8XchgU() throws(DecoderError) -> MemArg
     /// Decode `i64.atomic.rmw16.xchg_u` immediates
-    @inlinable mutating func visitI64AtomicRmw16XchgU() throws -> MemArg
+    @inlinable mutating func visitI64AtomicRmw16XchgU() throws(DecoderError) -> MemArg
     /// Decode `i64.atomic.rmw32.xchg_u` immediates
-    @inlinable mutating func visitI64AtomicRmw32XchgU() throws -> MemArg
+    @inlinable mutating func visitI64AtomicRmw32XchgU() throws(DecoderError) -> MemArg
     /// Decode `i32.atomic.rmw.cmpxchg` immediates
-    @inlinable mutating func visitI32AtomicRmwCmpxchg() throws -> MemArg
+    @inlinable mutating func visitI32AtomicRmwCmpxchg() throws(DecoderError) -> MemArg
     /// Decode `i64.atomic.rmw.cmpxchg` immediates
-    @inlinable mutating func visitI64AtomicRmwCmpxchg() throws -> MemArg
+    @inlinable mutating func visitI64AtomicRmwCmpxchg() throws(DecoderError) -> MemArg
     /// Decode `i32.atomic.rmw8.cmpxchg_u` immediates
-    @inlinable mutating func visitI32AtomicRmw8CmpxchgU() throws -> MemArg
+    @inlinable mutating func visitI32AtomicRmw8CmpxchgU() throws(DecoderError) -> MemArg
     /// Decode `i32.atomic.rmw16.cmpxchg_u` immediates
-    @inlinable mutating func visitI32AtomicRmw16CmpxchgU() throws -> MemArg
+    @inlinable mutating func visitI32AtomicRmw16CmpxchgU() throws(DecoderError) -> MemArg
     /// Decode `i64.atomic.rmw8.cmpxchg_u` immediates
-    @inlinable mutating func visitI64AtomicRmw8CmpxchgU() throws -> MemArg
+    @inlinable mutating func visitI64AtomicRmw8CmpxchgU() throws(DecoderError) -> MemArg
     /// Decode `i64.atomic.rmw16.cmpxchg_u` immediates
-    @inlinable mutating func visitI64AtomicRmw16CmpxchgU() throws -> MemArg
+    @inlinable mutating func visitI64AtomicRmw16CmpxchgU() throws(DecoderError) -> MemArg
     /// Decode `i64.atomic.rmw32.cmpxchg_u` immediates
-    @inlinable mutating func visitI64AtomicRmw32CmpxchgU() throws -> MemArg
+    @inlinable mutating func visitI64AtomicRmw32CmpxchgU() throws(DecoderError) -> MemArg
     /// Decode `v128.const` immediates
-    @inlinable mutating func visitV128Const() throws -> V128
+    @inlinable mutating func visitV128Const() throws(DecoderError) -> V128
     /// Decode `i8x16.shuffle` immediates
-    @inlinable mutating func visitI8x16Shuffle() throws -> V128ShuffleMask
+    @inlinable mutating func visitI8x16Shuffle() throws(DecoderError) -> V128ShuffleMask
     /// Decode `simdLane` category immediates
-    @inlinable mutating func visitSimdLane(_: Instruction.SimdLane) throws -> UInt8
+    @inlinable mutating func visitSimdLane(_: Instruction.SimdLane) throws(DecoderError) -> UInt8
     /// Decode `simdMemLane` category immediates
-    @inlinable mutating func visitSimdMemLane(_: Instruction.SimdMemLane) throws -> (memarg: MemArg, lane: UInt8)
+    @inlinable mutating func visitSimdMemLane(_: Instruction.SimdMemLane) throws(DecoderError) -> (memarg: MemArg, lane: UInt8)
 }
 
 @inlinable
-func parseBinaryInstruction(visitor: inout some InstructionVisitor, decoder: inout some BinaryInstructionDecoder) throws -> Bool {
+func parseBinaryInstruction<V: InstructionVisitor, D: BinaryInstructionDecoder>(
+    visitor: inout V, decoder: inout D
+) throws(EitherError<V.VisitorError, D.DecoderError>) -> Bool {
     visitor.binaryOffset = decoder.offset
     let opcode0 = try decoder.claimNextByte()
     switch opcode0 {

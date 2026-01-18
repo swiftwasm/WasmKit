@@ -25,7 +25,7 @@ public func parseWasm(filePath: FilePath, features: WasmFeatureSet = .default) t
 
 /// Parse a given byte array as a WebAssembly binary format file
 /// > Note: <https://webassembly.github.io/spec/core/binary/index.html>
-public func parseWasm(bytes: [UInt8], features: WasmFeatureSet = .default) throws -> Module {
+public func parseWasm(bytes: [UInt8], features: WasmFeatureSet = .default) throws((WasmParserError)) -> Module {
     let stream = StaticByteStream(bytes: bytes)
     let module = try parseModule(stream: stream, features: features)
     return module
@@ -33,7 +33,7 @@ public func parseWasm(bytes: [UInt8], features: WasmFeatureSet = .default) throw
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-module>
-func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = .default) throws -> Module {
+func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = .default) throws(WasmParserError) -> Module {
     var types: [FunctionType] = []
     var typeIndices: [TypeIndex] = []
     var codes: [Code] = []
@@ -85,29 +85,33 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
     }
 
     guard typeIndices.count == codes.count else {
-        throw ValidationError(
+        throw .unclassified(ValidationError(
             .inconsistentFunctionAndCodeLength(
                 functionCount: typeIndices.count,
                 codeCount: codes.count
-            ))
+            )))
     }
 
     if let dataCount = dataCount, dataCount != UInt32(data.count) {
-        throw ValidationError(
+        throw .unclassified(ValidationError(
             .inconsistentDataCountAndDataSectionLength(
                 dataCount: dataCount,
                 dataSection: data.count
-            ))
+            )))
     }
 
-    let functions = try codes.enumerated().map { index, code in
+    let functions = try codes.enumerated().map { index, code throws(WasmParserError) in
         // SAFETY: The number of typeIndices is guaranteed to be the same as the number of codes
         let funcTypeIndex = typeIndices[index]
-        let funcType = try Module.resolveType(funcTypeIndex, typeSection: types)
-        return GuestFunction(
-            type: funcType,
-            code: code
-        )
+        do {
+            let funcType = try Module.resolveType(funcTypeIndex, typeSection: types)
+            return GuestFunction(
+                type: funcType,
+                code: code
+            )
+        } catch {
+            throw .unclassified(error)
+        }
     }
 
     return Module(

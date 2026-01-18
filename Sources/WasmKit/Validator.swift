@@ -1,7 +1,7 @@
 import WasmParser
 
 /// Represents an error that occurs during validation
-struct ValidationError: Error, CustomStringConvertible {
+public struct ValidationError: Error, CustomStringConvertible {
     /// Represents a validation error message.
     struct Message {
         let text: String
@@ -19,7 +19,7 @@ struct ValidationError: Error, CustomStringConvertible {
     var offset: Int?
 
     /// The error description.
-    var description: String {
+    public var description: String {
         if let offset = offset {
             return "\(message.text) at offset 0x\(String(offset, radix: 16))"
         } else {
