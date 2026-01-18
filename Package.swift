@@ -67,15 +67,22 @@ let package = Package(
 
         .target(
             name: "WAT",
-            dependencies: ["WasmParser"],
+            dependencies: ["WasmParserCore"],
             exclude: ["CMakeLists.txt"]
         ),
         .testTarget(name: "WATTests", dependencies: ["WAT"]),
 
+
+        .target(
+            name: "WasmParserCore",
+            dependencies: [
+                "WasmTypes",
+            ]
+        ),
         .target(
             name: "WasmParser",
             dependencies: [
-                "WasmTypes",
+                "WasmParserCore",
                 .product(name: "SystemPackage", package: "swift-system"),
             ],
             exclude: ["CMakeLists.txt"]
