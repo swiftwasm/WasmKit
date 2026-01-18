@@ -250,27 +250,29 @@ extension BinaryInteger {
 
 extension WasmParserError: CustomStringConvertible {
     public var description: String {
+        var result: String
         switch self.kind {
         case .message(let message):
-            if let offset {
-                return "\"\(message)\" at offset 0x\(String(offset, radix: 16))"
-            } else {
-                return message.text
-            }
+            result = message.text
         case .unexpectedEnd(let expected):
             var result = "Unexpected end of byte sequence."
             if let expected, expected.count > 0 {
-                result.append(contentsOf: " Expected one of \(expected.map {$0.hexString})")
+                result.append(contentsOf: " Expected one of \(expected.map {$0.hexString}).")
             }
             return result
         case .unexpectedByte(let byte, let index, let expected):
-            var result = "Unexpected byte \(byte.hexString) at index \(index.hexString)."
+            result = "Unexpected byte \(byte.hexString) at index \(index.hexString)."
             if let expected, expected.count > 0 {
-                result.append(contentsOf: " Expected one of \(expected.map {$0.hexString})")
+                result.append(contentsOf: " Expected one of \(expected.map {$0.hexString}).")
             }
-            return result
         case .unclassified(let error):
-            return "\(error)"
+            result = "\(error)"
+        }
+
+        if let offset {
+            return "\"\(result)\" raised at offset 0x\(String(offset, radix: 16))"
+        } else {
+            return result
         }
     }
 }
