@@ -1,3 +1,4 @@
+import BasicContainers
 import WasmParser
 
 @_exported import struct WasmParser.GlobalType
@@ -463,7 +464,7 @@ struct MemoryEntity: ~Copyable {
         isMemory64 ? UInt64.max : UInt64(1 << 32) / UInt64(pageSize)
     }
 
-    private var storage: UnsafeMutableBufferPointer<UInt8>
+    private var storage: UniqueArray<UInt8>
     let maxPageCount: UInt64
     let limit: Limits
 
@@ -472,17 +473,15 @@ struct MemoryEntity: ~Copyable {
         guard try resourceLimiter.limitMemoryGrowth(to: byteSize) else {
             throw Trap(.initialMemorySizeExceedsLimit(byteSize: byteSize))
         }
-        storage = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: byteSize)
+
         if byteSize > 0 {
-            storage.initialize(repeating: 0)
+            storage = .init(repeating: 0, count: byteSize)
+        } else {
+            storage = .init(capacity: byteSize)
         }
         let defaultMaxPageCount = Self.maxPageCount(isMemory64: memoryType.isMemory64)
         maxPageCount = memoryType.max ?? defaultMaxPageCount
         limit = memoryType
-    }
-
-    deinit {
-        storage.deallocate()
     }
 
     var data: UnsafeBufferPointer<UInt8> {
