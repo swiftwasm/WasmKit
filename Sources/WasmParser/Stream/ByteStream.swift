@@ -51,11 +51,12 @@ public final class StaticByteStream: ByteStream {
 
         let consumed = bytes[currentIndex]
         guard expected.contains(consumed) else {
-            throw WasmParserError(kind: .unexpectedByte(
-                consumed,
-                index: currentIndex,
-                expected: Set(expected)
-            ), offset: currentIndex)
+            throw WasmParserError(
+                kind: .unexpectedByte(
+                    consumed,
+                    index: currentIndex,
+                    expected: Set(expected)
+                ), offset: currentIndex)
         }
 
         currentIndex = bytes.index(after: currentIndex)
