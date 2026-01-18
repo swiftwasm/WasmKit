@@ -207,9 +207,11 @@ public struct WasmFeatureSet: OptionSet, Sendable {
 }
 
 /// An error that occurs during parsing of a WebAssembly binary
-public struct WasmParserError: Swift.Error {
-    @usableFromInline
-    struct Message: Sendable {
+#if compiler(>=6.2.3)
+    @nonexhaustive
+#endif
+public enum WasmParserError: Swift.Error {
+    public struct Message: Sendable {
         let text: String
 
         init(_ text: String) {
@@ -217,19 +219,43 @@ public struct WasmParserError: Swift.Error {
         }
     }
 
-    let message: Message
-    let offset: Int
+    case message(Message, offset: Int)
+    case unexpectedEnd(expected: Set<UInt8>?)
+    case unexpectedByte(UInt8, index: Int, expected: Set<UInt8>?)
+    case unclassified(any Error)
 
     @usableFromInline
     init(_ message: Message, offset: Int) {
-        self.message = message
-        self.offset = offset
+        self = .message(message, offset: offset)
+    }
+}
+
+extension BinaryInteger {
+    var hexString: String {
+        "0x\(String(self, radix: 16))"
     }
 }
 
 extension WasmParserError: CustomStringConvertible {
     public var description: String {
-        return "\"\(message)\" at offset 0x\(String(offset, radix: 16))"
+        switch self {
+        case .message(let message, let offset):
+            return "\"\(message)\" at offset 0x\(String(offset, radix: 16))"
+        case .unexpectedEnd(let expected):
+            var result = "Unexpected end of byte sequence."
+            if let expected, expected.count > 0 {
+                result.append(contentsOf: " Expected one of \(expected.map {$0.hexString})")
+            }
+            return result
+        case .unexpectedByte(let byte, let index, let expected):
+            var result = "Unexpected byte \(byte.hexString) at index \(index.hexString)."
+            if let expected, expected.count > 0 {
+                result.append(contentsOf: " Expected one of \(expected.map {$0.hexString})")
+            }
+            return result
+        case .unclassified(let error):
+            return "\(error)"
+        }
     }
 }
 
@@ -595,7 +621,7 @@ extension Parser {
         case 0x6F:
             elementType = .externRef
         default:
-            throw StreamError.unexpected(b, index: offset, expected: [0x6F, 0x70])
+            throw WasmParserError.unexpectedByte(b, index: offset, expected: [0x6F, 0x70])
         }
 
         let limits = try parseLimits()

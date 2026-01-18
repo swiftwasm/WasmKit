@@ -17,18 +17,22 @@ public final class FileHandleStream: ByteStream {
         try readMoreIfNeeded()
     }
 
-    private func readMoreIfNeeded() throws {
+    private func readMoreIfNeeded() throws(WasmParserError) {
         guard Int(endOffset) == currentIndex else { return }
         startOffset = currentIndex
 
-        let data = try fileHandle.read(upToCount: bufferLength)
+        do {
+            let data = try fileHandle.read(upToCount: bufferLength)
 
-        bytes = [UInt8](data)
+            bytes = [UInt8](data)
+        } catch {
+            throw WasmParserError.unclassified(error)
+        }
         endOffset = startOffset + bytes.count
     }
 
     @discardableResult
-    public func consumeAny() throws -> UInt8 {
+    public func consumeAny() throws(WasmParserError) -> UInt8 {
         guard let consumed = try peek() else {
             throw WasmParserError(.unexpectedEnd, offset: currentIndex)
         }
@@ -37,18 +41,18 @@ public final class FileHandleStream: ByteStream {
     }
 
     @discardableResult
-    public func consume(_ expected: Set<UInt8>) throws -> UInt8 {
+    public func consume(_ expected: Set<UInt8>) throws(WasmParserError) -> UInt8 {
         guard let consumed = try peek() else {
-            throw StreamError<UInt8>.unexpectedEnd(expected: Set(expected))
+            throw WasmParserError.unexpectedEnd(expected: Set(expected))
         }
         guard expected.contains(consumed) else {
-            throw StreamError<Element>.unexpected(consumed, index: currentIndex, expected: Set(expected))
+            throw WasmParserError.unexpectedByte(consumed, index: currentIndex, expected: Set(expected))
         }
         currentIndex = bytes.index(after: currentIndex)
         return consumed
     }
 
-    public func consume(count: Int) throws -> ArraySlice<UInt8> {
+    public func consume(count: Int) throws(WasmParserError) -> ArraySlice<UInt8> {
         let bytesToRead = currentIndex + count - endOffset
 
         guard bytesToRead > 0 else {
@@ -58,9 +62,14 @@ public final class FileHandleStream: ByteStream {
             return result
         }
 
-        let data = try fileHandle.read(upToCount: bytesToRead)
+        let data: [UInt8]
+        do {
+            data = try fileHandle.read(upToCount: bytesToRead)
+        } catch {
+            throw WasmParserError.unclassified(error)
+        }
         guard data.count == bytesToRead else {
-            throw StreamError<UInt8>.unexpectedEnd(expected: nil)
+            throw WasmParserError.unexpectedEnd(expected: nil)
         }
 
         bytes.append(contentsOf: [UInt8](data))
@@ -74,7 +83,7 @@ public final class FileHandleStream: ByteStream {
         return result
     }
 
-    public func peek() throws -> UInt8? {
+    public func peek() throws(WasmParserError) -> UInt8? {
         try readMoreIfNeeded()
 
         let index = currentIndex - startOffset
