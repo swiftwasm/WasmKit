@@ -208,7 +208,8 @@ public struct WasmFeatureSet: OptionSet, Sendable {
 
 /// An error that occurs during parsing of a WebAssembly binary
 public struct WasmParserError: Swift.Error {
-    public struct Message: Sendable {
+    @usableFromInline
+    struct Message: Sendable {
         let text: String
 
         init(_ text: String) {
