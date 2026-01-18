@@ -120,6 +120,7 @@ public final class WASIBridgeToHost {
     ///   - randomGenerator: Random number generator. Defaults to `SystemRandomNumberGenerator()`.
     /// - Throws: An error if the file system or preopens cannot be initialized.
     @available(*, deprecated, message: "Use the ordered `preopens: [WASIBridgeToHost.Preopen]` initializer instead.")
+    @_disfavoredOverload
     public convenience init(
         args: [String] = [],
         environment: [String: String] = [:],

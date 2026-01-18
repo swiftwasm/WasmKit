@@ -4,7 +4,7 @@ import SystemPackage
 import Foundation
 import WasmKitWASI
 
-let benchmarks = {
+let benchmarks: @Sendable () -> () = {
     let macrosDir = FilePath(#filePath)
         .removingLastComponent()
         .removingLastComponent()
@@ -27,7 +27,7 @@ let benchmarks = {
            "expandFreestandingMacro":{
               "discriminator":"$s7Example0015mainswift_tzEGbfMX2_6_33_B384B672EB89465DCC67528E23350CF9Ll9stringifyfMf_",
               "lexicalContext":[
-                 
+
               ],
               "macro":{
                  "moduleName":"StringifyMacros",
@@ -54,7 +54,7 @@ let benchmarks = {
            "expandFreestandingMacro":{
               "discriminator":"$s7Example0015mainswift_tzEGbfMX2_6_33_B384B672EB89465DCC67528E23350CF9Ll9stringifyfMf_",
               "lexicalContext":[
-                 
+
               ],
               "macro":{
                  "moduleName":"FoundationMacros",
@@ -81,7 +81,7 @@ let benchmarks = {
            "expandFreestandingMacro":{
               "discriminator":"$s7Example0015mainswift_tzEGbfMX2_6_33_B384B672EB89465DCC67528E23350CF9Ll9stringifyfMf_",
               "lexicalContext":[
-                 
+
               ],
               "macro":{
                  "moduleName":"TestingMacros",
