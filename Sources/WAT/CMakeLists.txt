@@ -13,4 +13,4 @@ add_wasmkit_library(WAT
 )
 
 target_link_wasmkit_libraries(WAT PUBLIC
-  WasmParser)
+  WasmParserCore)
