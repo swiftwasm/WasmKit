@@ -344,7 +344,7 @@ jobs:
       image: swift:6.2-noble
     steps:
       - uses: actions/checkout@v4
-      - run: apt-get update && apt-get install -y python3
+      - run: apt-get update && apt-get install -y python3 libjemalloc-dev
       - run: ./Vendor/checkout-dependency --category benchmark
       - run: cd Benchmarks && swift package benchmark
 
