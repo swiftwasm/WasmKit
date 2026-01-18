@@ -2,19 +2,20 @@
 
 import Benchmark
 import System
+import WAT
 import WasmKit
 import _NIOFileSystem
 
 let benchmarks: @Sendable () -> () = {
-    Benchmark("WastBenchmark", closure: { (benchmark: Benchmark, setupResult: [(path: String, bytes: [UInt8])]) in
+    Benchmark("parseWasmBenchmark", closure: { (benchmark: Benchmark, setupResult: [(path: String, location: Location, bytes: [UInt8])]) in
         for _ in benchmark.scaledIterations {
-            for (path, bytes) in setupResult {
+            for (path, location, bytes) in setupResult {
                 blackHole({ () -> Module? in
                     do {
                         let module = try parseWasm(bytes: bytes, features: .all)
                         return module
                     } catch {
-                        print("Found error while parsing \(path): \(error)")
+                        print("Found error while parsing \(path) at \(location): \(error)")
                     }
                     return nil
                 }())
@@ -33,29 +34,31 @@ let benchmarks: @Sendable () -> () = {
 
         let wastOutputPath = packagePath.appending(".build")
 
+        var wasm = [(path: String, location: Location, bytes: [UInt8])]()
         try await FileSystem.shared.withDirectoryHandle(atPath: spectestsPath, options: .init()) { dir in
-            for try await entry in dir.listContents(recursive: true) {
-                guard entry.path.extension == "wast" else { continue }
-
-                // let result = try await run(
-                //     .name("wast2json"),
-                //     arguments: [entry.path.string],
-                //     workingDirectory: System.FilePath(wastOutputPath.string),
-                //     output: .standardError
-                // )
-                //
-                // guard result.terminationStatus.isSuccess else {
-                //     continue
-                // }
-            }
-        }
-        var wasm = [(path: String, bytes: [UInt8])]()
-        try await FileSystem.shared.withDirectoryHandle(atPath: wastOutputPath, options: .init()) { dir in
-            for try await entry in dir.listContents(recursive: true) {
-                guard entry.path.extension == "wasm" && entry.type == .regular else { continue }
+            for try await entry in dir.listContents(recursive: false) {
+                guard entry.path.extension == "wast" && entry.type == .regular else { continue }
 
                 try await FileSystem.shared.withFileHandle(forReadingAt: entry.path) { file in
-                    wasm.append((entry.path.string, .init(buffer: try await file.readToEnd(maximumSizeAllowed: ByteCount.megabytes(1024)))))
+                    do {
+                        var wast = try parseWAST(.init(buffer: try await file.readToEnd(maximumSizeAllowed: .megabytes(1024))), features: .all)
+                        var lastModule: (location: Location, wat: Wat)?
+                        while let (directive, _) = try wast.nextDirective() {
+                            switch directive {
+                            case .module(let wat):
+                                guard case .text(let source) = wat.source else { continue }
+                                lastModule = (wat.location, source)
+
+                            case .assertReturn:
+                                guard var lastModule else { continue }
+                                wasm.append((entry.path.string, lastModule.location, try lastModule.wat.encode()))
+
+                            default: continue
+                            }
+                        }
+                    } catch {
+                        print("Error while parsing \(entry.path): \(error)")
+                    }
                 }
             }
         }

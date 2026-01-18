@@ -21,7 +21,7 @@ let package = Package(
                 .product(name: "Benchmark", package: "package-benchmark"),
                 .product(name: "SystemPackage", package: "swift-system"),
                 .product(name: "WasmKit", package: "WasmKit"),
-                .product(name: "WAT", package: "WAT"),
+                .product(name: "WAT", package: "WasmKit"),
                 .product(name: "_NIOFileSystem", package: "swift-nio"),
             ],
             path: "Benchmarks/WasmParserBenchmark",
