@@ -2,7 +2,7 @@ import Benchmark
 import WasmKit
 import WAT
 
-let benchmarks = {
+let benchmarks: @Sendable () -> () = {
     Benchmark("empty instantiation") { benchmark in
         for _ in benchmark.scaledIterations {
             let engine = Engine()
