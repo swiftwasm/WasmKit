@@ -92,9 +92,9 @@ and should work on the following platforms:
 | WASI | WASI Preview 1 | 🚧 [Majority of syscalls implemented](https://github.com/swiftwasm/WasmKit/blob/d9b56a7b3f979a72682c0d37f6cc71b3493dae65/Tests/WASITests/IntegrationTests.swift#L31) |
 
 
-## Minimum Supported Swift Version
+## Minimum Supported Swift Version (MSSV)
 
-The minimum supported version is Swift 6.0, which is the version used to bootstrap the Swift toolchain on [ci.swift.org](https://ci.swift.org/).
+Currently, the minimum supported version is Swift 6.1. The general strategy is to support last two minor versions of the Swift toolchain available at the time of WasmKit's release. At the same time, development branches of WasmKit tend to adopt newer development versions of the Swift toolchain.
 
 ## Testing
 
