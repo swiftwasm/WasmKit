@@ -10,7 +10,7 @@
             ])
         }
 
-        mutating func encode(_ component: ComponentWat, options: EncodeOptions) throws {
+        mutating func encode(_ component: ComponentWatParser.ComponentDef, options: EncodeOptions) throws {
             try underlying.section(id: 1) {
                 for var module in component.modulesMap {
                     $0.output.append(contentsOf: try WAT.encode(module: &module.wat, options: options))

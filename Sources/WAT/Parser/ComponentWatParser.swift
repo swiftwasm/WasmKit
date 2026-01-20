@@ -6,14 +6,8 @@
     import WasmTypes
 
     struct ComponentWatParser: ~Copyable {
-        /// Component tree being parsed.
-        var wat = ComponentWat()
-
         /// Underlying WAT parser to delegate to.
         var parser: Parser
-
-        /// Indices in a parsed component tree used for access to currently-parsed component.
-        var currentNestingLevel = UniqueArray<ComponentIndex>()
 
         let features: WasmFeatureSet
 
@@ -21,8 +15,6 @@
             enum Kind {
                 case component(Int)
             }
-            let location: Location
-            let kind: Kind
         }
 
         init(_ input: String, features: WasmFeatureSet) {
@@ -32,7 +24,7 @@
 
         /// Parses a single top-level definition and updates in-progress parsing result stored in `self.wat`.
         /// - Returns: `true` if no more tokens to parse.
-        mutating func next() throws(WatParserError) -> Bool {
+        mutating func next(parsedComponent: inout ComponentDef) throws(WatParserError) -> Bool {
             // If we have reached the end of the (component ...) block, return nil
             guard try !parser.isEndOfParen() else { return false }
             try parser.expect(.leftParen)
@@ -43,38 +35,49 @@
             switch keyword {
             case "component":
                 let id = try parser.takeId()
+                var newComponent = ComponentDef(id: id)
 
-                var componentDefs = [ComponentDefField]()
                 while try parser.take(.leftParen) {
                     let componentDefKeyword = try parser.expectKeyword()
                     switch componentDefKeyword {
                     case "core":
                         let coreKeyword = try parser.expectKeyword()
+                        let location = parser.lexer.location()
                         switch coreKeyword {
                         case "module":
-                            componentDefs.append(.coreModule(try self.parseModuleDef()))
+                            newComponent.fields.append(
+                                .init(
+                                    location: location,
+                                    kind: .coreModule(try self.parseModuleDef())
+                                )
+                            )
 
                         case "instance":
-                            componentDefs.append(.coreInstance(try self.parseCoreInstanceDef()))
+                            newComponent.fields.append(
+                                .init(
+                                    location: location,
+                                    kind: .coreInstance(try self.parseCoreInstanceDef())
+                                )
+                            )
 
                         default:
                             throw WatParserError(
                                 "Unknown core definition keyword \(coreKeyword)",
-                                location: parser.lexer.location()
+                                location: location
                             )
                         }
                     case "func":
-                        try parseComponentFunction()
+                        try parseComponentFunction(&parsedComponent)
                     default:
                         throw WatParserError(
                             "Unknown component definition keyword \(componentDefKeyword)",
-                            location: parser.lexer.location()
+                            location: location
                         )
                     }
                     try parser.expect(.rightParen)
                 }
-                let componentIndex = try self.wat.componentsMap.add(.init(id: id, fields: componentDefs))
-                self.wat.fields.append(.init(location: location, kind: .component(componentIndex)))
+                let componentIndex = try parsedComponent.componentsMap.add(newComponent)
+                parsedComponent.fields.append(.init(location: location, kind: .component(.init(rawValue: componentIndex))))
             default:
                 fatalError()
             }
@@ -214,8 +217,9 @@
             }
         }
 
-        private mutating func parseComponentFunction(component: inout ComponentDef) throws(WatParserError) {
-            let fieldsCount = component.fields.count
+        private mutating func parseComponentFunction(
+            _ parsedComponent: inout ComponentDef
+        ) throws(WatParserError) {
             let id = try parser.takeId()
             var parameters = [(String, ComponentType)]()
             var resultType: ComponentType?
@@ -246,14 +250,14 @@
                 case "export":
 //                    let id = self.wat.componentFunctions.add(.init(id: id, linking: <#T##ComponentFuncDef.Linking?#>, params: <#T##[(String, ComponentType)]#>, result: <#T##ComponentType#>))
                     let exportName = try parser.expectString()
-                    result.append(
+                    parsedComponent.fields.append(
                         .exportDef(.init(exportName: exportName))
                     )
 
                 case "import":
                     let importModuleName = try parser.expectString()
                     let importName = try parser.expectString()
-                    result.append(
+                    parsedComponent.fields.append(
                         .importDef(.init(importModuleName: importModuleName, importName: importName))
                     )
 
@@ -265,14 +269,13 @@
                         options.append(try parseCanonOpt())
                         try parser.expect(.rightParen)
                     }
-                    result.append(
-                        .canon(
-                            .init(
-                                id: id,
-                                kind: .lift,
-                                functionIndex: coreFunctionIndex,
-                                options: options
-                            ))
+                    parsedComponent.canon.append(
+                        .init(
+                            id: id,
+                            kind: .lift,
+                            functionIndex: coreFunctionIndex,
+                            options: options
+                        )
                     )
 
                 default:
@@ -330,15 +333,20 @@
     }
 
     extension ComponentWatParser {
-        enum ComponentDefField {
-            case coreModule(ModuleDef)
-            case coreInstance(CoreInstanceDef)
-            case coreType(WatParser.FunctionType)
-            case component(ComponentDef)
-            case instance(ComponentInstanceDef)
-            case canon(CanonDef)
-            case exportDef(ExportDef)
-            case importDef(ImportDef)
+        struct ComponentDefField {
+            enum Kind {
+                case coreModule(ModuleDef)
+                case coreInstance(CoreInstanceDef)
+                case coreType(WatParser.FunctionType)
+                case component(ComponentIndex)
+                case instance(ComponentInstanceIndex)
+                case canon(CanonIndex)
+                case exportDef(ExportDef)
+                case importDef(ImportDef)
+            }
+
+            let location: Location
+            let kind: Kind
         }
 
         struct ValueDef: NamedFieldDecl {
@@ -349,9 +357,31 @@
             var id: Name?
         }
 
+        /// https://github.com/WebAssembly/component-model/blob/main/design/mvp/Explainer.md#index-spaces
         struct ComponentDef: NamedFieldDecl {
             var id: Name?
-            let fields: [ComponentDefField]
+            
+            // Listed in the order of section indices in binary encoding.
+            var coreModulesMap: NameMapping<ModuleDef> = .init()
+            var coreInstancesMap: NameMapping<CoreInstanceDef> = .init()
+            var coreTypesMap: NameMapping<ComponentTypeDef> = .init()
+
+            var componentFunctions: NameMapping<ComponentFuncDef> = .init()
+            var valuesMap: NameMapping<ValueDef> = .init()
+            var componentTypes: NameMapping<ComponentTypeDef> = .init()
+            var componentInstancesMap: NameMapping<ComponentInstanceDef> = .init()
+            var componentsMap: NameMapping<ComponentDef> = .init()
+
+            var aliases = Aliases()
+            var canon = [CanonDef]()
+
+            /// As sections in CM binaries can stay disjoint and unmerged, for compatibility with other tools, we should preserve disjoint sections together with their ordering.
+            var fields = [ComponentDefField]()
+
+            struct Aliases {
+                init() {}
+            }
+
         }
 
         struct ModuleDef: NamedFieldDecl {
