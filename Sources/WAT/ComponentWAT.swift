@@ -8,14 +8,12 @@
         let rawValue: Int
     }
 
-struct ComponentInstanceIndex: RawRepresentable {
-    let rawValue: Int
-}
+    struct ComponentInstanceIndex: RawRepresentable {
+        let rawValue: Int
+    }
 
-
-struct CanonIndex: RawRepresentable {
-    let rawValue: Int
-}
-
+    struct CanonIndex: RawRepresentable {
+        let rawValue: Int
+    }
 
 #endif

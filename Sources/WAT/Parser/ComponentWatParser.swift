@@ -248,7 +248,7 @@
                     resultType = try parseComponentType()
 
                 case "export":
-//                    let id = self.wat.componentFunctions.add(.init(id: id, linking: <#T##ComponentFuncDef.Linking?#>, params: <#T##[(String, ComponentType)]#>, result: <#T##ComponentType#>))
+                    //                    let id = self.wat.componentFunctions.add(.init(id: id, linking: <#T##ComponentFuncDef.Linking?#>, params: <#T##[(String, ComponentType)]#>, result: <#T##ComponentType#>))
                     let exportName = try parser.expectString()
                     parsedComponent.fields.append(
                         .exportDef(.init(exportName: exportName))
@@ -360,7 +360,7 @@
         /// https://github.com/WebAssembly/component-model/blob/main/design/mvp/Explainer.md#index-spaces
         struct ComponentDef: NamedFieldDecl {
             var id: Name?
-            
+
             // Listed in the order of section indices in binary encoding.
             var coreModulesMap: NameMapping<ModuleDef> = .init()
             var coreInstancesMap: NameMapping<CoreInstanceDef> = .init()
