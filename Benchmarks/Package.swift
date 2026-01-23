@@ -8,7 +8,6 @@ let package = Package(
     dependencies: [
         .package(name: "WasmKit", path: "../"),
         .package(url: "https://github.com/ordo-one/package-benchmark", .upToNextMajor(from: "1.4.0")),
-        .package(url: "https://github.com/apple/swift-nio.git", from: "2.92.2"),
         .package(url: "https://github.com/apple/swift-system.git", from: "1.6.4"),
     ]
 )
@@ -71,7 +70,6 @@ package.targets += [
             .product(name: "SystemPackage", package: "swift-system"),
             .product(name: "WasmKit", package: "WasmKit"),
             .product(name: "WAT", package: "WasmKit"),
-            .product(name: "_NIOFileSystem", package: "swift-nio"),
         ],
         path: "Benchmarks/WasmParserBenchmark",
         plugins: [

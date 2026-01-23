@@ -1,7 +1,7 @@
 import Benchmark
+import Foundation
 import WAT
 import WasmKit
-import _NIOFileSystem
 
 let benchmarks: @Sendable () -> () = {
     Benchmark("parseWasmBenchmark", closure: { (benchmark: Benchmark, setupResult: [(path: String, location: Location, bytes: [UInt8])]) in
@@ -31,31 +31,27 @@ let benchmarks: @Sendable () -> () = {
         let wastOutputPath = packagePath.appending(".build")
 
         var wasm = [(path: String, location: Location, bytes: [UInt8])]()
-        try await FileSystem.shared.withDirectoryHandle(atPath: spectestsPath, options: .init()) { dir in
-            for try await entry in dir.listContents(recursive: false) {
-                guard entry.path.extension == "wast" && entry.type == .regular else { continue }
+        for path in FileManager.shared.contentsOfDirectory(atPath: spectestsPath.string) {
+            guard path.extension == "wast" else { continue }
 
-                try await FileSystem.shared.withFileHandle(forReadingAt: entry.path) { file in
-                    do {
-                        var wast = try parseWAST(.init(buffer: try await file.readToEnd(maximumSizeAllowed: .megabytes(1024))), features: .all)
-                        var lastModule: (location: Location, wat: Wat)?
-                        while let (directive, _) = try wast.nextDirective() {
-                            switch directive {
-                            case .module(let wat):
-                                guard case .text(let source) = wat.source else { continue }
-                                lastModule = (wat.location, source)
+            do {
+                var wast = try parseWAST(.init(contentsOf: path), features: .all)
+                var lastModule: (location: Location, wat: Wat)?
+                while let (directive, _) = try wast.nextDirective() {
+                    switch directive {
+                    case .module(let wat):
+                        guard case .text(let source) = wat.source else { continue }
+                        lastModule = (wat.location, source)
 
-                            case .assertReturn:
-                                guard var lastModule else { continue }
-                                wasm.append((entry.path.string, lastModule.location, try lastModule.wat.encode()))
+                    case .assertReturn:
+                        guard var lastModule else { continue }
+                        wasm.append((entry.path.string, lastModule.location, try lastModule.wat.encode()))
 
-                            default: continue
-                            }
-                        }
-                    } catch {
-                        print("Error while parsing \(entry.path): \(error)")
+                    default: continue
                     }
                 }
+            } catch {
+                print("Error while parsing \(entry.path): \(error)")
             }
         }
 
