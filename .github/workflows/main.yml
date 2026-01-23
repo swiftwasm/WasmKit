@@ -218,7 +218,7 @@ jobs:
       - run: ./build-exec ./CI/install-wabt.sh
       - run: ./Vendor/checkout-dependency --category benchmark
       - run: ./build-exec swift test ${{ matrix.test-args }}
-      - run: cd Benchmarks && ../build-exec swift package benchmark
+      - run: ./build-exec swift package --package-path Benchmarks benchmark
 
       - if: matrix.build-dev-dashboard
         run: ./build-exec ./CI/build-dev-dashboard.sh
