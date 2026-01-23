@@ -32,11 +32,12 @@ let benchmarks: @Sendable () -> () = {
         let wastOutputPath = packagePath.appending(".build")
 
         var wasm = [(path: String, location: Location, bytes: [UInt8])]()
-        for path in FileManager.shared.contentsOfDirectory(atPath: spectestsPath.string) {
-            guard path.extension == "wast" else { continue }
+        for var path in try FileManager.default.contentsOfDirectory(atPath: spectestsPath.string) {
+            path = spectestsPath.appending(path).string
+            guard FilePath(path).extension == "wast" else { continue }
 
             do {
-                var wast = try parseWAST(.init(contentsOf: path), features: .all)
+                var wast = try parseWAST(.init(contentsOf: URL(filePath: path)), features: .all)
                 var lastModule: (location: Location, wat: Wat)?
                 while let (directive, _) = try wast.nextDirective() {
                     switch directive {
@@ -46,13 +47,13 @@ let benchmarks: @Sendable () -> () = {
 
                     case .assertReturn:
                         guard var lastModule else { continue }
-                        wasm.append((entry.path.string, lastModule.location, try lastModule.wat.encode()))
+                        wasm.append((path, lastModule.location, try lastModule.wat.encode()))
 
                     default: continue
                     }
                 }
             } catch {
-                print("Error while parsing \(entry.path): \(error)")
+                print("Error while parsing \(path): \(error)")
             }
         }
 
