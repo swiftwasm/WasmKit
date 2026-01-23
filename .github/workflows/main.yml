@@ -151,6 +151,7 @@ jobs:
             wasi-swift-sdk-id: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm
             wasi-swift-sdk-checksum: "b64dfad9e1c9ccdf06f35cf9b1a00317e000df0c0de0b3eb9f49d6db0fcba4d9"
             test-args: "--traits WasmDebuggingSupport"
+            build-benchmarks: true
           - swift: "swift:6.2-amazonlinux2"
             development-toolchain-download: "https://download.swift.org/development/amazonlinux2/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a-amazonlinux2.tar.gz"
             wasi-swift-sdk-download: "https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm.artifactbundle.tar.gz"
@@ -163,6 +164,7 @@ jobs:
             wasi-swift-sdk-id: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm
             wasi-swift-sdk-checksum: "b64dfad9e1c9ccdf06f35cf9b1a00317e000df0c0de0b3eb9f49d6db0fcba4d9"
             test-args: "--traits WasmDebuggingSupport --enable-code-coverage"
+            build-benchmarks: true
             build-dev-dashboard: true
           - swift: "swiftlang/swift:nightly-6.3-noble"
             development-toolchain-download: "https://download.swift.org/development/ubuntu2404/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a-ubuntu24.04.tar.gz"
@@ -170,12 +172,14 @@ jobs:
             wasi-swift-sdk-id: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm
             wasi-swift-sdk-checksum: "b64dfad9e1c9ccdf06f35cf9b1a00317e000df0c0de0b3eb9f49d6db0fcba4d9"
             test-args: "--traits WasmDebuggingSupport -Xswiftc -DWASMKIT_CI_TOOLCHAIN_NIGHTLY"
+            build-benchmarks: true
           - swift: "swiftlang/swift:nightly-main-noble"
             development-toolchain-download: "https://download.swift.org/development/ubuntu2404/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a-ubuntu24.04.tar.gz"
             wasi-swift-sdk-download: "https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm.artifactbundle.tar.gz"
             wasi-swift-sdk-id: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm
             wasi-swift-sdk-checksum: "b64dfad9e1c9ccdf06f35cf9b1a00317e000df0c0de0b3eb9f49d6db0fcba4d9"
             test-args: "--traits WasmDebuggingSupport -Xswiftc -DWASMKIT_CI_TOOLCHAIN_NIGHTLY -Xswiftc -DWASMKIT_CI_TOOLCHAIN_MAIN_NIGHTLY"
+            build-benchmarks: true
           - swift: "swiftlang/swift:nightly-main-noble"
             development-toolchain-download: "https://download.swift.org/development/ubuntu2404/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a-ubuntu24.04.tar.gz"
             wasi-swift-sdk-download: "https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm.artifactbundle.tar.gz"
@@ -218,7 +222,9 @@ jobs:
       - run: ./build-exec ./CI/install-wabt.sh
       - run: ./Vendor/checkout-dependency --category benchmark
       - run: ./build-exec swift test ${{ matrix.test-args }}
-      - run: ./build-exec swift package --package-path Benchmarks benchmark
+      
+      - if: matrix.build-benchmarks
+        run: ./build-exec swift package --package-path Benchmarks benchmark
 
       - if: matrix.build-dev-dashboard
         run: ./build-exec ./CI/build-dev-dashboard.sh
