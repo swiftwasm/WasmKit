@@ -12,382 +12,854 @@ import WasmTypes
 /// - Returns: A closure that invokes the corresponding visitor method. Nil if the keyword is not recognized.
 ///
 /// Note: The returned closure does not consume any tokens.
-func parseTextInstruction<V: InstructionVisitor>(keyword: String, expressionParser: inout ExpressionParser<V>, wat: inout Wat) throws -> ((inout V) throws -> Void)? {
+func parseTextInstruction<V: InstructionVisitor>(
+    keyword: String,
+    expressionParser: inout ExpressionParser<V>,
+    wat: inout Wat
+) throws(WatParserError) -> ((inout V) throws(WatParserError) -> Void)? where V.VisitorError == WatParserError {
     switch keyword {
-    case "unreachable": return { return try $0.visitUnreachable() }
-    case "nop": return { return try $0.visitNop() }
+    case "unreachable": return { visitor throws(WatParserError) in return try visitor.visitUnreachable() }
+    case "nop": return { visitor throws(WatParserError) in return try visitor.visitNop() }
     case "block":
         let (blockType) = try expressionParser.visitBlock(wat: &wat)
-        return { return try $0.visitBlock(blockType: blockType) }
+        return { visitor throws(WatParserError) in return try visitor.visitBlock(blockType: blockType) }
     case "loop":
         let (blockType) = try expressionParser.visitLoop(wat: &wat)
-        return { return try $0.visitLoop(blockType: blockType) }
+        return { visitor throws(WatParserError) in return try visitor.visitLoop(blockType: blockType) }
     case "if":
         let (blockType) = try expressionParser.visitIf(wat: &wat)
-        return { return try $0.visitIf(blockType: blockType) }
-    case "else": return { return try $0.visitElse() }
-    case "end": return { return try $0.visitEnd() }
+        return { visitor throws(WatParserError) in return try visitor.visitIf(blockType: blockType) }
+    case "else": return { visitor throws(WatParserError) in return try visitor.visitElse() }
+    case "end": return { visitor throws(WatParserError) in return try visitor.visitEnd() }
     case "br":
         let (relativeDepth) = try expressionParser.visitBr(wat: &wat)
-        return { return try $0.visitBr(relativeDepth: relativeDepth) }
+        return { visitor throws(WatParserError) in return try visitor.visitBr(relativeDepth: relativeDepth) }
     case "br_if":
         let (relativeDepth) = try expressionParser.visitBrIf(wat: &wat)
-        return { return try $0.visitBrIf(relativeDepth: relativeDepth) }
+        return { visitor throws(WatParserError) in return try visitor.visitBrIf(relativeDepth: relativeDepth) }
     case "br_table":
         let (targets) = try expressionParser.visitBrTable(wat: &wat)
-        return { return try $0.visitBrTable(targets: targets) }
-    case "return": return { return try $0.visitReturn() }
+        return { visitor throws(WatParserError) in return try visitor.visitBrTable(targets: targets) }
+    case "return": return { visitor throws(WatParserError) in return try visitor.visitReturn() }
     case "call":
         let (functionIndex) = try expressionParser.visitCall(wat: &wat)
-        return { return try $0.visitCall(functionIndex: functionIndex) }
+        return { visitor throws(WatParserError) in return try visitor.visitCall(functionIndex: functionIndex) }
     case "call_indirect":
         let (typeIndex, tableIndex) = try expressionParser.visitCallIndirect(wat: &wat)
-        return { return try $0.visitCallIndirect(typeIndex: typeIndex, tableIndex: tableIndex) }
+        return { visitor throws(WatParserError) in return try visitor.visitCallIndirect(typeIndex: typeIndex, tableIndex: tableIndex) }
     case "return_call":
         let (functionIndex) = try expressionParser.visitReturnCall(wat: &wat)
-        return { return try $0.visitReturnCall(functionIndex: functionIndex) }
+        return { visitor throws(WatParserError) in return try visitor.visitReturnCall(functionIndex: functionIndex) }
     case "return_call_indirect":
         let (typeIndex, tableIndex) = try expressionParser.visitReturnCallIndirect(wat: &wat)
-        return { return try $0.visitReturnCallIndirect(typeIndex: typeIndex, tableIndex: tableIndex) }
+        return { visitor throws(WatParserError) in return try visitor.visitReturnCallIndirect(typeIndex: typeIndex, tableIndex: tableIndex) }
     case "call_ref":
         let (typeIndex) = try expressionParser.visitCallRef(wat: &wat)
-        return { return try $0.visitCallRef(typeIndex: typeIndex) }
+        return { visitor throws(WatParserError) in return try visitor.visitCallRef(typeIndex: typeIndex) }
     case "return_call_ref":
         let (typeIndex) = try expressionParser.visitReturnCallRef(wat: &wat)
-        return { return try $0.visitReturnCallRef(typeIndex: typeIndex) }
-    case "drop": return { return try $0.visitDrop() }
-    case "select": return { return try $0.visitSelect() }
+        return { visitor throws(WatParserError) in return try visitor.visitReturnCallRef(typeIndex: typeIndex) }
+    case "drop": return { visitor throws(WatParserError) in return try visitor.visitDrop() }
+    case "select": return { visitor throws(WatParserError) in return try visitor.visitSelect() }
     case "local.get":
         let (localIndex) = try expressionParser.visitLocalGet(wat: &wat)
-        return { return try $0.visitLocalGet(localIndex: localIndex) }
+        return { visitor throws(WatParserError) in return try visitor.visitLocalGet(localIndex: localIndex) }
     case "local.set":
         let (localIndex) = try expressionParser.visitLocalSet(wat: &wat)
-        return { return try $0.visitLocalSet(localIndex: localIndex) }
+        return { visitor throws(WatParserError) in return try visitor.visitLocalSet(localIndex: localIndex) }
     case "local.tee":
         let (localIndex) = try expressionParser.visitLocalTee(wat: &wat)
-        return { return try $0.visitLocalTee(localIndex: localIndex) }
+        return { visitor throws(WatParserError) in return try visitor.visitLocalTee(localIndex: localIndex) }
     case "global.get":
         let (globalIndex) = try expressionParser.visitGlobalGet(wat: &wat)
-        return { return try $0.visitGlobalGet(globalIndex: globalIndex) }
+        return { visitor throws(WatParserError) in return try visitor.visitGlobalGet(globalIndex: globalIndex) }
     case "global.set":
         let (globalIndex) = try expressionParser.visitGlobalSet(wat: &wat)
-        return { return try $0.visitGlobalSet(globalIndex: globalIndex) }
+        return { visitor throws(WatParserError) in return try visitor.visitGlobalSet(globalIndex: globalIndex) }
     case "i32.load":
         let (memarg) = try expressionParser.visitLoad(.i32Load, wat: &wat)
-        return { return try $0.visitLoad(.i32Load, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.i32Load, memarg: memarg) }
     case "i64.load":
         let (memarg) = try expressionParser.visitLoad(.i64Load, wat: &wat)
-        return { return try $0.visitLoad(.i64Load, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.i64Load, memarg: memarg) }
     case "f32.load":
         let (memarg) = try expressionParser.visitLoad(.f32Load, wat: &wat)
-        return { return try $0.visitLoad(.f32Load, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.f32Load, memarg: memarg) }
     case "f64.load":
         let (memarg) = try expressionParser.visitLoad(.f64Load, wat: &wat)
-        return { return try $0.visitLoad(.f64Load, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.f64Load, memarg: memarg) }
     case "i32.load8_s":
         let (memarg) = try expressionParser.visitLoad(.i32Load8S, wat: &wat)
-        return { return try $0.visitLoad(.i32Load8S, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.i32Load8S, memarg: memarg) }
     case "i32.load8_u":
         let (memarg) = try expressionParser.visitLoad(.i32Load8U, wat: &wat)
-        return { return try $0.visitLoad(.i32Load8U, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.i32Load8U, memarg: memarg) }
     case "i32.load16_s":
         let (memarg) = try expressionParser.visitLoad(.i32Load16S, wat: &wat)
-        return { return try $0.visitLoad(.i32Load16S, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.i32Load16S, memarg: memarg) }
     case "i32.load16_u":
         let (memarg) = try expressionParser.visitLoad(.i32Load16U, wat: &wat)
-        return { return try $0.visitLoad(.i32Load16U, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.i32Load16U, memarg: memarg) }
     case "i64.load8_s":
         let (memarg) = try expressionParser.visitLoad(.i64Load8S, wat: &wat)
-        return { return try $0.visitLoad(.i64Load8S, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.i64Load8S, memarg: memarg) }
     case "i64.load8_u":
         let (memarg) = try expressionParser.visitLoad(.i64Load8U, wat: &wat)
-        return { return try $0.visitLoad(.i64Load8U, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.i64Load8U, memarg: memarg) }
     case "i64.load16_s":
         let (memarg) = try expressionParser.visitLoad(.i64Load16S, wat: &wat)
-        return { return try $0.visitLoad(.i64Load16S, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.i64Load16S, memarg: memarg) }
     case "i64.load16_u":
         let (memarg) = try expressionParser.visitLoad(.i64Load16U, wat: &wat)
-        return { return try $0.visitLoad(.i64Load16U, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.i64Load16U, memarg: memarg) }
     case "i64.load32_s":
         let (memarg) = try expressionParser.visitLoad(.i64Load32S, wat: &wat)
-        return { return try $0.visitLoad(.i64Load32S, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.i64Load32S, memarg: memarg) }
     case "i64.load32_u":
         let (memarg) = try expressionParser.visitLoad(.i64Load32U, wat: &wat)
-        return { return try $0.visitLoad(.i64Load32U, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.i64Load32U, memarg: memarg) }
     case "i32.store":
         let (memarg) = try expressionParser.visitStore(.i32Store, wat: &wat)
-        return { return try $0.visitStore(.i32Store, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitStore(.i32Store, memarg: memarg) }
     case "i64.store":
         let (memarg) = try expressionParser.visitStore(.i64Store, wat: &wat)
-        return { return try $0.visitStore(.i64Store, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitStore(.i64Store, memarg: memarg) }
     case "f32.store":
         let (memarg) = try expressionParser.visitStore(.f32Store, wat: &wat)
-        return { return try $0.visitStore(.f32Store, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitStore(.f32Store, memarg: memarg) }
     case "f64.store":
         let (memarg) = try expressionParser.visitStore(.f64Store, wat: &wat)
-        return { return try $0.visitStore(.f64Store, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitStore(.f64Store, memarg: memarg) }
     case "i32.store8":
         let (memarg) = try expressionParser.visitStore(.i32Store8, wat: &wat)
-        return { return try $0.visitStore(.i32Store8, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitStore(.i32Store8, memarg: memarg) }
     case "i32.store16":
         let (memarg) = try expressionParser.visitStore(.i32Store16, wat: &wat)
-        return { return try $0.visitStore(.i32Store16, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitStore(.i32Store16, memarg: memarg) }
     case "i64.store8":
         let (memarg) = try expressionParser.visitStore(.i64Store8, wat: &wat)
-        return { return try $0.visitStore(.i64Store8, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitStore(.i64Store8, memarg: memarg) }
     case "i64.store16":
         let (memarg) = try expressionParser.visitStore(.i64Store16, wat: &wat)
-        return { return try $0.visitStore(.i64Store16, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitStore(.i64Store16, memarg: memarg) }
     case "i64.store32":
         let (memarg) = try expressionParser.visitStore(.i64Store32, wat: &wat)
-        return { return try $0.visitStore(.i64Store32, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitStore(.i64Store32, memarg: memarg) }
     case "memory.size":
         let (memory) = try expressionParser.visitMemorySize(wat: &wat)
-        return { return try $0.visitMemorySize(memory: memory) }
+        return { visitor throws(WatParserError) in return try visitor.visitMemorySize(memory: memory) }
     case "memory.grow":
         let (memory) = try expressionParser.visitMemoryGrow(wat: &wat)
-        return { return try $0.visitMemoryGrow(memory: memory) }
+        return { visitor throws(WatParserError) in return try visitor.visitMemoryGrow(memory: memory) }
     case "i32.const":
         let (value) = try expressionParser.visitI32Const(wat: &wat)
-        return { return try $0.visitI32Const(value: value) }
+        return { visitor throws(WatParserError) in return try visitor.visitI32Const(value: value) }
     case "i64.const":
         let (value) = try expressionParser.visitI64Const(wat: &wat)
-        return { return try $0.visitI64Const(value: value) }
+        return { visitor throws(WatParserError) in return try visitor.visitI64Const(value: value) }
     case "f32.const":
         let (value) = try expressionParser.visitF32Const(wat: &wat)
-        return { return try $0.visitF32Const(value: value) }
+        return { visitor throws(WatParserError) in return try visitor.visitF32Const(value: value) }
     case "f64.const":
         let (value) = try expressionParser.visitF64Const(wat: &wat)
-        return { return try $0.visitF64Const(value: value) }
+        return { visitor throws(WatParserError) in return try visitor.visitF64Const(value: value) }
     case "ref.null":
         let (type) = try expressionParser.visitRefNull(wat: &wat)
-        return { return try $0.visitRefNull(type: type) }
-    case "ref.is_null": return { return try $0.visitRefIsNull() }
+        return { visitor throws(WatParserError) in return try visitor.visitRefNull(type: type) }
+    case "ref.is_null": return { visitor throws(WatParserError) in return try visitor.visitRefIsNull() }
     case "ref.func":
         let (functionIndex) = try expressionParser.visitRefFunc(wat: &wat)
-        return { return try $0.visitRefFunc(functionIndex: functionIndex) }
-    case "ref.as_non_null": return { return try $0.visitRefAsNonNull() }
+        return { visitor throws(WatParserError) in return try visitor.visitRefFunc(functionIndex: functionIndex) }
+    case "ref.as_non_null": return { visitor throws(WatParserError) in return try visitor.visitRefAsNonNull() }
     case "br_on_null":
         let (relativeDepth) = try expressionParser.visitBrOnNull(wat: &wat)
-        return { return try $0.visitBrOnNull(relativeDepth: relativeDepth) }
+        return { visitor throws(WatParserError) in return try visitor.visitBrOnNull(relativeDepth: relativeDepth) }
     case "br_on_non_null":
         let (relativeDepth) = try expressionParser.visitBrOnNonNull(wat: &wat)
-        return { return try $0.visitBrOnNonNull(relativeDepth: relativeDepth) }
-    case "i32.eqz": return { return try $0.visitI32Eqz() }
-    case "i32.eq": return { return try $0.visitCmp(.i32Eq) }
-    case "i32.ne": return { return try $0.visitCmp(.i32Ne) }
-    case "i32.lt_s": return { return try $0.visitCmp(.i32LtS) }
-    case "i32.lt_u": return { return try $0.visitCmp(.i32LtU) }
-    case "i32.gt_s": return { return try $0.visitCmp(.i32GtS) }
-    case "i32.gt_u": return { return try $0.visitCmp(.i32GtU) }
-    case "i32.le_s": return { return try $0.visitCmp(.i32LeS) }
-    case "i32.le_u": return { return try $0.visitCmp(.i32LeU) }
-    case "i32.ge_s": return { return try $0.visitCmp(.i32GeS) }
-    case "i32.ge_u": return { return try $0.visitCmp(.i32GeU) }
-    case "i64.eqz": return { return try $0.visitI64Eqz() }
-    case "i64.eq": return { return try $0.visitCmp(.i64Eq) }
-    case "i64.ne": return { return try $0.visitCmp(.i64Ne) }
-    case "i64.lt_s": return { return try $0.visitCmp(.i64LtS) }
-    case "i64.lt_u": return { return try $0.visitCmp(.i64LtU) }
-    case "i64.gt_s": return { return try $0.visitCmp(.i64GtS) }
-    case "i64.gt_u": return { return try $0.visitCmp(.i64GtU) }
-    case "i64.le_s": return { return try $0.visitCmp(.i64LeS) }
-    case "i64.le_u": return { return try $0.visitCmp(.i64LeU) }
-    case "i64.ge_s": return { return try $0.visitCmp(.i64GeS) }
-    case "i64.ge_u": return { return try $0.visitCmp(.i64GeU) }
-    case "f32.eq": return { return try $0.visitCmp(.f32Eq) }
-    case "f32.ne": return { return try $0.visitCmp(.f32Ne) }
-    case "f32.lt": return { return try $0.visitCmp(.f32Lt) }
-    case "f32.gt": return { return try $0.visitCmp(.f32Gt) }
-    case "f32.le": return { return try $0.visitCmp(.f32Le) }
-    case "f32.ge": return { return try $0.visitCmp(.f32Ge) }
-    case "f64.eq": return { return try $0.visitCmp(.f64Eq) }
-    case "f64.ne": return { return try $0.visitCmp(.f64Ne) }
-    case "f64.lt": return { return try $0.visitCmp(.f64Lt) }
-    case "f64.gt": return { return try $0.visitCmp(.f64Gt) }
-    case "f64.le": return { return try $0.visitCmp(.f64Le) }
-    case "f64.ge": return { return try $0.visitCmp(.f64Ge) }
-    case "i32.clz": return { return try $0.visitUnary(.i32Clz) }
-    case "i32.ctz": return { return try $0.visitUnary(.i32Ctz) }
-    case "i32.popcnt": return { return try $0.visitUnary(.i32Popcnt) }
-    case "i32.add": return { return try $0.visitBinary(.i32Add) }
-    case "i32.sub": return { return try $0.visitBinary(.i32Sub) }
-    case "i32.mul": return { return try $0.visitBinary(.i32Mul) }
-    case "i32.div_s": return { return try $0.visitBinary(.i32DivS) }
-    case "i32.div_u": return { return try $0.visitBinary(.i32DivU) }
-    case "i32.rem_s": return { return try $0.visitBinary(.i32RemS) }
-    case "i32.rem_u": return { return try $0.visitBinary(.i32RemU) }
-    case "i32.and": return { return try $0.visitBinary(.i32And) }
-    case "i32.or": return { return try $0.visitBinary(.i32Or) }
-    case "i32.xor": return { return try $0.visitBinary(.i32Xor) }
-    case "i32.shl": return { return try $0.visitBinary(.i32Shl) }
-    case "i32.shr_s": return { return try $0.visitBinary(.i32ShrS) }
-    case "i32.shr_u": return { return try $0.visitBinary(.i32ShrU) }
-    case "i32.rotl": return { return try $0.visitBinary(.i32Rotl) }
-    case "i32.rotr": return { return try $0.visitBinary(.i32Rotr) }
-    case "i64.clz": return { return try $0.visitUnary(.i64Clz) }
-    case "i64.ctz": return { return try $0.visitUnary(.i64Ctz) }
-    case "i64.popcnt": return { return try $0.visitUnary(.i64Popcnt) }
-    case "i64.add": return { return try $0.visitBinary(.i64Add) }
-    case "i64.sub": return { return try $0.visitBinary(.i64Sub) }
-    case "i64.mul": return { return try $0.visitBinary(.i64Mul) }
-    case "i64.div_s": return { return try $0.visitBinary(.i64DivS) }
-    case "i64.div_u": return { return try $0.visitBinary(.i64DivU) }
-    case "i64.rem_s": return { return try $0.visitBinary(.i64RemS) }
-    case "i64.rem_u": return { return try $0.visitBinary(.i64RemU) }
-    case "i64.and": return { return try $0.visitBinary(.i64And) }
-    case "i64.or": return { return try $0.visitBinary(.i64Or) }
-    case "i64.xor": return { return try $0.visitBinary(.i64Xor) }
-    case "i64.shl": return { return try $0.visitBinary(.i64Shl) }
-    case "i64.shr_s": return { return try $0.visitBinary(.i64ShrS) }
-    case "i64.shr_u": return { return try $0.visitBinary(.i64ShrU) }
-    case "i64.rotl": return { return try $0.visitBinary(.i64Rotl) }
-    case "i64.rotr": return { return try $0.visitBinary(.i64Rotr) }
-    case "f32.abs": return { return try $0.visitUnary(.f32Abs) }
-    case "f32.neg": return { return try $0.visitUnary(.f32Neg) }
-    case "f32.ceil": return { return try $0.visitUnary(.f32Ceil) }
-    case "f32.floor": return { return try $0.visitUnary(.f32Floor) }
-    case "f32.trunc": return { return try $0.visitUnary(.f32Trunc) }
-    case "f32.nearest": return { return try $0.visitUnary(.f32Nearest) }
-    case "f32.sqrt": return { return try $0.visitUnary(.f32Sqrt) }
-    case "f32.add": return { return try $0.visitBinary(.f32Add) }
-    case "f32.sub": return { return try $0.visitBinary(.f32Sub) }
-    case "f32.mul": return { return try $0.visitBinary(.f32Mul) }
-    case "f32.div": return { return try $0.visitBinary(.f32Div) }
-    case "f32.min": return { return try $0.visitBinary(.f32Min) }
-    case "f32.max": return { return try $0.visitBinary(.f32Max) }
-    case "f32.copysign": return { return try $0.visitBinary(.f32Copysign) }
-    case "f64.abs": return { return try $0.visitUnary(.f64Abs) }
-    case "f64.neg": return { return try $0.visitUnary(.f64Neg) }
-    case "f64.ceil": return { return try $0.visitUnary(.f64Ceil) }
-    case "f64.floor": return { return try $0.visitUnary(.f64Floor) }
-    case "f64.trunc": return { return try $0.visitUnary(.f64Trunc) }
-    case "f64.nearest": return { return try $0.visitUnary(.f64Nearest) }
-    case "f64.sqrt": return { return try $0.visitUnary(.f64Sqrt) }
-    case "f64.add": return { return try $0.visitBinary(.f64Add) }
-    case "f64.sub": return { return try $0.visitBinary(.f64Sub) }
-    case "f64.mul": return { return try $0.visitBinary(.f64Mul) }
-    case "f64.div": return { return try $0.visitBinary(.f64Div) }
-    case "f64.min": return { return try $0.visitBinary(.f64Min) }
-    case "f64.max": return { return try $0.visitBinary(.f64Max) }
-    case "f64.copysign": return { return try $0.visitBinary(.f64Copysign) }
-    case "i32.wrap_i64": return { return try $0.visitConversion(.i32WrapI64) }
-    case "i32.trunc_f32_s": return { return try $0.visitConversion(.i32TruncF32S) }
-    case "i32.trunc_f32_u": return { return try $0.visitConversion(.i32TruncF32U) }
-    case "i32.trunc_f64_s": return { return try $0.visitConversion(.i32TruncF64S) }
-    case "i32.trunc_f64_u": return { return try $0.visitConversion(.i32TruncF64U) }
-    case "i64.extend_i32_s": return { return try $0.visitConversion(.i64ExtendI32S) }
-    case "i64.extend_i32_u": return { return try $0.visitConversion(.i64ExtendI32U) }
-    case "i64.trunc_f32_s": return { return try $0.visitConversion(.i64TruncF32S) }
-    case "i64.trunc_f32_u": return { return try $0.visitConversion(.i64TruncF32U) }
-    case "i64.trunc_f64_s": return { return try $0.visitConversion(.i64TruncF64S) }
-    case "i64.trunc_f64_u": return { return try $0.visitConversion(.i64TruncF64U) }
-    case "f32.convert_i32_s": return { return try $0.visitConversion(.f32ConvertI32S) }
-    case "f32.convert_i32_u": return { return try $0.visitConversion(.f32ConvertI32U) }
-    case "f32.convert_i64_s": return { return try $0.visitConversion(.f32ConvertI64S) }
-    case "f32.convert_i64_u": return { return try $0.visitConversion(.f32ConvertI64U) }
-    case "f32.demote_f64": return { return try $0.visitConversion(.f32DemoteF64) }
-    case "f64.convert_i32_s": return { return try $0.visitConversion(.f64ConvertI32S) }
-    case "f64.convert_i32_u": return { return try $0.visitConversion(.f64ConvertI32U) }
-    case "f64.convert_i64_s": return { return try $0.visitConversion(.f64ConvertI64S) }
-    case "f64.convert_i64_u": return { return try $0.visitConversion(.f64ConvertI64U) }
-    case "f64.promote_f32": return { return try $0.visitConversion(.f64PromoteF32) }
-    case "i32.reinterpret_f32": return { return try $0.visitConversion(.i32ReinterpretF32) }
-    case "i64.reinterpret_f64": return { return try $0.visitConversion(.i64ReinterpretF64) }
-    case "f32.reinterpret_i32": return { return try $0.visitConversion(.f32ReinterpretI32) }
-    case "f64.reinterpret_i64": return { return try $0.visitConversion(.f64ReinterpretI64) }
-    case "i32.extend8_s": return { return try $0.visitUnary(.i32Extend8S) }
-    case "i32.extend16_s": return { return try $0.visitUnary(.i32Extend16S) }
-    case "i64.extend8_s": return { return try $0.visitUnary(.i64Extend8S) }
-    case "i64.extend16_s": return { return try $0.visitUnary(.i64Extend16S) }
-    case "i64.extend32_s": return { return try $0.visitUnary(.i64Extend32S) }
+        return { visitor throws(WatParserError) in return try visitor.visitBrOnNonNull(relativeDepth: relativeDepth) }
+    case "i32.eqz": return { visitor throws(WatParserError) in return try visitor.visitI32Eqz() }
+    case "i32.eq": return { visitor throws(WatParserError) in return try visitor.visitCmp(.i32Eq) }
+    case "i32.ne": return { visitor throws(WatParserError) in return try visitor.visitCmp(.i32Ne) }
+    case "i32.lt_s": return { visitor throws(WatParserError) in return try visitor.visitCmp(.i32LtS) }
+    case "i32.lt_u": return { visitor throws(WatParserError) in return try visitor.visitCmp(.i32LtU) }
+    case "i32.gt_s": return { visitor throws(WatParserError) in return try visitor.visitCmp(.i32GtS) }
+    case "i32.gt_u": return { visitor throws(WatParserError) in return try visitor.visitCmp(.i32GtU) }
+    case "i32.le_s": return { visitor throws(WatParserError) in return try visitor.visitCmp(.i32LeS) }
+    case "i32.le_u": return { visitor throws(WatParserError) in return try visitor.visitCmp(.i32LeU) }
+    case "i32.ge_s": return { visitor throws(WatParserError) in return try visitor.visitCmp(.i32GeS) }
+    case "i32.ge_u": return { visitor throws(WatParserError) in return try visitor.visitCmp(.i32GeU) }
+    case "i64.eqz": return { visitor throws(WatParserError) in return try visitor.visitI64Eqz() }
+    case "i64.eq": return { visitor throws(WatParserError) in return try visitor.visitCmp(.i64Eq) }
+    case "i64.ne": return { visitor throws(WatParserError) in return try visitor.visitCmp(.i64Ne) }
+    case "i64.lt_s": return { visitor throws(WatParserError) in return try visitor.visitCmp(.i64LtS) }
+    case "i64.lt_u": return { visitor throws(WatParserError) in return try visitor.visitCmp(.i64LtU) }
+    case "i64.gt_s": return { visitor throws(WatParserError) in return try visitor.visitCmp(.i64GtS) }
+    case "i64.gt_u": return { visitor throws(WatParserError) in return try visitor.visitCmp(.i64GtU) }
+    case "i64.le_s": return { visitor throws(WatParserError) in return try visitor.visitCmp(.i64LeS) }
+    case "i64.le_u": return { visitor throws(WatParserError) in return try visitor.visitCmp(.i64LeU) }
+    case "i64.ge_s": return { visitor throws(WatParserError) in return try visitor.visitCmp(.i64GeS) }
+    case "i64.ge_u": return { visitor throws(WatParserError) in return try visitor.visitCmp(.i64GeU) }
+    case "f32.eq": return { visitor throws(WatParserError) in return try visitor.visitCmp(.f32Eq) }
+    case "f32.ne": return { visitor throws(WatParserError) in return try visitor.visitCmp(.f32Ne) }
+    case "f32.lt": return { visitor throws(WatParserError) in return try visitor.visitCmp(.f32Lt) }
+    case "f32.gt": return { visitor throws(WatParserError) in return try visitor.visitCmp(.f32Gt) }
+    case "f32.le": return { visitor throws(WatParserError) in return try visitor.visitCmp(.f32Le) }
+    case "f32.ge": return { visitor throws(WatParserError) in return try visitor.visitCmp(.f32Ge) }
+    case "f64.eq": return { visitor throws(WatParserError) in return try visitor.visitCmp(.f64Eq) }
+    case "f64.ne": return { visitor throws(WatParserError) in return try visitor.visitCmp(.f64Ne) }
+    case "f64.lt": return { visitor throws(WatParserError) in return try visitor.visitCmp(.f64Lt) }
+    case "f64.gt": return { visitor throws(WatParserError) in return try visitor.visitCmp(.f64Gt) }
+    case "f64.le": return { visitor throws(WatParserError) in return try visitor.visitCmp(.f64Le) }
+    case "f64.ge": return { visitor throws(WatParserError) in return try visitor.visitCmp(.f64Ge) }
+    case "i32.clz": return { visitor throws(WatParserError) in return try visitor.visitUnary(.i32Clz) }
+    case "i32.ctz": return { visitor throws(WatParserError) in return try visitor.visitUnary(.i32Ctz) }
+    case "i32.popcnt": return { visitor throws(WatParserError) in return try visitor.visitUnary(.i32Popcnt) }
+    case "i32.add": return { visitor throws(WatParserError) in return try visitor.visitBinary(.i32Add) }
+    case "i32.sub": return { visitor throws(WatParserError) in return try visitor.visitBinary(.i32Sub) }
+    case "i32.mul": return { visitor throws(WatParserError) in return try visitor.visitBinary(.i32Mul) }
+    case "i32.div_s": return { visitor throws(WatParserError) in return try visitor.visitBinary(.i32DivS) }
+    case "i32.div_u": return { visitor throws(WatParserError) in return try visitor.visitBinary(.i32DivU) }
+    case "i32.rem_s": return { visitor throws(WatParserError) in return try visitor.visitBinary(.i32RemS) }
+    case "i32.rem_u": return { visitor throws(WatParserError) in return try visitor.visitBinary(.i32RemU) }
+    case "i32.and": return { visitor throws(WatParserError) in return try visitor.visitBinary(.i32And) }
+    case "i32.or": return { visitor throws(WatParserError) in return try visitor.visitBinary(.i32Or) }
+    case "i32.xor": return { visitor throws(WatParserError) in return try visitor.visitBinary(.i32Xor) }
+    case "i32.shl": return { visitor throws(WatParserError) in return try visitor.visitBinary(.i32Shl) }
+    case "i32.shr_s": return { visitor throws(WatParserError) in return try visitor.visitBinary(.i32ShrS) }
+    case "i32.shr_u": return { visitor throws(WatParserError) in return try visitor.visitBinary(.i32ShrU) }
+    case "i32.rotl": return { visitor throws(WatParserError) in return try visitor.visitBinary(.i32Rotl) }
+    case "i32.rotr": return { visitor throws(WatParserError) in return try visitor.visitBinary(.i32Rotr) }
+    case "i64.clz": return { visitor throws(WatParserError) in return try visitor.visitUnary(.i64Clz) }
+    case "i64.ctz": return { visitor throws(WatParserError) in return try visitor.visitUnary(.i64Ctz) }
+    case "i64.popcnt": return { visitor throws(WatParserError) in return try visitor.visitUnary(.i64Popcnt) }
+    case "i64.add": return { visitor throws(WatParserError) in return try visitor.visitBinary(.i64Add) }
+    case "i64.sub": return { visitor throws(WatParserError) in return try visitor.visitBinary(.i64Sub) }
+    case "i64.mul": return { visitor throws(WatParserError) in return try visitor.visitBinary(.i64Mul) }
+    case "i64.div_s": return { visitor throws(WatParserError) in return try visitor.visitBinary(.i64DivS) }
+    case "i64.div_u": return { visitor throws(WatParserError) in return try visitor.visitBinary(.i64DivU) }
+    case "i64.rem_s": return { visitor throws(WatParserError) in return try visitor.visitBinary(.i64RemS) }
+    case "i64.rem_u": return { visitor throws(WatParserError) in return try visitor.visitBinary(.i64RemU) }
+    case "i64.and": return { visitor throws(WatParserError) in return try visitor.visitBinary(.i64And) }
+    case "i64.or": return { visitor throws(WatParserError) in return try visitor.visitBinary(.i64Or) }
+    case "i64.xor": return { visitor throws(WatParserError) in return try visitor.visitBinary(.i64Xor) }
+    case "i64.shl": return { visitor throws(WatParserError) in return try visitor.visitBinary(.i64Shl) }
+    case "i64.shr_s": return { visitor throws(WatParserError) in return try visitor.visitBinary(.i64ShrS) }
+    case "i64.shr_u": return { visitor throws(WatParserError) in return try visitor.visitBinary(.i64ShrU) }
+    case "i64.rotl": return { visitor throws(WatParserError) in return try visitor.visitBinary(.i64Rotl) }
+    case "i64.rotr": return { visitor throws(WatParserError) in return try visitor.visitBinary(.i64Rotr) }
+    case "f32.abs": return { visitor throws(WatParserError) in return try visitor.visitUnary(.f32Abs) }
+    case "f32.neg": return { visitor throws(WatParserError) in return try visitor.visitUnary(.f32Neg) }
+    case "f32.ceil": return { visitor throws(WatParserError) in return try visitor.visitUnary(.f32Ceil) }
+    case "f32.floor": return { visitor throws(WatParserError) in return try visitor.visitUnary(.f32Floor) }
+    case "f32.trunc": return { visitor throws(WatParserError) in return try visitor.visitUnary(.f32Trunc) }
+    case "f32.nearest": return { visitor throws(WatParserError) in return try visitor.visitUnary(.f32Nearest) }
+    case "f32.sqrt": return { visitor throws(WatParserError) in return try visitor.visitUnary(.f32Sqrt) }
+    case "f32.add": return { visitor throws(WatParserError) in return try visitor.visitBinary(.f32Add) }
+    case "f32.sub": return { visitor throws(WatParserError) in return try visitor.visitBinary(.f32Sub) }
+    case "f32.mul": return { visitor throws(WatParserError) in return try visitor.visitBinary(.f32Mul) }
+    case "f32.div": return { visitor throws(WatParserError) in return try visitor.visitBinary(.f32Div) }
+    case "f32.min": return { visitor throws(WatParserError) in return try visitor.visitBinary(.f32Min) }
+    case "f32.max": return { visitor throws(WatParserError) in return try visitor.visitBinary(.f32Max) }
+    case "f32.copysign": return { visitor throws(WatParserError) in return try visitor.visitBinary(.f32Copysign) }
+    case "f64.abs": return { visitor throws(WatParserError) in return try visitor.visitUnary(.f64Abs) }
+    case "f64.neg": return { visitor throws(WatParserError) in return try visitor.visitUnary(.f64Neg) }
+    case "f64.ceil": return { visitor throws(WatParserError) in return try visitor.visitUnary(.f64Ceil) }
+    case "f64.floor": return { visitor throws(WatParserError) in return try visitor.visitUnary(.f64Floor) }
+    case "f64.trunc": return { visitor throws(WatParserError) in return try visitor.visitUnary(.f64Trunc) }
+    case "f64.nearest": return { visitor throws(WatParserError) in return try visitor.visitUnary(.f64Nearest) }
+    case "f64.sqrt": return { visitor throws(WatParserError) in return try visitor.visitUnary(.f64Sqrt) }
+    case "f64.add": return { visitor throws(WatParserError) in return try visitor.visitBinary(.f64Add) }
+    case "f64.sub": return { visitor throws(WatParserError) in return try visitor.visitBinary(.f64Sub) }
+    case "f64.mul": return { visitor throws(WatParserError) in return try visitor.visitBinary(.f64Mul) }
+    case "f64.div": return { visitor throws(WatParserError) in return try visitor.visitBinary(.f64Div) }
+    case "f64.min": return { visitor throws(WatParserError) in return try visitor.visitBinary(.f64Min) }
+    case "f64.max": return { visitor throws(WatParserError) in return try visitor.visitBinary(.f64Max) }
+    case "f64.copysign": return { visitor throws(WatParserError) in return try visitor.visitBinary(.f64Copysign) }
+    case "i32.wrap_i64": return { visitor throws(WatParserError) in return try visitor.visitConversion(.i32WrapI64) }
+    case "i32.trunc_f32_s": return { visitor throws(WatParserError) in return try visitor.visitConversion(.i32TruncF32S) }
+    case "i32.trunc_f32_u": return { visitor throws(WatParserError) in return try visitor.visitConversion(.i32TruncF32U) }
+    case "i32.trunc_f64_s": return { visitor throws(WatParserError) in return try visitor.visitConversion(.i32TruncF64S) }
+    case "i32.trunc_f64_u": return { visitor throws(WatParserError) in return try visitor.visitConversion(.i32TruncF64U) }
+    case "i64.extend_i32_s": return { visitor throws(WatParserError) in return try visitor.visitConversion(.i64ExtendI32S) }
+    case "i64.extend_i32_u": return { visitor throws(WatParserError) in return try visitor.visitConversion(.i64ExtendI32U) }
+    case "i64.trunc_f32_s": return { visitor throws(WatParserError) in return try visitor.visitConversion(.i64TruncF32S) }
+    case "i64.trunc_f32_u": return { visitor throws(WatParserError) in return try visitor.visitConversion(.i64TruncF32U) }
+    case "i64.trunc_f64_s": return { visitor throws(WatParserError) in return try visitor.visitConversion(.i64TruncF64S) }
+    case "i64.trunc_f64_u": return { visitor throws(WatParserError) in return try visitor.visitConversion(.i64TruncF64U) }
+    case "f32.convert_i32_s": return { visitor throws(WatParserError) in return try visitor.visitConversion(.f32ConvertI32S) }
+    case "f32.convert_i32_u": return { visitor throws(WatParserError) in return try visitor.visitConversion(.f32ConvertI32U) }
+    case "f32.convert_i64_s": return { visitor throws(WatParserError) in return try visitor.visitConversion(.f32ConvertI64S) }
+    case "f32.convert_i64_u": return { visitor throws(WatParserError) in return try visitor.visitConversion(.f32ConvertI64U) }
+    case "f32.demote_f64": return { visitor throws(WatParserError) in return try visitor.visitConversion(.f32DemoteF64) }
+    case "f64.convert_i32_s": return { visitor throws(WatParserError) in return try visitor.visitConversion(.f64ConvertI32S) }
+    case "f64.convert_i32_u": return { visitor throws(WatParserError) in return try visitor.visitConversion(.f64ConvertI32U) }
+    case "f64.convert_i64_s": return { visitor throws(WatParserError) in return try visitor.visitConversion(.f64ConvertI64S) }
+    case "f64.convert_i64_u": return { visitor throws(WatParserError) in return try visitor.visitConversion(.f64ConvertI64U) }
+    case "f64.promote_f32": return { visitor throws(WatParserError) in return try visitor.visitConversion(.f64PromoteF32) }
+    case "i32.reinterpret_f32": return { visitor throws(WatParserError) in return try visitor.visitConversion(.i32ReinterpretF32) }
+    case "i64.reinterpret_f64": return { visitor throws(WatParserError) in return try visitor.visitConversion(.i64ReinterpretF64) }
+    case "f32.reinterpret_i32": return { visitor throws(WatParserError) in return try visitor.visitConversion(.f32ReinterpretI32) }
+    case "f64.reinterpret_i64": return { visitor throws(WatParserError) in return try visitor.visitConversion(.f64ReinterpretI64) }
+    case "i32.extend8_s": return { visitor throws(WatParserError) in return try visitor.visitUnary(.i32Extend8S) }
+    case "i32.extend16_s": return { visitor throws(WatParserError) in return try visitor.visitUnary(.i32Extend16S) }
+    case "i64.extend8_s": return { visitor throws(WatParserError) in return try visitor.visitUnary(.i64Extend8S) }
+    case "i64.extend16_s": return { visitor throws(WatParserError) in return try visitor.visitUnary(.i64Extend16S) }
+    case "i64.extend32_s": return { visitor throws(WatParserError) in return try visitor.visitUnary(.i64Extend32S) }
     case "memory.init":
         let (dataIndex) = try expressionParser.visitMemoryInit(wat: &wat)
-        return { return try $0.visitMemoryInit(dataIndex: dataIndex) }
+        return { visitor throws(WatParserError) in return try visitor.visitMemoryInit(dataIndex: dataIndex) }
     case "data.drop":
         let (dataIndex) = try expressionParser.visitDataDrop(wat: &wat)
-        return { return try $0.visitDataDrop(dataIndex: dataIndex) }
+        return { visitor throws(WatParserError) in return try visitor.visitDataDrop(dataIndex: dataIndex) }
     case "memory.copy":
         let (dstMem, srcMem) = try expressionParser.visitMemoryCopy(wat: &wat)
-        return { return try $0.visitMemoryCopy(dstMem: dstMem, srcMem: srcMem) }
+        return { visitor throws(WatParserError) in return try visitor.visitMemoryCopy(dstMem: dstMem, srcMem: srcMem) }
     case "memory.fill":
         let (memory) = try expressionParser.visitMemoryFill(wat: &wat)
-        return { return try $0.visitMemoryFill(memory: memory) }
+        return { visitor throws(WatParserError) in return try visitor.visitMemoryFill(memory: memory) }
     case "table.init":
         let (elemIndex, table) = try expressionParser.visitTableInit(wat: &wat)
-        return { return try $0.visitTableInit(elemIndex: elemIndex, table: table) }
+        return { visitor throws(WatParserError) in return try visitor.visitTableInit(elemIndex: elemIndex, table: table) }
     case "elem.drop":
         let (elemIndex) = try expressionParser.visitElemDrop(wat: &wat)
-        return { return try $0.visitElemDrop(elemIndex: elemIndex) }
+        return { visitor throws(WatParserError) in return try visitor.visitElemDrop(elemIndex: elemIndex) }
     case "table.copy":
         let (dstTable, srcTable) = try expressionParser.visitTableCopy(wat: &wat)
-        return { return try $0.visitTableCopy(dstTable: dstTable, srcTable: srcTable) }
+        return { visitor throws(WatParserError) in return try visitor.visitTableCopy(dstTable: dstTable, srcTable: srcTable) }
     case "table.fill":
         let (table) = try expressionParser.visitTableFill(wat: &wat)
-        return { return try $0.visitTableFill(table: table) }
+        return { visitor throws(WatParserError) in return try visitor.visitTableFill(table: table) }
     case "table.get":
         let (table) = try expressionParser.visitTableGet(wat: &wat)
-        return { return try $0.visitTableGet(table: table) }
+        return { visitor throws(WatParserError) in return try visitor.visitTableGet(table: table) }
     case "table.set":
         let (table) = try expressionParser.visitTableSet(wat: &wat)
-        return { return try $0.visitTableSet(table: table) }
+        return { visitor throws(WatParserError) in return try visitor.visitTableSet(table: table) }
     case "table.grow":
         let (table) = try expressionParser.visitTableGrow(wat: &wat)
-        return { return try $0.visitTableGrow(table: table) }
+        return { visitor throws(WatParserError) in return try visitor.visitTableGrow(table: table) }
     case "table.size":
         let (table) = try expressionParser.visitTableSize(wat: &wat)
-        return { return try $0.visitTableSize(table: table) }
-    case "i32.trunc_sat_f32_s": return { return try $0.visitConversion(.i32TruncSatF32S) }
-    case "i32.trunc_sat_f32_u": return { return try $0.visitConversion(.i32TruncSatF32U) }
-    case "i32.trunc_sat_f64_s": return { return try $0.visitConversion(.i32TruncSatF64S) }
-    case "i32.trunc_sat_f64_u": return { return try $0.visitConversion(.i32TruncSatF64U) }
-    case "i64.trunc_sat_f32_s": return { return try $0.visitConversion(.i64TruncSatF32S) }
-    case "i64.trunc_sat_f32_u": return { return try $0.visitConversion(.i64TruncSatF32U) }
-    case "i64.trunc_sat_f64_s": return { return try $0.visitConversion(.i64TruncSatF64S) }
-    case "i64.trunc_sat_f64_u": return { return try $0.visitConversion(.i64TruncSatF64U) }
-    case "atomic.fence": return { return try $0.visitAtomicFence() }
+        return { visitor throws(WatParserError) in return try visitor.visitTableSize(table: table) }
+    case "i32.trunc_sat_f32_s": return { visitor throws(WatParserError) in return try visitor.visitConversion(.i32TruncSatF32S) }
+    case "i32.trunc_sat_f32_u": return { visitor throws(WatParserError) in return try visitor.visitConversion(.i32TruncSatF32U) }
+    case "i32.trunc_sat_f64_s": return { visitor throws(WatParserError) in return try visitor.visitConversion(.i32TruncSatF64S) }
+    case "i32.trunc_sat_f64_u": return { visitor throws(WatParserError) in return try visitor.visitConversion(.i32TruncSatF64U) }
+    case "i64.trunc_sat_f32_s": return { visitor throws(WatParserError) in return try visitor.visitConversion(.i64TruncSatF32S) }
+    case "i64.trunc_sat_f32_u": return { visitor throws(WatParserError) in return try visitor.visitConversion(.i64TruncSatF32U) }
+    case "i64.trunc_sat_f64_s": return { visitor throws(WatParserError) in return try visitor.visitConversion(.i64TruncSatF64S) }
+    case "i64.trunc_sat_f64_u": return { visitor throws(WatParserError) in return try visitor.visitConversion(.i64TruncSatF64U) }
+    case "atomic.fence": return { visitor throws(WatParserError) in return try visitor.visitAtomicFence() }
     case "i32.atomic.load":
         let (memarg) = try expressionParser.visitLoad(.i32AtomicLoad, wat: &wat)
-        return { return try $0.visitLoad(.i32AtomicLoad, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.i32AtomicLoad, memarg: memarg) }
     case "i64.atomic.load":
         let (memarg) = try expressionParser.visitLoad(.i64AtomicLoad, wat: &wat)
-        return { return try $0.visitLoad(.i64AtomicLoad, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.i64AtomicLoad, memarg: memarg) }
     case "i32.atomic.load8_u":
         let (memarg) = try expressionParser.visitLoad(.i32AtomicLoad8U, wat: &wat)
-        return { return try $0.visitLoad(.i32AtomicLoad8U, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.i32AtomicLoad8U, memarg: memarg) }
     case "i32.atomic.load16_u":
         let (memarg) = try expressionParser.visitLoad(.i32AtomicLoad16U, wat: &wat)
-        return { return try $0.visitLoad(.i32AtomicLoad16U, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.i32AtomicLoad16U, memarg: memarg) }
     case "i64.atomic.load8_u":
         let (memarg) = try expressionParser.visitLoad(.i64AtomicLoad8U, wat: &wat)
-        return { return try $0.visitLoad(.i64AtomicLoad8U, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.i64AtomicLoad8U, memarg: memarg) }
     case "i64.atomic.load16_u":
         let (memarg) = try expressionParser.visitLoad(.i64AtomicLoad16U, wat: &wat)
-        return { return try $0.visitLoad(.i64AtomicLoad16U, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.i64AtomicLoad16U, memarg: memarg) }
     case "i64.atomic.load32_u":
         let (memarg) = try expressionParser.visitLoad(.i64AtomicLoad32U, wat: &wat)
-        return { return try $0.visitLoad(.i64AtomicLoad32U, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.i64AtomicLoad32U, memarg: memarg) }
     case "i32.atomic.store":
         let (memarg) = try expressionParser.visitStore(.i32AtomicStore, wat: &wat)
-        return { return try $0.visitStore(.i32AtomicStore, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitStore(.i32AtomicStore, memarg: memarg) }
     case "i64.atomic.store":
         let (memarg) = try expressionParser.visitStore(.i64AtomicStore, wat: &wat)
-        return { return try $0.visitStore(.i64AtomicStore, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitStore(.i64AtomicStore, memarg: memarg) }
     case "i32.atomic.store8":
         let (memarg) = try expressionParser.visitStore(.i32AtomicStore8, wat: &wat)
-        return { return try $0.visitStore(.i32AtomicStore8, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitStore(.i32AtomicStore8, memarg: memarg) }
     case "i32.atomic.store16":
         let (memarg) = try expressionParser.visitStore(.i32AtomicStore16, wat: &wat)
-        return { return try $0.visitStore(.i32AtomicStore16, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitStore(.i32AtomicStore16, memarg: memarg) }
     case "i64.atomic.store8":
         let (memarg) = try expressionParser.visitStore(.i64AtomicStore8, wat: &wat)
-        return { return try $0.visitStore(.i64AtomicStore8, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitStore(.i64AtomicStore8, memarg: memarg) }
     case "i64.atomic.store16":
         let (memarg) = try expressionParser.visitStore(.i64AtomicStore16, wat: &wat)
-        return { return try $0.visitStore(.i64AtomicStore16, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitStore(.i64AtomicStore16, memarg: memarg) }
     case "i64.atomic.store32":
         let (memarg) = try expressionParser.visitStore(.i64AtomicStore32, wat: &wat)
-        return { return try $0.visitStore(.i64AtomicStore32, memarg: memarg) }
+        return { visitor throws(WatParserError) in return try visitor.visitStore(.i64AtomicStore32, memarg: memarg) }
+    case "memory.atomic.notify":
+        let (memarg) = try expressionParser.visitMemoryAtomicNotify(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitMemoryAtomicNotify(memarg: memarg) }
+    case "memory.atomic.wait32":
+        let (memarg) = try expressionParser.visitMemoryAtomicWait32(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitMemoryAtomicWait32(memarg: memarg) }
+    case "memory.atomic.wait64":
+        let (memarg) = try expressionParser.visitMemoryAtomicWait64(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitMemoryAtomicWait64(memarg: memarg) }
+    case "i32.atomic.rmw.add":
+        let (memarg) = try expressionParser.visitI32AtomicRmwAdd(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI32AtomicRmwAdd(memarg: memarg) }
+    case "i64.atomic.rmw.add":
+        let (memarg) = try expressionParser.visitI64AtomicRmwAdd(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI64AtomicRmwAdd(memarg: memarg) }
+    case "i32.atomic.rmw8.add_u":
+        let (memarg) = try expressionParser.visitI32AtomicRmw8AddU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI32AtomicRmw8AddU(memarg: memarg) }
+    case "i32.atomic.rmw16.add_u":
+        let (memarg) = try expressionParser.visitI32AtomicRmw16AddU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI32AtomicRmw16AddU(memarg: memarg) }
+    case "i64.atomic.rmw8.add_u":
+        let (memarg) = try expressionParser.visitI64AtomicRmw8AddU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI64AtomicRmw8AddU(memarg: memarg) }
+    case "i64.atomic.rmw16.add_u":
+        let (memarg) = try expressionParser.visitI64AtomicRmw16AddU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI64AtomicRmw16AddU(memarg: memarg) }
+    case "i64.atomic.rmw32.add_u":
+        let (memarg) = try expressionParser.visitI64AtomicRmw32AddU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI64AtomicRmw32AddU(memarg: memarg) }
+    case "i32.atomic.rmw.sub":
+        let (memarg) = try expressionParser.visitI32AtomicRmwSub(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI32AtomicRmwSub(memarg: memarg) }
+    case "i64.atomic.rmw.sub":
+        let (memarg) = try expressionParser.visitI64AtomicRmwSub(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI64AtomicRmwSub(memarg: memarg) }
+    case "i32.atomic.rmw8.sub_u":
+        let (memarg) = try expressionParser.visitI32AtomicRmw8SubU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI32AtomicRmw8SubU(memarg: memarg) }
+    case "i32.atomic.rmw16.sub_u":
+        let (memarg) = try expressionParser.visitI32AtomicRmw16SubU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI32AtomicRmw16SubU(memarg: memarg) }
+    case "i64.atomic.rmw8.sub_u":
+        let (memarg) = try expressionParser.visitI64AtomicRmw8SubU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI64AtomicRmw8SubU(memarg: memarg) }
+    case "i64.atomic.rmw16.sub_u":
+        let (memarg) = try expressionParser.visitI64AtomicRmw16SubU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI64AtomicRmw16SubU(memarg: memarg) }
+    case "i64.atomic.rmw32.sub_u":
+        let (memarg) = try expressionParser.visitI64AtomicRmw32SubU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI64AtomicRmw32SubU(memarg: memarg) }
+    case "i32.atomic.rmw.and":
+        let (memarg) = try expressionParser.visitI32AtomicRmwAnd(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI32AtomicRmwAnd(memarg: memarg) }
+    case "i64.atomic.rmw.and":
+        let (memarg) = try expressionParser.visitI64AtomicRmwAnd(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI64AtomicRmwAnd(memarg: memarg) }
+    case "i32.atomic.rmw8.and_u":
+        let (memarg) = try expressionParser.visitI32AtomicRmw8AndU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI32AtomicRmw8AndU(memarg: memarg) }
+    case "i32.atomic.rmw16.and_u":
+        let (memarg) = try expressionParser.visitI32AtomicRmw16AndU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI32AtomicRmw16AndU(memarg: memarg) }
+    case "i64.atomic.rmw8.and_u":
+        let (memarg) = try expressionParser.visitI64AtomicRmw8AndU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI64AtomicRmw8AndU(memarg: memarg) }
+    case "i64.atomic.rmw16.and_u":
+        let (memarg) = try expressionParser.visitI64AtomicRmw16AndU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI64AtomicRmw16AndU(memarg: memarg) }
+    case "i64.atomic.rmw32.and_u":
+        let (memarg) = try expressionParser.visitI64AtomicRmw32AndU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI64AtomicRmw32AndU(memarg: memarg) }
+    case "i32.atomic.rmw.or":
+        let (memarg) = try expressionParser.visitI32AtomicRmwOr(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI32AtomicRmwOr(memarg: memarg) }
+    case "i64.atomic.rmw.or":
+        let (memarg) = try expressionParser.visitI64AtomicRmwOr(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI64AtomicRmwOr(memarg: memarg) }
+    case "i32.atomic.rmw8.or_u":
+        let (memarg) = try expressionParser.visitI32AtomicRmw8OrU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI32AtomicRmw8OrU(memarg: memarg) }
+    case "i32.atomic.rmw16.or_u":
+        let (memarg) = try expressionParser.visitI32AtomicRmw16OrU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI32AtomicRmw16OrU(memarg: memarg) }
+    case "i64.atomic.rmw8.or_u":
+        let (memarg) = try expressionParser.visitI64AtomicRmw8OrU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI64AtomicRmw8OrU(memarg: memarg) }
+    case "i64.atomic.rmw16.or_u":
+        let (memarg) = try expressionParser.visitI64AtomicRmw16OrU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI64AtomicRmw16OrU(memarg: memarg) }
+    case "i64.atomic.rmw32.or_u":
+        let (memarg) = try expressionParser.visitI64AtomicRmw32OrU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI64AtomicRmw32OrU(memarg: memarg) }
+    case "i32.atomic.rmw.xor":
+        let (memarg) = try expressionParser.visitI32AtomicRmwXor(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI32AtomicRmwXor(memarg: memarg) }
+    case "i64.atomic.rmw.xor":
+        let (memarg) = try expressionParser.visitI64AtomicRmwXor(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI64AtomicRmwXor(memarg: memarg) }
+    case "i32.atomic.rmw8.xor_u":
+        let (memarg) = try expressionParser.visitI32AtomicRmw8XorU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI32AtomicRmw8XorU(memarg: memarg) }
+    case "i32.atomic.rmw16.xor_u":
+        let (memarg) = try expressionParser.visitI32AtomicRmw16XorU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI32AtomicRmw16XorU(memarg: memarg) }
+    case "i64.atomic.rmw8.xor_u":
+        let (memarg) = try expressionParser.visitI64AtomicRmw8XorU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI64AtomicRmw8XorU(memarg: memarg) }
+    case "i64.atomic.rmw16.xor_u":
+        let (memarg) = try expressionParser.visitI64AtomicRmw16XorU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI64AtomicRmw16XorU(memarg: memarg) }
+    case "i64.atomic.rmw32.xor_u":
+        let (memarg) = try expressionParser.visitI64AtomicRmw32XorU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI64AtomicRmw32XorU(memarg: memarg) }
+    case "i32.atomic.rmw.xchg":
+        let (memarg) = try expressionParser.visitI32AtomicRmwXchg(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI32AtomicRmwXchg(memarg: memarg) }
+    case "i64.atomic.rmw.xchg":
+        let (memarg) = try expressionParser.visitI64AtomicRmwXchg(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI64AtomicRmwXchg(memarg: memarg) }
+    case "i32.atomic.rmw8.xchg_u":
+        let (memarg) = try expressionParser.visitI32AtomicRmw8XchgU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI32AtomicRmw8XchgU(memarg: memarg) }
+    case "i32.atomic.rmw16.xchg_u":
+        let (memarg) = try expressionParser.visitI32AtomicRmw16XchgU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI32AtomicRmw16XchgU(memarg: memarg) }
+    case "i64.atomic.rmw8.xchg_u":
+        let (memarg) = try expressionParser.visitI64AtomicRmw8XchgU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI64AtomicRmw8XchgU(memarg: memarg) }
+    case "i64.atomic.rmw16.xchg_u":
+        let (memarg) = try expressionParser.visitI64AtomicRmw16XchgU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI64AtomicRmw16XchgU(memarg: memarg) }
+    case "i64.atomic.rmw32.xchg_u":
+        let (memarg) = try expressionParser.visitI64AtomicRmw32XchgU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI64AtomicRmw32XchgU(memarg: memarg) }
+    case "i32.atomic.rmw.cmpxchg":
+        let (memarg) = try expressionParser.visitI32AtomicRmwCmpxchg(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI32AtomicRmwCmpxchg(memarg: memarg) }
+    case "i64.atomic.rmw.cmpxchg":
+        let (memarg) = try expressionParser.visitI64AtomicRmwCmpxchg(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI64AtomicRmwCmpxchg(memarg: memarg) }
+    case "i32.atomic.rmw8.cmpxchg_u":
+        let (memarg) = try expressionParser.visitI32AtomicRmw8CmpxchgU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI32AtomicRmw8CmpxchgU(memarg: memarg) }
+    case "i32.atomic.rmw16.cmpxchg_u":
+        let (memarg) = try expressionParser.visitI32AtomicRmw16CmpxchgU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI32AtomicRmw16CmpxchgU(memarg: memarg) }
+    case "i64.atomic.rmw8.cmpxchg_u":
+        let (memarg) = try expressionParser.visitI64AtomicRmw8CmpxchgU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI64AtomicRmw8CmpxchgU(memarg: memarg) }
+    case "i64.atomic.rmw16.cmpxchg_u":
+        let (memarg) = try expressionParser.visitI64AtomicRmw16CmpxchgU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI64AtomicRmw16CmpxchgU(memarg: memarg) }
+    case "i64.atomic.rmw32.cmpxchg_u":
+        let (memarg) = try expressionParser.visitI64AtomicRmw32CmpxchgU(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI64AtomicRmw32CmpxchgU(memarg: memarg) }
+    case "v128.load":
+        let (memarg) = try expressionParser.visitLoad(.v128Load, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.v128Load, memarg: memarg) }
+    case "v128.load8x8_s":
+        let (memarg) = try expressionParser.visitLoad(.v128Load8X8S, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.v128Load8X8S, memarg: memarg) }
+    case "v128.load8x8_u":
+        let (memarg) = try expressionParser.visitLoad(.v128Load8X8U, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.v128Load8X8U, memarg: memarg) }
+    case "v128.load16x4_s":
+        let (memarg) = try expressionParser.visitLoad(.v128Load16X4S, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.v128Load16X4S, memarg: memarg) }
+    case "v128.load16x4_u":
+        let (memarg) = try expressionParser.visitLoad(.v128Load16X4U, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.v128Load16X4U, memarg: memarg) }
+    case "v128.load32x2_s":
+        let (memarg) = try expressionParser.visitLoad(.v128Load32X2S, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.v128Load32X2S, memarg: memarg) }
+    case "v128.load32x2_u":
+        let (memarg) = try expressionParser.visitLoad(.v128Load32X2U, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.v128Load32X2U, memarg: memarg) }
+    case "v128.load8_splat":
+        let (memarg) = try expressionParser.visitLoad(.v128Load8Splat, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.v128Load8Splat, memarg: memarg) }
+    case "v128.load16_splat":
+        let (memarg) = try expressionParser.visitLoad(.v128Load16Splat, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.v128Load16Splat, memarg: memarg) }
+    case "v128.load32_splat":
+        let (memarg) = try expressionParser.visitLoad(.v128Load32Splat, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.v128Load32Splat, memarg: memarg) }
+    case "v128.load64_splat":
+        let (memarg) = try expressionParser.visitLoad(.v128Load64Splat, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.v128Load64Splat, memarg: memarg) }
+    case "v128.store":
+        let (memarg) = try expressionParser.visitStore(.v128Store, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitStore(.v128Store, memarg: memarg) }
+    case "v128.const":
+        let (value) = try expressionParser.visitV128Const(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitV128Const(value: value) }
+    case "i8x16.shuffle":
+        let (lanes) = try expressionParser.visitI8x16Shuffle(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitI8x16Shuffle(lanes: lanes) }
+    case "i8x16.swizzle": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16Swizzle) }
+    case "i8x16.splat": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16Splat) }
+    case "i16x8.splat": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8Splat) }
+    case "i32x4.splat": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4Splat) }
+    case "i64x2.splat": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i64x2Splat) }
+    case "f32x4.splat": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f32x4Splat) }
+    case "f64x2.splat": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f64x2Splat) }
+    case "i8x16.extract_lane_s":
+        let (lane) = try expressionParser.visitSimdLane(.i8x16ExtractLaneS, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitSimdLane(.i8x16ExtractLaneS, lane: lane) }
+    case "i8x16.extract_lane_u":
+        let (lane) = try expressionParser.visitSimdLane(.i8x16ExtractLaneU, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitSimdLane(.i8x16ExtractLaneU, lane: lane) }
+    case "i8x16.replace_lane":
+        let (lane) = try expressionParser.visitSimdLane(.i8x16ReplaceLane, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitSimdLane(.i8x16ReplaceLane, lane: lane) }
+    case "i16x8.extract_lane_s":
+        let (lane) = try expressionParser.visitSimdLane(.i16x8ExtractLaneS, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitSimdLane(.i16x8ExtractLaneS, lane: lane) }
+    case "i16x8.extract_lane_u":
+        let (lane) = try expressionParser.visitSimdLane(.i16x8ExtractLaneU, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitSimdLane(.i16x8ExtractLaneU, lane: lane) }
+    case "i16x8.replace_lane":
+        let (lane) = try expressionParser.visitSimdLane(.i16x8ReplaceLane, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitSimdLane(.i16x8ReplaceLane, lane: lane) }
+    case "i32x4.extract_lane":
+        let (lane) = try expressionParser.visitSimdLane(.i32x4ExtractLane, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitSimdLane(.i32x4ExtractLane, lane: lane) }
+    case "i32x4.replace_lane":
+        let (lane) = try expressionParser.visitSimdLane(.i32x4ReplaceLane, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitSimdLane(.i32x4ReplaceLane, lane: lane) }
+    case "i64x2.extract_lane":
+        let (lane) = try expressionParser.visitSimdLane(.i64x2ExtractLane, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitSimdLane(.i64x2ExtractLane, lane: lane) }
+    case "i64x2.replace_lane":
+        let (lane) = try expressionParser.visitSimdLane(.i64x2ReplaceLane, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitSimdLane(.i64x2ReplaceLane, lane: lane) }
+    case "f32x4.extract_lane":
+        let (lane) = try expressionParser.visitSimdLane(.f32x4ExtractLane, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitSimdLane(.f32x4ExtractLane, lane: lane) }
+    case "f32x4.replace_lane":
+        let (lane) = try expressionParser.visitSimdLane(.f32x4ReplaceLane, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitSimdLane(.f32x4ReplaceLane, lane: lane) }
+    case "f64x2.extract_lane":
+        let (lane) = try expressionParser.visitSimdLane(.f64x2ExtractLane, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitSimdLane(.f64x2ExtractLane, lane: lane) }
+    case "f64x2.replace_lane":
+        let (lane) = try expressionParser.visitSimdLane(.f64x2ReplaceLane, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitSimdLane(.f64x2ReplaceLane, lane: lane) }
+    case "i8x16.eq": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16Eq) }
+    case "i8x16.ne": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16Ne) }
+    case "i8x16.lt_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16LtS) }
+    case "i8x16.lt_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16LtU) }
+    case "i8x16.gt_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16GtS) }
+    case "i8x16.gt_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16GtU) }
+    case "i8x16.le_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16LeS) }
+    case "i8x16.le_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16LeU) }
+    case "i8x16.ge_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16GeS) }
+    case "i8x16.ge_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16GeU) }
+    case "i16x8.eq": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8Eq) }
+    case "i16x8.ne": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8Ne) }
+    case "i16x8.lt_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8LtS) }
+    case "i16x8.lt_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8LtU) }
+    case "i16x8.gt_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8GtS) }
+    case "i16x8.gt_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8GtU) }
+    case "i16x8.le_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8LeS) }
+    case "i16x8.le_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8LeU) }
+    case "i16x8.ge_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8GeS) }
+    case "i16x8.ge_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8GeU) }
+    case "i32x4.eq": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4Eq) }
+    case "i32x4.ne": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4Ne) }
+    case "i32x4.lt_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4LtS) }
+    case "i32x4.lt_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4LtU) }
+    case "i32x4.gt_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4GtS) }
+    case "i32x4.gt_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4GtU) }
+    case "i32x4.le_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4LeS) }
+    case "i32x4.le_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4LeU) }
+    case "i32x4.ge_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4GeS) }
+    case "i32x4.ge_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4GeU) }
+    case "f32x4.eq": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f32x4Eq) }
+    case "f32x4.ne": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f32x4Ne) }
+    case "f32x4.lt": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f32x4Lt) }
+    case "f32x4.gt": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f32x4Gt) }
+    case "f32x4.le": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f32x4Le) }
+    case "f32x4.ge": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f32x4Ge) }
+    case "f64x2.eq": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f64x2Eq) }
+    case "f64x2.ne": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f64x2Ne) }
+    case "f64x2.lt": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f64x2Lt) }
+    case "f64x2.gt": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f64x2Gt) }
+    case "f64x2.le": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f64x2Le) }
+    case "f64x2.ge": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f64x2Ge) }
+    case "v128.not": return { visitor throws(WatParserError) in return try visitor.visitSimd(.v128Not) }
+    case "v128.and": return { visitor throws(WatParserError) in return try visitor.visitSimd(.v128And) }
+    case "v128.andnot": return { visitor throws(WatParserError) in return try visitor.visitSimd(.v128Andnot) }
+    case "v128.or": return { visitor throws(WatParserError) in return try visitor.visitSimd(.v128Or) }
+    case "v128.xor": return { visitor throws(WatParserError) in return try visitor.visitSimd(.v128Xor) }
+    case "v128.bitselect": return { visitor throws(WatParserError) in return try visitor.visitSimd(.v128Bitselect) }
+    case "i8x16.abs": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16Abs) }
+    case "i8x16.neg": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16Neg) }
+    case "i8x16.all_true": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16AllTrue) }
+    case "i8x16.bitmask": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16Bitmask) }
+    case "i8x16.narrow_i16x8_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16NarrowI16X8S) }
+    case "i8x16.narrow_i16x8_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16NarrowI16X8U) }
+    case "i8x16.shl": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16Shl) }
+    case "i8x16.shr_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16ShrS) }
+    case "i8x16.shr_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16ShrU) }
+    case "i8x16.add": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16Add) }
+    case "i8x16.add_sat_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16AddSatS) }
+    case "i8x16.add_sat_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16AddSatU) }
+    case "i8x16.sub": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16Sub) }
+    case "i8x16.sub_sat_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16SubSatS) }
+    case "i8x16.sub_sat_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16SubSatU) }
+    case "i8x16.min_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16MinS) }
+    case "i8x16.min_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16MinU) }
+    case "i8x16.max_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16MaxS) }
+    case "i8x16.max_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16MaxU) }
+    case "i8x16.avgr_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16AvgrU) }
+    case "i16x8.abs": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8Abs) }
+    case "i16x8.neg": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8Neg) }
+    case "i16x8.all_true": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8AllTrue) }
+    case "i16x8.bitmask": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8Bitmask) }
+    case "i16x8.narrow_i32x4_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8NarrowI32X4S) }
+    case "i16x8.narrow_i32x4_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8NarrowI32X4U) }
+    case "i16x8.extend_low_i8x16_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8ExtendLowI8X16S) }
+    case "i16x8.extend_high_i8x16_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8ExtendHighI8X16S) }
+    case "i16x8.extend_low_i8x16_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8ExtendLowI8X16U) }
+    case "i16x8.extend_high_i8x16_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8ExtendHighI8X16U) }
+    case "i16x8.shl": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8Shl) }
+    case "i16x8.shr_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8ShrS) }
+    case "i16x8.shr_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8ShrU) }
+    case "i16x8.add": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8Add) }
+    case "i16x8.add_sat_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8AddSatS) }
+    case "i16x8.add_sat_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8AddSatU) }
+    case "i16x8.sub": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8Sub) }
+    case "i16x8.sub_sat_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8SubSatS) }
+    case "i16x8.sub_sat_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8SubSatU) }
+    case "i16x8.mul": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8Mul) }
+    case "i16x8.min_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8MinS) }
+    case "i16x8.min_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8MinU) }
+    case "i16x8.max_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8MaxS) }
+    case "i16x8.max_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8MaxU) }
+    case "i16x8.avgr_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8AvgrU) }
+    case "i32x4.abs": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4Abs) }
+    case "i32x4.neg": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4Neg) }
+    case "i32x4.all_true": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4AllTrue) }
+    case "i32x4.bitmask": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4Bitmask) }
+    case "i32x4.extend_low_i16x8_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4ExtendLowI16X8S) }
+    case "i32x4.extend_high_i16x8_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4ExtendHighI16X8S) }
+    case "i32x4.extend_low_i16x8_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4ExtendLowI16X8U) }
+    case "i32x4.extend_high_i16x8_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4ExtendHighI16X8U) }
+    case "i32x4.shl": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4Shl) }
+    case "i32x4.shr_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4ShrS) }
+    case "i32x4.shr_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4ShrU) }
+    case "i32x4.add": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4Add) }
+    case "i32x4.sub": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4Sub) }
+    case "i32x4.mul": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4Mul) }
+    case "i32x4.min_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4MinS) }
+    case "i32x4.min_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4MinU) }
+    case "i32x4.max_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4MaxS) }
+    case "i32x4.max_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4MaxU) }
+    case "i32x4.dot_i16x8_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4DotI16X8S) }
+    case "i64x2.abs": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i64x2Abs) }
+    case "i64x2.neg": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i64x2Neg) }
+    case "i64x2.bitmask": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i64x2Bitmask) }
+    case "i64x2.extend_low_i32x4_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i64x2ExtendLowI32X4S) }
+    case "i64x2.extend_high_i32x4_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i64x2ExtendHighI32X4S) }
+    case "i64x2.extend_low_i32x4_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i64x2ExtendLowI32X4U) }
+    case "i64x2.extend_high_i32x4_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i64x2ExtendHighI32X4U) }
+    case "i64x2.shl": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i64x2Shl) }
+    case "i64x2.shr_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i64x2ShrS) }
+    case "i64x2.shr_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i64x2ShrU) }
+    case "i64x2.add": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i64x2Add) }
+    case "i64x2.sub": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i64x2Sub) }
+    case "i64x2.mul": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i64x2Mul) }
+    case "f32x4.ceil": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f32x4Ceil) }
+    case "f32x4.floor": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f32x4Floor) }
+    case "f32x4.trunc": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f32x4Trunc) }
+    case "f32x4.nearest": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f32x4Nearest) }
+    case "f64x2.ceil": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f64x2Ceil) }
+    case "f64x2.floor": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f64x2Floor) }
+    case "f64x2.trunc": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f64x2Trunc) }
+    case "f64x2.nearest": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f64x2Nearest) }
+    case "f32x4.abs": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f32x4Abs) }
+    case "f32x4.neg": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f32x4Neg) }
+    case "f32x4.sqrt": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f32x4Sqrt) }
+    case "f32x4.add": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f32x4Add) }
+    case "f32x4.sub": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f32x4Sub) }
+    case "f32x4.mul": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f32x4Mul) }
+    case "f32x4.div": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f32x4Div) }
+    case "f32x4.min": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f32x4Min) }
+    case "f32x4.max": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f32x4Max) }
+    case "f32x4.pmin": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f32x4Pmin) }
+    case "f32x4.pmax": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f32x4Pmax) }
+    case "f64x2.abs": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f64x2Abs) }
+    case "f64x2.neg": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f64x2Neg) }
+    case "f64x2.sqrt": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f64x2Sqrt) }
+    case "f64x2.add": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f64x2Add) }
+    case "f64x2.sub": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f64x2Sub) }
+    case "f64x2.mul": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f64x2Mul) }
+    case "f64x2.div": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f64x2Div) }
+    case "f64x2.min": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f64x2Min) }
+    case "f64x2.max": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f64x2Max) }
+    case "f64x2.pmin": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f64x2Pmin) }
+    case "f64x2.pmax": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f64x2Pmax) }
+    case "i32x4.trunc_sat_f32x4_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4TruncSatF32X4S) }
+    case "i32x4.trunc_sat_f32x4_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4TruncSatF32X4U) }
+    case "f32x4.convert_i32x4_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f32x4ConvertI32X4S) }
+    case "f32x4.convert_i32x4_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f32x4ConvertI32X4U) }
+    case "v128.load32_zero":
+        let (memarg) = try expressionParser.visitLoad(.v128Load32Zero, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.v128Load32Zero, memarg: memarg) }
+    case "v128.load64_zero":
+        let (memarg) = try expressionParser.visitLoad(.v128Load64Zero, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitLoad(.v128Load64Zero, memarg: memarg) }
+    case "i16x8.extmul_low_i8x16_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8ExtmulLowI8X16S) }
+    case "i16x8.extmul_high_i8x16_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8ExtmulHighI8X16S) }
+    case "i16x8.extmul_low_i8x16_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8ExtmulLowI8X16U) }
+    case "i16x8.extmul_high_i8x16_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8ExtmulHighI8X16U) }
+    case "i32x4.extmul_low_i16x8_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4ExtmulLowI16X8S) }
+    case "i32x4.extmul_high_i16x8_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4ExtmulHighI16X8S) }
+    case "i32x4.extmul_low_i16x8_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4ExtmulLowI16X8U) }
+    case "i32x4.extmul_high_i16x8_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4ExtmulHighI16X8U) }
+    case "i64x2.extmul_low_i32x4_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i64x2ExtmulLowI32X4S) }
+    case "i64x2.extmul_high_i32x4_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i64x2ExtmulHighI32X4S) }
+    case "i64x2.extmul_low_i32x4_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i64x2ExtmulLowI32X4U) }
+    case "i64x2.extmul_high_i32x4_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i64x2ExtmulHighI32X4U) }
+    case "i16x8.q15mulr_sat_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8Q15MulrSatS) }
+    case "v128.any_true": return { visitor throws(WatParserError) in return try visitor.visitSimd(.v128AnyTrue) }
+    case "v128.load8_lane":
+        let (memarg, lane) = try expressionParser.visitSimdMemLane(.v128Load8Lane, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitSimdMemLane(.v128Load8Lane, memarg: memarg, lane: lane) }
+    case "v128.load16_lane":
+        let (memarg, lane) = try expressionParser.visitSimdMemLane(.v128Load16Lane, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitSimdMemLane(.v128Load16Lane, memarg: memarg, lane: lane) }
+    case "v128.load32_lane":
+        let (memarg, lane) = try expressionParser.visitSimdMemLane(.v128Load32Lane, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitSimdMemLane(.v128Load32Lane, memarg: memarg, lane: lane) }
+    case "v128.load64_lane":
+        let (memarg, lane) = try expressionParser.visitSimdMemLane(.v128Load64Lane, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitSimdMemLane(.v128Load64Lane, memarg: memarg, lane: lane) }
+    case "v128.store8_lane":
+        let (memarg, lane) = try expressionParser.visitSimdMemLane(.v128Store8Lane, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitSimdMemLane(.v128Store8Lane, memarg: memarg, lane: lane) }
+    case "v128.store16_lane":
+        let (memarg, lane) = try expressionParser.visitSimdMemLane(.v128Store16Lane, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitSimdMemLane(.v128Store16Lane, memarg: memarg, lane: lane) }
+    case "v128.store32_lane":
+        let (memarg, lane) = try expressionParser.visitSimdMemLane(.v128Store32Lane, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitSimdMemLane(.v128Store32Lane, memarg: memarg, lane: lane) }
+    case "v128.store64_lane":
+        let (memarg, lane) = try expressionParser.visitSimdMemLane(.v128Store64Lane, wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitSimdMemLane(.v128Store64Lane, memarg: memarg, lane: lane) }
+    case "i64x2.eq": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i64x2Eq) }
+    case "i64x2.ne": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i64x2Ne) }
+    case "i64x2.lt_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i64x2LtS) }
+    case "i64x2.gt_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i64x2GtS) }
+    case "i64x2.le_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i64x2LeS) }
+    case "i64x2.ge_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i64x2GeS) }
+    case "i64x2.all_true": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i64x2AllTrue) }
+    case "f64x2.convert_low_i32x4_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f64x2ConvertLowI32X4S) }
+    case "f64x2.convert_low_i32x4_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f64x2ConvertLowI32X4U) }
+    case "i32x4.trunc_sat_f64x2_s_zero": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4TruncSatF64X2SZero) }
+    case "i32x4.trunc_sat_f64x2_u_zero": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4TruncSatF64X2UZero) }
+    case "f32x4.demote_f64x2_zero": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f32x4DemoteF64X2Zero) }
+    case "f64x2.promote_low_f32x4": return { visitor throws(WatParserError) in return try visitor.visitSimd(.f64x2PromoteLowF32X4) }
+    case "i8x16.popcnt": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i8x16Popcnt) }
+    case "i16x8.extadd_pairwise_i8x16_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8ExtaddPairwiseI8X16S) }
+    case "i16x8.extadd_pairwise_i8x16_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i16x8ExtaddPairwiseI8X16U) }
+    case "i32x4.extadd_pairwise_i16x8_s": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4ExtaddPairwiseI16X8S) }
+    case "i32x4.extadd_pairwise_i16x8_u": return { visitor throws(WatParserError) in return try visitor.visitSimd(.i32x4ExtaddPairwiseI16X8U) }
     default: return nil
     }
 }

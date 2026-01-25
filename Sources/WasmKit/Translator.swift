@@ -60,7 +60,8 @@ extension InternalInstance {
         return try self.globals[validating: Int(index)].globalType.valueType
     }
     func isMemory64(memoryIndex index: MemoryIndex) throws -> Bool {
-        return try self.memories[validating: Int(index)].limit.isMemory64
+        let memory = try self.memories[validating: Int(index), MemoryEntity.createOutOfBoundsError]
+        return memory.withValue { $0.limit.isMemory64 }
     }
     func isMemory64(tableIndex index: TableIndex) throws -> Bool {
         return try self.tables[validating: Int(index)].limits.isMemory64
@@ -1836,6 +1837,10 @@ struct InstructionTranslator: InstructionVisitor {
         case .i64Load: instruction = Instruction.i64Load
         case .f32Load: instruction = Instruction.f32Load
         case .f64Load: instruction = Instruction.f64Load
+        case .v128Load, .v128Load8X8S, .v128Load8X8U, .v128Load16X4S, .v128Load16X4U,
+            .v128Load32X2S, .v128Load32X2U, .v128Load8Splat, .v128Load16Splat, .v128Load32Splat,
+            .v128Load64Splat, .v128Load32Zero, .v128Load64Zero:
+            throw ValidationError(.simdNotSupported)
         case .i32Load8S: instruction = Instruction.i32Load8S
         case .i32Load8U: instruction = Instruction.i32Load8U
         case .i32Load16S: instruction = Instruction.i32Load16S
@@ -1865,6 +1870,8 @@ struct InstructionTranslator: InstructionVisitor {
         case .i64Store: instruction = Instruction.i64Store
         case .f32Store: instruction = Instruction.f32Store
         case .f64Store: instruction = Instruction.f64Store
+        case .v128Store:
+            throw ValidationError(.simdNotSupported)
         case .i32Store8: instruction = Instruction.i32Store8
         case .i32Store16: instruction = Instruction.i32Store16
         case .i64Store8: instruction = Instruction.i64Store8
@@ -1880,6 +1887,27 @@ struct InstructionTranslator: InstructionVisitor {
         }
         try visitStore(memarg, store.type, store.naturalAlignment, instruction)
     }
+
+    mutating func visitV128Const(value: V128) throws {
+        throw ValidationError(.simdNotSupported)
+    }
+
+    mutating func visitI8x16Shuffle(lanes: V128ShuffleMask) throws {
+        throw ValidationError(.simdNotSupported)
+    }
+
+    mutating func visitSimd(_ simd: WasmParser.Instruction.Simd) throws {
+        throw ValidationError(.simdNotSupported)
+    }
+
+    mutating func visitSimdLane(_ simdLane: WasmParser.Instruction.SimdLane, lane: UInt8) throws {
+        throw ValidationError(.simdNotSupported)
+    }
+
+    mutating func visitSimdMemLane(_ simdMemLane: WasmParser.Instruction.SimdMemLane, memarg: MemArg, lane: UInt8) throws {
+        throw ValidationError(.simdNotSupported)
+    }
+
     mutating func visitMemorySize(memory: UInt32) throws -> Output {
         let sizeType: ValueType = try module.isMemory64(memoryIndex: memory) ? .i64 : .i32
         pushEmit(sizeType, { .memorySize(Instruction.MemorySizeOperand(memoryIndex: memory, result: LVReg($0))) })

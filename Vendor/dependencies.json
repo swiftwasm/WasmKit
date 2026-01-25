@@ -17,7 +17,7 @@
   "swift-format": {
     "repository": "https://github.com/swiftlang/swift-format.git",
     "revision": "62eaad2822b865407b8cde56c36386c00800f7ec",
-    "categories": ["default"]
+    "categories": ["formatting"]
   },
   "wish-you-were-fast": {
     "repository": "https://github.com/composablesys/wish-you-were-fast.git",

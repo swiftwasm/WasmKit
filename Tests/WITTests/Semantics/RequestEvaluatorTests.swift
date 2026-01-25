@@ -1,8 +1,9 @@
-import XCTest
+import Testing
 
 @testable import WIT
 
-class RequestEvaluatorTests: XCTestCase {
+@Suite
+struct RequestEvaluatorTests {
     struct MyRequest<T>: EvaluationRequest {
         let key: Int
         let evaluate: (Evaluator) throws -> T
@@ -27,24 +28,24 @@ class RequestEvaluatorTests: XCTestCase {
 
     struct MyError: Error {}
 
-    func testMemoization() throws {
+    @Test func memoization() throws {
         var invoked = 0
         let request = MyRequest(key: 1) { _ in
             invoked += 1
             return invoked
         }
         let evaluator = Evaluator()
-        XCTAssertEqual(try evaluator.evaluate(request: request), 1)
+        #expect(try evaluator.evaluate(request: request) == 1)
         // Ensure it returns the same value
-        XCTAssertEqual(try evaluator.evaluate(request: request), 1)
+        #expect(try evaluator.evaluate(request: request) == 1)
         // Ensure the evaluation method is called only once
-        XCTAssertEqual(invoked, 1)
+        #expect(invoked == 1)
     }
 
-    func testCycleDetection() throws {
+    @Test func cycleDetection() throws {
         let evaluator = Evaluator()
-        var anyError: Error?
-        XCTAssertThrowsError(
+        var capturedError: Error?
+        do {
             try evaluator.evaluate(
                 request: MyRequest(
                     key: 1,
@@ -54,27 +55,36 @@ class RequestEvaluatorTests: XCTestCase {
                                 key: 2,
                                 evaluate: {
                                     try $0.evaluate(request: MyRequest(key: 1))  // again request key=1
-                                }))
-                    })),
-            "CyclicalRequestError expected",
-            { anyError = $0 }
-        )
+                                }
+                            )
+                        )
+                    }
+                )
+            )
+            #expect((false), "CyclicalRequestError expected")
+        } catch {
+            capturedError = error
+        }
 
-        let cyclicalRequestError = try XCTUnwrap(anyError as? Evaluator.CyclicalRequestError)
-        XCTAssertEqual(cyclicalRequestError.activeRequestDescriptions.count, 3)
+        let cyclicalRequestError = try #require(capturedError as? Evaluator.CyclicalRequestError)
+        #expect(cyclicalRequestError.activeRequestDescriptions.count == 3)
     }
 
-    func testThrowingRequest() throws {
+    @Test func throwingRequest() throws {
         var invoked = 0
         let request = MyRequest(key: 1) { _ in
             invoked += 1
             throw MyError()
         }
         let evaluator = Evaluator()
-        XCTAssertThrowsError(try evaluator.evaluate(request: request))
-        XCTAssertThrowsError(try evaluator.evaluate(request: request))
+        #expect(throws: (any Error).self) {
+            try evaluator.evaluate(request: request)
+        }
+        #expect(throws: (any Error).self) {
+            try evaluator.evaluate(request: request)
+        }
         // Ensure the evaluation method is called only once even though
         // the request throws error
-        XCTAssertEqual(invoked, 1)
+        #expect(invoked == 1)
     }
 }

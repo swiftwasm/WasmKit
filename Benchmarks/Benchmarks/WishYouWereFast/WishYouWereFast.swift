@@ -4,7 +4,7 @@ import WasmKitWASI
 import Foundation
 import SystemPackage
 
-let benchmarks = {
+let benchmarks: @Sendable () -> () = {
     let wishYouWereFast = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
         .deletingLastPathComponent()
@@ -30,7 +30,7 @@ let benchmarks = {
             let module = try parseWasm(
                 filePath: FilePath(wishYouWereFast.appendingPathComponent(file).path)
             )
-            let wasi = try WASIBridgeToHost(stdout: devNull, stderr: devNull)
+            let wasi = try WASIBridgeToHost(fileSystem: .host().withStdio(stdout: devNull, stderr: devNull))
             var imports = Imports()
             wasi.link(to: &imports, store: store)
             let instance = try module.instantiate(store: store, imports: imports)

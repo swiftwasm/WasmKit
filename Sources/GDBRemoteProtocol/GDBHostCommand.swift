@@ -136,27 +136,27 @@ package struct GDBHostCommand: Equatable {
     private static let parsingRules: [ParsingRule] = [
         .init(
             kind: .readMemoryBinaryData,
-            prefix: "x",
+            prefix: "x"
         ),
         .init(
             kind: .readMemory,
-            prefix: "m",
+            prefix: "m"
         ),
         .init(
             kind: .insertSoftwareBreakpoint,
-            prefix: "Z0",
+            prefix: "Z0"
         ),
         .init(
             kind: .removeSoftwareBreakpoint,
-            prefix: "z0",
+            prefix: "z0"
         ),
         .init(
             kind: .registerInfo,
-            prefix: "qRegisterInfo",
+            prefix: "qRegisterInfo"
         ),
         .init(
             kind: .threadStopInfo,
-            prefix: "qThreadStopInfo",
+            prefix: "qThreadStopInfo"
         ),
         .init(
             kind: .resumeThreads,

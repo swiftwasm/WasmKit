@@ -1,8 +1,8 @@
-import XCTest
+import Testing
 
 @testable import WIT
 
-final class ParseWorldTests: XCTestCase {
+@Suite struct ParseWorldTests {
 
     func parse(_ text: String) throws -> SyntaxNode<WorldSyntax> {
         var lexer = Lexer(cursor: .init(input: text))
@@ -13,13 +13,13 @@ final class ParseWorldTests: XCTestCase {
         )
     }
 
-    func testEmpty() throws {
+    @Test func empty() throws {
         let world = try parse("world empty {}")
-        XCTAssertEqual(world.name.text, "empty")
-        XCTAssertEqual(world.items.count, 0)
+        #expect(world.name.text == "empty")
+        #expect(world.items.count == 0)
     }
 
-    func testMultipleItems() throws {
+    @Test func multipleItems() throws {
         let world = try parse(
             """
             world x {
@@ -28,11 +28,11 @@ final class ParseWorldTests: XCTestCase {
             }
             """
         )
-        XCTAssertEqual(world.name.text, "x")
-        XCTAssertEqual(world.items.count, 2)
+        #expect(world.name.text == "x")
+        #expect(world.items.count == 2)
     }
 
-    func testWithComment() throws {
+    @Test func withComment() throws {
         let world = try parse(
             """
             world x {
@@ -41,21 +41,23 @@ final class ParseWorldTests: XCTestCase {
             }
             """
         )
-        XCTAssertEqual(world.name.text, "x")
-        XCTAssertEqual(world.items.count, 1)
+        #expect(world.name.text == "x")
+        #expect(world.items.count == 1)
         let item = world.items[0]
         guard case .type(let typeDef) = item else {
-            XCTFail("unexpected item type: \(item)")
+            Issue.record("unexpected item type: \(item)")
             return
         }
-        XCTAssertEqual(typeDef.documents.comments.count, 1)
+        #expect(typeDef.documents.comments.count == 1)
     }
 
-    func testInvalidItem() throws {
-        XCTAssertThrowsError(try parse("world x { . }"))
+    @Test func invalidItem() throws {
+        #expect(throws: (any Error).self) {
+            try parse("world x { . }")
+        }
     }
 
-    func testItemImport() throws {
+    @Test func itemImport() throws {
         let world = try parse(
             """
             world x {
@@ -65,49 +67,49 @@ final class ParseWorldTests: XCTestCase {
             }
             """
         )
-        XCTAssertEqual(world.items.count, 3)
+        #expect(world.items.count == 3)
         do {
             let item = world.items[0]
             guard case .import(let importItem) = item else {
-                XCTFail("unexpected item type: \(item)")
+                Issue.record("unexpected item type: \(item)")
                 return
             }
             guard case .function(let name, _) = importItem.kind else {
-                XCTFail("unexpected import type: \(importItem.kind)")
+                Issue.record("unexpected import type: \(importItem.kind)")
                 return
             }
-            XCTAssertEqual(name.text, "foo")
+            #expect(name.text == "foo")
         }
 
         do {
             let item = world.items[1]
             guard case .import(let importItem) = item else {
-                XCTFail("unexpected item type: \(item)")
+                Issue.record("unexpected item type: \(item)")
                 return
             }
             guard case .interface(let name, let iface) = importItem.kind else {
-                XCTFail("unexpected import type: \(importItem.kind)")
+                Issue.record("unexpected import type: \(importItem.kind)")
                 return
             }
-            XCTAssertEqual(name.text, "bar")
-            XCTAssertEqual(iface.count, 0)
+            #expect(name.text == "bar")
+            #expect(iface.count == 0)
         }
 
         do {
             let item = world.items[2]
             guard case .import(let importItem) = item else {
-                XCTFail("unexpected item type: \(item)")
+                Issue.record("unexpected item type: \(item)")
                 return
             }
             guard case .path(let path) = importItem.kind else {
-                XCTFail("unexpected import type: \(importItem.kind)")
+                Issue.record("unexpected import type: \(importItem.kind)")
                 return
             }
-            XCTAssertEqual(path.name.text, "baz")
+            #expect(path.name.text == "baz")
         }
     }
 
-    func testItemExport() throws {
+    @Test func itemExport() throws {
         let world = try parse(
             """
             world x {
@@ -115,20 +117,20 @@ final class ParseWorldTests: XCTestCase {
             }
             """
         )
-        XCTAssertEqual(world.items.count, 1)
+        #expect(world.items.count == 1)
         let item = world.items[0]
         guard case .export(let export) = item else {
-            XCTFail("unexpected item type: \(item)")
+            Issue.record("unexpected item type: \(item)")
             return
         }
         guard case .function(let name, _) = export.kind else {
-            XCTFail("unexpected export type: \(export.kind)")
+            Issue.record("unexpected export type: \(export.kind)")
             return
         }
-        XCTAssertEqual(name.text, "foo")
+        #expect(name.text == "foo")
     }
 
-    func testItemInclude() throws {
+    @Test func itemInclude() throws {
         let world = try parse(
             """
             world x {
@@ -138,47 +140,47 @@ final class ParseWorldTests: XCTestCase {
             }
             """
         )
-        XCTAssertEqual(world.items.count, 3)
+        #expect(world.items.count == 3)
         do {
             let item = world.items[0]
             guard case .include(let include) = item else {
-                XCTFail("unexpected item type: \(item)")
+                Issue.record("unexpected item type: \(item)")
                 return
             }
-            XCTAssertEqual(include.from.name.text, "foo")
-            XCTAssertEqual(include.names.count, 0)
+            #expect(include.from.name.text == "foo")
+            #expect(include.names.count == 0)
         }
 
         do {
             let item = world.items[1]
             guard case .include(let include) = item else {
-                XCTFail("unexpected item type: \(item)")
+                Issue.record("unexpected item type: \(item)")
                 return
             }
-            XCTAssertEqual(include.from.name.text, "bar")
-            XCTAssertEqual(include.names.count, 1)
+            #expect(include.from.name.text == "bar")
+            #expect(include.names.count == 1)
             let alias = include.names[0]
-            XCTAssertEqual(alias.name.text, "baz")
-            XCTAssertEqual(alias.asName.text, "qux")
+            #expect(alias.name.text == "baz")
+            #expect(alias.asName.text == "qux")
         }
 
         do {
             let item = world.items[2]
             guard case .include(let include) = item else {
-                XCTFail("unexpected item type: \(item)")
+                Issue.record("unexpected item type: \(item)")
                 return
             }
-            XCTAssertEqual(include.names.count, 2)
+            #expect(include.names.count == 2)
             let alias1 = include.names[0]
-            XCTAssertEqual(alias1.name.text, "n1")
-            XCTAssertEqual(alias1.asName.text, "a1")
+            #expect(alias1.name.text == "n1")
+            #expect(alias1.asName.text == "a1")
             let alias2 = include.names[1]
-            XCTAssertEqual(alias2.name.text, "n2")
-            XCTAssertEqual(alias2.asName.text, "a2")
+            #expect(alias2.name.text == "n2")
+            #expect(alias2.asName.text == "a2")
         }
     }
 
-    func testItemType() throws {
+    @Test func itemType() throws {
         let world = try parse(
             """
             world x {
@@ -186,16 +188,16 @@ final class ParseWorldTests: XCTestCase {
             }
             """
         )
-        XCTAssertEqual(world.items.count, 1)
+        #expect(world.items.count == 1)
         let item = world.items[0]
         guard case .type(let typeDef) = item else {
-            XCTFail("unexpected item type: \(item)")
+            Issue.record("unexpected item type: \(item)")
             return
         }
-        XCTAssertEqual(typeDef.name.text, "t1")
+        #expect(typeDef.name.text == "t1")
     }
 
-    func testItemFlags() throws {
+    @Test func itemFlags() throws {
         let world = try parse(
             """
             world x {
@@ -205,16 +207,16 @@ final class ParseWorldTests: XCTestCase {
             }
             """
         )
-        XCTAssertEqual(world.items.count, 1)
+        #expect(world.items.count == 1)
         let item = world.items[0]
         guard case .type(let typeDef) = item else {
-            XCTFail("unexpected item type: \(item)")
+            Issue.record("unexpected item type: \(item)")
             return
         }
-        XCTAssertEqual(typeDef.name.text, "f1")
+        #expect(typeDef.name.text == "f1")
     }
 
-    func testItemEnum() throws {
+    @Test func itemEnum() throws {
         let world = try parse(
             """
             world x {
@@ -224,16 +226,16 @@ final class ParseWorldTests: XCTestCase {
             }
             """
         )
-        XCTAssertEqual(world.items.count, 1)
+        #expect(world.items.count == 1)
         let item = world.items[0]
         guard case .type(let typeDef) = item else {
-            XCTFail("unexpected item type: \(item)")
+            Issue.record("unexpected item type: \(item)")
             return
         }
-        XCTAssertEqual(typeDef.name.text, "e1")
+        #expect(typeDef.name.text == "e1")
     }
 
-    func testItemVariant() throws {
+    @Test func itemVariant() throws {
         let world = try parse(
             """
             world x {
@@ -243,16 +245,16 @@ final class ParseWorldTests: XCTestCase {
             }
             """
         )
-        XCTAssertEqual(world.items.count, 1)
+        #expect(world.items.count == 1)
         let item = world.items[0]
         guard case .type(let typeDef) = item else {
-            XCTFail("unexpected item type: \(item)")
+            Issue.record("unexpected item type: \(item)")
             return
         }
-        XCTAssertEqual(typeDef.name.text, "v1")
+        #expect(typeDef.name.text == "v1")
     }
 
-    func testItemResource() throws {
+    @Test func itemResource() throws {
         let world = try parse(
             """
             world x {
@@ -260,16 +262,16 @@ final class ParseWorldTests: XCTestCase {
             }
             """
         )
-        XCTAssertEqual(world.items.count, 1)
+        #expect(world.items.count == 1)
         let item = world.items[0]
         guard case .type(let typeDef) = item else {
-            XCTFail("unexpected item type: \(item)")
+            Issue.record("unexpected item type: \(item)")
             return
         }
-        XCTAssertEqual(typeDef.name.text, "rs1")
+        #expect(typeDef.name.text == "rs1")
     }
 
-    func testItemRecord() throws {
+    @Test func itemRecord() throws {
         let world = try parse(
             """
             world x {
@@ -279,16 +281,16 @@ final class ParseWorldTests: XCTestCase {
             }
             """
         )
-        XCTAssertEqual(world.items.count, 1)
+        #expect(world.items.count == 1)
         let item = world.items[0]
         guard case .type(let typeDef) = item else {
-            XCTFail("unexpected item type: \(item)")
+            Issue.record("unexpected item type: \(item)")
             return
         }
-        XCTAssertEqual(typeDef.name.text, "rc1")
+        #expect(typeDef.name.text == "rc1")
     }
 
-    func testItemUnion() throws {
+    @Test func itemUnion() throws {
         let world = try parse(
             """
             world x {
@@ -299,16 +301,16 @@ final class ParseWorldTests: XCTestCase {
             }
             """
         )
-        XCTAssertEqual(world.items.count, 1)
+        #expect(world.items.count == 1)
         let item = world.items[0]
         guard case .type(let typeDef) = item else {
-            XCTFail("unexpected item type: \(item)")
+            Issue.record("unexpected item type: \(item)")
             return
         }
-        XCTAssertEqual(typeDef.name.text, "u1")
+        #expect(typeDef.name.text == "u1")
     }
 
-    func testItemUse() throws {
+    @Test func itemUse() throws {
         let world = try parse(
             """
             world x {
@@ -316,12 +318,12 @@ final class ParseWorldTests: XCTestCase {
             }
             """
         )
-        XCTAssertEqual(world.items.count, 1)
+        #expect(world.items.count == 1)
         let item = world.items[0]
         guard case .use(let use) = item else {
-            XCTFail("unexpected item type: \(item)")
+            Issue.record("unexpected item type: \(item)")
             return
         }
-        XCTAssertEqual(use.from.name.text, "pkg1")
+        #expect(use.from.name.text == "pkg1")
     }
 }

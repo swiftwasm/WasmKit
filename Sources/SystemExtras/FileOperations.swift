@@ -249,7 +249,16 @@ extension FileDescriptor {
 
     @_alwaysEmitIntoClient
     public var device: UInt64 {
-      UInt64(rawValue.st_dev)
+      // Preserve bit pattern for dev_t (may be signed or unsigned depending on platform)
+      let dev = rawValue.st_dev
+      return withUnsafeBytes(of: dev) { bytes in
+        var result: UInt64 = 0
+        let copyCount = min(bytes.count, MemoryLayout<UInt64>.size)
+        withUnsafeMutableBytes(of: &result) { resultBytes in
+          resultBytes.prefix(copyCount).copyBytes(from: bytes.prefix(copyCount))
+        }
+        return result
+      }
     }
 
     @_alwaysEmitIntoClient

@@ -98,10 +98,125 @@ protocol BinaryInstructionDecoder {
     @inlinable mutating func visitTableGrow() throws -> UInt32
     /// Decode `table.size` immediates
     @inlinable mutating func visitTableSize() throws -> UInt32
+    /// Decode `memory.atomic.notify` immediates
+    @inlinable mutating func visitMemoryAtomicNotify() throws -> MemArg
+    /// Decode `memory.atomic.wait32` immediates
+    @inlinable mutating func visitMemoryAtomicWait32() throws -> MemArg
+    /// Decode `memory.atomic.wait64` immediates
+    @inlinable mutating func visitMemoryAtomicWait64() throws -> MemArg
+    /// Decode `i32.atomic.rmw.add` immediates
+    @inlinable mutating func visitI32AtomicRmwAdd() throws -> MemArg
+    /// Decode `i64.atomic.rmw.add` immediates
+    @inlinable mutating func visitI64AtomicRmwAdd() throws -> MemArg
+    /// Decode `i32.atomic.rmw8.add_u` immediates
+    @inlinable mutating func visitI32AtomicRmw8AddU() throws -> MemArg
+    /// Decode `i32.atomic.rmw16.add_u` immediates
+    @inlinable mutating func visitI32AtomicRmw16AddU() throws -> MemArg
+    /// Decode `i64.atomic.rmw8.add_u` immediates
+    @inlinable mutating func visitI64AtomicRmw8AddU() throws -> MemArg
+    /// Decode `i64.atomic.rmw16.add_u` immediates
+    @inlinable mutating func visitI64AtomicRmw16AddU() throws -> MemArg
+    /// Decode `i64.atomic.rmw32.add_u` immediates
+    @inlinable mutating func visitI64AtomicRmw32AddU() throws -> MemArg
+    /// Decode `i32.atomic.rmw.sub` immediates
+    @inlinable mutating func visitI32AtomicRmwSub() throws -> MemArg
+    /// Decode `i64.atomic.rmw.sub` immediates
+    @inlinable mutating func visitI64AtomicRmwSub() throws -> MemArg
+    /// Decode `i32.atomic.rmw8.sub_u` immediates
+    @inlinable mutating func visitI32AtomicRmw8SubU() throws -> MemArg
+    /// Decode `i32.atomic.rmw16.sub_u` immediates
+    @inlinable mutating func visitI32AtomicRmw16SubU() throws -> MemArg
+    /// Decode `i64.atomic.rmw8.sub_u` immediates
+    @inlinable mutating func visitI64AtomicRmw8SubU() throws -> MemArg
+    /// Decode `i64.atomic.rmw16.sub_u` immediates
+    @inlinable mutating func visitI64AtomicRmw16SubU() throws -> MemArg
+    /// Decode `i64.atomic.rmw32.sub_u` immediates
+    @inlinable mutating func visitI64AtomicRmw32SubU() throws -> MemArg
+    /// Decode `i32.atomic.rmw.and` immediates
+    @inlinable mutating func visitI32AtomicRmwAnd() throws -> MemArg
+    /// Decode `i64.atomic.rmw.and` immediates
+    @inlinable mutating func visitI64AtomicRmwAnd() throws -> MemArg
+    /// Decode `i32.atomic.rmw8.and_u` immediates
+    @inlinable mutating func visitI32AtomicRmw8AndU() throws -> MemArg
+    /// Decode `i32.atomic.rmw16.and_u` immediates
+    @inlinable mutating func visitI32AtomicRmw16AndU() throws -> MemArg
+    /// Decode `i64.atomic.rmw8.and_u` immediates
+    @inlinable mutating func visitI64AtomicRmw8AndU() throws -> MemArg
+    /// Decode `i64.atomic.rmw16.and_u` immediates
+    @inlinable mutating func visitI64AtomicRmw16AndU() throws -> MemArg
+    /// Decode `i64.atomic.rmw32.and_u` immediates
+    @inlinable mutating func visitI64AtomicRmw32AndU() throws -> MemArg
+    /// Decode `i32.atomic.rmw.or` immediates
+    @inlinable mutating func visitI32AtomicRmwOr() throws -> MemArg
+    /// Decode `i64.atomic.rmw.or` immediates
+    @inlinable mutating func visitI64AtomicRmwOr() throws -> MemArg
+    /// Decode `i32.atomic.rmw8.or_u` immediates
+    @inlinable mutating func visitI32AtomicRmw8OrU() throws -> MemArg
+    /// Decode `i32.atomic.rmw16.or_u` immediates
+    @inlinable mutating func visitI32AtomicRmw16OrU() throws -> MemArg
+    /// Decode `i64.atomic.rmw8.or_u` immediates
+    @inlinable mutating func visitI64AtomicRmw8OrU() throws -> MemArg
+    /// Decode `i64.atomic.rmw16.or_u` immediates
+    @inlinable mutating func visitI64AtomicRmw16OrU() throws -> MemArg
+    /// Decode `i64.atomic.rmw32.or_u` immediates
+    @inlinable mutating func visitI64AtomicRmw32OrU() throws -> MemArg
+    /// Decode `i32.atomic.rmw.xor` immediates
+    @inlinable mutating func visitI32AtomicRmwXor() throws -> MemArg
+    /// Decode `i64.atomic.rmw.xor` immediates
+    @inlinable mutating func visitI64AtomicRmwXor() throws -> MemArg
+    /// Decode `i32.atomic.rmw8.xor_u` immediates
+    @inlinable mutating func visitI32AtomicRmw8XorU() throws -> MemArg
+    /// Decode `i32.atomic.rmw16.xor_u` immediates
+    @inlinable mutating func visitI32AtomicRmw16XorU() throws -> MemArg
+    /// Decode `i64.atomic.rmw8.xor_u` immediates
+    @inlinable mutating func visitI64AtomicRmw8XorU() throws -> MemArg
+    /// Decode `i64.atomic.rmw16.xor_u` immediates
+    @inlinable mutating func visitI64AtomicRmw16XorU() throws -> MemArg
+    /// Decode `i64.atomic.rmw32.xor_u` immediates
+    @inlinable mutating func visitI64AtomicRmw32XorU() throws -> MemArg
+    /// Decode `i32.atomic.rmw.xchg` immediates
+    @inlinable mutating func visitI32AtomicRmwXchg() throws -> MemArg
+    /// Decode `i64.atomic.rmw.xchg` immediates
+    @inlinable mutating func visitI64AtomicRmwXchg() throws -> MemArg
+    /// Decode `i32.atomic.rmw8.xchg_u` immediates
+    @inlinable mutating func visitI32AtomicRmw8XchgU() throws -> MemArg
+    /// Decode `i32.atomic.rmw16.xchg_u` immediates
+    @inlinable mutating func visitI32AtomicRmw16XchgU() throws -> MemArg
+    /// Decode `i64.atomic.rmw8.xchg_u` immediates
+    @inlinable mutating func visitI64AtomicRmw8XchgU() throws -> MemArg
+    /// Decode `i64.atomic.rmw16.xchg_u` immediates
+    @inlinable mutating func visitI64AtomicRmw16XchgU() throws -> MemArg
+    /// Decode `i64.atomic.rmw32.xchg_u` immediates
+    @inlinable mutating func visitI64AtomicRmw32XchgU() throws -> MemArg
+    /// Decode `i32.atomic.rmw.cmpxchg` immediates
+    @inlinable mutating func visitI32AtomicRmwCmpxchg() throws -> MemArg
+    /// Decode `i64.atomic.rmw.cmpxchg` immediates
+    @inlinable mutating func visitI64AtomicRmwCmpxchg() throws -> MemArg
+    /// Decode `i32.atomic.rmw8.cmpxchg_u` immediates
+    @inlinable mutating func visitI32AtomicRmw8CmpxchgU() throws -> MemArg
+    /// Decode `i32.atomic.rmw16.cmpxchg_u` immediates
+    @inlinable mutating func visitI32AtomicRmw16CmpxchgU() throws -> MemArg
+    /// Decode `i64.atomic.rmw8.cmpxchg_u` immediates
+    @inlinable mutating func visitI64AtomicRmw8CmpxchgU() throws -> MemArg
+    /// Decode `i64.atomic.rmw16.cmpxchg_u` immediates
+    @inlinable mutating func visitI64AtomicRmw16CmpxchgU() throws -> MemArg
+    /// Decode `i64.atomic.rmw32.cmpxchg_u` immediates
+    @inlinable mutating func visitI64AtomicRmw32CmpxchgU() throws -> MemArg
+    /// Decode `v128.const` immediates
+    @inlinable mutating func visitV128Const() throws -> V128
+    /// Decode `i8x16.shuffle` immediates
+    @inlinable mutating func visitI8x16Shuffle() throws -> V128ShuffleMask
+    /// Decode `simdLane` category immediates
+    @inlinable mutating func visitSimdLane(_: Instruction.SimdLane) throws -> UInt8
+    /// Decode `simdMemLane` category immediates
+    @inlinable mutating func visitSimdMemLane(_: Instruction.SimdMemLane) throws -> (memarg: MemArg, lane: UInt8)
 }
 
 @inlinable
-func parseBinaryInstruction(visitor: inout some InstructionVisitor & ~Copyable, decoder: inout some BinaryInstructionDecoder) throws -> Bool {
+func parseBinaryInstruction(
+    visitor: inout some InstructionVisitor & ~Copyable,
+    decoder: inout some BinaryInstructionDecoder
+) throws -> Bool {
     visitor.binaryOffset = decoder.offset
     let opcode0 = try decoder.claimNextByte()
     switch opcode0 {
@@ -592,10 +707,1292 @@ func parseBinaryInstruction(visitor: inout some InstructionVisitor & ~Copyable, 
         default:
             if try !visitor.visitUnknown([opcode0, opcode1]) { try decoder.throwUnknown([opcode0, opcode1]) }
         }
+    case 0xFD:
+
+        let opcode1 = try decoder.claimNextByte()
+        switch opcode1 {
+        case 0x00:
+            let (memarg) = try decoder.visitLoad(.v128Load)
+            try visitor.visitLoad(.v128Load, memarg: memarg)
+        case 0x01:
+            let (memarg) = try decoder.visitLoad(.v128Load8X8S)
+            try visitor.visitLoad(.v128Load8X8S, memarg: memarg)
+        case 0x02:
+            let (memarg) = try decoder.visitLoad(.v128Load8X8U)
+            try visitor.visitLoad(.v128Load8X8U, memarg: memarg)
+        case 0x03:
+            let (memarg) = try decoder.visitLoad(.v128Load16X4S)
+            try visitor.visitLoad(.v128Load16X4S, memarg: memarg)
+        case 0x04:
+            let (memarg) = try decoder.visitLoad(.v128Load16X4U)
+            try visitor.visitLoad(.v128Load16X4U, memarg: memarg)
+        case 0x05:
+            let (memarg) = try decoder.visitLoad(.v128Load32X2S)
+            try visitor.visitLoad(.v128Load32X2S, memarg: memarg)
+        case 0x06:
+            let (memarg) = try decoder.visitLoad(.v128Load32X2U)
+            try visitor.visitLoad(.v128Load32X2U, memarg: memarg)
+        case 0x07:
+            let (memarg) = try decoder.visitLoad(.v128Load8Splat)
+            try visitor.visitLoad(.v128Load8Splat, memarg: memarg)
+        case 0x08:
+            let (memarg) = try decoder.visitLoad(.v128Load16Splat)
+            try visitor.visitLoad(.v128Load16Splat, memarg: memarg)
+        case 0x09:
+            let (memarg) = try decoder.visitLoad(.v128Load32Splat)
+            try visitor.visitLoad(.v128Load32Splat, memarg: memarg)
+        case 0x0A:
+            let (memarg) = try decoder.visitLoad(.v128Load64Splat)
+            try visitor.visitLoad(.v128Load64Splat, memarg: memarg)
+        case 0x0B:
+            let (memarg) = try decoder.visitStore(.v128Store)
+            try visitor.visitStore(.v128Store, memarg: memarg)
+        case 0x0C:
+            let (value) = try decoder.visitV128Const()
+            try visitor.visitV128Const(value: value)
+        case 0x0D:
+            let (lanes) = try decoder.visitI8x16Shuffle()
+            try visitor.visitI8x16Shuffle(lanes: lanes)
+        case 0x0E:
+            try visitor.visitSimd(.i8x16Swizzle)
+        case 0x0F:
+            try visitor.visitSimd(.i8x16Splat)
+        case 0x10:
+            try visitor.visitSimd(.i16x8Splat)
+        case 0x11:
+            try visitor.visitSimd(.i32x4Splat)
+        case 0x12:
+            try visitor.visitSimd(.i64x2Splat)
+        case 0x13:
+            try visitor.visitSimd(.f32x4Splat)
+        case 0x14:
+            try visitor.visitSimd(.f64x2Splat)
+        case 0x15:
+            let (lane) = try decoder.visitSimdLane(.i8x16ExtractLaneS)
+            try visitor.visitSimdLane(.i8x16ExtractLaneS, lane: lane)
+        case 0x16:
+            let (lane) = try decoder.visitSimdLane(.i8x16ExtractLaneU)
+            try visitor.visitSimdLane(.i8x16ExtractLaneU, lane: lane)
+        case 0x17:
+            let (lane) = try decoder.visitSimdLane(.i8x16ReplaceLane)
+            try visitor.visitSimdLane(.i8x16ReplaceLane, lane: lane)
+        case 0x18:
+            let (lane) = try decoder.visitSimdLane(.i16x8ExtractLaneS)
+            try visitor.visitSimdLane(.i16x8ExtractLaneS, lane: lane)
+        case 0x19:
+            let (lane) = try decoder.visitSimdLane(.i16x8ExtractLaneU)
+            try visitor.visitSimdLane(.i16x8ExtractLaneU, lane: lane)
+        case 0x1A:
+            let (lane) = try decoder.visitSimdLane(.i16x8ReplaceLane)
+            try visitor.visitSimdLane(.i16x8ReplaceLane, lane: lane)
+        case 0x1B:
+            let (lane) = try decoder.visitSimdLane(.i32x4ExtractLane)
+            try visitor.visitSimdLane(.i32x4ExtractLane, lane: lane)
+        case 0x1C:
+            let (lane) = try decoder.visitSimdLane(.i32x4ReplaceLane)
+            try visitor.visitSimdLane(.i32x4ReplaceLane, lane: lane)
+        case 0x1D:
+            let (lane) = try decoder.visitSimdLane(.i64x2ExtractLane)
+            try visitor.visitSimdLane(.i64x2ExtractLane, lane: lane)
+        case 0x1E:
+            let (lane) = try decoder.visitSimdLane(.i64x2ReplaceLane)
+            try visitor.visitSimdLane(.i64x2ReplaceLane, lane: lane)
+        case 0x1F:
+            let (lane) = try decoder.visitSimdLane(.f32x4ExtractLane)
+            try visitor.visitSimdLane(.f32x4ExtractLane, lane: lane)
+        case 0x20:
+            let (lane) = try decoder.visitSimdLane(.f32x4ReplaceLane)
+            try visitor.visitSimdLane(.f32x4ReplaceLane, lane: lane)
+        case 0x21:
+            let (lane) = try decoder.visitSimdLane(.f64x2ExtractLane)
+            try visitor.visitSimdLane(.f64x2ExtractLane, lane: lane)
+        case 0x22:
+            let (lane) = try decoder.visitSimdLane(.f64x2ReplaceLane)
+            try visitor.visitSimdLane(.f64x2ReplaceLane, lane: lane)
+        case 0x23:
+            try visitor.visitSimd(.i8x16Eq)
+        case 0x24:
+            try visitor.visitSimd(.i8x16Ne)
+        case 0x25:
+            try visitor.visitSimd(.i8x16LtS)
+        case 0x26:
+            try visitor.visitSimd(.i8x16LtU)
+        case 0x27:
+            try visitor.visitSimd(.i8x16GtS)
+        case 0x28:
+            try visitor.visitSimd(.i8x16GtU)
+        case 0x29:
+            try visitor.visitSimd(.i8x16LeS)
+        case 0x2A:
+            try visitor.visitSimd(.i8x16LeU)
+        case 0x2B:
+            try visitor.visitSimd(.i8x16GeS)
+        case 0x2C:
+            try visitor.visitSimd(.i8x16GeU)
+        case 0x2D:
+            try visitor.visitSimd(.i16x8Eq)
+        case 0x2E:
+            try visitor.visitSimd(.i16x8Ne)
+        case 0x2F:
+            try visitor.visitSimd(.i16x8LtS)
+        case 0x30:
+            try visitor.visitSimd(.i16x8LtU)
+        case 0x31:
+            try visitor.visitSimd(.i16x8GtS)
+        case 0x32:
+            try visitor.visitSimd(.i16x8GtU)
+        case 0x33:
+            try visitor.visitSimd(.i16x8LeS)
+        case 0x34:
+            try visitor.visitSimd(.i16x8LeU)
+        case 0x35:
+            try visitor.visitSimd(.i16x8GeS)
+        case 0x36:
+            try visitor.visitSimd(.i16x8GeU)
+        case 0x37:
+            try visitor.visitSimd(.i32x4Eq)
+        case 0x38:
+            try visitor.visitSimd(.i32x4Ne)
+        case 0x39:
+            try visitor.visitSimd(.i32x4LtS)
+        case 0x3A:
+            try visitor.visitSimd(.i32x4LtU)
+        case 0x3B:
+            try visitor.visitSimd(.i32x4GtS)
+        case 0x3C:
+            try visitor.visitSimd(.i32x4GtU)
+        case 0x3D:
+            try visitor.visitSimd(.i32x4LeS)
+        case 0x3E:
+            try visitor.visitSimd(.i32x4LeU)
+        case 0x3F:
+            try visitor.visitSimd(.i32x4GeS)
+        case 0x40:
+            try visitor.visitSimd(.i32x4GeU)
+        case 0x41:
+            try visitor.visitSimd(.f32x4Eq)
+        case 0x42:
+            try visitor.visitSimd(.f32x4Ne)
+        case 0x43:
+            try visitor.visitSimd(.f32x4Lt)
+        case 0x44:
+            try visitor.visitSimd(.f32x4Gt)
+        case 0x45:
+            try visitor.visitSimd(.f32x4Le)
+        case 0x46:
+            try visitor.visitSimd(.f32x4Ge)
+        case 0x47:
+            try visitor.visitSimd(.f64x2Eq)
+        case 0x48:
+            try visitor.visitSimd(.f64x2Ne)
+        case 0x49:
+            try visitor.visitSimd(.f64x2Lt)
+        case 0x4A:
+            try visitor.visitSimd(.f64x2Gt)
+        case 0x4B:
+            try visitor.visitSimd(.f64x2Le)
+        case 0x4C:
+            try visitor.visitSimd(.f64x2Ge)
+        case 0x4D:
+            try visitor.visitSimd(.v128Not)
+        case 0x4E:
+            try visitor.visitSimd(.v128And)
+        case 0x4F:
+            try visitor.visitSimd(.v128Andnot)
+        case 0x50:
+            try visitor.visitSimd(.v128Or)
+        case 0x51:
+            try visitor.visitSimd(.v128Xor)
+        case 0x52:
+            try visitor.visitSimd(.v128Bitselect)
+        case 0x53:
+            try visitor.visitSimd(.v128AnyTrue)
+        case 0x54:
+            let (memarg, lane) = try decoder.visitSimdMemLane(.v128Load8Lane)
+            try visitor.visitSimdMemLane(.v128Load8Lane, memarg: memarg, lane: lane)
+        case 0x55:
+            let (memarg, lane) = try decoder.visitSimdMemLane(.v128Load16Lane)
+            try visitor.visitSimdMemLane(.v128Load16Lane, memarg: memarg, lane: lane)
+        case 0x56:
+            let (memarg, lane) = try decoder.visitSimdMemLane(.v128Load32Lane)
+            try visitor.visitSimdMemLane(.v128Load32Lane, memarg: memarg, lane: lane)
+        case 0x57:
+            let (memarg, lane) = try decoder.visitSimdMemLane(.v128Load64Lane)
+            try visitor.visitSimdMemLane(.v128Load64Lane, memarg: memarg, lane: lane)
+        case 0x58:
+            let (memarg, lane) = try decoder.visitSimdMemLane(.v128Store8Lane)
+            try visitor.visitSimdMemLane(.v128Store8Lane, memarg: memarg, lane: lane)
+        case 0x59:
+            let (memarg, lane) = try decoder.visitSimdMemLane(.v128Store16Lane)
+            try visitor.visitSimdMemLane(.v128Store16Lane, memarg: memarg, lane: lane)
+        case 0x5A:
+            let (memarg, lane) = try decoder.visitSimdMemLane(.v128Store32Lane)
+            try visitor.visitSimdMemLane(.v128Store32Lane, memarg: memarg, lane: lane)
+        case 0x5B:
+            let (memarg, lane) = try decoder.visitSimdMemLane(.v128Store64Lane)
+            try visitor.visitSimdMemLane(.v128Store64Lane, memarg: memarg, lane: lane)
+        case 0x5C:
+            let (memarg) = try decoder.visitLoad(.v128Load32Zero)
+            try visitor.visitLoad(.v128Load32Zero, memarg: memarg)
+        case 0x5D:
+            let (memarg) = try decoder.visitLoad(.v128Load64Zero)
+            try visitor.visitLoad(.v128Load64Zero, memarg: memarg)
+        case 0x5E:
+            try visitor.visitSimd(.f32x4DemoteF64X2Zero)
+        case 0x5F:
+            try visitor.visitSimd(.f64x2PromoteLowF32X4)
+        case 0x60:
+            try visitor.visitSimd(.i8x16Abs)
+        case 0x61:
+            try visitor.visitSimd(.i8x16Neg)
+        case 0x62:
+            try visitor.visitSimd(.i8x16Popcnt)
+        case 0x63:
+            try visitor.visitSimd(.i8x16AllTrue)
+        case 0x64:
+            try visitor.visitSimd(.i8x16Bitmask)
+        case 0x65:
+            try visitor.visitSimd(.i8x16NarrowI16X8S)
+        case 0x66:
+            try visitor.visitSimd(.i8x16NarrowI16X8U)
+        case 0x67:
+            try visitor.visitSimd(.f32x4Ceil)
+        case 0x68:
+            try visitor.visitSimd(.f32x4Floor)
+        case 0x69:
+            try visitor.visitSimd(.f32x4Trunc)
+        case 0x6A:
+            try visitor.visitSimd(.f32x4Nearest)
+        case 0x6B:
+            try visitor.visitSimd(.i8x16Shl)
+        case 0x6C:
+            try visitor.visitSimd(.i8x16ShrS)
+        case 0x6D:
+            try visitor.visitSimd(.i8x16ShrU)
+        case 0x6E:
+            try visitor.visitSimd(.i8x16Add)
+        case 0x6F:
+            try visitor.visitSimd(.i8x16AddSatS)
+        case 0x70:
+            try visitor.visitSimd(.i8x16AddSatU)
+        case 0x71:
+            try visitor.visitSimd(.i8x16Sub)
+        case 0x72:
+            try visitor.visitSimd(.i8x16SubSatS)
+        case 0x73:
+            try visitor.visitSimd(.i8x16SubSatU)
+        case 0x74:
+            try visitor.visitSimd(.f64x2Ceil)
+        case 0x75:
+            try visitor.visitSimd(.f64x2Floor)
+        case 0x76:
+            try visitor.visitSimd(.i8x16MinS)
+        case 0x77:
+            try visitor.visitSimd(.i8x16MinU)
+        case 0x78:
+            try visitor.visitSimd(.i8x16MaxS)
+        case 0x79:
+            try visitor.visitSimd(.i8x16MaxU)
+        case 0x7A:
+            try visitor.visitSimd(.f64x2Trunc)
+        case 0x7B:
+            try visitor.visitSimd(.i8x16AvgrU)
+        case 0x7C:
+            try visitor.visitSimd(.i16x8ExtaddPairwiseI8X16S)
+        case 0x7D:
+            try visitor.visitSimd(.i16x8ExtaddPairwiseI8X16U)
+        case 0x7E:
+            try visitor.visitSimd(.i32x4ExtaddPairwiseI16X8S)
+        case 0x7F:
+            try visitor.visitSimd(.i32x4ExtaddPairwiseI16X8U)
+        case 0x80:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i16x8Abs)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x81:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i16x8Neg)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x82:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i16x8Q15MulrSatS)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x83:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i16x8AllTrue)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x84:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i16x8Bitmask)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x85:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i16x8NarrowI32X4S)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x86:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i16x8NarrowI32X4U)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x87:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i16x8ExtendLowI8X16S)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x88:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i16x8ExtendHighI8X16S)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x89:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i16x8ExtendLowI8X16U)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x8A:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i16x8ExtendHighI8X16U)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x8B:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i16x8Shl)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x8C:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i16x8ShrS)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x8D:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i16x8ShrU)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x8E:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i16x8Add)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x8F:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i16x8AddSatS)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x90:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i16x8AddSatU)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x91:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i16x8Sub)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x92:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i16x8SubSatS)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x93:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i16x8SubSatU)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x94:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.f64x2Nearest)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x95:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i16x8Mul)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x96:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i16x8MinS)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x97:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i16x8MinU)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x98:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i16x8MaxS)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x99:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i16x8MaxU)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x9B:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i16x8AvgrU)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x9C:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i16x8ExtmulLowI8X16S)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x9D:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i16x8ExtmulHighI8X16S)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x9E:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i16x8ExtmulLowI8X16U)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0x9F:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i16x8ExtmulHighI8X16U)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xA0:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i32x4Abs)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xA1:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i32x4Neg)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xA3:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i32x4AllTrue)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xA4:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i32x4Bitmask)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xA7:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i32x4ExtendLowI16X8S)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xA8:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i32x4ExtendHighI16X8S)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xA9:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i32x4ExtendLowI16X8U)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xAA:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i32x4ExtendHighI16X8U)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xAB:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i32x4Shl)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xAC:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i32x4ShrS)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xAD:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i32x4ShrU)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xAE:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i32x4Add)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xB1:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i32x4Sub)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xB5:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i32x4Mul)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xB6:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i32x4MinS)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xB7:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i32x4MinU)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xB8:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i32x4MaxS)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xB9:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i32x4MaxU)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xBA:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i32x4DotI16X8S)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xBC:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i32x4ExtmulLowI16X8S)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xBD:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i32x4ExtmulHighI16X8S)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xBE:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i32x4ExtmulLowI16X8U)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xBF:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i32x4ExtmulHighI16X8U)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xC0:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i64x2Abs)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xC1:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i64x2Neg)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xC3:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i64x2AllTrue)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xC4:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i64x2Bitmask)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xC7:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i64x2ExtendLowI32X4S)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xC8:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i64x2ExtendHighI32X4S)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xC9:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i64x2ExtendLowI32X4U)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xCA:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i64x2ExtendHighI32X4U)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xCB:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i64x2Shl)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xCC:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i64x2ShrS)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xCD:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i64x2ShrU)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xCE:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i64x2Add)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xD1:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i64x2Sub)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xD5:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i64x2Mul)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xD6:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i64x2Eq)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xD7:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i64x2Ne)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xD8:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i64x2LtS)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xD9:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i64x2GtS)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xDA:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i64x2LeS)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xDB:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i64x2GeS)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xDC:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i64x2ExtmulLowI32X4S)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xDD:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i64x2ExtmulHighI32X4S)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xDE:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i64x2ExtmulLowI32X4U)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xDF:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i64x2ExtmulHighI32X4U)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xE0:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.f32x4Abs)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xE1:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.f32x4Neg)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xE3:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.f32x4Sqrt)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xE4:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.f32x4Add)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xE5:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.f32x4Sub)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xE6:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.f32x4Mul)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xE7:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.f32x4Div)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xE8:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.f32x4Min)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xE9:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.f32x4Max)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xEA:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.f32x4Pmin)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xEB:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.f32x4Pmax)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xEC:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.f64x2Abs)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xED:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.f64x2Neg)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xEF:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.f64x2Sqrt)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xF0:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.f64x2Add)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xF1:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.f64x2Sub)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xF2:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.f64x2Mul)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xF3:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.f64x2Div)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xF4:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.f64x2Min)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xF5:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.f64x2Max)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xF6:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.f64x2Pmin)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xF7:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.f64x2Pmax)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xF8:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i32x4TruncSatF32X4S)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xF9:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i32x4TruncSatF32X4U)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xFA:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.f32x4ConvertI32X4S)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xFB:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.f32x4ConvertI32X4U)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xFC:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i32x4TruncSatF64X2SZero)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xFD:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.i32x4TruncSatF64X2UZero)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xFE:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.f64x2ConvertLowI32X4S)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        case 0xFF:
+
+            let opcode2 = try decoder.claimNextByte()
+            switch opcode2 {
+            case 0x01:
+                try visitor.visitSimd(.f64x2ConvertLowI32X4U)
+            default:
+                if try !visitor.visitUnknown([opcode0, opcode1, opcode2]) { try decoder.throwUnknown([opcode0, opcode1, opcode2]) }
+            }
+        default:
+            if try !visitor.visitUnknown([opcode0, opcode1]) { try decoder.throwUnknown([opcode0, opcode1]) }
+        }
     case 0xFE:
 
         let opcode1 = try decoder.claimNextByte()
         switch opcode1 {
+        case 0x00:
+            let (memarg) = try decoder.visitMemoryAtomicNotify()
+            try visitor.visitMemoryAtomicNotify(memarg: memarg)
+        case 0x01:
+            let (memarg) = try decoder.visitMemoryAtomicWait32()
+            try visitor.visitMemoryAtomicWait32(memarg: memarg)
+        case 0x02:
+            let (memarg) = try decoder.visitMemoryAtomicWait64()
+            try visitor.visitMemoryAtomicWait64(memarg: memarg)
         case 0x03:
 
             let opcode2 = try decoder.claimNextByte()
@@ -647,6 +2044,153 @@ func parseBinaryInstruction(visitor: inout some InstructionVisitor & ~Copyable, 
         case 0x1D:
             let (memarg) = try decoder.visitStore(.i64AtomicStore32)
             try visitor.visitStore(.i64AtomicStore32, memarg: memarg)
+        case 0x1E:
+            let (memarg) = try decoder.visitI32AtomicRmwAdd()
+            try visitor.visitI32AtomicRmwAdd(memarg: memarg)
+        case 0x1F:
+            let (memarg) = try decoder.visitI64AtomicRmwAdd()
+            try visitor.visitI64AtomicRmwAdd(memarg: memarg)
+        case 0x20:
+            let (memarg) = try decoder.visitI32AtomicRmw8AddU()
+            try visitor.visitI32AtomicRmw8AddU(memarg: memarg)
+        case 0x21:
+            let (memarg) = try decoder.visitI32AtomicRmw16AddU()
+            try visitor.visitI32AtomicRmw16AddU(memarg: memarg)
+        case 0x22:
+            let (memarg) = try decoder.visitI64AtomicRmw8AddU()
+            try visitor.visitI64AtomicRmw8AddU(memarg: memarg)
+        case 0x23:
+            let (memarg) = try decoder.visitI64AtomicRmw16AddU()
+            try visitor.visitI64AtomicRmw16AddU(memarg: memarg)
+        case 0x24:
+            let (memarg) = try decoder.visitI64AtomicRmw32AddU()
+            try visitor.visitI64AtomicRmw32AddU(memarg: memarg)
+        case 0x25:
+            let (memarg) = try decoder.visitI32AtomicRmwSub()
+            try visitor.visitI32AtomicRmwSub(memarg: memarg)
+        case 0x26:
+            let (memarg) = try decoder.visitI64AtomicRmwSub()
+            try visitor.visitI64AtomicRmwSub(memarg: memarg)
+        case 0x27:
+            let (memarg) = try decoder.visitI32AtomicRmw8SubU()
+            try visitor.visitI32AtomicRmw8SubU(memarg: memarg)
+        case 0x28:
+            let (memarg) = try decoder.visitI32AtomicRmw16SubU()
+            try visitor.visitI32AtomicRmw16SubU(memarg: memarg)
+        case 0x29:
+            let (memarg) = try decoder.visitI64AtomicRmw8SubU()
+            try visitor.visitI64AtomicRmw8SubU(memarg: memarg)
+        case 0x2A:
+            let (memarg) = try decoder.visitI64AtomicRmw16SubU()
+            try visitor.visitI64AtomicRmw16SubU(memarg: memarg)
+        case 0x2B:
+            let (memarg) = try decoder.visitI64AtomicRmw32SubU()
+            try visitor.visitI64AtomicRmw32SubU(memarg: memarg)
+        case 0x2C:
+            let (memarg) = try decoder.visitI32AtomicRmwAnd()
+            try visitor.visitI32AtomicRmwAnd(memarg: memarg)
+        case 0x2D:
+            let (memarg) = try decoder.visitI64AtomicRmwAnd()
+            try visitor.visitI64AtomicRmwAnd(memarg: memarg)
+        case 0x2E:
+            let (memarg) = try decoder.visitI32AtomicRmw8AndU()
+            try visitor.visitI32AtomicRmw8AndU(memarg: memarg)
+        case 0x2F:
+            let (memarg) = try decoder.visitI32AtomicRmw16AndU()
+            try visitor.visitI32AtomicRmw16AndU(memarg: memarg)
+        case 0x30:
+            let (memarg) = try decoder.visitI64AtomicRmw8AndU()
+            try visitor.visitI64AtomicRmw8AndU(memarg: memarg)
+        case 0x31:
+            let (memarg) = try decoder.visitI64AtomicRmw16AndU()
+            try visitor.visitI64AtomicRmw16AndU(memarg: memarg)
+        case 0x32:
+            let (memarg) = try decoder.visitI64AtomicRmw32AndU()
+            try visitor.visitI64AtomicRmw32AndU(memarg: memarg)
+        case 0x33:
+            let (memarg) = try decoder.visitI32AtomicRmwOr()
+            try visitor.visitI32AtomicRmwOr(memarg: memarg)
+        case 0x34:
+            let (memarg) = try decoder.visitI64AtomicRmwOr()
+            try visitor.visitI64AtomicRmwOr(memarg: memarg)
+        case 0x35:
+            let (memarg) = try decoder.visitI32AtomicRmw8OrU()
+            try visitor.visitI32AtomicRmw8OrU(memarg: memarg)
+        case 0x36:
+            let (memarg) = try decoder.visitI32AtomicRmw16OrU()
+            try visitor.visitI32AtomicRmw16OrU(memarg: memarg)
+        case 0x37:
+            let (memarg) = try decoder.visitI64AtomicRmw8OrU()
+            try visitor.visitI64AtomicRmw8OrU(memarg: memarg)
+        case 0x38:
+            let (memarg) = try decoder.visitI64AtomicRmw16OrU()
+            try visitor.visitI64AtomicRmw16OrU(memarg: memarg)
+        case 0x39:
+            let (memarg) = try decoder.visitI64AtomicRmw32OrU()
+            try visitor.visitI64AtomicRmw32OrU(memarg: memarg)
+        case 0x3A:
+            let (memarg) = try decoder.visitI32AtomicRmwXor()
+            try visitor.visitI32AtomicRmwXor(memarg: memarg)
+        case 0x3B:
+            let (memarg) = try decoder.visitI64AtomicRmwXor()
+            try visitor.visitI64AtomicRmwXor(memarg: memarg)
+        case 0x3C:
+            let (memarg) = try decoder.visitI32AtomicRmw8XorU()
+            try visitor.visitI32AtomicRmw8XorU(memarg: memarg)
+        case 0x3D:
+            let (memarg) = try decoder.visitI32AtomicRmw16XorU()
+            try visitor.visitI32AtomicRmw16XorU(memarg: memarg)
+        case 0x3E:
+            let (memarg) = try decoder.visitI64AtomicRmw8XorU()
+            try visitor.visitI64AtomicRmw8XorU(memarg: memarg)
+        case 0x3F:
+            let (memarg) = try decoder.visitI64AtomicRmw16XorU()
+            try visitor.visitI64AtomicRmw16XorU(memarg: memarg)
+        case 0x40:
+            let (memarg) = try decoder.visitI64AtomicRmw32XorU()
+            try visitor.visitI64AtomicRmw32XorU(memarg: memarg)
+        case 0x41:
+            let (memarg) = try decoder.visitI32AtomicRmwXchg()
+            try visitor.visitI32AtomicRmwXchg(memarg: memarg)
+        case 0x42:
+            let (memarg) = try decoder.visitI64AtomicRmwXchg()
+            try visitor.visitI64AtomicRmwXchg(memarg: memarg)
+        case 0x43:
+            let (memarg) = try decoder.visitI32AtomicRmw8XchgU()
+            try visitor.visitI32AtomicRmw8XchgU(memarg: memarg)
+        case 0x44:
+            let (memarg) = try decoder.visitI32AtomicRmw16XchgU()
+            try visitor.visitI32AtomicRmw16XchgU(memarg: memarg)
+        case 0x45:
+            let (memarg) = try decoder.visitI64AtomicRmw8XchgU()
+            try visitor.visitI64AtomicRmw8XchgU(memarg: memarg)
+        case 0x46:
+            let (memarg) = try decoder.visitI64AtomicRmw16XchgU()
+            try visitor.visitI64AtomicRmw16XchgU(memarg: memarg)
+        case 0x47:
+            let (memarg) = try decoder.visitI64AtomicRmw32XchgU()
+            try visitor.visitI64AtomicRmw32XchgU(memarg: memarg)
+        case 0x48:
+            let (memarg) = try decoder.visitI32AtomicRmwCmpxchg()
+            try visitor.visitI32AtomicRmwCmpxchg(memarg: memarg)
+        case 0x49:
+            let (memarg) = try decoder.visitI64AtomicRmwCmpxchg()
+            try visitor.visitI64AtomicRmwCmpxchg(memarg: memarg)
+        case 0x4A:
+            let (memarg) = try decoder.visitI32AtomicRmw8CmpxchgU()
+            try visitor.visitI32AtomicRmw8CmpxchgU(memarg: memarg)
+        case 0x4B:
+            let (memarg) = try decoder.visitI32AtomicRmw16CmpxchgU()
+            try visitor.visitI32AtomicRmw16CmpxchgU(memarg: memarg)
+        case 0x4C:
+            let (memarg) = try decoder.visitI64AtomicRmw8CmpxchgU()
+            try visitor.visitI64AtomicRmw8CmpxchgU(memarg: memarg)
+        case 0x4D:
+            let (memarg) = try decoder.visitI64AtomicRmw16CmpxchgU()
+            try visitor.visitI64AtomicRmw16CmpxchgU(memarg: memarg)
+        case 0x4E:
+            let (memarg) = try decoder.visitI64AtomicRmw32CmpxchgU()
+            try visitor.visitI64AtomicRmw32CmpxchgU(memarg: memarg)
         default:
             if try !visitor.visitUnknown([opcode0, opcode1]) { try decoder.throwUnknown([opcode0, opcode1]) }
         }

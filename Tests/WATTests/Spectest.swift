@@ -24,6 +24,7 @@ enum Spectest {
                 testsuitePath,
                 testsuitePath.appendingPathComponent("proposals/memory64"),
                 testsuitePath.appendingPathComponent("proposals/tail-call"),
+                testsuitePath.appendingPathComponent("proposals/threads"),
                 rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite"),
             ].flatMap {
                 try! FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil)
@@ -32,6 +33,10 @@ enum Spectest {
                     return nil
                 }
                 guard !filePath.lastPathComponent.starts(with: "simd_") else { return nil }
+                #if WASMKIT_CI_TOOLCHAIN_MAIN_NIGHTLY
+                    // https://github.com/swiftwasm/WasmKit/issues/242
+                    guard !filePath.path.hasSuffix("Vendor/testsuite/const.wast") else { return nil }
+                #endif
                 if !include.isEmpty {
                     guard include.contains(filePath.lastPathComponent) else { return nil }
                 } else {
@@ -46,6 +51,9 @@ enum Spectest {
         var features = WasmFeatureSet.default
         if wast.deletingLastPathComponent().path.hasSuffix("proposals/memory64") {
             features.insert(.memory64)
+        }
+        if wast.deletingLastPathComponent().path.hasSuffix("proposals/threads") {
+            features.insert(.threads)
         }
         return features
     }

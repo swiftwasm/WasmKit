@@ -27,6 +27,19 @@ public enum Instruction: Equatable {
         case i64AtomicLoad8U
         case i64AtomicLoad16U
         case i64AtomicLoad32U
+        case v128Load
+        case v128Load8X8S
+        case v128Load8X8U
+        case v128Load16X4S
+        case v128Load16X4U
+        case v128Load32X2S
+        case v128Load32X2U
+        case v128Load8Splat
+        case v128Load16Splat
+        case v128Load32Splat
+        case v128Load64Splat
+        case v128Load32Zero
+        case v128Load64Zero
     }
     public enum Store: Equatable {
         case i32Store
@@ -45,6 +58,7 @@ public enum Instruction: Equatable {
         case i64AtomicStore8
         case i64AtomicStore16
         case i64AtomicStore32
+        case v128Store
     }
     public enum Cmp: Equatable {
         case i32Eq
@@ -188,6 +202,232 @@ public enum Instruction: Equatable {
         case i64TruncSatF64S
         case i64TruncSatF64U
     }
+    public enum Simd: Equatable {
+        case i8x16Swizzle
+        case i8x16Splat
+        case i16x8Splat
+        case i32x4Splat
+        case i64x2Splat
+        case f32x4Splat
+        case f64x2Splat
+        case i8x16Eq
+        case i8x16Ne
+        case i8x16LtS
+        case i8x16LtU
+        case i8x16GtS
+        case i8x16GtU
+        case i8x16LeS
+        case i8x16LeU
+        case i8x16GeS
+        case i8x16GeU
+        case i16x8Eq
+        case i16x8Ne
+        case i16x8LtS
+        case i16x8LtU
+        case i16x8GtS
+        case i16x8GtU
+        case i16x8LeS
+        case i16x8LeU
+        case i16x8GeS
+        case i16x8GeU
+        case i32x4Eq
+        case i32x4Ne
+        case i32x4LtS
+        case i32x4LtU
+        case i32x4GtS
+        case i32x4GtU
+        case i32x4LeS
+        case i32x4LeU
+        case i32x4GeS
+        case i32x4GeU
+        case f32x4Eq
+        case f32x4Ne
+        case f32x4Lt
+        case f32x4Gt
+        case f32x4Le
+        case f32x4Ge
+        case f64x2Eq
+        case f64x2Ne
+        case f64x2Lt
+        case f64x2Gt
+        case f64x2Le
+        case f64x2Ge
+        case v128Not
+        case v128And
+        case v128Andnot
+        case v128Or
+        case v128Xor
+        case v128Bitselect
+        case i8x16Abs
+        case i8x16Neg
+        case i8x16AllTrue
+        case i8x16Bitmask
+        case i8x16NarrowI16X8S
+        case i8x16NarrowI16X8U
+        case i8x16Shl
+        case i8x16ShrS
+        case i8x16ShrU
+        case i8x16Add
+        case i8x16AddSatS
+        case i8x16AddSatU
+        case i8x16Sub
+        case i8x16SubSatS
+        case i8x16SubSatU
+        case i8x16MinS
+        case i8x16MinU
+        case i8x16MaxS
+        case i8x16MaxU
+        case i8x16AvgrU
+        case i16x8Abs
+        case i16x8Neg
+        case i16x8AllTrue
+        case i16x8Bitmask
+        case i16x8NarrowI32X4S
+        case i16x8NarrowI32X4U
+        case i16x8ExtendLowI8X16S
+        case i16x8ExtendHighI8X16S
+        case i16x8ExtendLowI8X16U
+        case i16x8ExtendHighI8X16U
+        case i16x8Shl
+        case i16x8ShrS
+        case i16x8ShrU
+        case i16x8Add
+        case i16x8AddSatS
+        case i16x8AddSatU
+        case i16x8Sub
+        case i16x8SubSatS
+        case i16x8SubSatU
+        case i16x8Mul
+        case i16x8MinS
+        case i16x8MinU
+        case i16x8MaxS
+        case i16x8MaxU
+        case i16x8AvgrU
+        case i32x4Abs
+        case i32x4Neg
+        case i32x4AllTrue
+        case i32x4Bitmask
+        case i32x4ExtendLowI16X8S
+        case i32x4ExtendHighI16X8S
+        case i32x4ExtendLowI16X8U
+        case i32x4ExtendHighI16X8U
+        case i32x4Shl
+        case i32x4ShrS
+        case i32x4ShrU
+        case i32x4Add
+        case i32x4Sub
+        case i32x4Mul
+        case i32x4MinS
+        case i32x4MinU
+        case i32x4MaxS
+        case i32x4MaxU
+        case i32x4DotI16X8S
+        case i64x2Abs
+        case i64x2Neg
+        case i64x2Bitmask
+        case i64x2ExtendLowI32X4S
+        case i64x2ExtendHighI32X4S
+        case i64x2ExtendLowI32X4U
+        case i64x2ExtendHighI32X4U
+        case i64x2Shl
+        case i64x2ShrS
+        case i64x2ShrU
+        case i64x2Add
+        case i64x2Sub
+        case i64x2Mul
+        case f32x4Ceil
+        case f32x4Floor
+        case f32x4Trunc
+        case f32x4Nearest
+        case f64x2Ceil
+        case f64x2Floor
+        case f64x2Trunc
+        case f64x2Nearest
+        case f32x4Abs
+        case f32x4Neg
+        case f32x4Sqrt
+        case f32x4Add
+        case f32x4Sub
+        case f32x4Mul
+        case f32x4Div
+        case f32x4Min
+        case f32x4Max
+        case f32x4Pmin
+        case f32x4Pmax
+        case f64x2Abs
+        case f64x2Neg
+        case f64x2Sqrt
+        case f64x2Add
+        case f64x2Sub
+        case f64x2Mul
+        case f64x2Div
+        case f64x2Min
+        case f64x2Max
+        case f64x2Pmin
+        case f64x2Pmax
+        case i32x4TruncSatF32X4S
+        case i32x4TruncSatF32X4U
+        case f32x4ConvertI32X4S
+        case f32x4ConvertI32X4U
+        case i16x8ExtmulLowI8X16S
+        case i16x8ExtmulHighI8X16S
+        case i16x8ExtmulLowI8X16U
+        case i16x8ExtmulHighI8X16U
+        case i32x4ExtmulLowI16X8S
+        case i32x4ExtmulHighI16X8S
+        case i32x4ExtmulLowI16X8U
+        case i32x4ExtmulHighI16X8U
+        case i64x2ExtmulLowI32X4S
+        case i64x2ExtmulHighI32X4S
+        case i64x2ExtmulLowI32X4U
+        case i64x2ExtmulHighI32X4U
+        case i16x8Q15MulrSatS
+        case v128AnyTrue
+        case i64x2Eq
+        case i64x2Ne
+        case i64x2LtS
+        case i64x2GtS
+        case i64x2LeS
+        case i64x2GeS
+        case i64x2AllTrue
+        case f64x2ConvertLowI32X4S
+        case f64x2ConvertLowI32X4U
+        case i32x4TruncSatF64X2SZero
+        case i32x4TruncSatF64X2UZero
+        case f32x4DemoteF64X2Zero
+        case f64x2PromoteLowF32X4
+        case i8x16Popcnt
+        case i16x8ExtaddPairwiseI8X16S
+        case i16x8ExtaddPairwiseI8X16U
+        case i32x4ExtaddPairwiseI16X8S
+        case i32x4ExtaddPairwiseI16X8U
+    }
+    public enum SimdLane: Equatable {
+        case i8x16ExtractLaneS
+        case i8x16ExtractLaneU
+        case i8x16ReplaceLane
+        case i16x8ExtractLaneS
+        case i16x8ExtractLaneU
+        case i16x8ReplaceLane
+        case i32x4ExtractLane
+        case i32x4ReplaceLane
+        case i64x2ExtractLane
+        case i64x2ReplaceLane
+        case f32x4ExtractLane
+        case f32x4ReplaceLane
+        case f64x2ExtractLane
+        case f64x2ReplaceLane
+    }
+    public enum SimdMemLane: Equatable {
+        case v128Load8Lane
+        case v128Load16Lane
+        case v128Load32Lane
+        case v128Load64Lane
+        case v128Store8Lane
+        case v128Store16Lane
+        case v128Store32Lane
+        case v128Store64Lane
+    }
     case `unreachable`
     case `nop`
     case `block`(blockType: BlockType)
@@ -246,73 +486,187 @@ public enum Instruction: Equatable {
     case `tableGrow`(table: UInt32)
     case `tableSize`(table: UInt32)
     case `atomicFence`
+    case `memoryAtomicNotify`(memarg: MemArg)
+    case `memoryAtomicWait32`(memarg: MemArg)
+    case `memoryAtomicWait64`(memarg: MemArg)
+    case `i32AtomicRmwAdd`(memarg: MemArg)
+    case `i64AtomicRmwAdd`(memarg: MemArg)
+    case `i32AtomicRmw8AddU`(memarg: MemArg)
+    case `i32AtomicRmw16AddU`(memarg: MemArg)
+    case `i64AtomicRmw8AddU`(memarg: MemArg)
+    case `i64AtomicRmw16AddU`(memarg: MemArg)
+    case `i64AtomicRmw32AddU`(memarg: MemArg)
+    case `i32AtomicRmwSub`(memarg: MemArg)
+    case `i64AtomicRmwSub`(memarg: MemArg)
+    case `i32AtomicRmw8SubU`(memarg: MemArg)
+    case `i32AtomicRmw16SubU`(memarg: MemArg)
+    case `i64AtomicRmw8SubU`(memarg: MemArg)
+    case `i64AtomicRmw16SubU`(memarg: MemArg)
+    case `i64AtomicRmw32SubU`(memarg: MemArg)
+    case `i32AtomicRmwAnd`(memarg: MemArg)
+    case `i64AtomicRmwAnd`(memarg: MemArg)
+    case `i32AtomicRmw8AndU`(memarg: MemArg)
+    case `i32AtomicRmw16AndU`(memarg: MemArg)
+    case `i64AtomicRmw8AndU`(memarg: MemArg)
+    case `i64AtomicRmw16AndU`(memarg: MemArg)
+    case `i64AtomicRmw32AndU`(memarg: MemArg)
+    case `i32AtomicRmwOr`(memarg: MemArg)
+    case `i64AtomicRmwOr`(memarg: MemArg)
+    case `i32AtomicRmw8OrU`(memarg: MemArg)
+    case `i32AtomicRmw16OrU`(memarg: MemArg)
+    case `i64AtomicRmw8OrU`(memarg: MemArg)
+    case `i64AtomicRmw16OrU`(memarg: MemArg)
+    case `i64AtomicRmw32OrU`(memarg: MemArg)
+    case `i32AtomicRmwXor`(memarg: MemArg)
+    case `i64AtomicRmwXor`(memarg: MemArg)
+    case `i32AtomicRmw8XorU`(memarg: MemArg)
+    case `i32AtomicRmw16XorU`(memarg: MemArg)
+    case `i64AtomicRmw8XorU`(memarg: MemArg)
+    case `i64AtomicRmw16XorU`(memarg: MemArg)
+    case `i64AtomicRmw32XorU`(memarg: MemArg)
+    case `i32AtomicRmwXchg`(memarg: MemArg)
+    case `i64AtomicRmwXchg`(memarg: MemArg)
+    case `i32AtomicRmw8XchgU`(memarg: MemArg)
+    case `i32AtomicRmw16XchgU`(memarg: MemArg)
+    case `i64AtomicRmw8XchgU`(memarg: MemArg)
+    case `i64AtomicRmw16XchgU`(memarg: MemArg)
+    case `i64AtomicRmw32XchgU`(memarg: MemArg)
+    case `i32AtomicRmwCmpxchg`(memarg: MemArg)
+    case `i64AtomicRmwCmpxchg`(memarg: MemArg)
+    case `i32AtomicRmw8CmpxchgU`(memarg: MemArg)
+    case `i32AtomicRmw16CmpxchgU`(memarg: MemArg)
+    case `i64AtomicRmw8CmpxchgU`(memarg: MemArg)
+    case `i64AtomicRmw16CmpxchgU`(memarg: MemArg)
+    case `i64AtomicRmw32CmpxchgU`(memarg: MemArg)
+    case `v128Const`(value: V128)
+    case `i8x16Shuffle`(lanes: V128ShuffleMask)
+    case `simd`(Instruction.Simd)
+    case `simdLane`(Instruction.SimdLane, lane: UInt8)
+    case `simdMemLane`(Instruction.SimdMemLane, memarg: MemArg, lane: UInt8)
 }
 
 /// A visitor that visits all instructions by a single visit method.
 public protocol AnyInstructionVisitor: InstructionVisitor {
     /// Visiting any instruction.
-    mutating func visit(_ instruction: Instruction) throws
+    mutating func visit(_ instruction: Instruction) throws(VisitorError)
 }
 
 extension AnyInstructionVisitor {
-    public mutating func visitUnreachable() throws { return try self.visit(.unreachable) }
-    public mutating func visitNop() throws { return try self.visit(.nop) }
-    public mutating func visitBlock(blockType: BlockType) throws { return try self.visit(.block(blockType: blockType)) }
-    public mutating func visitLoop(blockType: BlockType) throws { return try self.visit(.loop(blockType: blockType)) }
-    public mutating func visitIf(blockType: BlockType) throws { return try self.visit(.if(blockType: blockType)) }
-    public mutating func visitElse() throws { return try self.visit(.else) }
-    public mutating func visitEnd() throws { return try self.visit(.end) }
-    public mutating func visitBr(relativeDepth: UInt32) throws { return try self.visit(.br(relativeDepth: relativeDepth)) }
-    public mutating func visitBrIf(relativeDepth: UInt32) throws { return try self.visit(.brIf(relativeDepth: relativeDepth)) }
-    public mutating func visitBrTable(targets: BrTable) throws { return try self.visit(.brTable(targets: targets)) }
-    public mutating func visitReturn() throws { return try self.visit(.return) }
-    public mutating func visitCall(functionIndex: UInt32) throws { return try self.visit(.call(functionIndex: functionIndex)) }
-    public mutating func visitCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws { return try self.visit(.callIndirect(typeIndex: typeIndex, tableIndex: tableIndex)) }
-    public mutating func visitReturnCall(functionIndex: UInt32) throws { return try self.visit(.returnCall(functionIndex: functionIndex)) }
-    public mutating func visitReturnCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws { return try self.visit(.returnCallIndirect(typeIndex: typeIndex, tableIndex: tableIndex)) }
-    public mutating func visitCallRef(typeIndex: UInt32) throws { return try self.visit(.callRef(typeIndex: typeIndex)) }
-    public mutating func visitReturnCallRef(typeIndex: UInt32) throws { return try self.visit(.returnCallRef(typeIndex: typeIndex)) }
-    public mutating func visitDrop() throws { return try self.visit(.drop) }
-    public mutating func visitSelect() throws { return try self.visit(.select) }
-    public mutating func visitTypedSelect(type: ValueType) throws { return try self.visit(.typedSelect(type: type)) }
-    public mutating func visitLocalGet(localIndex: UInt32) throws { return try self.visit(.localGet(localIndex: localIndex)) }
-    public mutating func visitLocalSet(localIndex: UInt32) throws { return try self.visit(.localSet(localIndex: localIndex)) }
-    public mutating func visitLocalTee(localIndex: UInt32) throws { return try self.visit(.localTee(localIndex: localIndex)) }
-    public mutating func visitGlobalGet(globalIndex: UInt32) throws { return try self.visit(.globalGet(globalIndex: globalIndex)) }
-    public mutating func visitGlobalSet(globalIndex: UInt32) throws { return try self.visit(.globalSet(globalIndex: globalIndex)) }
-    public mutating func visitLoad(_ load: Instruction.Load, memarg: MemArg) throws { return try self.visit(.load(load, memarg: memarg)) }
-    public mutating func visitStore(_ store: Instruction.Store, memarg: MemArg) throws { return try self.visit(.store(store, memarg: memarg)) }
-    public mutating func visitMemorySize(memory: UInt32) throws { return try self.visit(.memorySize(memory: memory)) }
-    public mutating func visitMemoryGrow(memory: UInt32) throws { return try self.visit(.memoryGrow(memory: memory)) }
-    public mutating func visitI32Const(value: Int32) throws { return try self.visit(.i32Const(value: value)) }
-    public mutating func visitI64Const(value: Int64) throws { return try self.visit(.i64Const(value: value)) }
-    public mutating func visitF32Const(value: IEEE754.Float32) throws { return try self.visit(.f32Const(value: value)) }
-    public mutating func visitF64Const(value: IEEE754.Float64) throws { return try self.visit(.f64Const(value: value)) }
-    public mutating func visitRefNull(type: HeapType) throws { return try self.visit(.refNull(type: type)) }
-    public mutating func visitRefIsNull() throws { return try self.visit(.refIsNull) }
-    public mutating func visitRefFunc(functionIndex: UInt32) throws { return try self.visit(.refFunc(functionIndex: functionIndex)) }
-    public mutating func visitRefAsNonNull() throws { return try self.visit(.refAsNonNull) }
-    public mutating func visitBrOnNull(relativeDepth: UInt32) throws { return try self.visit(.brOnNull(relativeDepth: relativeDepth)) }
-    public mutating func visitBrOnNonNull(relativeDepth: UInt32) throws { return try self.visit(.brOnNonNull(relativeDepth: relativeDepth)) }
-    public mutating func visitI32Eqz() throws { return try self.visit(.i32Eqz) }
-    public mutating func visitCmp(_ cmp: Instruction.Cmp) throws { return try self.visit(.cmp(cmp)) }
-    public mutating func visitI64Eqz() throws { return try self.visit(.i64Eqz) }
-    public mutating func visitUnary(_ unary: Instruction.Unary) throws { return try self.visit(.unary(unary)) }
-    public mutating func visitBinary(_ binary: Instruction.Binary) throws { return try self.visit(.binary(binary)) }
-    public mutating func visitConversion(_ conversion: Instruction.Conversion) throws { return try self.visit(.conversion(conversion)) }
-    public mutating func visitMemoryInit(dataIndex: UInt32) throws { return try self.visit(.memoryInit(dataIndex: dataIndex)) }
-    public mutating func visitDataDrop(dataIndex: UInt32) throws { return try self.visit(.dataDrop(dataIndex: dataIndex)) }
-    public mutating func visitMemoryCopy(dstMem: UInt32, srcMem: UInt32) throws { return try self.visit(.memoryCopy(dstMem: dstMem, srcMem: srcMem)) }
-    public mutating func visitMemoryFill(memory: UInt32) throws { return try self.visit(.memoryFill(memory: memory)) }
-    public mutating func visitTableInit(elemIndex: UInt32, table: UInt32) throws { return try self.visit(.tableInit(elemIndex: elemIndex, table: table)) }
-    public mutating func visitElemDrop(elemIndex: UInt32) throws { return try self.visit(.elemDrop(elemIndex: elemIndex)) }
-    public mutating func visitTableCopy(dstTable: UInt32, srcTable: UInt32) throws { return try self.visit(.tableCopy(dstTable: dstTable, srcTable: srcTable)) }
-    public mutating func visitTableFill(table: UInt32) throws { return try self.visit(.tableFill(table: table)) }
-    public mutating func visitTableGet(table: UInt32) throws { return try self.visit(.tableGet(table: table)) }
-    public mutating func visitTableSet(table: UInt32) throws { return try self.visit(.tableSet(table: table)) }
-    public mutating func visitTableGrow(table: UInt32) throws { return try self.visit(.tableGrow(table: table)) }
-    public mutating func visitTableSize(table: UInt32) throws { return try self.visit(.tableSize(table: table)) }
-    public mutating func visitAtomicFence() throws { return try self.visit(.atomicFence) }
+    public mutating func visitUnreachable() throws(VisitorError) { return try self.visit(.unreachable) }
+    public mutating func visitNop() throws(VisitorError) { return try self.visit(.nop) }
+    public mutating func visitBlock(blockType: BlockType) throws(VisitorError) { return try self.visit(.block(blockType: blockType)) }
+    public mutating func visitLoop(blockType: BlockType) throws(VisitorError) { return try self.visit(.loop(blockType: blockType)) }
+    public mutating func visitIf(blockType: BlockType) throws(VisitorError) { return try self.visit(.if(blockType: blockType)) }
+    public mutating func visitElse() throws(VisitorError) { return try self.visit(.else) }
+    public mutating func visitEnd() throws(VisitorError) { return try self.visit(.end) }
+    public mutating func visitBr(relativeDepth: UInt32) throws(VisitorError) { return try self.visit(.br(relativeDepth: relativeDepth)) }
+    public mutating func visitBrIf(relativeDepth: UInt32) throws(VisitorError) { return try self.visit(.brIf(relativeDepth: relativeDepth)) }
+    public mutating func visitBrTable(targets: BrTable) throws(VisitorError) { return try self.visit(.brTable(targets: targets)) }
+    public mutating func visitReturn() throws(VisitorError) { return try self.visit(.return) }
+    public mutating func visitCall(functionIndex: UInt32) throws(VisitorError) { return try self.visit(.call(functionIndex: functionIndex)) }
+    public mutating func visitCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws(VisitorError) { return try self.visit(.callIndirect(typeIndex: typeIndex, tableIndex: tableIndex)) }
+    public mutating func visitReturnCall(functionIndex: UInt32) throws(VisitorError) { return try self.visit(.returnCall(functionIndex: functionIndex)) }
+    public mutating func visitReturnCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws(VisitorError) { return try self.visit(.returnCallIndirect(typeIndex: typeIndex, tableIndex: tableIndex)) }
+    public mutating func visitCallRef(typeIndex: UInt32) throws(VisitorError) { return try self.visit(.callRef(typeIndex: typeIndex)) }
+    public mutating func visitReturnCallRef(typeIndex: UInt32) throws(VisitorError) { return try self.visit(.returnCallRef(typeIndex: typeIndex)) }
+    public mutating func visitDrop() throws(VisitorError) { return try self.visit(.drop) }
+    public mutating func visitSelect() throws(VisitorError) { return try self.visit(.select) }
+    public mutating func visitTypedSelect(type: ValueType) throws(VisitorError) { return try self.visit(.typedSelect(type: type)) }
+    public mutating func visitLocalGet(localIndex: UInt32) throws(VisitorError) { return try self.visit(.localGet(localIndex: localIndex)) }
+    public mutating func visitLocalSet(localIndex: UInt32) throws(VisitorError) { return try self.visit(.localSet(localIndex: localIndex)) }
+    public mutating func visitLocalTee(localIndex: UInt32) throws(VisitorError) { return try self.visit(.localTee(localIndex: localIndex)) }
+    public mutating func visitGlobalGet(globalIndex: UInt32) throws(VisitorError) { return try self.visit(.globalGet(globalIndex: globalIndex)) }
+    public mutating func visitGlobalSet(globalIndex: UInt32) throws(VisitorError) { return try self.visit(.globalSet(globalIndex: globalIndex)) }
+    public mutating func visitLoad(_ load: Instruction.Load, memarg: MemArg) throws(VisitorError) { return try self.visit(.load(load, memarg: memarg)) }
+    public mutating func visitStore(_ store: Instruction.Store, memarg: MemArg) throws(VisitorError) { return try self.visit(.store(store, memarg: memarg)) }
+    public mutating func visitMemorySize(memory: UInt32) throws(VisitorError) { return try self.visit(.memorySize(memory: memory)) }
+    public mutating func visitMemoryGrow(memory: UInt32) throws(VisitorError) { return try self.visit(.memoryGrow(memory: memory)) }
+    public mutating func visitI32Const(value: Int32) throws(VisitorError) { return try self.visit(.i32Const(value: value)) }
+    public mutating func visitI64Const(value: Int64) throws(VisitorError) { return try self.visit(.i64Const(value: value)) }
+    public mutating func visitF32Const(value: IEEE754.Float32) throws(VisitorError) { return try self.visit(.f32Const(value: value)) }
+    public mutating func visitF64Const(value: IEEE754.Float64) throws(VisitorError) { return try self.visit(.f64Const(value: value)) }
+    public mutating func visitRefNull(type: HeapType) throws(VisitorError) { return try self.visit(.refNull(type: type)) }
+    public mutating func visitRefIsNull() throws(VisitorError) { return try self.visit(.refIsNull) }
+    public mutating func visitRefFunc(functionIndex: UInt32) throws(VisitorError) { return try self.visit(.refFunc(functionIndex: functionIndex)) }
+    public mutating func visitRefAsNonNull() throws(VisitorError) { return try self.visit(.refAsNonNull) }
+    public mutating func visitBrOnNull(relativeDepth: UInt32) throws(VisitorError) { return try self.visit(.brOnNull(relativeDepth: relativeDepth)) }
+    public mutating func visitBrOnNonNull(relativeDepth: UInt32) throws(VisitorError) { return try self.visit(.brOnNonNull(relativeDepth: relativeDepth)) }
+    public mutating func visitI32Eqz() throws(VisitorError) { return try self.visit(.i32Eqz) }
+    public mutating func visitCmp(_ cmp: Instruction.Cmp) throws(VisitorError) { return try self.visit(.cmp(cmp)) }
+    public mutating func visitI64Eqz() throws(VisitorError) { return try self.visit(.i64Eqz) }
+    public mutating func visitUnary(_ unary: Instruction.Unary) throws(VisitorError) { return try self.visit(.unary(unary)) }
+    public mutating func visitBinary(_ binary: Instruction.Binary) throws(VisitorError) { return try self.visit(.binary(binary)) }
+    public mutating func visitConversion(_ conversion: Instruction.Conversion) throws(VisitorError) { return try self.visit(.conversion(conversion)) }
+    public mutating func visitMemoryInit(dataIndex: UInt32) throws(VisitorError) { return try self.visit(.memoryInit(dataIndex: dataIndex)) }
+    public mutating func visitDataDrop(dataIndex: UInt32) throws(VisitorError) { return try self.visit(.dataDrop(dataIndex: dataIndex)) }
+    public mutating func visitMemoryCopy(dstMem: UInt32, srcMem: UInt32) throws(VisitorError) { return try self.visit(.memoryCopy(dstMem: dstMem, srcMem: srcMem)) }
+    public mutating func visitMemoryFill(memory: UInt32) throws(VisitorError) { return try self.visit(.memoryFill(memory: memory)) }
+    public mutating func visitTableInit(elemIndex: UInt32, table: UInt32) throws(VisitorError) { return try self.visit(.tableInit(elemIndex: elemIndex, table: table)) }
+    public mutating func visitElemDrop(elemIndex: UInt32) throws(VisitorError) { return try self.visit(.elemDrop(elemIndex: elemIndex)) }
+    public mutating func visitTableCopy(dstTable: UInt32, srcTable: UInt32) throws(VisitorError) { return try self.visit(.tableCopy(dstTable: dstTable, srcTable: srcTable)) }
+    public mutating func visitTableFill(table: UInt32) throws(VisitorError) { return try self.visit(.tableFill(table: table)) }
+    public mutating func visitTableGet(table: UInt32) throws(VisitorError) { return try self.visit(.tableGet(table: table)) }
+    public mutating func visitTableSet(table: UInt32) throws(VisitorError) { return try self.visit(.tableSet(table: table)) }
+    public mutating func visitTableGrow(table: UInt32) throws(VisitorError) { return try self.visit(.tableGrow(table: table)) }
+    public mutating func visitTableSize(table: UInt32) throws(VisitorError) { return try self.visit(.tableSize(table: table)) }
+    public mutating func visitAtomicFence() throws(VisitorError) { return try self.visit(.atomicFence) }
+    public mutating func visitMemoryAtomicNotify(memarg: MemArg) throws(VisitorError) { return try self.visit(.memoryAtomicNotify(memarg: memarg)) }
+    public mutating func visitMemoryAtomicWait32(memarg: MemArg) throws(VisitorError) { return try self.visit(.memoryAtomicWait32(memarg: memarg)) }
+    public mutating func visitMemoryAtomicWait64(memarg: MemArg) throws(VisitorError) { return try self.visit(.memoryAtomicWait64(memarg: memarg)) }
+    public mutating func visitI32AtomicRmwAdd(memarg: MemArg) throws(VisitorError) { return try self.visit(.i32AtomicRmwAdd(memarg: memarg)) }
+    public mutating func visitI64AtomicRmwAdd(memarg: MemArg) throws(VisitorError) { return try self.visit(.i64AtomicRmwAdd(memarg: memarg)) }
+    public mutating func visitI32AtomicRmw8AddU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i32AtomicRmw8AddU(memarg: memarg)) }
+    public mutating func visitI32AtomicRmw16AddU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i32AtomicRmw16AddU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw8AddU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i64AtomicRmw8AddU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw16AddU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i64AtomicRmw16AddU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw32AddU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i64AtomicRmw32AddU(memarg: memarg)) }
+    public mutating func visitI32AtomicRmwSub(memarg: MemArg) throws(VisitorError) { return try self.visit(.i32AtomicRmwSub(memarg: memarg)) }
+    public mutating func visitI64AtomicRmwSub(memarg: MemArg) throws(VisitorError) { return try self.visit(.i64AtomicRmwSub(memarg: memarg)) }
+    public mutating func visitI32AtomicRmw8SubU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i32AtomicRmw8SubU(memarg: memarg)) }
+    public mutating func visitI32AtomicRmw16SubU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i32AtomicRmw16SubU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw8SubU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i64AtomicRmw8SubU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw16SubU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i64AtomicRmw16SubU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw32SubU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i64AtomicRmw32SubU(memarg: memarg)) }
+    public mutating func visitI32AtomicRmwAnd(memarg: MemArg) throws(VisitorError) { return try self.visit(.i32AtomicRmwAnd(memarg: memarg)) }
+    public mutating func visitI64AtomicRmwAnd(memarg: MemArg) throws(VisitorError) { return try self.visit(.i64AtomicRmwAnd(memarg: memarg)) }
+    public mutating func visitI32AtomicRmw8AndU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i32AtomicRmw8AndU(memarg: memarg)) }
+    public mutating func visitI32AtomicRmw16AndU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i32AtomicRmw16AndU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw8AndU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i64AtomicRmw8AndU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw16AndU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i64AtomicRmw16AndU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw32AndU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i64AtomicRmw32AndU(memarg: memarg)) }
+    public mutating func visitI32AtomicRmwOr(memarg: MemArg) throws(VisitorError) { return try self.visit(.i32AtomicRmwOr(memarg: memarg)) }
+    public mutating func visitI64AtomicRmwOr(memarg: MemArg) throws(VisitorError) { return try self.visit(.i64AtomicRmwOr(memarg: memarg)) }
+    public mutating func visitI32AtomicRmw8OrU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i32AtomicRmw8OrU(memarg: memarg)) }
+    public mutating func visitI32AtomicRmw16OrU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i32AtomicRmw16OrU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw8OrU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i64AtomicRmw8OrU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw16OrU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i64AtomicRmw16OrU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw32OrU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i64AtomicRmw32OrU(memarg: memarg)) }
+    public mutating func visitI32AtomicRmwXor(memarg: MemArg) throws(VisitorError) { return try self.visit(.i32AtomicRmwXor(memarg: memarg)) }
+    public mutating func visitI64AtomicRmwXor(memarg: MemArg) throws(VisitorError) { return try self.visit(.i64AtomicRmwXor(memarg: memarg)) }
+    public mutating func visitI32AtomicRmw8XorU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i32AtomicRmw8XorU(memarg: memarg)) }
+    public mutating func visitI32AtomicRmw16XorU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i32AtomicRmw16XorU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw8XorU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i64AtomicRmw8XorU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw16XorU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i64AtomicRmw16XorU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw32XorU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i64AtomicRmw32XorU(memarg: memarg)) }
+    public mutating func visitI32AtomicRmwXchg(memarg: MemArg) throws(VisitorError) { return try self.visit(.i32AtomicRmwXchg(memarg: memarg)) }
+    public mutating func visitI64AtomicRmwXchg(memarg: MemArg) throws(VisitorError) { return try self.visit(.i64AtomicRmwXchg(memarg: memarg)) }
+    public mutating func visitI32AtomicRmw8XchgU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i32AtomicRmw8XchgU(memarg: memarg)) }
+    public mutating func visitI32AtomicRmw16XchgU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i32AtomicRmw16XchgU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw8XchgU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i64AtomicRmw8XchgU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw16XchgU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i64AtomicRmw16XchgU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw32XchgU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i64AtomicRmw32XchgU(memarg: memarg)) }
+    public mutating func visitI32AtomicRmwCmpxchg(memarg: MemArg) throws(VisitorError) { return try self.visit(.i32AtomicRmwCmpxchg(memarg: memarg)) }
+    public mutating func visitI64AtomicRmwCmpxchg(memarg: MemArg) throws(VisitorError) { return try self.visit(.i64AtomicRmwCmpxchg(memarg: memarg)) }
+    public mutating func visitI32AtomicRmw8CmpxchgU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i32AtomicRmw8CmpxchgU(memarg: memarg)) }
+    public mutating func visitI32AtomicRmw16CmpxchgU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i32AtomicRmw16CmpxchgU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw8CmpxchgU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i64AtomicRmw8CmpxchgU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw16CmpxchgU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i64AtomicRmw16CmpxchgU(memarg: memarg)) }
+    public mutating func visitI64AtomicRmw32CmpxchgU(memarg: MemArg) throws(VisitorError) { return try self.visit(.i64AtomicRmw32CmpxchgU(memarg: memarg)) }
+    public mutating func visitV128Const(value: V128) throws(VisitorError) { return try self.visit(.v128Const(value: value)) }
+    public mutating func visitI8x16Shuffle(lanes: V128ShuffleMask) throws(VisitorError) { return try self.visit(.i8x16Shuffle(lanes: lanes)) }
+    public mutating func visitSimd(_ simd: Instruction.Simd) throws(VisitorError) { return try self.visit(.simd(simd)) }
+    public mutating func visitSimdLane(_ simdLane: Instruction.SimdLane, lane: UInt8) throws(VisitorError) { return try self.visit(.simdLane(simdLane, lane: lane)) }
+    public mutating func visitSimdMemLane(_ simdMemLane: Instruction.SimdMemLane, memarg: MemArg, lane: UInt8) throws(VisitorError) { return try self.visit(.simdMemLane(simdMemLane, memarg: memarg, lane: lane)) }
 }
 
 /// A visitor for WebAssembly instructions.
@@ -320,132 +674,247 @@ extension AnyInstructionVisitor {
 /// The visitor pattern is used while parsing WebAssembly expressions to allow for easy extensibility.
 /// See the expression parsing method ``Code/parseExpression(visitor:)``
 public protocol InstructionVisitor: ~Copyable {
+    associatedtype VisitorError: Error
     /// Current offset in visitor's instruction stream.
     var binaryOffset: Int { get set }
 
     /// Visiting `unreachable` instruction.
-    mutating func visitUnreachable() throws
+    mutating func visitUnreachable() throws(VisitorError)
     /// Visiting `nop` instruction.
-    mutating func visitNop() throws
+    mutating func visitNop() throws(VisitorError)
     /// Visiting `block` instruction.
-    mutating func visitBlock(blockType: BlockType) throws
+    mutating func visitBlock(blockType: BlockType) throws(VisitorError)
     /// Visiting `loop` instruction.
-    mutating func visitLoop(blockType: BlockType) throws
+    mutating func visitLoop(blockType: BlockType) throws(VisitorError)
     /// Visiting `if` instruction.
-    mutating func visitIf(blockType: BlockType) throws
+    mutating func visitIf(blockType: BlockType) throws(VisitorError)
     /// Visiting `else` instruction.
-    mutating func visitElse() throws
+    mutating func visitElse() throws(VisitorError)
     /// Visiting `end` instruction.
-    mutating func visitEnd() throws
+    mutating func visitEnd() throws(VisitorError)
     /// Visiting `br` instruction.
-    mutating func visitBr(relativeDepth: UInt32) throws
+    mutating func visitBr(relativeDepth: UInt32) throws(VisitorError)
     /// Visiting `br_if` instruction.
-    mutating func visitBrIf(relativeDepth: UInt32) throws
+    mutating func visitBrIf(relativeDepth: UInt32) throws(VisitorError)
     /// Visiting `br_table` instruction.
-    mutating func visitBrTable(targets: BrTable) throws
+    mutating func visitBrTable(targets: BrTable) throws(VisitorError)
     /// Visiting `return` instruction.
-    mutating func visitReturn() throws
+    mutating func visitReturn() throws(VisitorError)
     /// Visiting `call` instruction.
-    mutating func visitCall(functionIndex: UInt32) throws
+    mutating func visitCall(functionIndex: UInt32) throws(VisitorError)
     /// Visiting `call_indirect` instruction.
-    mutating func visitCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws
+    mutating func visitCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws(VisitorError)
     /// Visiting `return_call` instruction.
-    mutating func visitReturnCall(functionIndex: UInt32) throws
+    mutating func visitReturnCall(functionIndex: UInt32) throws(VisitorError)
     /// Visiting `return_call_indirect` instruction.
-    mutating func visitReturnCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws
+    mutating func visitReturnCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws(VisitorError)
     /// Visiting `call_ref` instruction.
-    mutating func visitCallRef(typeIndex: UInt32) throws
+    mutating func visitCallRef(typeIndex: UInt32) throws(VisitorError)
     /// Visiting `return_call_ref` instruction.
-    mutating func visitReturnCallRef(typeIndex: UInt32) throws
+    mutating func visitReturnCallRef(typeIndex: UInt32) throws(VisitorError)
     /// Visiting `drop` instruction.
-    mutating func visitDrop() throws
+    mutating func visitDrop() throws(VisitorError)
     /// Visiting `select` instruction.
-    mutating func visitSelect() throws
+    mutating func visitSelect() throws(VisitorError)
     /// Visiting `typedSelect` instruction.
-    mutating func visitTypedSelect(type: ValueType) throws
+    mutating func visitTypedSelect(type: ValueType) throws(VisitorError)
     /// Visiting `local.get` instruction.
-    mutating func visitLocalGet(localIndex: UInt32) throws
+    mutating func visitLocalGet(localIndex: UInt32) throws(VisitorError)
     /// Visiting `local.set` instruction.
-    mutating func visitLocalSet(localIndex: UInt32) throws
+    mutating func visitLocalSet(localIndex: UInt32) throws(VisitorError)
     /// Visiting `local.tee` instruction.
-    mutating func visitLocalTee(localIndex: UInt32) throws
+    mutating func visitLocalTee(localIndex: UInt32) throws(VisitorError)
     /// Visiting `global.get` instruction.
-    mutating func visitGlobalGet(globalIndex: UInt32) throws
+    mutating func visitGlobalGet(globalIndex: UInt32) throws(VisitorError)
     /// Visiting `global.set` instruction.
-    mutating func visitGlobalSet(globalIndex: UInt32) throws
+    mutating func visitGlobalSet(globalIndex: UInt32) throws(VisitorError)
     /// Visiting `load` category instruction.
-    mutating func visitLoad(_: Instruction.Load, memarg: MemArg) throws
+    mutating func visitLoad(_: Instruction.Load, memarg: MemArg) throws(VisitorError)
     /// Visiting `store` category instruction.
-    mutating func visitStore(_: Instruction.Store, memarg: MemArg) throws
+    mutating func visitStore(_: Instruction.Store, memarg: MemArg) throws(VisitorError)
     /// Visiting `memory.size` instruction.
-    mutating func visitMemorySize(memory: UInt32) throws
+    mutating func visitMemorySize(memory: UInt32) throws(VisitorError)
     /// Visiting `memory.grow` instruction.
-    mutating func visitMemoryGrow(memory: UInt32) throws
+    mutating func visitMemoryGrow(memory: UInt32) throws(VisitorError)
     /// Visiting `i32.const` instruction.
-    mutating func visitI32Const(value: Int32) throws
+    mutating func visitI32Const(value: Int32) throws(VisitorError)
     /// Visiting `i64.const` instruction.
-    mutating func visitI64Const(value: Int64) throws
+    mutating func visitI64Const(value: Int64) throws(VisitorError)
     /// Visiting `f32.const` instruction.
-    mutating func visitF32Const(value: IEEE754.Float32) throws
+    mutating func visitF32Const(value: IEEE754.Float32) throws(VisitorError)
     /// Visiting `f64.const` instruction.
-    mutating func visitF64Const(value: IEEE754.Float64) throws
+    mutating func visitF64Const(value: IEEE754.Float64) throws(VisitorError)
     /// Visiting `ref.null` instruction.
-    mutating func visitRefNull(type: HeapType) throws
+    mutating func visitRefNull(type: HeapType) throws(VisitorError)
     /// Visiting `ref.is_null` instruction.
-    mutating func visitRefIsNull() throws
+    mutating func visitRefIsNull() throws(VisitorError)
     /// Visiting `ref.func` instruction.
-    mutating func visitRefFunc(functionIndex: UInt32) throws
+    mutating func visitRefFunc(functionIndex: UInt32) throws(VisitorError)
     /// Visiting `ref.as_non_null` instruction.
-    mutating func visitRefAsNonNull() throws
+    mutating func visitRefAsNonNull() throws(VisitorError)
     /// Visiting `br_on_null` instruction.
-    mutating func visitBrOnNull(relativeDepth: UInt32) throws
+    mutating func visitBrOnNull(relativeDepth: UInt32) throws(VisitorError)
     /// Visiting `br_on_non_null` instruction.
-    mutating func visitBrOnNonNull(relativeDepth: UInt32) throws
+    mutating func visitBrOnNonNull(relativeDepth: UInt32) throws(VisitorError)
     /// Visiting `i32.eqz` instruction.
-    mutating func visitI32Eqz() throws
+    mutating func visitI32Eqz() throws(VisitorError)
     /// Visiting `cmp` category instruction.
-    mutating func visitCmp(_: Instruction.Cmp) throws
+    mutating func visitCmp(_: Instruction.Cmp) throws(VisitorError)
     /// Visiting `i64.eqz` instruction.
-    mutating func visitI64Eqz() throws
+    mutating func visitI64Eqz() throws(VisitorError)
     /// Visiting `unary` category instruction.
-    mutating func visitUnary(_: Instruction.Unary) throws
+    mutating func visitUnary(_: Instruction.Unary) throws(VisitorError)
     /// Visiting `binary` category instruction.
-    mutating func visitBinary(_: Instruction.Binary) throws
+    mutating func visitBinary(_: Instruction.Binary) throws(VisitorError)
     /// Visiting `conversion` category instruction.
-    mutating func visitConversion(_: Instruction.Conversion) throws
+    mutating func visitConversion(_: Instruction.Conversion) throws(VisitorError)
     /// Visiting `memory.init` instruction.
-    mutating func visitMemoryInit(dataIndex: UInt32) throws
+    mutating func visitMemoryInit(dataIndex: UInt32) throws(VisitorError)
     /// Visiting `data.drop` instruction.
-    mutating func visitDataDrop(dataIndex: UInt32) throws
+    mutating func visitDataDrop(dataIndex: UInt32) throws(VisitorError)
     /// Visiting `memory.copy` instruction.
-    mutating func visitMemoryCopy(dstMem: UInt32, srcMem: UInt32) throws
+    mutating func visitMemoryCopy(dstMem: UInt32, srcMem: UInt32) throws(VisitorError)
     /// Visiting `memory.fill` instruction.
-    mutating func visitMemoryFill(memory: UInt32) throws
+    mutating func visitMemoryFill(memory: UInt32) throws(VisitorError)
     /// Visiting `table.init` instruction.
-    mutating func visitTableInit(elemIndex: UInt32, table: UInt32) throws
+    mutating func visitTableInit(elemIndex: UInt32, table: UInt32) throws(VisitorError)
     /// Visiting `elem.drop` instruction.
-    mutating func visitElemDrop(elemIndex: UInt32) throws
+    mutating func visitElemDrop(elemIndex: UInt32) throws(VisitorError)
     /// Visiting `table.copy` instruction.
-    mutating func visitTableCopy(dstTable: UInt32, srcTable: UInt32) throws
+    mutating func visitTableCopy(dstTable: UInt32, srcTable: UInt32) throws(VisitorError)
     /// Visiting `table.fill` instruction.
-    mutating func visitTableFill(table: UInt32) throws
+    mutating func visitTableFill(table: UInt32) throws(VisitorError)
     /// Visiting `table.get` instruction.
-    mutating func visitTableGet(table: UInt32) throws
+    mutating func visitTableGet(table: UInt32) throws(VisitorError)
     /// Visiting `table.set` instruction.
-    mutating func visitTableSet(table: UInt32) throws
+    mutating func visitTableSet(table: UInt32) throws(VisitorError)
     /// Visiting `table.grow` instruction.
-    mutating func visitTableGrow(table: UInt32) throws
+    mutating func visitTableGrow(table: UInt32) throws(VisitorError)
     /// Visiting `table.size` instruction.
-    mutating func visitTableSize(table: UInt32) throws
+    mutating func visitTableSize(table: UInt32) throws(VisitorError)
     /// Visiting `atomic.fence` instruction.
-    mutating func visitAtomicFence() throws
+    mutating func visitAtomicFence() throws(VisitorError)
+    /// Visiting `memory.atomic.notify` instruction.
+    mutating func visitMemoryAtomicNotify(memarg: MemArg) throws(VisitorError)
+    /// Visiting `memory.atomic.wait32` instruction.
+    mutating func visitMemoryAtomicWait32(memarg: MemArg) throws(VisitorError)
+    /// Visiting `memory.atomic.wait64` instruction.
+    mutating func visitMemoryAtomicWait64(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i32.atomic.rmw.add` instruction.
+    mutating func visitI32AtomicRmwAdd(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i64.atomic.rmw.add` instruction.
+    mutating func visitI64AtomicRmwAdd(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i32.atomic.rmw8.add_u` instruction.
+    mutating func visitI32AtomicRmw8AddU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i32.atomic.rmw16.add_u` instruction.
+    mutating func visitI32AtomicRmw16AddU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i64.atomic.rmw8.add_u` instruction.
+    mutating func visitI64AtomicRmw8AddU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i64.atomic.rmw16.add_u` instruction.
+    mutating func visitI64AtomicRmw16AddU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i64.atomic.rmw32.add_u` instruction.
+    mutating func visitI64AtomicRmw32AddU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i32.atomic.rmw.sub` instruction.
+    mutating func visitI32AtomicRmwSub(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i64.atomic.rmw.sub` instruction.
+    mutating func visitI64AtomicRmwSub(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i32.atomic.rmw8.sub_u` instruction.
+    mutating func visitI32AtomicRmw8SubU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i32.atomic.rmw16.sub_u` instruction.
+    mutating func visitI32AtomicRmw16SubU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i64.atomic.rmw8.sub_u` instruction.
+    mutating func visitI64AtomicRmw8SubU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i64.atomic.rmw16.sub_u` instruction.
+    mutating func visitI64AtomicRmw16SubU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i64.atomic.rmw32.sub_u` instruction.
+    mutating func visitI64AtomicRmw32SubU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i32.atomic.rmw.and` instruction.
+    mutating func visitI32AtomicRmwAnd(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i64.atomic.rmw.and` instruction.
+    mutating func visitI64AtomicRmwAnd(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i32.atomic.rmw8.and_u` instruction.
+    mutating func visitI32AtomicRmw8AndU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i32.atomic.rmw16.and_u` instruction.
+    mutating func visitI32AtomicRmw16AndU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i64.atomic.rmw8.and_u` instruction.
+    mutating func visitI64AtomicRmw8AndU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i64.atomic.rmw16.and_u` instruction.
+    mutating func visitI64AtomicRmw16AndU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i64.atomic.rmw32.and_u` instruction.
+    mutating func visitI64AtomicRmw32AndU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i32.atomic.rmw.or` instruction.
+    mutating func visitI32AtomicRmwOr(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i64.atomic.rmw.or` instruction.
+    mutating func visitI64AtomicRmwOr(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i32.atomic.rmw8.or_u` instruction.
+    mutating func visitI32AtomicRmw8OrU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i32.atomic.rmw16.or_u` instruction.
+    mutating func visitI32AtomicRmw16OrU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i64.atomic.rmw8.or_u` instruction.
+    mutating func visitI64AtomicRmw8OrU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i64.atomic.rmw16.or_u` instruction.
+    mutating func visitI64AtomicRmw16OrU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i64.atomic.rmw32.or_u` instruction.
+    mutating func visitI64AtomicRmw32OrU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i32.atomic.rmw.xor` instruction.
+    mutating func visitI32AtomicRmwXor(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i64.atomic.rmw.xor` instruction.
+    mutating func visitI64AtomicRmwXor(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i32.atomic.rmw8.xor_u` instruction.
+    mutating func visitI32AtomicRmw8XorU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i32.atomic.rmw16.xor_u` instruction.
+    mutating func visitI32AtomicRmw16XorU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i64.atomic.rmw8.xor_u` instruction.
+    mutating func visitI64AtomicRmw8XorU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i64.atomic.rmw16.xor_u` instruction.
+    mutating func visitI64AtomicRmw16XorU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i64.atomic.rmw32.xor_u` instruction.
+    mutating func visitI64AtomicRmw32XorU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i32.atomic.rmw.xchg` instruction.
+    mutating func visitI32AtomicRmwXchg(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i64.atomic.rmw.xchg` instruction.
+    mutating func visitI64AtomicRmwXchg(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i32.atomic.rmw8.xchg_u` instruction.
+    mutating func visitI32AtomicRmw8XchgU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i32.atomic.rmw16.xchg_u` instruction.
+    mutating func visitI32AtomicRmw16XchgU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i64.atomic.rmw8.xchg_u` instruction.
+    mutating func visitI64AtomicRmw8XchgU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i64.atomic.rmw16.xchg_u` instruction.
+    mutating func visitI64AtomicRmw16XchgU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i64.atomic.rmw32.xchg_u` instruction.
+    mutating func visitI64AtomicRmw32XchgU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i32.atomic.rmw.cmpxchg` instruction.
+    mutating func visitI32AtomicRmwCmpxchg(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i64.atomic.rmw.cmpxchg` instruction.
+    mutating func visitI64AtomicRmwCmpxchg(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i32.atomic.rmw8.cmpxchg_u` instruction.
+    mutating func visitI32AtomicRmw8CmpxchgU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i32.atomic.rmw16.cmpxchg_u` instruction.
+    mutating func visitI32AtomicRmw16CmpxchgU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i64.atomic.rmw8.cmpxchg_u` instruction.
+    mutating func visitI64AtomicRmw8CmpxchgU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i64.atomic.rmw16.cmpxchg_u` instruction.
+    mutating func visitI64AtomicRmw16CmpxchgU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `i64.atomic.rmw32.cmpxchg_u` instruction.
+    mutating func visitI64AtomicRmw32CmpxchgU(memarg: MemArg) throws(VisitorError)
+    /// Visiting `v128.const` instruction.
+    mutating func visitV128Const(value: V128) throws(VisitorError)
+    /// Visiting `i8x16.shuffle` instruction.
+    mutating func visitI8x16Shuffle(lanes: V128ShuffleMask) throws(VisitorError)
+    /// Visiting `simd` category instruction.
+    mutating func visitSimd(_: Instruction.Simd) throws(VisitorError)
+    /// Visiting `simdLane` category instruction.
+    mutating func visitSimdLane(_: Instruction.SimdLane, lane: UInt8) throws(VisitorError)
+    /// Visiting `simdMemLane` category instruction.
+    mutating func visitSimdMemLane(_: Instruction.SimdMemLane, memarg: MemArg, lane: UInt8) throws(VisitorError)
     /// Returns: `true` if the parser should silently proceed parsing.
-    mutating func visitUnknown(_ opcode: [UInt8]) throws -> Bool
+    mutating func visitUnknown(_ opcode: [UInt8]) throws(VisitorError) -> Bool
 }
 
 extension InstructionVisitor where Self: ~Copyable {
     /// Visits an instruction.
-    public mutating func visit(_ instruction: Instruction) throws {
+    public mutating func visit(_ instruction: Instruction) throws(VisitorError) {
         switch instruction {
         case .unreachable: return try visitUnreachable()
         case .nop: return try visitNop()
@@ -505,70 +974,184 @@ extension InstructionVisitor where Self: ~Copyable {
         case let .tableGrow(table): return try visitTableGrow(table: table)
         case let .tableSize(table): return try visitTableSize(table: table)
         case .atomicFence: return try visitAtomicFence()
+        case let .memoryAtomicNotify(memarg): return try visitMemoryAtomicNotify(memarg: memarg)
+        case let .memoryAtomicWait32(memarg): return try visitMemoryAtomicWait32(memarg: memarg)
+        case let .memoryAtomicWait64(memarg): return try visitMemoryAtomicWait64(memarg: memarg)
+        case let .i32AtomicRmwAdd(memarg): return try visitI32AtomicRmwAdd(memarg: memarg)
+        case let .i64AtomicRmwAdd(memarg): return try visitI64AtomicRmwAdd(memarg: memarg)
+        case let .i32AtomicRmw8AddU(memarg): return try visitI32AtomicRmw8AddU(memarg: memarg)
+        case let .i32AtomicRmw16AddU(memarg): return try visitI32AtomicRmw16AddU(memarg: memarg)
+        case let .i64AtomicRmw8AddU(memarg): return try visitI64AtomicRmw8AddU(memarg: memarg)
+        case let .i64AtomicRmw16AddU(memarg): return try visitI64AtomicRmw16AddU(memarg: memarg)
+        case let .i64AtomicRmw32AddU(memarg): return try visitI64AtomicRmw32AddU(memarg: memarg)
+        case let .i32AtomicRmwSub(memarg): return try visitI32AtomicRmwSub(memarg: memarg)
+        case let .i64AtomicRmwSub(memarg): return try visitI64AtomicRmwSub(memarg: memarg)
+        case let .i32AtomicRmw8SubU(memarg): return try visitI32AtomicRmw8SubU(memarg: memarg)
+        case let .i32AtomicRmw16SubU(memarg): return try visitI32AtomicRmw16SubU(memarg: memarg)
+        case let .i64AtomicRmw8SubU(memarg): return try visitI64AtomicRmw8SubU(memarg: memarg)
+        case let .i64AtomicRmw16SubU(memarg): return try visitI64AtomicRmw16SubU(memarg: memarg)
+        case let .i64AtomicRmw32SubU(memarg): return try visitI64AtomicRmw32SubU(memarg: memarg)
+        case let .i32AtomicRmwAnd(memarg): return try visitI32AtomicRmwAnd(memarg: memarg)
+        case let .i64AtomicRmwAnd(memarg): return try visitI64AtomicRmwAnd(memarg: memarg)
+        case let .i32AtomicRmw8AndU(memarg): return try visitI32AtomicRmw8AndU(memarg: memarg)
+        case let .i32AtomicRmw16AndU(memarg): return try visitI32AtomicRmw16AndU(memarg: memarg)
+        case let .i64AtomicRmw8AndU(memarg): return try visitI64AtomicRmw8AndU(memarg: memarg)
+        case let .i64AtomicRmw16AndU(memarg): return try visitI64AtomicRmw16AndU(memarg: memarg)
+        case let .i64AtomicRmw32AndU(memarg): return try visitI64AtomicRmw32AndU(memarg: memarg)
+        case let .i32AtomicRmwOr(memarg): return try visitI32AtomicRmwOr(memarg: memarg)
+        case let .i64AtomicRmwOr(memarg): return try visitI64AtomicRmwOr(memarg: memarg)
+        case let .i32AtomicRmw8OrU(memarg): return try visitI32AtomicRmw8OrU(memarg: memarg)
+        case let .i32AtomicRmw16OrU(memarg): return try visitI32AtomicRmw16OrU(memarg: memarg)
+        case let .i64AtomicRmw8OrU(memarg): return try visitI64AtomicRmw8OrU(memarg: memarg)
+        case let .i64AtomicRmw16OrU(memarg): return try visitI64AtomicRmw16OrU(memarg: memarg)
+        case let .i64AtomicRmw32OrU(memarg): return try visitI64AtomicRmw32OrU(memarg: memarg)
+        case let .i32AtomicRmwXor(memarg): return try visitI32AtomicRmwXor(memarg: memarg)
+        case let .i64AtomicRmwXor(memarg): return try visitI64AtomicRmwXor(memarg: memarg)
+        case let .i32AtomicRmw8XorU(memarg): return try visitI32AtomicRmw8XorU(memarg: memarg)
+        case let .i32AtomicRmw16XorU(memarg): return try visitI32AtomicRmw16XorU(memarg: memarg)
+        case let .i64AtomicRmw8XorU(memarg): return try visitI64AtomicRmw8XorU(memarg: memarg)
+        case let .i64AtomicRmw16XorU(memarg): return try visitI64AtomicRmw16XorU(memarg: memarg)
+        case let .i64AtomicRmw32XorU(memarg): return try visitI64AtomicRmw32XorU(memarg: memarg)
+        case let .i32AtomicRmwXchg(memarg): return try visitI32AtomicRmwXchg(memarg: memarg)
+        case let .i64AtomicRmwXchg(memarg): return try visitI64AtomicRmwXchg(memarg: memarg)
+        case let .i32AtomicRmw8XchgU(memarg): return try visitI32AtomicRmw8XchgU(memarg: memarg)
+        case let .i32AtomicRmw16XchgU(memarg): return try visitI32AtomicRmw16XchgU(memarg: memarg)
+        case let .i64AtomicRmw8XchgU(memarg): return try visitI64AtomicRmw8XchgU(memarg: memarg)
+        case let .i64AtomicRmw16XchgU(memarg): return try visitI64AtomicRmw16XchgU(memarg: memarg)
+        case let .i64AtomicRmw32XchgU(memarg): return try visitI64AtomicRmw32XchgU(memarg: memarg)
+        case let .i32AtomicRmwCmpxchg(memarg): return try visitI32AtomicRmwCmpxchg(memarg: memarg)
+        case let .i64AtomicRmwCmpxchg(memarg): return try visitI64AtomicRmwCmpxchg(memarg: memarg)
+        case let .i32AtomicRmw8CmpxchgU(memarg): return try visitI32AtomicRmw8CmpxchgU(memarg: memarg)
+        case let .i32AtomicRmw16CmpxchgU(memarg): return try visitI32AtomicRmw16CmpxchgU(memarg: memarg)
+        case let .i64AtomicRmw8CmpxchgU(memarg): return try visitI64AtomicRmw8CmpxchgU(memarg: memarg)
+        case let .i64AtomicRmw16CmpxchgU(memarg): return try visitI64AtomicRmw16CmpxchgU(memarg: memarg)
+        case let .i64AtomicRmw32CmpxchgU(memarg): return try visitI64AtomicRmw32CmpxchgU(memarg: memarg)
+        case let .v128Const(value): return try visitV128Const(value: value)
+        case let .i8x16Shuffle(lanes): return try visitI8x16Shuffle(lanes: lanes)
+        case let .simd(simd): return try visitSimd(simd)
+        case let .simdLane(simdLane, lane): return try visitSimdLane(simdLane, lane: lane)
+        case let .simdMemLane(simdMemLane, memarg, lane): return try visitSimdMemLane(simdMemLane, memarg: memarg, lane: lane)
         }
     }
 }
 
 // MARK: - Placeholder implementations
 extension InstructionVisitor where Self: ~Copyable {
-    public mutating func visitUnreachable() throws {}
-    public mutating func visitNop() throws {}
-    public mutating func visitBlock(blockType: BlockType) throws {}
-    public mutating func visitLoop(blockType: BlockType) throws {}
-    public mutating func visitIf(blockType: BlockType) throws {}
-    public mutating func visitElse() throws {}
-    public mutating func visitEnd() throws {}
-    public mutating func visitBr(relativeDepth: UInt32) throws {}
-    public mutating func visitBrIf(relativeDepth: UInt32) throws {}
-    public mutating func visitBrTable(targets: BrTable) throws {}
-    public mutating func visitReturn() throws {}
-    public mutating func visitCall(functionIndex: UInt32) throws {}
-    public mutating func visitCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws {}
-    public mutating func visitReturnCall(functionIndex: UInt32) throws {}
-    public mutating func visitReturnCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws {}
-    public mutating func visitCallRef(typeIndex: UInt32) throws {}
-    public mutating func visitReturnCallRef(typeIndex: UInt32) throws {}
-    public mutating func visitDrop() throws {}
-    public mutating func visitSelect() throws {}
-    public mutating func visitTypedSelect(type: ValueType) throws {}
-    public mutating func visitLocalGet(localIndex: UInt32) throws {}
-    public mutating func visitLocalSet(localIndex: UInt32) throws {}
-    public mutating func visitLocalTee(localIndex: UInt32) throws {}
-    public mutating func visitGlobalGet(globalIndex: UInt32) throws {}
-    public mutating func visitGlobalSet(globalIndex: UInt32) throws {}
-    public mutating func visitLoad(_ load: Instruction.Load, memarg: MemArg) throws {}
-    public mutating func visitStore(_ store: Instruction.Store, memarg: MemArg) throws {}
-    public mutating func visitMemorySize(memory: UInt32) throws {}
-    public mutating func visitMemoryGrow(memory: UInt32) throws {}
-    public mutating func visitI32Const(value: Int32) throws {}
-    public mutating func visitI64Const(value: Int64) throws {}
-    public mutating func visitF32Const(value: IEEE754.Float32) throws {}
-    public mutating func visitF64Const(value: IEEE754.Float64) throws {}
-    public mutating func visitRefNull(type: HeapType) throws {}
-    public mutating func visitRefIsNull() throws {}
-    public mutating func visitRefFunc(functionIndex: UInt32) throws {}
-    public mutating func visitRefAsNonNull() throws {}
-    public mutating func visitBrOnNull(relativeDepth: UInt32) throws {}
-    public mutating func visitBrOnNonNull(relativeDepth: UInt32) throws {}
-    public mutating func visitI32Eqz() throws {}
-    public mutating func visitCmp(_ cmp: Instruction.Cmp) throws {}
-    public mutating func visitI64Eqz() throws {}
-    public mutating func visitUnary(_ unary: Instruction.Unary) throws {}
-    public mutating func visitBinary(_ binary: Instruction.Binary) throws {}
-    public mutating func visitConversion(_ conversion: Instruction.Conversion) throws {}
-    public mutating func visitMemoryInit(dataIndex: UInt32) throws {}
-    public mutating func visitDataDrop(dataIndex: UInt32) throws {}
-    public mutating func visitMemoryCopy(dstMem: UInt32, srcMem: UInt32) throws {}
-    public mutating func visitMemoryFill(memory: UInt32) throws {}
-    public mutating func visitTableInit(elemIndex: UInt32, table: UInt32) throws {}
-    public mutating func visitElemDrop(elemIndex: UInt32) throws {}
-    public mutating func visitTableCopy(dstTable: UInt32, srcTable: UInt32) throws {}
-    public mutating func visitTableFill(table: UInt32) throws {}
-    public mutating func visitTableGet(table: UInt32) throws {}
-    public mutating func visitTableSet(table: UInt32) throws {}
-    public mutating func visitTableGrow(table: UInt32) throws {}
-    public mutating func visitTableSize(table: UInt32) throws {}
-    public mutating func visitAtomicFence() throws {}
-    public mutating func visitUnknown(_ opcode: [UInt8]) throws -> Bool { false }
+    public mutating func visitUnreachable() throws(VisitorError) {}
+    public mutating func visitNop() throws(VisitorError) {}
+    public mutating func visitBlock(blockType: BlockType) throws(VisitorError) {}
+    public mutating func visitLoop(blockType: BlockType) throws(VisitorError) {}
+    public mutating func visitIf(blockType: BlockType) throws(VisitorError) {}
+    public mutating func visitElse() throws(VisitorError) {}
+    public mutating func visitEnd() throws(VisitorError) {}
+    public mutating func visitBr(relativeDepth: UInt32) throws(VisitorError) {}
+    public mutating func visitBrIf(relativeDepth: UInt32) throws(VisitorError) {}
+    public mutating func visitBrTable(targets: BrTable) throws(VisitorError) {}
+    public mutating func visitReturn() throws(VisitorError) {}
+    public mutating func visitCall(functionIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitReturnCall(functionIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitReturnCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitCallRef(typeIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitReturnCallRef(typeIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitDrop() throws(VisitorError) {}
+    public mutating func visitSelect() throws(VisitorError) {}
+    public mutating func visitTypedSelect(type: ValueType) throws(VisitorError) {}
+    public mutating func visitLocalGet(localIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitLocalSet(localIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitLocalTee(localIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitGlobalGet(globalIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitGlobalSet(globalIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitLoad(_ load: Instruction.Load, memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitStore(_ store: Instruction.Store, memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitMemorySize(memory: UInt32) throws(VisitorError) {}
+    public mutating func visitMemoryGrow(memory: UInt32) throws(VisitorError) {}
+    public mutating func visitI32Const(value: Int32) throws(VisitorError) {}
+    public mutating func visitI64Const(value: Int64) throws(VisitorError) {}
+    public mutating func visitF32Const(value: IEEE754.Float32) throws(VisitorError) {}
+    public mutating func visitF64Const(value: IEEE754.Float64) throws(VisitorError) {}
+    public mutating func visitRefNull(type: HeapType) throws(VisitorError) {}
+    public mutating func visitRefIsNull() throws(VisitorError) {}
+    public mutating func visitRefFunc(functionIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitRefAsNonNull() throws(VisitorError) {}
+    public mutating func visitBrOnNull(relativeDepth: UInt32) throws(VisitorError) {}
+    public mutating func visitBrOnNonNull(relativeDepth: UInt32) throws(VisitorError) {}
+    public mutating func visitI32Eqz() throws(VisitorError) {}
+    public mutating func visitCmp(_ cmp: Instruction.Cmp) throws(VisitorError) {}
+    public mutating func visitI64Eqz() throws(VisitorError) {}
+    public mutating func visitUnary(_ unary: Instruction.Unary) throws(VisitorError) {}
+    public mutating func visitBinary(_ binary: Instruction.Binary) throws(VisitorError) {}
+    public mutating func visitConversion(_ conversion: Instruction.Conversion) throws(VisitorError) {}
+    public mutating func visitMemoryInit(dataIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitDataDrop(dataIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitMemoryCopy(dstMem: UInt32, srcMem: UInt32) throws(VisitorError) {}
+    public mutating func visitMemoryFill(memory: UInt32) throws(VisitorError) {}
+    public mutating func visitTableInit(elemIndex: UInt32, table: UInt32) throws(VisitorError) {}
+    public mutating func visitElemDrop(elemIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitTableCopy(dstTable: UInt32, srcTable: UInt32) throws(VisitorError) {}
+    public mutating func visitTableFill(table: UInt32) throws(VisitorError) {}
+    public mutating func visitTableGet(table: UInt32) throws(VisitorError) {}
+    public mutating func visitTableSet(table: UInt32) throws(VisitorError) {}
+    public mutating func visitTableGrow(table: UInt32) throws(VisitorError) {}
+    public mutating func visitTableSize(table: UInt32) throws(VisitorError) {}
+    public mutating func visitAtomicFence() throws(VisitorError) {}
+    public mutating func visitMemoryAtomicNotify(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitMemoryAtomicWait32(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitMemoryAtomicWait64(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI32AtomicRmwAdd(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI64AtomicRmwAdd(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI32AtomicRmw8AddU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI32AtomicRmw16AddU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI64AtomicRmw8AddU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI64AtomicRmw16AddU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI64AtomicRmw32AddU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI32AtomicRmwSub(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI64AtomicRmwSub(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI32AtomicRmw8SubU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI32AtomicRmw16SubU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI64AtomicRmw8SubU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI64AtomicRmw16SubU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI64AtomicRmw32SubU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI32AtomicRmwAnd(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI64AtomicRmwAnd(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI32AtomicRmw8AndU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI32AtomicRmw16AndU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI64AtomicRmw8AndU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI64AtomicRmw16AndU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI64AtomicRmw32AndU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI32AtomicRmwOr(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI64AtomicRmwOr(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI32AtomicRmw8OrU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI32AtomicRmw16OrU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI64AtomicRmw8OrU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI64AtomicRmw16OrU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI64AtomicRmw32OrU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI32AtomicRmwXor(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI64AtomicRmwXor(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI32AtomicRmw8XorU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI32AtomicRmw16XorU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI64AtomicRmw8XorU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI64AtomicRmw16XorU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI64AtomicRmw32XorU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI32AtomicRmwXchg(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI64AtomicRmwXchg(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI32AtomicRmw8XchgU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI32AtomicRmw16XchgU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI64AtomicRmw8XchgU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI64AtomicRmw16XchgU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI64AtomicRmw32XchgU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI32AtomicRmwCmpxchg(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI64AtomicRmwCmpxchg(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI32AtomicRmw8CmpxchgU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI32AtomicRmw16CmpxchgU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI64AtomicRmw8CmpxchgU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI64AtomicRmw16CmpxchgU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitI64AtomicRmw32CmpxchgU(memarg: MemArg) throws(VisitorError) {}
+    public mutating func visitV128Const(value: V128) throws(VisitorError) {}
+    public mutating func visitI8x16Shuffle(lanes: V128ShuffleMask) throws(VisitorError) {}
+    public mutating func visitSimd(_ simd: Instruction.Simd) throws(VisitorError) {}
+    public mutating func visitSimdLane(_ simdLane: Instruction.SimdLane, lane: UInt8) throws(VisitorError) {}
+    public mutating func visitSimdMemLane(_ simdMemLane: Instruction.SimdMemLane, memarg: MemArg, lane: UInt8) throws(VisitorError) {}
+    public mutating func visitUnknown(_ opcode: [UInt8]) throws(VisitorError) -> Bool { false }
 }
 

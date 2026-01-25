@@ -1,5 +1,4 @@
 import Foundation
-import XCTest
 
 struct TestSupport {
     struct Configuration: Codable {
@@ -52,11 +51,19 @@ struct TestSupport {
 
 func assertSwiftPackage(fixturePackage: String, _ trailingArguments: [String]) throws -> String {
     #if os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
-        throw XCTSkip("WITExtractor does not support platforms where Foundation.Process is unavailable")
+        fatalError("WITExtractor does not support platforms where Foundation.Process is unavailable")
     #else
         guard let config = TestSupport.Configuration.default else {
-            throw XCTSkip("Please create 'Tests/default.json'")
+            fatalError("Please create 'Tests/default.json'")
         }
+        func lossyUTF8(_ data: Data) -> String {
+            String(decoding: data, as: UTF8.self)
+        }
+
+        func commandLine(_ executable: URL, _ arguments: [String]) -> String {
+            ([executable.path] + arguments).joined(separator: " ")
+        }
+
         let swiftExecutable = config.hostSwiftExecutablePath
         let packagePath = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -64,30 +71,59 @@ func assertSwiftPackage(fixturePackage: String, _ trailingArguments: [String]) t
             .appendingPathComponent(fixturePackage)
 
         return try TestSupport.withTemporaryDirectory { buildDir in
-            var arguments = ["package", "--package-path", packagePath.path, "--scratch-path", buildDir]
+            var arguments = ["package", "--package-path", packagePath.path, "--scratch-path", buildDir, "extract-wit"]
             if let sdkRootPath = config.hostSdkRootPath {
                 arguments += ["--sdk", sdkRootPath]
             }
+            let outputMappingPath = URL(fileURLWithPath: buildDir).appendingPathComponent("output-mapping.json").path
+            arguments += ["--output-mapping", outputMappingPath]
             arguments += trailingArguments
             let stdoutPipe = Pipe()
+            let stderrPipe = Pipe()
             let process = Process()
             process.executableURL = URL(fileURLWithPath: swiftExecutable.path)
             process.arguments = arguments
             process.standardOutput = stdoutPipe
+            process.standardError = stderrPipe
             try process.run()
             process.waitUntilExit()
 
+            let stdoutBytes = try stdoutPipe.fileHandleForReading.readToEnd() ?? Data()
+            let stderrBytes = try stderrPipe.fileHandleForReading.readToEnd() ?? Data()
+
+            let command = commandLine(swiftExecutable, arguments)
             guard process.terminationStatus == 0 else {
                 throw TestSupport.Error(
-                    description: "Failed to execute \(([swiftExecutable.path] + arguments).joined(separator: " "))"
+                    description: """
+                        Failed to execute: \(command)
+                        terminationStatus: \(process.terminationStatus)
+                        stdout (lossy utf8):
+                        \(lossyUTF8(stdoutBytes))
+                        stderr (lossy utf8):
+                        \(lossyUTF8(stderrBytes))
+                        """
                 )
             }
-            guard let stdoutBytes = try stdoutPipe.fileHandleForReading.readToEnd() else { return "" }
             struct Output: Codable {
                 let witOutputPath: String
                 let swiftOutputPath: String
             }
-            let jsonOutput = try JSONDecoder().decode(Output.self, from: stdoutBytes)
+            let jsonOutput: Output
+            do {
+                let jsonData = try Data(contentsOf: URL(fileURLWithPath: outputMappingPath))
+                jsonOutput = try JSONDecoder().decode(Output.self, from: jsonData)
+            } catch {
+                throw TestSupport.Error(
+                    description: """
+                        Failed to decode JSON from swift stdout for: \(command)
+                        decode error: \(error)
+                        stdout (lossy utf8):
+                        \(lossyUTF8(stdoutBytes))
+                        stderr (lossy utf8):
+                        \(lossyUTF8(stderrBytes))
+                        """
+                )
+            }
             return try String(contentsOfFile: jsonOutput.witOutputPath)
         }
     #endif

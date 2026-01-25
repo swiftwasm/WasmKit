@@ -40,7 +40,7 @@ struct GDBRemoteProtocolTests {
                 kind: .supportedFeatures,
                 arguments: "xmlRegisters=i386,arm,mips,arc;multiprocess+;fork-events+;vfork-events+"
             ),
-            checksum: 0x2e,
+            checksum: 0x2e
         )
         #expect(packet == expectedPacket)
         #expect(decoder.accummulatedChecksum == 0)

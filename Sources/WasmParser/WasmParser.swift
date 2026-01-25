@@ -196,11 +196,14 @@ public struct WasmFeatureSet: OptionSet, Sendable {
     /// The WebAssembly tail-call proposal
     @_alwaysEmitIntoClient
     public static var tailCall: WasmFeatureSet { WasmFeatureSet(rawValue: 1 << 3) }
+    /// The WebAssembly SIMD proposal
+    @_alwaysEmitIntoClient
+    public static var simd: WasmFeatureSet { WasmFeatureSet(rawValue: 1 << 4) }
 
     /// The default feature set
     public static let `default`: WasmFeatureSet = [.referenceTypes]
     /// The feature set with all features enabled
-    public static let all: WasmFeatureSet = [.memory64, .referenceTypes, .threads, .tailCall]
+    public static let all: WasmFeatureSet = [.memory64, .referenceTypes, .threads, .tailCall, .simd]
 }
 
 /// An error that occurs during parsing of a WebAssembly binary
@@ -214,19 +217,64 @@ public struct WasmParserError: Swift.Error {
         }
     }
 
-    let message: Message
-    let offset: Int
+    @usableFromInline
+    enum Kind: Sendable {
+        case message(Message)
+        case unexpectedEnd(expected: Set<UInt8>?)
+        case unexpectedByte(UInt8, index: Int, expected: Set<UInt8>?)
+        case unclassified(any Error)
+    }
+
+    let kind: Kind
+    let offset: Int?
 
     @usableFromInline
-    init(_ message: Message, offset: Int) {
-        self.message = message
+    init(kind: Kind, offset: Int) {
+        self.kind = kind
         self.offset = offset
+    }
+}
+
+extension WasmParserError {
+    @usableFromInline
+    init(_ message: Message, offset: Int) {
+        self.kind = .message(message)
+        self.offset = offset
+    }
+}
+
+extension BinaryInteger {
+    var hexString: String {
+        "0x\(String(self, radix: 16))"
     }
 }
 
 extension WasmParserError: CustomStringConvertible {
     public var description: String {
-        return "\"\(message)\" at offset 0x\(String(offset, radix: 16))"
+        var result: String
+        switch self.kind {
+        case .message(let message):
+            result = message.text
+        case .unexpectedEnd(let expected):
+            var result = "Unexpected end of byte sequence."
+            if let expected, expected.count > 0 {
+                result.append(contentsOf: " Expected one of \(expected.map {$0.hexString}).")
+            }
+            return result
+        case .unexpectedByte(let byte, let index, let expected):
+            result = "Unexpected byte \(byte.hexString) at index \(index.hexString)."
+            if let expected, expected.count > 0 {
+                result.append(contentsOf: " Expected one of \(expected.map {$0.hexString}).")
+            }
+        case .unclassified(let error):
+            result = "\(error)"
+        }
+
+        if let offset {
+            return "\"\(result)\" raised at offset 0x\(String(offset, radix: 16))"
+        } else {
+            return result
+        }
     }
 }
 
@@ -447,7 +495,7 @@ extension Parser {
         case 0x7E: return .i64
         case 0x7D: return .f32
         case 0x7C: return .f64
-        case 0x7B: return .f64
+        case 0x7B: return .v128
         default:
             guard let refType = try parseReferenceType(byte: b) else {
                 throw makeError(.malformedValueType(b))
@@ -592,7 +640,10 @@ extension Parser {
         case 0x6F:
             elementType = .externRef
         default:
-            throw StreamError.unexpected(b, index: offset, expected: [0x6F, 0x70])
+            throw WasmParserError(
+                kind: .unexpectedByte(b, index: offset, expected: [0x6F, 0x70]),
+                offset: stream.currentIndex
+            )
         }
 
         let limits = try parseLimits()
@@ -796,6 +847,72 @@ extension Parser: BinaryInstructionDecoder {
     @inlinable mutating func visitTableSize() throws -> UInt32 {
         try parseUnsigned()
     }
+    @inlinable mutating func visitMemoryAtomicNotify() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitMemoryAtomicWait32() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitMemoryAtomicWait64() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmwAdd() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmwAdd() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw8AddU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw16AddU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw8AddU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw16AddU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw32AddU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmwSub() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmwSub() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw8SubU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw16SubU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw8SubU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw16SubU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw32SubU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmwAnd() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmwAnd() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw8AndU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw16AndU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw8AndU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw16AndU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw32AndU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmwOr() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmwOr() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw8OrU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw16OrU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw8OrU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw16OrU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw32OrU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmwXor() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmwXor() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw8XorU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw16XorU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw8XorU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw16XorU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw32XorU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmwXchg() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmwXchg() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw8XchgU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw16XchgU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw8XchgU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw16XchgU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw32XchgU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmwCmpxchg() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmwCmpxchg() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw8CmpxchgU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw16CmpxchgU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw8CmpxchgU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw16CmpxchgU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw32CmpxchgU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitV128Const() throws -> V128 {
+        return V128(bytes: Array(try stream.consume(count: V128.byteCount)))
+    }
+    @inlinable mutating func visitI8x16Shuffle() throws -> V128ShuffleMask {
+        return V128ShuffleMask(lanes: Array(try stream.consume(count: V128ShuffleMask.laneCount)))
+    }
+    @inlinable mutating func visitSimdLane(_: Instruction.SimdLane) throws -> UInt8 {
+        return try stream.consumeAny()
+    }
+    @inlinable mutating func visitSimdMemLane(_: Instruction.SimdMemLane) throws -> (memarg: MemArg, lane: UInt8) {
+        let memarg = try parseMemarg()
+        let lane = try stream.consumeAny()
+        return (memarg: memarg, lane: lane)
+    }
     @inlinable func claimNextByte() throws -> UInt8 {
         return try stream.consumeAny()
     }
@@ -809,6 +926,9 @@ extension Parser: BinaryInstructionDecoder {
 
     @usableFromInline
     struct InstructionFactory: AnyInstructionVisitor {
+        @usableFromInline
+        typealias VisitorError = Never
+
         @usableFromInline var binaryOffset: Int = 0
 
         @usableFromInline var insts: [Instruction] = []
@@ -816,7 +936,7 @@ extension Parser: BinaryInstructionDecoder {
         @inlinable init() {}
 
         @inlinable
-        mutating func visit(_ instruction: Instruction) throws {
+        mutating func visit(_ instruction: Instruction) {
             insts.append(instruction)
         }
     }

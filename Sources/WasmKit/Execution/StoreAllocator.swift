@@ -1,7 +1,7 @@
 import WasmParser
 
 /// A simple bump allocator for a single type.
-class BumpAllocator<T> {
+class BumpAllocator<T: ~Copyable> {
     private var pages: [UnsafeMutableBufferPointer<T>] = []
     private var currentPage: UnsafeMutableBufferPointer<T>
     private var currentOffset: Int = 0
@@ -36,7 +36,7 @@ class BumpAllocator<T> {
     ///
     /// - Parameter value: The value to initialize the allocated memory with.
     /// - Returns: A pointer to the allocated memory.
-    func allocate(initializing value: T) -> UnsafeMutablePointer<T> {
+    func allocate(initializing value: consuming T) -> UnsafeMutablePointer<T> {
         let pointer = allocate()
         pointer.initialize(to: value)
         return pointer
@@ -58,7 +58,7 @@ class BumpAllocator<T> {
     }
 }
 
-protocol ValidatableEntity {
+protocol ValidatableEntity: ~Copyable {
     /// Create an error for an out-of-bounds access to the entity.
     static func createOutOfBoundsError(index: Int, count: Int) -> any Error
 }
@@ -292,8 +292,9 @@ extension StoreAllocator {
                 importedTables.append(table)
 
             case (.memory(let memoryType), .memory(let memory)):
-                if let max = memory.limit.max, max < memoryType.min {
-                    throw ImportError(.incompatibleMemoryType(importEntry, actual: memoryType, expected: memory.limit))
+                let expected = memory.withValue { $0.limit }
+                if let max = expected.max, max < memoryType.min {
+                    throw ImportError(.incompatibleMemoryType(importEntry, actual: memoryType, expected: expected))
                 }
                 importedMemories.append(memory)
 
@@ -424,7 +425,7 @@ extension StoreAllocator {
                 let handle = try tables[validating: Int(index)]
                 return .table(handle)
             case .memory(let index):
-                let handle = try memories[validating: Int(index)]
+                let handle = try memories[validating: Int(index), MemoryEntity.createOutOfBoundsError]
                 return .memory(handle)
             case .global(let index):
                 let handle = try globals[validating: Int(index)]
