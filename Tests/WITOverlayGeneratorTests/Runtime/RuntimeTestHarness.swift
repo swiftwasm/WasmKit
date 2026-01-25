@@ -227,7 +227,7 @@ struct RuntimeTestHarness {
                 let fileContents = inputFiles.map {
                     """
                     // MARK: - \($0)
-                    \((try? String(contentsOfFile: $0)) ?? "Failed to read \($0)")
+                    \((try? String(contentsOfFile: $0, encoding: .utf8)) ?? "Failed to read \($0)")
                     """
                 }.joined(separator: "\n====================\n")
                 let message = """
