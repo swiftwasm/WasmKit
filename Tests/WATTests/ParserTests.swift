@@ -189,7 +189,7 @@ struct ParserTests {
         arguments: Spectest.wastFiles(include: [])
     )
     func parseSpectest(wastFile: URL) throws {
-        let source = try String(contentsOf: wastFile)
+        let source = try String(contentsOf: wastFile, encoding: .utf8)
         _ = try parseWast(source, features: Spectest.deriveFeatureSet(wast: wastFile))
     }
 }

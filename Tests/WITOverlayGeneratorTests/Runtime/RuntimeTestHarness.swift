@@ -17,11 +17,11 @@ import WasmKitWASI
 /// ```
 struct RuntimeTestHarness {
     struct Configuration: Codable {
-        let swiftExecutablePath: URL
-        let wasiSwiftSDKPath: URL
+        let swiftExecutablePath: String
+        let wasiSwiftSDKPath: String
 
         var swiftCompilerExecutablePath: URL {
-            swiftExecutablePath.deletingLastPathComponent().appendingPathComponent("swiftc")
+            URL(fileURLWithPath: swiftExecutablePath).deletingLastPathComponent().appendingPathComponent("swiftc")
         }
 
         static let `default`: Configuration? = {
@@ -90,12 +90,13 @@ struct RuntimeTestHarness {
     static func createTemporaryFile(suffix: String = "") -> String {
         let tempdir = URL(fileURLWithPath: NSTemporaryDirectory())
         let templatePath = tempdir.appendingPathComponent("WasmKit.XXXXXX\(suffix)")
-        var template = [UInt8](templatePath.path.utf8).map { Int8($0) } + [Int8(0)]
+        var template = [UInt8](templatePath.path.utf8).map { UInt8($0) } + [UInt8(0)]
         let fd = mkstemps(&template, Int32(suffix.utf8.count))
         if fd == -1 {
             fatalError("Failed to create temp directory")
         }
-        return String(cString: template)
+
+        return String(decoding: template.dropLast(), as: UTF8.self)
     }
 
     private mutating func createTemporaryFile(suffix: String = "") -> String {
@@ -180,6 +181,7 @@ struct RuntimeTestHarness {
     }
 
     func compileForWASI(inputFiles: [String]) throws -> URL {
+        let wasiSwiftSDK = URL(fileURLWithPath: configuration.wasiSwiftSDKPath)
         return try compile(
             inputFiles: inputFiles,
             arguments: [
@@ -187,10 +189,10 @@ struct RuntimeTestHarness {
                 "-enable-experimental-feature", "Extern",
                 "-static-stdlib",
                 "-Xclang-linker", "-mexec-model=reactor",
-                "-resource-dir", configuration.wasiSwiftSDKPath.appendingPathComponent("/swift.xctoolchain/usr/lib/swift_static").path,
-                "-sdk", configuration.wasiSwiftSDKPath.appendingPathComponent("WASI.sdk").path,
+                "-resource-dir", wasiSwiftSDK.appendingPathComponent("/swift.xctoolchain/usr/lib/swift_static").path,
+                "-sdk", wasiSwiftSDK.appendingPathComponent("WASI.sdk").path,
                 "-Xclang-linker", "-resource-dir",
-                "-Xclang-linker", configuration.wasiSwiftSDKPath.appendingPathComponent("swift.xctoolchain/usr/lib/swift_static/clang").path,
+                "-Xclang-linker", wasiSwiftSDK.appendingPathComponent("swift.xctoolchain/usr/lib/swift_static/clang").path,
             ])
     }
 
@@ -207,7 +209,7 @@ struct RuntimeTestHarness {
                 withIntermediateDirectories: true
             )
             let process = Process()
-            process.launchPath = configuration.swiftCompilerExecutablePath.path
+            process.executableURL = URL(fileURLWithPath: configuration.swiftCompilerExecutablePath.path)
             process.arguments =
                 inputFiles + arguments + [
                     "-I\(Self.sourcesDirectory.appendingPathComponent("_CabiShims").appendingPathComponent("include").path)",
@@ -220,13 +222,13 @@ struct RuntimeTestHarness {
             //       and it makes Swift Driver wrongly pick the SDK root from the environment
             //       variable (typically host SDK root) instead of wasi-sysroot.
             process.environment = [:]
-            process.launch()
+            try process.run()
             process.waitUntilExit()
             guard process.terminationStatus == 0 else {
                 let fileContents = inputFiles.map {
                     """
                     // MARK: - \($0)
-                    \((try? String(contentsOfFile: $0)) ?? "Failed to read \($0)")
+                    \((try? String(contentsOfFile: $0, encoding: .utf8)) ?? "Failed to read \($0)")
                     """
                 }.joined(separator: "\n====================\n")
                 let message = """
@@ -250,16 +252,16 @@ struct RuntimeTestHarness {
         #else
             let process = Process()
             // Assume that clang is placed alongside swiftc
-            process.launchPath =
-                configuration.swiftCompilerExecutablePath
-                .deletingLastPathComponent().appendingPathComponent("clang").path
+            let clangExecutableURL = configuration.swiftCompilerExecutablePath
+                .deletingLastPathComponent().appendingPathComponent("clang")
+            process.executableURL = clangExecutableURL
             process.arguments =
                 cInputFiles + arguments + [
                     "-c",
                     "-o", outputPath.path,
                 ]
             process.environment = [:]
-            process.launch()
+            try process.run()
             process.waitUntilExit()
             guard process.terminationStatus == 0 else {
                 let message = """
