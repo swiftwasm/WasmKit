@@ -19,7 +19,7 @@ let cliCommandsTarget = Target.target(
 )
 
 let swiftSettings: [SwiftSetting] = [
-    .treatAllWarnings(as: .error),
+    .treatAllWarnings(as: .error, .when(platforms: DarwinPlatforms + [.linux, .wasi, .android, .openbsd])),
 ]
 
 let package = Package(
