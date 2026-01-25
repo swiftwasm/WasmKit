@@ -221,7 +221,7 @@ struct RuntimeTestHarness {
             //       and it makes Swift Driver wrongly pick the SDK root from the environment
             //       variable (typically host SDK root) instead of wasi-sysroot.
             process.environment = [:]
-            process.launch()
+            try process.run()
             process.waitUntilExit()
             guard process.terminationStatus == 0 else {
                 let fileContents = inputFiles.map {
@@ -259,7 +259,7 @@ struct RuntimeTestHarness {
                     "-o", outputPath.path,
                 ]
             process.environment = [:]
-            process.launch()
+            try process.run()
             process.waitUntilExit()
             guard process.terminationStatus == 0 else {
                 let message = """
