@@ -90,12 +90,13 @@ struct RuntimeTestHarness {
     static func createTemporaryFile(suffix: String = "") -> String {
         let tempdir = URL(fileURLWithPath: NSTemporaryDirectory())
         let templatePath = tempdir.appendingPathComponent("WasmKit.XXXXXX\(suffix)")
-        var template = [UInt8](templatePath.path.utf8).map { Int8($0) } + [Int8(0)]
+        var template = [UInt8](templatePath.path.utf8).map { UInt8($0) } + [UInt8(0)]
         let fd = mkstemps(&template, Int32(suffix.utf8.count))
         if fd == -1 {
             fatalError("Failed to create temp directory")
         }
-        return String(cString: template)
+
+        return String(decoding: template.dropLast(), as: UTF8.self)
     }
 
     private mutating func createTemporaryFile(suffix: String = "") -> String {

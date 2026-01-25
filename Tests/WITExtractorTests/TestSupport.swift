@@ -36,7 +36,14 @@ struct TestSupport {
         }
 
         init(errno: Int32) {
-            self.init(description: String(cString: strerror(errno)))
+            var cString = strerror(errno)!
+            var bytes = [UInt8]()
+            while cString.pointee != 0 {
+                bytes.append(UInt8(cString.pointee))
+                cString += 1
+            }
+
+            self.init(description: String(decoding: bytes, as: UTF8.self))
         }
     }
 
@@ -45,7 +52,7 @@ struct TestSupport {
     ) throws -> Result {
         let tempdir = URL(fileURLWithPath: NSTemporaryDirectory())
         let templatePath = tempdir.appendingPathComponent("WasmKit.XXXXXX")
-        var template = [UInt8](templatePath.path.utf8).map({ Int8($0) }) + [Int8(0)]
+        var template = [UInt8](templatePath.path.utf8).map({ UInt8($0) }) + [UInt8(0)]
 
         #if os(Windows)
             if _mktemp_s(&template, template.count) != 0 {
@@ -64,7 +71,7 @@ struct TestSupport {
             }
         #endif
 
-        let path = String(cString: template)
+        let path = String(decoding: template.dropLast(), as: UTF8.self)
         defer { _ = try? FileManager.default.removeItem(atPath: path) }
         return try body(path)
     }
