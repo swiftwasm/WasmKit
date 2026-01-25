@@ -87,7 +87,7 @@ struct TestSupport {
         #else
             let process = Process()
             let stdinPipe = Pipe()
-            process.launchPath = config.hostSwiftFrontendPath.path
+            process.executableURL = URL(fileURLWithPath: config.hostSwiftFrontendPath.path)
             var arguments = [
                 "-parse-as-library", "-module-name", moduleName,
                 "-emit-module", "-", "-o", moduleDir.appendingPathComponent(moduleName + ".swiftmodule").path,

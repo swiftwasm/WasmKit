@@ -208,7 +208,7 @@ struct RuntimeTestHarness {
                 withIntermediateDirectories: true
             )
             let process = Process()
-            process.launchPath = configuration.swiftCompilerExecutablePath.path
+            process.executableURL = URL(fileURLWithPath: configuration.swiftCompilerExecutablePath.path)
             process.arguments =
                 inputFiles + arguments + [
                     "-I\(Self.sourcesDirectory.appendingPathComponent("_CabiShims").appendingPathComponent("include").path)",
@@ -251,9 +251,8 @@ struct RuntimeTestHarness {
         #else
             let process = Process()
             // Assume that clang is placed alongside swiftc
-            process.launchPath =
-                configuration.swiftCompilerExecutablePath
-                .deletingLastPathComponent().appendingPathComponent("clang").path
+            process.executableURL = configuration.swiftCompilerExecutablePath
+                .deletingLastPathComponent().appendingPathComponent("clang")
             process.arguments =
                 cInputFiles + arguments + [
                     "-c",
