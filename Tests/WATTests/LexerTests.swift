@@ -96,7 +96,7 @@ struct LexerTests {
         arguments: Spectest.wastFiles(include: [])
     )
     func lexSpectest(wastFile: URL) throws {
-        let source = try String(contentsOf: wastFile)
+        let source = try String(contentsOf: wastFile, encoding: .utf8)
         _ = try collectToken(source)
     }
 }
