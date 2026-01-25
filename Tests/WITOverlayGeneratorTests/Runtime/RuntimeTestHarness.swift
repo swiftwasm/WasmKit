@@ -17,11 +17,11 @@ import WasmKitWASI
 /// ```
 struct RuntimeTestHarness {
     struct Configuration: Codable {
-        let swiftExecutablePath: URL
-        let wasiSwiftSDKPath: URL
+        let swiftExecutablePath: String
+        let wasiSwiftSDKPath: String
 
         var swiftCompilerExecutablePath: URL {
-            swiftExecutablePath.deletingLastPathComponent().appendingPathComponent("swiftc")
+            URL(fileURLWithPath: swiftExecutablePath).deletingLastPathComponent().appendingPathComponent("swiftc")
         }
 
         static let `default`: Configuration? = {
@@ -181,6 +181,7 @@ struct RuntimeTestHarness {
     }
 
     func compileForWASI(inputFiles: [String]) throws -> URL {
+        let wasiSwiftSDK = URL(fileURLWithPath: configuration.wasiSwiftSDKPath)
         return try compile(
             inputFiles: inputFiles,
             arguments: [
@@ -188,10 +189,10 @@ struct RuntimeTestHarness {
                 "-enable-experimental-feature", "Extern",
                 "-static-stdlib",
                 "-Xclang-linker", "-mexec-model=reactor",
-                "-resource-dir", configuration.wasiSwiftSDKPath.appendingPathComponent("/swift.xctoolchain/usr/lib/swift_static").path,
-                "-sdk", configuration.wasiSwiftSDKPath.appendingPathComponent("WASI.sdk").path,
+                "-resource-dir", wasiSwiftSDK.appendingPathComponent("/swift.xctoolchain/usr/lib/swift_static").path,
+                "-sdk", wasiSwiftSDK.appendingPathComponent("WASI.sdk").path,
                 "-Xclang-linker", "-resource-dir",
-                "-Xclang-linker", configuration.wasiSwiftSDKPath.appendingPathComponent("swift.xctoolchain/usr/lib/swift_static/clang").path,
+                "-Xclang-linker", wasiSwiftSDK.appendingPathComponent("swift.xctoolchain/usr/lib/swift_static/clang").path,
             ])
     }
 
@@ -253,7 +254,6 @@ struct RuntimeTestHarness {
             // Assume that clang is placed alongside swiftc
             let clangExecutableURL = configuration.swiftCompilerExecutablePath
                 .deletingLastPathComponent().appendingPathComponent("clang")
-            print("attempt to launch clang at \(clangExecutableURL)")
             process.executableURL = clangExecutableURL
             process.arguments =
                 cInputFiles + arguments + [
