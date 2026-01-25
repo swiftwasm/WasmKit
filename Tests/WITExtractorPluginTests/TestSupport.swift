@@ -124,7 +124,7 @@ func assertSwiftPackage(fixturePackage: String, _ trailingArguments: [String]) t
                         """
                 )
             }
-            return try String(contentsOfFile: jsonOutput.witOutputPath)
+            return try String(contentsOfFile: jsonOutput.witOutputPath, encoding: .utf8)
         }
     #endif
 }
