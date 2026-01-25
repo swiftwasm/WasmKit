@@ -69,7 +69,7 @@ struct EncoderTests {
         }
 
         var parser = WastParser(
-            try String(contentsOf: wast),
+            try String(contentsOf: wast, encoding: .utf8),
             features: Spectest.deriveFeatureSet(wast: wast)
         )
         var watModules: [ModuleDirective] = []
