@@ -156,7 +156,9 @@ enum TestSupport {
         func createFile(at relativePath: String, contents: String) throws {
             let fileURL = url.appendingPathComponent(relativePath)
             guard let data = contents.data(using: .utf8) else { return }
-            FileManager.default.createFile(atPath: fileURL.path, contents: data, attributes: nil)
+            guard FileManager.default.createFile(atPath: fileURL.path, contents: data, attributes: nil) else {
+                throw Error(description: "Couldn't create file at \(relativePath)")
+            }
         }
 
         func createSymlink(at relativePath: String, to target: String) throws {

@@ -251,8 +251,10 @@ struct RuntimeTestHarness {
         #else
             let process = Process()
             // Assume that clang is placed alongside swiftc
-            process.executableURL = configuration.swiftCompilerExecutablePath
+            let clangExecutableURL = configuration.swiftCompilerExecutablePath
                 .deletingLastPathComponent().appendingPathComponent("clang")
+            print("attempt to launch clang at \(clangExecutableURL)")
+            process.executableURL = clangExecutableURL
             process.arguments =
                 cInputFiles + arguments + [
                     "-c",
