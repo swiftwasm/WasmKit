@@ -19,6 +19,21 @@ extension Execution {
         }
     }
 
+    mutating func memoryLoadUnchecked<T: FixedWidthInteger>(
+        sp: Sp, md: Md, loadOperand: Instruction.LoadOperand, loadAs _: T.Type = T.self, castToValue: (T) -> UntypedValue
+    ) throws {
+        let length = UInt64(T.bitWidth) / 8
+        let i = sp[loadOperand.pointer].asAddressOffset()
+        let (_, isEndOverflow) = i.addingReportingOverflow(length &+ loadOperand.offset)
+        if _fastPath(!isEndOverflow) {
+            let address = loadOperand.offset + i
+            let loaded = md.unsafelyUnwrapped.loadUnaligned(fromByteOffset: Int(address), as: T.self)
+            sp[loadOperand.result] = castToValue(loaded)
+        } else {
+            try throwOutOfBoundsMemoryAccess()
+        }
+    }
+
     /// `[type].store[bitWidth]`
     mutating func memoryStore<T: FixedWidthInteger>(sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand, castFromValue: (UntypedValue) -> T) throws {
         let value = sp[storeOperand.value]
@@ -27,6 +42,23 @@ extension Execution {
         let address = storeOperand.offset + i
         let (endAddress, isEndOverflow) = i.addingReportingOverflow(length &+ storeOperand.offset)
         if _fastPath(!isEndOverflow && endAddress <= ms) {
+            let toStore = castFromValue(value)
+            md.unsafelyUnwrapped.advanced(by: Int(address))
+                .bindMemory(to: T.self, capacity: 1).pointee = toStore.littleEndian
+        } else {
+            try throwOutOfBoundsMemoryAccess()
+        }
+    }
+
+    mutating func memoryStoreUnchecked<T: FixedWidthInteger>(
+        sp: Sp, md: Md, storeOperand: Instruction.StoreOperand, castFromValue: (UntypedValue) -> T
+    ) throws {
+        let value = sp[storeOperand.value]
+        let length = UInt64(T.bitWidth) / 8
+        let i = sp[storeOperand.pointer].asAddressOffset()
+        let address = storeOperand.offset + i
+        let (_, isEndOverflow) = i.addingReportingOverflow(length &+ storeOperand.offset)
+        if _fastPath(!isEndOverflow) {
             let toStore = castFromValue(value)
             md.unsafelyUnwrapped.advanced(by: Int(address))
                 .bindMemory(to: T.self, capacity: 1).pointee = toStore.littleEndian

@@ -51,9 +51,20 @@ let package = Package(
                 "SystemExtras",
                 .product(name: "SystemPackage", package: "swift-system"),
             ],
-            exclude: ["CMakeLists.txt"]
+            exclude: ["CMakeLists.txt"],
+            cSettings: [
+                .define("WASMKIT_MPROTECT_BOUND_CHECKING", .when(platforms: [.macOS, .linux]))
+            ],
+            swiftSettings: [
+                .define("WASMKIT_MPROTECT_BOUND_CHECKING", .when(platforms: [.macOS, .linux]))
+            ]
         ),
-        .target(name: "_CWasmKit"),
+        .target(
+            name: "_CWasmKit",
+            cSettings: [
+                .define("WASMKIT_MPROTECT_BOUND_CHECKING", .when(platforms: [.macOS, .linux]))
+            ]
+        ),
         .target(
             name: "WasmKitFuzzing",
             dependencies: ["WasmKit"],

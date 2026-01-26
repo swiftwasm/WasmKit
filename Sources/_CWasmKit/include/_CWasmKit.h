@@ -17,6 +17,8 @@ typedef void *_Nullable Pc;
 typedef void *_Nullable Md;
 typedef size_t Ms;
 
+#include "TrapGuard.h"
+
 #if WASMKIT_USE_DIRECT_THREADED_CODE
 /// The function type for executing a single instruction and transitioning to
 /// the next instruction by tail calling. `swiftasync` calling convention is

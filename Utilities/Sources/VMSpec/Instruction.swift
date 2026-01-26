@@ -414,7 +414,30 @@ extension VMGen {
         return StoreOpInfo(type: type, op: op, castFromValue: castFromValue, isFloatingPoint: isFloatingPoint)
     }
     static let memoryAtomicStoreOps = memoryStoreOps.filter { !$0.isFloatingPoint }
-    static let memoryLoadStoreInsts: [Instruction] = memoryLoadOps.map(\.instruction) + memoryStoreOps.map(\.instruction)
+    static let memoryLoadUncheckedInsts: [Instruction] = memoryLoadOps.map { op in
+        Instruction(
+            name: "\(op.type)\(op.op)Unchecked",
+            documentation: "Unchecked variant of `\(op.type).\(VMGen.snakeCase(pascalCase: op.op))`",
+            mayThrow: true,
+            useCurrentMemory: .read,
+            immediateLayout: .load
+        )
+    }
+    static let memoryStoreUncheckedInsts: [Instruction] = memoryStoreOps.map { op in
+        Instruction(
+            name: "\(op.type)\(op.op)Unchecked",
+            documentation: "Unchecked variant of `\(op.type).\(VMGen.snakeCase(pascalCase: op.op))`",
+            mayThrow: true,
+            useCurrentMemory: .read,
+            immediateLayout: .store
+        )
+    }
+
+    static let memoryLoadStoreInsts: [Instruction] =
+        memoryLoadOps.map(\.instruction)
+        + memoryStoreOps.map(\.instruction)
+        + memoryLoadUncheckedInsts
+        + memoryStoreUncheckedInsts
     static let memoryAtomicInsts: [Instruction] = memoryAtomicLoadOps.map(\.atomicInstruction) + memoryAtomicStoreOps.map(\.atomicInstruction)
     static let memoryOpInsts: [Instruction] = [
         Instruction(name: "memorySize", documentation: "WebAssembly Core Instruction `memory.size`") {
