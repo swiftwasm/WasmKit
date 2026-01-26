@@ -255,7 +255,7 @@ public enum DataSegment: Equatable {
 /// Exported entity in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#exports>
-public struct Export: Equatable {
+public struct Export: Equatable, Sendable {
     /// Name of the export
     public let name: String
     /// Descriptor of the export
@@ -268,7 +268,7 @@ public struct Export: Equatable {
 }
 
 /// Export descriptor
-public enum ExportDescriptor: Equatable {
+public enum ExportDescriptor: Equatable, Sendable {
     /// Function export
     case function(FunctionIndex)
     /// Table export

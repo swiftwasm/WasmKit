@@ -12,6 +12,7 @@ package struct CodegenContext: ~Copyable {
         case objectFileEmissionFailed
         case multiValueResultsNotSupportedYet(functionName: String)
         case unsupportedImport(Import)
+        case unsupportedExport(Export)
     }
 
     private(set) var ir: IRContext
@@ -30,7 +31,7 @@ package struct CodegenContext: ~Copyable {
         var functionTypes = [TypeIndex]()
         var functionVisitors = RigidArray<IRFunctionVisitor>()
         var importedFunctions = [IRValue]()
-        var functionNames = [String]()
+        var functionNames = [Int: String]()
         var memories = [Memory]()
 
         while let payload = try parser.parseNext() {
@@ -41,6 +42,7 @@ package struct CodegenContext: ~Copyable {
                 memories = m
 
             case .importSection(let imports):
+                var currentFunctionIndex = 0
                 for i in imports {
                     switch i.descriptor {
                     case .function(let typeIndex):
@@ -63,7 +65,8 @@ package struct CodegenContext: ~Copyable {
                         name.withStringRef {
                             importedFunctions.append(self.ir.__createImportedFunctionUnsafe($0, irType))
                         }
-                        functionNames.append(name)
+                        functionNames[currentFunctionIndex] = name
+                        currentFunctionIndex += 1
                         functionTypes.append(typeIndex)
 
                     case .global, .table, .memory:
@@ -71,14 +74,26 @@ package struct CodegenContext: ~Copyable {
                     }
                 }
 
+            case .exportSection(let exports):
+                for e in exports {
+                    switch e.descriptor {
+                    case .function(let functionIndex):
+                        functionNames[Int(functionIndex)] = e.name
+
+                    default:
+                        throw Error.unsupportedExport(e)
+                    }
+                }
+
             case .codeSection(let functions):
                 functionVisitors = RigidArray(capacity: functions.count)
                 for (i, f) in functions.enumerated() {
-                    let type = types[Int(functionTypes[importedFunctions.count + i])]
+                    let functionIndex = importedFunctions.count + i
+                    let type = types[Int(functionTypes[functionIndex])]
                     // Create visitors first before actually visiting instructions.
                     // This will forward-declare all `llvm::Function` instances so that `call`
                     // LLVM IR instructions have these instances to refer to and are valid.
-                    let name = "\(i)"
+                    let name = functionNames[functionIndex] ?? "\(functionIndex)"
                     try functionVisitors.append(
                         .init(
                             name: name,
@@ -88,7 +103,9 @@ package struct CodegenContext: ~Copyable {
                             ir: self.ir
                         ))
 
-                    functionNames.append(name)
+                    if functionNames[i] == nil {
+                        functionNames[i] = name
+                    }
                 }
             default: continue
             }

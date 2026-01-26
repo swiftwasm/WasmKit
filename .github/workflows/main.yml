@@ -387,7 +387,7 @@ jobs:
       - name: Run a smoke test
         run: |
           ./build/bin/wasmkit-llvm wat2wasm Examples/wasm/factorial.wat
-          ./build/bin/wasmkit-llvm run Examples/wasm/factorial.wasm 0 i64:5
+          ./build/bin/wasmkit-llvm run Examples/wasm/factorial.wasm fac i64:5
 
   build-llvm-macos:
     strategy:
@@ -421,7 +421,7 @@ jobs:
       - name: Run a smoke test
         run: |
           ./build/bin/wasmkit-llvm wat2wasm Examples/wasm/factorial.wat
-          ./build/bin/wasmkit-llvm run Examples/wasm/factorial.wasm 0 i64:5
+          ./build/bin/wasmkit-llvm run Examples/wasm/factorial.wasm fac i64:5
 
   build-wasi:
     runs-on: ubuntu-24.04
