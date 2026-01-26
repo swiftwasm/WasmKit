@@ -85,7 +85,7 @@ package struct CodegenContext: ~Copyable {
                             type: type,
                             locals: type.parameters + f.locals,
                             code: f,
-                            ir: self.ir,
+                            ir: self.ir
                         ))
 
                     functionNames.append(name)
