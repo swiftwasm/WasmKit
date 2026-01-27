@@ -1,4 +1,4 @@
-public struct ComponentTypeIndex: RawRepresentable, Equatable {
+public struct ComponentTypeIndex: RawRepresentable, Hashable {
     public init(rawValue: UInt32) {
         self.rawValue = rawValue
     }
@@ -6,7 +6,7 @@ public struct ComponentTypeIndex: RawRepresentable, Equatable {
     public let rawValue: UInt32
 }
 
-public struct ComponentFuncIndex: RawRepresentable, Equatable {
+public struct ComponentFuncIndex: RawRepresentable, Hashable {
     public init(rawValue: UInt32) {
         self.rawValue = rawValue
     }
@@ -14,7 +14,7 @@ public struct ComponentFuncIndex: RawRepresentable, Equatable {
     public let rawValue: UInt32
 }
 
-public struct ModuleInstanceIndex: RawRepresentable, Equatable {
+public struct ModuleInstanceIndex: RawRepresentable, Hashable {
     public init(rawValue: UInt32) {
         self.rawValue = rawValue
     }
@@ -41,7 +41,7 @@ public enum ComponentDefSort {
     case instance
 }
 
-public enum ComponentType: Equatable {
+public enum ComponentType: Hashable {
     case bool
     case u8
     case u16
@@ -74,12 +74,12 @@ public enum ComponentType: Equatable {
     case resource(destructor: ComponentFuncIndex)
 }
 
-public struct ComponentRecordField: Equatable {
+public struct ComponentRecordField: Hashable {
     let name: String
     let type: ComponentTypeIndex
 }
 
-public struct ComponentCaseField: Equatable {
+public struct ComponentCaseField: Hashable {
     let name: String
     let type: ComponentTypeIndex?
 }

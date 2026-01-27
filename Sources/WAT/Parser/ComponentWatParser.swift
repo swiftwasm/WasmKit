@@ -220,10 +220,12 @@
         private mutating func parseComponentFunction(
             _ parsedComponent: inout ComponentDef
         ) throws(WatParserError) {
+            let funcLocation = parser.lexer.location()
             let id = try parser.takeId()
             var parameters = [(String, ComponentType)]()
             var resultType: ComponentType?
             var type: Parser.IndexOrId?
+            var exportDef: (Location, String)?
 
             /// Component functions are not tracked as separate entities in the final binary, i.e. there's no dedicated
             /// component functions section in the binary format. They're always encoded as a part of following
@@ -248,11 +250,7 @@
                     resultType = try parseComponentType()
 
                 case "export":
-                    //                    let id = self.wat.componentFunctions.add(.init(id: id, linking: <#T##ComponentFuncDef.Linking?#>, params: <#T##[(String, ComponentType)]#>, result: <#T##ComponentType#>))
-                    let exportName = try parser.expectString()
-                    parsedComponent.fields.append(
-                        .exportDef(.init(exportName: exportName))
-                    )
+                    exportDef = (parser.lexer.location(), try parser.expectString())
 
                 case "import":
                     let importModuleName = try parser.expectString()
@@ -288,15 +286,14 @@
                 try parser.expect(.rightParen)
             }
 
-            guard fieldsCount > component.fields.count else {
-                throw WatParserError(
-                    """
-                    Component function definition expected to desugar into one or more of type, import, export, \
-                    or canonical definitions.
-                    """,
-                    location: parser.lexer.location()
+            if let type = parsedComponent.typesMap[.]
+            let id = parsedComponent.componentFunctions.add(ComponentFuncDef(paramNames: <#T##[String]#>, type: <#T##Parser.IndexOrId#>))
+            parsedComponent.fields.append(
+                .init(
+                    location: ,
+                    kind: .exportDef(ExportDef(exportName: exportName, descriptor: .function(<#T##Parser.IndexOrId#>)))
                 )
-            }
+            )
         }
 
         private mutating func parseCanonOpt() throws(WatParserError) -> CanonDef.Option {
@@ -377,6 +374,9 @@
 
             /// As sections in CM binaries can stay disjoint and unmerged, for compatibility with other tools, we should preserve disjoint sections together with their ordering.
             var fields = [ComponentDefField]()
+
+            /// Mapping from a component type to its unique ID in `componentTypes` name mapping storage.
+            var typesMap = [ComponentType: Int]()
 
             struct Aliases {
                 init() {}
@@ -472,7 +472,11 @@
         }
 
         struct ComponentTypeDef: NamedFieldDecl {
+            enum Kind {
+                case function([ComponentType], ComponentType)
+            }
             var id: Name?
+            let kind: Kind
         }
     }
 
