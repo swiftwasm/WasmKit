@@ -3,6 +3,7 @@ add_wasmkit_library(WasmKit
   Imports.swift
   Module.swift
   ModuleParser.swift
+  SIMDOpcode.swift
   Translator.swift
   Validator.swift
   ResourceLimiter.swift
