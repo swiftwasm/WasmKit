@@ -1,3 +1,4 @@
+#if !$Embedded
 import SystemExtras
 import SystemPackage
 
@@ -138,3 +139,4 @@ private enum JSON {
         return output
     }
 }
+#endif

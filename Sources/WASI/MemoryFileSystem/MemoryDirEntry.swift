@@ -1,3 +1,4 @@
+#if !$Embedded
 import SystemExtras
 import SystemPackage
 
@@ -255,3 +256,4 @@ struct MemoryDirEntry: WASIDir {
         }
     }
 }
+#endif

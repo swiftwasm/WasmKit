@@ -78,15 +78,27 @@ extension ValidationError.Message {
     }
 
     static func indexOutOfBounds<Index: Numeric, Max: Numeric>(_ entity: StaticString, _ index: Index, max: Max) -> Self {
-        Self("\(entity) index out of bounds: \(index) (max: \(max))")
+        #if !$Embedded
+        return Self("\(entity) index out of bounds: \(index) (max: \(max))")
+        #else
+        return Self("\(entity) index out of bounds: \(index) (max: \(max))")
+        #endif
     }
 
     static func tableElementTypeMismatch(tableType: String, elementType: String) -> Self {
-        Self("table element type mismatch: \(tableType) != \(elementType)")
+        #if !$Embedded
+        return Self("table element type mismatch: \(tableType) != \(elementType)")
+        #else
+        return Self("table element type mismatch: \(tableType) != \(elementType)")
+        #endif
     }
 
     static func expectTypeButGot(expected: String, got: String) -> Self {
-        Self("expect \(expected) but got \(got)")
+        #if !$Embedded
+        return Self("expect \(expected) but got \(got)")
+        #else
+        return Self("expect a value but got \(got)")
+        #endif
     }
 
     static var sizeMinimumMustNotExceedMaximum: Self {
@@ -94,51 +106,95 @@ extension ValidationError.Message {
     }
 
     static func functionIndexNotDeclared(index: FunctionIndex) -> Self {
-        Self("function index \(index) is not declared but referenced as a function reference")
+        #if !$Embedded
+        return Self("function index \(index) is not declared but referenced as a function reference")
+        #else
+        return Self("function index \(index) is not declared but referenced as a function reference")
+        #endif
     }
 
     static func duplicateExportName(name: String) -> Self {
-        Self("duplicate export name: \(name)")
+        #if !$Embedded
+        return Self("duplicate export name: \(name)")
+        #else
+        return Self("duplicate export name: \(name)")
+        #endif
     }
 
     static func elementSegmentTypeMismatch(
         elementType: ReferenceType,
         tableElementType: ReferenceType
     ) -> Self {
-        Self("element segment type \(elementType) does not match table element type \(tableElementType)")
+        #if !$Embedded
+        return Self("element segment type \(elementType) does not match table element type \(tableElementType)")
+        #else
+        return Self("element segment type \(elementType) does not match table element type \(tableElementType)")
+        #endif
     }
 
     static var controlStackEmpty: Self {
-        Self("control stack is empty. Instruction cannot be appeared after \"end\" of function")
+        #if !$Embedded
+        return Self("control stack is empty. Instruction cannot be appeared after \"end\" of function")
+        #else
+        return Self("control stack is empty. Instruction cannot be appeared after \"end\" of function")
+        #endif
     }
 
     static func relativeDepthOutOfRange(relativeDepth: UInt32) -> Self {
-        Self("relative depth \(relativeDepth) is out of range")
+        #if !$Embedded
+        return Self("relative depth \(relativeDepth) is out of range")
+        #else
+        return Self("relative depth \(relativeDepth) is out of range")
+        #endif
     }
 
     static var expectedIfControlFrame: Self {
-        Self("expected `if` control frame on top of the stack for `else`")
+        #if !$Embedded
+        return Self("expected `if` control frame on top of the stack for `else`")
+        #else
+        return Self("expected `if` control frame on top of the stack for `else`")
+        #endif
     }
 
     static var valuesRemainingAtEndOfBlock: Self {
-        Self("values remaining on stack at end of block")
+        #if !$Embedded
+        return Self("values remaining on stack at end of block")
+        #else
+        return Self("values remaining on the stack at end of block")
+        #endif
     }
 
     static func parameterResultTypeMismatch(blockType: FunctionType) -> Self {
-        Self("expected the same parameter and result types for `if` block but got \(blockType)")
+        #if !$Embedded
+        return Self("expected the same parameter and result types for `if` block but got \(blockType)")
+        #else
+        return Self("expected the same parameter and result types for `if` block but got \(blockType)")
+        #endif
     }
 
     static func stackHeightUnderflow(available: Int, required: Int) -> Self {
-        Self("stack height underflow: available \(available), required \(required)")
+        #if !$Embedded
+        return Self("stack height underflow: available \(available), required \(required)")
+        #else
+        return Self("stack height underflow: available \(available), required \(required)")
+        #endif
     }
 
     static func expectedTypeOnStack(expected: ValueType, actual: ValueType) -> Self {
-        Self("expected \(expected) on the stack top but got \(actual)")
+        #if !$Embedded
+        return Self("expected \(expected) on the stack top but got \(actual)")
+        #else
+        return Self("expected a value on the stack top but got \(actual)")
+        #endif
     }
 
     static func expectedTypeOnStackButEmpty(expected: ValueType?) -> Self {
+        #if !$Embedded
         let typeHint = expected.map(String.init(describing:)) ?? "a value"
         return Self("expected \(typeHint) on the stack top but it's empty")
+        #else
+        return Self("expected a value on the stack top but it's empty")
+        #endif
     }
 
     static func expectedMoreEndInstructions(count: Int) -> Self {
@@ -197,13 +253,13 @@ extension ValidationError.Message {
 struct InstructionValidator {
     let context: InternalInstance
 
-    func validateMemArg(_ memarg: MemArg, naturalAlignment: Int) throws {
+    func validateMemArg(_ memarg: MemArg, naturalAlignment: Int) throws(ValidationError) {
         if memarg.align > naturalAlignment {
             throw ValidationError(.invalidMemArgAlignment(memarg: memarg, naturalAlignment: naturalAlignment))
         }
     }
 
-    func validateGlobalSet(_ type: GlobalType) throws {
+    func validateGlobalSet(_ type: GlobalType) throws(ValidationError) {
         switch type.mutability {
         case .constant:
             throw ValidationError(.globalSetConstant)
@@ -212,7 +268,7 @@ struct InstructionValidator {
         }
     }
 
-    func validateTableInit(elemIndex: UInt32, table: UInt32) throws {
+    func validateTableInit(elemIndex: UInt32, table: UInt32) throws(ValidationError) {
         let tableType = try context.tableType(table)
         let elementType = try context.elementType(elemIndex)
         guard tableType.elementType == elementType else {
@@ -220,7 +276,7 @@ struct InstructionValidator {
         }
     }
 
-    func validateTableCopy(dest: UInt32, source: UInt32) throws {
+    func validateTableCopy(dest: UInt32, source: UInt32) throws(ValidationError) {
         let tableType1 = try context.tableType(source)
         let tableType2 = try context.tableType(dest)
         guard tableType1.elementType == tableType2.elementType else {
@@ -228,11 +284,11 @@ struct InstructionValidator {
         }
     }
 
-    func validateRefFunc(functionIndex: UInt32) throws {
+    func validateRefFunc(functionIndex: UInt32) throws(ValidationError) {
         try context.validateFunctionIndex(functionIndex)
     }
 
-    func validateDataSegment(_ dataIndex: DataIndex) throws {
+    func validateDataSegment(_ dataIndex: DataIndex) throws(ValidationError) {
         guard let dataCount = context.dataCount else {
             throw ValidationError(.dataCountSectionRequired)
         }
@@ -241,11 +297,16 @@ struct InstructionValidator {
         }
     }
 
-    func validateReturnCallLike(calleeType: FunctionType, callerType: FunctionType) throws {
+    func validateReturnCallLike(calleeType: FunctionType, callerType: FunctionType) throws(ValidationError) {
         guard calleeType.results == callerType.results else {
             throw ValidationError(.typeMismatchOnReturnCall(expected: callerType.results, actual: calleeType.results))
         }
     }
+}
+
+enum ModuleValidationError: Error {
+    case translation(TranslationError)
+    case validation(ValidationError)
 }
 
 /// Validates a WebAssembly module.
@@ -255,29 +316,43 @@ struct ModuleValidator {
         self.module = module
     }
 
-    func validate() throws {
+    func validate() throws(ModuleValidationError) {
         if module.memoryTypes.count > 1 {
-            throw ValidationError(.multipleMemoriesNotPermitted)
+            throw ModuleValidationError.validation(ValidationError(.multipleMemoriesNotPermitted))
         }
         for memoryType in module.memoryTypes {
-            try Self.checkMemoryType(memoryType, features: module.features)
+            do {
+                try Self.checkMemoryType(memoryType, features: module.features)
+            } catch {
+                throw ModuleValidationError.validation(error)
+            }
         }
         for tableType in module.tableTypes {
-            try Self.checkTableType(tableType, features: module.features)
+            do {
+                try Self.checkTableType(tableType, features: module.features)
+            } catch {
+                throw ModuleValidationError.validation(error)
+            }
         }
         try checkStartFunction()
     }
 
-    func checkStartFunction() throws {
+    func checkStartFunction() throws(ModuleValidationError) {
         if let startFunction = module.start {
-            let type = try module.resolveFunctionType(startFunction)
+            let type: FunctionType
+            do {
+                type = try module.resolveFunctionType(startFunction)
+            } catch {
+                throw ModuleValidationError.translation(error)
+            }
+
             guard type.parameters.isEmpty, type.results.isEmpty else {
-                throw ValidationError(.startFunctionInvalidParameters())
+                throw ModuleValidationError.validation(ValidationError(.startFunctionInvalidParameters()))
             }
         }
     }
 
-    static func checkMemoryType(_ type: MemoryType, features: WasmFeatureSet) throws {
+    static func checkMemoryType(_ type: MemoryType, features: WasmFeatureSet) throws(ValidationError) {
         try checkLimit(type)
 
         if type.isMemory64 {
@@ -303,7 +378,7 @@ struct ModuleValidator {
         }
     }
 
-    static func checkTableType(_ type: TableType, features: WasmFeatureSet) throws {
+    static func checkTableType(_ type: TableType, features: WasmFeatureSet) throws(ValidationError) {
         if type.elementType != .funcRef, !features.contains(.referenceTypes) {
             throw ValidationError(.referenceTypesFeatureRequiredForNonFuncrefTables)
         }
@@ -326,7 +401,7 @@ struct ModuleValidator {
         }
     }
 
-    private static func checkLimit(_ limit: Limits) throws {
+    private static func checkLimit(_ limit: Limits) throws(ValidationError) {
         guard let max = limit.max else { return }
         if limit.min > max {
             throw ValidationError(.sizeMinimumMustNotExceedMaximum)
@@ -336,7 +411,7 @@ struct ModuleValidator {
 
 extension WasmTypes.Reference {
     /// Checks if the reference type matches the expected type.
-    func checkType(_ type: WasmTypes.ReferenceType) throws {
+    func checkType(_ type: WasmTypes.ReferenceType) throws(ValidationError) {
         switch (self, type.heapType, type.isNullable) {
         case (.function(_?), .funcRef, _): return
         case (.function(nil), .funcRef, true): return
@@ -350,7 +425,7 @@ extension WasmTypes.Reference {
 
 extension Value {
     /// Checks if the value type matches the expected type.
-    func checkType(_ type: WasmTypes.ValueType) throws {
+    func checkType(_ type: WasmTypes.ValueType) throws(ValidationError) {
         switch (self, type) {
         case (.i32, .i32): return
         case (.i64, .i64): return

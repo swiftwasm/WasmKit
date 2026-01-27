@@ -1,3 +1,4 @@
+#if !$Embedded
 import SystemPackage
 
 /// Base protocol for all file system nodes in memory.
@@ -304,3 +305,4 @@ final class MemoryCharacterDeviceEntry: WASIFile {
         throw WASIAbi.Errno.ESPIPE
     }
 }
+#enidf

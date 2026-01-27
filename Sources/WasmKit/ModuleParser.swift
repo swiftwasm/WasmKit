@@ -1,3 +1,4 @@
+#if !$Embedded
 import SystemPackage
 import WasmParser
 
@@ -126,3 +127,4 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
         dataCount: dataCount
     )
 }
+#endif

@@ -1,3 +1,4 @@
+#if !$Embedded
 import SystemExtras
 import SystemPackage
 
@@ -61,3 +62,4 @@ extension SandboxPrimitives {
         #endif
     }
 }
+#endif

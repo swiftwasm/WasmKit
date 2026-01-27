@@ -1,3 +1,4 @@
+#if !$Embedded
 import SystemPackage
 
 /// Split the given path to the parent and the last component to be passed to openat
@@ -71,3 +72,4 @@ extension SandboxPrimitives {
         return (dirFd, basename.string)
     }
 }
+#endif

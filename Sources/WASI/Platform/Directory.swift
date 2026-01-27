@@ -1,3 +1,4 @@
+#if !$Embedded
 import SystemPackage
 
 struct DirEntry {
@@ -229,3 +230,4 @@ extension DirEntry: WASIDir, FdWASIEntry {
         #endif
     }
 }
+#endif

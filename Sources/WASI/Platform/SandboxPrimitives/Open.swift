@@ -1,3 +1,4 @@
+#if !$Embedded
 import SystemExtras
 import SystemPackage
 
@@ -247,3 +248,4 @@ extension SandboxPrimitives {
         return try resolution.resolve()
     }
 }
+#endif

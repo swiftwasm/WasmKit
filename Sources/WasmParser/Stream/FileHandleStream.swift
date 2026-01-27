@@ -1,3 +1,4 @@
+#if !$Embedded
 import struct SystemPackage.FileDescriptor
 
 public final class FileHandleStream: ByteStream {
@@ -107,3 +108,4 @@ extension FileDescriptor {
         }
     }
 }
+#endif

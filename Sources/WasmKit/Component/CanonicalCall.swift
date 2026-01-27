@@ -36,7 +36,7 @@ public struct CanonicalCallContext {
         oldSize: UInt32,
         oldAlign: UInt32,
         newSize: UInt32
-    ) throws -> UnsafeGuestRawPointer {
+    ) throws(CanonicalABIError) -> UnsafeGuestRawPointer {
         guard let realloc = options.realloc else {
             throw CanonicalABIError(description: "Missing required \"cabi_realloc\" export")
         }

@@ -1,3 +1,4 @@
+#if !$Embedded
 import SystemPackage
 
 protocol FdWASIEntry: WASIEntry {
@@ -112,3 +113,4 @@ struct StdioFileEntry: FdWASIFile {
         )
     }
 }
+#endif

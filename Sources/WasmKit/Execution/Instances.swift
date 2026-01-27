@@ -66,7 +66,7 @@ package struct EntityHandle<T: ~Copyable>: Equatable, Hashable, Copyable {
 }
 
 extension EntityHandle: ValidatableEntity where T: ValidatableEntity {
-    static func createOutOfBoundsError(index: Int, count: Int) -> Error {
+    static func createOutOfBoundsError(index: Int, count: Int) -> T.OutOfBoundsError {
         T.createOutOfBoundsError(index: index, count: count)
     }
 }
@@ -375,7 +375,7 @@ struct TableEntity /* : ~Copyable */ {
 }
 
 extension TableEntity: ValidatableEntity {
-    static func createOutOfBoundsError(index: Int, count: Int) -> Error {
+    static func createOutOfBoundsError(index: Int, count: Int) -> ValidationError {
         ValidationError(.indexOutOfBounds("table", index, max: count))
     }
 }
@@ -591,7 +591,7 @@ struct MemoryEntity: ~Copyable {
 }
 
 extension MemoryEntity: ValidatableEntity {
-    static func createOutOfBoundsError(index: Int, count: Int) -> Error {
+    static func createOutOfBoundsError(index: Int, count: Int) -> ValidationError {
         ValidationError(.indexOutOfBounds("memory", index, max: count))
     }
 }
@@ -791,7 +791,7 @@ struct ElementSegmentEntity {
 }
 
 extension ElementSegmentEntity: ValidatableEntity {
-    static func createOutOfBoundsError(index: Int, count: Int) -> Error {
+    static func createOutOfBoundsError(index: Int, count: Int) -> ValidationError {
         ValidationError(.indexOutOfBounds("element", index, max: count))
     }
 }

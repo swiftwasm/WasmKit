@@ -1,3 +1,4 @@
+#if !$Embedded
 import SystemPackage
 
 /// A bridge that connects WebAssembly System Interface (WASI) calls to the host system.
@@ -217,3 +218,4 @@ public final class WASIBridgeToHost {
         try fileSystemOptions.initializePreopens?(fileSystem, &underlying.fdTable)
     }
 }
+#endif

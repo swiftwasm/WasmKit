@@ -1,3 +1,4 @@
+#if !$Embedded
 import SystemPackage
 
 extension FdWASIEntry {
@@ -98,3 +99,4 @@ extension FdWASIEntry {
         }
     }
 }
+#endif

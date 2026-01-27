@@ -1,15 +1,21 @@
 @usableFromInline
-enum LEBError: Swift.Error, Equatable {
+enum LEBError: Swift.Error {
     case overflow
     case integerRepresentationTooLong
     case insufficientBytes
+    case streamError(WasmParserError)
 }
 
 @inlinable
 func decodeLEB128<IntType, Stream>(
     stream: Stream
-) throws -> IntType where IntType: FixedWidthInteger, IntType: UnsignedInteger, Stream: ByteStream {
-    let firstByte = try stream.consumeAny()
+) throws(LEBError) -> IntType where IntType: FixedWidthInteger, IntType: UnsignedInteger, Stream: ByteStream {
+    let firstByte: UInt8
+    do {
+        firstByte = try stream.consumeAny()
+    } catch {
+        throw LEBError.streamError(error)
+    }
     var result: IntType = IntType(firstByte & 0b0111_1111)
     if _fastPath(firstByte & 0b1000_0000 == 0) {
         return result
@@ -18,7 +24,12 @@ func decodeLEB128<IntType, Stream>(
     var shift: UInt = 7
 
     while true {
-        let byte = try stream.consumeAny()
+        let byte: UInt8
+        do {
+            byte = try stream.consumeAny()
+        } catch {
+            throw LEBError.streamError(error)
+        }
         let slice = IntType(byte & 0b0111_1111)
         let nextShift = shift + 7
         if nextShift >= IntType.bitWidth, (byte >> (UInt(IntType.bitWidth) - shift)) != 0 {
@@ -36,8 +47,13 @@ func decodeLEB128<IntType, Stream>(
 @inlinable
 func decodeLEB128<IntType, Stream>(
     stream: Stream, bitWidth: Int = IntType.bitWidth
-) throws -> IntType where IntType: FixedWidthInteger, IntType: RawSignedInteger, Stream: ByteStream {
-    let firstByte = try stream.consumeAny()
+) throws(LEBError) -> IntType where IntType: FixedWidthInteger, IntType: RawSignedInteger, Stream: ByteStream {
+    let firstByte: UInt8
+    do {
+        firstByte = try stream.consumeAny()
+    } catch {
+        throw LEBError.streamError(error)
+    }
     var result = IntType.Unsigned(firstByte & 0b0111_1111)
     if _fastPath(firstByte & 0b1000_0000 == 0) {
         // Interpret Int${Self.bitWidth-1} as Int${Self.bitWidth}
@@ -48,7 +64,11 @@ func decodeLEB128<IntType, Stream>(
 
     var byte: UInt8
     repeat {
-        byte = try stream.consumeAny()
+        do {
+            byte = try stream.consumeAny()
+        } catch {
+            throw LEBError.streamError(error)
+        }
 
         let slice = IntType.Unsigned(byte & 0b0111_1111)
         result |= slice << shift

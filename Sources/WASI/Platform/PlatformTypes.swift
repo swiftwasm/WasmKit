@@ -1,3 +1,4 @@
+#if !$Embedded
 import SystemExtras
 import SystemPackage
 
@@ -265,3 +266,4 @@ extension WASIAbi.Errno {
         }
     }
 }
+#endif

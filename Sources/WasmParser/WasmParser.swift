@@ -1,7 +1,9 @@
 import WasmTypes
 
+#if !$Embedded
 import struct SystemPackage.FileDescriptor
 import struct SystemPackage.FilePath
+#endif
 
 #if os(Windows)
     import ucrt
@@ -54,6 +56,7 @@ extension Parser where Stream == StaticByteStream {
     }
 }
 
+#if !$Embedded
 extension Parser where Stream == FileHandleStream {
 
     /// Initialize a new parser with the given file handle
@@ -83,6 +86,7 @@ extension Parser where Stream == FileHandleStream {
         self.init(stream: try FileHandleStream(fileHandle: fileHandle), features: features)
     }
 }
+#endif
 
 extension Code {
     /// Parse a WebAssembly expression from the given byte stream
@@ -209,7 +213,7 @@ public struct WasmFeatureSet: OptionSet, Sendable {
 /// An error that occurs during parsing of a WebAssembly binary
 public struct WasmParserError: Swift.Error {
     @usableFromInline
-    struct Message: Sendable {
+    struct Message: Sendable, Equatable {
         let text: String
 
         init(_ text: String) {
@@ -222,7 +226,9 @@ public struct WasmParserError: Swift.Error {
         case message(Message)
         case unexpectedEnd(expected: Set<UInt8>?)
         case unexpectedByte(UInt8, index: Int, expected: Set<UInt8>?)
+        #if !$Embedded
         case unclassified(any Error)
+        #endif
     }
 
     let kind: Kind
@@ -266,8 +272,10 @@ extension WasmParserError: CustomStringConvertible {
             if let expected, expected.count > 0 {
                 result.append(contentsOf: " Expected one of \(expected.map {$0.hexString}).")
             }
+        #if !$Embedded
         case .unclassified(let error):
             result = "\(error)"
+        #endif
         }
 
         if let offset {

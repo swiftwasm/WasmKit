@@ -1,3 +1,4 @@
+#if !$Embedded
 import SystemPackage
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
@@ -93,3 +94,4 @@ final class HostFileSystem: FileSystemImplementation {
         return StdioFileEntry(fd: fd, accessMode: accessMode)
     }
 }
+#endif

@@ -1,3 +1,4 @@
+#if !$Embedded
 import SystemPackage
 
 /// An in-memory file system implementation for WASI environments.
@@ -452,3 +453,4 @@ public final class MemoryFileSystem: FileSystemImplementation {
         return (parentPath, fileName)
     }
 }
+#endif

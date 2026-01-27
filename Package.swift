@@ -12,8 +12,6 @@ let cliCommandsTarget = Target.target(
         "WAT",
         "WasmKit",
         "WasmKitWASI",
-        .product(name: "ArgumentParser", package: "swift-argument-parser"),
-        .product(name: "SystemPackage", package: "swift-system"),
     ],
     exclude: ["CMakeLists.txt"]
 )
@@ -47,9 +45,7 @@ let package = Package(
             dependencies: [
                 "_CWasmKit",
                 "WasmParser",
-                "WasmTypes",
-                "SystemExtras",
-                .product(name: "SystemPackage", package: "swift-system"),
+                "WasmTypes"
             ],
             exclude: ["CMakeLists.txt"]
         ),
@@ -76,7 +72,6 @@ let package = Package(
             name: "WasmParser",
             dependencies: [
                 "WasmTypes",
-                .product(name: "SystemPackage", package: "swift-system"),
             ],
             exclude: ["CMakeLists.txt"]
         ),
@@ -91,24 +86,10 @@ let package = Package(
         ),
         .target(
             name: "WASI",
-            dependencies: ["WasmTypes", "SystemExtras"],
+            dependencies: ["WasmTypes"],
             exclude: ["CMakeLists.txt"]
         ),
         .testTarget(name: "WASITests", dependencies: ["WASI", "WasmKitWASI"]),
-
-        .target(
-            name: "SystemExtras",
-            dependencies: [
-                .product(name: "SystemPackage", package: "swift-system"),
-                .target(name: "CSystemExtras", condition: .when(platforms: [.wasi])),
-            ],
-            exclude: ["CMakeLists.txt"],
-            swiftSettings: [
-                .define("SYSTEM_PACKAGE_DARWIN", .when(platforms: DarwinPlatforms))
-            ]
-        ),
-
-        .target(name: "CSystemExtras"),
 
         .executableTarget(
             name: "WITTool",
@@ -116,7 +97,6 @@ let package = Package(
                 "WIT",
                 "WITOverlayGenerator",
                 "WITExtractor",
-                .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ]
         ),
 
@@ -132,8 +112,6 @@ let package = Package(
         .target(
             name: "GDBRemoteProtocol",
             dependencies: [
-                .product(name: "Logging", package: "swift-log"),
-                .product(name: "NIOCore", package: "swift-nio"),
             ],
             exclude: ["LICENSE.txt"]
         ),
@@ -147,17 +125,9 @@ let package = Package(
 
 if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
     package.dependencies += [
-        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.5.1"),
-        .package(url: "https://github.com/apple/swift-system", from: "1.5.0"),
-        .package(url: "https://github.com/apple/swift-nio", from: "2.90.0"),
-        .package(url: "https://github.com/apple/swift-log", from: "1.7.1"),
     ]
 } else {
     package.dependencies += [
-        .package(path: "../swift-argument-parser"),
-        .package(path: "../swift-system"),
-        .package(path: "../swift-nio"),
-        .package(path: "../swift-log"),
     ]
 }
 
@@ -193,9 +163,6 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
         .target(
             name: "WasmKitGDBHandler",
             dependencies: [
-                .product(name: "_NIOFileSystem", package: "swift-nio"),
-                .product(name: "NIOCore", package: "swift-nio"),
-                .product(name: "SystemPackage", package: "swift-system"),
                 "WasmKit",
                 "WasmKitWASI",
                 "GDBRemoteProtocol",
@@ -205,9 +172,6 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
     ])
 
     cliCommandsTarget.dependencies.append(contentsOf: [
-        .product(name: "Logging", package: "swift-log", condition: .when(traits: ["WasmDebuggingSupport"])),
-        .product(name: "NIOCore", package: "swift-nio", condition: .when(traits: ["WasmDebuggingSupport"])),
-        .product(name: "NIOPosix", package: "swift-nio", condition: .when(traits: ["WasmDebuggingSupport"])),
         .target(name: "GDBRemoteProtocol", condition: .when(traits: ["WasmDebuggingSupport"])),
         .target(name: "WasmKitGDBHandler", condition: .when(traits: ["WasmDebuggingSupport"])),
     ])

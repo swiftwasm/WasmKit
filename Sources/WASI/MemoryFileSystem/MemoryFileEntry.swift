@@ -1,3 +1,4 @@
+#if !$Embedded
 import SystemExtras
 import SystemPackage
 
@@ -365,3 +366,4 @@ final class MemoryFileEntry: WASIFile {
         return totalRead
     }
 }
+#endif

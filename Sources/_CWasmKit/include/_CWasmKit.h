@@ -4,8 +4,6 @@
 #include <stdatomic.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
 
 #include "Platform.h"
 
@@ -44,7 +42,7 @@ static inline void wasmkit_tc_start(
 #endif
 
 static inline void wasmkit_fwrite_stderr(const char *_Nonnull str, size_t len) {
-  fwrite(str, 1, len, stderr);
+  // FIXME: fwrite(str, 1, len, stderr);
 }
 
 // MARK: - Swift Runtime Functions

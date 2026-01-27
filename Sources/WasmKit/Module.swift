@@ -108,14 +108,14 @@ public struct Module {
         self.tableTypes = tableTypes + tables
     }
 
-    static func resolveType(_ index: TypeIndex, typeSection: [FunctionType]) throws -> FunctionType {
+    static func resolveType(_ index: TypeIndex, typeSection: [FunctionType]) throws(TranslationError) -> FunctionType {
         guard Int(index) < typeSection.count else {
             throw TranslationError("Type index \(index) is out of range")
         }
         return typeSection[Int(index)]
     }
 
-    internal func resolveFunctionType(_ index: FunctionIndex) throws -> FunctionType {
+    internal func resolveFunctionType(_ index: FunctionIndex) throws(TranslationError) -> FunctionType {
         guard Int(index) < functions.count + self.moduleImports.numberOfFunctions else {
             throw TranslationError("Function index \(index) is out of range")
         }
