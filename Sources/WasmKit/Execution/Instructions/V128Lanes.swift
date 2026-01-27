@@ -112,4 +112,3 @@ struct V128Lanes {
         return pack(out, widthBits: widthBits, laneCount: laneCount)
     }
 }
-

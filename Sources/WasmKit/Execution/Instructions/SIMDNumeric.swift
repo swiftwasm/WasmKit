@@ -569,12 +569,13 @@ extension Execution {
             .i32x4Shl, .i32x4ShrS, .i32x4ShrU,
             .i64x2Shl, .i64x2ShrS, .i64x2ShrU:
             let shift32 = sp[immediate.input1].i32
-            let (widthBits, laneCount, shiftMask): (Int, Int, UInt32) = switch opcode {
-            case .i8x16Shl, .i8x16ShrS, .i8x16ShrU: (8, 16, 7)
-            case .i16x8Shl, .i16x8ShrS, .i16x8ShrU: (16, 8, 15)
-            case .i32x4Shl, .i32x4ShrS, .i32x4ShrU: (32, 4, 31)
-            default: (64, 2, 63)
-            }
+            let (widthBits, laneCount, shiftMask): (Int, Int, UInt32) =
+                switch opcode {
+                case .i8x16Shl, .i8x16ShrS, .i8x16ShrU: (8, 16, 7)
+                case .i16x8Shl, .i16x8ShrS, .i16x8ShrU: (16, 8, 15)
+                case .i32x4Shl, .i32x4ShrS, .i32x4ShrU: (32, 4, 31)
+                default: (64, 2, 63)
+                }
             let shift = Int(shift32 & shiftMask)
             v128Unary { input in
                 let lanes = V128Lanes.extract(input, widthBits: widthBits, laneCount: laneCount)
@@ -853,15 +854,16 @@ extension Execution {
                 let a = V128Lanes.extract(input, widthBits: 32, laneCount: 4)
                 let out = a.map { bits -> UInt64 in
                     let x = Float32(bitPattern: UInt32(truncatingIfNeeded: bits))
-                    let y: Float32 = switch opcode {
-                    case .f32x4Ceil: x.ceil
-                    case .f32x4Floor: x.floor
-                    case .f32x4Trunc: x.trunc
-                    case .f32x4Nearest: x.nearest
-                    case .f32x4Abs: x.abs
-                    case .f32x4Neg: x.neg
-                    default: x.sqrt
-                    }
+                    let y: Float32 =
+                        switch opcode {
+                        case .f32x4Ceil: x.ceil
+                        case .f32x4Floor: x.floor
+                        case .f32x4Trunc: x.trunc
+                        case .f32x4Nearest: x.nearest
+                        case .f32x4Abs: x.abs
+                        case .f32x4Neg: x.neg
+                        default: x.sqrt
+                        }
                     return UInt64(y.bitPattern)
                 }
                 return V128Lanes.pack(out, widthBits: 32, laneCount: 4)
@@ -873,15 +875,16 @@ extension Execution {
                 let a = V128Lanes.extract(input, widthBits: 64, laneCount: 2)
                 let out = a.map { bits -> UInt64 in
                     let x = Float64(bitPattern: bits)
-                    let y: Float64 = switch opcode {
-                    case .f64x2Ceil: x.ceil
-                    case .f64x2Floor: x.floor
-                    case .f64x2Trunc: x.trunc
-                    case .f64x2Nearest: x.nearest
-                    case .f64x2Abs: x.abs
-                    case .f64x2Neg: x.neg
-                    default: x.sqrt
-                    }
+                    let y: Float64 =
+                        switch opcode {
+                        case .f64x2Ceil: x.ceil
+                        case .f64x2Floor: x.floor
+                        case .f64x2Trunc: x.trunc
+                        case .f64x2Nearest: x.nearest
+                        case .f64x2Abs: x.abs
+                        case .f64x2Neg: x.neg
+                        default: x.sqrt
+                        }
                     return y.bitPattern
                 }
                 return V128Lanes.pack(out, widthBits: 64, laneCount: 2)
@@ -897,16 +900,17 @@ extension Execution {
                 for i in 0..<4 {
                     let x = Float32(bitPattern: UInt32(truncatingIfNeeded: a[i]))
                     let y = Float32(bitPattern: UInt32(truncatingIfNeeded: b[i]))
-                    let z: Float32 = switch opcode {
-                    case .f32x4Add: x + y
-                    case .f32x4Sub: x - y
-                    case .f32x4Mul: x * y
-                    case .f32x4Div: x / y
-                    case .f32x4Min: x.min(y)
-                    case .f32x4Max: x.max(y)
-                    case .f32x4Pmin: pmin(x, y)
-                    default: pmax(x, y)
-                    }
+                    let z: Float32 =
+                        switch opcode {
+                        case .f32x4Add: x + y
+                        case .f32x4Sub: x - y
+                        case .f32x4Mul: x * y
+                        case .f32x4Div: x / y
+                        case .f32x4Min: x.min(y)
+                        case .f32x4Max: x.max(y)
+                        case .f32x4Pmin: pmin(x, y)
+                        default: pmax(x, y)
+                        }
                     out.append(UInt64(z.bitPattern))
                 }
                 return V128Lanes.pack(out, widthBits: 32, laneCount: 4)
@@ -922,16 +926,17 @@ extension Execution {
                 for i in 0..<2 {
                     let x = Float64(bitPattern: a[i])
                     let y = Float64(bitPattern: b[i])
-                    let z: Float64 = switch opcode {
-                    case .f64x2Add: x + y
-                    case .f64x2Sub: x - y
-                    case .f64x2Mul: x * y
-                    case .f64x2Div: x / y
-                    case .f64x2Min: x.min(y)
-                    case .f64x2Max: x.max(y)
-                    case .f64x2Pmin: pmin(x, y)
-                    default: pmax(x, y)
-                    }
+                    let z: Float64 =
+                        switch opcode {
+                        case .f64x2Add: x + y
+                        case .f64x2Sub: x - y
+                        case .f64x2Mul: x * y
+                        case .f64x2Div: x / y
+                        case .f64x2Min: x.min(y)
+                        case .f64x2Max: x.max(y)
+                        case .f64x2Pmin: pmin(x, y)
+                        default: pmax(x, y)
+                        }
                     out.append(z.bitPattern)
                 }
                 return V128Lanes.pack(out, widthBits: 64, laneCount: 2)
@@ -1018,4 +1023,3 @@ extension Execution {
         }
     }
 }
-
