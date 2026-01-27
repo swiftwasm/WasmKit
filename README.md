@@ -86,6 +86,7 @@ and should work on the following platforms:
 |                      | [Non-trapping float-to-int conversions](https://github.com/WebAssembly/nontrapping-float-to-int-conversions/blob/main/proposals/nontrapping-float-to-int-conversion/Overview.md) | ✅ Implemented |
 |                      | [Memory64](https://github.com/WebAssembly/memory64/blob/main/proposals/memory64/Overview.md) | ✅ Implemented |
 |                      | [Tail call](https://github.com/WebAssembly/tail-call/blob/master/proposals/tail-call/Overview.md) | ✅ Implemented |
+|                      | [SIMD](https://github.com/WebAssembly/simd/blob/main/proposals/simd/SIMD.md) | ✅ Implemented |
 |                      | [Threads and atomics](https://github.com/WebAssembly/threads/blob/master/proposals/threads/Overview.md) | 🚧 Parser implemented |
 |                      | [Typed Function References](https://github.com/WebAssembly/function-references/blob/main/proposals/function-references/Overview.md) | 🚧 Parser implemented  |
 |                      | [Garbage Collection](https://github.com/WebAssembly/gc/blob/main/proposals/gc/Overview.md) |  📋 Todo |
