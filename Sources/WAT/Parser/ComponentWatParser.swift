@@ -225,7 +225,8 @@
             var parameters = [(String, ComponentType)]()
             var resultType: ComponentType?
             var type: Parser.IndexOrId?
-            var exportDef: (Location, String)?
+            var exportDef: (Location, exportName: String)?
+            var importDef: (Location, importModule: String, importName: String)?
 
             /// Component functions are not tracked as separate entities in the final binary, i.e. there's no dedicated
             /// component functions section in the binary format. They're always encoded as a part of following
@@ -255,11 +256,10 @@
                 case "import":
                     let importModuleName = try parser.expectString()
                     let importName = try parser.expectString()
-                    parsedComponent.fields.append(
-                        .importDef(.init(importModuleName: importModuleName, importName: importName))
-                    )
+                    importDef = (parser.lexer.location(), importModuleName, importName)
 
                 case "canon":
+                    let location = parser.lexer.location()
                     try parser.expectKeyword("lift")
                     let coreFunctionIndex = try parseCoreFunctionIndex()
                     var options = [CanonDef.Option]()
@@ -267,12 +267,14 @@
                         options.append(try parseCanonOpt())
                         try parser.expect(.rightParen)
                     }
-                    parsedComponent.canon.append(
+                    parsedComponent.fields.append(
                         .init(
-                            id: id,
-                            kind: .lift,
-                            functionIndex: coreFunctionIndex,
-                            options: options
+                            location: location,
+                            kind: .canon(.init(
+                                kind: .lift(coreFunctionIndex),
+                                functionIndex: coreFunctionIndex,
+                                options: options
+                            ))
                         )
                     )
 
@@ -337,7 +339,7 @@
                 case coreType(WatParser.FunctionType)
                 case component(ComponentIndex)
                 case instance(ComponentInstanceIndex)
-                case canon(CanonIndex)
+                case canon(CanonDef)
                 case exportDef(ExportDef)
                 case importDef(ImportDef)
             }
@@ -369,10 +371,8 @@
             var componentInstancesMap: NameMapping<ComponentInstanceDef> = .init()
             var componentsMap: NameMapping<ComponentDef> = .init()
 
-            var aliases = Aliases()
-            var canon = [CanonDef]()
-
-            /// As sections in CM binaries can stay disjoint and unmerged, for compatibility with other tools, we should preserve disjoint sections together with their ordering.
+            /// As sections in CM binaries can stay disjoint and unmerged, for compatibility with other tools,
+            /// we should preserve disjoint sections together with their ordering.
             var fields = [ComponentDefField]()
 
             /// Mapping from a component type to its unique ID in `componentTypes` name mapping storage.
@@ -420,7 +420,7 @@
             var exportName: String
         }
 
-        struct CanonDef: NamedFieldDecl {
+        struct CanonDef {
             enum Option {
                 enum Encoding {
                     case utf8
@@ -437,9 +437,8 @@
 
             enum Kind {
                 case lower(ComponentFuncIndex)
-                case lift(FunctionIndex)
+                case lift(FuncIndex)
             }
-            var id: Name?
             let kind: Kind
             let functionIndex: FuncIndex
             let options: [Option]

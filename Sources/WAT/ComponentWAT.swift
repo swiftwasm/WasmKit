@@ -12,8 +12,4 @@
         let rawValue: Int
     }
 
-    struct CanonIndex: RawRepresentable {
-        let rawValue: Int
-    }
-
 #endif
