@@ -491,7 +491,6 @@ extension SIMDOpcode {
         case .i16x8ExtaddPairwiseI8X16U: return .i16x8ExtaddPairwiseI8X16U
         case .i32x4ExtaddPairwiseI16X8S: return .i32x4ExtaddPairwiseI16X8S
         case .i32x4ExtaddPairwiseI16X8U: return .i32x4ExtaddPairwiseI16X8U
-        default: return nil
         }
     }
 
@@ -511,7 +510,6 @@ extension SIMDOpcode {
         case .f32x4ReplaceLane: return .f32x4ReplaceLane
         case .f64x2ExtractLane: return .f64x2ExtractLane
         case .f64x2ReplaceLane: return .f64x2ReplaceLane
-        default: return nil
         }
     }
 
@@ -525,7 +523,6 @@ extension SIMDOpcode {
         case .v128Store16Lane: return .v128Store16Lane
         case .v128Store32Lane: return .v128Store32Lane
         case .v128Store64Lane: return .v128Store64Lane
-        default: return nil
         }
     }
 }
