@@ -213,6 +213,24 @@ enum VMGen {
 
         output += """
         extension Instruction {
+            func emit(to emitSlot: @escaping (CodeSlot) -> Void) {
+                switch self {
+        
+        """
+        for inst in instructions {
+            guard let immediate = inst.immediate else { continue }
+            output += "        case .\(inst.name)(let \(immediate.label)): \(immediate.label).emit(to: emitSlot)\n"
+        }
+        output += """
+                default: ()
+                }
+            }
+        }
+
+        """
+        
+        output += """
+        extension Instruction {
             var rawImmediate: (any InstructionImmediate)? {
                 switch self {
 

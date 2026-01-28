@@ -304,7 +304,7 @@ struct InstructionValidator {
     }
 }
 
-enum ModuleValidationError: Error {
+public enum ModuleValidationError: Error {
     case translation(TranslationError)
     case validation(ValidationError)
 }

@@ -2,15 +2,17 @@ import struct WasmParser.CustomSection
 import struct WasmParser.NameMap
 import struct WasmParser.NameSectionParser
 import class WasmParser.StaticByteStream
+import struct WasmParser.WasmParserError
 
 struct NameRegistry {
+    typealias Materializer = (inout NameRegistry) throws(WasmParserError) -> Void
     private var functionNames: [InternalFunction: String] = [:]
-    private var materializers: [(inout NameRegistry) throws -> Void] = []
+    private var materializers: [Materializer] = []
 
     init() {}
 
-    mutating func register(instance: InternalInstance, nameSection: CustomSection) throws {
-        materializers.append { registry in
+    mutating func register(instance: InternalInstance, nameSection: CustomSection) {
+        let materializer: Materializer = { (registry: inout NameRegistry) throws(WasmParserError) in
             let stream = StaticByteStream(bytes: Array(nameSection.bytes))
             let parser = NameSectionParser(stream: stream)
             for result in try parser.parseAll() {
@@ -27,6 +29,7 @@ struct NameRegistry {
                 registry.functionNames[function] = name
             }
         }
+        materializers.append(materializer)
     }
 
     private mutating func register(instance: InternalInstance, nameMap: NameMap) {
@@ -36,7 +39,7 @@ struct NameRegistry {
         }
     }
 
-    private mutating func materializeIfNeeded() throws {
+    private mutating func materializeIfNeeded() throws(WasmParserError) {
         guard !materializers.isEmpty else { return }
         for materialize in materializers {
             try materialize(&self)
@@ -44,7 +47,7 @@ struct NameRegistry {
         materializers = []
     }
 
-    mutating func lookup(_ addr: InternalFunction) throws -> String? {
+    mutating func lookup(_ addr: InternalFunction) throws(WasmParserError) -> String? {
         try materializeIfNeeded()
         return functionNames[addr]
     }

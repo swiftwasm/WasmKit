@@ -134,7 +134,7 @@ public struct Module {
     ///   - store: The ``Store`` to allocate the instance in.
     ///   - imports: The imports to use for instantiation. All imported entities
     ///     must be allocated in the given store.
-    public func instantiate(store: Store, imports: Imports = [:]) throws -> Instance {
+    public func instantiate(store: Store, imports: Imports = [:]) throws(ImportError) -> Instance {
         Instance(handle: try self.instantiateHandle(store: store, imports: imports), store: store)
     }
 
@@ -147,15 +147,19 @@ public struct Module {
         ///     must be allocated in the given store.
         ///   - isDebuggable: Whether the module should support debugging actions
         ///     (breakpoints etc) after instantiation.
-        public func instantiate(store: Store, imports: Imports = [:], isDebuggable: Bool) throws -> Instance {
+        public func instantiate(store: Store, imports: Imports = [:], isDebuggable: Bool) throws(ImportError) -> Instance {
             Instance(handle: try self.instantiateHandle(store: store, imports: imports, isDebuggable: isDebuggable), store: store)
         }
     #endif
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#instantiation>
-    private func instantiateHandle(store: Store, imports: Imports, isDebuggable: Bool = false) throws -> InternalInstance {
-        try ModuleValidator(module: self).validate()
+    private func instantiateHandle(store: Store, imports: Imports, isDebuggable: Bool = false) throws(ImportError) -> InternalInstance {
+        do throws(ModuleValidationError) {
+            try ModuleValidator(module: self).validate()
+        } catch {
+            throw ImportError(error)
+        }
 
         // Steps 5-8.
 
@@ -182,60 +186,110 @@ public struct Module {
         // Steps 14-15.
         for element in elements {
             guard case .active(let tableIndex, let offset) = element.mode else { continue }
-            let table = try instance.tables[validating: Int(tableIndex)]
-            let offsetValue = try offset.evaluate(
-                context: constEvalContext,
-                expectedType: .addressType(isMemory64: table.limits.isMemory64)
-            )
-            try table.withValue { table in
-                guard let offset = offsetValue.maybeAddressOffset(table.limits.isMemory64) else {
-                    throw ValidationError(
+            // Get table and evaluate offset - throws ValidationError
+            let table: InternalTable
+            let offsetValue: Value
+            do throws(ValidationError) {
+                table = try instance.tables[validating: Int(tableIndex)]
+                offsetValue = try offset.evaluate(
+                    context: constEvalContext,
+                    expectedType: .addressType(isMemory64: table.limits.isMemory64)
+                )
+            } catch {
+                throw ImportError(error)
+            }
+
+            try table.withValue { (table: inout TableEntity) throws(ImportError) in
+                guard let offsetAddr = offsetValue.maybeAddressOffset(table.limits.isMemory64) else {
+                    throw ImportError(ValidationError(
                         .unexpectedOffsetInitializer(expected: .addressType(isMemory64: table.limits.isMemory64), got: offsetValue)
-                    )
+                    ))
                 }
                 guard table.tableType.elementType == element.type else {
-                    throw ValidationError(
+                    throw ImportError(ValidationError(
                         .elementSegmentTypeMismatch(
                             elementType: element.type,
                             tableElementType: table.tableType.elementType
                         )
-                    )
+                    ))
                 }
-                let references = try element.evaluateInits(context: constEvalContext)
-                try table.initialize(
-                    references, from: 0, to: Int(offset), count: references.count
-                )
+                // Evaluate references - throws ValidationError
+                let references: [Reference]
+                do throws(ValidationError) {
+                    references = try element.evaluateInits(context: constEvalContext)
+                } catch {
+                    throw ImportError(error)
+                }
+                // Initialize table - throws Trap
+                do throws(Trap) {
+                    try table.initialize(
+                        references, from: 0, to: Int(offsetAddr), count: references.count
+                    )
+                } catch {
+                    throw ImportError(error)
+                }
             }
         }
 
         // Step 16.
         for case .active(let data) in data {
-            let memory = try instance.memories[validating: Int(data.index), MemoryEntity.createOutOfBoundsError]
+            // Get memory - throws Trap
+            let memory: InternalMemory
+            do {
+                memory = try instance.memories[validating: Int(data.index), MemoryEntity.createOutOfBoundsError]
+            } catch {
+                throw ImportError(error)
+            }
             let isMemory64 = memory.withValue { $0.limit.isMemory64 }
-            let offsetValue = try data.offset.evaluate(
-                context: constEvalContext,
-                expectedType: .addressType(isMemory64: isMemory64)
-            )
-            try memory.withValue { memory in
+
+            // Evaluate offset - throws ValidationError
+            let offsetValue: Value
+            do {
+                offsetValue = try data.offset.evaluate(
+                    context: constEvalContext,
+                    expectedType: .addressType(isMemory64: isMemory64)
+                )
+            } catch {
+                throw ImportError(error)
+            }
+
+            try memory.withValue { (memory: inout MemoryEntity) throws(ImportError) in
                 guard let offset = offsetValue.maybeAddressOffset(isMemory64) else {
-                    throw ValidationError(
+                    throw ImportError(ValidationError(
                         .unexpectedOffsetInitializer(expected: .addressType(isMemory64: isMemory64), got: offsetValue)
-                    )
+                    ))
                 }
-                try memory.write(offset: Int(offset), bytes: data.initializer)
+                do throws(Trap) {
+                    try memory.write(offset: Int(offset), bytes: data.initializer)
+                } catch {
+                    throw ImportError(error)
+                }
             }
         }
 
         // Step 17.
         if let startIndex = start {
-            let startFunction = try instance.functions[validating: Int(startIndex)]
-            _ = try startFunction.invoke([], store: store)
+            let startFunction: InternalFunction
+            do {
+                startFunction = try instance.functions[validating: Int(startIndex)]
+            } catch {
+                throw ImportError(error)
+            }
+            do {
+                _ = try startFunction.invoke([], store: store)
+            } catch {
+                throw ImportError(error)
+            }
         }
 
         // Compile all functions eagerly if the engine is in eager compilation mode
         if store.engine.configuration.compilationMode == .eager {
-            try instance.withValue {
-                try $0.compileAllFunctions(store: store)
+            try instance.withValue { (instance: inout InstanceEntity) throws(ImportError) in
+                do throws(Trap) {
+                    try instance.compileAllFunctions(store: store)
+                } catch {
+                    throw ImportError(error)
+                }
             }
         }
 
@@ -244,7 +298,7 @@ public struct Module {
 
     /// Materialize lazily-computed elements in this module
     @available(*, deprecated, message: "Module materialization is no longer supported. Instantiate the module explicitly instead.")
-    public mutating func materializeAll() throws {}
+    public mutating func materializeAll() {}
 }
 
 extension Module {

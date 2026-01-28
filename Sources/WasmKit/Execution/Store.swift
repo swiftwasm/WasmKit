@@ -53,9 +53,11 @@ public struct Caller {
     /// The store associated with the caller execution context.
     public let store: Store
 
+    #if !$Embedded
     /// The runtime that called the host function.
     @available(*, unavailable, message: "Use `engine` instead")
     public var runtime: Runtime { fatalError() }
+    #endif
 
     init(instanceHandle: InternalInstance?, store: Store) {
         self.instanceHandle = instanceHandle
@@ -69,6 +71,7 @@ struct HostFunctionEntity {
 }
 
 extension Store {
+    #if !$Embedded
     @available(*, unavailable, message: "Use ``Imports/define(_:as:)`` instead. Or use ``Runtime/register(_:as:)`` as a temporary drop-in replacement.")
     public func register(_ instance: Instance, as name: String) throws(Trap) {}
 
@@ -79,6 +82,7 @@ extension Store {
     ///   - name: A name to register the given host module.
     @available(*, unavailable, message: "Use ``Imports/define(_:as:)`` instead. Or use ``Runtime/register(_:as:)`` as a temporary drop-in replacement.")
     public func register(_ hostModule: HostModule, as name: String, runtime: Any) throws(Trap) {}
+    #endif
 
     @available(*, deprecated, message: "Address-based APIs has been removed; use Memory instead")
     public func memory(at address: Memory) -> Memory {

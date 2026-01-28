@@ -1,5 +1,6 @@
 import WasmParser
 
+#if !$Embedded
 /// A container to manage execution state of one or more module instances.
 @available(*, deprecated, message: "Use `Engine` instead")
 public final class Runtime {
@@ -212,3 +213,4 @@ public struct HostModule {
     /// Names of functions exported by this module mapped to corresponding host functions.
     public var functions: [String: HostFunction]
 }
+#endif

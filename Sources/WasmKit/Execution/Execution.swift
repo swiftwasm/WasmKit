@@ -309,22 +309,16 @@ func executeWasm(
             sp[VReg(index)] = UntypedValue(argument)
         }
 
-        do {
-            try withUnsafeTemporaryAllocation(of: CodeSlot.self, capacity: 2) { rootISeq in
-                rootISeq[0] = Instruction.endOfExecution.headSlot(
-                    threadingModel: store.value.engine.configuration.threadingModel
-                )
-                try stack.execute(
-                    sp: sp,
-                    pc: rootISeq.baseAddress!,
-                    handle: handle,
-                    type: type
-                )
-            }
-        } catch let trap as Trap {
-            throw trap
-        } catch {
-            throw Trap(TrapReason.message(TrapReason.Message("Unexpected error during execution")))
+        try withUnsafeTemporaryAllocation(of: CodeSlot.self, capacity: 2) { rootISeq throws(Trap) in
+            rootISeq[0] = Instruction.endOfExecution.headSlot(
+                threadingModel: store.value.engine.configuration.threadingModel
+            )
+            try stack.execute(
+                sp: sp,
+                pc: rootISeq.baseAddress!,
+                handle: handle,
+                type: type
+            )
         }
         return type.results.enumerated().map { (i, type) in
             sp[VReg(i)].cast(to: type)
@@ -492,13 +486,13 @@ extension Execution {
         #endif
     }
 
+    #if !$Embedded
     /// Starts the main execution loop using the direct threading model.
     @inline(never)
-    @_unavailableInEmbedded
     mutating func runDirectThreaded(
         sp: Sp, pc: Pc, md: Md, ms: Ms
     ) throws {
-        #if os(WASI) || $Embedded
+        #if os(WASI)
             fatalError("Direct threading is not supported on WASI or Embedded Swift")
         #else
             var pc = pc
@@ -520,6 +514,7 @@ extension Execution {
             }
         #endif
     }
+    #endif
 
     #if EngineStats
         /// A helper structure for collecting instruction statistics.

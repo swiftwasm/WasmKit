@@ -71,6 +71,7 @@ package enum TrapReason: Error, CustomStringConvertible {
     case unreachable
     /// A validation error
     case validationError(ValidationError)
+    case translationError(TranslationError)
     /// Too deep call stack
     ///
     /// Note: When this trap occurs, consider extending ``EngineConfiguration/stackSize``.
@@ -115,6 +116,8 @@ package enum TrapReason: Error, CustomStringConvertible {
             return "out of bounds table access at \(index) (undefined element)"
         case .validationError(let error):
             return "validation error: \(error)"
+        case .translationError(let error):
+            return "translation error: \(error)"
         }
     }
 }
@@ -151,6 +154,7 @@ public struct ImportError: Error {
         case message(Message)
         case trap(Trap)
         case validation(ValidationError)
+        case moduleValidation(ModuleValidationError)
     }
 
     public struct Message {
@@ -173,6 +177,10 @@ public struct ImportError: Error {
 
     init(_ validation: ValidationError) {
         self.reason = .validation(validation)
+    }
+
+    init(_ moduleValidation: ModuleValidationError) {
+        self.reason = .moduleValidation(moduleValidation)
     }
 }
 

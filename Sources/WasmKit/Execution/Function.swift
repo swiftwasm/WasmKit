@@ -98,6 +98,7 @@ public struct Function: Equatable {
         return try invoke(arguments)
     }
 
+    #if !$Embedded
     /// Invokes a function of the given address with the given parameters.
     ///
     /// - Parameters:
@@ -110,6 +111,7 @@ public struct Function: Equatable {
     public func invoke(_ arguments: [Value] = [], runtime: Runtime) throws(Trap) -> [Value] {
         return try invoke(arguments)
     }
+    #endif
 }
 
 @available(*, deprecated, renamed: "Function", message: "Use Function instead")

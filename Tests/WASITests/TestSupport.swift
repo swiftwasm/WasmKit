@@ -26,18 +26,18 @@ enum TestSupport {
             self.data = Array(repeating: 0, count: size)
         }
 
-        func withUnsafeMutableBufferPointer<T>(
+        func withUnsafeMutableBufferPointer(
             offset: UInt,
             count: Int,
-            _ body: (UnsafeMutableRawBufferPointer) throws -> T
-        ) rethrows -> T {
+            _ body: (UnsafeMutableRawBufferPointer) -> Void
+        ) -> Void {
             guard offset + UInt(count) <= data.count else {
                 fatalError("Memory access out of bounds")
             }
-            return try data.withUnsafeMutableBytes { buffer in
+            return data.withUnsafeMutableBytes { buffer in
                 let start = buffer.baseAddress!.advanced(by: Int(offset))
                 let slice = UnsafeMutableRawBufferPointer(start: start, count: count)
-                return try body(slice)
+                return body(slice)
             }
         }
 

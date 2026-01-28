@@ -628,14 +628,12 @@ struct InstructionTranslator: InstructionVisitor {
             let headSlot = instruction.headSlot(threadingModel: engineConfiguration.threadingModel)
             trace("        [\(index)] = 0x\(String(headSlot, radix: 16))")
             self.instructions[index] = headSlot
-            if let immediate = instruction.rawImmediate {
-                var slots: [CodeSlot] = []
-                immediate.emit(to: { slots.append($0) })
-                for (i, slot) in slots.enumerated() {
-                    let slotIndex = index + 1 + i
-                    trace("        [\(slotIndex)] = 0x\(String(slot, radix: 16))")
-                    self.instructions[slotIndex] = slot
-                }
+            var slots: [CodeSlot] = []
+            instruction.emit(to: { slots.append($0) })
+            for (i, slot) in slots.enumerated() {
+                let slotIndex = index + 1 + i
+                trace("        [\(slotIndex)] = 0x\(String(slot, radix: 16))")
+                self.instructions[slotIndex] = slot
             }
         }
 
@@ -672,11 +670,9 @@ struct InstructionTranslator: InstructionVisitor {
             self.lastEmission = LastEmission(position: insertingPC, resultRelink: resultRelink)
             trace("emitInstruction: \(instruction)")
             emitSlot(instruction.headSlot(threadingModel: engineConfiguration.threadingModel))
-            if let immediate = instruction.rawImmediate {
-                var slots: [CodeSlot] = []
-                immediate.emit(to: { slots.append($0) })
-                for slot in slots { emitSlot(slot) }
-            }
+            var slots: [CodeSlot] = []
+            instruction.emit(to: { slots.append($0) })
+            for slot in slots { emitSlot(slot) }
         }
 
         mutating func putLabel() -> LabelRef {
@@ -1362,10 +1358,15 @@ struct InstructionTranslator: InstructionVisitor {
         iseqBuilder.emitWithLabel(makeInstruction, frame.continuation) { _, selfPC, continuation in
             let relativeOffset = continuation.offsetFromHead - selfPC.offsetFromHead
             return make(Int32(relativeOffset), UInt32(copyCount), popCount)
-        }`
+        }
     }
     mutating func visitBr(relativeDepth: UInt32) throws(InstructionTranslatorError) -> Output {
-        let frame = try controlStack.branchTarget(relativeDepth: relativeDepth)
+        let frame: InstructionTranslator.ControlStack.ControlFrame
+        do {
+            frame = try controlStack.branchTarget(relativeDepth: relativeDepth)
+        } catch {
+            throw InstructionTranslatorError.validation(error)
+        }
 
         // Copy from the stack top to the bottom to avoid overwrites
         //              [BLOCK1]
@@ -1391,7 +1392,7 @@ struct InstructionTranslator: InstructionVisitor {
             frame = try controlStack.branchTarget(relativeDepth: relativeDepth)            
         } catch {
             throw InstructionTranslatorError.validation(error)
-        } = try controlStack.branchTarget(relativeDepth: relativeDepth)
+        }
         let condition = try popVRegOperand(.i32)
 
         if frame.copyCount == 0 {
@@ -1440,23 +1441,36 @@ struct InstructionTranslator: InstructionVisitor {
             try emitBranch(Instruction.br, relativeDepth: relativeDepth) { offset, copyCount, popCount in
                 return offset
             }
-            try iseqBuilder.pinLabelHere(onBranchNotTaken)
+            do {
+                try iseqBuilder.pinLabelHere(onBranchNotTaken)
+            } catch {
+                throw InstructionTranslatorError.translation(error)
+            }
         }
         try popPushValues(frame.copyTypes)
     }
 
-    mutating func visitBrTable(targets: WasmParser.BrTable) throws -> Output {
+    mutating func visitBrTable(targets: WasmParser.BrTable) throws(InstructionTranslatorError) -> Output {
         guard let index = try popVRegOperand(.i32) else { return }
 
-        let defaultFrame = try controlStack.branchTarget(relativeDepth: targets.defaultIndex)
+        let defaultFrame: ControlStack.ControlFrame
+        do {
+            defaultFrame = try controlStack.branchTarget(relativeDepth: targets.defaultIndex)
+        } catch {
+            throw InstructionTranslatorError.validation(error)
+        }
 
         // If this instruction is unreachable, copyCount might be greater than the actual stack height
-        try preserveOnStack(
-            depth: min(
-                Int(defaultFrame.copyCount),
-                valueStack.height - controlStack.currentFrame().stackHeight
+        do {
+            try preserveOnStack(
+                depth: min(
+                    Int(defaultFrame.copyCount),
+                    valueStack.height - controlStack.currentFrame().stackHeight
+                )
             )
-        )
+        } catch {
+            throw InstructionTranslatorError.validation(error)
+        }
         let allLabelIndices = targets.labelIndices + [targets.defaultIndex]
         let tableBuffer = allocator.allocateBrTable(capacity: allLabelIndices.count)
         let operand = Instruction.BrTableOperand(
@@ -1497,13 +1511,13 @@ struct InstructionTranslator: InstructionVisitor {
         //     |     [0x0a] (stack.copy reg:2 -> reg:0)
         //     +---> [0x0b] ...
         for (entryIndex, labelIndex) in allLabelIndices.enumerated() {
-            let frame = try controlStack.branchTarget(relativeDepth: labelIndex)
+            let frame = try InstructionTranslatorError.validate(controlStack.branchTarget(relativeDepth: labelIndex))
 
             // Check copyTypes consistency
             guard frame.copyTypes.count == defaultFrame.copyTypes.count else {
-                throw ValidationError(.expectedSameCopyTypes(frameCopyTypes: frame.copyTypes, defaultFrameCopyTypes: defaultFrame.copyTypes))
+                throw InstructionTranslatorError.validation(ValidationError(.expectedSameCopyTypes(frameCopyTypes: frame.copyTypes, defaultFrameCopyTypes: defaultFrame.copyTypes)))
             }
-            try checkStackTop(frame.copyTypes)
+            try InstructionTranslatorError.validate(checkStackTop(frame.copyTypes))
 
             do {
                 let relativeOffset = iseqBuilder.insertingPC.offsetFromHead - brTableAt.offsetFromHead
@@ -1532,12 +1546,12 @@ struct InstructionTranslator: InstructionVisitor {
         try markUnreachable()
     }
 
-    mutating func visitReturn() throws -> Output {
+    mutating func visitReturn() throws(InstructionTranslatorError) -> Output {
         try translateReturn()
         try markUnreachable()
     }
 
-    private mutating func visitCallLike(calleeType: FunctionType) throws -> VReg? {
+    private mutating func visitCallLike(calleeType: FunctionType) throws(InstructionTranslatorError) -> VReg? {
         for parameter in calleeType.parameters.reversed() {
             guard (try popOnStackOperand(parameter)) != nil else { return nil }
         }
@@ -1551,8 +1565,13 @@ struct InstructionTranslator: InstructionVisitor {
         }
         return VReg(spAddend)
     }
-    mutating func visitCall(functionIndex: UInt32) throws -> Output {
-        let calleeType = try self.module.functionType(functionIndex, interner: funcTypeInterner)
+    mutating func visitCall(functionIndex: UInt32) throws(InstructionTranslatorError) -> Output {
+        let calleeType: FunctionType
+        do throws(ValidationError) {
+            calleeType = try self.module.functionType(functionIndex, interner: funcTypeInterner)
+        } catch {
+            throw InstructionTranslatorError.validation(error)
+        }
         guard let spAddend = try visitCallLike(calleeType: calleeType) else { return }
         guard let callee = self.module.resolveCallee(functionIndex) else {
             // Skip actual code emission if validation-only mode
@@ -1567,10 +1586,20 @@ struct InstructionTranslator: InstructionVisitor {
         emit(.call(Instruction.CallOperand(callee: callee, spAddend: spAddend)))
     }
 
-    mutating func visitCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws -> Output {
-        let addressType = try module.addressType(tableIndex: tableIndex)
+    mutating func visitCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws(InstructionTranslatorError) -> Output {
+        let addressType: ValueType
+        do {
+            addressType = try module.addressType(tableIndex: tableIndex)
+        } catch {
+            throw InstructionTranslatorError.validation(error)
+        }
         let address = try popVRegOperand(addressType)  // function address
-        let calleeType = try self.module.resolveType(typeIndex)
+        let calleeType: FunctionType
+        do {
+            calleeType = try self.module.resolveType(typeIndex)
+        } catch {
+            throw InstructionTranslatorError.validation(error)
+        }
         guard let spAddend = try visitCallLike(calleeType: calleeType) else { return }
         guard let address = address else { return }
         let internType = funcTypeInterner.intern(calleeType)
@@ -1593,7 +1622,7 @@ struct InstructionTranslator: InstructionVisitor {
     ///   - calleeType: The type of the callee function.
     ///   - stackTopHeightToCopy: The height of the stack top needed to be available at the
     ///     return-call-like instruction point.
-    private mutating func prepareFrameHeaderForReturnCall(calleeType: FunctionType, stackTopHeightToCopy: Int) throws {
+    private mutating func prepareFrameHeaderForReturnCall(calleeType: FunctionType, stackTopHeightToCopy: Int) throws(InstructionTranslatorError) {
         let calleeFrameHeader = FrameHeaderLayout(type: calleeType)
         if calleeType == self.type {
             // Fast path: If the callee and the caller have the same signature, we can
@@ -1611,9 +1640,14 @@ struct InstructionTranslator: InstructionVisitor {
         try copyValuesIntoResultSlots(calleeType.parameters, frameHeader: calleeFrameHeader)
     }
 
-    mutating func visitReturnCall(functionIndex: UInt32) throws {
-        let calleeType = try self.module.functionType(functionIndex, interner: funcTypeInterner)
-        try validator.validateReturnCallLike(calleeType: calleeType, callerType: type)
+    mutating func visitReturnCall(functionIndex: UInt32) throws(InstructionTranslatorError) {
+        let calleeType: FunctionType
+        do {
+            calleeType = try self.module.functionType(functionIndex, interner: funcTypeInterner)
+            try validator.validateReturnCallLike(calleeType: calleeType, callerType: type)
+        } catch {
+            throw InstructionTranslatorError.validation(error)
+        }
 
         guard let callee = self.module.resolveCallee(functionIndex) else {
             // Skip actual code emission if validation-only mode
@@ -1624,14 +1658,24 @@ struct InstructionTranslator: InstructionVisitor {
         try markUnreachable()
     }
 
-    mutating func visitReturnCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws {
+    mutating func visitReturnCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws(InstructionTranslatorError) {
         let stackTopHeightToCopy = valueStack.height
-        let addressType = try module.addressType(tableIndex: tableIndex)
+        let addressType: ValueType
+        do {
+            addressType = try module.addressType(tableIndex: tableIndex)
+        } catch {
+            throw InstructionTranslatorError.validation(error)
+        }
         // Preserve function index slot on stack
         let address = try popOnStackOperand(addressType)  // function address
         guard let address = address else { return }
 
-        let calleeType = try self.module.resolveType(typeIndex)
+        let calleeType: FunctionType
+        do {
+            calleeType = try self.module.resolveType(typeIndex)
+        } catch {
+            throw InstructionTranslatorError.validation(error)
+        }
         let internType = funcTypeInterner.intern(calleeType)
 
         try prepareFrameHeaderForReturnCall(
@@ -1650,20 +1694,20 @@ struct InstructionTranslator: InstructionVisitor {
         try markUnreachable()
     }
 
-    mutating func visitDrop() throws -> Output {
+    mutating func visitDrop() throws(InstructionTranslatorError) -> Output {
         _ = try popAnyOperand()
         iseqBuilder.resetLastEmission()
     }
-    mutating func visitSelect() throws -> Output {
+    mutating func visitSelect() throws(InstructionTranslatorError) -> Output {
         let condition = try popVRegOperand(.i32)
         let (value1Type, value1) = try popAnyOperand()
         let (value2Type, value2) = try popAnyOperand()
         switch (value1Type, value2Type) {
         case (.some(.ref(_)), _), (_, .some(.ref(_))):
-            throw ValidationError(.cannotSelectOnReferenceTypes)
+            throw InstructionTranslatorError.validation(ValidationError(.cannotSelectOnReferenceTypes))
         case (.some(let type1), .some(let type2)):
             guard type1 == type2 else {
-                throw ValidationError(.typeMismatchOnSelect(expected: type1, actual: type2))
+                throw InstructionTranslatorError.validation(ValidationError(.typeMismatchOnSelect(expected: type1, actual: type2)))
             }
         case (.unknown, _), (_, .unknown):
             break
@@ -1679,16 +1723,16 @@ struct InstructionTranslator: InstructionVisitor {
             emit(.select(operand))
         }
     }
-    mutating func visitTypedSelect(type: WasmTypes.ValueType) throws -> Output {
+    mutating func visitTypedSelect(type: WasmTypes.ValueType) throws(InstructionTranslatorError) -> Output {
         let condition = try popVRegOperand(.i32)
         let (value1Type, value1) = try popAnyOperand()
         let (_, value2) = try popAnyOperand()
         // TODO: Perform actual validation
         // guard value1 == ValueType(type) else {
-        //     throw TranslationError("Type mismatch on `select`. Expected \(value1) and \(type) to be same")
+        //     throw InstructionTranslatorError.translation(TranslationError("Type mismatch on `select`. Expected \(value1) and \(type) to be same"))
         // }
         // guard value2 == ValueType(type) else {
-        //     throw TranslationError("Type mismatch on `select`. Expected \(value2) and \(type) to be same")
+        //     throw InstructionTranslatorError.translation(TranslationError("Type mismatch on `select`. Expected \(value2) and \(type) to be same"))
         // }
         let result = valueStack.push(value1Type)
         if let condition = condition, let value1 = value1, let value2 = value2 {
@@ -2005,7 +2049,7 @@ struct InstructionTranslator: InstructionVisitor {
         pushEmit(.ref(.funcRef), { .refFunc(Instruction.RefFuncOperand(index: functionIndex, result: LVReg($0))) })
     }
 
-    private mutating func visitUnary(_ operand: ValueType, _ instruction: @escaping (Instruction.UnaryOperand) -> Instruction) throws {
+    private mutating func visitUnary(_ operand: ValueType, _ instruction: @escaping (Instruction.UnaryOperand) -> Instruction) throws(InstructionTranslatorError) {
         try popPushEmit(operand, operand) { value, result in
             return instruction(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
@@ -2014,7 +2058,7 @@ struct InstructionTranslator: InstructionVisitor {
         _ operand: ValueType,
         _ result: ValueType,
         _ instruction: @escaping (Instruction.BinaryOperand) -> Instruction
-    ) throws {
+    ) throws(InstructionTranslatorError) {
         let rhs = try popVRegOperand(operand)
         let lhs = try popVRegOperand(operand)
         let result = valueStack.push(result)
@@ -2026,7 +2070,7 @@ struct InstructionTranslator: InstructionVisitor {
             }
         )
     }
-    private mutating func visitCmp(_ operand: ValueType, _ instruction: @escaping (Instruction.BinaryOperand) -> Instruction) throws {
+    private mutating func visitCmp(_ operand: ValueType, _ instruction: @escaping (Instruction.BinaryOperand) -> Instruction) throws(InstructionTranslatorError) {
         try visitBinary(operand, .i32, instruction)
     }
     private mutating func visitConversion(_ from: ValueType, _ to: ValueType, _ instruction: @escaping (Instruction.UnaryOperand) -> Instruction) throws(InstructionTranslatorError) {
@@ -2039,7 +2083,7 @@ struct InstructionTranslator: InstructionVisitor {
             .i32Eqz(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
     }
-    mutating func visitCmp(_ cmp: WasmParser.Instruction.Cmp) throws {
+    mutating func visitCmp(_ cmp: WasmParser.Instruction.Cmp) throws(InstructionTranslatorError) {
         let operand: ValueType
         let instruction: (Instruction.BinaryOperand) -> Instruction
         switch cmp {
@@ -2078,7 +2122,7 @@ struct InstructionTranslator: InstructionVisitor {
         }
         try visitCmp(operand, instruction)
     }
-    public mutating func visitBinary(_ binary: WasmParser.Instruction.Binary) throws {
+    public mutating func visitBinary(_ binary: WasmParser.Instruction.Binary) throws(InstructionTranslatorError) {
         let operand: ValueType
         let result: ValueType
         let instruction: (Instruction.BinaryOperand) -> Instruction
@@ -2135,7 +2179,7 @@ struct InstructionTranslator: InstructionVisitor {
             .i64Eqz(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
     }
-    mutating func visitUnary(_ unary: WasmParser.Instruction.Unary) throws {
+    mutating func visitUnary(_ unary: WasmParser.Instruction.Unary) throws(InstructionTranslatorError) {
         let operand: ValueType
         let instruction: (Instruction.UnaryOperand) -> Instruction
         switch unary {
@@ -2378,8 +2422,8 @@ struct InstructionTranslator: InstructionVisitor {
     }
 }
 
-struct TranslationError: Error, CustomStringConvertible {
-    let description: String
+public struct TranslationError: Error, CustomStringConvertible {
+    public let description: String
 
     init(_ description: String) {
         self.description = description

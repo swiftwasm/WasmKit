@@ -64,10 +64,12 @@ extension CanonicalCallContext {
         return instance
     }
 
+    #if !$Embedded
     @available(*, deprecated, renamed: "init(options:instance:)")
     public init(options: CanonicalOptions, moduleInstance: Instance, runtime: Runtime) {
         self.init(options: options, instance: moduleInstance)
     }
+    #endif
 }
 
 @available(*, deprecated, renamed: "Memory", message: "WasmKitGuestMemory has been removed; use Memory instead")

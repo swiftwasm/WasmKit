@@ -71,7 +71,7 @@ private class ImmutableArrayAllocator {
     /// Allocates a buffer for an immutable array of `T` with the given `count`.
     ///
     /// - Note: The element type `T` must be a trivial type.
-    func allocate<T>(count: Int) -> UnsafeMutableBufferPointer<T> {
+    final func allocate<T>(count: Int) -> UnsafeMutableBufferPointer<T> {
         // We only support trivial types for now. Otherwise, we have to track the element type
         // until the deallocation of this allocator.
         assert(_isPOD(T.self), "ImmutableArrayAllocator only supports trivial element types.")
@@ -379,7 +379,7 @@ extension StoreAllocator {
         // Step 5.
         let constEvalContext = ConstEvaluationContext(
             functions: functions,
-            globals: importedGlobals.map(\.value),
+            globals: importedGlobals.map { $0.value },
             onFunctionReferenced: { function in
                 functionRefs.insert(function)
             }
@@ -438,7 +438,7 @@ extension StoreAllocator {
             }
         }
 
-        func createExportValue(_ export: WasmParser.Export) throws -> InternalExternalValue {
+        func createExportValue(_ export: WasmParser.Export) throws(ValidationError) -> InternalExternalValue {
             switch export.descriptor {
             case .function(let index):
                 let handle = try functions[validating: Int(index)]
@@ -455,11 +455,16 @@ extension StoreAllocator {
             }
         }
 
-        let exports: [String: InternalExternalValue] = try module.exports.reduce(into: [:]) { result, export in
-            guard result[export.name] == nil else {
-                throw ValidationError(.duplicateExportName(name: export.name))
+        var exports: [String: InternalExternalValue] = [:]
+        do throws(ValidationError) {
+            for export in module.exports {
+                guard exports[export.name] == nil else {
+                    throw ValidationError(.duplicateExportName(name: export.name))
+                }
+                exports[export.name] = try createExportValue(export)
             }
-            result[export.name] = try createExportValue(export)
+        } catch {
+            throw ImportError(error)
         }
 
         // Steps 20-21.

@@ -281,7 +281,7 @@ public struct Instance {
     ///
     /// - Precondition: The instance must be compiled with the token threading model.
     @_spi(OnlyForCLI)
-    public func dumpFunctions<Target>(to target: inout Target, module: Module) throws where Target: TextOutputStream {
+    public func dumpFunctions<Target>(to target: inout Target, module: Module) throws(Trap) where Target: TextOutputStream {
         for (offset, function) in self.handle.functions.enumerated() {
             let index = offset
             guard function.isWasm else { continue }
@@ -297,11 +297,16 @@ public struct Instance {
             let (iseq, locals, _) = function.assumeCompiled()
 
             // Print slot space information
-            let stackLayout = try StackLayout(
-                type: store.engine.funcTypeInterner.resolve(function.type),
-                numberOfLocals: locals,
-                codeSize: code.expression.count
-            )
+            let stackLayout: StackLayout
+            do {
+                stackLayout = try StackLayout(
+                    type: store.engine.funcTypeInterner.resolve(function.type),
+                    numberOfLocals: locals,
+                    codeSize: code.expression.count
+                )
+            } catch {
+                throw Trap(.translationError(error))
+            }
             stackLayout.dump(to: &target, iseq: iseq)
 
             var context = InstructionPrintingContext(
@@ -737,11 +742,11 @@ public struct Memory: Equatable {
 
 extension Memory: GuestMemory {
     /// Executes the given closure with an immutable buffer pointer to the host memory region mapped as guest memory.
-    public func withUnsafeBufferPointer<T>(
+    public func withUnsafeBufferPointer(
         offset: UInt,
         count: Int,
-        _ body: (UnsafeRawBufferPointer) -> T
-    ) -> T {
+        _ body: (UnsafeRawBufferPointer) -> Void
+    ) {
         return handle.withValue { memory in
             precondition(Int(offset) + count <= memory.byteCount, "Memory access out of bounds")
             guard let base = memory.baseAddress else {

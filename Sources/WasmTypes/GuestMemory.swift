@@ -1,11 +1,11 @@
 /// A write/read-able view representation of WebAssembly Memory instance
 public protocol GuestMemory {
     /// Executes the given closure with a mutable buffer pointer to the host memory region mapped as guest memory.
-    func withUnsafeMutableBufferPointer<T>(
+    func withUnsafeMutableBufferPointer(
         offset: UInt,
         count: Int,
-        _ body: (UnsafeMutableRawBufferPointer) -> T
-    ) -> T
+        _ body: (UnsafeMutableRawBufferPointer) -> Void
+    )
 }
 
 /// A pointer-referenceable type that is intended to be pointee of ``UnsafeGuestPointer``
@@ -89,9 +89,12 @@ public struct UnsafeGuestRawPointer {
 
     /// Executes the given closure with a mutable raw pointer to the host memory region mapped as guest memory.
     public func withHostPointer<R>(count: Int, _ body: (UnsafeMutableRawBufferPointer) -> R) -> R {
+        var result: R!
+
         memorySpace.withUnsafeMutableBufferPointer(offset: UInt(offset), count: count) { buffer in
-            body(UnsafeMutableRawBufferPointer(start: buffer.baseAddress!, count: count))
+            result = body(UnsafeMutableRawBufferPointer(start: buffer.baseAddress!, count: count))
         }
+        return result
     }
 
     /// Returns a new pointer offset from this pointer by the specified number of bytes.
