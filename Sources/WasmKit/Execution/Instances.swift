@@ -95,7 +95,7 @@ extension EntityHandle where T == WasmFunctionEntity {
 
 extension EntityHandle where T == HostFunctionEntity {
     var type: InternedFuncType { withValue { $0.type } }
-    var implementation: (Caller, [Value]) throws(Trap) -> [Value] { withValue { $0.implementation } }
+    var implementation: (InternalCaller, [Value]) throws(Trap) -> [Value] { withValue { $0.implementation } }
 }
 
 extension EntityHandle where T == Code {
@@ -170,7 +170,7 @@ package struct InstanceEntity /* : ~Copyable */ {
         )
     }
 
-    package func compileAllFunctions(store: Store) throws(Trap) {
+    package func compileAllFunctions<M: GuestMemory>(store: Store<M>) throws(Trap) {
         let store = StoreRef(store)
         for function in functions {
             guard function.isWasm else { continue }
@@ -221,7 +221,7 @@ public struct Exports<MemorySpace: GuestMemory>: Sequence {
         return global
     }
 
-    public struct Iterator<MemorySpace: GuestMemory>: IteratorProtocol {
+    public struct Iterator: IteratorProtocol {
         private let store: Store<MemorySpace>
         private var iterator: Dictionary<String, InternalExternalValue>.Iterator
 
@@ -230,13 +230,13 @@ public struct Exports<MemorySpace: GuestMemory>: Sequence {
             self.iterator = parent.items.makeIterator()
         }
 
-        public mutating func next() -> (name: String, value: ExternalValue)? {
+        public mutating func next() -> (name: String, value: ExternalValue<MemorySpace>)? {
             guard let (name, entity) = iterator.next() else { return nil }
             return (name, ExternalValue(handle: entity, store: store))
         }
     }
 
-    public func makeIterator() -> Iterator<MemorySpace> {
+    public func makeIterator() -> Iterator {
         Iterator(parent: self)
     }
 }
@@ -513,7 +513,7 @@ public struct Table: Equatable {
     /// let imports: Imports = ["env": ["table": table]]
     /// let instance = try module.instantiate(store: store, imports: imports)
     /// ```
-    public init(store: Store<MemorySpace>, type: TableType) throws(Trap) {
+    public init<M: GuestMemory>(store: Store<M>, type: TableType) throws(Trap) {
         self.init(
             handle: try store.allocator.allocate(tableType: type, resourceLimiter: store.resourceLimiter),
             allocator: store.allocator
@@ -714,10 +714,10 @@ public struct Memory: Equatable {
     /// let imports: Imports = ["env": ["memory": memory]]
     /// let instance = try module.instantiate(store: store, imports: imports)
     /// ```
-    public init(store: Store<MemorySpace>, type: MemoryType) throws(Trap) {
+    public init<M: GuestMemory>(store: Store<M>, type: MemoryType) throws(Trap) {
         // Validate the memory type because the type is not validated at instantiation time.
-        do {
-            try ModuleValidator<MemorySpace>.checkMemoryType(type, features: store.engine.configuration.features)
+        do throws(ValidationError) {
+            try ModuleValidator<M>.checkMemoryType(type, features: store.engine.configuration.features)
         } catch {
             throw Trap(.validationError(error))
         }

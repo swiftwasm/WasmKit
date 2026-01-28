@@ -4,11 +4,10 @@ import _CWasmKit
 ///
 /// Each new invocation through exported function has a separate ``Execution``
 /// even though the invocation happens during another invocation.
-struct Execution<MemorySpace>: ~Copyable {
-    associatedtype MemorySpace: GuestMemory
-    
+struct Execution<MemorySpace: GuestMemory>: ~Copyable {
+
     /// The reference to the ``Store`` associated with the execution.
-    let store: StoreRef
+    let store: StoreRef<MemorySpace>
 
     /// The end of the VM stack space.
     private let stackEnd: UnsafeMutablePointer<StackSlot>
@@ -18,7 +17,7 @@ struct Execution<MemorySpace>: ~Copyable {
     private var trap: (error: UnsafeRawPointer, sp: Sp)? = nil
 
     #if WasmDebuggingSupport
-        package init(store: StoreRef, stackEnd: UnsafeMutablePointer<StackSlot>) {
+        package init(store: StoreRef<MemorySpace>, stackEnd: UnsafeMutablePointer<StackSlot>) {
             self.store = store
             self.stackEnd = stackEnd
         }
@@ -27,7 +26,7 @@ struct Execution<MemorySpace>: ~Copyable {
     /// Executes the given closure with a new execution state associated with
     /// the given ``Store`` instance.
     static func with<T, E: Error>(
-        store: StoreRef,
+        store: StoreRef<MemorySpace>,
         body: (inout Execution, Sp) throws(E) -> T
     ) throws(E) -> T {
         let limit = store.value.engine.configuration.stackSize / MemoryLayout<StackSlot>.stride
@@ -138,14 +137,14 @@ struct Execution<MemorySpace>: ~Copyable {
 
 /// An unmanaged reference to a ``Store`` instance.
 /// - Note: This is used to avoid ARC overhead during VM execution.
-struct StoreRef {
-    private let _value: Unmanaged<Store>
+struct StoreRef<MemorySpace: GuestMemory> {
+    private let _value: Unmanaged<Store<MemorySpace>>
 
-    var value: Store {
+    var value: Store<MemorySpace> {
         _value.takeUnretainedValue()
     }
 
-    init(_ value: __shared Store) {
+    init(_ value: __shared Store<MemorySpace>) {
         self._value = .passUnretained(value)
     }
 }
@@ -732,9 +731,10 @@ extension Execution {
             sp[spAddend + layout.paramReg(i)].cast(to: type)
         }
         let instance = self.currentInstance(sp: sp)
-        let caller = Caller(
+        let caller = InternalCaller(
             instanceHandle: instance,
-            store: store.value
+            allocator: store.value.allocator,
+            engine: store.value.engine
         )
         let results = try function.implementation(caller, Array(parameters))
         for (index, result) in results.enumerated() {

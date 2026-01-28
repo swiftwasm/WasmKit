@@ -134,7 +134,7 @@ public struct Module<MemorySpace: GuestMemory> {
     ///   - store: The ``Store`` to allocate the instance in.
     ///   - imports: The imports to use for instantiation. All imported entities
     ///     must be allocated in the given store.
-    public func instantiate(store: Store<MemorySpace>, imports: Imports<MemorySpace> = [:]) throws(ImportError) -> Instance<MemorySpace> {
+    public func instantiate(store: Store<MemorySpace>, imports: Imports<MemorySpace> = Imports()) throws(ImportError) -> Instance<MemorySpace> {
         Instance(handle: try self.instantiateHandle(store: store, imports: imports), store: store)
     }
 
@@ -188,9 +188,13 @@ public struct Module<MemorySpace: GuestMemory> {
             guard case .active(let tableIndex, let offset) = element.mode else { continue }
             // Get table and evaluate offset - throws ValidationError
             let table: InternalTable
-            let offsetValue: Value
             do throws(ValidationError) {
                 table = try instance.tables[validating: Int(tableIndex)]
+            } catch {
+                throw ImportError(error)
+            }
+            let offsetValue: Value
+            do throws(ValidationError) {
                 offsetValue = try offset.evaluate(
                     context: constEvalContext,
                     expectedType: .addressType(isMemory64: table.limits.isMemory64)
@@ -233,10 +237,10 @@ public struct Module<MemorySpace: GuestMemory> {
 
         // Step 16.
         for case .active(let data) in data {
-            // Get memory - throws Trap
+            // Get memory
             let memory: InternalMemory
-            do {
-                memory = try instance.memories[validating: Int(data.index), MemoryEntity.createOutOfBoundsError]
+            do throws(ValidationError) {
+                memory = try instance.memories[validating: Int(data.index)]
             } catch {
                 throw ImportError(error)
             }
@@ -244,7 +248,7 @@ public struct Module<MemorySpace: GuestMemory> {
 
             // Evaluate offset - throws ValidationError
             let offsetValue: Value
-            do {
+            do throws(ValidationError) {
                 offsetValue = try data.offset.evaluate(
                     context: constEvalContext,
                     expectedType: .addressType(isMemory64: isMemory64)
@@ -270,12 +274,12 @@ public struct Module<MemorySpace: GuestMemory> {
         // Step 17.
         if let startIndex = start {
             let startFunction: InternalFunction
-            do {
+            do throws(ValidationError) {
                 startFunction = try instance.functions[validating: Int(startIndex)]
             } catch {
                 throw ImportError(error)
             }
-            do {
+            do throws(Trap) {
                 _ = try startFunction.invoke([], store: store)
             } catch {
                 throw ImportError(error)

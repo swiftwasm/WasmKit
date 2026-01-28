@@ -138,10 +138,10 @@ extension TrapReason.Message {
     static var cannotAssignToImmutableGlobal: Self {
         Self("cannot assign to an immutable global")
     }
-    static func noGlobalExportWithName(globalName: String, instance: Instance<_>) -> Self {
+    static func noGlobalExportWithName<M: GuestMemory>(globalName: String, instance: Instance<M>) -> Self {
         Self("no global export with name \(globalName) in a module instance \(instance)")
     }
-    static func exportedFunctionNotFound(name: String, instance: Instance<_>) -> Self {
+    static func exportedFunctionNotFound<M: GuestMemory>(name: String, instance: Instance<M>) -> Self {
         Self("exported function \(name) not found in instance \(instance)")
     }
     static func unimplemented(feature: String) -> Self {

@@ -63,11 +63,27 @@ public struct Caller<MemorySpace: GuestMemory> {
         self.instanceHandle = instanceHandle
         self.store = store
     }
+
+    init(internalCaller: InternalCaller, store: Store<MemorySpace>) {
+        self.instanceHandle = internalCaller.instanceHandle
+        self.store = store
+    }
 }
 
 struct HostFunctionEntity {
     let type: InternedFuncType
-    let implementation: (Caller, [Value]) throws(Trap) -> [Value]
+    #if hasFeature(Embedded)
+    let implementation: (InternalCaller, [Value]) throws(Trap) -> [Value]
+    #else
+    let implementation: (InternalCaller, [Value]) throws(Trap) -> [Value]
+    #endif
+}
+
+/// Internal caller context used by host functions
+struct InternalCaller {
+    let instanceHandle: InternalInstance?
+    let allocator: StoreAllocator
+    let engine: Engine
 }
 
 extension Store {

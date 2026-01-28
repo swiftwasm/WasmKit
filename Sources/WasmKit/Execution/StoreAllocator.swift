@@ -248,11 +248,11 @@ extension StoreAllocator: Equatable {
 extension StoreAllocator {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-module>
-    func allocate<RL: ResourceLimiter>(
-        module: Module,
+    func allocate<RL: ResourceLimiter, MemorySpace: GuestMemory>(
+        module: Module<MemorySpace>,
         engine: Engine,
         resourceLimiter: RL,
-        imports: Imports,
+        imports: Imports<MemorySpace>,
         isDebuggable: Bool
     ) throws(ImportError) -> InternalInstance {
         // Step 1 of module allocation algorithm, according to Wasm 2.0 spec.
@@ -509,7 +509,7 @@ extension StoreAllocator {
 
     internal func allocate(
         type: FunctionType,
-        implementation: @escaping (Caller, [Value]) throws(Trap) -> [Value],
+        implementation: @escaping (InternalCaller, [Value]) throws(Trap) -> [Value],
         engine: Engine
     ) -> InternalFunction {
         let pointer = hostFunctions.allocate(

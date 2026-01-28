@@ -211,6 +211,7 @@ extension Execution {
         sp = newSp
     }
 
+    #if !hasFeature(Embedded)
     mutating func onEnter(sp: Sp, immediate: Instruction.OnEnterOperand) {
         let function = currentInstance(sp: sp).functions[Int(immediate)]
         self.store.value.engine.interceptor?.onEnterFunction(
@@ -223,6 +224,10 @@ extension Execution {
             Function<MemorySpace>(handle: function, store: store.value)
         )
     }
+    #else
+    mutating func onEnter(sp: Sp, immediate: Instruction.OnEnterOperand) {}
+    mutating func onExit(sp: Sp, immediate: Instruction.OnExitOperand) {}
+    #endif
 
     mutating func breakpoint(sp: inout Sp, pc: Pc) throws(Breakpoint) -> (Pc, CodeSlot) {
         throw Breakpoint(

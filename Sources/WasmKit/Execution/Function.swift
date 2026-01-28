@@ -52,7 +52,7 @@ public struct Function<MemorySpace: GuestMemory>: Equatable {
     public init(
         store: Store<MemorySpace>,
         parameters: [ValueType], results: [ValueType] = [],
-        body: @escaping (Caller, [Value]) throws(Trap) -> [Value]
+        body: @escaping (Caller<MemorySpace>, [Value]) throws(Trap) -> [Value]
     ) {
         self.init(store: store, type: FunctionType(parameters: parameters, results: results), body: body)
     }
@@ -66,9 +66,13 @@ public struct Function<MemorySpace: GuestMemory>: Equatable {
     public init(
         store: Store<MemorySpace>,
         type: FunctionType,
-        body: @escaping (Caller, [Value]) throws(Trap) -> [Value]
+        body: @escaping (Caller<MemorySpace>, [Value]) throws(Trap) -> [Value]
     ) {
-        self.init(handle: store.allocator.allocate(type: type, implementation: body, engine: store.engine), store: store)
+        let wrappedBody: (InternalCaller, [Value]) throws(Trap) -> [Value] = { internalCaller, args in
+            let caller = Caller<MemorySpace>(internalCaller: internalCaller, store: store)
+            return try body(caller, args)
+        }
+        self.init(handle: store.allocator.allocate(type: type, implementation: wrappedBody, engine: store.engine), store: store)
     }
 
     /// The signature type of the function.
@@ -165,7 +169,7 @@ extension InternalFunction: ValidatableEntity {
 }
 
 extension InternalFunction {
-    func invoke(_ arguments: [Value], store: Store) throws(Trap) -> [Value] {
+    func invoke<MemorySpace: GuestMemory>(_ arguments: [Value], store: Store<MemorySpace>) throws(Trap) -> [Value] {
         if isWasm {
             let entity = wasm
             let resolvedType = store.engine.resolveType(entity.type)
@@ -180,7 +184,7 @@ extension InternalFunction {
             let entity = host
             let resolvedType = store.engine.resolveType(entity.type)
             try check(functionType: resolvedType, parameters: arguments)
-            let caller = Caller(instanceHandle: nil, store: store)
+            let caller = InternalCaller(instanceHandle: nil, allocator: store.allocator, engine: store.engine)
             let results = try entity.implementation(caller, arguments)
             try check(functionType: resolvedType, results: results)
             return results
@@ -242,7 +246,7 @@ struct WasmFunctionEntity {
         self.index = index
     }
 
-    mutating func ensureCompiled(store: StoreRef) throws(InstructionTranslatorError) -> InstructionSequence {
+    mutating func ensureCompiled<M: GuestMemory>(store: StoreRef<M>) throws(InstructionTranslatorError) -> InstructionSequence {
         switch code {
         case .uncompiled(let code):
             return try compile(store: store, code: code)
@@ -252,10 +256,15 @@ struct WasmFunctionEntity {
     }
 
     @inline(never)
-    mutating func compile(store: StoreRef, code: InternalUncompiledCode) throws(InstructionTranslatorError) -> InstructionSequence {
+    mutating func compile<M: GuestMemory>(store: StoreRef<M>, code: InternalUncompiledCode) throws(InstructionTranslatorError) -> InstructionSequence {
         let store = store.value
         let engine = store.engine
         let type = self.type
+        #if hasFeature(Embedded)
+        let isIntercepting = false
+        #else
+        let isIntercepting = engine.interceptor != nil
+        #endif
         var translator = try InstructionTranslator(
             allocator: store.allocator.iseqAllocator,
             engineConfiguration: engine.configuration,
@@ -265,7 +274,7 @@ struct WasmFunctionEntity {
             locals: code.locals,
             functionIndex: index,
             codeSize: code.expression.count,
-            isIntercepting: engine.interceptor != nil
+            isIntercepting: isIntercepting
         )
         let iseq = try code.withValue { (code: inout Code) throws(InstructionTranslatorError) in
             try translator.translate(code: code)
@@ -278,10 +287,10 @@ struct WasmFunctionEntity {
 extension EntityHandle<WasmFunctionEntity> {
     @inline(never)
     @discardableResult
-    func ensureCompiled(store: StoreRef) throws(Trap) -> InstructionSequence {
+    func ensureCompiled<M: GuestMemory>(store: StoreRef<M>) throws(Trap) -> InstructionSequence {
         switch self.code {
         case .uncompiled(let code):
-            do {
+            do throws(InstructionTranslatorError) {
                 return try self.withValue { (entity: inout WasmFunctionEntity) throws(InstructionTranslatorError) in
                     let iseq = try entity.compile(store: store, code: code)
                     if entity.instance.isDebuggable {

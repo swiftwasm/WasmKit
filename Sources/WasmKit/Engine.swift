@@ -10,7 +10,9 @@ import struct WasmParser.WasmFeatureSet
 public final class Engine {
     /// The engine configuration.
     public let configuration: EngineConfiguration
-    let interceptor: EngineInterceptor?
+    #if !hasFeature(Embedded)
+    let interceptor: (any EngineInterceptor)?
+    #endif
     let funcTypeInterner: Interner<FunctionType>
 
     /// Create a new execution engine.
@@ -18,15 +20,18 @@ public final class Engine {
     /// - Parameters:
     ///   - configuration: The engine configuration.
     ///   - interceptor: An optional runtime interceptor to intercept execution of instructions.
-    public init(configuration: EngineConfiguration = EngineConfiguration(), interceptor: EngineInterceptor? = nil) {
+    #if !hasFeature(Embedded)
+    public init(configuration: EngineConfiguration = EngineConfiguration(), interceptor: (any EngineInterceptor)? = nil) {
         self.configuration = configuration
         self.interceptor = interceptor
         self.funcTypeInterner = Interner()
     }
-
-    /// Migration aid for the old ``Runtime/instantiate(module:)``
-    @available(*, unavailable, message: "Use ``Module/instantiate(store:imports:)`` instead")
-    public func instantiate(module: Module) -> Instance { fatalError() }
+    #else
+    public init(configuration: EngineConfiguration = EngineConfiguration()) {
+        self.configuration = configuration
+        self.funcTypeInterner = Interner()
+    }
+    #endif
 }
 
 /// The configuration for the WebAssembly execution engine.
