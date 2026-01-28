@@ -187,9 +187,9 @@ enum WASIAbi {
         let buffer: UnsafeGuestRawPointer
         let length: WASIAbi.Size
 
-        func withHostBufferPointer<R>(_ body: (UnsafeMutableRawBufferPointer) throws -> R) rethrows -> R {
-            try buffer.withHostPointer(count: Int(length)) { hostPointer in
-                try body(hostPointer)
+        func withHostBufferPointer<R>(_ body: (UnsafeMutableRawBufferPointer) -> R) -> R {
+            return buffer.withHostPointer(count: Int(length)) { hostPointer in
+                return body(hostPointer)
             }
         }
 

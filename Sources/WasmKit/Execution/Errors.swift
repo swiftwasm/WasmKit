@@ -69,6 +69,8 @@ package enum TrapReason: Error, CustomStringConvertible {
     case message(Message)
     /// `unreachable` instruction executed
     case unreachable
+    /// A validation error
+    case validationError(ValidationError)
     /// Too deep call stack
     ///
     /// Note: When this trap occurs, consider extending ``EngineConfiguration/stackSize``.

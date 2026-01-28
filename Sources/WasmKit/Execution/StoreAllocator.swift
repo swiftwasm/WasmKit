@@ -496,21 +496,21 @@ extension StoreAllocator {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-table>
-    func allocate<RL: ResourceLimiter>(tableType: TableType, resourceLimiter: RL) throws -> InternalTable {
+    func allocate<RL: ResourceLimiter>(tableType: TableType, resourceLimiter: RL) throws(Trap) -> InternalTable {
         let pointer = try tables.allocate(initializing: TableEntity(tableType, resourceLimiter: resourceLimiter))
         return InternalTable(unsafe: pointer)
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-mem>
-    func allocate<RL: ResourceLimiter>(memoryType: MemoryType, resourceLimiter: RL) throws -> InternalMemory {
+    func allocate<RL: ResourceLimiter>(memoryType: MemoryType, resourceLimiter: RL) throws(Trap) -> InternalMemory {
         let pointer = try memories.allocate(initializing: MemoryEntity(memoryType, resourceLimiter: resourceLimiter))
         return InternalMemory(unsafe: pointer)
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-global>
-    func allocate(globalType: GlobalType, initialValue: Value) throws -> InternalGlobal {
+    func allocate(globalType: GlobalType, initialValue: Value) throws(ValidationError) -> InternalGlobal {
         let pointer = try globals.allocate(initializing: GlobalEntity(globalType: globalType, initialValue: initialValue))
         return InternalGlobal(unsafe: pointer)
     }

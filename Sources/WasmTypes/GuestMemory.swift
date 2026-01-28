@@ -1,11 +1,11 @@
 /// A write/read-able view representation of WebAssembly Memory instance
 public protocol GuestMemory {
     /// Executes the given closure with a mutable buffer pointer to the host memory region mapped as guest memory.
-    func withUnsafeMutableBufferPointer<T, E: Error>(
+    func withUnsafeMutableBufferPointer<T>(
         offset: UInt,
         count: Int,
-        _ body: (UnsafeMutableRawBufferPointer) throws(E) -> T
-    ) throws(E) -> T
+        _ body: (UnsafeMutableRawBufferPointer) -> T
+    ) -> T
 }
 
 /// A pointer-referenceable type that is intended to be pointee of ``UnsafeGuestPointer``

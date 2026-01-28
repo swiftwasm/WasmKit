@@ -342,7 +342,7 @@ struct TableEntity /* : ~Copyable */ {
         return UInt64(UInt32.max)
     }
 
-    init<RL: ResourceLimiter>(_ tableType: TableType, resourceLimiter: RL) throws {
+    init<RL: ResourceLimiter>(_ tableType: TableType, resourceLimiter: RL) throws(Trap) {
         let emptyElement: Reference
         switch tableType.elementType.heapType {
         case .abstract(.funcRef):
@@ -354,7 +354,13 @@ struct TableEntity /* : ~Copyable */ {
         }
 
         let numberOfElements = Int(tableType.limits.min)
-        guard try resourceLimiter.limitTableGrowth(to: numberOfElements) else {
+        let limited: Bool
+        do {
+            limited = try resourceLimiter.limitTableGrowth(to: numberOfElements)
+        } catch {
+            throw Trap(.initialTableSizeExceedsLimit(numberOfElements: numberOfElements))
+        }
+        guard limited else {
             throw Trap(.initialTableSizeExceedsLimit(numberOfElements: numberOfElements))
         }
         elements = Array(repeating: emptyElement, count: numberOfElements)
@@ -532,9 +538,15 @@ struct MemoryEntity: ~Copyable {
     let maxPageCount: UInt64
     let limit: Limits
 
-    init<RL: ResourceLimiter>(_ memoryType: MemoryType, resourceLimiter: RL) throws {
+    init<RL: ResourceLimiter>(_ memoryType: MemoryType, resourceLimiter: RL) throws(Trap) {
         let byteSize = Int(memoryType.min) * Self.pageSize
-        guard try resourceLimiter.limitMemoryGrowth(to: byteSize) else {
+        let limited: Bool
+        do {
+            limited = try resourceLimiter.limitMemoryGrowth(to: byteSize)
+        } catch {
+            throw Trap(.initialMemorySizeExceedsLimit(byteSize: byteSize))
+        }
+        guard limited else {
             throw Trap(.initialMemorySizeExceedsLimit(byteSize: byteSize))
         }
         storage = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: byteSize)
@@ -697,9 +709,13 @@ public struct Memory: Equatable {
     /// let imports: Imports = ["env": ["memory": memory]]
     /// let instance = try module.instantiate(store: store, imports: imports)
     /// ```
-    public init(store: Store, type: MemoryType) throws {
+    public init(store: Store, type: MemoryType) throws(Trap) {
         // Validate the memory type because the type is not validated at instantiation time.
-        try ModuleValidator.checkMemoryType(type, features: store.engine.configuration.features)
+        do {
+            try ModuleValidator.checkMemoryType(type, features: store.engine.configuration.features)
+        } catch {
+            throw Trap(.validationError(error))
+        }
 
         self.init(
             handle: try store.allocator.allocate(memoryType: type, resourceLimiter: store.resourceLimiter),
@@ -724,15 +740,15 @@ extension Memory: GuestMemory {
     public func withUnsafeBufferPointer<T>(
         offset: UInt,
         count: Int,
-        _ body: (UnsafeRawBufferPointer) throws -> T
-    ) rethrows -> T {
-        return try handle.withValue { memory in
+        _ body: (UnsafeRawBufferPointer) -> T
+    ) -> T {
+        return handle.withValue { memory in
             precondition(Int(offset) + count <= memory.byteCount, "Memory access out of bounds")
             guard let base = memory.baseAddress else {
                 preconditionFailure("Memory has no base address")
             }
             let start = base.advanced(by: Int(offset))
-            return try body(UnsafeRawBufferPointer(start: UnsafeRawPointer(start), count: count))
+            return body(UnsafeRawBufferPointer(start: UnsafeRawPointer(start), count: count))
         }
     }
 
@@ -740,15 +756,15 @@ extension Memory: GuestMemory {
     public func withUnsafeMutableBufferPointer<T>(
         offset: UInt,
         count: Int,
-        _ body: (UnsafeMutableRawBufferPointer) throws -> T
-    ) rethrows -> T {
-        return try handle.withValue { memory in
+        _ body: (UnsafeMutableRawBufferPointer) -> T
+    ) -> T {
+        return handle.withValue { memory in
             precondition(Int(offset) + count <= memory.byteCount, "Memory access out of bounds")
             guard let base = memory.baseAddress else {
                 preconditionFailure("Memory has no base address")
             }
             let start = base.advanced(by: Int(offset))
-            return try body(UnsafeMutableRawBufferPointer(start: start, count: count))
+            return body(UnsafeMutableRawBufferPointer(start: start, count: count))
         }
     }
 }
@@ -762,7 +778,7 @@ struct GlobalEntity /* : ~Copyable */ {
     }
     let globalType: GlobalType
 
-    init(globalType: GlobalType, initialValue: Value) throws {
+    init(globalType: GlobalType, initialValue: Value) throws(ValidationError) {
         try initialValue.checkType(globalType.valueType)
         rawValue = UntypedValue(initialValue)
         self.globalType = globalType
