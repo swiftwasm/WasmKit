@@ -12,4 +12,8 @@
         let rawValue: Int
     }
 
+    struct ComponentTypeIndex: RawRepresentable {
+        let rawValue: Int
+    }
+
 #endif

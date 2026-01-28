@@ -222,9 +222,9 @@
         ) throws(WatParserError) {
             let funcLocation = parser.lexer.location()
             let id = try parser.takeId()
-            var parameters = [(String, ComponentType)]()
+            var parameters = [(name: String, type: ComponentType)]()
             var resultType: ComponentType?
-            var type: Parser.IndexOrId?
+            var typeId: Parser.IndexOrId?
             var exportDef: (Location, exportName: String)?
             var importDef: (Location, importModule: String, importName: String)?
 
@@ -288,8 +288,24 @@
                 try parser.expect(.rightParen)
             }
 
-            if let type = parsedComponent.typesMap[.]
-            let id = parsedComponent.componentFunctions.add(ComponentFuncDef(paramNames: <#T##[String]#>, type: <#T##Parser.IndexOrId#>))
+            let concreteType: ComponentTypeDef.Kind
+            if parameters.count > 0 || resultType != nil {
+                concreteType = .function(parameters.map(\.type), resultType)
+            } else {
+                concreteType = .function([], nil)
+            }
+
+            let typeIndex: Int
+            if let existingTypeIndex = parsedComponent.typesMap[concreteType] {
+                typeIndex = existingTypeIndex
+            } else {
+                typeIndex = try parsedComponent.componentTypes.add(.init(kind: concreteType))
+                parsedComponent.typesMap[concreteType] = typeIndex
+            }
+
+            let funcIndex = try parsedComponent.componentFunctions.add(
+                ComponentFuncDef(paramNames: parameters.map(\.name), type: .init(rawValue: typeIndex))
+            )
             parsedComponent.fields.append(
                 .init(
                     location: ,
@@ -376,7 +392,7 @@
             var fields = [ComponentDefField]()
 
             /// Mapping from a component type to its unique ID in `componentTypes` name mapping storage.
-            var typesMap = [ComponentType: Int]()
+            var typesMap = [ComponentTypeDef.Kind: Int]()
 
             struct Aliases {
                 init() {}
@@ -467,12 +483,12 @@
         struct ComponentFuncDef: NamedFieldDecl {
             var id: Name?
             let paramNames: [String]
-            let type: Parser.IndexOrId
+            let type: ComponentTypeIndex
         }
 
         struct ComponentTypeDef: NamedFieldDecl {
-            enum Kind {
-                case function([ComponentType], ComponentType)
+            enum Kind: Hashable {
+                case function([ComponentType], ComponentType?)
             }
             var id: Name?
             let kind: Kind
