@@ -231,7 +231,7 @@ extension Instruction {
 // MARK: - Instruction printing support
 
 extension InstructionSequence {
-    func write<Target>(to target: inout Target, context: inout InstructionPrintingContext) where Target: TextOutputStream {
+    func write<Target, MemorySpace: GuestMemory>(to target: inout Target, context: inout InstructionPrintingContext<MemorySpace>) where Target: TextOutputStream {
         var hexOffsetWidth = String(instructions.count - 1, radix: 16).count
         hexOffsetWidth = (hexOffsetWidth + 1) & ~1
 
@@ -257,9 +257,9 @@ extension InstructionSequence {
     }
 }
 
-struct InstructionPrintingContext {
+struct InstructionPrintingContext<MemorySpace: GuestMemory> {
     let shouldColor: Bool
-    let function: Function
+    let function: Function<MemorySpace>
     var nameRegistry: NameRegistry
 
     func reg<R: FixedWidthInteger>(_ reg: R) -> String {

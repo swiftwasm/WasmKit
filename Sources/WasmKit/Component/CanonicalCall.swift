@@ -36,7 +36,7 @@ public struct CanonicalCallContext<MemorySpace: GuestMemory> {
         oldSize: UInt32,
         oldAlign: UInt32,
         newSize: UInt32
-    ) throws(CanonicalABIError) -> UnsafeGuestRawPointer<MemorySpace> {
+    ) throws(CanonicalABIError) -> UnsafeGuestRawPointer<Memory> {
         guard let realloc = options.realloc else {
             throw CanonicalABIError(description: "Missing required \"cabi_realloc\" export")
         }
@@ -54,7 +54,7 @@ public struct CanonicalCallContext<MemorySpace: GuestMemory> {
         guard case .i32(let new) = results[0] else {
             throw CanonicalABIError(description: "\"cabi_realloc\" export should return an i32 value")
         }
-        return UnsafeGuestRawPointer<MemorySpace>(memorySpace: guestMemory, offset: new)
+        return UnsafeGuestRawPointer<Memory>(memorySpace: guestMemory, offset: new)
     }
 }
 

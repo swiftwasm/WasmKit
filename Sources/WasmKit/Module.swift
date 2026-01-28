@@ -240,7 +240,7 @@ public struct Module<MemorySpace: GuestMemory> {
             // Get memory
             let memory: InternalMemory
             do throws(ValidationError) {
-                memory = try instance.memories[validating: Int(data.index)]
+                memory = try instance.memories[validating: Int(data.index), MemoryEntity.createOutOfBoundsError]
             } catch {
                 throw ImportError(error)
             }

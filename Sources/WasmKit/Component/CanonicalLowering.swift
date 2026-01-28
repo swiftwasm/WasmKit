@@ -27,10 +27,10 @@ public enum CanonicalLowering {
     ///   - storeElement: A closure that stores an element to the given pointer.
     ///   - context: A canonical call context.
     /// - Returns: A pair of a pointer and a length.
-    public static func lowerList<Element, MemorySpace: GuestMemory>(
+    public static func lowerList<Element>(
         _ value: [Element], elementSize: UInt32, elementAlignment: UInt32,
-        storeElement: (Element, UnsafeGuestRawPointer<MemorySpace>) throws(CanonicalABIError) -> Void,
-        context: CanonicalCallContext<MemorySpace>
+        storeElement: (Element, UnsafeGuestRawPointer<Memory>) throws(CanonicalABIError) -> Void,
+        context: CanonicalCallContext<Memory>
     ) throws(CanonicalABIError) -> (pointer: UInt32, length: UInt32) {
         let byteLength = UInt32(value.count) * elementSize
         let newBuffer = try context.realloc(

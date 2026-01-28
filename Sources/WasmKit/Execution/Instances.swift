@@ -210,7 +210,7 @@ public struct Exports<MemorySpace: GuestMemory>: Sequence {
     }
 
     /// Returns the exported memory with the given name.
-    public subscript(memory name: String) -> MemorySpace? {
+    public subscript(memory name: String) -> Memory? {
         guard case .memory(let memory) = self[name] else { return nil }
         return memory
     }
@@ -258,7 +258,7 @@ public struct Instance<MemorySpace: GuestMemory> {
     ///
     /// - Parameter name: The name of the exported entity.
     /// - Returns: The exported entity if found, otherwise `nil`.
-    public func export(_ name: String) -> ExternalValue? {
+    public func export(_ name: String) -> ExternalValue<MemorySpace>? {
         guard let entity = handle.exports[name] else { return nil }
         return ExternalValue(handle: entity, store: store)
     }
@@ -281,7 +281,7 @@ public struct Instance<MemorySpace: GuestMemory> {
     ///
     /// - Precondition: The instance must be compiled with the token threading model.
     @_spi(OnlyForCLI)
-    public func dumpFunctions<Target>(to target: inout Target, module: Module) throws(Trap) where Target: TextOutputStream {
+    public func dumpFunctions<Target>(to target: inout Target, module: Module<MemorySpace>) throws(Trap) where Target: TextOutputStream {
         for (offset, function) in self.handle.functions.enumerated() {
             let index = offset
             guard function.isWasm else { continue }
@@ -803,7 +803,11 @@ typealias InternalGlobal = EntityHandle<GlobalEntity>
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#global-instances>
 public struct Global<MemorySpace: GuestMemory>: Equatable {
     let handle: InternalGlobal
-    let allocator: StoreAllocator<MemorySpace>
+    let allocator: StoreAllocator
+
+    public static func == (lhs: Global<MemorySpace>, rhs: Global<MemorySpace>) -> Bool {
+        lhs.handle == rhs.handle && lhs.allocator == rhs.allocator
+    }
 
     /// The value of the global instance.
     public var value: Value {
@@ -823,7 +827,7 @@ public struct Global<MemorySpace: GuestMemory>: Equatable {
         }
     }
 
-    init(handle: InternalGlobal, allocator: StoreAllocator<MemorySpace>) {
+    init(handle: InternalGlobal, allocator: StoreAllocator) {
         self.handle = handle
         self.allocator = allocator
     }
