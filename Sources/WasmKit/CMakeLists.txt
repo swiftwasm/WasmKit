@@ -12,6 +12,7 @@ add_wasmkit_library(WasmKit
   Component/CanonicalCall.swift
   Component/CanonicalOptions.swift
   Component/ComponentTypes.swift
+  Execution/AtomicParkingLot.swift
   Execution/DebuggerInstructionMapping.swift
   Execution/Instructions/Control.swift
   Execution/Instructions/Instruction.swift
