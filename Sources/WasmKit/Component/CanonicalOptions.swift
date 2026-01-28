@@ -2,7 +2,7 @@
 /// `canon lift` or `canon lower`.
 /// > Note:
 /// <https://github.com/WebAssembly/component-model/blob/main/design/mvp/CanonicalABI.md#runtime-state>
-public struct CanonicalOptions {
+public struct CanonicalOptions<MemorySpace: GuestMemory> {
     /// A type of string encoding used in the Component Model.
     public enum StringEncoding {
         /// UTF-8
@@ -18,13 +18,13 @@ public struct CanonicalOptions {
     /// The string encoding used for lifting or lowering string values.
     public let stringEncoding: StringEncoding
     /// The realloc function address used for lifting or lowering values.
-    public let realloc: Function?
+    public let realloc: Function<MemorySpace>?
     /// The function address called when a lifted/lowered function returns.
-    public let postReturn: Function?
+    public let postReturn: Function<MemorySpace>?
 
     public init(
         memory: Memory, stringEncoding: StringEncoding,
-        realloc: Function?, postReturn: Function?
+        realloc: Function<MemorySpace>?, postReturn: Function<MemorySpace>?
     ) {
         self.memory = memory
         self.stringEncoding = stringEncoding
@@ -35,7 +35,7 @@ public struct CanonicalOptions {
     /// FIXME: This deriviation is wrong because the options should be determined by `(canon lift)` or `(canon lower)`
     /// in an encoded component at componetizing-time. (e.g. wit-component tool is one of the componetizers)
     /// Remove this temporary method after we will accept binary form of component file.
-    public static func _derive(from instance: Instance, exportName: String) -> CanonicalOptions {
+    public static func _derive(from instance: Instance<MemorySpace>, exportName: String) -> CanonicalOptions<MemorySpace> {
         guard case .memory(let memory) = instance.exports["memory"] else {
             fatalError("Missing required \"memory\" export")
         }

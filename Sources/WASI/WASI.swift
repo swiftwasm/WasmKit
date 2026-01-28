@@ -183,8 +183,8 @@ enum WASIAbi {
 
     typealias Fd = UInt32
 
-    struct IOVec: GuestPointee {
-        let buffer: UnsafeGuestRawPointer
+    struct IOVec<MemorySpace: GuestMemory>: GuestPointee<MemorySpace> {
+        let buffer: UnsafeGuestRawPointer<MemorySpace>
         let length: WASIAbi.Size
 
         func withHostBufferPointer<R>(_ body: (UnsafeMutableRawBufferPointer) -> R) -> R {
@@ -194,23 +194,23 @@ enum WASIAbi {
         }
 
         static var sizeInGuest: UInt32 {
-            return UnsafeGuestRawPointer.sizeInGuest + WASIAbi.Size.sizeInGuest
+            return UnsafeGuestRawPointer<MemorySpace>.sizeInGuest + WASIAbi.Size.sizeInGuest
         }
 
         static var alignInGuest: UInt32 {
-            max(UnsafeGuestRawPointer.alignInGuest, WASIAbi.Size.alignInGuest)
+            max(UnsafeGuestRawPointer<MemorySpace>.alignInGuest, WASIAbi.Size.alignInGuest)
         }
 
-        static func readFromGuest(_ pointer: UnsafeGuestRawPointer) -> IOVec {
+        static func readFromGuest(_ pointer: UnsafeGuestRawPointer<MemorySpace>) -> IOVec<MemorySpace> {
             return IOVec(
                 buffer: .readFromGuest(pointer),
-                length: .readFromGuest(pointer.advanced(by: UnsafeGuestRawPointer.sizeInGuest))
+                length: .readFromGuest(pointer.advanced(by: UnsafeGuestRawPointer<MemorySpace>.sizeInGuest))
             )
         }
 
-        static func writeToGuest(at pointer: UnsafeGuestRawPointer, value: IOVec) {
-            UnsafeGuestRawPointer.writeToGuest(at: pointer, value: value.buffer)
-            WASIAbi.Size.writeToGuest(at: pointer.advanced(by: UnsafeGuestRawPointer.sizeInGuest), value: value.length)
+        static func writeToGuest(at pointer: UnsafeGuestRawPointer<MemorySpace>, value: IOVec<MemorySpace>) {
+            UnsafeGuestRawPointer<MemorySpace>.writeToGuest(at: pointer, value: value.buffer)
+            WASIAbi.Size.writeToGuest(at: pointer.advanced(by: UnsafeGuestRawPointer<MemorySpace>.sizeInGuest), value: value.length)
         }
     }
 
@@ -244,7 +244,7 @@ enum WASIAbi {
 
     typealias Timestamp = UInt64
 
-    struct Fdflags: OptionSet, GuestPrimitivePointee {
+    struct Fdflags: OptionSet, GuestPrimitivePointee<Memory> {
         var rawValue: UInt16
         /// Append mode: Data written to the file is always appended to the file's end.
         static let APPEND = Fdflags(rawValue: 1 << 0)
@@ -260,7 +260,7 @@ enum WASIAbi {
         static let SYNC = Fdflags(rawValue: 1 << 4)
     }
 
-    struct Rights: OptionSet, GuestPrimitivePointee {
+    struct Rights: OptionSet, GuestPrimitivePointee<Memory> {
         let rawValue: UInt64
 
         /// The right to invoke `fd_datasync`.
@@ -453,7 +453,7 @@ enum WASIAbi {
         case NOREUSE = 5
     }
 
-    struct FdStat: GuestPrimitivePointee {
+    struct FdStat: GuestPrimitivePointee<Memory> {
         let fsFileType: FileType
         let fsFlags: Fdflags
         let fsRightsBase: Rights
@@ -463,7 +463,7 @@ enum WASIAbi {
             FileType.sizeInGuest + Fdflags.sizeInGuest + Rights.sizeInGuest * 2
         }
 
-        static func readFromGuest(_ pointer: UnsafeGuestRawPointer) -> FdStat {
+        static func readFromGuest(_ pointer: UnsafeGuestRawPointer<Memory>) -> FdStat {
             var pointer = pointer
             return FdStat(
                 fsFileType: .readFromGuest(&pointer),
@@ -473,7 +473,7 @@ enum WASIAbi {
             )
         }
 
-        static func writeToGuest(at pointer: UnsafeGuestRawPointer, value: FdStat) {
+        static func writeToGuest(at pointer: UnsafeGuestRawPointer<Memory>, value: FdStat) {
             var pointer = pointer
             FileType.writeToGuest(at: &pointer, value: value.fsFileType)
             Fdflags.writeToGuest(at: &pointer, value: value.fsFlags)
@@ -487,7 +487,7 @@ enum WASIAbi {
     typealias Device = UInt64
 
     /// Which file time attributes to adjust.
-    struct FstFlags: OptionSet, GuestPrimitivePointee {
+    struct FstFlags: OptionSet, GuestPrimitivePointee<Memory> {
         let rawValue: UInt16
 
         static let ATIM = FstFlags(rawValue: 1 << 0)
@@ -499,14 +499,14 @@ enum WASIAbi {
         static let MTIM_NOW = FstFlags(rawValue: 1 << 3)
     }
 
-    struct LookupFlags: OptionSet, GuestPrimitivePointee {
+    struct LookupFlags: OptionSet, GuestPrimitivePointee<Memory> {
         let rawValue: UInt32
 
         /// As long as the resolved path corresponds to a symbolic link, it is expanded.
         static let SYMLINK_FOLLOW = LookupFlags(rawValue: 1 << 0)
     }
 
-    struct Oflags: OptionSet, GuestPrimitivePointee {
+    struct Oflags: OptionSet, GuestPrimitivePointee<Memory> {
         let rawValue: UInt32
 
         /// Create file if it does not exist.
@@ -523,7 +523,7 @@ enum WASIAbi {
     typealias LinkCount = UInt64
 
     /// File attributes.
-    struct Filestat: GuestPrimitivePointee {
+    struct Filestat: GuestPrimitivePointee<Memory> {
         /// Device ID of device containing the file.
         let dev: Device
         /// File serial number.
@@ -541,7 +541,7 @@ enum WASIAbi {
         /// Last file status change timestamp.
         let ctim: Timestamp
 
-        static func readFromGuest(_ pointer: UnsafeGuestRawPointer) -> WASIAbi.Filestat {
+        static func readFromGuest(_ pointer: UnsafeGuestRawPointer<Memory>) -> WASIAbi.Filestat {
             var pointer = pointer
             return Filestat(
                 dev: .readFromGuest(&pointer), ino: .readFromGuest(&pointer),
@@ -551,7 +551,7 @@ enum WASIAbi {
             )
         }
 
-        static func writeToGuest(at pointer: UnsafeGuestRawPointer, value: WASIAbi.Filestat) {
+        static func writeToGuest(at pointer: UnsafeGuestRawPointer<Memory>, value: WASIAbi.Filestat) {
             var pointer = pointer
             Device.writeToGuest(at: &pointer, value: value.dev)
             Inode.writeToGuest(at: &pointer, value: value.ino)
@@ -566,12 +566,12 @@ enum WASIAbi {
 
     typealias PrestatDir = Size
 
-    enum Prestat: GuestPointee {
+    enum Prestat: GuestPointee<Memory> {
         case dir(PrestatDir)
         static var sizeInGuest: UInt32 { 8 }
         static var alignInGuest: UInt32 { 4 }
 
-        static func readFromGuest(_ pointer: UnsafeGuestRawPointer) -> WASIAbi.Prestat {
+        static func readFromGuest(_ pointer: UnsafeGuestRawPointer<Memory>) -> WASIAbi.Prestat {
             var pointer = pointer
             switch UInt8.readFromGuest(&pointer) {
             case 0:
@@ -580,7 +580,7 @@ enum WASIAbi {
             }
         }
 
-        static func writeToGuest(at pointer: UnsafeGuestRawPointer, value: WASIAbi.Prestat) {
+        static func writeToGuest(at pointer: UnsafeGuestRawPointer<Memory>, value: WASIAbi.Prestat) {
             var pointer = pointer
             switch value {
             case .dir(let dir):
@@ -641,8 +641,8 @@ extension WASIImplementation {
         }
 
         func readString(pointer: UInt32, length: UInt32, buffer: GuestMemory) throws -> String {
-            let pointer = UnsafeGuestBufferPointer<UInt8>(
-                baseAddress: UnsafeGuestPointer(memorySpace: buffer, offset: pointer),
+            let pointer = UnsafeGuestBufferPointer<UInt8, Memory>(
+                baseAddress: UnsafeGuestPointer<UInt8, Memory>(memorySpace: buffer, offset: pointer),
                 count: length
             )
             return try pointer.withHostPointer { hostBuffer in

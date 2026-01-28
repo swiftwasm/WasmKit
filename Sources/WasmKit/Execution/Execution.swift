@@ -4,7 +4,9 @@ import _CWasmKit
 ///
 /// Each new invocation through exported function has a separate ``Execution``
 /// even though the invocation happens during another invocation.
-struct Execution: ~Copyable {
+struct Execution<MemorySpace>: ~Copyable {
+    associatedtype MemorySpace: GuestMemory
+    
     /// The reference to the ``Store`` associated with the execution.
     let store: StoreRef
 
@@ -75,7 +77,7 @@ struct Execution: ~Copyable {
         }
     }
 
-    static func captureBacktrace(sp: Sp, store: Store) -> Backtrace {
+    static func captureBacktrace(sp: Sp, store: Store<MemorySpace>) -> Backtrace {
         let callStack = CallStack(sp: sp)
         var symbols: [Backtrace.Symbol] = []
 
@@ -290,8 +292,8 @@ extension Pc {
 ///   - callerInstance: The instance that called the function.
 /// - Returns: The result values of the function.
 @inline(never)
-func executeWasm(
-    store: Store,
+func executeWasm<MemorySpace: GuestMemory>(
+    store: Store<MemorySpace>,
     function handle: InternalFunction,
     type: FunctionType,
     arguments: [Value]

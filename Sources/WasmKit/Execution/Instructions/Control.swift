@@ -214,13 +214,13 @@ extension Execution {
     mutating func onEnter(sp: Sp, immediate: Instruction.OnEnterOperand) {
         let function = currentInstance(sp: sp).functions[Int(immediate)]
         self.store.value.engine.interceptor?.onEnterFunction(
-            Function(handle: function, store: store.value)
+            Function<MemorySpace>(handle: function, store: store.value)
         )
     }
     mutating func onExit(sp: Sp, immediate: Instruction.OnExitOperand) {
         let function = currentInstance(sp: sp).functions[Int(immediate)]
         self.store.value.engine.interceptor?.onExitFunction(
-            Function(handle: function, store: store.value)
+            Function<MemorySpace>(handle: function, store: store.value)
         )
     }
 

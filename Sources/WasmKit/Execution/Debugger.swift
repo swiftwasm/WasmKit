@@ -29,13 +29,13 @@
 
         private let valueStack: Sp
         private var execution: Execution
-        private let store: Store
+        private let store: Store<MemorySpace>
 
         /// Parsed in-memory representation of a Wasm module instantiated for debugging.
         private let module: Module
 
         /// Instance of parsed Wasm ``module``.
-        private let instance: Instance
+        private let instance: Instance<MemorySpace>
 
         /// Reference to the entrypoint function of the currently debugged module, for use in ``stopAtEntrypoint``.
         /// Currently assumed to be the WASI command `_start` entrypoint.
@@ -65,7 +65,7 @@
         ///   - module: Wasm module to instantiate.
         ///   - store: Store that instantiates the module.
         ///   - imports: Imports required by `module` for instantiation.
-        package init(module: Module, store: Store, imports: Imports) throws(Error) {
+        package init(module: Module, store: Store<MemorySpace>, imports: Imports<MemorySpace>) throws(Error) {
             let limit = store.engine.configuration.stackSize / MemoryLayout<StackSlot>.stride
             let instance = try module.instantiate(store: store, imports: imports, isDebuggable: true)
 

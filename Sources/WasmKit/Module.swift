@@ -46,7 +46,7 @@ struct ModuleImports {
 /// by calling either ``parseWasm(bytes:features:)`` or ``parseWasm(filePath:features:)``.
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#modules>
-public struct Module {
+public struct Module<MemorySpace: GuestMemory> {
     var functions: [GuestFunction]
     let elements: [ElementSegment]
     let data: [DataSegment]
@@ -134,7 +134,7 @@ public struct Module {
     ///   - store: The ``Store`` to allocate the instance in.
     ///   - imports: The imports to use for instantiation. All imported entities
     ///     must be allocated in the given store.
-    public func instantiate(store: Store, imports: Imports = [:]) throws(ImportError) -> Instance {
+    public func instantiate(store: Store<MemorySpace>, imports: Imports<MemorySpace> = [:]) throws(ImportError) -> Instance<MemorySpace> {
         Instance(handle: try self.instantiateHandle(store: store, imports: imports), store: store)
     }
 
@@ -147,14 +147,14 @@ public struct Module {
         ///     must be allocated in the given store.
         ///   - isDebuggable: Whether the module should support debugging actions
         ///     (breakpoints etc) after instantiation.
-        public func instantiate(store: Store, imports: Imports = [:], isDebuggable: Bool) throws(ImportError) -> Instance {
+        public func instantiate(store: Store<MemorySpace>, imports: Imports<MemorySpace> = [:], isDebuggable: Bool) throws(ImportError) -> Instance<MemorySpace> {
             Instance(handle: try self.instantiateHandle(store: store, imports: imports, isDebuggable: isDebuggable), store: store)
         }
     #endif
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#instantiation>
-    private func instantiateHandle(store: Store, imports: Imports, isDebuggable: Bool = false) throws(ImportError) -> InternalInstance {
+    private func instantiateHandle(store: Store<MemorySpace>, imports: Imports<MemorySpace>, isDebuggable: Bool = false) throws(ImportError) -> InternalInstance {
         do throws(ModuleValidationError) {
             try ModuleValidator(module: self).validate()
         } catch {

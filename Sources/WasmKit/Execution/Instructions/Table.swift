@@ -117,7 +117,7 @@ extension Execution {
 }
 
 extension Execution {
-    fileprivate func getTable(_ tableIndex: UInt32, sp: Sp, store: Store) -> InternalTable {
+    fileprivate func getTable(_ tableIndex: UInt32, sp: Sp, store: Store<MemorySpace>) -> InternalTable {
         return currentInstance(sp: sp).tables[Int(tableIndex)]
     }
 

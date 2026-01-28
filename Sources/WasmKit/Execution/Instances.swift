@@ -182,23 +182,23 @@ package struct InstanceEntity /* : ~Copyable */ {
 package typealias InternalInstance = EntityHandle<InstanceEntity>
 
 /// A map of exported entities by name.
-public struct Exports: Sequence {
-    let store: Store
+public struct Exports<MemorySpace: GuestMemory>: Sequence {
+    let store: Store<MemorySpace>
     let items: [String: InternalExternalValue]
 
     /// A collection of exported entities without their names.
-    public var values: [ExternalValue] {
+    public var values: [ExternalValue<MemorySpace>] {
         self.map { $0.value }
     }
 
     /// Returns the exported entity with the given name.
-    public subscript(_ name: String) -> ExternalValue? {
+    public subscript(_ name: String) -> ExternalValue<MemorySpace>? {
         guard let entity = items[name] else { return nil }
         return ExternalValue(handle: entity, store: store)
     }
 
     /// Returns the exported function with the given name.
-    public subscript(function name: String) -> Function? {
+    public subscript(function name: String) -> Function<MemorySpace>? {
         guard case .function(let function) = self[name] else { return nil }
         return function
     }
@@ -210,22 +210,22 @@ public struct Exports: Sequence {
     }
 
     /// Returns the exported memory with the given name.
-    public subscript(memory name: String) -> Memory? {
+    public subscript(memory name: String) -> MemorySpace? {
         guard case .memory(let memory) = self[name] else { return nil }
         return memory
     }
 
     /// Returns the exported global with the given name.
-    public subscript(global name: String) -> Global? {
+    public subscript(global name: String) -> Global<MemorySpace>? {
         guard case .global(let global) = self[name] else { return nil }
         return global
     }
 
-    public struct Iterator: IteratorProtocol {
-        private let store: Store
+    public struct Iterator<MemorySpace: GuestMemory>: IteratorProtocol {
+        private let store: Store<MemorySpace>
         private var iterator: Dictionary<String, InternalExternalValue>.Iterator
 
-        init(parent: Exports) {
+        init(parent: Exports<MemorySpace>) {
             self.store = parent.store
             self.iterator = parent.items.makeIterator()
         }
@@ -236,7 +236,7 @@ public struct Exports: Sequence {
         }
     }
 
-    public func makeIterator() -> Iterator {
+    public func makeIterator() -> Iterator<MemorySpace> {
         Iterator(parent: self)
     }
 }
@@ -245,11 +245,11 @@ public struct Exports: Sequence {
 /// Usually instantiated by ``Module/instantiate(store:imports:)``.
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#module-instances>
-public struct Instance {
+public struct Instance<MemorySpace: GuestMemory> {
     package let handle: InternalInstance
-    let store: Store
+    let store: Store<MemorySpace>
 
-    init(handle: InternalInstance, store: Store) {
+    init(handle: InternalInstance, store: Store<MemorySpace>) {
         self.handle = handle
         self.store = store
     }
@@ -267,13 +267,13 @@ public struct Instance {
     ///
     /// - Parameter name: The name of the exported function.
     /// - Returns: The address of the exported function if found, otherwise `nil`.
-    package func exportedFunction(name: String) -> Function? {
+    package func exportedFunction(name: String) -> Function<MemorySpace>? {
         guard case .function(let function) = self.export(name) else { return nil }
         return function
     }
 
     /// A dictionary of exported entities by name.
-    public var exports: Exports {
+    public var exports: Exports<MemorySpace> {
         Exports(store: store, items: handle.exports)
     }
 
@@ -513,7 +513,7 @@ public struct Table: Equatable {
     /// let imports: Imports = ["env": ["table": table]]
     /// let instance = try module.instantiate(store: store, imports: imports)
     /// ```
-    public init(store: Store, type: TableType) throws(Trap) {
+    public init(store: Store<MemorySpace>, type: TableType) throws(Trap) {
         self.init(
             handle: try store.allocator.allocate(tableType: type, resourceLimiter: store.resourceLimiter),
             allocator: store.allocator
@@ -714,10 +714,10 @@ public struct Memory: Equatable {
     /// let imports: Imports = ["env": ["memory": memory]]
     /// let instance = try module.instantiate(store: store, imports: imports)
     /// ```
-    public init(store: Store, type: MemoryType) throws(Trap) {
+    public init(store: Store<MemorySpace>, type: MemoryType) throws(Trap) {
         // Validate the memory type because the type is not validated at instantiation time.
         do {
-            try ModuleValidator.checkMemoryType(type, features: store.engine.configuration.features)
+            try ModuleValidator<MemorySpace>.checkMemoryType(type, features: store.engine.configuration.features)
         } catch {
             throw Trap(.validationError(error))
         }
@@ -801,9 +801,9 @@ typealias InternalGlobal = EntityHandle<GlobalEntity>
 /// A WebAssembly `global` instance.
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#global-instances>
-public struct Global: Equatable {
+public struct Global<MemorySpace: GuestMemory>: Equatable {
     let handle: InternalGlobal
-    let allocator: StoreAllocator
+    let allocator: StoreAllocator<MemorySpace>
 
     /// The value of the global instance.
     public var value: Value {
@@ -823,7 +823,7 @@ public struct Global: Equatable {
         }
     }
 
-    init(handle: InternalGlobal, allocator: StoreAllocator) {
+    init(handle: InternalGlobal, allocator: StoreAllocator<MemorySpace>) {
         self.handle = handle
         self.allocator = allocator
     }
@@ -832,7 +832,7 @@ public struct Global: Equatable {
     /// The returned global instance may be used to instantiate a new
     /// WebAssembly module.
     @available(*, deprecated, renamed: "init(store:type:value:)")
-    public init(globalType: GlobalType, initialValue: Value, store: Store) {
+    public init(globalType: GlobalType, initialValue: Value, store: Store<MemorySpace>) {
         try! self.init(store: store, type: globalType, value: initialValue)
     }
 
@@ -859,7 +859,7 @@ public struct Global: Equatable {
     /// let imports: Imports = ["env": ["i32-global": i32Global]]
     /// let instance = try module.instantiate(store: store, imports: imports)
     /// ```
-    public init(store: Store, type: GlobalType, value: Value) throws(ValidationError) {
+    public init(store: Store<MemorySpace>, type: GlobalType, value: Value) throws(ValidationError) {
         let handle = try store.allocator.allocate(globalType: type, initialValue: value)
         self.init(handle: handle, allocator: store.allocator)
     }
@@ -899,13 +899,13 @@ typealias InternalDataSegment = EntityHandle<DataSegmentEntity>
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#syntax-externval>
-public enum ExternalValue: Equatable {
-    case function(Function)
+public enum ExternalValue<MemorySpace: GuestMemory>: Equatable {
+    case function(Function<MemorySpace>)
     case table(Table)
     case memory(Memory)
-    case global(Global)
+    case global(Global<MemorySpace>)
 
-    init(handle: InternalExternalValue, store: Store) {
+    init(handle: InternalExternalValue, store: Store<MemorySpace>) {
         switch handle {
         case .function(let function):
             self = .function(Function(handle: function, store: store))

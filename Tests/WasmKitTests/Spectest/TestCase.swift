@@ -107,23 +107,23 @@ package struct SpectestError: Error, CustomStringConvertible {
     }
 }
 
-class WastRunContext {
-    let store: Store
+final class WastRunContext<MemorySpace: GuestMemory> {
+    let store: Store<MemorySpace>
     var engine: Engine { store.engine }
     let rootPath: String
-    private var namedModuleInstances: [String: Instance] = [:]
-    var currentInstance: Instance?
+    private var namedModuleInstances: [String: Instance<MemorySpace>] = [:]
+    var currentInstance: Instance<MemorySpace>?
     var importsSpace = Imports()
 
-    init(store: Store, rootPath: String) {
+    init(store: Store<MemorySpace>, rootPath: String) {
         self.store = store
         self.rootPath = rootPath
     }
 
-    func lookupInstance(_ name: String) -> Instance? {
+    func lookupInstance(_ name: String) -> Instance<MemorySpace>? {
         return namedModuleInstances[name]
     }
-    func register(_ name: String, instance: Instance) {
+    func register(_ name: String, instance: Instance<MemorySpace>) {
         self.namedModuleInstances[name] = instance
     }
 }
@@ -163,7 +163,7 @@ extension TestCase {
 }
 
 extension WastRunContext {
-    func instantiate(module: Module, name: String? = nil) throws -> Instance {
+    func instantiate(module: Module, name: String? = nil) throws -> Instance<MemorySpace> {
         let instance = try module.instantiate(store: store, imports: importsSpace)
         if let name {
             register(name, instance: instance)

@@ -9,14 +9,14 @@ public enum CanonicalLifting {
     ///   - loadElement: A closure that loads an element from the given pointer.
     ///   - memoryBase: A base address of the guest memory region. Can be `nil` if length is zero.
     /// - Returns: A lifted Swift Array value with the given element type.
-    public static func liftList<Element>(
+    public static func liftList<Element, MemorySpace: GuestMemory>(
         pointer: UInt32, length: UInt32, elementSize: UInt32,
-        loadElement: (UnsafeGuestRawPointer) throws(CanonicalABIError) -> Element,
-        context: CanonicalCallContext
+        loadElement: (UnsafeGuestRawPointer<MemorySpace>) throws(CanonicalABIError) -> Element,
+        context: CanonicalCallContext<MemorySpace>
     ) throws(CanonicalABIError) -> [Element] {
         var elements = [Element]()
         elements.reserveCapacity(Int(elementSize))
-        let guestPointer = UnsafeGuestRawPointer(memorySpace: context.guestMemory, offset: pointer)
+        let guestPointer = UnsafeGuestRawPointer<MemorySpace>(memorySpace: context.guestMemory, offset: pointer)
         for i in 0..<length {
             let element = try loadElement(guestPointer.advanced(by: i * elementSize))
             elements.append(element)

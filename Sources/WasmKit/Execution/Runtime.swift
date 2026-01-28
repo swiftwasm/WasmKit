@@ -3,8 +3,8 @@ import WasmParser
 #if !$Embedded
 /// A container to manage execution state of one or more module instances.
 @available(*, deprecated, message: "Use `Engine` instead")
-public final class Runtime {
-    public let store: Store
+public final class Runtime<MemorySpace: GuestMemory> {
+    public let store: Store<MemorySpace>
     let engine: Engine
     var interceptor: EngineInterceptor? {
         engine.interceptor
@@ -46,7 +46,7 @@ public final class Runtime {
         return funcTypeInterner.intern(type)
     }
 
-    public func instantiate(module: Module) throws -> Instance {
+    public func instantiate(module: Module) throws -> Instance<Memory> {
         return try module.instantiate(
             store: store,
             imports: getExternalValues(module, runtime: self)
@@ -54,7 +54,7 @@ public final class Runtime {
     }
 
     /// Legacy compatibility method to register a module instance with a name.
-    public func register(_ instance: Instance, as name: String) throws {
+    public func register(_ instance: Instance<Memory>, as name: String) throws {
         guard availableExports[name] == nil else {
             throw ImportError(.moduleInstanceAlreadyRegistered(name))
         }
@@ -129,7 +129,7 @@ public final class Runtime {
     /// let value = myGlobal.value
     /// ```
     @available(*, deprecated, message: "Use `Instance.export` and `Global.value` instead")
-    public func getGlobal(_ instance: Instance, globalName: String) throws -> Value {
+    public func getGlobal(_ instance: Instance<Memory>, globalName: String) throws -> Value {
         guard case .global(let global) = instance.export(globalName) else {
             throw Trap(.noGlobalExportWithName(globalName: globalName, instance: instance))
         }
@@ -137,7 +137,7 @@ public final class Runtime {
     }
 
     /// Invokes a function in a given module instance.
-    public func invoke(_ instance: Instance, function: String, with arguments: [Value] = []) throws -> [Value] {
+    public func invoke(_ instance: Instance<Memory>, function: String, with arguments: [Value] = []) throws -> [Value] {
         guard case .function(let function)? = instance.export(function) else {
             throw Trap(.exportedFunctionNotFound(name: function, instance: instance))
         }

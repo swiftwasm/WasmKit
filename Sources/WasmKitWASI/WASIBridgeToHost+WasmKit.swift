@@ -11,7 +11,7 @@ extension WASIBridgeToHost {
     /// - Parameters:
     ///   - imports: The imports scope to register the WASI implementation.
     ///   - store: The store to create the host functions.
-    public func link(to imports: inout Imports, store: Store) {
+    public func link<MemorySpace: GuestMemory>(to imports: inout Imports<MemorySpace>, store: Store<MemorySpace>) {
         for (moduleName, module) in wasiHostModules {
             for (name, function) in module.functions {
                 imports.define(
@@ -49,7 +49,7 @@ extension WASIBridgeToHost {
     ///
     /// - Parameter instance: The WASI application instance.
     /// - Returns: The exit code returned by the WASI application.
-    public func start(_ instance: Instance) throws -> UInt32 {
+    public func start(_ instance: Instance<some GuestMemory>) throws -> UInt32 {
         do {
             guard let start = instance.exports[function: "_start"] else {
                 throw WASIError(description: "Missing required \"_start\" function")
@@ -67,7 +67,7 @@ extension WASIBridgeToHost {
     /// for more information about the WASI Preview 1 Application ABI.
     ///
     /// - Parameter instance: The WASI application instance.
-    public func initialize(_ instance: Instance) throws {
+    public func initialize(_ instance: Instance<some GuestMemory>) throws {
         if let initialize = instance.exports[function: "_initialize"] {
             // Call the optional `_initialize` function.
             _ = try initialize()
@@ -75,7 +75,7 @@ extension WASIBridgeToHost {
     }
 
     @available(*, deprecated, message: "Use `Engine`-based API instead")
-    public func start(_ instance: Instance, runtime: Runtime) throws -> UInt32 {
+    public func start(_ instance: Instance<some GuestMemory>, runtime: Runtime) throws -> UInt32 {
         return try start(instance)
     }
 }

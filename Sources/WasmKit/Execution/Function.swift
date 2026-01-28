@@ -33,11 +33,11 @@ import struct WasmTypes.FunctionType
 ///     return []
 /// }
 /// ```
-public struct Function: Equatable {
+public struct Function<MemorySpace: GuestMemory>: Equatable {
     internal let handle: InternalFunction
-    let store: Store
+    let store: Store<MemorySpace>
 
-    internal init(handle: InternalFunction, store: Store) {
+    internal init(handle: InternalFunction, store: Store<MemorySpace>) {
         self.handle = handle
         self.store = store
     }
@@ -50,7 +50,7 @@ public struct Function: Equatable {
     ///   - results: The types of the function results.
     ///   - body: The implementation of the function.
     public init(
-        store: Store,
+        store: Store<MemorySpace>,
         parameters: [ValueType], results: [ValueType] = [],
         body: @escaping (Caller, [Value]) throws(Trap) -> [Value]
     ) {
@@ -64,7 +64,7 @@ public struct Function: Equatable {
     ///   - type: The signature type of the function.
     ///   - body: The implementation of the function.
     public init(
-        store: Store,
+        store: Store<MemorySpace>,
         type: FunctionType,
         body: @escaping (Caller, [Value]) throws(Trap) -> [Value]
     ) {

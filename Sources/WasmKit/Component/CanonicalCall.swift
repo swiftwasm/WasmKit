@@ -15,17 +15,17 @@ public struct CanonicalABIError: Error, CustomStringConvertible {
 ///
 /// > Note:
 /// <https://github.com/WebAssembly/component-model/blob/main/design/mvp/CanonicalABI.md#runtime-state>
-public struct CanonicalCallContext {
+public struct CanonicalCallContext<MemorySpace: GuestMemory> {
     /// The options used for lifting or lowering operations.
-    public let options: CanonicalOptions
+    public let options: CanonicalOptions<MemorySpace>
     /// The module instance that defines the lift/lower operation.
-    public let instance: Instance
+    public let instance: Instance<MemorySpace>
     /// A reference to the guest memory.
     public var guestMemory: Memory {
         options.memory
     }
 
-    public init(options: CanonicalOptions, instance: Instance) {
+    public init(options: CanonicalOptions<MemorySpace>, instance: Instance<MemorySpace>) {
         self.options = options
         self.instance = instance
     }
@@ -36,7 +36,7 @@ public struct CanonicalCallContext {
         oldSize: UInt32,
         oldAlign: UInt32,
         newSize: UInt32
-    ) throws(CanonicalABIError) -> UnsafeGuestRawPointer {
+    ) throws(CanonicalABIError) -> UnsafeGuestRawPointer<MemorySpace> {
         guard let realloc = options.realloc else {
             throw CanonicalABIError(description: "Missing required \"cabi_realloc\" export")
         }
@@ -54,19 +54,19 @@ public struct CanonicalCallContext {
         guard case .i32(let new) = results[0] else {
             throw CanonicalABIError(description: "\"cabi_realloc\" export should return an i32 value")
         }
-        return UnsafeGuestRawPointer(memorySpace: guestMemory, offset: new)
+        return UnsafeGuestRawPointer<MemorySpace>(memorySpace: guestMemory, offset: new)
     }
 }
 
 extension CanonicalCallContext {
     @available(*, deprecated, renamed: "instance")
-    public var moduleInstance: Instance {
+    public var moduleInstance: Instance<MemorySpace> {
         return instance
     }
 
     #if !$Embedded
     @available(*, deprecated, renamed: "init(options:instance:)")
-    public init(options: CanonicalOptions, moduleInstance: Instance, runtime: Runtime) {
+    public init(options: CanonicalOptions<MemorySpace>, moduleInstance: Instance<MemorySpace>, runtime: Runtime) {
         self.init(options: options, instance: moduleInstance)
     }
     #endif
@@ -78,7 +78,7 @@ public typealias WasmKitGuestMemory = Memory
 extension Memory {
     /// Creates a new memory instance from the given store and address
     @available(*, unavailable, message: "WasmKitGuestMemory has been removed; use Memory instead")
-    public init(store: Store, memory: Memory) {
+    public init(store: Store<Memory>, memory: Memory) {
         fatalError()
     }
 }

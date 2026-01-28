@@ -310,9 +310,9 @@ public enum ModuleValidationError: Error {
 }
 
 /// Validates a WebAssembly module.
-struct ModuleValidator {
-    let module: Module
-    init(module: Module) {
+struct ModuleValidator<MemorySpace: GuestMemory> {
+    let module: Module<MemorySpace>
+    init(module: Module<MemorySpace>) {
         self.module = module
     }
 

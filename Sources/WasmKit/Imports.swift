@@ -22,15 +22,15 @@ import struct WasmParser.Import
 ///
 /// let instance = try module.instantiate(store: store, imports: imports)
 /// ```
-public struct Imports {
-    private var definitions: [String: [String: ExternalValue]] = [:]
+public struct Imports<MemorySpace: GuestMemory> {
+    private var definitions: [String: [String: ExternalValue<MemorySpace>]] = [:]
 
     /// Initializes a new instance of `Imports`.
     public init() {
     }
 
     /// Define a value to be imported by the given module and name.
-    public mutating func define<Extern: ExternalValueConvertible>(module: String, name: String, _ value: Extern) {
+    public mutating func define<Extern: ExternalValueConvertible>(module: String, name: String, _ value: Extern<MemorySpace>) {
         definitions[module, default: [:]][name] = value.externalValue
     }
 
@@ -38,11 +38,11 @@ public struct Imports {
     /// - Parameters:
     ///   - module: The module name to be used for resolving the imports.
     ///   - values: The values to be imported keyed by their name.
-    public mutating func define(module: String, _ values: Exports) {
+    public mutating func define(module: String, _ values: Exports<MemorySpace>) {
         definitions[module, default: [:]].merge(values.map { ($0, $1) }, uniquingKeysWith: { _, new in new })
     }
 
-    mutating func define(_ importEntry: Import, _ value: ExternalValue) {
+    mutating func define(_ importEntry: Import, _ value: ExternalValue<MemorySpace>) {
         define(module: importEntry.module, name: importEntry.name, value)
     }
 
@@ -53,28 +53,29 @@ public struct Imports {
 }
 
 /// A value that can be imported or exported from an instance.
-public protocol ExternalValueConvertible {
-    var externalValue: ExternalValue { get }
+public protocol ExternalValueConvertible<MemorySpace> {
+    associatedtype MemorySpace: GuestMemory
+    var externalValue: ExternalValue<MemorySpace> { get }
 }
 
-extension ExternalValue: ExternalValueConvertible {
-    public var externalValue: ExternalValue { self }
+extension ExternalValue: ExternalValueConvertible<MemorySpace> {
+    public var externalValue: ExternalValue<MemorySpace> { self }
 }
 
-extension Memory: ExternalValueConvertible {
-    public var externalValue: ExternalValue { .memory(self) }
+extension Memory: ExternalValueConvertible<MemorySpace> {
+    public var externalValue: ExternalValue<MemorySpace> { .memory(self) }
 }
 
-extension Table: ExternalValueConvertible {
-    public var externalValue: ExternalValue { .table(self) }
+extension Table: ExternalValueConvertible<MemorySpace> {
+    public var externalValue: ExternalValue<MemorySpace> { .table(self) }
 }
 
-extension Global: ExternalValueConvertible {
-    public var externalValue: ExternalValue { .global(self) }
+extension Global: ExternalValueConvertible<MemorySpace> {
+    public var externalValue: ExternalValue<MemorySpace> { .global(self) }
 }
 
-extension Function: ExternalValueConvertible {
-    public var externalValue: ExternalValue { .function(self) }
+extension Function: ExternalValueConvertible<MemorySpace> {
+    public var externalValue: ExternalValue<MemorySpace> { .function(self) }
 }
 
 extension Imports: ExpressibleByDictionaryLiteral {
@@ -83,7 +84,7 @@ extension Imports: ExpressibleByDictionaryLiteral {
         public typealias Key = String
         public typealias Value = ExternalValueConvertible
 
-        let definitions: [String: ExternalValue]
+        let definitions: [String: ExternalValue<MemorySpace>]
 
         public init(dictionaryLiteral elements: (String, any Value)...) {
             self.definitions = Dictionary(uniqueKeysWithValues: elements.map { ($0.0, $0.1.externalValue) })

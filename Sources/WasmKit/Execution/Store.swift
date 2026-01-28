@@ -3,7 +3,7 @@ import WasmParser
 /// A container to manage WebAssembly object space.
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#store>
-public final class Store {
+public final class Store<MemorySpace: GuestMemory> {
     var nameRegistry = NameRegistry()
     #if $Embedded
     @_spi(Fuzzing)  // Consider making this public
@@ -38,11 +38,11 @@ extension Store: Equatable {
 }
 
 /// A caller context passed to host functions
-public struct Caller {
+public struct Caller<MemorySpace: GuestMemory> {
     private let instanceHandle: InternalInstance?
     /// The instance that called the host function.
     /// - Note: This property is `nil` if a `Function` backed by a host function is called directly.
-    public var instance: Instance? {
+    public var instance: Instance<MemorySpace>? {
         guard let instanceHandle else { return nil }
         return Instance(handle: instanceHandle, store: store)
     }
@@ -51,7 +51,7 @@ public struct Caller {
     public var engine: Engine { store.engine }
 
     /// The store associated with the caller execution context.
-    public let store: Store
+    public let store: Store<MemorySpace>
 
     #if !$Embedded
     /// The runtime that called the host function.
@@ -59,7 +59,7 @@ public struct Caller {
     public var runtime: Runtime { fatalError() }
     #endif
 
-    init(instanceHandle: InternalInstance?, store: Store) {
+    init(instanceHandle: InternalInstance?, store: Store<MemorySpace>) {
         self.instanceHandle = instanceHandle
         self.store = store
     }
@@ -73,7 +73,7 @@ struct HostFunctionEntity {
 extension Store {
     #if !$Embedded
     @available(*, unavailable, message: "Use ``Imports/define(_:as:)`` instead. Or use ``Runtime/register(_:as:)`` as a temporary drop-in replacement.")
-    public func register(_ instance: Instance, as name: String) throws(Trap) {}
+    public func register(_ instance: Instance<Memory>, as name: String) throws(Trap) {}
 
     /// Register the given host module in this store with the given name.
     ///
@@ -85,7 +85,7 @@ extension Store {
     #endif
 
     @available(*, deprecated, message: "Address-based APIs has been removed; use Memory instead")
-    public func memory(at address: Memory) -> Memory {
+    public func memory(at address: MemorySpace) -> MemorySpace {
         address
     }
 
