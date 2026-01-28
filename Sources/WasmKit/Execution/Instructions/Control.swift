@@ -1,7 +1,7 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#control-instructions>
 extension Execution {
-    func unreachable(sp: Sp, pc: Pc) throws -> (Pc, CodeSlot) {
+    func unreachable(sp: Sp, pc: Pc) throws(Trap) -> (Pc, CodeSlot) {
         throw Trap(.unreachable)
     }
     mutating func nop(sp: Sp) {
@@ -51,7 +51,7 @@ extension Execution {
         return pc.next()
     }
 
-    mutating func endOfExecution(sp: inout Sp, pc: Pc) throws -> (Pc, CodeSlot) {
+    mutating func endOfExecution(sp: inout Sp, pc: Pc) throws(EndOfExecution) -> (Pc, CodeSlot) {
         throw EndOfExecution(sp: sp)
     }
 

@@ -386,7 +386,11 @@ struct InstructionPrintingContext {
         case ._return:
             target.write("return")
         default:
+            #if $Embedded
+            target.write("<instruction>")
+            #else
             target.write(String(describing: instruction))
+            #endif
         }
     }
 }

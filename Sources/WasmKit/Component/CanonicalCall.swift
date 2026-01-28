@@ -40,9 +40,14 @@ public struct CanonicalCallContext {
         guard let realloc = options.realloc else {
             throw CanonicalABIError(description: "Missing required \"cabi_realloc\" export")
         }
-        let results = try realloc(
-            [.i32(old), .i32(oldSize), .i32(oldAlign), .i32(newSize)]
-        )
+        let results: [Value]
+        do {
+            results = try realloc(
+                [.i32(old), .i32(oldSize), .i32(oldAlign), .i32(newSize)]
+            )
+        } catch {
+            throw CanonicalABIError(description: "\"cabi_realloc\" trapped: \(error)")
+        }
         guard results.count == 1 else {
             throw CanonicalABIError(description: "\"cabi_realloc\" export should return a single value")
         }

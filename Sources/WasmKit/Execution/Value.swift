@@ -145,25 +145,25 @@ extension RawUnsignedInteger {
         return self >> shift | self << (Self(Self.bitWidth) - shift)
     }
 
-    func divS(_ other: Self) throws -> Self {
+    func divS(_ other: Self) throws(Trap) -> Self {
         if _slowPath(other == 0) { throw Trap(.integerDividedByZero) }
         let (signed, overflow) = signed.dividedReportingOverflow(by: other.signed)
         guard !overflow else { throw Trap(.integerOverflow) }
         return signed.unsigned
     }
-    func divU(_ other: Self) throws -> Self {
+    func divU(_ other: Self) throws(Trap) -> Self {
         if _slowPath(other == 0) { throw Trap(.integerDividedByZero) }
         let (unsigned, overflow) = dividedReportingOverflow(by: other)
         guard !overflow else { throw Trap(.integerOverflow) }
         return unsigned
     }
-    func remS(_ other: Self) throws -> Self {
+    func remS(_ other: Self) throws(Trap) -> Self {
         if _slowPath(other == 0) { throw Trap(.integerDividedByZero) }
         let (signed, overflow) = signed.remainderReportingOverflow(dividingBy: other.signed)
         guard !overflow else { return 0 }
         return signed.unsigned
     }
-    func remU(_ other: Self) throws -> Self {
+    func remU(_ other: Self) throws(Trap) -> Self {
         if _slowPath(other == 0) { throw Trap(.integerDividedByZero) }
         let (unsigned, overflow) = remainderReportingOverflow(dividingBy: other)
         guard !overflow else { throw Trap(.integerOverflow) }
@@ -262,7 +262,7 @@ extension FloatingPoint {
     fileprivate func truncTo<T: FixedWidthInteger>(
         rounding: (Self) -> T,
         max: Self, min: Self
-    ) throws -> T {
+    ) throws(Trap) -> T {
         guard !self.isNaN else { throw Trap(.invalidConversionToInteger) }
         if self <= min || self >= max {
             throw Trap(.integerOverflow)

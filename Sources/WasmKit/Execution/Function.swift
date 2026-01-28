@@ -52,7 +52,7 @@ public struct Function: Equatable {
     public init(
         store: Store,
         parameters: [ValueType], results: [ValueType] = [],
-        body: @escaping (Caller, [Value]) throws -> [Value]
+        body: @escaping (Caller, [Value]) throws(Trap) -> [Value]
     ) {
         self.init(store: store, type: FunctionType(parameters: parameters, results: results), body: body)
     }
@@ -66,7 +66,7 @@ public struct Function: Equatable {
     public init(
         store: Store,
         type: FunctionType,
-        body: @escaping (Caller, [Value]) throws -> [Value]
+        body: @escaping (Caller, [Value]) throws(Trap) -> [Value]
     ) {
         self.init(handle: store.allocator.allocate(type: type, implementation: body, engine: store.engine), store: store)
     }
@@ -83,7 +83,7 @@ public struct Function: Equatable {
     /// - Throws: A trap if the function invocation fails.
     /// - Returns: The results of the function invocation.
     @discardableResult
-    public func invoke(_ arguments: [Value] = []) throws -> [Value] {
+    public func invoke(_ arguments: [Value] = []) throws(Trap) -> [Value] {
         return try handle.invoke(arguments, store: store)
     }
 
@@ -94,7 +94,7 @@ public struct Function: Equatable {
     /// - Throws: A trap if the function invocation fails.
     /// - Returns: The results of the function invocation.
     @discardableResult
-    public func callAsFunction(_ arguments: [Value] = []) throws -> [Value] {
+    public func callAsFunction(_ arguments: [Value] = []) throws(Trap) -> [Value] {
         return try invoke(arguments)
     }
 
@@ -107,7 +107,7 @@ public struct Function: Equatable {
     /// - Returns: The results of the function invocation.
     @available(*, deprecated, renamed: "invoke(_:)")
     @discardableResult
-    public func invoke(_ arguments: [Value] = [], runtime: Runtime) throws -> [Value] {
+    public func invoke(_ arguments: [Value] = [], runtime: Runtime) throws(Trap) -> [Value] {
         return try invoke(arguments)
     }
 }
@@ -163,7 +163,7 @@ extension InternalFunction: ValidatableEntity {
 }
 
 extension InternalFunction {
-    func invoke(_ arguments: [Value], store: Store) throws -> [Value] {
+    func invoke(_ arguments: [Value], store: Store) throws(Trap) -> [Value] {
         if isWasm {
             let entity = wasm
             let resolvedType = store.engine.resolveType(entity.type)
@@ -198,13 +198,13 @@ extension InternalFunction {
         return true
     }
 
-    private func check(functionType: FunctionType, parameters: [Value]) throws {
+    private func check(functionType: FunctionType, parameters: [Value]) throws(Trap) {
         guard check(expectedTypes: functionType.parameters, values: parameters) else {
             throw Trap(.parameterTypesMismatch(expected: functionType.parameters, got: parameters))
         }
     }
 
-    private func check(functionType: FunctionType, results: [Value]) throws {
+    private func check(functionType: FunctionType, results: [Value]) throws(Trap) {
         guard check(expectedTypes: functionType.results, values: results) else {
             throw Trap(.resultTypesMismatch(expected: functionType.results, got: results))
         }

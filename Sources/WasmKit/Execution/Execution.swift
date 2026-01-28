@@ -24,10 +24,10 @@ struct Execution: ~Copyable {
 
     /// Executes the given closure with a new execution state associated with
     /// the given ``Store`` instance.
-    static func with<T>(
+    static func with<T, E: Error>(
         store: StoreRef,
-        body: (inout Execution, Sp) throws -> T
-    ) rethrows -> T {
+        body: (inout Execution, Sp) throws(E) -> T
+    ) throws(E) -> T {
         let limit = store.value.engine.configuration.stackSize / MemoryLayout<StackSlot>.stride
         let valueStack = UnsafeMutablePointer<StackSlot>.allocate(capacity: limit)
         defer {
@@ -295,10 +295,10 @@ func executeWasm(
     function handle: InternalFunction,
     type: FunctionType,
     arguments: [Value]
-) throws -> [Value] {
+) throws(Trap) -> [Value] {
     // NOTE: `store` variable must not outlive this function
     let store = StoreRef(store)
-    return try Execution.with(store: store) { (stack, sp) in
+    return try Execution.with(store: store) { (stack, sp) throws(Trap) -> [Value] in
         // Advance the stack pointer to be able to reference negative indices
         // for saving slots.
         let sp = sp.advanced(by: FrameHeaderLayout.numberOfSavingSlots)
@@ -309,16 +309,22 @@ func executeWasm(
             sp[VReg(index)] = UntypedValue(argument)
         }
 
-        try withUnsafeTemporaryAllocation(of: CodeSlot.self, capacity: 2) { rootISeq in
-            rootISeq[0] = Instruction.endOfExecution.headSlot(
-                threadingModel: store.value.engine.configuration.threadingModel
-            )
-            try stack.execute(
-                sp: sp,
-                pc: rootISeq.baseAddress!,
-                handle: handle,
-                type: type
-            )
+        do {
+            try withUnsafeTemporaryAllocation(of: CodeSlot.self, capacity: 2) { rootISeq in
+                rootISeq[0] = Instruction.endOfExecution.headSlot(
+                    threadingModel: store.value.engine.configuration.threadingModel
+                )
+                try stack.execute(
+                    sp: sp,
+                    pc: rootISeq.baseAddress!,
+                    handle: handle,
+                    type: type
+                )
+            }
+        } catch let trap as Trap {
+            throw trap
+        } catch {
+            throw Trap(TrapReason.message(TrapReason.Message("Unexpected error during execution")))
         }
         return type.results.enumerated().map { (i, type) in
             sp[VReg(i)].cast(to: type)
@@ -454,8 +460,8 @@ extension Execution {
     mutating func runDirectThreaded(
         sp: Sp, pc: Pc, md: Md, ms: Ms
     ) throws {
-        #if os(WASI)
-            fatalError("Direct threading is not supported on WASI")
+        #if os(WASI) || $Embedded
+            fatalError("Direct threading is not supported on WASI or Embedded Swift")
         #else
             var pc = pc
             let handler = pc.read(wasmkit_tc_exec.self)

@@ -102,7 +102,7 @@ extension Execution {
     fileprivate mutating func getElementIndex(
         sp: Sp,
         _ register: VReg, _ table: InternalTable
-    ) throws -> ElementIndex {
+    ) throws(Trap) -> ElementIndex {
         let elementIndex = sp[register].asAddressOffset(table.limits.isMemory64)
 
         guard elementIndex < table.elements.count else {

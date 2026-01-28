@@ -218,6 +218,25 @@ struct FrameHeaderLayout {
 enum InstructionTranslatorError: Error {
     case translation(TranslationError)
     case validation(ValidationError)
+    case wasmParserError(WasmParserError)
+
+    @inline(__always)
+    static func validate<T>(_ expr: @autoclosure () throws(ValidationError) -> T) throws(InstructionTranslatorError) -> T {
+        do {
+            return try expr()
+        } catch {
+            throw InstructionTranslatorError.validation(error)
+        }
+    }
+
+    @inline(__always)
+    static func translate<T>(_ expr: @autoclosure () throws(TranslationError) -> T) throws(InstructionTranslatorError) -> T {
+        do {
+            return try expr()
+        } catch {
+            throw InstructionTranslatorError.translation(error)
+        }
+    }
 }
 
 struct StackLayout {
@@ -428,7 +447,7 @@ struct InstructionTranslator: InstructionVisitor {
             assert(height < UInt16.max)
             return stackRegBase + VReg(usedRegister)
         }
-        mutating func pushLocal(_ localIndex: LocalIndex, locals: inout Locals) throws {
+        mutating func pushLocal(_ localIndex: LocalIndex, locals: inout Locals) throws(TranslationError) {
             let type = try locals.type(of: localIndex)
             self.values.append(.local(type, localIndex))
         }
@@ -681,7 +700,7 @@ struct InstructionTranslator: InstructionVisitor {
             }
         }
 
-        fileprivate mutating func pinLabel(_ ref: LabelRef, pc: MetaProgramCounter) throws {
+        fileprivate mutating func pinLabel(_ ref: LabelRef, pc: MetaProgramCounter) throws(TranslationError) {
             switch self.labels[ref] {
             case .pinned(let oldPC):
                 throw TranslationError("Internal consistency error: Label \(ref) is already pinned at \(oldPC), but tried to pin at \(pc) again")
@@ -699,7 +718,7 @@ struct InstructionTranslator: InstructionVisitor {
             }
         }
 
-        mutating func pinLabelHere(_ ref: LabelRef) throws {
+        mutating func pinLabelHere(_ ref: LabelRef) throws(TranslationError) {
             try pinLabel(ref, pc: insertingPC)
         }
 
@@ -970,19 +989,11 @@ struct InstructionTranslator: InstructionVisitor {
         }
     }
     private mutating func popOperand(_ type: ValueType) throws(InstructionTranslatorError) -> ValueSource? {
-        do {
-            guard try checkBeforePop(typeHint: type) else {
-                return nil
-            }
-        } catch {
-            throw InstructionTranslatorError.validation(error)
+        guard try InstructionTranslatorError.validate(checkBeforePop(typeHint: type)) else {
+            return nil
         }
-        do {
-            iseqBuilder.resetLastEmission()
-            return try valueStack.pop(type)
-        } catch {
-            throw InstructionTranslatorError.translation(error)
-        }
+        iseqBuilder.resetLastEmission()
+        return try InstructionTranslatorError.translate(valueStack.pop(type))
     }
 
     private mutating func popOnStackOperand(_ type: ValueType) throws(InstructionTranslatorError) -> VReg? {
@@ -996,19 +1007,11 @@ struct InstructionTranslator: InstructionVisitor {
     }
 
     private mutating func popAnyOperand() throws(InstructionTranslatorError) -> (MetaValue, ValueSource?) {
-        do {
-            guard try checkBeforePop(typeHint: nil) else {
-                return (.unknown, nil)
-            }
-        } catch {
-            throw InstructionTranslatorError.validation(error)
+        guard try InstructionTranslatorError.validate(checkBeforePop(typeHint: nil)) else {
+            return (.unknown, nil)
         }
-        do {
-            iseqBuilder.resetLastEmission()
-            return try valueStack.pop()
-        } catch {
-            throw InstructionTranslatorError.translation(error)
-        }
+        iseqBuilder.resetLastEmission()
+        return try InstructionTranslatorError.translate(valueStack.pop())
     }
 
     @discardableResult
@@ -1022,11 +1025,7 @@ struct InstructionTranslator: InstructionVisitor {
             switch value {
             case .local(let localIndex):
                 // Re-push local variables to the stack
-                do {
-                    _ = try valueStack.pushLocal(localIndex, locals: &locals)
-                } catch {
-                    throw InstructionTranslatorError.translation(error)
-                }
+                _ = try InstructionTranslatorError.translate(valueStack.pushLocal(localIndex, locals: &locals))
             case .vreg, nil:
                 _ = valueStack.push(type)
             case .const(let index, let type):
@@ -1106,18 +1105,18 @@ struct InstructionTranslator: InstructionVisitor {
         self.updateInstructionMapping()
         iseqBuilder.emit(._return)
     }
-    private mutating func markUnreachable() throws(TranslationError) {
-        try controlStack.markUnreachable()
-        let currentFrame = try controlStack.currentFrame()
-        try valueStack.truncate(height: currentFrame.stackHeight)
+    private mutating func markUnreachable() throws(InstructionTranslatorError) {
+        try InstructionTranslatorError.validate(controlStack.markUnreachable())
+        let currentFrame = try InstructionTranslatorError.validate(controlStack.currentFrame())
+        try InstructionTranslatorError.translate(valueStack.truncate(height: currentFrame.stackHeight))
     }
 
-    private mutating func finalize() throws(ValidationError) -> InstructionSequence {
+    private mutating func finalize() throws(InstructionTranslatorError) -> InstructionSequence {
         if controlStack.numberOfFrames > 1 {
-            throw ValidationError(.expectedMoreEndInstructions(count: controlStack.numberOfFrames - 1))
+            throw InstructionTranslatorError.validation(ValidationError(.expectedMoreEndInstructions(count: controlStack.numberOfFrames - 1)))
         }
         // Check dangling labels
-        try iseqBuilder.assertDanglingLabels()
+        try InstructionTranslatorError.translate(iseqBuilder.assertDanglingLabels())
 
         iseqBuilder.emit(._return)
         let instructions = iseqBuilder.finalize()
@@ -1155,20 +1154,21 @@ struct InstructionTranslator: InstructionVisitor {
     // MARK: Main entry point
 
     /// Translate a Wasm expression into a sequence of instructions.
-    mutating func translate(code: Code) throws -> InstructionSequence {
+    mutating func translate(code: Code) throws(InstructionTranslatorError) -> InstructionSequence {
         if isIntercepting {
             // Emit `onEnter` instruction at the beginning of the function
             emit(.onEnter(functionIndex))
         }
         var parser = ExpressionParser(code: code)
-        var offset = parser.offset
         do {
-            while try parser.visit(visitor: &self) {
-                offset = parser.offset
+            while try parser.visit(visitor: &self) {}
+        } catch let wasmError {
+            switch wasmError {
+            case .parser(let parserError):
+                throw InstructionTranslatorError.wasmParserError(parserError)
+            case .visitor(let visitorError):
+                throw visitorError
             }
-        } catch var error as ValidationError {
-            error.offset = offset
-            throw error
         }
         return try finalize()
     }
@@ -1183,16 +1183,16 @@ struct InstructionTranslator: InstructionVisitor {
         emit(.nop)
     }
 
-    mutating func visitBlock(blockType: WasmParser.BlockType) throws -> Output {
-        let blockType = try module.resolveBlockType(blockType)
+    mutating func visitBlock(blockType _blockType: WasmParser.BlockType) throws(InstructionTranslatorError) -> Output {
+        let blockType = try InstructionTranslatorError.validate(module.resolveBlockType(_blockType))
         let endLabel = iseqBuilder.allocLabel()
         self.preserveLocalsOnStack(depth: self.valueStack.height)
         let stackHeight = try popPushValues(blockType.parameters)
         controlStack.pushFrame(ControlStack.ControlFrame(blockType: blockType, stackHeight: stackHeight, continuation: endLabel, kind: .block))
     }
 
-    mutating func visitLoop(blockType: WasmParser.BlockType) throws -> Output {
-        let blockType = try module.resolveBlockType(blockType)
+    mutating func visitLoop(blockType _blockType: WasmParser.BlockType) throws(InstructionTranslatorError) -> Output {
+        let blockType = try InstructionTranslatorError.validate(module.resolveBlockType(_blockType))
         preserveOnStack(depth: blockType.parameters.count)
         iseqBuilder.resetLastEmission()
         for param in blockType.parameters.reversed() {
@@ -1206,10 +1206,10 @@ struct InstructionTranslator: InstructionVisitor {
         controlStack.pushFrame(ControlStack.ControlFrame(blockType: blockType, stackHeight: stackHeight, continuation: headLabel, kind: .loop))
     }
 
-    mutating func visitIf(blockType: WasmParser.BlockType) throws -> Output {
+    mutating func visitIf(blockType _blockType: WasmParser.BlockType) throws(InstructionTranslatorError) -> Output {
         // Pop condition value
         let condition = try popVRegOperand(.i32)
-        let blockType = try module.resolveBlockType(blockType)
+        let blockType = try InstructionTranslatorError.validate(module.resolveBlockType(_blockType))
         self.preserveLocalsOnStack(depth: self.valueStack.height)
         preserveOnStack(depth: blockType.parameters.count)
         let endLabel = iseqBuilder.allocLabel()
@@ -1241,13 +1241,13 @@ struct InstructionTranslator: InstructionVisitor {
         }
     }
 
-    mutating func visitElse() throws -> Output {
-        var frame = try controlStack.currentFrame()
+    mutating func visitElse() throws(InstructionTranslatorError) -> Output {
+        var frame = try InstructionTranslatorError.validate(controlStack.currentFrame())
         guard case .if(let elseLabel, let endLabel, _) = frame.kind else {
-            throw ValidationError(.expectedIfControlFrame)
+            throw InstructionTranslatorError.validation(ValidationError(.expectedIfControlFrame))
         }
         preserveOnStack(depth: valueStack.height - frame.stackHeight)
-        try controlStack.resetReachability()
+        try InstructionTranslatorError.validate(controlStack.resetReachability())
         iseqBuilder.resetLastEmission()
 
         self.updateInstructionMapping()
@@ -1256,11 +1256,11 @@ struct InstructionTranslator: InstructionVisitor {
             return Int32(offset)
         }
         for result in frame.blockType.results.reversed() {
-            guard try checkBeforePop(typeHint: result, controlFrame: frame) else { continue }
-            _ = try valueStack.pop(result)
+            guard try InstructionTranslatorError.validate(checkBeforePop(typeHint: result, controlFrame: frame)) else { continue }
+            _ = try InstructionTranslatorError.translate(valueStack.pop(result))
         }
         guard valueStack.height == frame.stackHeight else {
-            throw ValidationError(.valuesRemainingAtEndOfBlock)
+            throw InstructionTranslatorError.validation(ValidationError(.valuesRemainingAtEndOfBlock))
         }
         _ = controlStack.popFrame()
         frame.kind = .if(elseLabel: elseLabel, endLabel: endLabel, isElse: true)
@@ -1271,42 +1271,42 @@ struct InstructionTranslator: InstructionVisitor {
         for parameter in frame.blockType.parameters {
             _ = valueStack.push(parameter)
         }
-        try iseqBuilder.pinLabelHere(elseLabel)
+        try InstructionTranslatorError.translate(iseqBuilder.pinLabelHere(elseLabel))
     }
 
-    mutating func visitEnd() throws -> Output {
-        let toBePopped = try controlStack.currentFrame()
+    mutating func visitEnd() throws(InstructionTranslatorError) -> Output {
+        let toBePopped = try InstructionTranslatorError.validate(controlStack.currentFrame())
         iseqBuilder.resetLastEmission()
         if case .block(root: true) = toBePopped.kind {
             try translateReturn()
             guard valueStack.height == toBePopped.stackHeight else {
-                throw ValidationError(.valuesRemainingAtEndOfBlock)
+                throw InstructionTranslatorError.validation(ValidationError(.valuesRemainingAtEndOfBlock))
             }
-            try iseqBuilder.pinLabelHere(toBePopped.continuation)
+            try InstructionTranslatorError.translate(iseqBuilder.pinLabelHere(toBePopped.continuation))
             return
         }
 
         if case .if(_, _, isElse: false) = toBePopped.kind {
             let blockType = toBePopped.blockType
             guard blockType.parameters == blockType.results else {
-                throw ValidationError(.parameterResultTypeMismatch(blockType: blockType))
+                throw InstructionTranslatorError.validation(ValidationError(.parameterResultTypeMismatch(blockType: blockType)))
             }
         }
 
         preserveOnStack(depth: Int(valueStack.height - toBePopped.stackHeight))
         switch toBePopped.kind {
         case .block:
-            try iseqBuilder.pinLabelHere(toBePopped.continuation)
+            try InstructionTranslatorError.translate(iseqBuilder.pinLabelHere(toBePopped.continuation))
         case .loop: break
         case .if:
-            try iseqBuilder.pinLabelHere(toBePopped.continuation)
+            try InstructionTranslatorError.translate(iseqBuilder.pinLabelHere(toBePopped.continuation))
         }
         for result in toBePopped.blockType.results.reversed() {
-            guard try checkBeforePop(typeHint: result, controlFrame: toBePopped) else { continue }
-            _ = try valueStack.pop(result)
+            guard try InstructionTranslatorError.validate(checkBeforePop(typeHint: result, controlFrame: toBePopped)) else { continue }
+            _ = try InstructionTranslatorError.translate(valueStack.pop(result))
         }
         guard valueStack.height == toBePopped.stackHeight else {
-            throw ValidationError(.valuesRemainingAtEndOfBlock)
+            throw InstructionTranslatorError.validation(ValidationError(.valuesRemainingAtEndOfBlock))
         }
         for result in toBePopped.blockType.results {
             _ = valueStack.push(result)
@@ -1685,17 +1685,17 @@ struct InstructionTranslator: InstructionVisitor {
             emit(.select(operand))
         }
     }
-    mutating func visitLocalGet(localIndex: UInt32) throws -> Output {
+    mutating func visitLocalGet(localIndex: UInt32) throws(TranslationError) -> Output {
         iseqBuilder.resetLastEmission()
         try valueStack.pushLocal(localIndex, locals: &locals)
     }
-    mutating func visitLocalSetOrTee(localIndex: UInt32, isTee: Bool) throws {
+    mutating func visitLocalSetOrTee(localIndex: UInt32, isTee: Bool) throws(InstructionTranslatorError) {
         preserveLocalsOnStack(localIndex)
-        let type = try locals.type(of: localIndex)
+        let type = try InstructionTranslatorError.translate(locals.type(of: localIndex))
         let result = localReg(localIndex)
 
-        guard try checkBeforePop(typeHint: type) else { return }
-        let op = try valueStack.pop(type)
+        guard try InstructionTranslatorError.validate(checkBeforePop(typeHint: type)) else { return }
+        let op = try InstructionTranslatorError.translate(valueStack.pop(type))
 
         if case .const(let slotIndex, _) = op {
             // Optimize (local.set $x (i32.const $c)) to reg:$x = 42 rather than through const slot
@@ -1710,22 +1710,22 @@ struct InstructionTranslator: InstructionVisitor {
         }
 
         let value = ensureOnVReg(op)
-        guard try controlStack.currentFrame().reachable else { return }
+        guard try InstructionTranslatorError.validate(controlStack.currentFrame()).reachable else { return }
         if !isTee, iseqBuilder.relinkLastInstructionResult(result) {
             // Good news, copyStack is optimized out :)
             return
         }
         emitCopyStack(from: value, to: result)
     }
-    mutating func visitLocalSet(localIndex: UInt32) throws -> Output {
+    mutating func visitLocalSet(localIndex: UInt32) throws(InstructionTranslatorError) -> Output {
         try visitLocalSetOrTee(localIndex: localIndex, isTee: false)
     }
-    mutating func visitLocalTee(localIndex: UInt32) throws -> Output {
+    mutating func visitLocalTee(localIndex: UInt32) throws(InstructionTranslatorError) -> Output {
         try visitLocalSetOrTee(localIndex: localIndex, isTee: true)
-        _ = try valueStack.pushLocal(localIndex, locals: &locals)
+        _ = try InstructionTranslatorError.translate(valueStack.pushLocal(localIndex, locals: &locals))
     }
-    mutating func visitGlobalGet(globalIndex: UInt32) throws -> Output {
-        let type = try module.globalType(globalIndex)
+    mutating func visitGlobalGet(globalIndex: UInt32) throws(InstructionTranslatorError) -> Output {
+        let type = try InstructionTranslatorError.validate(module.globalType(globalIndex))
         let result = valueStack.push(type)
         guard let global = module.resolveGlobal(globalIndex) else {
             // Skip actual code emission if validation-only mode
@@ -1733,14 +1733,14 @@ struct InstructionTranslator: InstructionVisitor {
         }
         emit(.globalGet(Instruction.GlobalAndVRegOperand(reg: LLVReg(result), global: global)))
     }
-    mutating func visitGlobalSet(globalIndex: UInt32) throws -> Output {
-        let type = try module.globalType(globalIndex)
+    mutating func visitGlobalSet(globalIndex: UInt32) throws(InstructionTranslatorError) -> Output {
+        let type = try InstructionTranslatorError.validate(module.globalType(globalIndex))
         guard let value = try popVRegOperand(type) else { return }
         guard let global = module.resolveGlobal(globalIndex) else {
             // Skip actual code emission if validation-only mode
             return
         }
-        try validator.validateGlobalSet(global.globalType)
+        try InstructionTranslatorError.validate(validator.validateGlobalSet(global.globalType))
         emit(.globalSet(Instruction.GlobalAndVRegOperand(reg: LLVReg(value), global: global)))
     }
 
@@ -1824,13 +1824,8 @@ struct InstructionTranslator: InstructionVisitor {
         _ naturalAlignment: Int,
         _ instruction: @escaping (Instruction.LoadOperand) -> Instruction
     ) throws(InstructionTranslatorError) {
-        let isMemory64: Bool
-        do {
-            isMemory64 = try module.isMemory64(memoryIndex: 0)
-            try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
-        } catch {
-            throw InstructionTranslatorError.validation(error)
-        }
+        let isMemory64 = try InstructionTranslatorError.validate(module.isMemory64(memoryIndex: 0))
+        try InstructionTranslatorError.validate(validator.validateMemArg(memarg, naturalAlignment: naturalAlignment))
         try popPushEmit(.address(isMemory64: isMemory64), type) { value, result in
             let loadOperand = Instruction.LoadOperand(
                 offset: memarg.offset,
@@ -1846,13 +1841,8 @@ struct InstructionTranslator: InstructionVisitor {
         _ naturalAlignment: Int,
         _ instruction: (Instruction.StoreOperand) -> Instruction
     ) throws(InstructionTranslatorError) {
-        let isMemory64: Bool
-        do {
-            isMemory64 = try module.isMemory64(memoryIndex: 0)
-            try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
-        } catch {
-            throw InstructionTranslatorError.validation(error)
-        }
+        let isMemory64 = try InstructionTranslatorError.validate(module.isMemory64(memoryIndex: 0))
+        try InstructionTranslatorError.validate(validator.validateMemArg(memarg, naturalAlignment: naturalAlignment))
         let value = try popVRegOperand(type)
         let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
         if let value = value, let pointer = pointer {
@@ -1948,12 +1938,7 @@ struct InstructionTranslator: InstructionVisitor {
         pushEmit(sizeType, { .memorySize(Instruction.MemorySizeOperand(memoryIndex: memory, result: LVReg($0))) })
     }
     mutating func visitMemoryGrow(memory: UInt32) throws(InstructionTranslatorError) -> Output {
-        let isMemory64: Bool
-        do {
-            isMemory64 = try module.isMemory64(memoryIndex: memory)
-        } catch {
-            throw InstructionTranslatorError.validation(error)
-        }
+        let isMemory64 = try InstructionTranslatorError.validate(module.isMemory64(memoryIndex: memory))
         let sizeType = ValueType.address(isMemory64: isMemory64)
         // Just pop/push the same type (i64 or i32) value
         try popPushEmit(sizeType, sizeType) { value, result in
@@ -1987,19 +1972,19 @@ struct InstructionTranslator: InstructionVisitor {
     mutating func visitI64Const(value: Int64) -> Output { visitConst(.i64, .i64(UInt64(bitPattern: value))) }
     mutating func visitF32Const(value: IEEE754.Float32) -> Output { visitConst(.f32, .f32(value.bitPattern)) }
     mutating func visitF64Const(value: IEEE754.Float64) -> Output { visitConst(.f64, .f64(value.bitPattern)) }
-    mutating func visitRefNull(type: HeapType) throws {
+    mutating func visitRefNull(type: HeapType) throws(TranslationError) {
         guard case .abstract(let abstractType) = type else {
             throw TranslationError("concrete heap type is not implemented yet")
         }
         let typeToPush = ReferenceType(isNullable: true, heapType: type)
         pushEmit(.ref(typeToPush), { .refNull(Instruction.RefNullOperand(result: $0, type: abstractType)) })
     }
-    mutating func visitRefIsNull() throws -> Output {
+    mutating func visitRefIsNull() throws(TranslationError) -> Output {
         let value = try valueStack.popRef()
         let result = valueStack.push(.i32)
         emit(.refIsNull(Instruction.RefIsNullOperand(value: LVReg(ensureOnVReg(value)), result: LVReg(result))))
     }
-    mutating func visitRefFunc(functionIndex: UInt32) throws -> Output {
+    mutating func visitRefFunc(functionIndex: UInt32) throws(ValidationError) -> Output {
         try validator.validateRefFunc(functionIndex: functionIndex)
         pushEmit(.ref(.funcRef), { .refFunc(Instruction.RefFuncOperand(index: functionIndex, result: LVReg($0))) })
     }
@@ -2033,7 +2018,7 @@ struct InstructionTranslator: InstructionVisitor {
             return instruction(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
     }
-    mutating func visitI32Eqz() throws -> Output {
+    mutating func visitI32Eqz() throws(InstructionTranslatorError) -> Output {
         try popPushEmit(.i32, .i32) { value, result in
             .i32Eqz(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
@@ -2129,7 +2114,7 @@ struct InstructionTranslator: InstructionVisitor {
         }
         try visitBinary(operand, result, instruction)
     }
-    mutating func visitI64Eqz() throws -> Output {
+    mutating func visitI64Eqz() throws(InstructionTranslatorError) -> Output {
         try popPushEmit(.i64, .i32) { value, result in
             .i64Eqz(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
@@ -2208,9 +2193,9 @@ struct InstructionTranslator: InstructionVisitor {
         try visitConversion(from, to, instruction)
     }
 
-    mutating func visitMemoryInit(dataIndex: UInt32) throws -> Output {
-        try self.validator.validateDataSegment(dataIndex)
-        let addressType = try module.addressType(memoryIndex: 0)
+    mutating func visitMemoryInit(dataIndex: UInt32) throws(InstructionTranslatorError) -> Output {
+        try InstructionTranslatorError.validate(self.validator.validateDataSegment(dataIndex))
+        let addressType = try InstructionTranslatorError.validate(module.addressType(memoryIndex: 0))
         try pop3Emit((.i32, .i32, addressType)) { values, stack in
             let (size, sourceOffset, destOffset) = values
             return .memoryInit(
@@ -2223,16 +2208,16 @@ struct InstructionTranslator: InstructionVisitor {
             )
         }
     }
-    mutating func visitDataDrop(dataIndex: UInt32) throws -> Output {
+    mutating func visitDataDrop(dataIndex: UInt32) throws(ValidationError) -> Output {
         try self.validator.validateDataSegment(dataIndex)
         emit(.memoryDataDrop(Instruction.MemoryDataDropOperand(segmentIndex: dataIndex)))
     }
-    mutating func visitMemoryCopy(dstMem: UInt32, srcMem: UInt32) throws -> Output {
+    mutating func visitMemoryCopy(dstMem: UInt32, srcMem: UInt32) throws(InstructionTranslatorError) -> Output {
         //     C.mems[0] = it limits
         // -----------------------------
         // C ⊦ memory.fill : [it i32 it] → []
         // https://github.com/WebAssembly/memory64/blob/main/proposals/memory64/Overview.md
-        let addressType = try module.addressType(memoryIndex: 0)
+        let addressType = try InstructionTranslatorError.validate(module.addressType(memoryIndex: 0))
         try pop3Emit((addressType, addressType, addressType)) { values, stack in
             let (size, sourceOffset, destOffset) = values
             return .memoryCopy(
@@ -2244,12 +2229,12 @@ struct InstructionTranslator: InstructionVisitor {
             )
         }
     }
-    mutating func visitMemoryFill(memory: UInt32) throws -> Output {
+    mutating func visitMemoryFill(memory: UInt32) throws(InstructionTranslatorError) -> Output {
         //     C.mems[0] = it limits
         // -----------------------------
         // C ⊦ memory.fill : [it i32 it] → []
         // https://github.com/WebAssembly/memory64/blob/main/proposals/memory64/Overview.md
-        let addressType = try module.addressType(memoryIndex: 0)
+        let addressType = try InstructionTranslatorError.validate(module.addressType(memoryIndex: 0))
         try pop3Emit((addressType, .i32, addressType)) { values, stack in
             let (size, value, destOffset) = values
             return .memoryFill(
@@ -2261,10 +2246,11 @@ struct InstructionTranslator: InstructionVisitor {
             )
         }
     }
-    mutating func visitTableInit(elemIndex: UInt32, table: UInt32) throws -> Output {
-        try validator.validateTableInit(elemIndex: elemIndex, table: table)
+    mutating func visitTableInit(elemIndex: UInt32, table: UInt32) throws(InstructionTranslatorError) -> Output {
+        try InstructionTranslatorError.validate(validator.validateTableInit(elemIndex: elemIndex, table: table))
+        let addressType = try InstructionTranslatorError.validate(module.addressType(tableIndex: table))
 
-        try pop3Emit((.i32, .i32, module.addressType(tableIndex: table))) { values, stack in
+        try pop3Emit((.i32, .i32, addressType)) { values, stack in
             let (size, sourceOffset, destOffset) = values
             return .tableInit(
                 Instruction.TableInitOperand(
@@ -2277,18 +2263,18 @@ struct InstructionTranslator: InstructionVisitor {
             )
         }
     }
-    mutating func visitElemDrop(elemIndex: UInt32) throws(TableEntity.OutOfBoundsError) -> Output {
-        try self.module.validateElementSegment(elemIndex)
+    mutating func visitElemDrop(elemIndex: UInt32) throws(InstructionTranslatorError) -> Output {
+        try InstructionTranslatorError.validate(self.module.validateElementSegment(elemIndex))
         emit(.tableElementDrop(Instruction.TableElementDropOperand(index: elemIndex)))
     }
-    mutating func visitTableCopy(dstTable: UInt32, srcTable: UInt32) throws(TableEntity.OutOfBoundsError) -> Output {
+    mutating func visitTableCopy(dstTable: UInt32, srcTable: UInt32) throws(InstructionTranslatorError) -> Output {
         //   C.tables[d] = iN limits t   C.tables[s] = iM limits t    K = min {N, M}
         // -----------------------------------------------------------------------------
         // C ⊦ table.copy d s : [iN iM iK] → []
         // https://github.com/WebAssembly/memory64/blob/main/proposals/memory64/Overview.md
-        try validator.validateTableCopy(dest: dstTable, source: srcTable)
-        let destIsMemory64 = try module.isMemory64(tableIndex: dstTable)
-        let sourceIsMemory64 = try module.isMemory64(tableIndex: srcTable)
+        try InstructionTranslatorError.validate(validator.validateTableCopy(dest: dstTable, source: srcTable))
+        let destIsMemory64 = try InstructionTranslatorError.validate(module.isMemory64(tableIndex: dstTable))
+        let sourceIsMemory64 = try InstructionTranslatorError.validate(module.isMemory64(tableIndex: srcTable))
         let lengthIsMemory64 = destIsMemory64 && sourceIsMemory64
         try pop3Emit(
             (
@@ -2309,9 +2295,9 @@ struct InstructionTranslator: InstructionVisitor {
             )
         }
     }
-    mutating func visitTableFill(table: UInt32) throws(TableEntity.OutOfBoundsError) -> Output {
-        let address = try module.addressType(tableIndex: table)
-        let type = try module.tableType(table)
+    mutating func visitTableFill(table: UInt32) throws(InstructionTranslatorError) -> Output {
+        let address = try InstructionTranslatorError.validate(module.addressType(tableIndex: table))
+        let type = try InstructionTranslatorError.validate(module.tableType(table))
         try pop3Emit((address, .ref(type.elementType), address)) { values, stack in
             let (size, value, destOffset) = values
             return .tableFill(
@@ -2324,10 +2310,11 @@ struct InstructionTranslator: InstructionVisitor {
             )
         }
     }
-    mutating func visitTableGet(table: UInt32) throws(TableEntity.OutOfBoundsError) -> Output {
-        let type = try module.tableType(table)
+    mutating func visitTableGet(table: UInt32) throws(InstructionTranslatorError) -> Output {
+        let type = try InstructionTranslatorError.validate(module.tableType(table))
+        let address = try InstructionTranslatorError.validate(module.addressType(tableIndex: table))
         try popPushEmit(
-            module.addressType(tableIndex: table),
+            address,
             .ref(type.elementType)
         ) { index, result in
             return .tableGet(
@@ -2340,13 +2327,9 @@ struct InstructionTranslator: InstructionVisitor {
         }
     }
     mutating func visitTableSet(table: UInt32) throws(InstructionTranslatorError) -> Output {
-        let type: TableType
-        do {
-            type = try module.tableType(table)
-        } catch {
-            throw InstructionTranslatorError.validation(error)
-        }
-        try pop2Emit((.ref(type.elementType), module.addressType(tableIndex: table))) { values, stack in
+        let type = try InstructionTranslatorError.validate(module.tableType(table))
+        let address = try InstructionTranslatorError.validate(module.addressType(tableIndex: table))
+        try pop2Emit((.ref(type.elementType), address)) { values, stack in
             let (value, index) = values
             return .tableSet(
                 Instruction.TableSetOperand(
@@ -2358,14 +2341,8 @@ struct InstructionTranslator: InstructionVisitor {
         }
     }
     mutating func visitTableGrow(table: UInt32) throws(InstructionTranslatorError) -> Output {
-        let address: ValueType
-        let type: TableType
-        do {
-            address = try module.addressType(tableIndex: table)
-            type = try module.tableType(table)
-        } catch {
-            throw InstructionTranslatorError.validation(error)
-        }
+        let address = try InstructionTranslatorError.validate(module.addressType(tableIndex: table))
+        let type = try InstructionTranslatorError.validate(module.tableType(table))
         return try pop2PushEmit((address, .ref(type.elementType)), address) { values, result in
             let (delta, value) = values
             return .tableGrow(

@@ -56,7 +56,7 @@ package struct EntityHandle<T: ~Copyable>: Equatable, Hashable, Copyable {
     }
 
     @inline(__always)
-    package func withValue<R>(_ body: (inout T) throws -> R) rethrows -> R {
+    package func withValue<R, E: Error>(_ body: (inout T) throws(E) -> R) throws(E) -> R {
         return try body(&pointer.pointee)
     }
 
@@ -524,7 +524,7 @@ struct MemoryEntity: ~Copyable {
         return limit.isMemory64 ? .i64(UInt64(result)) : .i32(result)
     }
 
-    mutating func copy(from source: UInt64, to destination: UInt64, count: UInt64) throws {
+    mutating func copy(from source: UInt64, to destination: UInt64, count: UInt64) throws(Trap) {
         let (destinationEnd, destinationOverflow) = destination.addingReportingOverflow(count)
         let (sourceEnd, sourceOverflow) = source.addingReportingOverflow(count)
 
@@ -549,7 +549,7 @@ struct MemoryEntity: ~Copyable {
         }
     }
 
-    mutating func initialize(_ segment: InternalDataSegment, from source: UInt32, to destination: UInt64, count: UInt32) throws {
+    mutating func initialize(_ segment: InternalDataSegment, from source: UInt32, to destination: UInt64, count: UInt32) throws(Trap) {
         let (destinationEnd, destinationOverflow) = destination.addingReportingOverflow(UInt64(count))
         let (sourceEnd, sourceOverflow) = source.addingReportingOverflow(count)
 
@@ -569,7 +569,7 @@ struct MemoryEntity: ~Copyable {
         }
     }
 
-    mutating func write(offset: Int, bytes: ArraySlice<UInt8>) throws {
+    mutating func write(offset: Int, bytes: ArraySlice<UInt8>) throws(Trap) {
         let endOffset = offset + bytes.count
         guard endOffset <= storage.count else {
             throw Trap(.memoryOutOfBounds)
@@ -580,7 +580,7 @@ struct MemoryEntity: ~Copyable {
         }
     }
 
-    mutating func fill(offset: Int, value: UInt8, count: Int) throws {
+    mutating func fill(offset: Int, value: UInt8, count: Int) throws(Trap) {
         let endOffset = offset + count
         guard endOffset <= storage.count else {
             throw Trap(.memoryOutOfBounds)
@@ -705,7 +705,7 @@ struct GlobalEntity /* : ~Copyable */ {
 }
 
 extension GlobalEntity: ValidatableEntity {
-    static func createOutOfBoundsError(index: Int, count: Int) -> Error {
+    static func createOutOfBoundsError(index: Int, count: Int) -> ValidationError {
         ValidationError(.indexOutOfBounds("global", index, max: count))
     }
 }

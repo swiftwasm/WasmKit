@@ -60,7 +60,7 @@ public struct Caller {
 
 struct HostFunctionEntity {
     let type: InternedFuncType
-    let implementation: (Caller, [Value]) throws -> [Value]
+    let implementation: (Caller, [Value]) throws(Trap) -> [Value]
 }
 
 extension Store {
