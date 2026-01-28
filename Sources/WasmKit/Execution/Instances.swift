@@ -38,7 +38,9 @@ import WasmParser
 ///
 /// This type is designed to eliminate ARC retain/release for entities
 /// known to be alive during a VM execution.
+#if !$Embedded
 @dynamicMemberLookup
+#endif
 package struct EntityHandle<T: ~Copyable>: Equatable, Hashable, Copyable {
     private let pointer: UnsafeMutablePointer<T>
 
@@ -51,9 +53,11 @@ package struct EntityHandle<T: ~Copyable>: Equatable, Hashable, Copyable {
         self.pointer = pointer
     }
 
+    #if !$Embedded
     package subscript<R>(dynamicMember keyPath: KeyPath<T, R>) -> R where T: Copyable {
         withValue { $0[keyPath: keyPath] }
     }
+    #endif
 
     @inline(__always)
     package func withValue<R, E: Error>(_ body: (inout T) throws(E) -> R) throws(E) -> R {
@@ -64,6 +68,67 @@ package struct EntityHandle<T: ~Copyable>: Equatable, Hashable, Copyable {
         return Int(bitPattern: pointer)
     }
 }
+
+// MARK: - Embedded Swift explicit accessors (key paths not available)
+
+#if $Embedded
+extension EntityHandle where T == InstanceEntity {
+    var functions: ImmutableArray<InternalFunction> { withValue { $0.functions } }
+    var tables: ImmutableArray<InternalTable> { withValue { $0.tables } }
+    var memories: ImmutableArray<InternalMemory> { withValue { $0.memories } }
+    var globals: ImmutableArray<InternalGlobal> { withValue { $0.globals } }
+    var exports: [String: InternalExternalValue] { withValue { $0.exports } }
+    var dataSegments: ImmutableArray<InternalDataSegment> { withValue { $0.dataSegments } }
+    var elementSegments: ImmutableArray<InternalElementSegment> { withValue { $0.elementSegments } }
+    var isDebuggable: Bool { withValue { $0.isDebuggable } }
+    var types: [FunctionType] { withValue { $0.types } }
+    var functionRefs: Set<InternalFunction> { withValue { $0.functionRefs } }
+}
+
+extension EntityHandle where T == WasmFunctionEntity {
+    var type: InternedFuncType { withValue { $0.type } }
+    var code: CodeBody { withValue { $0.code } }
+    var numberOfNonParameterLocals: Int { withValue { $0.numberOfNonParameterLocals } }
+    var instance: InternalInstance { withValue { $0.instance } }
+    var index: FunctionIndex { withValue { $0.index } }
+}
+
+extension EntityHandle where T == HostFunctionEntity {
+    var type: InternedFuncType { withValue { $0.type } }
+    var implementation: (Caller, [Value]) throws(Trap) -> [Value] { withValue { $0.implementation } }
+}
+
+extension EntityHandle where T == Code {
+    var locals: [ValueType] { withValue { $0.locals } }
+    var expression: ArraySlice<UInt8> { withValue { $0.expression } }
+}
+
+extension EntityHandle where T == ElementSegmentEntity {
+    var references: [Reference] { withValue { $0.references } }
+    var type: ReferenceType { withValue { $0.type } }
+}
+
+extension EntityHandle where T == DataSegmentEntity {
+    var data: ArraySlice<UInt8> { withValue { $0.data } }
+}
+
+extension EntityHandle where T == TableEntity {
+    var elements: [Reference] { withValue { $0.elements } }
+    var tableType: TableType { withValue { $0.tableType } }
+    var limits: Limits { withValue { $0.limits } }
+}
+
+extension EntityHandle where T == GlobalEntity {
+    var value: Value { withValue { $0.value } }
+    var globalType: GlobalType { withValue { $0.globalType } }
+}
+
+extension EntityHandle where T == MemoryEntity {
+    var limit: Limits { withValue { $0.limit } }
+    var byteCount: Int { withValue { $0.byteCount } }
+    var baseAddress: UnsafeMutableRawPointer? { withValue { $0.baseAddress } }
+}
+#endif
 
 extension EntityHandle: ValidatableEntity where T: ValidatableEntity {
     static func createOutOfBoundsError(index: Int, count: Int) -> T.OutOfBoundsError {
@@ -277,7 +342,7 @@ struct TableEntity /* : ~Copyable */ {
         return UInt64(UInt32.max)
     }
 
-    init(_ tableType: TableType, resourceLimiter: any ResourceLimiter) throws {
+    init<RL: ResourceLimiter>(_ tableType: TableType, resourceLimiter: RL) throws {
         let emptyElement: Reference
         switch tableType.elementType.heapType {
         case .abstract(.funcRef):
@@ -297,8 +362,8 @@ struct TableEntity /* : ~Copyable */ {
     }
 
     /// > Note: https://webassembly.github.io/spec/core/exec/modules.html#grow-table
-    /// Returns true if gorwth succeeds, otherwise returns false
-    mutating func grow(by growthSize: UInt64, value: Reference, resourceLimiter: any ResourceLimiter) throws -> Bool {
+    /// Returns true if growth succeeds, otherwise returns false
+    mutating func grow<RL: ResourceLimiter>(by growthSize: UInt64, value: Reference, resourceLimiter: RL) throws(RL.ResourceLimiterError) -> Bool {
         let oldSize = UInt64(elements.count)
         guard !UInt64(elements.count).addingReportingOverflow(growthSize).overflow else {
             return false
@@ -467,7 +532,7 @@ struct MemoryEntity: ~Copyable {
     let maxPageCount: UInt64
     let limit: Limits
 
-    init(_ memoryType: MemoryType, resourceLimiter: any ResourceLimiter) throws {
+    init<RL: ResourceLimiter>(_ memoryType: MemoryType, resourceLimiter: RL) throws {
         let byteSize = Int(memoryType.min) * Self.pageSize
         guard try resourceLimiter.limitMemoryGrowth(to: byteSize) else {
             throw Trap(.initialMemorySizeExceedsLimit(byteSize: byteSize))
@@ -499,7 +564,7 @@ struct MemoryEntity: ~Copyable {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#grow-mem>
-    mutating func grow(by pageCount: Int, resourceLimiter: any ResourceLimiter) throws -> Value {
+    mutating func grow<RL: ResourceLimiter>(by pageCount: Int, resourceLimiter: RL) throws(RL.ResourceLimiterError) -> Value {
         let newPageCount = storage.count / Self.pageSize + pageCount
 
         guard newPageCount <= maxPageCount else {

@@ -273,7 +273,7 @@ extension FloatingPoint {
     fileprivate func truncSatTo<T: FixedWidthInteger>(
         rounding: (Self) -> T,
         max: Self, min: Self
-    ) throws -> T {
+    ) throws(Trap) -> T {
         guard !self.isNaN else { return .zero }
         if self <= min {
             return .min
@@ -286,42 +286,42 @@ extension FloatingPoint {
 
 extension Float32 {
     var truncToI32S: UInt32 {
-        get throws {
+        get throws(Trap) {
             return try truncTo(rounding: { Int32($0) }, max: 2147483648.0, min: -2147483904.0).unsigned
         }
     }
     var truncToI64S: UInt64 {
-        get throws {
+        get throws(Trap) {
             return try truncTo(rounding: { Int64($0) }, max: 9223372036854775808.0, min: -9223373136366403584.0).unsigned
         }
     }
     var truncToI32U: UInt32 {
-        get throws {
+        get throws(Trap) {
             return try truncTo(rounding: { UInt32($0) }, max: 4294967296.0, min: -1.0)
         }
     }
     var truncToI64U: UInt64 {
-        get throws {
+        get throws(Trap) {
             return try truncTo(rounding: { UInt64($0) }, max: 18446744073709551616.0, min: -1.0)
         }
     }
     var truncSatToI32S: UInt32 {
-        get throws {
+        get throws(Trap) {
             return try truncSatTo(rounding: { Int32($0) }, max: 2147483648.0, min: -2147483904.0).unsigned
         }
     }
     var truncSatToI64S: UInt64 {
-        get throws {
+        get throws(Trap) {
             return try truncSatTo(rounding: { Int64($0) }, max: 9223372036854775808.0, min: -9223373136366403584.0).unsigned
         }
     }
     var truncSatToI32U: UInt32 {
-        get throws {
+        get throws(Trap) {
             return try truncSatTo(rounding: { UInt32($0) }, max: 4294967296.0, min: -1.0)
         }
     }
     var truncSatToI64U: UInt64 {
-        get throws {
+        get throws(Trap) {
             return try truncSatTo(rounding: { UInt64($0) }, max: 18446744073709551616.0, min: -1.0)
         }
     }
@@ -330,42 +330,42 @@ extension Float32 {
 }
 extension Float64 {
     var truncToI32S: UInt32 {
-        get throws {
+        get throws(Trap) {
             return try truncTo(rounding: { Int32($0) }, max: 2147483648.0, min: -2147483649.0).unsigned
         }
     }
     var truncToI64S: UInt64 {
-        get throws {
+        get throws(Trap) {
             return try truncTo(rounding: { Int64($0) }, max: 9223372036854775808.0, min: -9223372036854777856.0).unsigned
         }
     }
     var truncToI32U: UInt32 {
-        get throws {
+        get throws(Trap) {
             return try truncTo(rounding: { UInt32($0) }, max: 4294967296.0, min: -1.0)
         }
     }
     var truncToI64U: UInt64 {
-        get throws {
+        get throws(Trap) {
             return try truncTo(rounding: { UInt64($0) }, max: 18446744073709551616.0, min: -1.0)
         }
     }
     var truncSatToI32S: UInt32 {
-        get throws {
+        get throws(Trap) {
             return try truncSatTo(rounding: { Int32($0) }, max: 2147483648.0, min: -2147483649.0).unsigned
         }
     }
     var truncSatToI64S: UInt64 {
-        get throws {
+        get throws(Trap) {
             return try truncSatTo(rounding: { Int64($0) }, max: 9223372036854775808.0, min: -9223372036854777856.0).unsigned
         }
     }
     var truncSatToI32U: UInt32 {
-        get throws {
+        get throws(Trap) {
             return try truncSatTo(rounding: { UInt32($0) }, max: 4294967296.0, min: -1.0)
         }
     }
     var truncSatToI64U: UInt64 {
-        get throws {
+        get throws(Trap) {
             return try truncSatTo(rounding: { UInt64($0) }, max: 18446744073709551616.0, min: -1.0)
         }
     }

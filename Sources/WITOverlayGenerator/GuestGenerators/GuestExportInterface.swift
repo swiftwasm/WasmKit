@@ -15,17 +15,15 @@ struct GuestExportInterface: ASTVisitor {
         try walk(interface)
     }
 
-    func visit<T>(_: T) throws {}
-    func visitPost<T>(_: T) throws {}
+    func visit<T>(_: T) {}
+    func visitPost<T>(_: T) {}
 
     var protocolName: String {
-        get throws {
-            try "\(ConvertCase.pascalCase(packageName.namespace))\(ConvertCase.pascalCase(packageName.name))\(ConvertCase.pascalCase(interface.name))Exports"
-        }
+        "\(ConvertCase.pascalCase(packageName.namespace))\(ConvertCase.pascalCase(packageName.name))\(ConvertCase.pascalCase(interface.name))Exports"
     }
 
     func visit(_ interface: SyntaxNode<InterfaceSyntax>) throws {
-        try printer.write(line: "public protocol \(protocolName) {")
+        printer.write(line: "public protocol \(protocolName) {")
         printer.indent()
     }
 
@@ -43,7 +41,7 @@ struct GuestExportInterface: ASTVisitor {
                     interfaceName: interface.name.text,
                     id: namedFunction.name.text
                 ),
-                implementation: "\(protocolName)Impl.\(try ConvertCase.camelCase(namedFunction.name))"
+                implementation: "\(protocolName)Impl.\(ConvertCase.camelCase(namedFunction.name))"
             ).print(
                 typeResolver: {
                     try context.resolveType($0, in: interface, sourceFile: sourceFile, contextPackage: packageUnit)

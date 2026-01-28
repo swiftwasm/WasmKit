@@ -113,7 +113,7 @@ extension Execution {
     private func prepareForIndirectCall(
         sp: Sp, tableIndex: TableIndex, expectedType: InternedFuncType,
         address: VReg
-    ) throws -> (InternalFunction, InternalInstance) {
+    ) throws(Trap) -> (InternalFunction, InternalInstance) {
         let callerInstance = currentInstance(sp: sp)
         let table = callerInstance.tables[Int(tableIndex)]
         let value = sp[address].asAddressOffset(table.limits.isMemory64)

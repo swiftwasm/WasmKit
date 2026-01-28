@@ -248,10 +248,10 @@ extension StoreAllocator: Equatable {
 extension StoreAllocator {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-module>
-    func allocate(
+    func allocate<RL: ResourceLimiter>(
         module: Module,
         engine: Engine,
-        resourceLimiter: any ResourceLimiter,
+        resourceLimiter: RL,
         imports: Imports,
         isDebuggable: Bool
     ) throws -> InternalInstance {
@@ -496,14 +496,14 @@ extension StoreAllocator {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-table>
-    func allocate(tableType: TableType, resourceLimiter: any ResourceLimiter) throws -> InternalTable {
+    func allocate<RL: ResourceLimiter>(tableType: TableType, resourceLimiter: RL) throws -> InternalTable {
         let pointer = try tables.allocate(initializing: TableEntity(tableType, resourceLimiter: resourceLimiter))
         return InternalTable(unsafe: pointer)
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-mem>
-    func allocate(memoryType: MemoryType, resourceLimiter: any ResourceLimiter) throws -> InternalMemory {
+    func allocate<RL: ResourceLimiter>(memoryType: MemoryType, resourceLimiter: RL) throws -> InternalMemory {
         let pointer = try memories.allocate(initializing: MemoryEntity(memoryType, resourceLimiter: resourceLimiter))
         return InternalMemory(unsafe: pointer)
     }

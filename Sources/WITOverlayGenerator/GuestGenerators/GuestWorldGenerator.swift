@@ -20,13 +20,11 @@ struct WorldGenerator: ASTVisitor {
     func visitPost<T>(_: T) throws {}
 
     var protocolName: String {
-        get throws {
-            try "\(ConvertCase.pascalCase(world.name))Exports"
-        }
+        "\(ConvertCase.pascalCase(world.name))Exports"
     }
 
     mutating func visitPost(_ world: SyntaxNode<WorldSyntax>) throws {
-        try printer.write(line: "public protocol \(protocolName) {")
+        printer.write(line: "public protocol \(protocolName) {")
         try printer.indent {
             for (name, function) in exportFunctions {
                 try printer.write(

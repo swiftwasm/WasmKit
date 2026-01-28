@@ -1,11 +1,11 @@
 /// A write/read-able view representation of WebAssembly Memory instance
 public protocol GuestMemory {
     /// Executes the given closure with a mutable buffer pointer to the host memory region mapped as guest memory.
-    func withUnsafeMutableBufferPointer<T>(
+    func withUnsafeMutableBufferPointer<T, E: Error>(
         offset: UInt,
         count: Int,
-        _ body: (UnsafeMutableRawBufferPointer) throws -> T
-    ) rethrows -> T
+        _ body: (UnsafeMutableRawBufferPointer) throws(E) -> T
+    ) throws(E) -> T
 }
 
 /// A pointer-referenceable type that is intended to be pointee of ``UnsafeGuestPointer``
@@ -50,110 +50,28 @@ extension GuestPrimitivePointee where Self: RawRepresentable, Self.RawValue: Gue
     }
 }
 
-extension UInt8: GuestPrimitivePointee {
-    /// Reads a value of `UInt8` type from the given pointer of guest memory
-    public static func readFromGuest(_ pointer: UnsafeGuestRawPointer) -> UInt8 {
-        pointer.withHostPointer(count: MemoryLayout<UInt8>.size) { hostPointer in
-            let pointer = hostPointer.assumingMemoryBound(to: UInt8.self)
+extension FixedWidthInteger where Self: GuestPrimitivePointee {
+    /// Reads a value of Self type from the given pointer of guest memory
+    public static func readFromGuest(_ pointer: UnsafeGuestRawPointer) -> Self {
+        pointer.withHostPointer(count: MemoryLayout<Self>.size) { hostPointer -> Self in
+            let pointer = hostPointer.assumingMemoryBound(to: Self.self)
             return pointer.baseAddress!.pointee
         }
     }
 
     /// Writes the given value at the given pointer of guest memory
-    public static func writeToGuest(at pointer: UnsafeGuestRawPointer, value: UInt8) {
-        pointer.withHostPointer(count: MemoryLayout<UInt8>.size) { hostPointer in
-            let pointer = hostPointer.assumingMemoryBound(to: UInt8.self)
+    public static func writeToGuest(at pointer: UnsafeGuestRawPointer, value: Self) {
+        pointer.withHostPointer(count: MemoryLayout<Self>.size) { hostPointer in
+            let pointer = hostPointer.assumingMemoryBound(to: Self.self)
             pointer.baseAddress!.pointee = value
         }
     }
 }
 
-extension UInt16: GuestPrimitivePointee {
-    /// Reads a value of `UInt16` type from the given pointer of guest memory
-    public static func readFromGuest(_ pointer: UnsafeGuestRawPointer) -> UInt16 {
-        pointer.withHostPointer(count: MemoryLayout<UInt16>.size) { hostPointer in
-            let pointer = hostPointer.assumingMemoryBound(to: UInt16.self)
-            let value = pointer.baseAddress!.pointee
-            #if _endian(little)
-                return value
-            #else
-                return value.byteSwapped
-            #endif
-        }
-    }
-
-    /// Writes the given value at the given pointer of guest memory
-    public static func writeToGuest(at pointer: UnsafeGuestRawPointer, value: UInt16) {
-        pointer.withHostPointer(count: MemoryLayout<UInt16>.size) { hostPointer in
-            let pointer = hostPointer.assumingMemoryBound(to: UInt16.self)
-            let writingValue: UInt16
-            #if _endian(little)
-                writingValue = value
-            #else
-                value = value.byteSwapped
-            #endif
-            pointer.baseAddress!.pointee = writingValue
-        }
-    }
-}
-
-extension UInt32: GuestPrimitivePointee {
-    /// Reads a value of `UInt32` type from the given pointer of guest memory
-    public static func readFromGuest(_ pointer: UnsafeGuestRawPointer) -> UInt32 {
-        pointer.withHostPointer(count: MemoryLayout<UInt32>.size) { hostPointer in
-            let pointer = hostPointer.assumingMemoryBound(to: UInt32.self)
-            let value = pointer.baseAddress!.pointee
-            #if _endian(little)
-                return value
-            #else
-                return value.byteSwapped
-            #endif
-        }
-    }
-
-    /// Writes the given value at the given pointer of guest memory
-    public static func writeToGuest(at pointer: UnsafeGuestRawPointer, value: UInt32) {
-        pointer.withHostPointer(count: MemoryLayout<UInt32>.size) { hostPointer in
-            let pointer = hostPointer.assumingMemoryBound(to: UInt32.self)
-            let writingValue: UInt32
-            #if _endian(little)
-                writingValue = value
-            #else
-                value = value.byteSwapped
-            #endif
-            pointer.baseAddress!.pointee = writingValue
-        }
-    }
-}
-
-extension UInt64: GuestPrimitivePointee {
-    /// Reads a value of `UInt64` type from the given pointer of guest memory
-    public static func readFromGuest(_ pointer: UnsafeGuestRawPointer) -> UInt64 {
-        pointer.withHostPointer(count: MemoryLayout<UInt64>.size) { hostPointer in
-            let pointer = hostPointer.assumingMemoryBound(to: UInt64.self)
-            let value = pointer.baseAddress!.pointee
-            #if _endian(little)
-                return value
-            #else
-                return value.byteSwapped
-            #endif
-        }
-    }
-
-    /// Writes the given value at the given pointer of guest memory
-    public static func writeToGuest(at pointer: UnsafeGuestRawPointer, value: UInt64) {
-        pointer.withHostPointer(count: MemoryLayout<UInt64>.size) { hostPointer in
-            let pointer = hostPointer.assumingMemoryBound(to: UInt64.self)
-            let writingValue: UInt64
-            #if _endian(little)
-                writingValue = value
-            #else
-                value = value.byteSwapped
-            #endif
-            pointer.baseAddress!.pointee = writingValue
-        }
-    }
-}
+extension UInt8: GuestPrimitivePointee {}
+extension UInt16: GuestPrimitivePointee {}
+extension UInt32: GuestPrimitivePointee {}
+extension UInt64: GuestPrimitivePointee {}
 
 /// A raw pointer representation of guest memory space
 /// > Note: This type assumes pointer-size is 32-bit because WASI preview1 assumes the address space is 32-bit
@@ -170,9 +88,9 @@ public struct UnsafeGuestRawPointer {
     }
 
     /// Executes the given closure with a mutable raw pointer to the host memory region mapped as guest memory.
-    public func withHostPointer<R>(count: Int, _ body: (UnsafeMutableRawBufferPointer) throws -> R) rethrows -> R {
-        try memorySpace.withUnsafeMutableBufferPointer(offset: UInt(offset), count: count) { buffer in
-            try body(UnsafeMutableRawBufferPointer(start: buffer.baseAddress!, count: count))
+    public func withHostPointer<R>(count: Int, _ body: (UnsafeMutableRawBufferPointer) -> R) -> R {
+        memorySpace.withUnsafeMutableBufferPointer(offset: UInt(offset), count: count) { buffer in
+            body(UnsafeMutableRawBufferPointer(start: buffer.baseAddress!, count: count))
         }
     }
 
@@ -250,16 +168,32 @@ public struct UnsafeGuestPointer<Pointee: GuestPointee> {
     }
 
     /// Executes the given closure with a mutable pointer to the host memory region mapped as guest memory.
-    public func withHostPointer<R>(count: Int, _ body: (UnsafeMutableBufferPointer<Pointee>) throws -> R) rethrows -> R {
-        try raw.withHostPointer(count: MemoryLayout<Pointee>.stride * count) { raw in
-            try body(raw.assumingMemoryBound(to: Pointee.self))
+    public func withHostPointer<R, E: Error>(count: Int, _ body: (UnsafeMutableBufferPointer<Pointee>) throws(E) -> R) throws(E) -> R {
+        let result = raw.withHostPointer(count: MemoryLayout<Pointee>.stride * count) { raw -> Result<R, E> in
+            return Result<R, E>.catchError(failure: E.self) { () throws(E) -> R in
+                try body(raw.assumingMemoryBound(to: Pointee.self))
+            }
         }
+        return try result.get()
     }
 
     /// Accesses the instance referenced by this pointer.
     public var pointee: Pointee {
         get { Pointee.readFromGuest(self.raw) }
         nonmutating set { Pointee.writeToGuest(at: raw, value: newValue) }
+    }
+}
+
+extension Result {
+    static func catchError(
+        failure: Failure.Type,
+        catching body: () throws(Failure) -> Success
+    ) -> Result<Success, Failure> {
+        do {
+            return  .success(try body())
+        } catch {
+            return .failure(error)
+        }
     }
 }
 
@@ -326,8 +260,8 @@ public struct UnsafeGuestBufferPointer<Pointee: GuestPointee> {
     }
 
     /// Executes the given closure with a mutable buffer pointer to the host memory region mapped as guest memory.
-    public func withHostPointer<R>(_ body: (UnsafeMutableBufferPointer<Pointee>) throws -> R) rethrows -> R {
-        try baseAddress.withHostPointer(count: Int(count)) { baseAddress in
+    public func withHostPointer<R, E: Error>(_ body: (UnsafeMutableBufferPointer<Pointee>) throws(E) -> R) throws(E) -> R {
+        try baseAddress.withHostPointer(count: Int(count)) { baseAddress throws(E) -> R in
             try body(baseAddress)
         }
     }

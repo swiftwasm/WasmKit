@@ -17,7 +17,7 @@ public protocol ResourceLimiter {
 }
 
 // By default, we don't limit resource growth.
-extension ResourceLimiter {
+public extension ResourceLimiter {
     func limitMemoryGrowth(to desired: Int) throws(Never) -> Bool {
         return true
     }
@@ -27,4 +27,4 @@ extension ResourceLimiter {
 }
 
 /// A default resource limiter that doesn't limit resource growth.
-struct DefaultResourceLimiter: ResourceLimiter {}
+public struct DefaultResourceLimiter: ResourceLimiter {}

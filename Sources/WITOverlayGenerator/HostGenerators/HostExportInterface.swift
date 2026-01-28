@@ -10,9 +10,7 @@ struct HostExportInterface: ASTVisitor {
     let definitionMapping: DefinitionMapping
 
     var structName: String {
-        get throws {
-            return try ConvertCase.pascalCase(interface.name)
-        }
+        ConvertCase.pascalCase(interface.name)
     }
 
     mutating func generate() throws {

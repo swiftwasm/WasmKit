@@ -1,7 +1,7 @@
 import WIT
 
 enum ConvertCase {
-    static func pascalCase(_ ident: Identifier) throws -> String {
+    static func pascalCase(_ ident: Identifier) -> String {
         return pascalCase(kebab: ident.text)
     }
 
@@ -14,7 +14,7 @@ enum ConvertCase {
         return id
     }
 
-    static func camelCase(_ ident: Identifier) throws -> String {
+    static func camelCase(_ ident: Identifier) -> String {
         return camelCase(kebab: ident.text)
     }
 

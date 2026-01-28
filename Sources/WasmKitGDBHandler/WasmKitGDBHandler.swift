@@ -109,7 +109,7 @@
         }
 
         var currentThreadStopInfo: GDBTargetResponse.Kind {
-            get throws {
+            get throws(Error) {
                 var result: [(String, String)] = [
                     ("T05thread", "1"),
                     ("threads", "1"),

@@ -5,8 +5,13 @@ import WasmParser
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#store>
 public final class Store {
     var nameRegistry = NameRegistry()
+    #if $Embedded
     @_spi(Fuzzing)  // Consider making this public
-    public var resourceLimiter: ResourceLimiter = DefaultResourceLimiter()
+    public var resourceLimiter: DefaultResourceLimiter = DefaultResourceLimiter()
+    #else
+    @_spi(Fuzzing)  // Consider making this public
+    public var resourceLimiter: any ResourceLimiter = DefaultResourceLimiter()
+    #endif
 
     @available(*, unavailable)
     public var namedModuleInstances: [String: Any] {

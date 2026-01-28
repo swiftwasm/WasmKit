@@ -1,12 +1,12 @@
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#memory-instructions>
 extension Execution {
-    @inline(never) func throwOutOfBoundsMemoryAccess() throws -> Never {
+    @inline(never) func throwOutOfBoundsMemoryAccess() throws(Trap) -> Never {
         throw Trap(.memoryOutOfBounds)
     }
     mutating func memoryLoad<T: FixedWidthInteger>(
         sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand, loadAs _: T.Type = T.self, castToValue: (T) -> UntypedValue
-    ) throws {
+    ) throws(Trap) {
         let length = UInt64(T.bitWidth) / 8
         let i = sp[loadOperand.pointer].asAddressOffset()
         let (endAddress, isEndOverflow) = i.addingReportingOverflow(length &+ loadOperand.offset)
@@ -20,7 +20,7 @@ extension Execution {
     }
 
     /// `[type].store[bitWidth]`
-    mutating func memoryStore<T: FixedWidthInteger>(sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand, castFromValue: (UntypedValue) -> T) throws {
+    mutating func memoryStore<T: FixedWidthInteger>(sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand, castFromValue: (UntypedValue) -> T) throws(Trap) {
         let value = sp[storeOperand.value]
         let length = UInt64(T.bitWidth) / 8
         let i = sp[storeOperand.pointer].asAddressOffset()
@@ -45,6 +45,22 @@ extension Execution {
         }
     }
 
+    #if $Embedded
+    // In Embedded mode, DefaultResourceLimiter throws Never, so this function doesn't throw
+    mutating func memoryGrow(sp: Sp, md: inout Md, ms: inout Ms, immediate: Instruction.MemoryGrowOperand) {
+        let memory = currentInstance(sp: sp).memories[Int(immediate.memory)]
+        memory.withValue { (memory: inout MemoryEntity) throws(Never) in
+            let isMemory64 = memory.limit.isMemory64
+
+            let value = sp[immediate.delta]
+            let pageCount: UInt64 = isMemory64 ? value.i64 : UInt64(value.i32)
+            // DefaultResourceLimiter.limitMemoryGrowth throws Never, so try never actually throws
+            let oldPageCount = try memory.grow(by: Int(pageCount), resourceLimiter: store.value.resourceLimiter)
+            CurrentMemory.assign(md: &md, ms: &ms, memory: &memory)
+            sp[immediate.result] = UntypedValue(oldPageCount)
+        }
+    }
+    #else
     mutating func memoryGrow(sp: Sp, md: inout Md, ms: inout Ms, immediate: Instruction.MemoryGrowOperand) throws {
         let memory = currentInstance(sp: sp).memories[Int(immediate.memory)]
         try memory.withValue { memory in
@@ -57,10 +73,11 @@ extension Execution {
             sp[immediate.result] = UntypedValue(oldPageCount)
         }
     }
-    mutating func memoryInit(sp: Sp, immediate: Instruction.MemoryInitOperand) throws {
+    #endif
+    mutating func memoryInit(sp: Sp, immediate: Instruction.MemoryInitOperand) throws(Trap) {
         let instance = currentInstance(sp: sp)
         let memory = instance.memories[0]
-        try memory.withValue { memory in
+        try memory.withValue { (memory: inout MemoryEntity) throws(Trap) in
             let segment = instance.dataSegments[Int(immediate.segmentIndex)]
 
             let size = sp[immediate.size].i32
@@ -73,9 +90,9 @@ extension Execution {
         let segment = currentInstance(sp: sp).dataSegments[Int(immediate.segmentIndex)]
         segment.withValue { $0.drop() }
     }
-    mutating func memoryCopy(sp: Sp, immediate: Instruction.MemoryCopyOperand) throws {
+    mutating func memoryCopy(sp: Sp, immediate: Instruction.MemoryCopyOperand) throws(Trap) {
         let memory = currentInstance(sp: sp).memories[0]
-        try memory.withValue { memory in
+        try memory.withValue { (memory: inout MemoryEntity) throws(Trap) in
             let isMemory64 = memory.limit.isMemory64
             let size = sp[immediate.size].asAddressOffset(isMemory64)
             let source = sp[immediate.sourceOffset].asAddressOffset(isMemory64)
@@ -83,9 +100,9 @@ extension Execution {
             try memory.copy(from: source, to: destination, count: size)
         }
     }
-    mutating func memoryFill(sp: Sp, immediate: Instruction.MemoryFillOperand) throws {
+    mutating func memoryFill(sp: Sp, immediate: Instruction.MemoryFillOperand) throws(Trap) {
         let memory = currentInstance(sp: sp).memories[0]
-        try memory.withValue { memoryInstance in
+        try memory.withValue { (memoryInstance: inout MemoryEntity) throws(Trap) in
             let isMemory64 = memoryInstance.limit.isMemory64
             let copyCounter = Int(sp[immediate.size].asAddressOffset(isMemory64))
             let value = sp[immediate.value].i32
