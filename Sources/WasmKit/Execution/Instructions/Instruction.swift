@@ -451,6 +451,110 @@ enum Instruction: Equatable {
     case i64AtomicStore16(Instruction.StoreOperand)
     /// WebAssembly Core Instruction `i64.atomic.store32`
     case i64AtomicStore32(Instruction.StoreOperand)
+    /// WebAssembly Core Instruction `i32.atomic.rmw.add`
+    case i32AtomicRmwAdd(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i64.atomic.rmw.add`
+    case i64AtomicRmwAdd(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i32.atomic.rmw.sub`
+    case i32AtomicRmwSub(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i64.atomic.rmw.sub`
+    case i64AtomicRmwSub(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i32.atomic.rmw.and`
+    case i32AtomicRmwAnd(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i64.atomic.rmw.and`
+    case i64AtomicRmwAnd(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i32.atomic.rmw.or`
+    case i32AtomicRmwOr(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i64.atomic.rmw.or`
+    case i64AtomicRmwOr(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i32.atomic.rmw.xor`
+    case i32AtomicRmwXor(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i64.atomic.rmw.xor`
+    case i64AtomicRmwXor(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i32.atomic.rmw.xchg`
+    case i32AtomicRmwXchg(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i64.atomic.rmw.xchg`
+    case i64AtomicRmwXchg(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i32.atomic.rmw8.add_u`
+    case i32AtomicRmw8AddU(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i64.atomic.rmw8.add_u`
+    case i64AtomicRmw8AddU(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i32.atomic.rmw8.sub_u`
+    case i32AtomicRmw8SubU(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i64.atomic.rmw8.sub_u`
+    case i64AtomicRmw8SubU(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i32.atomic.rmw8.and_u`
+    case i32AtomicRmw8AndU(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i64.atomic.rmw8.and_u`
+    case i64AtomicRmw8AndU(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i32.atomic.rmw8.or_u`
+    case i32AtomicRmw8OrU(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i64.atomic.rmw8.or_u`
+    case i64AtomicRmw8OrU(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i32.atomic.rmw8.xor_u`
+    case i32AtomicRmw8XorU(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i64.atomic.rmw8.xor_u`
+    case i64AtomicRmw8XorU(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i32.atomic.rmw8.xchg_u`
+    case i32AtomicRmw8XchgU(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i64.atomic.rmw8.xchg_u`
+    case i64AtomicRmw8XchgU(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i32.atomic.rmw16.add_u`
+    case i32AtomicRmw16AddU(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i64.atomic.rmw16.add_u`
+    case i64AtomicRmw16AddU(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i32.atomic.rmw16.sub_u`
+    case i32AtomicRmw16SubU(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i64.atomic.rmw16.sub_u`
+    case i64AtomicRmw16SubU(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i32.atomic.rmw16.and_u`
+    case i32AtomicRmw16AndU(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i64.atomic.rmw16.and_u`
+    case i64AtomicRmw16AndU(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i32.atomic.rmw16.or_u`
+    case i32AtomicRmw16OrU(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i64.atomic.rmw16.or_u`
+    case i64AtomicRmw16OrU(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i32.atomic.rmw16.xor_u`
+    case i32AtomicRmw16XorU(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i64.atomic.rmw16.xor_u`
+    case i64AtomicRmw16XorU(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i32.atomic.rmw16.xchg_u`
+    case i32AtomicRmw16XchgU(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i64.atomic.rmw16.xchg_u`
+    case i64AtomicRmw16XchgU(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i64.atomic.rmw32.add_u`
+    case i64AtomicRmw32AddU(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i64.atomic.rmw32.sub_u`
+    case i64AtomicRmw32SubU(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i64.atomic.rmw32.and_u`
+    case i64AtomicRmw32AndU(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i64.atomic.rmw32.or_u`
+    case i64AtomicRmw32OrU(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i64.atomic.rmw32.xor_u`
+    case i64AtomicRmw32XorU(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i64.atomic.rmw32.xchg_u`
+    case i64AtomicRmw32XchgU(Instruction.RmwOperand)
+    /// WebAssembly Core Instruction `i32.atomic.rmw.cmpxchg`
+    case i32AtomicRmwCmpxchg(Instruction.CmpxchgOperand)
+    /// WebAssembly Core Instruction `i64.atomic.rmw.cmpxchg`
+    case i64AtomicRmwCmpxchg(Instruction.CmpxchgOperand)
+    /// WebAssembly Core Instruction `i32.atomic.rmw8.cmpxchg_u`
+    case i32AtomicRmw8CmpxchgU(Instruction.CmpxchgOperand)
+    /// WebAssembly Core Instruction `i32.atomic.rmw16.cmpxchg_u`
+    case i32AtomicRmw16CmpxchgU(Instruction.CmpxchgOperand)
+    /// WebAssembly Core Instruction `i64.atomic.rmw8.cmpxchg_u`
+    case i64AtomicRmw8CmpxchgU(Instruction.CmpxchgOperand)
+    /// WebAssembly Core Instruction `i64.atomic.rmw16.cmpxchg_u`
+    case i64AtomicRmw16CmpxchgU(Instruction.CmpxchgOperand)
+    /// WebAssembly Core Instruction `i64.atomic.rmw32.cmpxchg_u`
+    case i64AtomicRmw32CmpxchgU(Instruction.CmpxchgOperand)
+    /// WebAssembly Core Instruction `memory.atomic.wait32`
+    case memoryAtomicWait32(Instruction.AtomicWaitOperand)
+    /// WebAssembly Core Instruction `memory.atomic.wait64`
+    case memoryAtomicWait64(Instruction.AtomicWaitOperand)
+    /// WebAssembly Core Instruction `memory.atomic.notify`
+    case memoryAtomicNotify(Instruction.AtomicNotifyOperand)
 }
 
 extension Instruction {
@@ -972,6 +1076,72 @@ extension Instruction {
             emitSlot { unsafeBitCast(($0.index, 0, 0, 0, 0) as (UInt32, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
         }
     }
+
+    struct RmwOperand: Equatable, InstructionImmediate {
+        var offset: UInt64
+        var pointer: VReg
+        var value: VReg
+        var result: VReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (offset) = pc.read((UInt64).self)
+            let (pointer, value, result, _, _) = pc.read((VReg, VReg, VReg, UInt8, UInt8).self)
+            return Self(offset: offset, pointer: pointer, value: value, result: result)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { $0.offset }
+            emitSlot { unsafeBitCast(($0.pointer, $0.value, $0.result, 0, 0) as (VReg, VReg, VReg, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
+
+    struct CmpxchgOperand: Equatable, InstructionImmediate {
+        var offset: UInt64
+        var pointer: VReg
+        var expected: VReg
+        var replacement: VReg
+        var result: VReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (offset) = pc.read((UInt64).self)
+            let (pointer, expected, replacement, result) = pc.read((VReg, VReg, VReg, VReg).self)
+            return Self(offset: offset, pointer: pointer, expected: expected, replacement: replacement, result: result)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { $0.offset }
+            emitSlot { unsafeBitCast(($0.pointer, $0.expected, $0.replacement, $0.result) as (VReg, VReg, VReg, VReg), to: CodeSlot.self) }
+        }
+    }
+
+    struct AtomicWaitOperand: Equatable, InstructionImmediate {
+        var offset: UInt64
+        var pointer: VReg
+        var expected: VReg
+        var timeout: VReg
+        var result: VReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (offset) = pc.read((UInt64).self)
+            let (pointer, expected, timeout, result) = pc.read((VReg, VReg, VReg, VReg).self)
+            return Self(offset: offset, pointer: pointer, expected: expected, timeout: timeout, result: result)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { $0.offset }
+            emitSlot { unsafeBitCast(($0.pointer, $0.expected, $0.timeout, $0.result) as (VReg, VReg, VReg, VReg), to: CodeSlot.self) }
+        }
+    }
+
+    struct AtomicNotifyOperand: Equatable, InstructionImmediate {
+        var offset: UInt64
+        var pointer: VReg
+        var count: VReg
+        var result: VReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (offset) = pc.read((UInt64).self)
+            let (pointer, count, result, _, _) = pc.read((VReg, VReg, VReg, UInt8, UInt8).self)
+            return Self(offset: offset, pointer: pointer, count: count, result: result)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { $0.offset }
+            emitSlot { unsafeBitCast(($0.pointer, $0.count, $0.result, 0, 0) as (VReg, VReg, VReg, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
 }
 
 extension Instruction {
@@ -1189,6 +1359,58 @@ extension Instruction {
         case .i64AtomicStore8(let immediate): return immediate
         case .i64AtomicStore16(let immediate): return immediate
         case .i64AtomicStore32(let immediate): return immediate
+        case .i32AtomicRmwAdd(let immediate): return immediate
+        case .i64AtomicRmwAdd(let immediate): return immediate
+        case .i32AtomicRmwSub(let immediate): return immediate
+        case .i64AtomicRmwSub(let immediate): return immediate
+        case .i32AtomicRmwAnd(let immediate): return immediate
+        case .i64AtomicRmwAnd(let immediate): return immediate
+        case .i32AtomicRmwOr(let immediate): return immediate
+        case .i64AtomicRmwOr(let immediate): return immediate
+        case .i32AtomicRmwXor(let immediate): return immediate
+        case .i64AtomicRmwXor(let immediate): return immediate
+        case .i32AtomicRmwXchg(let immediate): return immediate
+        case .i64AtomicRmwXchg(let immediate): return immediate
+        case .i32AtomicRmw8AddU(let immediate): return immediate
+        case .i64AtomicRmw8AddU(let immediate): return immediate
+        case .i32AtomicRmw8SubU(let immediate): return immediate
+        case .i64AtomicRmw8SubU(let immediate): return immediate
+        case .i32AtomicRmw8AndU(let immediate): return immediate
+        case .i64AtomicRmw8AndU(let immediate): return immediate
+        case .i32AtomicRmw8OrU(let immediate): return immediate
+        case .i64AtomicRmw8OrU(let immediate): return immediate
+        case .i32AtomicRmw8XorU(let immediate): return immediate
+        case .i64AtomicRmw8XorU(let immediate): return immediate
+        case .i32AtomicRmw8XchgU(let immediate): return immediate
+        case .i64AtomicRmw8XchgU(let immediate): return immediate
+        case .i32AtomicRmw16AddU(let immediate): return immediate
+        case .i64AtomicRmw16AddU(let immediate): return immediate
+        case .i32AtomicRmw16SubU(let immediate): return immediate
+        case .i64AtomicRmw16SubU(let immediate): return immediate
+        case .i32AtomicRmw16AndU(let immediate): return immediate
+        case .i64AtomicRmw16AndU(let immediate): return immediate
+        case .i32AtomicRmw16OrU(let immediate): return immediate
+        case .i64AtomicRmw16OrU(let immediate): return immediate
+        case .i32AtomicRmw16XorU(let immediate): return immediate
+        case .i64AtomicRmw16XorU(let immediate): return immediate
+        case .i32AtomicRmw16XchgU(let immediate): return immediate
+        case .i64AtomicRmw16XchgU(let immediate): return immediate
+        case .i64AtomicRmw32AddU(let immediate): return immediate
+        case .i64AtomicRmw32SubU(let immediate): return immediate
+        case .i64AtomicRmw32AndU(let immediate): return immediate
+        case .i64AtomicRmw32OrU(let immediate): return immediate
+        case .i64AtomicRmw32XorU(let immediate): return immediate
+        case .i64AtomicRmw32XchgU(let immediate): return immediate
+        case .i32AtomicRmwCmpxchg(let immediate): return immediate
+        case .i64AtomicRmwCmpxchg(let immediate): return immediate
+        case .i32AtomicRmw8CmpxchgU(let immediate): return immediate
+        case .i32AtomicRmw16CmpxchgU(let immediate): return immediate
+        case .i64AtomicRmw8CmpxchgU(let immediate): return immediate
+        case .i64AtomicRmw16CmpxchgU(let immediate): return immediate
+        case .i64AtomicRmw32CmpxchgU(let immediate): return immediate
+        case .memoryAtomicWait32(let immediate): return immediate
+        case .memoryAtomicWait64(let immediate): return immediate
+        case .memoryAtomicNotify(let immediate): return immediate
         default: return nil
         }
     }
@@ -1416,6 +1638,58 @@ extension Instruction {
         case .i64AtomicStore8: return 214
         case .i64AtomicStore16: return 215
         case .i64AtomicStore32: return 216
+        case .i32AtomicRmwAdd: return 217
+        case .i64AtomicRmwAdd: return 218
+        case .i32AtomicRmwSub: return 219
+        case .i64AtomicRmwSub: return 220
+        case .i32AtomicRmwAnd: return 221
+        case .i64AtomicRmwAnd: return 222
+        case .i32AtomicRmwOr: return 223
+        case .i64AtomicRmwOr: return 224
+        case .i32AtomicRmwXor: return 225
+        case .i64AtomicRmwXor: return 226
+        case .i32AtomicRmwXchg: return 227
+        case .i64AtomicRmwXchg: return 228
+        case .i32AtomicRmw8AddU: return 229
+        case .i64AtomicRmw8AddU: return 230
+        case .i32AtomicRmw8SubU: return 231
+        case .i64AtomicRmw8SubU: return 232
+        case .i32AtomicRmw8AndU: return 233
+        case .i64AtomicRmw8AndU: return 234
+        case .i32AtomicRmw8OrU: return 235
+        case .i64AtomicRmw8OrU: return 236
+        case .i32AtomicRmw8XorU: return 237
+        case .i64AtomicRmw8XorU: return 238
+        case .i32AtomicRmw8XchgU: return 239
+        case .i64AtomicRmw8XchgU: return 240
+        case .i32AtomicRmw16AddU: return 241
+        case .i64AtomicRmw16AddU: return 242
+        case .i32AtomicRmw16SubU: return 243
+        case .i64AtomicRmw16SubU: return 244
+        case .i32AtomicRmw16AndU: return 245
+        case .i64AtomicRmw16AndU: return 246
+        case .i32AtomicRmw16OrU: return 247
+        case .i64AtomicRmw16OrU: return 248
+        case .i32AtomicRmw16XorU: return 249
+        case .i64AtomicRmw16XorU: return 250
+        case .i32AtomicRmw16XchgU: return 251
+        case .i64AtomicRmw16XchgU: return 252
+        case .i64AtomicRmw32AddU: return 253
+        case .i64AtomicRmw32SubU: return 254
+        case .i64AtomicRmw32AndU: return 255
+        case .i64AtomicRmw32OrU: return 256
+        case .i64AtomicRmw32XorU: return 257
+        case .i64AtomicRmw32XchgU: return 258
+        case .i32AtomicRmwCmpxchg: return 259
+        case .i64AtomicRmwCmpxchg: return 260
+        case .i32AtomicRmw8CmpxchgU: return 261
+        case .i32AtomicRmw16CmpxchgU: return 262
+        case .i64AtomicRmw8CmpxchgU: return 263
+        case .i64AtomicRmw16CmpxchgU: return 264
+        case .i64AtomicRmw32CmpxchgU: return 265
+        case .memoryAtomicWait32: return 266
+        case .memoryAtomicWait64: return 267
+        case .memoryAtomicNotify: return 268
         }
     }
 }
@@ -1644,6 +1918,58 @@ extension Instruction {
         case 214: return .i64AtomicStore8(Instruction.StoreOperand.load(from: &pc))
         case 215: return .i64AtomicStore16(Instruction.StoreOperand.load(from: &pc))
         case 216: return .i64AtomicStore32(Instruction.StoreOperand.load(from: &pc))
+        case 217: return .i32AtomicRmwAdd(Instruction.RmwOperand.load(from: &pc))
+        case 218: return .i64AtomicRmwAdd(Instruction.RmwOperand.load(from: &pc))
+        case 219: return .i32AtomicRmwSub(Instruction.RmwOperand.load(from: &pc))
+        case 220: return .i64AtomicRmwSub(Instruction.RmwOperand.load(from: &pc))
+        case 221: return .i32AtomicRmwAnd(Instruction.RmwOperand.load(from: &pc))
+        case 222: return .i64AtomicRmwAnd(Instruction.RmwOperand.load(from: &pc))
+        case 223: return .i32AtomicRmwOr(Instruction.RmwOperand.load(from: &pc))
+        case 224: return .i64AtomicRmwOr(Instruction.RmwOperand.load(from: &pc))
+        case 225: return .i32AtomicRmwXor(Instruction.RmwOperand.load(from: &pc))
+        case 226: return .i64AtomicRmwXor(Instruction.RmwOperand.load(from: &pc))
+        case 227: return .i32AtomicRmwXchg(Instruction.RmwOperand.load(from: &pc))
+        case 228: return .i64AtomicRmwXchg(Instruction.RmwOperand.load(from: &pc))
+        case 229: return .i32AtomicRmw8AddU(Instruction.RmwOperand.load(from: &pc))
+        case 230: return .i64AtomicRmw8AddU(Instruction.RmwOperand.load(from: &pc))
+        case 231: return .i32AtomicRmw8SubU(Instruction.RmwOperand.load(from: &pc))
+        case 232: return .i64AtomicRmw8SubU(Instruction.RmwOperand.load(from: &pc))
+        case 233: return .i32AtomicRmw8AndU(Instruction.RmwOperand.load(from: &pc))
+        case 234: return .i64AtomicRmw8AndU(Instruction.RmwOperand.load(from: &pc))
+        case 235: return .i32AtomicRmw8OrU(Instruction.RmwOperand.load(from: &pc))
+        case 236: return .i64AtomicRmw8OrU(Instruction.RmwOperand.load(from: &pc))
+        case 237: return .i32AtomicRmw8XorU(Instruction.RmwOperand.load(from: &pc))
+        case 238: return .i64AtomicRmw8XorU(Instruction.RmwOperand.load(from: &pc))
+        case 239: return .i32AtomicRmw8XchgU(Instruction.RmwOperand.load(from: &pc))
+        case 240: return .i64AtomicRmw8XchgU(Instruction.RmwOperand.load(from: &pc))
+        case 241: return .i32AtomicRmw16AddU(Instruction.RmwOperand.load(from: &pc))
+        case 242: return .i64AtomicRmw16AddU(Instruction.RmwOperand.load(from: &pc))
+        case 243: return .i32AtomicRmw16SubU(Instruction.RmwOperand.load(from: &pc))
+        case 244: return .i64AtomicRmw16SubU(Instruction.RmwOperand.load(from: &pc))
+        case 245: return .i32AtomicRmw16AndU(Instruction.RmwOperand.load(from: &pc))
+        case 246: return .i64AtomicRmw16AndU(Instruction.RmwOperand.load(from: &pc))
+        case 247: return .i32AtomicRmw16OrU(Instruction.RmwOperand.load(from: &pc))
+        case 248: return .i64AtomicRmw16OrU(Instruction.RmwOperand.load(from: &pc))
+        case 249: return .i32AtomicRmw16XorU(Instruction.RmwOperand.load(from: &pc))
+        case 250: return .i64AtomicRmw16XorU(Instruction.RmwOperand.load(from: &pc))
+        case 251: return .i32AtomicRmw16XchgU(Instruction.RmwOperand.load(from: &pc))
+        case 252: return .i64AtomicRmw16XchgU(Instruction.RmwOperand.load(from: &pc))
+        case 253: return .i64AtomicRmw32AddU(Instruction.RmwOperand.load(from: &pc))
+        case 254: return .i64AtomicRmw32SubU(Instruction.RmwOperand.load(from: &pc))
+        case 255: return .i64AtomicRmw32AndU(Instruction.RmwOperand.load(from: &pc))
+        case 256: return .i64AtomicRmw32OrU(Instruction.RmwOperand.load(from: &pc))
+        case 257: return .i64AtomicRmw32XorU(Instruction.RmwOperand.load(from: &pc))
+        case 258: return .i64AtomicRmw32XchgU(Instruction.RmwOperand.load(from: &pc))
+        case 259: return .i32AtomicRmwCmpxchg(Instruction.CmpxchgOperand.load(from: &pc))
+        case 260: return .i64AtomicRmwCmpxchg(Instruction.CmpxchgOperand.load(from: &pc))
+        case 261: return .i32AtomicRmw8CmpxchgU(Instruction.CmpxchgOperand.load(from: &pc))
+        case 262: return .i32AtomicRmw16CmpxchgU(Instruction.CmpxchgOperand.load(from: &pc))
+        case 263: return .i64AtomicRmw8CmpxchgU(Instruction.CmpxchgOperand.load(from: &pc))
+        case 264: return .i64AtomicRmw16CmpxchgU(Instruction.CmpxchgOperand.load(from: &pc))
+        case 265: return .i64AtomicRmw32CmpxchgU(Instruction.CmpxchgOperand.load(from: &pc))
+        case 266: return .memoryAtomicWait32(Instruction.AtomicWaitOperand.load(from: &pc))
+        case 267: return .memoryAtomicWait64(Instruction.AtomicWaitOperand.load(from: &pc))
+        case 268: return .memoryAtomicNotify(Instruction.AtomicNotifyOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -1875,6 +2201,58 @@ extension Instruction {
         case 214: return "i64AtomicStore8"
         case 215: return "i64AtomicStore16"
         case 216: return "i64AtomicStore32"
+        case 217: return "i32AtomicRmwAdd"
+        case 218: return "i64AtomicRmwAdd"
+        case 219: return "i32AtomicRmwSub"
+        case 220: return "i64AtomicRmwSub"
+        case 221: return "i32AtomicRmwAnd"
+        case 222: return "i64AtomicRmwAnd"
+        case 223: return "i32AtomicRmwOr"
+        case 224: return "i64AtomicRmwOr"
+        case 225: return "i32AtomicRmwXor"
+        case 226: return "i64AtomicRmwXor"
+        case 227: return "i32AtomicRmwXchg"
+        case 228: return "i64AtomicRmwXchg"
+        case 229: return "i32AtomicRmw8AddU"
+        case 230: return "i64AtomicRmw8AddU"
+        case 231: return "i32AtomicRmw8SubU"
+        case 232: return "i64AtomicRmw8SubU"
+        case 233: return "i32AtomicRmw8AndU"
+        case 234: return "i64AtomicRmw8AndU"
+        case 235: return "i32AtomicRmw8OrU"
+        case 236: return "i64AtomicRmw8OrU"
+        case 237: return "i32AtomicRmw8XorU"
+        case 238: return "i64AtomicRmw8XorU"
+        case 239: return "i32AtomicRmw8XchgU"
+        case 240: return "i64AtomicRmw8XchgU"
+        case 241: return "i32AtomicRmw16AddU"
+        case 242: return "i64AtomicRmw16AddU"
+        case 243: return "i32AtomicRmw16SubU"
+        case 244: return "i64AtomicRmw16SubU"
+        case 245: return "i32AtomicRmw16AndU"
+        case 246: return "i64AtomicRmw16AndU"
+        case 247: return "i32AtomicRmw16OrU"
+        case 248: return "i64AtomicRmw16OrU"
+        case 249: return "i32AtomicRmw16XorU"
+        case 250: return "i64AtomicRmw16XorU"
+        case 251: return "i32AtomicRmw16XchgU"
+        case 252: return "i64AtomicRmw16XchgU"
+        case 253: return "i64AtomicRmw32AddU"
+        case 254: return "i64AtomicRmw32SubU"
+        case 255: return "i64AtomicRmw32AndU"
+        case 256: return "i64AtomicRmw32OrU"
+        case 257: return "i64AtomicRmw32XorU"
+        case 258: return "i64AtomicRmw32XchgU"
+        case 259: return "i32AtomicRmwCmpxchg"
+        case 260: return "i64AtomicRmwCmpxchg"
+        case 261: return "i32AtomicRmw8CmpxchgU"
+        case 262: return "i32AtomicRmw16CmpxchgU"
+        case 263: return "i64AtomicRmw8CmpxchgU"
+        case 264: return "i64AtomicRmw16CmpxchgU"
+        case 265: return "i64AtomicRmw32CmpxchgU"
+        case 266: return "memoryAtomicWait32"
+        case 267: return "memoryAtomicWait64"
+        case 268: return "memoryAtomicNotify"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }

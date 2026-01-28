@@ -2724,6 +2724,419 @@ struct InstructionTranslator: InstructionVisitor {
             return .tableSize(Instruction.TableSizeOperand(tableIndex: table, result: LVReg(result)))
         }
     }
+
+    // MARK: - Atomic Operations Translation
+
+    private mutating func visitRmw(
+        _ memarg: MemArg,
+        _ type: ValueType,
+        _ naturalAlignment: Int,
+        _ instruction: @escaping (Instruction.RmwOperand) -> Instruction
+    ) throws {
+        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
+        let value = try popVRegOperand(type)
+        let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
+        guard let value = value, let pointer = pointer else {
+            throw TranslationError("missing rmw operands")
+        }
+        let result = valueStack.push(type)
+        let rmwOperand = Instruction.RmwOperand(
+            offset: memarg.offset,
+            pointer: pointer,
+            value: value,
+            result: result
+        )
+        emit(instruction(rmwOperand))
+    }
+
+    private mutating func visitRmw8(
+        _ memarg: MemArg,
+        _ resultType: ValueType,
+        _ naturalAlignment: Int,
+        _ instruction: @escaping (Instruction.RmwOperand) -> Instruction
+    ) throws {
+        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
+        let value = try popVRegOperand(resultType)
+        let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
+        guard let value = value, let pointer = pointer else {
+            throw TranslationError("missing rmw operands")
+        }
+        let result = valueStack.push(resultType)
+        let rmwOperand = Instruction.RmwOperand(
+            offset: memarg.offset,
+            pointer: pointer,
+            value: value,
+            result: result
+        )
+        emit(instruction(rmwOperand))
+    }
+
+    private mutating func visitRmw16(
+        _ memarg: MemArg,
+        _ resultType: ValueType,
+        _ naturalAlignment: Int,
+        _ instruction: @escaping (Instruction.RmwOperand) -> Instruction
+    ) throws {
+        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
+        let value = try popVRegOperand(resultType)
+        let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
+        guard let value = value, let pointer = pointer else {
+            throw TranslationError("missing rmw operands")
+        }
+        let result = valueStack.push(resultType)
+        let rmwOperand = Instruction.RmwOperand(
+            offset: memarg.offset,
+            pointer: pointer,
+            value: value,
+            result: result
+        )
+        emit(instruction(rmwOperand))
+    }
+
+    private mutating func visitRmw32(
+        _ memarg: MemArg,
+        _ resultType: ValueType,
+        _ naturalAlignment: Int,
+        _ instruction: @escaping (Instruction.RmwOperand) -> Instruction
+    ) throws {
+        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
+        let value = try popVRegOperand(resultType)
+        let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
+        guard let value = value, let pointer = pointer else {
+            throw TranslationError("missing rmw operands")
+        }
+        let result = valueStack.push(resultType)
+        let rmwOperand = Instruction.RmwOperand(
+            offset: memarg.offset,
+            pointer: pointer,
+            value: value,
+            result: result
+        )
+        emit(instruction(rmwOperand))
+    }
+
+    mutating func visitI32AtomicRmwAdd(memarg: MemArg) throws -> Output {
+        try visitRmw(memarg, .i32, 4) { .i32AtomicRmwAdd($0) }
+    }
+    mutating func visitI64AtomicRmwAdd(memarg: MemArg) throws -> Output {
+        try visitRmw(memarg, .i64, 8) { .i64AtomicRmwAdd($0) }
+    }
+    mutating func visitI32AtomicRmw8AddU(memarg: MemArg) throws -> Output {
+        try visitRmw8(memarg, .i32, 1) { .i32AtomicRmw8AddU($0) }
+    }
+    mutating func visitI32AtomicRmw16AddU(memarg: MemArg) throws -> Output {
+        try visitRmw16(memarg, .i32, 2) { .i32AtomicRmw16AddU($0) }
+    }
+    mutating func visitI64AtomicRmw8AddU(memarg: MemArg) throws -> Output {
+        try visitRmw8(memarg, .i64, 1) { .i64AtomicRmw8AddU($0) }
+    }
+    mutating func visitI64AtomicRmw16AddU(memarg: MemArg) throws -> Output {
+        try visitRmw16(memarg, .i64, 2) { .i64AtomicRmw16AddU($0) }
+    }
+    mutating func visitI64AtomicRmw32AddU(memarg: MemArg) throws -> Output {
+        try visitRmw32(memarg, .i64, 4) { .i64AtomicRmw32AddU($0) }
+    }
+
+    mutating func visitI32AtomicRmwSub(memarg: MemArg) throws -> Output {
+        try visitRmw(memarg, .i32, 4) { .i32AtomicRmwSub($0) }
+    }
+    mutating func visitI64AtomicRmwSub(memarg: MemArg) throws -> Output {
+        try visitRmw(memarg, .i64, 8) { .i64AtomicRmwSub($0) }
+    }
+    mutating func visitI32AtomicRmw8SubU(memarg: MemArg) throws -> Output {
+        try visitRmw8(memarg, .i32, 1) { .i32AtomicRmw8SubU($0) }
+    }
+    mutating func visitI32AtomicRmw16SubU(memarg: MemArg) throws -> Output {
+        try visitRmw16(memarg, .i32, 2) { .i32AtomicRmw16SubU($0) }
+    }
+    mutating func visitI64AtomicRmw8SubU(memarg: MemArg) throws -> Output {
+        try visitRmw8(memarg, .i64, 1) { .i64AtomicRmw8SubU($0) }
+    }
+    mutating func visitI64AtomicRmw16SubU(memarg: MemArg) throws -> Output {
+        try visitRmw16(memarg, .i64, 2) { .i64AtomicRmw16SubU($0) }
+    }
+    mutating func visitI64AtomicRmw32SubU(memarg: MemArg) throws -> Output {
+        try visitRmw32(memarg, .i64, 4) { .i64AtomicRmw32SubU($0) }
+    }
+
+    mutating func visitI32AtomicRmwAnd(memarg: MemArg) throws -> Output {
+        try visitRmw(memarg, .i32, 4) { .i32AtomicRmwAnd($0) }
+    }
+    mutating func visitI64AtomicRmwAnd(memarg: MemArg) throws -> Output {
+        try visitRmw(memarg, .i64, 8) { .i64AtomicRmwAnd($0) }
+    }
+    mutating func visitI32AtomicRmw8AndU(memarg: MemArg) throws -> Output {
+        try visitRmw8(memarg, .i32, 1) { .i32AtomicRmw8AndU($0) }
+    }
+    mutating func visitI32AtomicRmw16AndU(memarg: MemArg) throws -> Output {
+        try visitRmw16(memarg, .i32, 2) { .i32AtomicRmw16AndU($0) }
+    }
+    mutating func visitI64AtomicRmw8AndU(memarg: MemArg) throws -> Output {
+        try visitRmw8(memarg, .i64, 1) { .i64AtomicRmw8AndU($0) }
+    }
+    mutating func visitI64AtomicRmw16AndU(memarg: MemArg) throws -> Output {
+        try visitRmw16(memarg, .i64, 2) { .i64AtomicRmw16AndU($0) }
+    }
+    mutating func visitI64AtomicRmw32AndU(memarg: MemArg) throws -> Output {
+        try visitRmw32(memarg, .i64, 4) { .i64AtomicRmw32AndU($0) }
+    }
+
+    mutating func visitI32AtomicRmwOr(memarg: MemArg) throws -> Output {
+        try visitRmw(memarg, .i32, 4) { .i32AtomicRmwOr($0) }
+    }
+    mutating func visitI64AtomicRmwOr(memarg: MemArg) throws -> Output {
+        try visitRmw(memarg, .i64, 8) { .i64AtomicRmwOr($0) }
+    }
+    mutating func visitI32AtomicRmw8OrU(memarg: MemArg) throws -> Output {
+        try visitRmw8(memarg, .i32, 1) { .i32AtomicRmw8OrU($0) }
+    }
+    mutating func visitI32AtomicRmw16OrU(memarg: MemArg) throws -> Output {
+        try visitRmw16(memarg, .i32, 2) { .i32AtomicRmw16OrU($0) }
+    }
+    mutating func visitI64AtomicRmw8OrU(memarg: MemArg) throws -> Output {
+        try visitRmw8(memarg, .i64, 1) { .i64AtomicRmw8OrU($0) }
+    }
+    mutating func visitI64AtomicRmw16OrU(memarg: MemArg) throws -> Output {
+        try visitRmw16(memarg, .i64, 2) { .i64AtomicRmw16OrU($0) }
+    }
+    mutating func visitI64AtomicRmw32OrU(memarg: MemArg) throws -> Output {
+        try visitRmw32(memarg, .i64, 4) { .i64AtomicRmw32OrU($0) }
+    }
+
+    mutating func visitI32AtomicRmwXor(memarg: MemArg) throws -> Output {
+        try visitRmw(memarg, .i32, 4) { .i32AtomicRmwXor($0) }
+    }
+    mutating func visitI64AtomicRmwXor(memarg: MemArg) throws -> Output {
+        try visitRmw(memarg, .i64, 8) { .i64AtomicRmwXor($0) }
+    }
+    mutating func visitI32AtomicRmw8XorU(memarg: MemArg) throws -> Output {
+        try visitRmw8(memarg, .i32, 1) { .i32AtomicRmw8XorU($0) }
+    }
+    mutating func visitI32AtomicRmw16XorU(memarg: MemArg) throws -> Output {
+        try visitRmw16(memarg, .i32, 2) { .i32AtomicRmw16XorU($0) }
+    }
+    mutating func visitI64AtomicRmw8XorU(memarg: MemArg) throws -> Output {
+        try visitRmw8(memarg, .i64, 1) { .i64AtomicRmw8XorU($0) }
+    }
+    mutating func visitI64AtomicRmw16XorU(memarg: MemArg) throws -> Output {
+        try visitRmw16(memarg, .i64, 2) { .i64AtomicRmw16XorU($0) }
+    }
+    mutating func visitI64AtomicRmw32XorU(memarg: MemArg) throws -> Output {
+        try visitRmw32(memarg, .i64, 4) { .i64AtomicRmw32XorU($0) }
+    }
+
+    mutating func visitI32AtomicRmwXchg(memarg: MemArg) throws -> Output {
+        try visitRmw(memarg, .i32, 4) { .i32AtomicRmwXchg($0) }
+    }
+    mutating func visitI64AtomicRmwXchg(memarg: MemArg) throws -> Output {
+        try visitRmw(memarg, .i64, 8) { .i64AtomicRmwXchg($0) }
+    }
+    mutating func visitI32AtomicRmw8XchgU(memarg: MemArg) throws -> Output {
+        try visitRmw8(memarg, .i32, 1) { .i32AtomicRmw8XchgU($0) }
+    }
+    mutating func visitI32AtomicRmw16XchgU(memarg: MemArg) throws -> Output {
+        try visitRmw16(memarg, .i32, 2) { .i32AtomicRmw16XchgU($0) }
+    }
+    mutating func visitI64AtomicRmw8XchgU(memarg: MemArg) throws -> Output {
+        try visitRmw8(memarg, .i64, 1) { .i64AtomicRmw8XchgU($0) }
+    }
+    mutating func visitI64AtomicRmw16XchgU(memarg: MemArg) throws -> Output {
+        try visitRmw16(memarg, .i64, 2) { .i64AtomicRmw16XchgU($0) }
+    }
+    mutating func visitI64AtomicRmw32XchgU(memarg: MemArg) throws -> Output {
+        try visitRmw32(memarg, .i64, 4) { .i64AtomicRmw32XchgU($0) }
+    }
+
+    private mutating func visitCmpxchg(
+        _ memarg: MemArg,
+        _ type: ValueType,
+        _ naturalAlignment: Int,
+        _ instruction: @escaping (Instruction.CmpxchgOperand) -> Instruction
+    ) throws {
+        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
+        let replacement = try popVRegOperand(type)
+        let expected = try popVRegOperand(type)
+        let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
+        guard let replacement = replacement, let expected = expected, let pointer = pointer else {
+            throw TranslationError("missing cmpxchg operands")
+        }
+        let result = valueStack.push(type)
+        let cmpxchgOperand = Instruction.CmpxchgOperand(
+            offset: memarg.offset,
+            pointer: pointer,
+            expected: expected,
+            replacement: replacement,
+            result: result
+        )
+        emit(instruction(cmpxchgOperand))
+    }
+
+    private mutating func visitCmpxchg8(
+        _ memarg: MemArg,
+        _ resultType: ValueType,
+        _ naturalAlignment: Int,
+        _ instruction: @escaping (Instruction.CmpxchgOperand) -> Instruction
+    ) throws {
+        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
+        let replacement = try popVRegOperand(resultType)
+        let expected = try popVRegOperand(resultType)
+        let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
+        guard let replacement = replacement, let expected = expected, let pointer = pointer else {
+            throw TranslationError("missing cmpxchg operands")
+        }
+        let result = valueStack.push(resultType)
+        let cmpxchgOperand = Instruction.CmpxchgOperand(
+            offset: memarg.offset,
+            pointer: pointer,
+            expected: expected,
+            replacement: replacement,
+            result: result
+        )
+        emit(instruction(cmpxchgOperand))
+    }
+
+    private mutating func visitCmpxchg16(
+        _ memarg: MemArg,
+        _ resultType: ValueType,
+        _ naturalAlignment: Int,
+        _ instruction: @escaping (Instruction.CmpxchgOperand) -> Instruction
+    ) throws {
+        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
+        let replacement = try popVRegOperand(resultType)
+        let expected = try popVRegOperand(resultType)
+        let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
+        guard let replacement = replacement, let expected = expected, let pointer = pointer else {
+            throw TranslationError("missing cmpxchg operands")
+        }
+        let result = valueStack.push(resultType)
+        let cmpxchgOperand = Instruction.CmpxchgOperand(
+            offset: memarg.offset,
+            pointer: pointer,
+            expected: expected,
+            replacement: replacement,
+            result: result
+        )
+        emit(instruction(cmpxchgOperand))
+    }
+
+    private mutating func visitCmpxchg32(
+        _ memarg: MemArg,
+        _ resultType: ValueType,
+        _ naturalAlignment: Int,
+        _ instruction: @escaping (Instruction.CmpxchgOperand) -> Instruction
+    ) throws {
+        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
+        let replacement = try popVRegOperand(resultType)
+        let expected = try popVRegOperand(resultType)
+        let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
+        guard let replacement = replacement, let expected = expected, let pointer = pointer else {
+            throw TranslationError("missing cmpxchg operands")
+        }
+        let result = valueStack.push(resultType)
+        let cmpxchgOperand = Instruction.CmpxchgOperand(
+            offset: memarg.offset,
+            pointer: pointer,
+            expected: expected,
+            replacement: replacement,
+            result: result
+        )
+        emit(instruction(cmpxchgOperand))
+    }
+
+    mutating func visitI32AtomicRmwCmpxchg(memarg: MemArg) throws -> Output {
+        try visitCmpxchg(memarg, .i32, 4) { .i32AtomicRmwCmpxchg($0) }
+    }
+    mutating func visitI64AtomicRmwCmpxchg(memarg: MemArg) throws -> Output {
+        try visitCmpxchg(memarg, .i64, 8) { .i64AtomicRmwCmpxchg($0) }
+    }
+    mutating func visitI32AtomicRmw8CmpxchgU(memarg: MemArg) throws -> Output {
+        try visitCmpxchg8(memarg, .i32, 1) { .i32AtomicRmw8CmpxchgU($0) }
+    }
+    mutating func visitI32AtomicRmw16CmpxchgU(memarg: MemArg) throws -> Output {
+        try visitCmpxchg16(memarg, .i32, 2) { .i32AtomicRmw16CmpxchgU($0) }
+    }
+    mutating func visitI64AtomicRmw8CmpxchgU(memarg: MemArg) throws -> Output {
+        try visitCmpxchg8(memarg, .i64, 1) { .i64AtomicRmw8CmpxchgU($0) }
+    }
+    mutating func visitI64AtomicRmw16CmpxchgU(memarg: MemArg) throws -> Output {
+        try visitCmpxchg16(memarg, .i64, 2) { .i64AtomicRmw16CmpxchgU($0) }
+    }
+    mutating func visitI64AtomicRmw32CmpxchgU(memarg: MemArg) throws -> Output {
+        try visitCmpxchg32(memarg, .i64, 4) { .i64AtomicRmw32CmpxchgU($0) }
+    }
+
+    mutating func visitMemoryAtomicWait32(memarg: MemArg) throws -> Output {
+        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        try validator.validateMemArg(memarg, naturalAlignment: 4)
+        let timeout = try popVRegOperand(.i64)
+        let expected = try popVRegOperand(.i32)
+        let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
+        guard let timeout = timeout, let expected = expected, let pointer = pointer else {
+            throw TranslationError("missing wait operands")
+        }
+        let result = valueStack.push(.i32)
+        let waitOperand = Instruction.AtomicWaitOperand(
+            offset: memarg.offset,
+            pointer: pointer,
+            expected: expected,
+            timeout: timeout,
+            result: VReg(result)
+        )
+        emit(.memoryAtomicWait32(waitOperand))
+    }
+
+    mutating func visitMemoryAtomicWait64(memarg: MemArg) throws -> Output {
+        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        try validator.validateMemArg(memarg, naturalAlignment: 8)
+        let timeout = try popVRegOperand(.i64)
+        let expected = try popVRegOperand(.i64)
+        let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
+        guard let timeout = timeout, let expected = expected, let pointer = pointer else {
+            throw TranslationError("missing wait operands")
+        }
+        let result = valueStack.push(.i32)
+        let waitOperand = Instruction.AtomicWaitOperand(
+            offset: memarg.offset,
+            pointer: pointer,
+            expected: expected,
+            timeout: timeout,
+            result: VReg(result)
+        )
+        emit(.memoryAtomicWait64(waitOperand))
+    }
+
+    mutating func visitMemoryAtomicNotify(memarg: MemArg) throws -> Output {
+        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        try validator.validateMemArg(memarg, naturalAlignment: 4)
+        let count = try popVRegOperand(.i32)
+        let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
+        guard let count = count, let pointer = pointer else {
+            throw TranslationError("missing notify operands")
+        }
+        let result = valueStack.push(.i32)
+        let notifyOperand = Instruction.AtomicNotifyOperand(
+            offset: memarg.offset,
+            pointer: pointer,
+            count: count,
+            result: VReg(result)
+        )
+        emit(.memoryAtomicNotify(notifyOperand))
+    }
+
+    mutating func visitAtomicFence() throws -> Output {
+        // No-op: In an interpreter, instructions are executed sequentially,
+        // so no reordering can occur. atomic.fence is only meaningful for
+        // compiled code with actual CPU-level reordering.
+        // Do not emit any instruction.
+    }
 }
 
 extension InstructionTranslator.MetaValue {

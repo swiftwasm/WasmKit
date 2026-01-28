@@ -133,14 +133,25 @@ extension TestCase {
             assertionFailure("failed to load \(path)")
             return
         }
+        var configuration = configuration
+        let rootPath = FilePath(path).removingLastComponent()
+        let features = WastRunContext.deriveFeatureSet(rootPath: rootPath)
+        configuration.features = features
+
         let engine = Engine(configuration: configuration)
         let store = Store(engine: engine)
         let spectestInstance = try spectestModule.instantiate(store: store)
 
-        let rootPath = FilePath(path).removingLastComponent().string
-        var content = try parseWAST(String(data: data, encoding: .utf8)!)
-        let context = WastRunContext(store: store, rootPath: rootPath)
+        var content = try parseWAST(String(data: data, encoding: .utf8)!, features: features)
+        let context = WastRunContext(store: store, rootPath: rootPath.string)
         context.importsSpace.define(module: "spectest", spectestInstance.exports)
+
+        // Add shared_memory export for threads proposal tests
+        if configuration.features.contains(.threads) {
+            let sharedMemoryType = MemoryType(min: 1, max: 2, shared: true)
+            let sharedMemory = try Memory(store: store, type: sharedMemoryType)
+            context.importsSpace.define(module: "spectest", name: "shared_memory", sharedMemory)
+        }
         do {
             while let (directive, location) = try content.nextDirective() {
                 do {
@@ -369,12 +380,18 @@ extension WastRunContext {
         return try function.invoke(args)
     }
 
-    private func deriveFeatureSet(rootPath: FilePath) -> WasmFeatureSet {
+    static func deriveFeatureSet(rootPath: FilePath) -> WasmFeatureSet {
         var features = WasmFeatureSet.default
         if rootPath.ends(with: "proposals/memory64") {
             features.insert(.memory64)
         }
         features.insert(.simd)
+        if rootPath.ends(with: "proposals/threads") {
+            // Threads proposal tests should not enable reference types by default
+            // as they test core WebAssembly features without reference types
+            features.remove(.referenceTypes)
+            features.insert(.threads)
+        }
         return features
     }
 
@@ -382,7 +399,7 @@ extension WastRunContext {
         let rootPath = FilePath(rootPath)
         let path = rootPath.appending(filename)
 
-        let module = try parseWasm(filePath: path, features: deriveFeatureSet(rootPath: rootPath))
+        let module = try parseWasm(filePath: path, features: Self.deriveFeatureSet(rootPath: rootPath))
         return module
     }
 
@@ -398,7 +415,7 @@ extension WastRunContext {
             binary = bytes
         }
 
-        let module = try parseWasm(bytes: binary, features: deriveFeatureSet(rootPath: rootPath))
+        let module = try parseWasm(bytes: binary, features: Self.deriveFeatureSet(rootPath: rootPath))
         return module
     }
 }

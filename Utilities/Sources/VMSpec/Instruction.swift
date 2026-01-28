@@ -416,6 +416,120 @@ extension VMGen {
     static let memoryAtomicStoreOps = memoryStoreOps.filter { !$0.isFloatingPoint }
     static let memoryLoadStoreInsts: [Instruction] = memoryLoadOps.map(\.instruction) + memoryStoreOps.map(\.instruction)
     static let memoryAtomicInsts: [Instruction] = memoryAtomicLoadOps.map(\.atomicInstruction) + memoryAtomicStoreOps.map(\.atomicInstruction)
+
+    // MARK: - Atomic RMW Operations
+
+    struct RmwOpInfo {
+        let type: String
+        let op: String
+        let size: String?
+        let castFromValue: String
+        let castToValue: String
+        var instruction: Instruction {
+            let name: String
+            if let size = size {
+                name = "\(type)AtomicRmw\(size)\(op)U"
+            } else {
+                name = "\(type)AtomicRmw\(op)"
+            }
+            let doc: String
+            if let size = size {
+                doc = "WebAssembly Core Instruction `\(type).atomic.rmw\(size).\(VMGen.snakeCase(pascalCase: op))_u`"
+            } else {
+                doc = "WebAssembly Core Instruction `\(type).atomic.rmw.\(VMGen.snakeCase(pascalCase: op))`"
+            }
+            return Instruction(name: name, documentation: doc,
+                        mayThrow: true, useCurrentMemory: .read, immediateLayout: .rmw)
+        }
+    }
+
+    static let atomicRmwOps: [RmwOpInfo] = [
+        ("i32", "Add", nil, "$0.i32", ".i32($0)", false),
+        ("i64", "Add", nil, "$0.i64", ".i64($0)", false),
+        ("i32", "Sub", nil, "$0.i32", ".i32($0)", false),
+        ("i64", "Sub", nil, "$0.i64", ".i64($0)", false),
+        ("i32", "And", nil, "$0.i32", ".i32($0)", false),
+        ("i64", "And", nil, "$0.i64", ".i64($0)", false),
+        ("i32", "Or", nil, "$0.i32", ".i32($0)", false),
+        ("i64", "Or", nil, "$0.i64", ".i64($0)", false),
+        ("i32", "Xor", nil, "$0.i32", ".i32($0)", false),
+        ("i64", "Xor", nil, "$0.i64", ".i64($0)", false),
+        ("i32", "Xchg", nil, "$0.i32", ".i32($0)", false),
+        ("i64", "Xchg", nil, "$0.i64", ".i64($0)", false),
+    ].map { (type, op, size, castFromValue, castToValue, _) in
+        return RmwOpInfo(type: type, op: op, size: size, castFromValue: castFromValue, castToValue: castToValue)
+    }
+
+    static let atomicRmw8Ops: [RmwOpInfo] = [
+        ("i32", "Add", "8", "UInt8(truncatingIfNeeded: $0.i32)", ".i32(UInt32($0))", false),
+        ("i64", "Add", "8", "UInt8(truncatingIfNeeded: $0.i64)", ".i64(UInt64($0))", false),
+        ("i32", "Sub", "8", "UInt8(truncatingIfNeeded: $0.i32)", ".i32(UInt32($0))", false),
+        ("i64", "Sub", "8", "UInt8(truncatingIfNeeded: $0.i64)", ".i64(UInt64($0))", false),
+        ("i32", "And", "8", "UInt8(truncatingIfNeeded: $0.i32)", ".i32(UInt32($0))", false),
+        ("i64", "And", "8", "UInt8(truncatingIfNeeded: $0.i64)", ".i64(UInt64($0))", false),
+        ("i32", "Or", "8", "UInt8(truncatingIfNeeded: $0.i32)", ".i32(UInt32($0))", false),
+        ("i64", "Or", "8", "UInt8(truncatingIfNeeded: $0.i64)", ".i64(UInt64($0))", false),
+        ("i32", "Xor", "8", "UInt8(truncatingIfNeeded: $0.i32)", ".i32(UInt32($0))", false),
+        ("i64", "Xor", "8", "UInt8(truncatingIfNeeded: $0.i64)", ".i64(UInt64($0))", false),
+        ("i32", "Xchg", "8", "UInt8(truncatingIfNeeded: $0.i32)", ".i32(UInt32($0))", false),
+        ("i64", "Xchg", "8", "UInt8(truncatingIfNeeded: $0.i64)", ".i64(UInt64($0))", false),
+    ].map { (type, op, size, castFromValue, castToValue, _) in
+        return RmwOpInfo(type: type, op: op, size: size, castFromValue: castFromValue, castToValue: castToValue)
+    }
+
+    static let atomicRmw16Ops: [RmwOpInfo] = [
+        ("i32", "Add", "16", "UInt16(truncatingIfNeeded: $0.i32)", ".i32(UInt32($0))", false),
+        ("i64", "Add", "16", "UInt16(truncatingIfNeeded: $0.i64)", ".i64(UInt64($0))", false),
+        ("i32", "Sub", "16", "UInt16(truncatingIfNeeded: $0.i32)", ".i32(UInt32($0))", false),
+        ("i64", "Sub", "16", "UInt16(truncatingIfNeeded: $0.i64)", ".i64(UInt64($0))", false),
+        ("i32", "And", "16", "UInt16(truncatingIfNeeded: $0.i32)", ".i32(UInt32($0))", false),
+        ("i64", "And", "16", "UInt16(truncatingIfNeeded: $0.i64)", ".i64(UInt64($0))", false),
+        ("i32", "Or", "16", "UInt16(truncatingIfNeeded: $0.i32)", ".i32(UInt32($0))", false),
+        ("i64", "Or", "16", "UInt16(truncatingIfNeeded: $0.i64)", ".i64(UInt64($0))", false),
+        ("i32", "Xor", "16", "UInt16(truncatingIfNeeded: $0.i32)", ".i32(UInt32($0))", false),
+        ("i64", "Xor", "16", "UInt16(truncatingIfNeeded: $0.i64)", ".i64(UInt64($0))", false),
+        ("i32", "Xchg", "16", "UInt16(truncatingIfNeeded: $0.i32)", ".i32(UInt32($0))", false),
+        ("i64", "Xchg", "16", "UInt16(truncatingIfNeeded: $0.i64)", ".i64(UInt64($0))", false),
+    ].map { (type, op, size, castFromValue, castToValue, _) in
+        return RmwOpInfo(type: type, op: op, size: size, castFromValue: castFromValue, castToValue: castToValue)
+    }
+
+    static let atomicRmw32Ops: [RmwOpInfo] = [
+        ("i64", "Add", "32", "UInt32(truncatingIfNeeded: $0.i64)", ".i64(UInt64($0))", false),
+        ("i64", "Sub", "32", "UInt32(truncatingIfNeeded: $0.i64)", ".i64(UInt64($0))", false),
+        ("i64", "And", "32", "UInt32(truncatingIfNeeded: $0.i64)", ".i64(UInt64($0))", false),
+        ("i64", "Or", "32", "UInt32(truncatingIfNeeded: $0.i64)", ".i64(UInt64($0))", false),
+        ("i64", "Xor", "32", "UInt32(truncatingIfNeeded: $0.i64)", ".i64(UInt64($0))", false),
+        ("i64", "Xchg", "32", "UInt32(truncatingIfNeeded: $0.i64)", ".i64(UInt64($0))", false),
+    ].map { (type, op, size, castFromValue, castToValue, _) in
+        return RmwOpInfo(type: type, op: op, size: size, castFromValue: castFromValue, castToValue: castToValue)
+    }
+
+    static let atomicCmpxchgOps: [Instruction] = [
+        Instruction(name: "i32AtomicRmwCmpxchg", documentation: "WebAssembly Core Instruction `i32.atomic.rmw.cmpxchg`",
+                    mayThrow: true, useCurrentMemory: .read, immediateLayout: .cmpxchg),
+        Instruction(name: "i64AtomicRmwCmpxchg", documentation: "WebAssembly Core Instruction `i64.atomic.rmw.cmpxchg`",
+                    mayThrow: true, useCurrentMemory: .read, immediateLayout: .cmpxchg),
+        Instruction(name: "i32AtomicRmw8CmpxchgU", documentation: "WebAssembly Core Instruction `i32.atomic.rmw8.cmpxchg_u`",
+                    mayThrow: true, useCurrentMemory: .read, immediateLayout: .cmpxchg),
+        Instruction(name: "i32AtomicRmw16CmpxchgU", documentation: "WebAssembly Core Instruction `i32.atomic.rmw16.cmpxchg_u`",
+                    mayThrow: true, useCurrentMemory: .read, immediateLayout: .cmpxchg),
+        Instruction(name: "i64AtomicRmw8CmpxchgU", documentation: "WebAssembly Core Instruction `i64.atomic.rmw8.cmpxchg_u`",
+                    mayThrow: true, useCurrentMemory: .read, immediateLayout: .cmpxchg),
+        Instruction(name: "i64AtomicRmw16CmpxchgU", documentation: "WebAssembly Core Instruction `i64.atomic.rmw16.cmpxchg_u`",
+                    mayThrow: true, useCurrentMemory: .read, immediateLayout: .cmpxchg),
+        Instruction(name: "i64AtomicRmw32CmpxchgU", documentation: "WebAssembly Core Instruction `i64.atomic.rmw32.cmpxchg_u`",
+                    mayThrow: true, useCurrentMemory: .read, immediateLayout: .cmpxchg),
+    ]
+
+    static let atomicWaitNotifyInsts: [Instruction] = [
+        Instruction(name: "memoryAtomicWait32", documentation: "WebAssembly Core Instruction `memory.atomic.wait32`",
+                    mayThrow: true, useCurrentMemory: .read, immediateLayout: .atomicWait),
+        Instruction(name: "memoryAtomicWait64", documentation: "WebAssembly Core Instruction `memory.atomic.wait64`",
+                    mayThrow: true, useCurrentMemory: .read, immediateLayout: .atomicWait),
+        Instruction(name: "memoryAtomicNotify", documentation: "WebAssembly Core Instruction `memory.atomic.notify`",
+                    mayThrow: true, useCurrentMemory: .read, immediateLayout: .atomicNotify),
+    ]
     static let memoryOpInsts: [Instruction] = [
         Instruction(name: "memorySize", documentation: "WebAssembly Core Instruction `memory.size`") {
             $0.field(name: "memoryIndex", type: .MemoryIndex)
@@ -630,6 +744,12 @@ extension VMGen {
         instructions += floatUnaryOps.map(\.instruction)
         instructions += miscInsts
         instructions += memoryAtomicInsts
+        instructions += atomicRmwOps.map(\.instruction)
+        instructions += atomicRmw8Ops.map(\.instruction)
+        instructions += atomicRmw16Ops.map(\.instruction)
+        instructions += atomicRmw32Ops.map(\.instruction)
+        instructions += atomicCmpxchgOps
+        instructions += atomicWaitNotifyInsts
         return instructions
     }
 
