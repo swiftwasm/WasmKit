@@ -38,7 +38,7 @@ enum VMGen {
                 /// Execute an instruction identified by the opcode.
                 /// Note: This function is only used when using token threading model.
                 @inline(__always)
-                mutating func doExecute(_ \(doExecuteParams.map { "\($0.label): \($0.isInout ? "inout " : "")\($0.type)" }.joined(separator: ", "))) throws -> CodeSlot {
+                mutating func doExecute(_ \(doExecuteParams.map { "\($0.label): \($0.isInout ? "inout " : "")\($0.type)" }.joined(separator: ", "))) throws(ExecutionError) -> CodeSlot {
                     switch opcode {
             """
 
@@ -100,7 +100,19 @@ enum VMGen {
     }
 
     static func instMethodDecl(_ inst: Instruction) -> String {
-        let throwsKwd = inst.mayThrow ? " throws" : ""
+        // Use typed throws for Embedded Swift compatibility
+        let throwsKwd: String
+        if inst.mayThrow {
+            if inst.name == "endOfExecution" {
+                throwsKwd = " throws(EndOfExecution)"
+            } else if inst.name == "breakpoint" {
+                throwsKwd = " throws(Breakpoint)"
+            } else {
+                throwsKwd = " throws(Trap)"
+            }
+        } else {
+            throwsKwd = ""
+        }
         let returnClause = inst.mayUpdatePc ? " -> (Pc, CodeSlot)" : ""
         let args = inst.parameters
         return "func \(inst.name)(\(args.map { "\($0.label): \($0.isInout ? "inout " : "")\($0.type)" }.joined(separator: ", ")))\(throwsKwd)\(returnClause)"
@@ -331,8 +343,7 @@ enum VMGen {
                     return "\(label): \(isInout ? "&" : "")\(label)"
                 }
             }.joined(separator: ", ")
-            let throwsKwd = inst.mayThrow ? " throws" : ""
-            let tryKwd = inst.mayThrow ? "try " : ""
+            let throwsKwd = inst.mayThrow ? " throws(ExecutionError)" : ""
             output += """
 
                 @_silgen_name("wasmkit_execute_\(inst.name)") @inline(__always)
@@ -345,20 +356,52 @@ enum VMGen {
 
                 """
             }
-            let call = "\(tryKwd)self.\(inst.name)(\(args))"
+            let call = "self.\(inst.name)(\(args))"
             if inst.mayUpdatePc {
-                output += """
+                if inst.mayThrow {
+                    // Special case for endOfExecution which throws EndOfExecution
+                    if inst.name == "endOfExecution" {
+                        output += """
+                        let next: CodeSlot
+                        do { (pc.pointee, next) = try \(call) } catch { throw .endOfExecution(sp: error.sp) }
+
+                """
+                    } else if inst.name == "breakpoint" {
+                        output += """
+                        let next: CodeSlot
+                        do { (pc.pointee, next) = try \(call) } catch { throw .breakpoint(sp: error.sp, pc: error.pc) }
+
+                """
+                    } else {
+                        output += """
+                        let next: CodeSlot
+                        do { (pc.pointee, next) = try \(call) } catch { throw ExecutionError(error) }
+
+                """
+                    }
+                } else {
+                    output += """
                         let next: CodeSlot
                         (pc.pointee, next) = \(call)
 
                 """
+                }
             } else {
-                output += """
+                if inst.mayThrow {
+                    output += """
+                        do { \(inlineImpls[inst.name] ?? "try \(call)") } catch { throw ExecutionError(error) }
+                        let next = pc.pointee.pointee
+                        pc.pointee = pc.pointee.advanced(by: 1)
+
+                """
+                } else {
+                    output += """
                         \(inlineImpls[inst.name] ?? call)
                         let next = pc.pointee.pointee
                         pc.pointee = pc.pointee.advanced(by: 1)
 
                 """
+                }
             }
             output += """
                     return next
@@ -463,7 +506,7 @@ enum VMGen {
                 extension Instruction {
                     /// The tail-calling execution handler for the instruction.
                     var handler: UInt {
-                        #if os(WASI)
+                        #if os(WASI) || $Embedded
                         fatalError("Direct threading is not supported on WASI")
                         #else
                         return withUnsafePointer(to: wasmkit_tc_exec_handlers) {

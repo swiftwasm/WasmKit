@@ -65,7 +65,7 @@
         ///   - module: Wasm module to instantiate.
         ///   - store: Store that instantiates the module.
         ///   - imports: Imports required by `module` for instantiation.
-        package init(module: Module, store: Store, imports: Imports) throws {
+        package init(module: Module, store: Store, imports: Imports) throws(Error) {
             let limit = store.engine.configuration.stackSize / MemoryLayout<StackSlot>.stride
             let instance = try module.instantiate(store: store, imports: imports, isDebuggable: true)
 
@@ -97,14 +97,14 @@
 
         /// Sets a breakpoint at the first instruction in the entrypoint function of the module instantiated by
         /// this debugger.
-        package mutating func stopAtEntrypoint() throws {
+        package mutating func stopAtEntrypoint() throws(Error) {
             try self.enableBreakpoint(address: self.originalAddress(function: entrypointFunction))
         }
 
         /// Finds a Wasm address for the first instruction in a given function.
         /// - Parameter function: the Wasm function to find the first Wasm instruction address for.
         /// - Returns: byte offset of the first Wasm instruction of given function in the module it was parsed from.
-        package func originalAddress(function: Function) throws -> Int {
+        package func originalAddress(function: Function) throws(Error) -> Int {
             precondition(function.handle.isWasm)
 
             switch function.handle.wasm.code {
@@ -118,7 +118,7 @@
             }
         }
 
-        private func findIseq(forWasmAddress address: Int) throws -> (iseq: Pc, wasm: Int) {
+        private func findIseq(forWasmAddress address: Int) throws(Error) -> (iseq: Pc, wasm: Int) {
             if let (iseq, wasm) = self.instance.handle.instructionMapping.findIseq(forWasmAddress: address) {
                 return (iseq, wasm)
             }
@@ -142,7 +142,7 @@
         /// represented by `self`.
         /// See also ``Debugger/disableBreakpoint(address:)``.
         @discardableResult
-        package mutating func enableBreakpoint(address: Int) throws -> Int {
+        package mutating func enableBreakpoint(address: Int) throws(Error) -> Int {
             guard self.breakpoints[address] == nil else {
                 return address
             }
@@ -157,7 +157,7 @@
             module: Module,
             function: Int,
             offsetWithinFunction: Int = 0
-        ) throws -> Int {
+        ) throws(Error) -> Int {
             try self.enableBreakpoint(address: module.functions[function].code.originalAddress + offsetWithinFunction)
         }
 
@@ -166,7 +166,7 @@
         /// - Parameter address: byte offset of the Wasm instruction that was replaced with a breakpoint. The original
         /// instruction is restored from debugger state and replaces the breakpoint instruction.
         /// See also ``Debugger/enableBreakpoint(address:)``.
-        package mutating func disableBreakpoint(address: Int) throws {
+        package mutating func disableBreakpoint(address: Int) throws(Error) {
             guard let oldCodeSlot = self.breakpoints[address] else {
                 return
             }
@@ -180,7 +180,7 @@
         /// Resumes the module instantiated by the debugger stopped at a breakpoint. The breakpoint is disabled
         /// and execution is resumed until the next breakpoint is triggered or all remaining instructions are
         /// executed. If the module is not stopped at a breakpoint, this function returns immediately.
-        package mutating func run() throws {
+        package mutating func run() throws(Error) {
             do {
                 switch self.state {
                 case .stoppedAtBreakpoint(let breakpoint):
@@ -246,7 +246,7 @@
         /// The current breakpoint is disabled and new breakpoints are put on the next instruction (or instructions in case
         /// of multiple possible execution branches). After breakpoints setup, execution is resumed until suspension.
         /// If the module is not stopped at a breakpoint, this function returns immediately.
-        package mutating func step() throws {
+        package mutating func step() throws(Error) {
             guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
                 return
             }
@@ -259,7 +259,7 @@
         /// Resumes the module instantiated by the debugger stopped at a breakpoint. The breakpoint from which
         /// the debugger resumes is preserved. If the module is current not stopped at a breakpoint, this function
         /// returns immediately.
-        package mutating func runPreservingCurrentBreakpoint() throws {
+        package mutating func runPreservingCurrentBreakpoint() throws(Error) {
             guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
                 return
             }
@@ -271,7 +271,7 @@
             try self.run()
         }
 
-        package func getLocal(frameIndex: UInt, localIndex: UInt) throws -> UInt64 {
+        package func getLocal(frameIndex: UInt, localIndex: UInt) throws(Error) -> UInt64 {
             guard case .stoppedAtBreakpoint(let breakpoint) = self.state else {
                 throw Error.notStoppedAtBreakpoint
             }

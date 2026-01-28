@@ -113,6 +113,8 @@ package enum TrapReason: Error, CustomStringConvertible {
             return "indirect call type mismatch, expected \(expected), got \(actual)"
         case .tableOutOfBounds(let index):
             return "out of bounds table access at \(index) (undefined element)"
+        case .validationError(let error):
+            return "validation error: \(error)"
         }
     }
 }
@@ -144,19 +146,33 @@ extension TrapReason.Message {
     }
 }
 
-package struct ImportError: Error {
-    package struct Message {
-        package let text: String
+public struct ImportError: Error {
+    public enum Reason {
+        case message(Message)
+        case trap(Trap)
+        case validation(ValidationError)
+    }
+
+    public struct Message {
+        public let text: String
 
         init(_ text: String) {
             self.text = text
         }
     }
 
-    package let message: Message
+    public let reason: Reason
 
     init(_ message: Message) {
-        self.message = message
+        self.reason = .message(message)
+    }
+
+    init(_ trap: Trap) {
+        self.reason = .trap(trap)
+    }
+
+    init(_ validation: ValidationError) {
+        self.reason = .validation(validation)
     }
 }
 
@@ -206,5 +222,8 @@ extension ImportError.Message {
     }
     static func moduleInstanceAlreadyRegistered(_ name: String) -> Self {
         Self("a module instance is already registered under a name `\(name)")
+    }
+    static func invalidTypeIndex(_ index: UInt32, max: Int) -> Self {
+        Self("type index \(index) out of bounds, max: \(max)")
     }
 }

@@ -56,7 +56,7 @@ extension Execution {
     }
 
     @inline(__always)
-    mutating func call(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.CallOperand) throws -> (Pc, CodeSlot) {
+    mutating func call(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.CallOperand) throws(Trap) -> (Pc, CodeSlot) {
         var pc = pc
 
         (pc, sp) = try invoke(
@@ -74,7 +74,7 @@ extension Execution {
         pc: inout Pc,
         callee: InternalFunction,
         internalCallOperand: Instruction.CallOperand
-    ) throws {
+    ) throws(Trap) {
         // The callee is known to be a function defined within the same module, so we can
         // skip updating the current instance.
         let (iseq, locals, instance) = internalCallOperand.callee.assumeCompiled()
@@ -89,7 +89,7 @@ extension Execution {
     }
 
     @inline(__always)
-    mutating func internalCall(sp: inout Sp, pc: Pc, immediate: Instruction.CallOperand) throws -> (Pc, CodeSlot) {
+    mutating func internalCall(sp: inout Sp, pc: Pc, immediate: Instruction.CallOperand) throws(Trap) -> (Pc, CodeSlot) {
         var pc = pc
         let callee = immediate.callee
         try _internalCall(sp: &sp, pc: &pc, callee: callee, internalCallOperand: immediate)
@@ -97,7 +97,7 @@ extension Execution {
     }
 
     @inline(__always)
-    mutating func compilingCall(sp: inout Sp, pc: Pc, immediate: Instruction.CallOperand) throws -> (Pc, CodeSlot) {
+    mutating func compilingCall(sp: inout Sp, pc: Pc, immediate: Instruction.CallOperand) throws(Trap) -> (Pc, CodeSlot) {
         var pc = pc
         // NOTE: `CompilingCallOperand` consumes 2 slots, discriminator is at -3
         let headSlotPc = pc.advanced(by: -3)
@@ -137,7 +137,7 @@ extension Execution {
     }
 
     @inline(__always)
-    mutating func callIndirect(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.CallIndirectOperand) throws -> (Pc, CodeSlot) {
+    mutating func callIndirect(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.CallIndirectOperand) throws(Trap) -> (Pc, CodeSlot) {
         var pc = pc
         let (function, callerInstance) = try prepareForIndirectCall(
             sp: sp, tableIndex: immediate.tableIndex, expectedType: immediate.type,
@@ -152,7 +152,7 @@ extension Execution {
         return pc.next()
     }
 
-    mutating func returnCall(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.ReturnCallOperand) throws -> (Pc, CodeSlot) {
+    mutating func returnCall(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.ReturnCallOperand) throws(Trap) -> (Pc, CodeSlot) {
         var pc = pc
         (pc, sp) = try tailInvoke(
             function: immediate.callee,
@@ -162,7 +162,7 @@ extension Execution {
         return pc.next()
     }
 
-    mutating func returnCallIndirect(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.ReturnCallIndirectOperand) throws -> (Pc, CodeSlot) {
+    mutating func returnCallIndirect(sp: inout Sp, pc: Pc, md: inout Md, ms: inout Ms, immediate: Instruction.ReturnCallIndirectOperand) throws(Trap) -> (Pc, CodeSlot) {
         var pc = pc
         let (function, callerInstance) = try prepareForIndirectCall(
             sp: sp, tableIndex: immediate.tableIndex, expectedType: immediate.type,
@@ -176,7 +176,7 @@ extension Execution {
         return pc.next()
     }
 
-    mutating func resizeFrameHeader(sp: inout Sp, immediate: Instruction.ResizeFrameHeaderOperand) throws {
+    mutating func resizeFrameHeader(sp: inout Sp, immediate: Instruction.ResizeFrameHeaderOperand) throws(Trap) {
         // The params/results space are resized by `delta` slots and the rest of the
         // frame is copied to the new location. See the following diagram for the
         // layout of the frame before and after the resize operation:
@@ -224,7 +224,7 @@ extension Execution {
         )
     }
 
-    mutating func breakpoint(sp: inout Sp, pc: Pc) throws -> (Pc, CodeSlot) {
+    mutating func breakpoint(sp: inout Sp, pc: Pc) throws(Breakpoint) -> (Pc, CodeSlot) {
         throw Breakpoint(
             sp: sp,
             // Throw `pc` value before the breakpoint was triggered to allow resumption in same place

@@ -70,7 +70,7 @@ struct HostFunctionEntity {
 
 extension Store {
     @available(*, unavailable, message: "Use ``Imports/define(_:as:)`` instead. Or use ``Runtime/register(_:as:)`` as a temporary drop-in replacement.")
-    public func register(_ instance: Instance, as name: String) throws {}
+    public func register(_ instance: Instance, as name: String) throws(Trap) {}
 
     /// Register the given host module in this store with the given name.
     ///
@@ -78,7 +78,7 @@ extension Store {
     ///   - hostModule: A host module to register.
     ///   - name: A name to register the given host module.
     @available(*, unavailable, message: "Use ``Imports/define(_:as:)`` instead. Or use ``Runtime/register(_:as:)`` as a temporary drop-in replacement.")
-    public func register(_ hostModule: HostModule, as name: String, runtime: Any) throws {}
+    public func register(_ hostModule: HostModule, as name: String, runtime: Any) throws(Trap) {}
 
     @available(*, deprecated, message: "Address-based APIs has been removed; use Memory instead")
     public func memory(at address: Memory) -> Memory {
@@ -86,7 +86,7 @@ extension Store {
     }
 
     @available(*, deprecated, message: "Address-based APIs has been removed; use Memory instead")
-    public func withMemory<T>(at address: Memory, _ body: (Memory) throws -> T) rethrows -> T {
+    public func withMemory<T, E: Error>(at address: Memory, _ body: (Memory) throws(E) -> T) throws(E) -> T {
         try body(address)
     }
 }

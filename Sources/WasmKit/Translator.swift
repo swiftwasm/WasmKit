@@ -248,7 +248,7 @@ struct StackLayout {
         return VReg(numberOfLocals + constantSlotSize)
     }
 
-    init(type: FunctionType, numberOfLocals: Int, codeSize: Int) throws {
+    init(type: FunctionType, numberOfLocals: Int, codeSize: Int) throws(TranslationError) {
         self.frameHeader = FrameHeaderLayout(type: type)
         self.numberOfLocals = numberOfLocals
         // The number of constant slots is determined by the code size
@@ -870,18 +870,22 @@ struct InstructionTranslator: InstructionVisitor {
         functionIndex: FunctionIndex,
         codeSize: Int,
         isIntercepting: Bool
-    ) throws {
+    ) throws(InstructionTranslatorError) {
         self.allocator = allocator
         self.funcTypeInterner = funcTypeInterner
         self.type = type
         self.module = module
         self.iseqBuilder = ISeqBuilder(engineConfiguration: engineConfiguration)
         self.controlStack = ControlStack()
-        self.stackLayout = try StackLayout(
-            type: type,
-            numberOfLocals: locals.count,
-            codeSize: codeSize
-        )
+        do {
+            self.stackLayout = try StackLayout(
+                type: type,
+                numberOfLocals: locals.count,
+                codeSize: codeSize
+            )
+        } catch {
+            throw InstructionTranslatorError.translation(error)
+        }
         self.valueStack = ValueStack(stackLayout: stackLayout)
         self.locals = Locals(types: type.parameters + locals)
         self.functionIndex = functionIndex
@@ -1318,7 +1322,7 @@ struct InstructionTranslator: InstructionVisitor {
         destination: ControlStack.ControlFrame,
         currentFrame: ControlStack.ControlFrame,
         currentHeight: Int
-    ) throws -> UInt32 {
+    ) throws(ValidationError) -> UInt32 {
         let popCount: UInt32
         if _fastPath(currentFrame.reachable) {
             let count = currentHeight - Int(destination.copyCount) - destination.stackHeight
@@ -1338,22 +1342,29 @@ struct InstructionTranslator: InstructionVisitor {
         _ makeInstruction: @escaping (Immediate) -> Instruction,
         relativeDepth: UInt32,
         make: @escaping (_ offset: Int32, _ copyCount: UInt32, _ popCount: UInt32) -> Immediate
-    ) throws {
-        let frame = try controlStack.branchTarget(relativeDepth: relativeDepth)
-        let copyCount = frame.copyCount
-        let popCount = try Self.computePopCount(
-            destination: frame,
-            currentFrame: try controlStack.currentFrame(),
-            currentHeight: valueStack.height
-        )
+    ) throws(InstructionTranslatorError) {
+        let frame: InstructionTranslator.ControlStack.ControlFrame
+        let copyCount: UInt16
+        let popCount: UInt32
+        do {
+            frame = try controlStack.branchTarget(relativeDepth: relativeDepth)
+            copyCount = frame.copyCount
+            popCount = try Self.computePopCount(
+                destination: frame,
+                currentFrame: try controlStack.currentFrame(),
+                currentHeight: valueStack.height
+            )
+        } catch {
+            throw InstructionTranslatorError.validation(error)
+        }
 
         self.updateInstructionMapping()
         iseqBuilder.emitWithLabel(makeInstruction, frame.continuation) { _, selfPC, continuation in
             let relativeOffset = continuation.offsetFromHead - selfPC.offsetFromHead
             return make(Int32(relativeOffset), UInt32(copyCount), popCount)
-        }
+        }`
     }
-    mutating func visitBr(relativeDepth: UInt32) throws -> Output {
+    mutating func visitBr(relativeDepth: UInt32) throws(InstructionTranslatorError) -> Output {
         let frame = try controlStack.branchTarget(relativeDepth: relativeDepth)
 
         // Copy from the stack top to the bottom to avoid overwrites
@@ -1374,8 +1385,13 @@ struct InstructionTranslator: InstructionVisitor {
         try markUnreachable()
     }
 
-    mutating func visitBrIf(relativeDepth: UInt32) throws -> Output {
-        let frame = try controlStack.branchTarget(relativeDepth: relativeDepth)
+    mutating func visitBrIf(relativeDepth: UInt32) throws(InstructionTranslatorError) -> Output {
+        let frame: InstructionTranslator.ControlStack.ControlFrame
+        do {
+            frame = try controlStack.branchTarget(relativeDepth: relativeDepth)            
+        } catch {
+            throw InstructionTranslatorError.validation(error)
+        } = try controlStack.branchTarget(relativeDepth: relativeDepth)
         let condition = try popVRegOperand(.i32)
 
         if frame.copyCount == 0 {
@@ -2013,7 +2029,7 @@ struct InstructionTranslator: InstructionVisitor {
     private mutating func visitCmp(_ operand: ValueType, _ instruction: @escaping (Instruction.BinaryOperand) -> Instruction) throws {
         try visitBinary(operand, .i32, instruction)
     }
-    private mutating func visitConversion(_ from: ValueType, _ to: ValueType, _ instruction: @escaping (Instruction.UnaryOperand) -> Instruction) throws {
+    private mutating func visitConversion(_ from: ValueType, _ to: ValueType, _ instruction: @escaping (Instruction.UnaryOperand) -> Instruction) throws(InstructionTranslatorError) {
         try popPushEmit(from, to) { value, result in
             return instruction(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
@@ -2151,7 +2167,7 @@ struct InstructionTranslator: InstructionVisitor {
         }
         try visitUnary(operand, instruction)
     }
-    mutating func visitConversion(_ conversion: WasmParser.Instruction.Conversion) throws {
+    mutating func visitConversion(_ conversion: WasmParser.Instruction.Conversion) throws(InstructionTranslatorError) {
         let from: ValueType
         let to: ValueType
         let instruction: (Instruction.UnaryOperand) -> Instruction

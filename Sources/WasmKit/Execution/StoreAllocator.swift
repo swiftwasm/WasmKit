@@ -100,7 +100,7 @@ struct ImmutableArray<T> {
     ///   - allocator: An allocator to allocate the buffer. The returned array should not outlive the allocator.
     ///   - count: The number of elements in the array.
     ///   - initialize: A closure to initialize the buffer.
-    fileprivate init(allocator: ImmutableArrayAllocator, count: Int, initialize: (UnsafeMutableBufferPointer<T>) throws -> Void) rethrows {
+    fileprivate init<E: Error>(allocator: ImmutableArrayAllocator, count: Int, initialize: (UnsafeMutableBufferPointer<T>) throws(E) -> Void) throws(E) {
         let mutable: UnsafeMutableBufferPointer<T> = allocator.allocate(count: count)
         try initialize(mutable)
         buffer = UnsafeBufferPointer(mutable)
@@ -254,7 +254,7 @@ extension StoreAllocator {
         resourceLimiter: RL,
         imports: Imports,
         isDebuggable: Bool
-    ) throws -> InternalInstance {
+    ) throws(ImportError) -> InternalInstance {
         // Step 1 of module allocation algorithm, according to Wasm 2.0 spec.
 
         let types = module.types
@@ -277,7 +277,7 @@ extension StoreAllocator {
             case (.function(let typeIndex), .function(let externalFunc)):
                 let type = externalFunc.type
                 guard typeIndex < module.types.count else {
-                    throw ValidationError(.indexOutOfBounds("type", typeIndex, max: module.types.count))
+                    throw ImportError(.invalidTypeIndex(typeIndex, max: module.types.count))
                 }
                 let expected = module.types[Int(typeIndex)]
                 guard engine.internType(expected) == type else {
@@ -310,11 +310,11 @@ extension StoreAllocator {
             }
         }
 
-        func allocateEntities<EntityHandle, Internals: Collection>(
+        func allocateEntities<EntityHandle, Internals: Collection, E: Error>(
             imports: [EntityHandle],
-            internals: Internals, allocateHandle: (Internals.Element, Int) throws -> EntityHandle
-        ) rethrows -> ImmutableArray<EntityHandle> {
-            return try ImmutableArray<EntityHandle>(allocator: arrayAllocator, count: imports.count + internals.count) { buffer in
+            internals: Internals, allocateHandle: (Internals.Element, Int) throws(E) -> EntityHandle
+        ) throws(E) -> ImmutableArray<EntityHandle> {
+            return try ImmutableArray<EntityHandle>(allocator: arrayAllocator, count: imports.count + internals.count) { (buffer: UnsafeMutableBufferPointer<EntityHandle>) throws(E) in
                 for (index, importedEntity) in imports.enumerated() {
                     buffer.initializeElement(at: index, to: importedEntity)
                 }
@@ -353,14 +353,26 @@ extension StoreAllocator {
         let tables = try allocateEntities(
             imports: importedTables,
             internals: module.internalTables,
-            allocateHandle: { t, _ in try allocate(tableType: t, resourceLimiter: resourceLimiter) }
+            allocateHandle: { (t: TableType, _: Int) throws(ImportError) -> InternalTable in
+                do throws(Trap) {
+                    return try allocate(tableType: t, resourceLimiter: resourceLimiter)
+                } catch {
+                    throw ImportError(error)
+                }
+            }
         )
 
         // Step 4.
         let memories = try allocateEntities(
             imports: importedMemories,
             internals: module.internalMemories,
-            allocateHandle: { m, _ in try allocate(memoryType: m, resourceLimiter: resourceLimiter) }
+            allocateHandle: { (m: MemoryType, _: Int) throws(ImportError) -> InternalMemory in
+                do throws(Trap) {
+                    return try allocate(memoryType: m, resourceLimiter: resourceLimiter)
+                } catch {
+                    throw ImportError(error)
+                }
+            }
         )
 
         var functionRefs: Set<InternalFunction> = []
@@ -376,28 +388,37 @@ extension StoreAllocator {
         let globals = try allocateEntities(
             imports: importedGlobals,
             internals: module.globals,
-            allocateHandle: { global, _ in
-                let initialValue = try global.initializer.evaluate(
-                    context: constEvalContext, expectedType: global.type.valueType
-                )
-                return try allocate(globalType: global.type, initialValue: initialValue)
+            allocateHandle: { (global: WasmParser.Global, _: Int) throws(ImportError) -> InternalGlobal in
+                do throws(ValidationError) {
+                    let initialValue = try global.initializer.evaluate(
+                        context: constEvalContext, expectedType: global.type.valueType
+                    )
+                    return try allocate(globalType: global.type, initialValue: initialValue)
+                } catch {
+                    throw ImportError(error)
+                }
             }
         )
 
         // Step 6.
-        let elements = try ImmutableArray<InternalElementSegment>(allocator: arrayAllocator, count: module.elements.count) { buffer in
-            for (index, element) in module.elements.enumerated() {
-                // TODO: Avoid evaluating element expr twice in `Module.instantiate` and here.
-                var references = try element.evaluateInits(context: constEvalContext)
-                switch element.mode {
-                case .active, .declarative:
-                    // active & declarative segments are unavailable at runtime
-                    references = []
-                case .passive: break
+        let elements: ImmutableArray<InternalElementSegment>
+        do {
+            elements = try ImmutableArray<InternalElementSegment>(allocator: arrayAllocator, count: module.elements.count) { (buffer: UnsafeMutableBufferPointer<InternalElementSegment>) throws(ValidationError) in
+                for (index, element) in module.elements.enumerated() {
+                    // TODO: Avoid evaluating element expr twice in `Module.instantiate` and here.
+                    var references = try element.evaluateInits(context: constEvalContext)
+                    switch element.mode {
+                    case .active, .declarative:
+                        // active & declarative segments are unavailable at runtime
+                        references = []
+                    case .passive: break
+                    }
+                    let handle = allocate(elementType: element.type, references: references)
+                    buffer.initializeElement(at: index, to: handle)
                 }
-                let handle = allocate(elementType: element.type, references: references)
-                buffer.initializeElement(at: index, to: handle)
             }
+        } catch {
+            throw ImportError(error)
         }
 
         // Step 13.

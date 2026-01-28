@@ -4,7 +4,7 @@
 import WasmParser
 
 extension Execution {
-    mutating func tableGet(sp: Sp, immediate: Instruction.TableGetOperand) throws {
+    mutating func tableGet(sp: Sp, immediate: Instruction.TableGetOperand) throws(Trap) {
         let table = getTable(immediate.tableIndex, sp: sp, store: store.value)
 
         let elementIndex = try getElementIndex(sp: sp, VReg(immediate.index), table)
@@ -12,7 +12,7 @@ extension Execution {
         let reference = table.elements[Int(elementIndex)]
         sp[immediate.result] = UntypedValue(.ref(reference))
     }
-    mutating func tableSet(sp: Sp, immediate: Instruction.TableSetOperand) throws {
+    mutating func tableSet(sp: Sp, immediate: Instruction.TableSetOperand) throws(Trap) {
         let table = getTable(immediate.tableIndex, sp: sp, store: store.value)
 
         let reference = sp.getReference(VReg(immediate.value), type: table.tableType)
@@ -24,6 +24,25 @@ extension Execution {
         let elementsCount = table.elements.count
         sp[immediate.result] = UntypedValue(table.limits.isMemory64 ? .i64(UInt64(elementsCount)) : .i32(UInt32(elementsCount)))
     }
+    #if $Embedded
+    // In Embedded mode, DefaultResourceLimiter throws Never, so the closure doesn't actually throw
+    mutating func tableGrow(sp: Sp, immediate: Instruction.TableGrowOperand) throws(Trap) {
+        let table = getTable(immediate.tableIndex, sp: sp, store: store.value)
+
+        let growthSize = sp[immediate.delta].asAddressOffset(table.limits.isMemory64)
+        let growthValue = sp.getReference(VReg(immediate.value), type: table.tableType)
+
+        let oldSize = table.elements.count
+        // DefaultResourceLimiter.limitTableGrowth throws Never, so try never actually throws
+        guard table.withValue({ (t: inout TableEntity) throws(Never) -> Bool in
+            try t.grow(by: growthSize, value: growthValue, resourceLimiter: store.value.resourceLimiter)
+        }) else {
+            sp[immediate.result] = UntypedValue(.i32(Int32(-1).unsigned))
+            return
+        }
+        sp[immediate.result] = UntypedValue(table.limits.isMemory64 ? .i64(UInt64(oldSize)) : .i32(UInt32(oldSize)))
+    }
+    #else
     mutating func tableGrow(sp: Sp, immediate: Instruction.TableGrowOperand) throws {
         let table = getTable(immediate.tableIndex, sp: sp, store: store.value)
 
@@ -37,15 +56,18 @@ extension Execution {
         }
         sp[immediate.result] = UntypedValue(table.limits.isMemory64 ? .i64(UInt64(oldSize)) : .i32(UInt32(oldSize)))
     }
-    mutating func tableFill(sp: Sp, immediate: Instruction.TableFillOperand) throws {
+    #endif
+    mutating func tableFill(sp: Sp, immediate: Instruction.TableFillOperand) throws(Trap) {
         let table = getTable(immediate.tableIndex, sp: sp, store: store.value)
         let fillCounter = sp[immediate.size].asAddressOffset(table.limits.isMemory64)
         let fillValue = sp.getReference(immediate.value, type: table.tableType)
         let startIndex = sp[immediate.destOffset].asAddressOffset(table.limits.isMemory64)
 
-        try table.withValue { try $0.fill(repeating: fillValue, from: Int(startIndex), count: Int(fillCounter)) }
+        try table.withValue { (t: inout TableEntity) throws(Trap) in
+            try t.fill(repeating: fillValue, from: Int(startIndex), count: Int(fillCounter))
+        }
     }
-    mutating func tableCopy(sp: Sp, immediate: Instruction.TableCopyOperand) throws {
+    mutating func tableCopy(sp: Sp, immediate: Instruction.TableCopyOperand) throws(Trap) {
         let sourceTableIndex = immediate.sourceIndex
         let destinationTableIndex = immediate.destIndex
         let store = self.store.value
@@ -60,7 +82,7 @@ extension Execution {
 
         try destinationTable.copy(sourceTable, from: Int(sourceIndex), to: Int(destinationIndex), count: Int(size))
     }
-    mutating func tableInit(sp: Sp, immediate: Instruction.TableInitOperand) throws {
+    mutating func tableInit(sp: Sp, immediate: Instruction.TableInitOperand) throws(Trap) {
         let tableIndex = immediate.tableIndex
         let segmentIndex = immediate.segmentIndex
         let destinationTable = getTable(tableIndex, sp: sp, store: store.value)
@@ -70,8 +92,8 @@ extension Execution {
         let sourceIndex = UInt64(sp[immediate.sourceOffset].i32)
         let destinationIndex = sp[immediate.destOffset].asAddressOffset(destinationTable.limits.isMemory64)
 
-        try destinationTable.withValue {
-            try $0.initialize(
+        try destinationTable.withValue { (t: inout TableEntity) throws(Trap) in
+            try t.initialize(
                 sourceElement,
                 from: Int(sourceIndex), to: Int(destinationIndex),
                 count: Int(copyCounter)

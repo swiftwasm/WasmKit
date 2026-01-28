@@ -4,7 +4,7 @@ public enum CanonicalLowering {
     /// The pointer points to a guest memory region that contains the encoded string value.
     public static func lowerString(
         _ value: String, context: CanonicalCallContext
-    ) throws -> (pointer: UInt32, length: UInt32) {
+    ) throws(CanonicalABIError) -> (pointer: UInt32, length: UInt32) {
         guard context.options.stringEncoding == .utf8 else {
             throw CanonicalABIError(description: "Unsupported string encoding: \(context.options.stringEncoding)")
         }
@@ -29,9 +29,9 @@ public enum CanonicalLowering {
     /// - Returns: A pair of a pointer and a length.
     public static func lowerList<Element>(
         _ value: [Element], elementSize: UInt32, elementAlignment: UInt32,
-        storeElement: (Element, UnsafeGuestRawPointer) throws -> Void,
+        storeElement: (Element, UnsafeGuestRawPointer) throws(CanonicalABIError) -> Void,
         context: CanonicalCallContext
-    ) throws -> (pointer: UInt32, length: UInt32) {
+    ) throws(CanonicalABIError) -> (pointer: UInt32, length: UInt32) {
         let byteLength = UInt32(value.count) * elementSize
         let newBuffer = try context.realloc(
             old: 0, oldSize: 0, oldAlign: elementAlignment, newSize: byteLength

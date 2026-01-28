@@ -170,7 +170,7 @@ package struct InstanceEntity /* : ~Copyable */ {
         )
     }
 
-    package func compileAllFunctions(store: Store) throws {
+    package func compileAllFunctions(store: Store) throws(Trap) {
         let store = StoreRef(store)
         for function in functions {
             guard function.isWasm else { continue }
@@ -388,11 +388,11 @@ struct TableEntity /* : ~Copyable */ {
         return true
     }
 
-    mutating func initialize(_ segment: InternalElementSegment, from source: Int, to destination: Int, count: Int) throws {
+    mutating func initialize(_ segment: InternalElementSegment, from source: Int, to destination: Int, count: Int) throws(Trap){
         try self.initialize(segment.references, from: source, to: destination, count: count)
     }
 
-    mutating func initialize(_ references: [Reference], from source: Int, to destination: Int, count: Int) throws {
+    mutating func initialize(_ references: [Reference], from source: Int, to destination: Int, count: Int) throws(Trap) {
         let (destinationEnd, destinationOverflow) = destination.addingReportingOverflow(count)
         let (sourceEnd, sourceOverflow) = source.addingReportingOverflow(count)
 
@@ -410,7 +410,7 @@ struct TableEntity /* : ~Copyable */ {
         }
     }
 
-    mutating func fill(repeating value: Reference, from index: Int, count: Int) throws {
+    mutating func fill(repeating value: Reference, from index: Int, count: Int) throws(Trap) {
         let (end, overflow) = index.addingReportingOverflow(count)
         guard !overflow, end <= elements.count else { throw Trap(.tableOutOfBounds(end)) }
 
@@ -423,7 +423,7 @@ struct TableEntity /* : ~Copyable */ {
         _ sourceTable: UnsafeBufferPointer<Reference>,
         _ destinationTable: UnsafeMutableBufferPointer<Reference>,
         from source: Int, to destination: Int, count: Int
-    ) throws {
+    ) throws(Trap) {
         let (destinationEnd, destinationOverflow) = destination.addingReportingOverflow(count)
         let (sourceEnd, sourceOverflow) = source.addingReportingOverflow(count)
 
@@ -454,20 +454,20 @@ extension TableEntity: ValidatableEntity {
 typealias InternalTable = EntityHandle<TableEntity>
 
 extension InternalTable {
-    func copy(_ sourceTable: InternalTable, from source: Int, to destination: Int, count: Int) throws {
+    func copy(_ sourceTable: InternalTable, from source: Int, to destination: Int, count: Int) throws(Trap) {
         // Check if the source and destination tables are the same for dynamic exclusive
         // access enforcement
         if self == sourceTable {
-            try withValue {
-                try $0.elements.withUnsafeMutableBufferPointer {
-                    try TableEntity.copy(UnsafeBufferPointer($0), $0, from: source, to: destination, count: count)
+            try withValue { (table: inout TableEntity) throws(Trap) -> Void in
+                try table.elements.withUnsafeMutableBufferPointer { (buffer: inout UnsafeMutableBufferPointer<Reference>) throws(Trap) -> Void in
+                    try TableEntity.copy(UnsafeBufferPointer(buffer), buffer, from: source, to: destination, count: count)
                 }
             }
         } else {
-            try withValue { destinationTable in
-                try sourceTable.withValue { sourceTable in
-                    try destinationTable.elements.withUnsafeMutableBufferPointer { dest in
-                        try sourceTable.elements.withUnsafeBufferPointer { src in
+            try withValue { (destinationTable: inout TableEntity) throws(Trap) -> Void in
+                try sourceTable.withValue { (sourceTable: inout TableEntity) throws(Trap) -> Void in
+                    try destinationTable.elements.withUnsafeMutableBufferPointer { (dest: inout UnsafeMutableBufferPointer<Reference>) throws(Trap) -> Void in
+                        try sourceTable.elements.withUnsafeBufferPointer { (src: UnsafeBufferPointer<Reference>) throws(Trap) -> Void in
                             try TableEntity.copy(src, dest, from: source, to: destination, count: count)
                         }
                     }
@@ -508,7 +508,7 @@ public struct Table: Equatable {
     /// let imports: Imports = ["env": ["table": table]]
     /// let instance = try module.instantiate(store: store, imports: imports)
     /// ```
-    public init(store: Store, type: TableType) throws {
+    public init(store: Store, type: TableType) throws(Trap) {
         self.init(
             handle: try store.allocator.allocate(tableType: type, resourceLimiter: store.resourceLimiter),
             allocator: store.allocator
@@ -809,8 +809,8 @@ public struct Global: Equatable {
     ///
     /// - Parameter value: The new value to assign.
     /// - Throws: `Trap` if the global is immutable.
-    public func assign(_ value: Value) throws {
-        try handle.withValue { global in
+    public func assign(_ value: Value) throws(Trap) {
+        try handle.withValue { (global: inout GlobalEntity) throws(Trap) in
             guard global.globalType.mutability == .variable else {
                 throw Trap(.cannotAssignToImmutableGlobal)
             }
@@ -854,7 +854,7 @@ public struct Global: Equatable {
     /// let imports: Imports = ["env": ["i32-global": i32Global]]
     /// let instance = try module.instantiate(store: store, imports: imports)
     /// ```
-    public init(store: Store, type: GlobalType, value: Value) throws {
+    public init(store: Store, type: GlobalType, value: Value) throws(ValidationError) {
         let handle = try store.allocator.allocate(globalType: type, initialValue: value)
         self.init(handle: handle, allocator: store.allocator)
     }

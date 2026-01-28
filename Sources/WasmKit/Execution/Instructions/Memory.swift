@@ -47,7 +47,7 @@ extension Execution {
 
     #if $Embedded
     // In Embedded mode, DefaultResourceLimiter throws Never, so this function doesn't throw
-    mutating func memoryGrow(sp: Sp, md: inout Md, ms: inout Ms, immediate: Instruction.MemoryGrowOperand) {
+    mutating func memoryGrow(sp: Sp, md: inout Md, ms: inout Ms, immediate: Instruction.MemoryGrowOperand) throws(Trap) {
         let memory = currentInstance(sp: sp).memories[Int(immediate.memory)]
         memory.withValue { (memory: inout MemoryEntity) throws(Never) in
             let isMemory64 = memory.limit.isMemory64

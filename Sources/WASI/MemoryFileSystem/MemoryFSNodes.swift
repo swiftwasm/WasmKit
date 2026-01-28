@@ -305,4 +305,4 @@ final class MemoryCharacterDeviceEntry: WASIFile {
         throw WASIAbi.Errno.ESPIPE
     }
 }
-#enidf
+#endif

@@ -11,9 +11,9 @@ public enum CanonicalLifting {
     /// - Returns: A lifted Swift Array value with the given element type.
     public static func liftList<Element>(
         pointer: UInt32, length: UInt32, elementSize: UInt32,
-        loadElement: (UnsafeGuestRawPointer) throws -> Element,
+        loadElement: (UnsafeGuestRawPointer) throws(CanonicalABIError) -> Element,
         context: CanonicalCallContext
-    ) throws -> [Element] {
+    ) throws(CanonicalABIError) -> [Element] {
         var elements = [Element]()
         elements.reserveCapacity(Int(elementSize))
         let guestPointer = UnsafeGuestRawPointer(memorySpace: context.guestMemory, offset: pointer)

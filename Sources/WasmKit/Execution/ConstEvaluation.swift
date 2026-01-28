@@ -1,8 +1,8 @@
 import WasmParser
 
 protocol ConstEvaluationContextProtocol {
-    func functionRef(_ index: FunctionIndex) throws -> Reference
-    func globalValue(_ index: GlobalIndex) throws -> Value
+    func functionRef(_ index: FunctionIndex) throws(ValidationError) -> Reference
+    func globalValue(_ index: GlobalIndex) throws(ValidationError) -> Value
 }
 
 struct ConstEvaluationContext: ConstEvaluationContextProtocol {
@@ -28,12 +28,12 @@ struct ConstEvaluationContext: ConstEvaluationContextProtocol {
         self.init(functions: instance.functions, globals: Array(externalGlobals))
     }
 
-    func functionRef(_ index: FunctionIndex) throws -> Reference {
+    func functionRef(_ index: FunctionIndex) throws(ValidationError) -> Reference {
         let function = try self.functions[validating: Int(index)]
         self.onFunctionReferenced?(function)
         return .function(from: function)
     }
-    func globalValue(_ index: GlobalIndex) throws -> Value {
+    func globalValue(_ index: GlobalIndex) throws(ValidationError) -> Value {
         guard index < globals.count else {
             throw GlobalEntity.createOutOfBoundsError(index: Int(index), count: globals.count)
         }
@@ -42,13 +42,13 @@ struct ConstEvaluationContext: ConstEvaluationContextProtocol {
 }
 
 extension ConstExpression {
-    func evaluate<C: ConstEvaluationContextProtocol>(context: C, expectedType: WasmTypes.ValueType) throws -> Value {
+    func evaluate<C: ConstEvaluationContextProtocol>(context: C, expectedType: WasmTypes.ValueType) throws(ValidationError) -> Value {
         let result = try self._evaluate(context: context)
         try result.checkType(expectedType)
         return result
     }
 
-    private func _evaluate<C: ConstEvaluationContextProtocol>(context: C) throws -> Value {
+    private func _evaluate<C: ConstEvaluationContextProtocol>(context: C) throws(ValidationError) -> Value {
         guard self.last == .end, self.count == 2 else {
             throw ValidationError(.expectedEndAtOffsetExpression)
         }
@@ -76,8 +76,8 @@ extension ConstExpression {
 }
 
 extension WasmParser.ElementSegment {
-    func evaluateInits<C: ConstEvaluationContextProtocol>(context: C) throws -> [Reference] {
-        return try self.initializer.map { expression -> Reference in
+    func evaluateInits<C: ConstEvaluationContextProtocol>(context: C) throws(ValidationError) -> [Reference] {
+        return try self.initializer.map { expression throws(ValidationError) -> Reference in
             let result = try Self._evaluateInits(context: context, expression: expression)
             try result.checkType(self.type)
             return result
@@ -85,7 +85,7 @@ extension WasmParser.ElementSegment {
     }
     static func _evaluateInits<C: ConstEvaluationContextProtocol>(
         context: C, expression: ConstExpression
-    ) throws -> Reference {
+    ) throws(ValidationError) -> Reference {
         switch expression[0] {
         case .refFunc(let index):
             return try context.functionRef(index)

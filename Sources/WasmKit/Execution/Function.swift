@@ -240,7 +240,7 @@ struct WasmFunctionEntity {
         self.index = index
     }
 
-    mutating func ensureCompiled(store: StoreRef) throws -> InstructionSequence {
+    mutating func ensureCompiled(store: StoreRef) throws(InstructionTranslatorError) -> InstructionSequence {
         switch code {
         case .uncompiled(let code):
             return try compile(store: store, code: code)
@@ -250,7 +250,7 @@ struct WasmFunctionEntity {
     }
 
     @inline(never)
-    mutating func compile(store: StoreRef, code: InternalUncompiledCode) throws -> InstructionSequence {
+    mutating func compile(store: StoreRef, code: InternalUncompiledCode) throws(InstructionTranslatorError) -> InstructionSequence {
         let store = store.value
         let engine = store.engine
         let type = self.type
@@ -265,7 +265,7 @@ struct WasmFunctionEntity {
             codeSize: code.expression.count,
             isIntercepting: engine.interceptor != nil
         )
-        let iseq = try code.withValue { code in
+        let iseq = try code.withValue { (code: inout Code) throws(InstructionTranslatorError) in
             try translator.translate(code: code)
         }
         self.code = .compiled(iseq)
@@ -276,17 +276,29 @@ struct WasmFunctionEntity {
 extension EntityHandle<WasmFunctionEntity> {
     @inline(never)
     @discardableResult
-    func ensureCompiled(store: StoreRef) throws -> InstructionSequence {
+    func ensureCompiled(store: StoreRef) throws(Trap) -> InstructionSequence {
         switch self.code {
         case .uncompiled(let code):
-            return try self.withValue {
-                let iseq = try $0.compile(store: store, code: code)
-                if $0.instance.isDebuggable {
-                    $0.code = .debuggable(code, iseq)
-                } else {
-                    $0.code = .compiled(iseq)
+            do {
+                return try self.withValue { (entity: inout WasmFunctionEntity) throws(InstructionTranslatorError) in
+                    let iseq = try entity.compile(store: store, code: code)
+                    if entity.instance.isDebuggable {
+                        entity.code = .debuggable(code, iseq)
+                    } else {
+                        entity.code = .compiled(iseq)
+                    }
+                    return iseq
                 }
-                return iseq
+            } catch {
+                // Convert InstructionTranslatorError to Trap
+                switch error {
+                case .translation(let translationError):
+                    throw Trap(.message(.init("Translation error: \(translationError)")))
+                case .validation(let validationError):
+                    throw Trap(.validationError(validationError))
+                case .wasmParserError(let parserError):
+                    throw Trap(.message(.init("Parser error: \(parserError)")))
+                }
             }
         case .compiled(let iseq), .debuggable(_, let iseq):
             return iseq

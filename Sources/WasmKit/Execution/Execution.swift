@@ -112,7 +112,7 @@ struct Execution: ~Copyable {
         numberOfNonParameterLocals: Int,
         sp: Sp, returnPC: Pc,
         spAddend: VReg
-    ) throws -> Sp {
+    ) throws(Trap) -> Sp {
         let newSp = sp.advanced(by: Int(spAddend))
         try checkStackBoundary(newSp.advanced(by: iseq.maxStackHeight))
         initializeConstSlots(sp: newSp, iseq: iseq, numberOfNonParameterLocals: numberOfNonParameterLocals)
@@ -426,13 +426,26 @@ extension Execution {
         let pc: Pc
     }
 
+    /// A unified error type for instruction dispatch in Embedded Swift.
+    /// This type wraps the different specific error types that can occur during execution.
+    enum ExecutionError: Error {
+        case trap(Trap)
+        case endOfExecution(sp: Sp)
+        case breakpoint(sp: Sp, pc: Pc)
+
+        @inline(__always)
+        init(_ trap: Trap) {
+            self = .trap(trap)
+        }
+    }
+
     /// The entry point for the execution of the WebAssembly function.
     @inline(never)
     mutating func execute(
         sp: Sp, pc: Pc,
         handle: InternalFunction,
         type: FunctionType
-    ) throws {
+    ) throws(Trap) {
         var sp: Sp = sp
         var md: Md = nil
         var ms: Ms = 0
@@ -443,6 +456,20 @@ extension Execution {
             spAddend: FrameHeaderLayout.size(of: type),
             sp: sp, pc: pc, md: &md, ms: &ms
         )
+        #if $Embedded
+        do {
+            try runTokenThreaded(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        } catch {
+            switch error {
+            case .endOfExecution:
+                return
+            case .trap(let trap):
+                throw trap
+            case .breakpoint:
+                fatalError("Breakpoints are not supported in Embedded Swift")
+            }
+        }
+        #else
         do {
             switch self.store.value.engine.configuration.threadingModel {
             case .direct:
@@ -452,11 +479,22 @@ extension Execution {
             }
         } catch is EndOfExecution {
             return
+        } catch let executionError as ExecutionError {
+            switch executionError {
+            case .endOfExecution:
+                return
+            case .trap(let trap):
+                throw trap
+            case .breakpoint:
+                fatalError("Breakpoints should be handled by debugger")
+            }
         }
+        #endif
     }
 
     /// Starts the main execution loop using the direct threading model.
     @inline(never)
+    @_unavailableInEmbedded
     mutating func runDirectThreaded(
         sp: Sp, pc: Pc, md: Md, ms: Ms
     ) throws {
@@ -549,12 +587,17 @@ extension Execution {
     /// Starts the main execution loop using the token threading model.
     /// Be careful when modifying this function as it is performance-critical.
     @inline(__always)
-    mutating func runTokenThreaded(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
+    mutating func runTokenThreaded(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws(ExecutionError) {
         #if EngineStats
             var stats = StatsCollector()
             defer { stats.dump() }
         #endif
         var opcode = pc.read(OpcodeID.self)
+        #if $Embedded
+        while true {
+            opcode = try doExecute(opcode, sp: &sp, pc: &pc, md: &md, ms: &ms)
+        }
+        #else
         do {
             while true {
                 #if EngineStats
@@ -562,9 +605,17 @@ extension Execution {
                 #endif
                 opcode = try doExecute(opcode, sp: &sp, pc: &pc, md: &md, ms: &ms)
             }
-        } catch let trap as Trap {
-            throw trap.withBacktrace(Self.captureBacktrace(sp: sp, store: store.value))
+        } catch let error as ExecutionError {
+            switch error {
+            case .trap(let trap):
+                throw trap.withBacktrace(Self.captureBacktrace(sp: sp, store: store.value))
+            case .endOfExecution(let endSp):
+                throw EndOfExecution(sp: endSp)
+            case .breakpoint(let bpSp, let bpPc):
+                throw Breakpoint(sp: bpSp, pc: bpPc)
+            }
         }
+        #endif
     }
 
     /// Sets the error trap thrown during execution.
@@ -584,7 +635,7 @@ extension Execution {
     }
 
     @inline(__always)
-    func checkStackBoundary(_ sp: Sp) throws {
+    func checkStackBoundary(_ sp: Sp) throws(Trap) {
         guard sp < stackEnd else { throw Trap(.callStackExhausted) }
     }
 
@@ -595,7 +646,7 @@ extension Execution {
         callerInstance: InternalInstance?,
         spAddend: VReg,
         sp: Sp, pc: Pc, md: inout Md, ms: inout Ms
-    ) throws -> (Pc, Sp) {
+    ) throws(Trap) -> (Pc, Sp) {
         if function.isWasm {
             return try invokeWasmFunction(
                 function: function.wasm, callerInstance: callerInstance,
@@ -612,7 +663,7 @@ extension Execution {
         function: InternalFunction,
         callerInstance: InternalInstance?,
         sp: Sp, pc: Pc, md: inout Md, ms: inout Ms
-    ) throws -> (Pc, Sp) {
+    ) throws(Trap) -> (Pc, Sp) {
         if function.isWasm {
             return try tailInvokeWasmFunction(
                 function: function.wasm, callerInstance: callerInstance,
@@ -633,7 +684,7 @@ extension Execution {
         function: EntityHandle<WasmFunctionEntity>,
         callerInstance: InternalInstance?,
         sp: Sp, md: inout Md, ms: inout Ms
-    ) throws -> (Pc, Sp) {
+    ) throws(Trap) -> (Pc, Sp) {
         let iseq = try function.ensureCompiled(store: store)
         try checkStackBoundary(sp.advanced(by: iseq.maxStackHeight))
         sp.currentFunction = function
@@ -654,7 +705,7 @@ extension Execution {
         callerInstance: InternalInstance?,
         spAddend: VReg,
         sp: Sp, pc: Pc, md: inout Md, ms: inout Ms
-    ) throws -> (Pc, Sp) {
+    ) throws(Trap) -> (Pc, Sp) {
         let iseq = try function.ensureCompiled(store: store)
 
         let newSp = try pushFrame(
@@ -677,7 +728,7 @@ extension Execution {
     /// Note that this function does not modify neither the positions of the
     /// stack pointer nor the program counter.
     @inline(never)
-    private func invokeHostFunction(function: EntityHandle<HostFunctionEntity>, sp: Sp, spAddend: VReg) throws {
+    private func invokeHostFunction(function: EntityHandle<HostFunctionEntity>, sp: Sp, spAddend: VReg) throws(Trap) {
         let resolvedType = store.value.engine.resolveType(function.type)
         let layout = FrameHeaderLayout(type: resolvedType)
         let parameters = resolvedType.parameters.enumerated().map { (i, type) in
