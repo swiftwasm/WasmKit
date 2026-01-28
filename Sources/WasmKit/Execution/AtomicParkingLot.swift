@@ -13,7 +13,7 @@ import Synchronization
 /// Represents a thread waiting on a memory address
 final class WaitingThread: @unchecked Sendable {
     let isWoken: Atomic<Bool>
-    
+
     init() {
         self.isWoken = Atomic(false)
     }
@@ -23,11 +23,11 @@ final class WaitingThread: @unchecked Sendable {
 final class AtomicParkingLot {
     /// Synchronized map from memory address to waiting threads
     private let lock: Mutex<[UInt64: [WaitingThread]]>
-    
+
     init() {
         self.lock = Mutex([:])
     }
-    
+
     /// Parks the thread in a queue associated with the given address.
     ///
     /// The parking only succeeds if the validation function returns true while
@@ -56,12 +56,12 @@ final class AtomicParkingLot {
         if !validate() {
             return WaitOutcome.mismatch
         }
-        
+
         // Initialize thread state if needed
         let thread = threadState.thread ?? WaitingThread()
         threadState.thread = thread
         thread.isWoken.store(false, ordering: .relaxed)
-        
+
         // Register this thread as waiting
         let shouldBlock = lock.withLock { registry -> Bool in
             // Re-check condition while holding lock
@@ -69,22 +69,22 @@ final class AtomicParkingLot {
                 thread.isWoken.store(true, ordering: .relaxed)
                 return false
             }
-            
+
             // Add to waiting list for this address
             registry[address, default: []].append(thread)
             return true
         }
-        
+
         // Exit early if condition no longer holds
         if !shouldBlock || thread.isWoken.load(ordering: .acquiring) {
             return WaitOutcome.mismatch
         }
-        
+
         // Wait for wake signal with timeout handling
         let deadlineTime = deadline?()
         var expired = false
         var spinCount = 1
-        
+
         while !thread.isWoken.load(ordering: .acquiring) {
             if let deadlineTime = deadlineTime {
                 let currentTime = ContinuousClock.now
@@ -93,14 +93,14 @@ final class AtomicParkingLot {
                     break
                 }
             }
-            
+
             // Progressive backoff to reduce CPU spinning
             for _ in 0..<spinCount {
                 _ = spinCount & 1
             }
             spinCount = min(spinCount * 2, 1024)
         }
-        
+
         // Clean up if we timed out
         if expired {
             lock.withLock { registry in
@@ -115,10 +115,10 @@ final class AtomicParkingLot {
             }
             return WaitOutcome.timedOut
         }
-        
+
         return WaitOutcome.woken
     }
-    
+
     /// Unparks up to `count` threads from the queue associated with the given address.
     ///
     /// - Parameters:
@@ -129,32 +129,32 @@ final class AtomicParkingLot {
         if count == 0 {
             return 0
         }
-        
+
         var wokenCount: UInt32 = 0
-        
+
         lock.withLock { registry in
             guard var threads = registry[address], !threads.isEmpty else {
                 return
             }
-            
+
             let wakeCount = min(Int(count), threads.count)
             let toWake = Array(threads.prefix(wakeCount))
             threads.removeFirst(wakeCount)
-            
+
             if threads.isEmpty {
                 registry.removeValue(forKey: address)
             } else {
                 registry[address] = threads
             }
-            
+
             // Signal waiting threads
             for thread in toWake {
                 thread.isWoken.store(true, ordering: .releasing)
             }
-            
+
             wokenCount = UInt32(wakeCount)
         }
-        
+
         return wokenCount
     }
 }
@@ -162,7 +162,7 @@ final class AtomicParkingLot {
 /// Per-thread state for wait operations
 struct ThreadWaitState {
     var thread: WaitingThread?
-    
+
     init() {
         self.thread = nil
     }
@@ -170,7 +170,7 @@ struct ThreadWaitState {
 
 /// Result of a wait operation
 enum WaitOutcome {
-    case woken      // 0 - successfully woken by notify
-    case mismatch   // 1 - value didn't match expected
-    case timedOut   // 2 - deadline expired
+    case woken  // 0 - successfully woken by notify
+    case mismatch  // 1 - value didn't match expected
+    case timedOut  // 2 - deadline expired
 }
