@@ -12,12 +12,12 @@
 
         mutating func encode(_ component: ComponentWatParser.ComponentDef, options: EncodeOptions) throws {
             try underlying.section(id: 1) {
-                for var module in component.modulesMap {
+                for var module in component.coreModulesMap {
                     $0.output.append(contentsOf: try WAT.encode(module: &module.wat, options: options))
                 }
             }
 
-            try underlying.section(id: 2) {
+            underlying.section(id: 2) {
                 $0.encodeVector(
                     component.coreInstancesMap,
                     encodeElement: {

@@ -196,18 +196,31 @@
                 let compositeTypeKeyword = try parser.expectKeyword()
                 switch compositeTypeKeyword {
                 case "func":
+                    fatalError()
                 case "record":
+                    fatalError()
                 case "variant":
+                    fatalError()
                 case "list":
+                    fatalError()
                 case "tuple":
+                    fatalError()
                 case "flags":
+                    fatalError()
                 case "enum":
+                    fatalError()
                 case "option":
+                    fatalError()
                 case "result":
+                    fatalError()
                 case "own":
+                    fatalError()
                 case "borrow":
+                    fatalError()
                 case "stream":
+                    fatalError()
                 case "future":
+                    fatalError()
                 default:
                     throw WatParserError(
                         "Unexpected composite component type keyword `\(compositeTypeKeyword)",
