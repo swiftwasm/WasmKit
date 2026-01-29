@@ -33,6 +33,7 @@ let package = Package(
     ],
     traits: [
         .default(enabledTraits: []),
+        "ComponentModel",
         "WasmDebuggingSupport",
     ],
     targets: [
