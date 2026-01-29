@@ -224,9 +224,8 @@
             let id = try parser.takeId()
             var parameters = [(name: String, type: ComponentType)]()
             var resultType: ComponentType?
-            var typeId: Parser.IndexOrId?
-            var exportDef: (Location, exportName: String)?
-            var importDef: (Location, importModule: String, importName: String)?
+            var exportDef: (location: Location, exportName: String)?
+            var importDef: (location: Location, importModule: String, importName: String)?
 
             /// Component functions are not tracked as separate entities in the final binary, i.e. there's no dedicated
             /// component functions section in the binary format. They're always encoded as a part of following
@@ -306,12 +305,30 @@
             let funcIndex = try parsedComponent.componentFunctions.add(
                 ComponentFuncDef(paramNames: parameters.map(\.name), type: .init(rawValue: typeIndex))
             )
-            parsedComponent.fields.append(
-                .init(
-                    location: ,
-                    kind: .exportDef(ExportDef(exportName: exportName, descriptor: .function(<#T##Parser.IndexOrId#>)))
+
+            if let exportDef {
+                parsedComponent.fields.append(
+                    .init(
+                        location: exportDef.location,
+                        kind: .exportDef(ExportDef(exportName: exportDef.exportName, descriptor: .function(.init(funcIndex))))
+                    )
                 )
-            )
+            }
+
+            if let importDef {
+                parsedComponent.fields.append(
+                    .init(
+                        location: importDef.location,
+                        kind: .importDef(
+                            .init(
+                                importModuleName: importDef.importModule,
+                                importName: importDef.importName,
+                                descriptor: .function(.init(funcIndex))
+                            )
+                        )
+                    )
+                )
+            }
         }
 
         private mutating func parseCanonOpt() throws(WatParserError) -> CanonDef.Option {
@@ -462,7 +479,7 @@
 
         enum ExternDesc {
             case module(Parser.IndexOrId)
-            case function(Parser.IndexOrId)
+            case function(ComponentFuncIndex)
             case value(Parser.IndexOrId)
             case type(Parser.IndexOrId)
             case component(Parser.IndexOrId)

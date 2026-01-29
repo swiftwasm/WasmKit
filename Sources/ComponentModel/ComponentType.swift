@@ -11,6 +11,10 @@ public struct ComponentFuncIndex: RawRepresentable, Hashable {
         self.rawValue = rawValue
     }
 
+    public init(_ int: Int) {
+        self.rawValue = UInt32(int)
+    }
+
     public let rawValue: UInt32
 }
 
