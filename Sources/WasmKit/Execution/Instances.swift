@@ -465,7 +465,7 @@ struct MemoryEntity: ~Copyable {
         isMemory64 ? UInt64.max : UInt64(1 << 32) / UInt64(pageSize)
     }
 
-    private var storage: UniqueArray<UInt8>
+    private var storage: UnsafeMutableBufferPointer<UInt8>
     let maxPageCount: UInt64
     let limit: Limits
     let sharedMutex: Mutex<Void>?
@@ -475,16 +475,18 @@ struct MemoryEntity: ~Copyable {
         guard try resourceLimiter.limitMemoryGrowth(to: byteSize) else {
             throw Trap(.initialMemorySizeExceedsLimit(byteSize: byteSize))
         }
-
+        storage = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: byteSize)
         if byteSize > 0 {
-            storage = .init(repeating: 0, count: byteSize)
-        } else {
-            storage = .init(capacity: byteSize)
+            storage.initialize(repeating: 0)
         }
         let defaultMaxPageCount = Self.maxPageCount(isMemory64: memoryType.isMemory64)
         maxPageCount = memoryType.max ?? defaultMaxPageCount
         limit = memoryType
         sharedMutex = memoryType.shared ? Mutex<Void>(()) : nil
+    }
+
+    deinit {
+        storage.deallocate()
     }
 
     var data: UnsafeBufferPointer<UInt8> {
