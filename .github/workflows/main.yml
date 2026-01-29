@@ -119,13 +119,13 @@ jobs:
       - run: swift test ${{ matrix.test-args }}
 
   build-xcode:
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
       - name: Prepare Xcode platforms
         run: |
           set -euxo pipefail
-          sudo xcode-select -s /Applications/Xcode_26.0.app
+          sudo xcode-select -s /Applications/Xcode_26.2.app
           sudo xcodebuild -runFirstLaunch || true
           for PLAT in iOS tvOS watchOS visionOS; do
             if ! xcodebuild -showsdks | grep -q "$PLAT"; then
