@@ -36,9 +36,9 @@ struct WatParser {
     }
 
     struct UnresolvedType<T> {
-        private let make: (any NameToIndexResolver) -> Result<T, WatParserError>
+        private let make: (any NameToIndexResolver) -> Result<T, WasmKitError>
 
-        init(make: @escaping (any NameToIndexResolver) -> Result<T, WatParserError>) {
+        init(make: @escaping (any NameToIndexResolver) -> Result<T, WasmKitError>) {
             self.make = make
         }
 
@@ -54,13 +54,13 @@ struct WatParser {
         }
 
         func map<U>(_ transform: @escaping (T) -> U) -> UnresolvedType<U> {
-            return UnresolvedType<U>(make: { resolver in Result { () throws(WatParserError) in transform(try resolve(resolver)) } })
+            return UnresolvedType<U>(make: { resolver in Result { () throws(WasmKitError) in transform(try resolve(resolver)) } })
         }
 
-        func resolve(_ typeMap: TypesMap) throws(WatParserError) -> T {
+        func resolve(_ typeMap: TypesMap) throws(WasmKitError) -> T {
             return try resolve(typeMap.nameMapping)
         }
-        func resolve(_ resolver: any NameToIndexResolver) throws(WatParserError) -> T {
+        func resolve(_ resolver: any NameToIndexResolver) throws(WasmKitError) -> T {
             return try make(resolver).get()
         }
     }
@@ -87,7 +87,7 @@ struct WatParser {
         var id: Name?
         var type: UnresolvedType<ValueType>
 
-        func resolve(_ typeMap: TypesNameMapping) throws(WatParserError) -> ResolvedLocalDecl {
+        func resolve(_ typeMap: TypesNameMapping) throws(WasmKitError) -> ResolvedLocalDecl {
             try ResolvedLocalDecl(id: id, type: type.resolve(typeMap))
         }
     }
@@ -113,7 +113,7 @@ struct WatParser {
         /// This method may modify TypesMap of the given WATModule
         ///
         /// - Returns: Type index of this function
-        func parse<V: InstructionVisitor>(visitor: inout V, wat: inout Wat, features: WasmFeatureSet) throws(WatParserError) -> Int where V.VisitorError == WatParserError {
+        func parse<V: InstructionVisitor>(visitor: inout V, wat: inout Wat, features: WasmFeatureSet) throws(WasmKitError) -> Int {
             guard case .definition(let locals, let body) = kind else {
                 fatalError("Imported functions cannot be parsed")
             }
@@ -125,7 +125,7 @@ struct WatParser {
             try parser.parse(visitor: &visitor, wat: &wat)
             // Check if the parser has reached the end of the function body
             guard try parser.parser.isEndOfParen() else {
-                throw WatParserError("unexpected token", location: parser.parser.lexer.location())
+                throw WasmKitError.wat("unexpected token", location: parser.parser.lexer.location())
             }
             return typeIndex
         }
@@ -219,7 +219,7 @@ struct WatParser {
         case data(DataSegmentDecl)
     }
 
-    mutating func next() throws(WatParserError) -> ModuleField? {
+    mutating func next() throws(WasmKitError) -> ModuleField? {
         // If we have reached the end of the (module ...) block, return nil
         guard try !parser.isEndOfParen() else { return nil }
         try parser.expect(.leftParen)
@@ -248,7 +248,7 @@ struct WatParser {
                 let id = try parser.takeId()
                 kind = .global(GlobalDecl(id: id, exports: [], type: try globalType(), kind: .imported(importNames)))
             } else {
-                throw WatParserError("unexpected token", location: parser.lexer.location())
+                throw WasmKitError.wat("unexpected token", location: parser.lexer.location())
             }
             try parser.expect(.rightParen)  // closing paren for import description
             try parser.expect(.rightParen)  // closing paren for import
@@ -275,7 +275,7 @@ struct WatParser {
             let isMemory64 = try expectAddressSpaceType()
 
             // elemexpr ::= '(' 'item' expr ')' | '(' instr ')'
-            func parseExprList() throws(WatParserError) -> (UInt64, ElementDecl.Indices) {
+            func parseExprList() throws(WasmKitError) -> (UInt64, ElementDecl.Indices) {
                 var numberOfItems: UInt64 = 0
                 let indices: ElementDecl.Indices = .elementExprList(parser.lexer)
                 while try parser.take(.leftParen) {
@@ -287,7 +287,7 @@ struct WatParser {
 
             if let refType = try takeRefType() {
                 guard try parser.takeParenBlockStart("elem") else {
-                    throw WatParserError("expected elem", location: parser.lexer.location())
+                    throw WasmKitError.wat("expected elem", location: parser.lexer.location())
                 }
                 var numberOfItems: UInt64 = 0
                 let indices: ElementDecl.Indices
@@ -394,7 +394,7 @@ struct WatParser {
                 try parser.expect(.rightParen)
                 decl = ExportDecl(name: name, id: index, kind: .global)
             } else {
-                throw WatParserError("unexpected token", location: parser.lexer.location())
+                throw WasmKitError.wat("unexpected token", location: parser.lexer.location())
             }
             kind = .export(decl)
             try parser.expect(.rightParen)
@@ -415,7 +415,7 @@ struct WatParser {
                     try parser.skipParenBlock()
                 } else {
                     // Need to distinguish '(' instr ')' and reftype without parsing instruction
-                    if try parser.peek(.leftParen) != nil, try fork({ parser throws(WatParserError) in try parser.takeRefType() == nil }) {
+                    if try parser.peek(.leftParen) != nil, try fork({ parser throws(WasmKitError) in try parser.takeRefType() == nil }) {
                         // abbreviated offset instruction
                         mode = .active(table: table, offset: .singleInstruction(parser.lexer))
                         try parser.consume()  // consume (
@@ -461,7 +461,7 @@ struct WatParser {
             kind = .data(DataSegmentDecl(id: id, memory: memory, offset: offset, data: data))
             try parser.expect(.rightParen)
         default:
-            throw WatParserError("unexpected module field \(keyword)", location: location)
+            throw WasmKitError.wat("unexpected module field \(keyword)", location: location)
         }
         return ModuleField(location: location, kind: kind)
     }
@@ -471,7 +471,7 @@ struct WatParser {
         return try body(&subParser)
     }
 
-    mutating func locals() throws(WatParserError) -> [LocalDecl] {
+    mutating func locals() throws(WasmKitError) -> [LocalDecl] {
         var decls: [LocalDecl] = []
         while try parser.takeParenBlockStart("local") {
             if let id = try parser.takeId() {
@@ -488,7 +488,7 @@ struct WatParser {
         return decls
     }
 
-    mutating func inlineExports() throws(WatParserError) -> [String] {
+    mutating func inlineExports() throws(WasmKitError) -> [String] {
         var exports: [String] = []
         while try parser.takeParenBlockStart("export") {
             let name = try parser.expectString()
@@ -498,20 +498,20 @@ struct WatParser {
         return exports
     }
 
-    mutating func inlineImport() throws(WatParserError) -> ImportNames? {
+    mutating func inlineImport() throws(WasmKitError) -> ImportNames? {
         guard try parser.takeParenBlockStart("import") else { return nil }
         let names = try importNames()
         try parser.expect(.rightParen)
         return names
     }
 
-    mutating func importNames() throws(WatParserError) -> ImportNames {
+    mutating func importNames() throws(WasmKitError) -> ImportNames {
         let module = try parser.expectString()
         let name = try parser.expectString()
         return ImportNames(module: module, name: name)
     }
 
-    mutating func typeUse(mayHaveName: Bool) throws(WatParserError) -> TypeUse {
+    mutating func typeUse(mayHaveName: Bool) throws(WasmKitError) -> TypeUse {
         let location = parser.lexer.location()
         var index: Parser.IndexOrId?
         if try parser.takeParenBlockStart("type") {
@@ -522,7 +522,7 @@ struct WatParser {
         return TypeUse(index: index, inline: inline, location: location)
     }
 
-    mutating func takeTableUse() throws(WatParserError) -> Parser.IndexOrId? {
+    mutating func takeTableUse() throws(WasmKitError) -> Parser.IndexOrId? {
         // Try full form: (table idx)
         if try parser.takeParenBlockStart("table") {
             let index = try parser.expectIndexOrId()
@@ -541,7 +541,7 @@ struct WatParser {
         return nil
     }
 
-    mutating func memoryUse() throws(WatParserError) -> Parser.IndexOrId? {
+    mutating func memoryUse() throws(WasmKitError) -> Parser.IndexOrId? {
         // Try full form: (memory idx)
         if try parser.takeParenBlockStart("memory") {
             let index = try parser.expectIndexOrId()
@@ -560,7 +560,7 @@ struct WatParser {
         return nil
     }
 
-    mutating func dataString() throws(WatParserError) -> [UInt8] {
+    mutating func dataString() throws(WasmKitError) -> [UInt8] {
         var data: [UInt8] = []
         while let bytes = try parser.takeStringBytes() {
             data.append(contentsOf: bytes)
@@ -570,7 +570,7 @@ struct WatParser {
 
     /// Expect "i32", "i64", or any other
     /// - Returns: `true` if "i64", otherwise `false`
-    mutating func expectAddressSpaceType() throws(WatParserError) -> Bool {
+    mutating func expectAddressSpaceType() throws(WasmKitError) -> Bool {
         let isMemory64: Bool
         if try parser.takeKeyword("i64") {
             isMemory64 = true
@@ -581,11 +581,11 @@ struct WatParser {
         return isMemory64
     }
 
-    mutating func tableType() throws(WatParserError) -> UnresolvedType<TableType> {
+    mutating func tableType() throws(WasmKitError) -> UnresolvedType<TableType> {
         return try tableType(isMemory64: expectAddressSpaceType())
     }
 
-    mutating func tableType(isMemory64: Bool) throws(WatParserError) -> UnresolvedType<TableType> {
+    mutating func tableType(isMemory64: Bool) throws(WasmKitError) -> UnresolvedType<TableType> {
         let limits: Limits
         if isMemory64 {
             limits = try limit64()
@@ -596,11 +596,11 @@ struct WatParser {
         return elementType.map { TableType(elementType: $0, limits: limits) }
     }
 
-    mutating func memoryType() throws(WatParserError) -> MemoryType {
+    mutating func memoryType() throws(WasmKitError) -> MemoryType {
         return try memoryType(isMemory64: expectAddressSpaceType())
     }
 
-    mutating func memoryType(isMemory64: Bool) throws(WatParserError) -> MemoryType {
+    mutating func memoryType(isMemory64: Bool) throws(WasmKitError) -> MemoryType {
         let limits: Limits
         if isMemory64 {
             limits = try limit64()
@@ -612,7 +612,7 @@ struct WatParser {
     }
 
     /// globaltype ::= t:valtype | '(' 'mut' t:valtype ')'
-    mutating func globalType() throws(WatParserError) -> UnresolvedType<GlobalType> {
+    mutating func globalType() throws(WasmKitError) -> UnresolvedType<GlobalType> {
         let mutability: Mutability
         if try parser.takeParenBlockStart("mut") {
             mutability = .variable
@@ -626,52 +626,52 @@ struct WatParser {
         return valueType.map { GlobalType(mutability: mutability, valueType: $0) }
     }
 
-    mutating func limit32() throws(WatParserError) -> Limits {
+    mutating func limit32() throws(WasmKitError) -> Limits {
         let min = try parser.expectUnsignedInt(UInt32.self)
         let max: UInt32? = try parser.takeUnsignedInt(UInt32.self)
         return Limits(min: UInt64(min), max: max.map(UInt64.init), isMemory64: false)
     }
 
-    mutating func limit64() throws(WatParserError) -> Limits {
+    mutating func limit64() throws(WasmKitError) -> Limits {
         let min = try parser.expectUnsignedInt(UInt64.self)
         let max: UInt64? = try parser.takeUnsignedInt(UInt64.self)
         return Limits(min: min, max: max, isMemory64: true)
     }
 
     /// functype ::= '(' 'func' t1*:vec(param) t2*:vec(result) ')' => [t1*] -> [t2*]
-    mutating func funcType() throws(WatParserError) -> UnresolvedType<FunctionType> {
+    mutating func funcType() throws(WasmKitError) -> UnresolvedType<FunctionType> {
         try parser.expect(.leftParen)
         try parser.expectKeyword("func")
         let (params, names) = try params(mayHaveName: true)
         let results = try results()
         try parser.expect(.rightParen)
         return UnresolvedType<FunctionType> { typeMap in
-            Result { () throws(WatParserError) in
-                let params = try params.map { param throws(WatParserError) in try param.resolve(typeMap) }
-                let results = try results.map { result throws(WatParserError) in try result.resolve(typeMap) }
+            Result { () throws(WasmKitError) in
+                let params = try params.map { param throws(WasmKitError) in try param.resolve(typeMap) }
+                let results = try results.map { result throws(WasmKitError) in try result.resolve(typeMap) }
                 let signature = WasmTypes.FunctionType(parameters: params, results: results)
                 return FunctionType(signature: signature, parameterNames: names)
             }
         }
     }
 
-    mutating func optionalFunctionType(mayHaveName: Bool) throws(WatParserError) -> UnresolvedType<FunctionType>? {
+    mutating func optionalFunctionType(mayHaveName: Bool) throws(WasmKitError) -> UnresolvedType<FunctionType>? {
         let (params, names) = try params(mayHaveName: mayHaveName)
         let results = try results()
         if results.isEmpty, params.isEmpty {
             return nil
         }
         return UnresolvedType<FunctionType> { typeMap in
-            Result { () throws(WatParserError) in
-                let params = try params.map { resolver throws(WatParserError) in try resolver.resolve(typeMap) }
-                let results = try results.map { resolver throws(WatParserError) in try resolver.resolve(typeMap) }
+            Result { () throws(WasmKitError) in
+                let params = try params.map { resolver throws(WasmKitError) in try resolver.resolve(typeMap) }
+                let results = try results.map { resolver throws(WasmKitError) in try resolver.resolve(typeMap) }
                 let signature = WasmTypes.FunctionType(parameters: params, results: results)
                 return FunctionType(signature: signature, parameterNames: names)
             }
         }
     }
 
-    mutating func params(mayHaveName: Bool) throws(WatParserError) -> ([UnresolvedType<ValueType>], [Name?]) {
+    mutating func params(mayHaveName: Bool) throws(WasmKitError) -> ([UnresolvedType<ValueType>], [Name?]) {
         var types: [UnresolvedType<ValueType>] = []
         var names: [Name?] = []
         while try parser.takeParenBlockStart("param") {
@@ -693,7 +693,7 @@ struct WatParser {
         return (types, names)
     }
 
-    mutating func results() throws(WatParserError) -> [UnresolvedType<ValueType>] {
+    mutating func results() throws(WasmKitError) -> [UnresolvedType<ValueType>] {
         var results: [UnresolvedType<ValueType>] = []
         while try parser.takeParenBlockStart("result") {
             while try !parser.take(.rightParen) {
@@ -704,7 +704,7 @@ struct WatParser {
         return results
     }
 
-    mutating func valueType() throws(WatParserError) -> UnresolvedType<ValueType> {
+    mutating func valueType() throws(WasmKitError) -> UnresolvedType<ValueType> {
         if try parser.takeKeyword("i32") {
             return UnresolvedType(.i32)
         } else if try parser.takeKeyword("i64") {
@@ -718,19 +718,19 @@ struct WatParser {
         } else if let refType = try takeRefType() {
             return refType.map { .ref($0) }
         } else {
-            throw WatParserError("expected value type", location: parser.lexer.location())
+            throw WasmKitError.wat("expected value type", location: parser.lexer.location())
         }
     }
 
-    mutating func refType() throws(WatParserError) -> UnresolvedType<ReferenceType> {
+    mutating func refType() throws(WasmKitError) -> UnresolvedType<ReferenceType> {
         guard let refType = try takeRefType() else {
-            throw WatParserError("expected reference type", location: parser.lexer.location())
+            throw WasmKitError.wat("expected reference type", location: parser.lexer.location())
         }
         return refType
     }
 
     /// Parse a reference type tokens if the head tokens seems like so.
-    mutating func takeRefType() throws(WatParserError) -> UnresolvedType<ReferenceType>? {
+    mutating func takeRefType() throws(WasmKitError) -> UnresolvedType<ReferenceType>? {
         // Check abbreviations first
         // https://webassembly.github.io/function-references/core/text/types.html#abbreviations
         if try parser.takeKeyword("funcref") {
@@ -750,16 +750,16 @@ struct WatParser {
 
     /// > Note:
     /// <https://webassembly.github.io/function-references/core/text/types.html#heap-types>
-    mutating func heapType() throws(WatParserError) -> UnresolvedType<HeapType> {
+    mutating func heapType() throws(WasmKitError) -> UnresolvedType<HeapType> {
         if try parser.takeKeyword("func") {
             return UnresolvedType(.abstract(.funcRef))
         } else if try parser.takeKeyword("extern") {
             return UnresolvedType(.abstract(.externRef))
         } else if let id = try parser.takeIndexOrId() {
             return UnresolvedType(make: { resolver in
-                Result { () throws(WatParserError) in try .concrete(typeIndex: UInt32(resolver.resolveIndex(use: id))) }
+                Result { () throws(WasmKitError) in try .concrete(typeIndex: UInt32(resolver.resolveIndex(use: id))) }
             })
         }
-        throw WatParserError("expected heap type", location: parser.lexer.location())
+        throw WasmKitError.wat("expected heap type", location: parser.lexer.location())
     }
 }

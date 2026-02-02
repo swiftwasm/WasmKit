@@ -167,11 +167,11 @@ public struct Wast {
 ///     print("\(location): \(directive)")
 /// }
 /// ```
-public func parseWAST(_ input: String, features: WasmFeatureSet = .default) throws(WatParserError) -> Wast {
+public func parseWAST(_ input: String, features: WasmFeatureSet = .default) throws(WasmKitError) -> Wast {
     return Wast(input, features: features)
 }
 
-func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParserError) -> Wat {
+func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WasmKitError) -> Wat {
     // This parser is 2-pass: first it collects all module items and creates a mapping of names to indices.
 
     let initialParser = parser
@@ -195,7 +195,7 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
         }
     }
 
-    var importFactories: [() -> Result<Import, WatParserError>] = []
+    var importFactories: [() -> Result<Import, WasmKitError>] = []
     var functionsMap = NameMapping<WatParser.FunctionDecl>()
     var tablesMap = NameMapping<WatParser.TableDecl>()
     var memoriesMap = NameMapping<WatParser.MemoryDecl>()
@@ -207,7 +207,7 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
     var exportDecls: [WatParser.ExportDecl] = []
 
     var hasNonImport = false
-    func visitDecl(decl: WatParser.ModuleField) throws(WatParserError) {
+    func visitDecl(decl: WatParser.ModuleField) throws(WasmKitError) {
         let location = decl.location
 
         func addExports(_ exports: [String], index: Int, kind: WatParser.ExternalKind) {
@@ -216,9 +216,9 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
             }
         }
 
-        func addImport(_ importNames: WatParser.ImportNames, makeDescriptor: @escaping () throws(WatParserError) -> ImportDescriptor) {
+        func addImport(_ importNames: WatParser.ImportNames, makeDescriptor: @escaping () throws(WasmKitError) -> ImportDescriptor) {
             importFactories.append {
-                return Result { () throws(WatParserError) in
+                return Result { () throws(WasmKitError) in
                     Import(
                         module: importNames.module, name: importNames.name,
                         descriptor: try makeDescriptor()
@@ -228,10 +228,10 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
         }
 
         // Verify that imports precede all non-import module fields
-        func checkImportOrder(_ importNames: WatParser.ImportNames?) throws(WatParserError) {
+        func checkImportOrder(_ importNames: WatParser.ImportNames?) throws(WasmKitError) {
             if importNames != nil {
                 if hasNonImport {
-                    throw WatParserError("Imports must precede all non-import module fields", location: location)
+                    throw WasmKitError.wat("Imports must precede all non-import module fields", location: location)
                 }
             } else {
                 hasNonImport = true
@@ -247,7 +247,7 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
             switch decl.kind {
             case .definition: break
             case .imported(let importNames):
-                addImport(importNames) { () throws(WatParserError) in
+                addImport(importNames) { () throws(WasmKitError) in
                     let typeIndex = try typesMap.resolveIndex(use: decl.typeUse)
                     return .function(TypeIndex(typeIndex))
                 }
@@ -263,7 +263,7 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
                 try elementSegmentsMap.add(inlineElement)
             }
             if let importNames = decl.importNames {
-                addImport(importNames) { () throws(WatParserError) in try .table(decl.type.resolve(typesMap)) }
+                addImport(importNames) { () throws(WasmKitError) in try .table(decl.type.resolve(typesMap)) }
             }
         case .memory(let decl):
             try checkImportOrder(decl.importNames)
@@ -285,7 +285,7 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
             switch decl.kind {
             case .definition: break
             case .imported(let importNames):
-                addImport(importNames) { () throws(WatParserError) in try .global(decl.type.resolve(typesMap)) }
+                addImport(importNames) { () throws(WasmKitError) in try .global(decl.type.resolve(typesMap)) }
             }
         case .element(let decl):
             try elementSegmentsMap.add(decl)
@@ -295,7 +295,7 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
             try dataSegmentsMap.add(decl)
         case .start(let startIndex):
             guard start == nil else {
-                throw WatParserError("Multiple start sections", location: location)
+                throw WasmKitError.wat("Multiple start sections", location: location)
             }
             start = startIndex
         }
@@ -309,7 +309,7 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
 
     // 3. Resolve a part of module items that reference other module items.
     // Remaining items like $id references like (call $func) are resolved during encoding.
-    let exports: [Export] = try exportDecls.map { decl throws(WatParserError) in
+    let exports: [Export] = try exportDecls.map { decl throws(WasmKitError) in
         let descriptor: ExportDescriptor
         switch decl.kind {
         case .function:
@@ -324,8 +324,8 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
         return Export(name: decl.name, descriptor: descriptor)
     }
 
-    let imports = try importFactories.map { factory throws(WatParserError) in try factory().get() }
-    let startIndex = try start.map { use throws(WatParserError) in try FunctionIndex(functionsMap.resolveIndex(use: use)) }
+    let imports = try importFactories.map { factory throws(WasmKitError) in try factory().get() }
+    let startIndex = try start.map { use throws(WasmKitError) in try FunctionIndex(functionsMap.resolveIndex(use: use)) }
 
     parser = watParser.parser
 
@@ -333,7 +333,7 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
         types: typesMap,
         functionsMap: functionsMap,
         tablesMap: tablesMap,
-        tables: try tablesMap.map { table throws(WatParserError) in
+        tables: try tablesMap.map { table throws(WasmKitError) in
             try Table(type: table.type.resolve(typesMap))
         },
         memories: memoriesMap,

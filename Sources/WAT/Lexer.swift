@@ -142,11 +142,11 @@ struct Lexer {
             return Location(at: nextIndex, in: self.input)
         }
 
-        func createError(_ description: String) -> WatParserError {
-            return WatParserError(description, location: currentSourceLocation())
+        func createError(_ description: String) -> WasmKitError {
+            return WasmKitError.wat(description, location: currentSourceLocation())
         }
 
-        func unexpectedEof() -> WatParserError {
+        func unexpectedEof() -> WasmKitError {
             createError("Unexpected end-of-file")
         }
     }
@@ -165,7 +165,7 @@ struct Lexer {
 
     /// Lex the next meaningful token
     /// - Returns: The next meaningful token or `nil` if EOF
-    mutating func lex() throws(WatParserError) -> Token? {
+    mutating func lex() throws(WasmKitError) -> Token? {
         while true {
             guard let token = try rawLex() else { return nil }
             guard token.kind.isMeaningful else { continue }
@@ -174,7 +174,7 @@ struct Lexer {
     }
 
     /// Lex the next token without skipping comments
-    mutating func rawLex() throws(WatParserError) -> Token? {
+    mutating func rawLex() throws(WasmKitError) -> Token? {
         guard let (start, initialChar) = peekNonWhitespaceChar() else {
             return nil
         }
@@ -187,7 +187,7 @@ struct Lexer {
         return cursor.currentSourceLocation()
     }
 
-    private mutating func classifyToken(_ initialChar: Unicode.Scalar) throws(WatParserError) -> TokenKind? {
+    private mutating func classifyToken(_ initialChar: Unicode.Scalar) throws(WasmKitError) -> TokenKind? {
         switch initialChar {
         case "(":
             _ = cursor.next()
@@ -248,18 +248,18 @@ struct Lexer {
                         return .float(sign, .nan(hexPattern: try numberSource.parseHexNumber()))
                     }
                     var pattern: String
-                    let parseFraction: () throws(WatParserError) -> String
+                    let parseFraction: () throws(WasmKitError) -> String
                     let makeFloatToken: (String) -> FloatToken
                     if numberSource.eat("0x") {
                         pattern = try numberSource.parseHexNumber()
                         if numberSource.isEOF {
                             return .integer(sign, .hexPattern(pattern))
                         }
-                        parseFraction = { () throws(WatParserError) in try numberSource.parseHexNumber() }
+                        parseFraction = { () throws(WasmKitError) in try numberSource.parseHexNumber() }
                         makeFloatToken = { FloatToken.hexPattern($0) }
                     } else {
                         pattern = try numberSource.parseDecimalNumber()
-                        parseFraction = { () throws(WatParserError) in try numberSource.parseDecimalNumber() }
+                        parseFraction = { () throws(WasmKitError) in try numberSource.parseDecimalNumber() }
                         makeFloatToken = { FloatToken.decimalPattern($0) }
                     }
                     if !pattern.isEmpty {
@@ -303,7 +303,7 @@ struct Lexer {
         }
     }
 
-    private mutating func lexBlockComment() throws(WatParserError) -> TokenKind {
+    private mutating func lexBlockComment() throws(WasmKitError) -> TokenKind {
         var level = 1
         while true {
             guard let char = cursor.next() else {
@@ -362,7 +362,7 @@ struct Lexer {
         case unknown
     }
 
-    private mutating func lexReservedChars(initial: Unicode.Scalar) throws(WatParserError) -> (ReservedKind, String.UnicodeScalarView.SubSequence) {
+    private mutating func lexReservedChars(initial: Unicode.Scalar) throws(WasmKitError) -> (ReservedKind, String.UnicodeScalarView.SubSequence) {
         let start = cursor.nextIndex
         var numberOfIdChars: Int = 0
         var strings: [[UInt8]] = []
@@ -392,7 +392,7 @@ struct Lexer {
         return (.unknown, text)
     }
 
-    private mutating func readString() throws(WatParserError) -> [UInt8] {
+    private mutating func readString() throws(WasmKitError) -> [UInt8] {
         var copyingBuffer: [UInt8] = []
         func append(_ char: Unicode.Scalar) {
             copyingBuffer.append(contentsOf: String(char).utf8)
@@ -451,7 +451,7 @@ struct Lexer {
     }
 }
 
-func parseHexDigit(_ char: Unicode.Scalar) throws(WatParserError) -> UInt8? {
+func parseHexDigit(_ char: Unicode.Scalar) throws(WasmKitError) -> UInt8? {
     let base: Unicode.Scalar
     let addend: UInt8
     if ("0"..."9").contains(char) {
@@ -470,18 +470,18 @@ func parseHexDigit(_ char: Unicode.Scalar) throws(WatParserError) -> UInt8? {
 }
 
 extension Lexer.Cursor {
-    mutating func parseHexNumber() throws(WatParserError) -> String {
+    mutating func parseHexNumber() throws(WasmKitError) -> String {
         return try parseUnderscoredChars(continueParsing: \.properties.isASCIIHexDigit)
     }
 
-    mutating func parseDecimalNumber() throws(WatParserError) -> String {
+    mutating func parseDecimalNumber() throws(WasmKitError) -> String {
         return try parseUnderscoredChars(continueParsing: { "0"..."9" ~= $0 })
     }
 
     /// Parse underscore-separated characters
     /// - Parameter continueParsing: A closure that returns `true` if the parsing should continue
     /// - Returns: The parsed string without underscores
-    mutating func parseUnderscoredChars(continueParsing: (Unicode.Scalar) -> Bool) throws(WatParserError) -> String {
+    mutating func parseUnderscoredChars(continueParsing: (Unicode.Scalar) -> Bool) throws(WasmKitError) -> String {
         var value = String.UnicodeScalarView()
         var lastParsedChar: Unicode.Scalar?
         while let char = peek() {

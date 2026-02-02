@@ -87,7 +87,7 @@ struct Encoder {
         }
     }
 
-    mutating func writeExpression(lexer: inout Lexer, wat: inout Wat) throws(WatParserError) {
+    mutating func writeExpression(lexer: inout Lexer, wat: inout Wat) throws(WasmKitError) {
         var parser = ExpressionParser<ExpressionEncoder>(lexer: lexer, features: wat.features)
         var exprEncoder = ExpressionEncoder()
         try parser.parse(visitor: &exprEncoder, wat: &wat)
@@ -96,11 +96,11 @@ struct Encoder {
         lexer = parser.parser.lexer
     }
 
-    mutating func writeInstruction(lexer: inout Lexer, wat: inout Wat) throws(WatParserError) {
+    mutating func writeInstruction(lexer: inout Lexer, wat: inout Wat) throws(WasmKitError) {
         var parser = ExpressionParser<ExpressionEncoder>(lexer: lexer, features: wat.features)
         var exprEncoder = ExpressionEncoder()
         guard try parser.instruction(visitor: &exprEncoder, wat: &wat) else {
-            throw WatParserError("unexpected end of instruction", location: lexer.location())
+            throw WasmKitError.wat("unexpected end of instruction", location: lexer.location())
         }
         try exprEncoder.visitEnd()
         output.append(contentsOf: exprEncoder.encoder.output)
@@ -173,14 +173,13 @@ extension TableType: WasmEncodable {
 }
 
 struct ElementExprCollector: AnyInstructionVisitor {
-    typealias VisitorError = WatParserError
     typealias Output = Void
 
     var binaryOffset: Int = 0
     var isAllRefFunc: Bool = true
     var instructions: [Instruction] = []
 
-    mutating func parse(indices: WatParser.ElementDecl.Indices, wat: inout Wat) throws(WatParserError) {
+    mutating func parse(indices: WatParser.ElementDecl.Indices, wat: inout Wat) throws(WasmKitError) {
         switch indices {
         case .elementExprList(let lexer):
             var parser = ExpressionParser<ElementExprCollector>(lexer: lexer, features: wat.features)
@@ -194,7 +193,7 @@ struct ElementExprCollector: AnyInstructionVisitor {
         instructions.append(.refFunc(functionIndex: index))
     }
 
-    private mutating func parseFunctionList(lexer: Lexer, wat: Wat) throws(WatParserError) {
+    private mutating func parseFunctionList(lexer: Lexer, wat: Wat) throws(WasmKitError) {
         var parser = Parser(lexer)
         while let funcUse = try parser.takeIndexOrId() {
             let (_, funcIndex) = try wat.functionsMap.resolve(use: funcUse)
@@ -212,8 +211,8 @@ struct ElementExprCollector: AnyInstructionVisitor {
 }
 
 extension WAT.WatParser.ElementDecl {
-    func encode(to encoder: inout Encoder, wat: inout Wat) throws(WatParserError) {
-        func isMemory64(tableIndex: Int) throws(WatParserError) -> Bool {
+    func encode(to encoder: inout Encoder, wat: inout Wat) throws(WasmKitError) {
+        func isMemory64(tableIndex: Int) throws(WasmKitError) -> Bool {
             guard tableIndex < wat.tablesMap.count else { return false }
             return try wat.tablesMap[tableIndex].type.resolve(wat.types).limits.isMemory64
         }
@@ -291,7 +290,7 @@ extension WAT.WatParser.ElementDecl {
         }
 
         if useExpression {
-            try encoder.encodeVector(collector.instructions) { instruction, encoder throws(WatParserError) in
+            try encoder.encodeVector(collector.instructions) { instruction, encoder throws(WasmKitError) in
                 var exprEncoder = ExpressionEncoder()
                 switch instruction {
                 case .globalGet(let globalIndex):
@@ -301,7 +300,7 @@ extension WAT.WatParser.ElementDecl {
                 case .refNull(let type):
                     try exprEncoder.visitRefNull(type: type)
                 default:
-                    throw WatParserError("unexpected instruction in element expression (\(instruction)", location: nil)
+                    throw WasmKitError.wat("unexpected instruction in element expression (\(instruction)", location: nil)
                 }
                 try exprEncoder.visitEnd()
                 encoder.output.append(contentsOf: exprEncoder.encoder.output)
@@ -343,7 +342,7 @@ extension Export: WasmEncodable {
 }
 
 extension WatParser.GlobalDecl {
-    func encode(to encoder: inout Encoder, wat: inout Wat) throws(WatParserError) {
+    func encode(to encoder: inout Encoder, wat: inout Wat) throws(WasmKitError) {
         let type = try self.type.resolve(wat.types)
         encoder.encode(type)
         guard case .definition(var expr) = kind else {
@@ -414,7 +413,7 @@ extension Import: WasmEncodable {
 }
 
 extension WatParser.DataSegmentDecl.Offset {
-    func encode(to encoder: inout Encoder, wat: inout Wat, isMemory64: Bool) throws(WatParserError) {
+    func encode(to encoder: inout Encoder, wat: inout Wat, isMemory64: Bool) throws(WasmKitError) {
         switch self {
         case .source(var offset):
             try encoder.writeExpression(lexer: &offset, wat: &wat)
@@ -432,7 +431,7 @@ extension WatParser.DataSegmentDecl.Offset {
 }
 
 extension WatParser.DataSegmentDecl {
-    func encode(to encoder: inout Encoder, wat: inout Wat) throws(WatParserError) {
+    func encode(to encoder: inout Encoder, wat: inout Wat) throws(WasmKitError) {
         func isMemory64(memoryIndex: Int) -> Bool {
             guard memoryIndex < wat.memories.count else { return false }
             return wat.memories[memoryIndex].type.isMemory64
@@ -464,7 +463,6 @@ extension WatParser.DataSegmentDecl {
 }
 
 struct ExpressionEncoder: BinaryInstructionEncoder {
-    typealias VisitorError = WatParserError
 
     var binaryOffset: Int = 0
     var encoder = Encoder()
@@ -567,7 +565,7 @@ struct ExpressionEncoder: BinaryInstructionEncoder {
     }
 }
 
-func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) -> [UInt8] {
+func encode(module: inout Wat, options: EncodeOptions) throws(WasmKitError) -> [UInt8] {
     var encoder = Encoder()
     encoder.writeHeader()
 
@@ -582,10 +580,10 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
     var hasDataSegmentInstruction = false
 
     if !functions.isEmpty {
-        try codeEncoder.section(id: 0x0A) { encoder throws(WatParserError) in
+        try codeEncoder.section(id: 0x0A) { encoder throws(WasmKitError) in
             try encoder.encodeVector(
                 functions,
-                encodeElement: { source, encoder throws(WatParserError) in
+                encodeElement: { source, encoder throws(WasmKitError) in
                     let (locals, function) = source
                     var exprEncoder = ExpressionEncoder()
                     // Encode locals
@@ -639,8 +637,8 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
     // Section 4: Table section
     let tables = module.tablesMap.definitions()
     if !tables.isEmpty {
-        try encoder.section(id: 0x04) { encoder throws(WatParserError) in
-            try encoder.encodeVector(tables) { table, encoder throws(WatParserError) in
+        try encoder.section(id: 0x04) { encoder throws(WasmKitError) in
+            try encoder.encodeVector(tables) { table, encoder throws(WasmKitError) in
                 try table.type.resolve(module.types).encode(to: &encoder)
             }
         }
@@ -657,8 +655,8 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
     // Section 6: Global section
     let globals = module.globals.definitions()
     if !globals.isEmpty {
-        try encoder.section(id: 0x06) { encoder throws(WatParserError) in
-            try encoder.encodeVector(globals) { global, encoder throws(WatParserError) in
+        try encoder.section(id: 0x06) { encoder throws(WasmKitError) in
+            try encoder.encodeVector(globals) { global, encoder throws(WasmKitError) in
                 try global.encode(to: &encoder, wat: &module)
             }
         }
@@ -682,8 +680,8 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
 
     // Section 9: Element section
     if !module.elementsMap.isEmpty {
-        try encoder.section(id: 0x09) { encoder throws(WatParserError) in
-            try encoder.encodeVector(module.elementsMap) { element, encoder throws(WatParserError) in
+        try encoder.section(id: 0x09) { encoder throws(WasmKitError) in
+            try encoder.encodeVector(module.elementsMap) { element, encoder throws(WasmKitError) in
                 try element.encode(to: &encoder, wat: &module)
             }
         }
@@ -701,8 +699,8 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
 
     // Section 11: Data section
     if !module.data.isEmpty {
-        try encoder.section(id: 0x0B) { encoder throws(WatParserError) in
-            try encoder.encodeVector(module.data) { data, encoder throws(WatParserError) in
+        try encoder.section(id: 0x0B) { encoder throws(WasmKitError) in
+            try encoder.encodeVector(module.data) { data, encoder throws(WasmKitError) in
                 try data.encode(to: &encoder, wat: &module)
             }
         }

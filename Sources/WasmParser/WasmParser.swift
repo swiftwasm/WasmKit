@@ -378,6 +378,26 @@ extension WasmParserError.Message {
     }
 }
 
+public enum WasmKitError: Error, CustomStringConvertible {
+    /// An error from the binary WebAssembly parser.
+    case wasmParser(WasmParserError)
+    /// An error from the WebAssembly Text format parser.
+    case watParser(message: String, line: Int?, column: Int?)
+
+    public var description: String {
+        switch self {
+        case .wasmParser(let error):
+            return error.description
+        case .watParser(let message, let line, let column):
+            if let line, let column {
+                return "\(line):\(column): \(message)"
+            } else {
+                return message
+            }
+        }
+    }
+}
+
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/conventions.html#vectors>
 extension ByteStream {
