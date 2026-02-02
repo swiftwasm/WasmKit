@@ -199,7 +199,7 @@ public final class WASIBridgeToHost {
     public init(
         args: [String] = [],
         environment: [String: String] = [:],
-        fileSystem fileSystemOptions: FileSystemOptions = .host(),
+        fileSystem fileSystemOptions: FileSystemOptions = .host().withStdio(),
         wallClock: WallClock = SystemWallClock(),
         monotonicClock: MonotonicClock = SystemMonotonicClock(),
         randomGenerator: RandomBufferGenerator = SystemRandomNumberGenerator()
