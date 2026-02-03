@@ -21,7 +21,7 @@
   },
   "wasm-tools": {
     "url": "https://github.com/bytecodealliance/wasm-tools/releases/download/v1.244.0/wasm-tools-1.244.0-wasm32-wasip1.tar.gz",
-    "sha256": "sha256:010f8a3c591f3070d06a1c13830c8a61dcbf6527a62ab289970ed3341f0008e7",
+    "sha256": "010f8a3c591f3070d06a1c13830c8a61dcbf6527a62ab289970ed3341f0008e7",
     "categories": ["component-model"]
   },
   "swift-format": {
