@@ -1,3 +1,5 @@
+#if ComponentModel
+
 import Testing
 
 @testable import WAT
@@ -131,3 +133,5 @@ struct ComponentTests {
         #expect(instanceNames == ["$M1"])
     }
 }
+
+#endif
