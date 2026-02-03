@@ -20,8 +20,6 @@ class CheckoutDependency:
 
     def verify_sha256(self, file_path, expected_sha256):
         """Verify SHA256 checksum of a file"""
-        if expected_sha256.startswith("sha256:"):
-            expected_sha256 = expected_sha256[7:]
 
         sha256_hash = hashlib.sha256()
         with open(file_path, "rb") as f:
