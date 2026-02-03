@@ -1,6 +1,5 @@
 #if ComponentModel
 
-    import BasicContainers
     import ComponentModel
     import WasmParser
     import WasmTypes
