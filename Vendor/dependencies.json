@@ -14,6 +14,16 @@
     "revision": "2ce1367c9d1271c83fb63bef26d896a2f290cd23",
     "categories": ["default"]
   },
+  "component-model": {
+    "repository": "https://github.com/WebAssembly/component-model.git",
+    "revision": "0b951b72b3f4019edf386a93585782587d221a0c",
+    "categories": ["component-model"]
+  },
+  "wasm-tools": {
+    "url": "https://github.com/bytecodealliance/wasm-tools/releases/download/v1.244.0/wasm-tools-1.244.0-wasm32-wasip1.tar.gz",
+    "sha256": "010f8a3c591f3070d06a1c13830c8a61dcbf6527a62ab289970ed3341f0008e7",
+    "categories": ["component-model"]
+  },
   "swift-format": {
     "repository": "https://github.com/swiftlang/swift-format.git",
     "revision": "62eaad2822b865407b8cde56c36386c00800f7ec",

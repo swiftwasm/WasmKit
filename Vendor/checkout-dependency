@@ -9,12 +9,75 @@ import os
 import sys
 import json
 import subprocess
+import hashlib
+import tarfile
 
 class CheckoutDependency:
 
     def __init__(self, dependencies_file):
         self.dependencies_file = dependencies_file
         self.dependencies = json.load(open(dependencies_file))
+
+    def verify_sha256(self, file_path, expected_sha256):
+        """Verify SHA256 checksum of a file"""
+
+        sha256_hash = hashlib.sha256()
+        with open(file_path, "rb") as f:
+            for byte_block in iter(lambda: f.read(4096), b""):
+                sha256_hash.update(byte_block)
+
+        actual_sha256 = sha256_hash.hexdigest()
+        if actual_sha256 != expected_sha256:
+            raise ValueError(f"SHA256 mismatch: expected {expected_sha256}, got {actual_sha256}")
+
+        print(f"SHA256 verification passed: {actual_sha256}")
+
+    def checkout_tarball(self, dependency_name, dependency):
+        """Download and extract a tarball dependency"""
+        url = dependency["url"]
+        expected_sha256 = dependency.get("sha256")
+
+        vendor_dir = os.path.dirname(__file__)
+        dependency_path = os.path.join(vendor_dir, dependency_name)
+
+        os.makedirs(dependency_path, exist_ok=True)
+
+        tarball_name = os.path.basename(url)
+        tarball_path = os.path.join(vendor_dir, tarball_name)
+
+        if not os.path.exists(tarball_path):
+            print(f"Downloading '{dependency_name}' from {url}")
+            result = subprocess.run(
+                ["curl", "-L", "--progress-bar", "-o", tarball_path, url],
+                capture_output=False
+            )
+            if result.returncode != 0:
+                raise RuntimeError(f"Failed to download {url}")
+        else:
+            print(f"Tarball already downloaded: {tarball_path}")
+
+        if expected_sha256:
+            print(f"Verifying SHA256 checksum for '{dependency_name}'")
+            self.verify_sha256(tarball_path, expected_sha256)
+
+        print(f"Extracting '{dependency_name}' to {dependency_path}")
+        with tarfile.open(tarball_path, "r:gz") as tar:
+            tar.extractall(path=dependency_path)
+
+        print(f"Successfully extracted '{dependency_name}'")
+
+    def checkout_git(self, dependency_name, dependency):
+        """Clone and checkout a git repository dependency"""
+        dependency_path = os.path.join(os.path.dirname(__file__), dependency_name)
+
+        if os.path.exists(dependency_path):
+            print(f"Dependency '{dependency_name}' already exists at {dependency_path}")
+        else:
+            print(f"Cloning '{dependency_name}' to {dependency_path}")
+            subprocess.run(["git", "clone", dependency["repository"], dependency_path], check=True)
+
+        print(f"Checking out '{dependency_name}' to {dependency['revision']}")
+        subprocess.run(["git", "-C", dependency_path, "checkout", dependency["revision"]], check=True)
 
     def checkout(self, dependency_name):
         dependency = self.dependencies.get(dependency_name)
@@ -24,15 +87,13 @@ class CheckoutDependency:
             print(f"Available dependencies: {', '.join(self.dependencies.keys())}")
             sys.exit(1)
 
-        dependency_path = os.path.join(os.path.dirname(__file__), dependency_name)
-        if os.path.exists(dependency_path):
-            print(f"Dependency '{dependency_name}' already exists at {dependency_path}")
+        if "url" in dependency:
+            self.checkout_tarball(dependency_name, dependency)
+        elif "repository" in dependency:
+            self.checkout_git(dependency_name, dependency)
         else:
-            print(f"Cloning '{dependency_name}' to {dependency_path}")
-            subprocess.run(["git", "clone", dependency["repository"], dependency_path], check=True)
-
-        print(f"Checking out '{dependency_name}' to {dependency['revision']}")
-        subprocess.run(["git", "-C", dependency_path, "checkout", dependency["revision"]], check=True)
+            print(f"Unknown dependency type for '{dependency_name}'")
+            sys.exit(1)
 
     def checkout_category(self, category):
         for dependency_name, dependency in self.dependencies.items():
