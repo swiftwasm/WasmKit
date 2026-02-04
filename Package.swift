@@ -33,6 +33,7 @@ let package = Package(
     ],
     traits: [
         .default(enabledTraits: []),
+        "ComponentModel",
         "WasmDebuggingSupport",
     ],
     targets: [
@@ -67,7 +68,13 @@ let package = Package(
 
         .target(
             name: "WAT",
-            dependencies: ["WasmParser"],
+            dependencies: [
+                "WasmParser",
+                .target(
+                    name: "ComponentModel",
+                    condition: .when(traits: ["ComponentModel"])
+                ),
+            ],
             exclude: ["CMakeLists.txt"]
         ),
         .testTarget(name: "WATTests", dependencies: ["WAT"]),
@@ -109,6 +116,12 @@ let package = Package(
         ),
 
         .target(name: "CSystemExtras"),
+
+        // Component Model
+
+        .target(
+            name: "ComponentModel"
+        ),
 
         .executableTarget(
             name: "WITTool",

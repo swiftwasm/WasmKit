@@ -9,8 +9,9 @@ struct Name: Equatable {
     let location: Location
 }
 
-/// A module field declaration that may have its name
-protocol NamedModuleFieldDecl {
+/// A module or component field declaration that may have a name identifier.
+/// Otherwise it's identified by an index.
+protocol NamedFieldDecl {
     /// The name of the module field declaration specified in $id form
     var id: Name? { get }
 }
@@ -26,9 +27,9 @@ protocol NameToIndexResolver {
 }
 
 /// A map of module field declarations indexed by their name
-struct NameMapping<Decl: NamedModuleFieldDecl>: NameToIndexResolver {
-    private var decls: [Decl] = []
-    private var nameToIndex: [String: Int] = [:]
+struct NameMapping<Decl: NamedFieldDecl>: NameToIndexResolver {
+    private(set) var decls: [Decl] = []
+    private(set) var nameToIndex: [String: Int] = [:]
 
     /// Adds a new declaration to the mapping
     /// - Parameter newDecl: The declaration to add
@@ -102,7 +103,7 @@ typealias TypesNameMapping = NameMapping<TypesMap.NamedResolvedType>
 
 /// A map of unique function types indexed by their name or type signature
 struct TypesMap {
-    struct NamedResolvedType: NamedModuleFieldDecl {
+    struct NamedResolvedType: NamedFieldDecl {
         let id: Name?
         let type: WatParser.FunctionType
     }
