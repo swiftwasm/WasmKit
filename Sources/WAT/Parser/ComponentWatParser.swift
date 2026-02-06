@@ -79,7 +79,7 @@
                 case "instance":
                     try parseComponentInstance(&parser, location: location)
                 case "alias":
-                    // Stub: skip unsupported component fields for now
+                    #warning("Stub: skip unsupported component fields for now")
                     try parser.skipParenBlock()
                     continue  // skipParenBlock consumes the closing ), so skip expect below
                 default:
