@@ -793,8 +793,8 @@
                     // 1. Function imports (at indices 0, 1, ...)
                     // 2. Function aliases (continuing indices)
                     // Since we emit aliases before canon.lower, the aliasIndexInArray
-                    // is the correct index (offset by any function imports, but we
-                    // don't have function imports in these test cases yet)
+                    // is the correct index (offset by any function imports)
+                    #warning("No function imports in enabled test cases yet to exercise this code path fully")
                     encoder.writeUnsignedLEB128(UInt32(aliasIndexInArray))
 
                     try encoder.encodeVector(canonDef.options) { option, encoder throws(WatParserError) in
