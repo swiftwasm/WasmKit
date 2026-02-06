@@ -261,7 +261,7 @@ public final class MemoryFileSystem: FileSystemImplementation {
     }
 
     @discardableResult
-    func ensureDirectory(at path: String) throws -> MemoryDirectoryNode {
+    package func ensureDirectory(at path: String) throws -> MemoryDirectoryNode {
         let normalized = normalizePath(path)
 
         if normalized == Self.rootPath {

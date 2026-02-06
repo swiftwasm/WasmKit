@@ -13,7 +13,7 @@ enum MemFSNodeType {
 }
 
 /// A directory node in the memory file system.
-final class MemoryDirectoryNode: MemFSNode {
+package final class MemoryDirectoryNode: MemFSNode {
     let type: MemFSNodeType = .directory
     private var children: [String: MemFSNode] = [:]
 

@@ -83,7 +83,7 @@ public struct Wat {
     /// This method effectively consumes the module value, encoding it into a
     /// binary format byte array. If you need to encode the module multiple times,
     /// you should create a copy of the module value before encoding it.
-    public mutating func encode(options: EncodeOptions = .default) throws -> [UInt8] {
+    public consuming func encode(options: EncodeOptions = .default) throws -> [UInt8] {
         try WAT.encode(module: &self, options: options)
     }
 }
@@ -170,6 +170,69 @@ public struct Wast {
 public func parseWAST(_ input: String, features: WasmFeatureSet = .default) throws(WatParserError) -> Wast {
     return Wast(input, features: features)
 }
+
+// MARK: - Component WAST
+
+#if ComponentModel
+
+    /// A Component WAST script representation.
+    public struct ComponentWast {
+        var parser: ComponentWastParser
+
+        init(_ input: String, features: WasmFeatureSet) {
+            self.parser = ComponentWastParser(input, features: features)
+        }
+
+        /// Parses the next directive in the Component WAST script.
+        ///
+        /// - Returns: A tuple containing the parsed directive and its location in the script,
+        ///   or `nil` if there are no more directives to parse.
+        public mutating func nextDirective() throws -> (directive: ComponentWastDirective, location: Location)? {
+            let location = try parser.parser.peek()?.location(in: parser.parser.lexer) ?? parser.parser.lexer.location()
+            if let directive = try parser.nextDirective() {
+                return (directive, location)
+            } else {
+                return nil
+            }
+        }
+
+        /// Skip the current directive after an error.
+        /// Call this after catching an error from `nextDirective()` to recover and continue parsing.
+        public mutating func skipCurrentDirective() {
+            parser.skipCurrentDirective()
+        }
+    }
+
+    /// Parses a Component WAST string into a `ComponentWast` instance.
+    ///
+    /// - Parameter input: The Component WAST string to parse
+    /// - Parameter features: The feature set to use for parsing
+    /// - Returns: The parsed `ComponentWast` instance
+    ///
+    /// The returned `ComponentWast` instance can be used to iterate over the directives in the script.
+    ///
+    /// ```swift
+    /// var wast = try parseComponentWAST("""
+    /// (component
+    ///   (core module $m (func (export "")))
+    ///   (core instance $m (instantiate $m))
+    ///   (func (export "a") (canon lift (core func $m "")))
+    /// )
+    /// (assert_return (invoke "a"))
+    /// """)
+    ///
+    /// while let (directive, location) = try wast.nextDirective() {
+    ///     print("\(location): \(directive)")
+    /// }
+    /// ```
+    public func parseComponentWAST(
+        _ input: String,
+        features: WasmFeatureSet = .default
+    ) throws(WatParserError) -> ComponentWast {
+        return ComponentWast(input, features: features)
+    }
+
+#endif
 
 func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParserError) -> Wat {
     // This parser is 2-pass: first it collects all module items and creates a mapping of names to indices.
