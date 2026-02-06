@@ -139,7 +139,10 @@ let package = Package(
         ),
 
         .target(
-            name: "ComponentModel"
+            name: "ComponentModel",
+            dependencies: [
+                "WasmTypes"
+            ]
         ),
 
         .executableTarget(
