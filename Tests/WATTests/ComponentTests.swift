@@ -69,7 +69,6 @@
                     "link.wast",
                     "inline-exports.wast",
                     "nested-modules.wast",
-                    "definedtypes.wast",
                     "fused.wast",
                 ],
                 excludePaths: []
