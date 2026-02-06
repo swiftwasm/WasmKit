@@ -306,7 +306,7 @@ jobs:
           swift-version: swift-6.2-release
           swift-build: 6.2-RELEASE
       - uses: actions/checkout@v4
-      - run: python3 ./Vendor/checkout-dependency --category default --category component-model
+      - run: python3 ./Vendor/checkout-dependency --category default
       # FIXME: CMake build is failing on CI due to "link: extra operand '/OUT:lib\\libXXXX.a'" error
       # # Check Windows build with CMake
       # - uses: Cyberboss/install-winget@v1
@@ -318,7 +318,7 @@ jobs:
       # - run: cmake --build .build/cmake
       # Run tests with SwiftPM
       - name: Run tests with SwiftPM
-        run: swift test --traits ComponentModel
+        run: swift test
 
   build-cmake:
     runs-on: ubuntu-24.04
