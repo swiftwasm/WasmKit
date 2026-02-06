@@ -2,6 +2,7 @@
     import ComponentModel
     import WasmTypes
 
+    /// Binary component encoder, implementing CM proposal `Binary.md` spec: https://github.com/WebAssembly/component-model/blob/main/design/mvp/Binary.md
     public struct ComponentEncoder {
         private var underlying = Encoder()
 
@@ -28,7 +29,11 @@
             // This accounts for inline export instances that shift indices
             let coreInstanceIndexMapping = buildCoreInstanceIndexMapping(component: component, fields: fields)
 
-            let coreFuncAliases = try collectCoreFuncAliases(from: fields.canons, component: component, coreInstanceIndexMapping: coreInstanceIndexMapping)
+            let coreFuncAliases = try collectCoreFuncAliases(
+                from: fields.canons,
+                component: component,
+                coreInstanceIndexMapping: coreInstanceIndexMapping
+            )
             let componentFuncAliases = try collectComponentFuncAliases(from: fields.canons, component: component)
             let exportFuncAliases = try collectExportFuncAliases(from: fields.exports, component: component)
 

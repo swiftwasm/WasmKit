@@ -99,7 +99,7 @@ public enum ComponentValueType: Hashable {
 
     case indexed(ComponentTypeIndex)
 
-    /// Returns true if this is a primitive type that can be inlined in valtypes
+    /// Returns `true` if this is a primitive type that can be inlined in valtypes during binary encoding
     package var isPrimitive: Bool {
         switch self {
         case .bool, .s8, .u8, .s16, .u16, .s32, .u32, .s64, .u64, .float32, .float64, .char, .string, .errorContext:
@@ -175,6 +175,7 @@ public indirect enum ComponentValue {
     case string(String)
 
     // Composite types
+    // TODO: store strings in an interner, create a resizable bitset type for `case flags`
     case list([ComponentValue])
     case record([(name: String, value: ComponentValue)])
     case variant(caseName: String, payload: ComponentValue?)
