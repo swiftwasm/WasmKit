@@ -191,25 +191,48 @@ private struct MetaProgramCounter {
 struct FrameHeaderLayout {
     let type: FunctionType
     let size: VReg
+    private let paramSlotOffsets: [Int]
+    private let resultSlotOffsets: [Int]
 
     init(type: FunctionType) {
         self.type = type
-        self.size = Self.size(of: type)
+        self.paramSlotOffsets = Self.slotOffsets(of: type.parameters)
+        self.resultSlotOffsets = Self.slotOffsets(of: type.results)
+        self.size = Self.size(of: type, paramSlotOffsets: paramSlotOffsets, resultSlotOffsets: resultSlotOffsets)
     }
 
     func paramReg(_ index: Int) -> VReg {
-        VReg(index) - size
+        VReg(paramSlotOffsets[index]) - size
     }
 
     func returnReg(_ index: Int) -> VReg {
-        return VReg(index) - size
+        VReg(resultSlotOffsets[index]) - size
     }
 
     internal static func size(of: FunctionType) -> VReg {
-        size(parameters: of.parameters.count, results: of.results.count)
+        let paramSlotOffsets = Self.slotOffsets(of: of.parameters)
+        let resultSlotOffsets = Self.slotOffsets(of: of.results)
+        return Self.size(of: of, paramSlotOffsets: paramSlotOffsets, resultSlotOffsets: resultSlotOffsets)
     }
-    internal static func size(parameters: Int, results: Int) -> VReg {
-        VReg(max(parameters, results)) + VReg(numberOfSavingSlots)
+    private static func size(
+        of type: FunctionType,
+        paramSlotOffsets: [Int],
+        resultSlotOffsets: [Int]
+    ) -> VReg {
+        let paramSlots = (paramSlotOffsets.last ?? 0) + (type.parameters.last?.stackSlotCount ?? 0)
+        let resultSlots = (resultSlotOffsets.last ?? 0) + (type.results.last?.stackSlotCount ?? 0)
+        return VReg(max(paramSlots, resultSlots)) + VReg(numberOfSavingSlots)
+    }
+
+    private static func slotOffsets(of types: [WasmTypes.ValueType]) -> [Int] {
+        var offsets: [Int] = []
+        offsets.reserveCapacity(types.count)
+        var next = 0
+        for t in types {
+            offsets.append(next)
+            next += t.stackSlotCount
+        }
+        return offsets
     }
     /// The number of slots used to save the current instance, PC, and SP
     internal static var numberOfSavingSlots: Int { 3 }
@@ -242,20 +265,25 @@ enum InstructionTranslatorError: Error {
 struct StackLayout {
     let frameHeader: FrameHeaderLayout
     let constantSlotSize: Int
-    let numberOfLocals: Int
+    let localTypes: [WasmTypes.ValueType]
+    private let nonParameterLocalSlotOffsets: [Int]
+    private let numberOfNonParameterLocalSlots: Int
 
     var stackRegBase: VReg {
-        return VReg(numberOfLocals + constantSlotSize)
+        return VReg(numberOfNonParameterLocalSlots + constantSlotSize)
     }
 
-    init(type: FunctionType, numberOfLocals: Int, codeSize: Int) throws(TranslationError) {
+    init(type: FunctionType, locals: [WasmTypes.ValueType], codeSize: Int) throws(TranslationError) {
         self.frameHeader = FrameHeaderLayout(type: type)
-        self.numberOfLocals = numberOfLocals
+        self.localTypes = locals
+        self.nonParameterLocalSlotOffsets = Self.slotOffsets(of: locals)
+        self.numberOfNonParameterLocalSlots =
+            (nonParameterLocalSlotOffsets.last ?? 0) + (locals.last?.stackSlotCount ?? 0)
         // The number of constant slots is determined by the code size
         // This is a heuristic value to balance the fast access to constants
         // and the size of stack frame. Cap the slot size to avoid size explosion.
         self.constantSlotSize = min(max(codeSize / 20, 4), 128)
-        let (maxSlots, overflow) = self.constantSlotSize.addingReportingOverflow(numberOfLocals)
+        let (maxSlots, overflow) = self.constantSlotSize.addingReportingOverflow(numberOfNonParameterLocalSlots)
         guard !overflow, maxSlots < VReg.max else {
             throw TranslationError("The number of constant slots overflows")
         }
@@ -265,7 +293,8 @@ struct StackLayout {
         if isParameter(index) {
             return frameHeader.paramReg(Int(index))
         } else {
-            return VReg(index) - VReg(frameHeader.type.parameters.count)
+            let nonParamIndex = Int(index) - frameHeader.type.parameters.count
+            return VReg(nonParameterLocalSlotOffsets[nonParamIndex])
         }
     }
 
@@ -274,7 +303,7 @@ struct StackLayout {
     }
 
     func constReg(_ index: Int) -> VReg {
-        return VReg(numberOfLocals + index)
+        return VReg(numberOfNonParameterLocalSlots + index)
     }
 
     func dump<Target: TextOutputStream>(to target: inout Target, iseq: InstructionSequence) {
@@ -309,12 +338,25 @@ struct StackLayout {
             writeSlot(&target, VReg(i - savedItems.count), "Saved \(name)")
         }
 
-        for i in 0..<numberOfLocals {
-            writeSlot(&target, VReg(i), "Local \(i)")
+        var localSlot = 0
+        for (i, t) in localTypes.enumerated() {
+            writeSlot(&target, VReg(localSlot), "Local \(i) (\(t))")
+            localSlot += t.stackSlotCount
         }
         for i in 0..<iseq.constants.count {
-            writeSlot(&target, VReg(numberOfLocals + i), "Const \(i) = \(iseq.constants[i])")
+            writeSlot(&target, VReg(numberOfNonParameterLocalSlots + i), "Const \(i) = \(iseq.constants[i])")
         }
+    }
+
+    private static func slotOffsets(of types: [WasmTypes.ValueType]) -> [Int] {
+        var offsets: [Int] = []
+        offsets.reserveCapacity(types.count)
+        var next = 0
+        for t in types {
+            offsets.append(next)
+            next += t.stackSlotCount
+        }
+        return offsets
     }
 }
 
@@ -337,8 +379,10 @@ struct InstructionTranslator: InstructionVisitor {
             }
 
             let blockType: BlockType
-            /// The height of `ValueStack` without including the frame parameters
-            let stackHeight: Int
+            /// The logical value height of `ValueStack` without including the frame parameters.
+            let valueStackHeight: Int
+            /// The physical slot height of `ValueStack` without including the frame parameters.
+            let slotStackHeight: Int
             let continuation: LabelRef
             var kind: Kind
             var reachable: Bool = true
@@ -351,8 +395,8 @@ struct InstructionTranslator: InstructionVisitor {
                     return blockType.parameters
                 }
             }
-            var copyCount: UInt16 {
-                return UInt16(copyTypes.count)
+            var copySlotCount: UInt16 {
+                UInt16(copyTypes.reduce(into: 0) { $0 += $1.stackSlotCount })
             }
         }
 
@@ -425,9 +469,13 @@ struct InstructionTranslator: InstructionVisitor {
 
     struct ValueStack {
         private var values: [MetaValueOnStack] = []
-        /// The maximum height of the stack within the function
-        private(set) var maxHeight: Int = 0
-        var height: Int { values.count }
+        private var startSlotOffsets: [Int] = []
+        /// The current physical slot height of the stack (excluding locals/const pool base).
+        private(set) var slotHeight: Int = 0
+        /// The maximum physical slot height of the stack within the function.
+        private(set) var maxSlotHeight: Int = 0
+        /// The current logical value height of the stack.
+        var valueHeight: Int { values.count }
         let stackRegBase: VReg
         let stackLayout: StackLayout
 
@@ -441,69 +489,81 @@ struct InstructionTranslator: InstructionVisitor {
         }
         mutating func push(_ value: MetaValue) -> VReg {
             // Record the maximum height of the stack we have seen
-            maxHeight = max(maxHeight, height)
-            let usedRegister = self.values.count
+            let type = value.concreteType
+            let width = type?.stackSlotCount ?? 1
+            maxSlotHeight = max(maxSlotHeight, slotHeight + width)
+            let usedSlotOffset = slotHeight
             self.values.append(.stack(value))
-            assert(height < UInt16.max)
-            return stackRegBase + VReg(usedRegister)
+            self.startSlotOffsets.append(usedSlotOffset)
+            self.slotHeight += width
+            assert(valueHeight < UInt16.max)
+            return stackRegBase + VReg(usedSlotOffset)
         }
         mutating func pushLocal(_ localIndex: LocalIndex, locals: inout Locals) throws(TranslationError) {
             let type = try locals.type(of: localIndex)
             self.values.append(.local(type, localIndex))
+            self.startSlotOffsets.append(slotHeight)
+            self.slotHeight += type.stackSlotCount
+            maxSlotHeight = max(maxSlotHeight, slotHeight)
         }
         mutating func pushConst(_ index: Int, type: ValueType) {
             assert(index < stackLayout.constantSlotSize)
             self.values.append(.const(type, index))
+            self.startSlotOffsets.append(slotHeight)
+            self.slotHeight += type.stackSlotCount
+            maxSlotHeight = max(maxSlotHeight, slotHeight)
         }
-        mutating func preserveLocalsOnStack(_ localIndex: LocalIndex) -> [VReg] {
-            var copyTo: [VReg] = []
+        mutating func preserveLocalsOnStack(_ localIndex: LocalIndex) -> [(to: VReg, type: ValueType)] {
+            var copyTo: [(to: VReg, type: ValueType)] = []
             for i in 0..<values.count {
                 guard case .local(let type, localIndex) = self.values[i] else { continue }
                 self.values[i] = .stack(.some(type))
-                copyTo.append(stackRegBase + VReg(i))
+                copyTo.append((to: stackRegBase + VReg(startSlotOffsets[i]), type: type))
             }
             return copyTo
         }
 
-        mutating func preserveLocalsOnStack(depth: Int) -> [(source: LocalIndex, to: VReg)] {
-            var copies: [(source: LocalIndex, to: VReg)] = []
-            for offset in 0..<min(depth, self.values.count) {
+        mutating func preserveLocalsOnStack(depth: Int) -> [(source: LocalIndex, to: VReg, type: ValueType)] {
+            var copies: [(source: LocalIndex, to: VReg, type: ValueType)] = []
+            for offset in 0..<min(depth, self.valueHeight) {
                 let valueIndex = self.values.count - 1 - offset
                 let value = self.values[valueIndex]
                 guard case .local(let type, let localIndex) = value else { continue }
                 self.values[valueIndex] = .stack(.some(type))
-                copies.append((localIndex, self.stackRegBase + VReg(valueIndex)))
+                copies.append((localIndex, self.stackRegBase + VReg(startSlotOffsets[valueIndex]), type))
             }
             return copies
         }
 
-        mutating func preserveConstsOnStack(depth: Int) -> [(source: VReg, to: VReg)] {
-            var copies: [(source: VReg, to: VReg)] = []
-            for offset in 0..<min(depth, self.values.count) {
+        mutating func preserveConstsOnStack(depth: Int) -> [(source: VReg, to: VReg, type: ValueType)] {
+            var copies: [(source: VReg, to: VReg, type: ValueType)] = []
+            for offset in 0..<min(depth, self.valueHeight) {
                 let valueIndex = self.values.count - 1 - offset
                 let value = self.values[valueIndex]
                 guard case .const(let type, let index) = value else { continue }
                 self.values[valueIndex] = .stack(.some(type))
-                copies.append((stackLayout.constReg(index), self.stackRegBase + VReg(valueIndex)))
+                copies.append((stackLayout.constReg(index), self.stackRegBase + VReg(startSlotOffsets[valueIndex]), type))
             }
             return copies
         }
 
         func peek(depth: Int) -> ValueSource {
-            return makeValueSource(self.values[height - 1 - depth])
+            return makeValueSource(valueIndexFromTop: depth)
         }
 
         func peekType(depth: Int) -> MetaValue {
-            return self.values[height - 1 - depth].type
+            return self.values[valueHeight - 1 - depth].type
         }
 
-        private func makeValueSource(_ value: MetaValueOnStack) -> ValueSource {
+        private func makeValueSource(valueIndexFromTop depth: Int) -> ValueSource {
+            let valueIndex = valueHeight - 1 - depth
+            let value = values[valueIndex]
             let source: ValueSource
             switch value {
             case .local(_, let localIndex):
                 source = .local(localIndex)
             case .stack:
-                source = .vreg(stackRegBase + VReg(height))
+                source = .vreg(stackRegBase + VReg(startSlotOffsets[valueIndex]))
             case .const(let type, let index):
                 source = .const(index, type)
             }
@@ -514,7 +574,20 @@ struct InstructionTranslator: InstructionVisitor {
             guard let value = self.values.popLast() else {
                 throw TranslationError("Expected a value on stack but it's empty")
             }
-            let source = makeValueSource(value)
+            guard let startSlotOffset = self.startSlotOffsets.popLast() else {
+                throw TranslationError("Internal consistency error: missing slot offset")
+            }
+            let width = value.type.concreteType?.stackSlotCount ?? 1
+            self.slotHeight -= width
+            let source: ValueSource
+            switch value {
+            case .local(_, let localIndex):
+                source = .local(localIndex)
+            case .stack:
+                source = .vreg(stackRegBase + VReg(startSlotOffset))
+            case .const(let type, let index):
+                source = .const(index, type)
+            }
             return (value.type, source)
         }
         mutating func pop(_ expected: ValueType) throws(TranslationError) -> ValueSource {
@@ -540,13 +613,11 @@ struct InstructionTranslator: InstructionVisitor {
             return register
         }
         mutating func truncate(height: Int) throws(TranslationError) {
-            guard height <= self.height else {
-                throw TranslationError("Truncating to \(height) but the stack height is \(self.height)")
+            guard height <= self.valueHeight else {
+                throw TranslationError("Truncating to \(height) but the stack height is \(self.valueHeight)")
             }
-            while height != self.height {
-                guard self.values.popLast() != nil else {
-                    throw TranslationError("Internal consistency error: Stack height is \(self.height) but failed to pop")
-                }
+            while height != self.valueHeight {
+                _ = try pop()
             }
         }
     }
@@ -876,7 +947,7 @@ struct InstructionTranslator: InstructionVisitor {
         do {
             self.stackLayout = try StackLayout(
                 type: type,
-                numberOfLocals: locals.count,
+                locals: locals,
                 codeSize: codeSize
             )
         } catch {
@@ -893,7 +964,8 @@ struct InstructionTranslator: InstructionVisitor {
             let endLabel = self.iseqBuilder.allocLabel()
             let rootFrame = ControlStack.ControlFrame(
                 blockType: type,
-                stackHeight: 0,
+                valueStackHeight: 0,
+                slotStackHeight: 0,
                 continuation: endLabel,
                 kind: .block(root: true)
             )
@@ -921,16 +993,25 @@ struct InstructionTranslator: InstructionVisitor {
         return true
     }
 
+    @discardableResult
+    private mutating func emitCopyValueSlots(_ type: ValueType, from source: VReg, to dest: VReg) -> Bool {
+        var copied = false
+        for offset in 0..<type.stackSlotCount {
+            copied = emitCopyStack(from: source + VReg(offset), to: dest + VReg(offset)) || copied
+        }
+        return copied
+    }
+
     private mutating func preserveOnStack(depth: Int) {
         preserveLocalsOnStack(depth: depth)
-        for (source, dest) in valueStack.preserveConstsOnStack(depth: depth) {
-            emitCopyStack(from: source, to: dest)
+        for (source, dest, type) in valueStack.preserveConstsOnStack(depth: depth) {
+            emitCopyValueSlots(type, from: source, to: dest)
         }
     }
 
     private mutating func preserveLocalsOnStack(_ localIndex: LocalIndex) {
-        for copyTo in valueStack.preserveLocalsOnStack(localIndex) {
-            emitCopyStack(from: localReg(localIndex), to: copyTo)
+        for (copyTo, type) in valueStack.preserveLocalsOnStack(localIndex) {
+            emitCopyValueSlots(type, from: localReg(localIndex), to: copyTo)
         }
     }
 
@@ -940,8 +1021,8 @@ struct InstructionTranslator: InstructionVisitor {
     /// - Parameter depth: The depth of the logical stack to ensure the values
     ///   are on the physical stack.
     private mutating func preserveLocalsOnStack(depth: Int) {
-        for (sourceLocal, destReg) in valueStack.preserveLocalsOnStack(depth: depth) {
-            emitCopyStack(from: localReg(sourceLocal), to: destReg)
+        for (sourceLocal, destReg, type) in valueStack.preserveLocalsOnStack(depth: depth) {
+            emitCopyValueSlots(type, from: localReg(sourceLocal), to: destReg)
         }
     }
 
@@ -950,7 +1031,7 @@ struct InstructionTranslator: InstructionVisitor {
     /// - Parameter typeHint: A type expected to be popped. Only used for diagnostic purpose.
     /// - Returns: `true` if check succeed. `false` if the pop operation is going to be performed in unreachable code path.
     private func checkBeforePop(typeHint: ValueType?, depth: Int = 0, controlFrame: ControlStack.ControlFrame) throws(ValidationError) -> Bool {
-        if _slowPath(valueStack.height - depth <= controlFrame.stackHeight) {
+        if _slowPath(valueStack.valueHeight - depth <= controlFrame.valueStackHeight) {
             if controlFrame.reachable {
                 throw ValidationError(.expectedTypeOnStackButEmpty(expected: typeHint))
             }
@@ -965,7 +1046,7 @@ struct InstructionTranslator: InstructionVisitor {
     }
     private mutating func ensureOnVReg(_ source: ValueSource) -> VReg {
         // TODO: Copy to stack if source is on preg
-        // let copyTo = valueStack.stackRegBase + VReg(valueStack.height)
+        // let copyTo = valueStack.stackRegBase + VReg(valueStack.slotHeight)
         switch source {
         case .vreg(let register):
             return register
@@ -975,16 +1056,16 @@ struct InstructionTranslator: InstructionVisitor {
             return stackLayout.constReg(index)
         }
     }
-    private mutating func ensureOnStack(_ source: ValueSource) -> VReg {
-        let copyTo = valueStack.stackRegBase + VReg(valueStack.height)
+    private mutating func ensureOnStack(_ source: ValueSource, type: ValueType) -> VReg {
+        let copyTo = valueStack.stackRegBase + VReg(valueStack.slotHeight)
         switch source {
         case .vreg(let vReg):
             return vReg
         case .local(let localIndex):
-            emitCopyStack(from: localReg(localIndex), to: copyTo)
+            emitCopyValueSlots(type, from: localReg(localIndex), to: copyTo)
             return copyTo
         case .const(let index, _):
-            emitCopyStack(from: stackLayout.constReg(index), to: copyTo)
+            emitCopyValueSlots(type, from: stackLayout.constReg(index), to: copyTo)
             return copyTo
         }
     }
@@ -998,7 +1079,7 @@ struct InstructionTranslator: InstructionVisitor {
 
     private mutating func popOnStackOperand(_ type: ValueType) throws(InstructionTranslatorError) -> VReg? {
         guard let op = try popOperand(type) else { return nil }
-        return ensureOnStack(op)
+        return ensureOnStack(op, type: type)
     }
 
     private mutating func popVRegOperand(_ type: ValueType) throws(InstructionTranslatorError) -> VReg? {
@@ -1015,12 +1096,12 @@ struct InstructionTranslator: InstructionVisitor {
     }
 
     @discardableResult
-    private mutating func popPushValues(_ valueTypes: [ValueType]) throws(InstructionTranslatorError) -> Int {
+    private mutating func popPushValues(_ valueTypes: [ValueType]) throws(InstructionTranslatorError) -> (valueHeight: Int, slotHeight: Int) {
         var values: [ValueSource?] = []
         for type in valueTypes.reversed() {
             values.append(try popOperand(type))
         }
-        let stackHeight = self.valueStack.height
+        let stackHeight = (valueHeight: self.valueStack.valueHeight, slotHeight: self.valueStack.slotHeight)
         for (type, value) in zip(valueTypes, values.reversed()) {
             switch value {
             case .local(let localIndex):
@@ -1057,37 +1138,63 @@ struct InstructionTranslator: InstructionVisitor {
     ///
     /// - Parameter valueTypes: The types of the values to copy.
     private mutating func copyValuesIntoResultSlots(_ valueTypes: [ValueType], frameHeader: FrameHeaderLayout) throws(InstructionTranslatorError) {
-        var copies: [(source: VReg, dest: VReg)] = []
+        var copies: [(source: VReg, dest: VReg, type: ValueType)] = []
         for (index, resultType) in valueTypes.enumerated().reversed() {
             guard let operand = try popOperand(resultType) else { continue }
             var source = ensureOnVReg(operand)
             if case .local(let localIndex) = operand, stackLayout.isParameter(localIndex) {
                 // Parameter space is shared with return values, so we need to copy it to the stack
                 // before copying to the return slot to avoid overwriting the parameter value.
-                let copyTo = valueStack.stackRegBase + VReg(valueStack.height)
-                emitCopyStack(from: localReg(localIndex), to: copyTo)
+                let copyTo = valueStack.stackRegBase + VReg(valueStack.slotHeight)
+                emitCopyValueSlots(resultType, from: localReg(localIndex), to: copyTo)
                 source = copyTo
             }
             let dest = frameHeader.returnReg(index)
-            copies.append((source, dest))
+            copies.append((source, dest, resultType))
         }
-        for (source, dest) in copies {
-            emitCopyStack(from: source, to: dest)
+        for (source, dest, type) in copies {
+            emitCopyValueSlots(type, from: source, to: dest)
+        }
+    }
+
+    /// Pop values from the stack and copy them to the parameter slots.
+    ///
+    /// This is used by `return_call`-like instructions which rewrite the current frame header
+    /// to the callee's frame header layout.
+    private mutating func copyValuesIntoParamSlots(_ valueTypes: [ValueType], frameHeader: FrameHeaderLayout) throws {
+        var copies: [(source: VReg, dest: VReg, type: ValueType)] = []
+        for (index, paramType) in valueTypes.enumerated().reversed() {
+            guard let operand = try popOperand(paramType) else { continue }
+            var source = ensureOnVReg(operand)
+            if case .local(let localIndex) = operand, stackLayout.isParameter(localIndex) {
+                // Parameter space is shared with frame header slots, so copy to stack first
+                // to avoid overwriting when the destination is also in the frame header.
+                let copyTo = valueStack.stackRegBase + VReg(valueStack.slotHeight)
+                emitCopyValueSlots(paramType, from: localReg(localIndex), to: copyTo)
+                source = copyTo
+            }
+            let dest = frameHeader.paramReg(index)
+            copies.append((source, dest, paramType))
+        }
+        for (source, dest, type) in copies {
+            emitCopyValueSlots(type, from: source, to: dest)
         }
     }
 
     @discardableResult
     private mutating func copyOnBranch(targetFrame frame: ControlStack.ControlFrame) throws(InstructionTranslatorError) -> Bool {
-        preserveOnStack(depth: min(Int(frame.copyCount), valueStack.height - frame.stackHeight))
-        let copyCount = VReg(frame.copyCount)
-        let sourceBase = valueStack.stackRegBase + VReg(valueStack.height)
-        let destBase = valueStack.stackRegBase + VReg(frame.stackHeight)
+        let depthValues = min(frame.copyTypes.count, valueStack.valueHeight - frame.valueStackHeight)
+        preserveOnStack(depth: depthValues)
+        let copyCount = VReg(frame.copySlotCount)
+        let sourceBase = valueStack.stackRegBase + VReg(valueStack.slotHeight)
+        let destBase = valueStack.stackRegBase + VReg(frame.slotStackHeight)
         var emittedCopy = false
         for i in (0..<copyCount).reversed() {
             let source = sourceBase - 1 - VReg(i)
             let dest: VReg
             if case .block(root: true) = frame.kind {
-                dest = returnReg(Int(copyCount - 1 - i))
+                guard frame.copySlotCount > 0 else { continue }
+                dest = returnReg(0) + copyCount - 1 - VReg(i)
             } else {
                 dest = destBase + copyCount - 1 - VReg(i)
             }
@@ -1108,7 +1215,7 @@ struct InstructionTranslator: InstructionVisitor {
     private mutating func markUnreachable() throws(InstructionTranslatorError) {
         try InstructionTranslatorError.validate(controlStack.markUnreachable())
         let currentFrame = try InstructionTranslatorError.validate(controlStack.currentFrame())
-        try InstructionTranslatorError.translate(valueStack.truncate(height: currentFrame.stackHeight))
+        try InstructionTranslatorError.translate(valueStack.truncate(height: currentFrame.valueStackHeight))
     }
 
     private mutating func finalize() throws(InstructionTranslatorError) -> InstructionSequence {
@@ -1137,7 +1244,7 @@ struct InstructionTranslator: InstructionVisitor {
         let constants = allocator.allocateConstants(self.constantSlots.values)
         return InstructionSequence(
             instructions: buffer,
-            maxStackHeight: Int(valueStack.stackRegBase) + valueStack.maxHeight,
+            maxStackHeight: Int(valueStack.stackRegBase) + valueStack.maxSlotHeight,
             constants: constants
         )
     }
@@ -1186,9 +1293,17 @@ struct InstructionTranslator: InstructionVisitor {
     mutating func visitBlock(blockType _blockType: WasmParser.BlockType) throws(InstructionTranslatorError) -> Output {
         let blockType = try InstructionTranslatorError.validate(module.resolveBlockType(_blockType))
         let endLabel = iseqBuilder.allocLabel()
-        self.preserveLocalsOnStack(depth: self.valueStack.height)
+        self.preserveLocalsOnStack(depth: self.valueStack.valueHeight)
         let stackHeight = try popPushValues(blockType.parameters)
-        controlStack.pushFrame(ControlStack.ControlFrame(blockType: blockType, stackHeight: stackHeight, continuation: endLabel, kind: .block))
+        controlStack.pushFrame(
+            ControlStack.ControlFrame(
+                blockType: blockType,
+                valueStackHeight: stackHeight.valueHeight,
+                slotStackHeight: stackHeight.slotHeight,
+                continuation: endLabel,
+                kind: .block
+            )
+        )
     }
 
     mutating func visitLoop(blockType _blockType: WasmParser.BlockType) throws(InstructionTranslatorError) -> Output {
@@ -1199,31 +1314,42 @@ struct InstructionTranslator: InstructionVisitor {
             _ = try popOperand(param)
         }
         let headLabel = iseqBuilder.putLabel()
-        let stackHeight = self.valueStack.height
+        let stackHeight = (valueHeight: self.valueStack.valueHeight, slotHeight: self.valueStack.slotHeight)
         for param in blockType.parameters {
             _ = valueStack.push(param)
         }
-        controlStack.pushFrame(ControlStack.ControlFrame(blockType: blockType, stackHeight: stackHeight, continuation: headLabel, kind: .loop))
+        controlStack.pushFrame(
+            ControlStack.ControlFrame(
+                blockType: blockType,
+                valueStackHeight: stackHeight.valueHeight,
+                slotStackHeight: stackHeight.slotHeight,
+                continuation: headLabel,
+                kind: .loop
+            )
+        )
     }
 
     mutating func visitIf(blockType _blockType: WasmParser.BlockType) throws(InstructionTranslatorError) -> Output {
         // Pop condition value
         let condition = try popVRegOperand(.i32)
         let blockType = try InstructionTranslatorError.validate(module.resolveBlockType(_blockType))
-        self.preserveLocalsOnStack(depth: self.valueStack.height)
+        self.preserveLocalsOnStack(depth: self.valueStack.valueHeight)
         preserveOnStack(depth: blockType.parameters.count)
         let endLabel = iseqBuilder.allocLabel()
         let elseLabel = iseqBuilder.allocLabel()
         for param in blockType.parameters.reversed() {
             _ = try popOperand(param)
         }
-        let stackHeight = self.valueStack.height
+        let stackHeight = (valueHeight: self.valueStack.valueHeight, slotHeight: self.valueStack.slotHeight)
         for param in blockType.parameters {
             _ = valueStack.push(param)
         }
         controlStack.pushFrame(
             ControlStack.ControlFrame(
-                blockType: blockType, stackHeight: stackHeight, continuation: endLabel,
+                blockType: blockType,
+                valueStackHeight: stackHeight.valueHeight,
+                slotStackHeight: stackHeight.slotHeight,
+                continuation: endLabel,
                 kind: .if(elseLabel: elseLabel, endLabel: endLabel, isElse: false)
             )
         )
@@ -1246,7 +1372,7 @@ struct InstructionTranslator: InstructionVisitor {
         guard case .if(let elseLabel, let endLabel, _) = frame.kind else {
             throw InstructionTranslatorError.validation(ValidationError(.expectedIfControlFrame))
         }
-        preserveOnStack(depth: valueStack.height - frame.stackHeight)
+        preserveOnStack(depth: valueStack.valueHeight - frame.valueStackHeight)
         try InstructionTranslatorError.validate(controlStack.resetReachability())
         iseqBuilder.resetLastEmission()
 
@@ -1259,7 +1385,10 @@ struct InstructionTranslator: InstructionVisitor {
             guard try InstructionTranslatorError.validate(checkBeforePop(typeHint: result, controlFrame: frame)) else { continue }
             _ = try InstructionTranslatorError.translate(valueStack.pop(result))
         }
-        guard valueStack.height == frame.stackHeight else {
+        guard valueStack.valueHeight == frame.valueStackHeight else {
+            throw InstructionTranslatorError.validation(ValidationError(.valuesRemainingAtEndOfBlock))
+        }
+        guard valueStack.slotHeight == frame.slotStackHeight else {
             throw InstructionTranslatorError.validation(ValidationError(.valuesRemainingAtEndOfBlock))
         }
         _ = controlStack.popFrame()
@@ -1279,7 +1408,10 @@ struct InstructionTranslator: InstructionVisitor {
         iseqBuilder.resetLastEmission()
         if case .block(root: true) = toBePopped.kind {
             try translateReturn()
-            guard valueStack.height == toBePopped.stackHeight else {
+            guard valueStack.valueHeight == toBePopped.valueStackHeight else {
+                throw InstructionTranslatorError.validation(ValidationError(.valuesRemainingAtEndOfBlock))
+            }
+            guard valueStack.slotHeight == toBePopped.slotStackHeight else {
                 throw InstructionTranslatorError.validation(ValidationError(.valuesRemainingAtEndOfBlock))
             }
             try InstructionTranslatorError.translate(iseqBuilder.pinLabelHere(toBePopped.continuation))
@@ -1293,7 +1425,7 @@ struct InstructionTranslator: InstructionVisitor {
             }
         }
 
-        preserveOnStack(depth: Int(valueStack.height - toBePopped.stackHeight))
+        preserveOnStack(depth: Int(valueStack.valueHeight - toBePopped.valueStackHeight))
         switch toBePopped.kind {
         case .block:
             try InstructionTranslatorError.translate(iseqBuilder.pinLabelHere(toBePopped.continuation))
@@ -1305,7 +1437,10 @@ struct InstructionTranslator: InstructionVisitor {
             guard try InstructionTranslatorError.validate(checkBeforePop(typeHint: result, controlFrame: toBePopped)) else { continue }
             _ = try InstructionTranslatorError.translate(valueStack.pop(result))
         }
-        guard valueStack.height == toBePopped.stackHeight else {
+        guard valueStack.valueHeight == toBePopped.valueStackHeight else {
+            throw InstructionTranslatorError.validation(ValidationError(.valuesRemainingAtEndOfBlock))
+        }
+        guard valueStack.slotHeight == toBePopped.slotStackHeight else {
             throw InstructionTranslatorError.validation(ValidationError(.valuesRemainingAtEndOfBlock))
         }
         for result in toBePopped.blockType.results {
@@ -1321,9 +1456,9 @@ struct InstructionTranslator: InstructionVisitor {
     ) throws(ValidationError) -> UInt32 {
         let popCount: UInt32
         if _fastPath(currentFrame.reachable) {
-            let count = currentHeight - Int(destination.copyCount) - destination.stackHeight
+            let count = currentHeight - Int(destination.copySlotCount) - destination.slotStackHeight
             guard count >= 0 else {
-                throw ValidationError(.stackHeightUnderflow(available: currentHeight, required: destination.stackHeight + Int(destination.copyCount)))
+                throw ValidationError(.stackHeightUnderflow(available: currentHeight, required: destination.slotStackHeight + Int(destination.copySlotCount)))
             }
             popCount = UInt32(count)
         } else {
@@ -1344,11 +1479,11 @@ struct InstructionTranslator: InstructionVisitor {
         let popCount: UInt32
         do {
             frame = try controlStack.branchTarget(relativeDepth: relativeDepth)
-            copyCount = frame.copyCount
+            copyCount = frame.copySlotCount
             popCount = try Self.computePopCount(
                 destination: frame,
                 currentFrame: try controlStack.currentFrame(),
-                currentHeight: valueStack.height
+                currentHeight: valueStack.slotHeight
             )
         } catch {
             throw InstructionTranslatorError.validation(error)
@@ -1395,7 +1530,7 @@ struct InstructionTranslator: InstructionVisitor {
         }
         let condition = try popVRegOperand(.i32)
 
-        if frame.copyCount == 0 {
+        if frame.copySlotCount == 0 {
             guard let condition else { return }
             // Optimization where we don't need copying values when the branch taken
             self.updateInstructionMapping()
@@ -1407,7 +1542,7 @@ struct InstructionTranslator: InstructionVisitor {
             }
             return
         }
-        preserveOnStack(depth: valueStack.height - frame.stackHeight)
+        preserveOnStack(depth: valueStack.valueHeight - frame.valueStackHeight)
 
         if let condition {
             // If branch taken, fallthrough to landing pad, copy stack values
@@ -1464,8 +1599,8 @@ struct InstructionTranslator: InstructionVisitor {
         do {
             try preserveOnStack(
                 depth: min(
-                    Int(defaultFrame.copyCount),
-                    valueStack.height - controlStack.currentFrame().stackHeight
+                    defaultFrame.copyTypes.count,
+                    valueStack.valueHeight - controlStack.currentFrame().valueStackHeight
                 )
             )
         } catch {
@@ -1557,7 +1692,7 @@ struct InstructionTranslator: InstructionVisitor {
         }
 
         let spAddend =
-            valueStack.stackRegBase + VReg(valueStack.height)
+            valueStack.stackRegBase + VReg(valueStack.slotHeight)
             + FrameHeaderLayout.size(of: calleeType)
 
         for result in calleeType.results {
@@ -1637,7 +1772,7 @@ struct InstructionTranslator: InstructionVisitor {
             let sizeToCopy = VReg(FrameHeaderLayout.numberOfSavingSlots) + valueStack.stackRegBase + VReg(stackTopHeightToCopy)
             emit(.resizeFrameHeader(Instruction.ResizeFrameHeaderOperand(delta: delta, sizeToCopy: sizeToCopy)))
         }
-        try copyValuesIntoResultSlots(calleeType.parameters, frameHeader: calleeFrameHeader)
+        try copyValuesIntoParamSlots(calleeType.parameters, frameHeader: calleeFrameHeader)
     }
 
     mutating func visitReturnCall(functionIndex: UInt32) throws(InstructionTranslatorError) {
@@ -1653,13 +1788,13 @@ struct InstructionTranslator: InstructionVisitor {
             // Skip actual code emission if validation-only mode
             return
         }
-        try prepareFrameHeaderForReturnCall(calleeType: calleeType, stackTopHeightToCopy: valueStack.height)
+        try prepareFrameHeaderForReturnCall(calleeType: calleeType, stackTopHeightToCopy: valueStack.slotHeight)
         emit(.returnCall(Instruction.ReturnCallOperand(callee: callee)))
         try markUnreachable()
     }
 
     mutating func visitReturnCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws(InstructionTranslatorError) {
-        let stackTopHeightToCopy = valueStack.height
+        let stackTopHeightToCopy = valueStack.slotHeight
         let addressType: ValueType
         do {
             addressType = try module.addressType(tableIndex: tableIndex)
@@ -1714,13 +1849,14 @@ struct InstructionTranslator: InstructionVisitor {
         }
         let result = valueStack.push(value1Type)
         if let condition = condition, let value1 = value1, let value2 = value2 {
-            let operand = Instruction.SelectOperand(
-                result: result,
-                condition: condition,
-                onTrue: ensureOnVReg(value2),
-                onFalse: ensureOnVReg(value1)
-            )
-            emit(.select(operand))
+            let onTrue = ensureOnVReg(value2)
+            let onFalse = ensureOnVReg(value1)
+            if value1Type.concreteType == .v128 {
+                emit(.select(.init(result: result, condition: condition, onTrue: onTrue, onFalse: onFalse)))
+                emit(.select(.init(result: result + 1, condition: condition, onTrue: onTrue + 1, onFalse: onFalse + 1)))
+            } else {
+                emit(.select(.init(result: result, condition: condition, onTrue: onTrue, onFalse: onFalse)))
+            }
         }
     }
     mutating func visitTypedSelect(type: WasmTypes.ValueType) throws(InstructionTranslatorError) -> Output {
@@ -1736,13 +1872,14 @@ struct InstructionTranslator: InstructionVisitor {
         // }
         let result = valueStack.push(value1Type)
         if let condition = condition, let value1 = value1, let value2 = value2 {
-            let operand = Instruction.SelectOperand(
-                result: result,
-                condition: condition,
-                onTrue: ensureOnVReg(value2),
-                onFalse: ensureOnVReg(value1)
-            )
-            emit(.select(operand))
+            let onTrue = ensureOnVReg(value2)
+            let onFalse = ensureOnVReg(value1)
+            if type == .v128 {
+                emit(.select(.init(result: result, condition: condition, onTrue: onTrue, onFalse: onFalse)))
+                emit(.select(.init(result: result + 1, condition: condition, onTrue: onTrue + 1, onFalse: onFalse + 1)))
+            } else {
+                emit(.select(.init(result: result, condition: condition, onTrue: onTrue, onFalse: onFalse)))
+            }
         }
     }
     mutating func visitLocalGet(localIndex: UInt32) throws(TranslationError) -> Output {
@@ -1771,11 +1908,11 @@ struct InstructionTranslator: InstructionVisitor {
 
         let value = ensureOnVReg(op)
         guard try InstructionTranslatorError.validate(controlStack.currentFrame()).reachable else { return }
-        if !isTee, iseqBuilder.relinkLastInstructionResult(result) {
+        if type != .v128, !isTee, iseqBuilder.relinkLastInstructionResult(result) {
             // Good news, copyStack is optimized out :)
             return
         }
-        emitCopyStack(from: value, to: result)
+        emitCopyValueSlots(type, from: value, to: result)
     }
     mutating func visitLocalSet(localIndex: UInt32) throws(InstructionTranslatorError) -> Output {
         try visitLocalSetOrTee(localIndex: localIndex, isTee: false)
@@ -1878,6 +2015,23 @@ struct InstructionTranslator: InstructionVisitor {
             })
     }
 
+    private mutating func pop3PushEmit(
+        _ pops: (ValueType, ValueType, ValueType),
+        _ push: ValueType,
+        _ instruction: @escaping (_ popped: (VReg, VReg, VReg), _ result: VReg) -> Instruction
+    ) throws {
+        guard let pop1 = try popVRegOperand(pops.0),
+            let pop2 = try popVRegOperand(pops.1),
+            let pop3 = try popVRegOperand(pops.2)
+        else { return }
+        let result = valueStack.push(push)
+        emit(
+            instruction((pop1, pop2, pop3), result),
+            resultRelink: { result in
+                instruction((pop1, pop2, pop3), result)
+            })
+    }
+
     private mutating func visitLoad(
         _ memarg: MemArg,
         _ type: ValueType,
@@ -1925,7 +2079,23 @@ struct InstructionTranslator: InstructionVisitor {
         case .v128Load, .v128Load8X8S, .v128Load8X8U, .v128Load16X4S, .v128Load16X4U,
             .v128Load32X2S, .v128Load32X2U, .v128Load8Splat, .v128Load16Splat, .v128Load32Splat,
             .v128Load64Splat, .v128Load32Zero, .v128Load64Zero:
-            throw InstructionTranslatorError.validation(ValidationError(.simdNotSupported))
+            let isMemory64 = try InstructionTranslatorError.validate(module.isMemory64(memoryIndex: 0))
+            try InstructionTranslatorError.validate(validator.validateMemArg(memarg, naturalAlignment: load.naturalAlignment))
+            guard let opcode = SIMDOpcode.fromLoad(load) else { preconditionFailure("missing SIMDOpcode mapping: \(load)") }
+            try popPushEmit(.address(isMemory64: isMemory64), .v128) { pointer, result in
+                .simd(
+                    Instruction.SimdOperand(
+                        opcode: opcode.rawValue,
+                        lane: 0,
+                        reserved: 0,
+                        offset: memarg.offset,
+                        input0: pointer,
+                        input1: 0,
+                        input2: 0,
+                        result: result
+                    ))
+            }
+            return
         case .i32Load8S: instruction = Instruction.i32Load8S
         case .i32Load8U: instruction = Instruction.i32Load8U
         case .i32Load16S: instruction = Instruction.i32Load16S
@@ -1956,7 +2126,26 @@ struct InstructionTranslator: InstructionVisitor {
         case .f32Store: instruction = Instruction.f32Store
         case .f64Store: instruction = Instruction.f64Store
         case .v128Store:
-            throw InstructionTranslatorError.validation(ValidationError(.simdNotSupported))
+            let isMemory64 = try InstructionTranslatorError.validate(module.isMemory64(memoryIndex: 0))
+            try InstructionTranslatorError.validate(validator.validateMemArg(memarg, naturalAlignment: store.naturalAlignment))
+            guard let opcode = SIMDOpcode.fromStore(store) else { preconditionFailure("missing SIMDOpcode mapping: \(store)") }
+            let value = try popVRegOperand(.v128)
+            let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
+            if let value = value, let pointer = pointer {
+                emit(
+                    .simd(
+                        Instruction.SimdOperand(
+                            opcode: opcode.rawValue,
+                            lane: 0,
+                            reserved: 0,
+                            offset: memarg.offset,
+                            input0: pointer,
+                            input1: value,
+                            input2: 0,
+                            result: 0
+                        )))
+            }
+            return
         case .i32Store8: instruction = Instruction.i32Store8
         case .i32Store16: instruction = Instruction.i32Store16
         case .i64Store8: instruction = Instruction.i64Store8
@@ -1973,24 +2162,227 @@ struct InstructionTranslator: InstructionVisitor {
         try visitStore(memarg, store.type, store.naturalAlignment, instruction)
     }
 
-    mutating func visitV128Const(value: V128) throws(ValidationError) {
-        throw ValidationError(.simdNotSupported)
+    mutating func visitV128Const(value: V128) throws(InstructionTranslatorError) {
+        let storage = V128Storage(value)
+        pushEmit(.v128) { result in
+            .v128Const(.init(lo: storage.lo, hi: storage.hi, result: result))
+        }
     }
 
-    mutating func visitI8x16Shuffle(lanes: V128ShuffleMask) throws(ValidationError) {
-        throw ValidationError(.simdNotSupported)
+    mutating func visitI8x16Shuffle(lanes: V128ShuffleMask) throws(InstructionTranslatorError) {
+        for lane in lanes.lanes where lane >= 32 {
+            throw InstructionTranslatorError.validation(ValidationError(.invalidLaneIndex(lane: lane, laneCount: 32)))
+        }
+        try pop2PushEmit((.v128, .v128), .v128) { popped, result in
+            let rhs = popped.0
+            let lhs = popped.1
+            let ls = lanes.lanes
+            precondition(ls.count == 16)
+            return .i8x16Shuffle(
+                .init(
+                    lane0: ls[0], lane1: ls[1], lane2: ls[2], lane3: ls[3],
+                    lane4: ls[4], lane5: ls[5], lane6: ls[6], lane7: ls[7],
+                    lane8: ls[8], lane9: ls[9], lane10: ls[10], lane11: ls[11],
+                    lane12: ls[12], lane13: ls[13], lane14: ls[14], lane15: ls[15],
+                    lhs: lhs, rhs: rhs, result: result
+                ))
+        }
     }
 
-    mutating func visitSimd(_ simd: WasmParser.Instruction.Simd) throws(ValidationError) {
-        throw ValidationError(.simdNotSupported)
+    mutating func visitSimd(_ simd: WasmParser.Instruction.Simd) throws(InstructionTranslatorError) {
+        guard let opcode = SIMDOpcode.fromSimd(simd) else { preconditionFailure("missing SIMDOpcode mapping: \(simd)") }
+        func emitUnaryV128() throws {
+            try popPushEmit(.v128, .v128) { v0, result in
+                .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: v0, input1: 0, input2: 0, result: result))
+            }
+        }
+        func emitBinaryV128() throws {
+            try pop2PushEmit((.v128, .v128), .v128) { popped, result in
+                let rhs = popped.0
+                let lhs = popped.1
+                return .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: lhs, input1: rhs, input2: 0, result: result))
+            }
+        }
+        func emitTernaryV128() throws {
+            try pop3PushEmit((.v128, .v128, .v128), .v128) { popped, result in
+                let mask = popped.0
+                let b = popped.1
+                let a = popped.2
+                return .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: a, input1: b, input2: mask, result: result))
+            }
+        }
+        func emitUnaryI32() throws {
+            try popPushEmit(.v128, .i32) { v0, result in
+                .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: v0, input1: 0, input2: 0, result: result))
+            }
+        }
+        func emitShift() throws {
+            try pop2PushEmit((.i32, .v128), .v128) { popped, result in
+                let shift = popped.0
+                let vec = popped.1
+                return .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: vec, input1: shift, input2: 0, result: result))
+            }
+        }
+
+        switch simd {
+        case .i8x16Splat, .i16x8Splat, .i32x4Splat:
+            try popPushEmit(.i32, .v128) { scalar, result in
+                .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: scalar, input1: 0, input2: 0, result: result))
+            }
+        case .i64x2Splat:
+            try popPushEmit(.i64, .v128) { scalar, result in
+                .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: scalar, input1: 0, input2: 0, result: result))
+            }
+        case .f32x4Splat:
+            try popPushEmit(.f32, .v128) { scalar, result in
+                .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: scalar, input1: 0, input2: 0, result: result))
+            }
+        case .f64x2Splat:
+            try popPushEmit(.f64, .v128) { scalar, result in
+                .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: scalar, input1: 0, input2: 0, result: result))
+            }
+
+        case .v128Bitselect:
+            try emitTernaryV128()
+
+        case .v128AnyTrue, .i8x16AllTrue, .i8x16Bitmask, .i16x8AllTrue, .i16x8Bitmask, .i32x4AllTrue, .i32x4Bitmask, .i64x2AllTrue, .i64x2Bitmask:
+            try emitUnaryI32()
+
+        case .i8x16Shl, .i8x16ShrS, .i8x16ShrU,
+            .i16x8Shl, .i16x8ShrS, .i16x8ShrU,
+            .i32x4Shl, .i32x4ShrS, .i32x4ShrU,
+            .i64x2Shl, .i64x2ShrS, .i64x2ShrU:
+            try emitShift()
+
+        case .v128Not,
+            .i8x16Abs, .i8x16Neg,
+            .i16x8Abs, .i16x8Neg,
+            .i32x4Abs, .i32x4Neg,
+            .i64x2Abs, .i64x2Neg,
+            .f32x4Ceil, .f32x4Floor, .f32x4Trunc, .f32x4Nearest,
+            .f64x2Ceil, .f64x2Floor, .f64x2Trunc, .f64x2Nearest,
+            .f32x4Abs, .f32x4Neg, .f32x4Sqrt,
+            .f64x2Abs, .f64x2Neg, .f64x2Sqrt,
+            .i32x4TruncSatF32X4S, .i32x4TruncSatF32X4U,
+            .f32x4ConvertI32X4S, .f32x4ConvertI32X4U,
+            .f64x2ConvertLowI32X4S, .f64x2ConvertLowI32X4U,
+            .i32x4TruncSatF64X2SZero, .i32x4TruncSatF64X2UZero,
+            .f32x4DemoteF64X2Zero, .f64x2PromoteLowF32X4,
+            .i8x16Popcnt,
+            .i16x8ExtaddPairwiseI8X16S, .i16x8ExtaddPairwiseI8X16U,
+            .i32x4ExtaddPairwiseI16X8S, .i32x4ExtaddPairwiseI16X8U,
+            .i16x8ExtendLowI8X16S, .i16x8ExtendHighI8X16S, .i16x8ExtendLowI8X16U, .i16x8ExtendHighI8X16U,
+            .i32x4ExtendLowI16X8S, .i32x4ExtendHighI16X8S, .i32x4ExtendLowI16X8U, .i32x4ExtendHighI16X8U,
+            .i64x2ExtendLowI32X4S, .i64x2ExtendHighI32X4S, .i64x2ExtendLowI32X4U, .i64x2ExtendHighI32X4U:
+            try emitUnaryV128()
+
+        case .v128And, .v128Andnot, .v128Or, .v128Xor,
+            .i8x16Swizzle,
+            .i8x16Eq, .i8x16Ne, .i8x16LtS, .i8x16LtU, .i8x16GtS, .i8x16GtU, .i8x16LeS, .i8x16LeU, .i8x16GeS, .i8x16GeU,
+            .i16x8Eq, .i16x8Ne, .i16x8LtS, .i16x8LtU, .i16x8GtS, .i16x8GtU, .i16x8LeS, .i16x8LeU, .i16x8GeS, .i16x8GeU,
+            .i32x4Eq, .i32x4Ne, .i32x4LtS, .i32x4LtU, .i32x4GtS, .i32x4GtU, .i32x4LeS, .i32x4LeU, .i32x4GeS, .i32x4GeU,
+            .i64x2Eq, .i64x2Ne, .i64x2LtS, .i64x2GtS, .i64x2LeS, .i64x2GeS,
+            .f32x4Eq, .f32x4Ne, .f32x4Lt, .f32x4Gt, .f32x4Le, .f32x4Ge,
+            .f64x2Eq, .f64x2Ne, .f64x2Lt, .f64x2Gt, .f64x2Le, .f64x2Ge,
+            .i8x16NarrowI16X8S, .i8x16NarrowI16X8U,
+            .i16x8NarrowI32X4S, .i16x8NarrowI32X4U,
+            .i8x16Add, .i8x16AddSatS, .i8x16AddSatU, .i8x16Sub, .i8x16SubSatS, .i8x16SubSatU, .i8x16MinS, .i8x16MinU, .i8x16MaxS, .i8x16MaxU, .i8x16AvgrU,
+            .i16x8Add, .i16x8AddSatS, .i16x8AddSatU, .i16x8Sub, .i16x8SubSatS, .i16x8SubSatU, .i16x8Mul, .i16x8MinS, .i16x8MinU, .i16x8MaxS, .i16x8MaxU, .i16x8AvgrU,
+            .i32x4Add, .i32x4Sub, .i32x4Mul, .i32x4MinS, .i32x4MinU, .i32x4MaxS, .i32x4MaxU,
+            .i64x2Add, .i64x2Sub, .i64x2Mul,
+            .f32x4Add, .f32x4Sub, .f32x4Mul, .f32x4Div, .f32x4Min, .f32x4Max, .f32x4Pmin, .f32x4Pmax,
+            .f64x2Add, .f64x2Sub, .f64x2Mul, .f64x2Div, .f64x2Min, .f64x2Max, .f64x2Pmin, .f64x2Pmax,
+            .i32x4DotI16X8S,
+            .i16x8ExtmulLowI8X16S, .i16x8ExtmulHighI8X16S, .i16x8ExtmulLowI8X16U, .i16x8ExtmulHighI8X16U,
+            .i32x4ExtmulLowI16X8S, .i32x4ExtmulHighI16X8S, .i32x4ExtmulLowI16X8U, .i32x4ExtmulHighI16X8U,
+            .i64x2ExtmulLowI32X4S, .i64x2ExtmulHighI32X4S, .i64x2ExtmulLowI32X4U, .i64x2ExtmulHighI32X4U,
+            .i16x8Q15MulrSatS:
+            try emitBinaryV128()
+        }
     }
 
-    mutating func visitSimdLane(_ simdLane: WasmParser.Instruction.SimdLane, lane: UInt8) throws(ValidationError) {
-        throw ValidationError(.simdNotSupported)
+    mutating func visitSimdLane(_ simdLane: WasmParser.Instruction.SimdLane, lane: UInt8) throws {
+        guard let opcode = SIMDOpcode.fromSimdLane(simdLane) else { preconditionFailure("missing SIMDOpcode mapping: \(simdLane)") }
+        let laneCount: UInt8
+        switch simdLane {
+        case .i8x16ExtractLaneS, .i8x16ExtractLaneU, .i8x16ReplaceLane: laneCount = 16
+        case .i16x8ExtractLaneS, .i16x8ExtractLaneU, .i16x8ReplaceLane: laneCount = 8
+        case .i32x4ExtractLane, .i32x4ReplaceLane, .f32x4ExtractLane, .f32x4ReplaceLane: laneCount = 4
+        case .i64x2ExtractLane, .i64x2ReplaceLane, .f64x2ExtractLane, .f64x2ReplaceLane: laneCount = 2
+        }
+        if lane >= laneCount {
+            throw ValidationError(.invalidLaneIndex(lane: lane, laneCount: laneCount))
+        }
+        switch simdLane {
+        case .i8x16ExtractLaneS, .i8x16ExtractLaneU, .i16x8ExtractLaneS, .i16x8ExtractLaneU, .i32x4ExtractLane:
+            try popPushEmit(.v128, .i32) { vec, result in
+                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: vec, input1: 0, input2: 0, result: result))
+            }
+        case .i64x2ExtractLane:
+            try popPushEmit(.v128, .i64) { vec, result in
+                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: vec, input1: 0, input2: 0, result: result))
+            }
+        case .f32x4ExtractLane:
+            try popPushEmit(.v128, .f32) { vec, result in
+                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: vec, input1: 0, input2: 0, result: result))
+            }
+        case .f64x2ExtractLane:
+            try popPushEmit(.v128, .f64) { vec, result in
+                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: vec, input1: 0, input2: 0, result: result))
+            }
+        case .i8x16ReplaceLane:
+            try pop2PushEmit((.i32, .v128), .v128) { popped, result in
+                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: popped.1, input1: popped.0, input2: 0, result: result))
+            }
+        case .i16x8ReplaceLane, .i32x4ReplaceLane:
+            try pop2PushEmit((.i32, .v128), .v128) { popped, result in
+                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: popped.1, input1: popped.0, input2: 0, result: result))
+            }
+        case .i64x2ReplaceLane:
+            try pop2PushEmit((.i64, .v128), .v128) { popped, result in
+                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: popped.1, input1: popped.0, input2: 0, result: result))
+            }
+        case .f32x4ReplaceLane:
+            try pop2PushEmit((.f32, .v128), .v128) { popped, result in
+                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: popped.1, input1: popped.0, input2: 0, result: result))
+            }
+        case .f64x2ReplaceLane:
+            try pop2PushEmit((.f64, .v128), .v128) { popped, result in
+                .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: 0, input0: popped.1, input1: popped.0, input2: 0, result: result))
+            }
+        }
     }
 
-    mutating func visitSimdMemLane(_ simdMemLane: WasmParser.Instruction.SimdMemLane, memarg: MemArg, lane: UInt8) throws(ValidationError) {
-        throw ValidationError(.simdNotSupported)
+    mutating func visitSimdMemLane(_ simdMemLane: WasmParser.Instruction.SimdMemLane, memarg: MemArg, lane: UInt8) throws {
+        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        guard let opcode = SIMDOpcode.fromSimdMemLane(simdMemLane) else { preconditionFailure("missing SIMDOpcode mapping: \(simdMemLane)") }
+        let naturalAlignment: Int
+        let laneCount: UInt8
+        switch simdMemLane {
+        case .v128Load8Lane, .v128Store8Lane: (naturalAlignment, laneCount) = (0, 16)
+        case .v128Load16Lane, .v128Store16Lane: (naturalAlignment, laneCount) = (1, 8)
+        case .v128Load32Lane, .v128Store32Lane: (naturalAlignment, laneCount) = (2, 4)
+        case .v128Load64Lane, .v128Store64Lane: (naturalAlignment, laneCount) = (3, 2)
+        }
+        if lane >= laneCount {
+            throw ValidationError(.invalidLaneIndex(lane: lane, laneCount: laneCount))
+        }
+        try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
+
+        switch simdMemLane {
+        case .v128Load8Lane, .v128Load16Lane, .v128Load32Lane, .v128Load64Lane:
+            try pop2PushEmit((.v128, .address(isMemory64: isMemory64)), .v128) { popped, result in
+                let vec = popped.0
+                let ptr = popped.1
+                return .simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: memarg.offset, input0: ptr, input1: vec, input2: 0, result: result))
+            }
+        case .v128Store8Lane, .v128Store16Lane, .v128Store32Lane, .v128Store64Lane:
+            let vec = try popVRegOperand(.v128)
+            let ptr = try popVRegOperand(.address(isMemory64: isMemory64))
+            if let vec = vec, let ptr = ptr {
+                emit(.simd(.init(opcode: opcode.rawValue, lane: lane, reserved: 0, offset: memarg.offset, input0: ptr, input1: vec, input2: 0, result: 0)))
+            }
+        }
     }
 
     mutating func visitMemorySize(memory: UInt32) throws(ValidationError) -> Output {
@@ -2418,6 +2810,428 @@ struct InstructionTranslator: InstructionVisitor {
     mutating func visitTableSize(table: UInt32) throws(ValidationError) -> Output {
         pushEmit(try module.addressType(tableIndex: table)) { result in
             return .tableSize(Instruction.TableSizeOperand(tableIndex: table, result: LVReg(result)))
+        }
+    }
+
+    // MARK: - Atomic Operations Translation
+
+    private mutating func visitRmw(
+        _ memarg: MemArg,
+        _ type: ValueType,
+        _ naturalAlignment: Int,
+        _ instruction: @escaping (Instruction.RmwOperand) -> Instruction
+    ) throws {
+        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
+        let value = try popVRegOperand(type)
+        let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
+        guard let value = value, let pointer = pointer else {
+            throw TranslationError("missing rmw operands")
+        }
+        let result = valueStack.push(type)
+        let rmwOperand = Instruction.RmwOperand(
+            offset: memarg.offset,
+            pointer: pointer,
+            value: value,
+            result: result
+        )
+        emit(instruction(rmwOperand))
+    }
+
+    private mutating func visitRmw8(
+        _ memarg: MemArg,
+        _ resultType: ValueType,
+        _ naturalAlignment: Int,
+        _ instruction: @escaping (Instruction.RmwOperand) -> Instruction
+    ) throws {
+        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
+        let value = try popVRegOperand(resultType)
+        let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
+        guard let value = value, let pointer = pointer else {
+            throw TranslationError("missing rmw operands")
+        }
+        let result = valueStack.push(resultType)
+        let rmwOperand = Instruction.RmwOperand(
+            offset: memarg.offset,
+            pointer: pointer,
+            value: value,
+            result: result
+        )
+        emit(instruction(rmwOperand))
+    }
+
+    private mutating func visitRmw16(
+        _ memarg: MemArg,
+        _ resultType: ValueType,
+        _ naturalAlignment: Int,
+        _ instruction: @escaping (Instruction.RmwOperand) -> Instruction
+    ) throws {
+        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
+        let value = try popVRegOperand(resultType)
+        let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
+        guard let value = value, let pointer = pointer else {
+            throw TranslationError("missing rmw operands")
+        }
+        let result = valueStack.push(resultType)
+        let rmwOperand = Instruction.RmwOperand(
+            offset: memarg.offset,
+            pointer: pointer,
+            value: value,
+            result: result
+        )
+        emit(instruction(rmwOperand))
+    }
+
+    private mutating func visitRmw32(
+        _ memarg: MemArg,
+        _ resultType: ValueType,
+        _ naturalAlignment: Int,
+        _ instruction: @escaping (Instruction.RmwOperand) -> Instruction
+    ) throws {
+        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
+        let value = try popVRegOperand(resultType)
+        let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
+        guard let value = value, let pointer = pointer else {
+            throw TranslationError("missing rmw operands")
+        }
+        let result = valueStack.push(resultType)
+        let rmwOperand = Instruction.RmwOperand(
+            offset: memarg.offset,
+            pointer: pointer,
+            value: value,
+            result: result
+        )
+        emit(instruction(rmwOperand))
+    }
+
+    mutating func visitI32AtomicRmwAdd(memarg: MemArg) throws -> Output {
+        try visitRmw(memarg, .i32, 4) { .i32AtomicRmwAdd($0) }
+    }
+    mutating func visitI64AtomicRmwAdd(memarg: MemArg) throws -> Output {
+        try visitRmw(memarg, .i64, 8) { .i64AtomicRmwAdd($0) }
+    }
+    mutating func visitI32AtomicRmw8AddU(memarg: MemArg) throws -> Output {
+        try visitRmw8(memarg, .i32, 1) { .i32AtomicRmw8AddU($0) }
+    }
+    mutating func visitI32AtomicRmw16AddU(memarg: MemArg) throws -> Output {
+        try visitRmw16(memarg, .i32, 2) { .i32AtomicRmw16AddU($0) }
+    }
+    mutating func visitI64AtomicRmw8AddU(memarg: MemArg) throws -> Output {
+        try visitRmw8(memarg, .i64, 1) { .i64AtomicRmw8AddU($0) }
+    }
+    mutating func visitI64AtomicRmw16AddU(memarg: MemArg) throws -> Output {
+        try visitRmw16(memarg, .i64, 2) { .i64AtomicRmw16AddU($0) }
+    }
+    mutating func visitI64AtomicRmw32AddU(memarg: MemArg) throws -> Output {
+        try visitRmw32(memarg, .i64, 4) { .i64AtomicRmw32AddU($0) }
+    }
+
+    mutating func visitI32AtomicRmwSub(memarg: MemArg) throws -> Output {
+        try visitRmw(memarg, .i32, 4) { .i32AtomicRmwSub($0) }
+    }
+    mutating func visitI64AtomicRmwSub(memarg: MemArg) throws -> Output {
+        try visitRmw(memarg, .i64, 8) { .i64AtomicRmwSub($0) }
+    }
+    mutating func visitI32AtomicRmw8SubU(memarg: MemArg) throws -> Output {
+        try visitRmw8(memarg, .i32, 1) { .i32AtomicRmw8SubU($0) }
+    }
+    mutating func visitI32AtomicRmw16SubU(memarg: MemArg) throws -> Output {
+        try visitRmw16(memarg, .i32, 2) { .i32AtomicRmw16SubU($0) }
+    }
+    mutating func visitI64AtomicRmw8SubU(memarg: MemArg) throws -> Output {
+        try visitRmw8(memarg, .i64, 1) { .i64AtomicRmw8SubU($0) }
+    }
+    mutating func visitI64AtomicRmw16SubU(memarg: MemArg) throws -> Output {
+        try visitRmw16(memarg, .i64, 2) { .i64AtomicRmw16SubU($0) }
+    }
+    mutating func visitI64AtomicRmw32SubU(memarg: MemArg) throws -> Output {
+        try visitRmw32(memarg, .i64, 4) { .i64AtomicRmw32SubU($0) }
+    }
+
+    mutating func visitI32AtomicRmwAnd(memarg: MemArg) throws -> Output {
+        try visitRmw(memarg, .i32, 4) { .i32AtomicRmwAnd($0) }
+    }
+    mutating func visitI64AtomicRmwAnd(memarg: MemArg) throws -> Output {
+        try visitRmw(memarg, .i64, 8) { .i64AtomicRmwAnd($0) }
+    }
+    mutating func visitI32AtomicRmw8AndU(memarg: MemArg) throws -> Output {
+        try visitRmw8(memarg, .i32, 1) { .i32AtomicRmw8AndU($0) }
+    }
+    mutating func visitI32AtomicRmw16AndU(memarg: MemArg) throws -> Output {
+        try visitRmw16(memarg, .i32, 2) { .i32AtomicRmw16AndU($0) }
+    }
+    mutating func visitI64AtomicRmw8AndU(memarg: MemArg) throws -> Output {
+        try visitRmw8(memarg, .i64, 1) { .i64AtomicRmw8AndU($0) }
+    }
+    mutating func visitI64AtomicRmw16AndU(memarg: MemArg) throws -> Output {
+        try visitRmw16(memarg, .i64, 2) { .i64AtomicRmw16AndU($0) }
+    }
+    mutating func visitI64AtomicRmw32AndU(memarg: MemArg) throws -> Output {
+        try visitRmw32(memarg, .i64, 4) { .i64AtomicRmw32AndU($0) }
+    }
+
+    mutating func visitI32AtomicRmwOr(memarg: MemArg) throws -> Output {
+        try visitRmw(memarg, .i32, 4) { .i32AtomicRmwOr($0) }
+    }
+    mutating func visitI64AtomicRmwOr(memarg: MemArg) throws -> Output {
+        try visitRmw(memarg, .i64, 8) { .i64AtomicRmwOr($0) }
+    }
+    mutating func visitI32AtomicRmw8OrU(memarg: MemArg) throws -> Output {
+        try visitRmw8(memarg, .i32, 1) { .i32AtomicRmw8OrU($0) }
+    }
+    mutating func visitI32AtomicRmw16OrU(memarg: MemArg) throws -> Output {
+        try visitRmw16(memarg, .i32, 2) { .i32AtomicRmw16OrU($0) }
+    }
+    mutating func visitI64AtomicRmw8OrU(memarg: MemArg) throws -> Output {
+        try visitRmw8(memarg, .i64, 1) { .i64AtomicRmw8OrU($0) }
+    }
+    mutating func visitI64AtomicRmw16OrU(memarg: MemArg) throws -> Output {
+        try visitRmw16(memarg, .i64, 2) { .i64AtomicRmw16OrU($0) }
+    }
+    mutating func visitI64AtomicRmw32OrU(memarg: MemArg) throws -> Output {
+        try visitRmw32(memarg, .i64, 4) { .i64AtomicRmw32OrU($0) }
+    }
+
+    mutating func visitI32AtomicRmwXor(memarg: MemArg) throws -> Output {
+        try visitRmw(memarg, .i32, 4) { .i32AtomicRmwXor($0) }
+    }
+    mutating func visitI64AtomicRmwXor(memarg: MemArg) throws -> Output {
+        try visitRmw(memarg, .i64, 8) { .i64AtomicRmwXor($0) }
+    }
+    mutating func visitI32AtomicRmw8XorU(memarg: MemArg) throws -> Output {
+        try visitRmw8(memarg, .i32, 1) { .i32AtomicRmw8XorU($0) }
+    }
+    mutating func visitI32AtomicRmw16XorU(memarg: MemArg) throws -> Output {
+        try visitRmw16(memarg, .i32, 2) { .i32AtomicRmw16XorU($0) }
+    }
+    mutating func visitI64AtomicRmw8XorU(memarg: MemArg) throws -> Output {
+        try visitRmw8(memarg, .i64, 1) { .i64AtomicRmw8XorU($0) }
+    }
+    mutating func visitI64AtomicRmw16XorU(memarg: MemArg) throws -> Output {
+        try visitRmw16(memarg, .i64, 2) { .i64AtomicRmw16XorU($0) }
+    }
+    mutating func visitI64AtomicRmw32XorU(memarg: MemArg) throws -> Output {
+        try visitRmw32(memarg, .i64, 4) { .i64AtomicRmw32XorU($0) }
+    }
+
+    mutating func visitI32AtomicRmwXchg(memarg: MemArg) throws -> Output {
+        try visitRmw(memarg, .i32, 4) { .i32AtomicRmwXchg($0) }
+    }
+    mutating func visitI64AtomicRmwXchg(memarg: MemArg) throws -> Output {
+        try visitRmw(memarg, .i64, 8) { .i64AtomicRmwXchg($0) }
+    }
+    mutating func visitI32AtomicRmw8XchgU(memarg: MemArg) throws -> Output {
+        try visitRmw8(memarg, .i32, 1) { .i32AtomicRmw8XchgU($0) }
+    }
+    mutating func visitI32AtomicRmw16XchgU(memarg: MemArg) throws -> Output {
+        try visitRmw16(memarg, .i32, 2) { .i32AtomicRmw16XchgU($0) }
+    }
+    mutating func visitI64AtomicRmw8XchgU(memarg: MemArg) throws -> Output {
+        try visitRmw8(memarg, .i64, 1) { .i64AtomicRmw8XchgU($0) }
+    }
+    mutating func visitI64AtomicRmw16XchgU(memarg: MemArg) throws -> Output {
+        try visitRmw16(memarg, .i64, 2) { .i64AtomicRmw16XchgU($0) }
+    }
+    mutating func visitI64AtomicRmw32XchgU(memarg: MemArg) throws -> Output {
+        try visitRmw32(memarg, .i64, 4) { .i64AtomicRmw32XchgU($0) }
+    }
+
+    private mutating func visitCmpxchg(
+        _ memarg: MemArg,
+        _ type: ValueType,
+        _ naturalAlignment: Int,
+        _ instruction: @escaping (Instruction.CmpxchgOperand) -> Instruction
+    ) throws {
+        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
+        let replacement = try popVRegOperand(type)
+        let expected = try popVRegOperand(type)
+        let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
+        guard let replacement = replacement, let expected = expected, let pointer = pointer else {
+            throw TranslationError("missing cmpxchg operands")
+        }
+        let result = valueStack.push(type)
+        let cmpxchgOperand = Instruction.CmpxchgOperand(
+            offset: memarg.offset,
+            pointer: pointer,
+            expected: expected,
+            replacement: replacement,
+            result: result
+        )
+        emit(instruction(cmpxchgOperand))
+    }
+
+    private mutating func visitCmpxchg8(
+        _ memarg: MemArg,
+        _ resultType: ValueType,
+        _ naturalAlignment: Int,
+        _ instruction: @escaping (Instruction.CmpxchgOperand) -> Instruction
+    ) throws {
+        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
+        let replacement = try popVRegOperand(resultType)
+        let expected = try popVRegOperand(resultType)
+        let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
+        guard let replacement = replacement, let expected = expected, let pointer = pointer else {
+            throw TranslationError("missing cmpxchg operands")
+        }
+        let result = valueStack.push(resultType)
+        let cmpxchgOperand = Instruction.CmpxchgOperand(
+            offset: memarg.offset,
+            pointer: pointer,
+            expected: expected,
+            replacement: replacement,
+            result: result
+        )
+        emit(instruction(cmpxchgOperand))
+    }
+
+    private mutating func visitCmpxchg16(
+        _ memarg: MemArg,
+        _ resultType: ValueType,
+        _ naturalAlignment: Int,
+        _ instruction: @escaping (Instruction.CmpxchgOperand) -> Instruction
+    ) throws {
+        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
+        let replacement = try popVRegOperand(resultType)
+        let expected = try popVRegOperand(resultType)
+        let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
+        guard let replacement = replacement, let expected = expected, let pointer = pointer else {
+            throw TranslationError("missing cmpxchg operands")
+        }
+        let result = valueStack.push(resultType)
+        let cmpxchgOperand = Instruction.CmpxchgOperand(
+            offset: memarg.offset,
+            pointer: pointer,
+            expected: expected,
+            replacement: replacement,
+            result: result
+        )
+        emit(instruction(cmpxchgOperand))
+    }
+
+    private mutating func visitCmpxchg32(
+        _ memarg: MemArg,
+        _ resultType: ValueType,
+        _ naturalAlignment: Int,
+        _ instruction: @escaping (Instruction.CmpxchgOperand) -> Instruction
+    ) throws {
+        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
+        let replacement = try popVRegOperand(resultType)
+        let expected = try popVRegOperand(resultType)
+        let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
+        guard let replacement = replacement, let expected = expected, let pointer = pointer else {
+            throw TranslationError("missing cmpxchg operands")
+        }
+        let result = valueStack.push(resultType)
+        let cmpxchgOperand = Instruction.CmpxchgOperand(
+            offset: memarg.offset,
+            pointer: pointer,
+            expected: expected,
+            replacement: replacement,
+            result: result
+        )
+        emit(instruction(cmpxchgOperand))
+    }
+
+    mutating func visitI32AtomicRmwCmpxchg(memarg: MemArg) throws -> Output {
+        try visitCmpxchg(memarg, .i32, 4) { .i32AtomicRmwCmpxchg($0) }
+    }
+    mutating func visitI64AtomicRmwCmpxchg(memarg: MemArg) throws -> Output {
+        try visitCmpxchg(memarg, .i64, 8) { .i64AtomicRmwCmpxchg($0) }
+    }
+    mutating func visitI32AtomicRmw8CmpxchgU(memarg: MemArg) throws -> Output {
+        try visitCmpxchg8(memarg, .i32, 1) { .i32AtomicRmw8CmpxchgU($0) }
+    }
+    mutating func visitI32AtomicRmw16CmpxchgU(memarg: MemArg) throws -> Output {
+        try visitCmpxchg16(memarg, .i32, 2) { .i32AtomicRmw16CmpxchgU($0) }
+    }
+    mutating func visitI64AtomicRmw8CmpxchgU(memarg: MemArg) throws -> Output {
+        try visitCmpxchg8(memarg, .i64, 1) { .i64AtomicRmw8CmpxchgU($0) }
+    }
+    mutating func visitI64AtomicRmw16CmpxchgU(memarg: MemArg) throws -> Output {
+        try visitCmpxchg16(memarg, .i64, 2) { .i64AtomicRmw16CmpxchgU($0) }
+    }
+    mutating func visitI64AtomicRmw32CmpxchgU(memarg: MemArg) throws -> Output {
+        try visitCmpxchg32(memarg, .i64, 4) { .i64AtomicRmw32CmpxchgU($0) }
+    }
+
+    mutating func visitMemoryAtomicWait32(memarg: MemArg) throws -> Output {
+        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        try validator.validateMemArg(memarg, naturalAlignment: 4)
+        let timeout = try popVRegOperand(.i64)
+        let expected = try popVRegOperand(.i32)
+        let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
+        guard let timeout = timeout, let expected = expected, let pointer = pointer else {
+            throw TranslationError("missing wait operands")
+        }
+        let result = valueStack.push(.i32)
+        let waitOperand = Instruction.AtomicWaitOperand(
+            offset: memarg.offset,
+            pointer: pointer,
+            expected: expected,
+            timeout: timeout,
+            result: VReg(result)
+        )
+        emit(.memoryAtomicWait32(waitOperand))
+    }
+
+    mutating func visitMemoryAtomicWait64(memarg: MemArg) throws -> Output {
+        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        try validator.validateMemArg(memarg, naturalAlignment: 8)
+        let timeout = try popVRegOperand(.i64)
+        let expected = try popVRegOperand(.i64)
+        let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
+        guard let timeout = timeout, let expected = expected, let pointer = pointer else {
+            throw TranslationError("missing wait operands")
+        }
+        let result = valueStack.push(.i32)
+        let waitOperand = Instruction.AtomicWaitOperand(
+            offset: memarg.offset,
+            pointer: pointer,
+            expected: expected,
+            timeout: timeout,
+            result: VReg(result)
+        )
+        emit(.memoryAtomicWait64(waitOperand))
+    }
+
+    mutating func visitMemoryAtomicNotify(memarg: MemArg) throws -> Output {
+        let isMemory64 = try module.isMemory64(memoryIndex: 0)
+        try validator.validateMemArg(memarg, naturalAlignment: 4)
+        let count = try popVRegOperand(.i32)
+        let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
+        guard let count = count, let pointer = pointer else {
+            throw TranslationError("missing notify operands")
+        }
+        let result = valueStack.push(.i32)
+        let notifyOperand = Instruction.AtomicNotifyOperand(
+            offset: memarg.offset,
+            pointer: pointer,
+            count: count,
+            result: VReg(result)
+        )
+        emit(.memoryAtomicNotify(notifyOperand))
+    }
+
+    mutating func visitAtomicFence() throws -> Output {
+        // No-op: In an interpreter, instructions are executed sequentially,
+        // so no reordering can occur. atomic.fence is only meaningful for
+        // compiled code with actual CPU-level reordering.
+        // Do not emit any instruction.
+    }
+}
+
+extension InstructionTranslator.MetaValue {
+    fileprivate var concreteType: WasmTypes.ValueType? {
+        switch self {
+        case .some(let type): return type
+        case .unknown: return nil
         }
     }
 }

@@ -93,13 +93,13 @@ struct Execution<MemorySpace: GuestMemory>: ~Copyable {
 
     private func initializeConstSlots(
         sp: Sp, iseq: InstructionSequence,
-        numberOfNonParameterLocals: Int
+        numberOfNonParameterLocalSlots: Int
     ) {
         // Initialize the locals with zeros (all types of value have the same representation)
-        sp.initialize(repeating: UntypedValue.default.storage, count: numberOfNonParameterLocals)
+        sp.initialize(repeating: UntypedValue.default.storage, count: numberOfNonParameterLocalSlots)
         if let constants = iseq.constants.baseAddress {
             let count = iseq.constants.count
-            sp.advanced(by: numberOfNonParameterLocals).withMemoryRebound(to: UntypedValue.self, capacity: count) {
+            sp.advanced(by: numberOfNonParameterLocalSlots).withMemoryRebound(to: UntypedValue.self, capacity: count) {
                 $0.initialize(from: constants, count: count)
             }
         }
@@ -110,13 +110,13 @@ struct Execution<MemorySpace: GuestMemory>: ~Copyable {
     func pushFrame(
         iseq: InstructionSequence,
         function: EntityHandle<WasmFunctionEntity>,
-        numberOfNonParameterLocals: Int,
+        numberOfNonParameterLocalSlots: Int,
         sp: Sp, returnPC: Pc,
         spAddend: VReg
     ) throws(Trap) -> Sp {
         let newSp = sp.advanced(by: Int(spAddend))
         try checkStackBoundary(newSp.advanced(by: iseq.maxStackHeight))
-        initializeConstSlots(sp: newSp, iseq: iseq, numberOfNonParameterLocals: numberOfNonParameterLocals)
+        initializeConstSlots(sp: newSp, iseq: iseq, numberOfNonParameterLocalSlots: numberOfNonParameterLocalSlots)
         newSp.previousSP = sp
         newSp.returnPC = returnPC
         newSp.currentFunction = function
@@ -242,6 +242,31 @@ extension Sp {
         nonmutating set { write(index, .f64(newValue)) }
     }
 
+    func loadValue(at reg: VReg, type: ValueType) -> Value {
+        switch type {
+        case .v128:
+            let lo = self[Int(reg)]
+            let hi = self[Int(reg) + 1]
+            return .v128(V128Storage(lo: lo, hi: hi).value)
+        case .i32, .i64, .f32, .f64, .ref:
+            return self[reg].cast(to: type)
+        }
+    }
+
+    func storeValue(_ value: Value, at reg: VReg, type: ValueType) {
+        switch type {
+        case .v128:
+            guard case .v128(let v) = value else {
+                preconditionFailure("type mismatch: expected v128, got \(value)")
+            }
+            let storage = V128Storage(v)
+            self[Int(reg)] = storage.lo
+            self[Int(reg) + 1] = storage.hi
+        case .i32, .i64, .f32, .f64, .ref:
+            self[reg] = UntypedValue(value)
+        }
+    }
+
     // MARK: - Special slots
 
     /// The current executing function.
@@ -306,8 +331,10 @@ func executeWasm<MemorySpace: GuestMemory>(
         // Mark root stack pointer and current function as nil.
         sp.previousSP = nil
         sp.currentFunction = nil
+        let layout = FrameHeaderLayout(type: type)
         for (index, argument) in arguments.enumerated() {
-            sp[VReg(index)] = UntypedValue(argument)
+            let reg = layout.size + layout.paramReg(index)
+            sp.storeValue(argument, at: reg, type: type.parameters[index])
         }
 
         try withUnsafeTemporaryAllocation(of: CodeSlot.self, capacity: 2) { rootISeq throws(Trap) in
@@ -321,8 +348,9 @@ func executeWasm<MemorySpace: GuestMemory>(
                 type: type
             )
         }
-        return type.results.enumerated().map { (i, type) in
-            sp[VReg(i)].cast(to: type)
+        return type.results.enumerated().map { (i, resultType) in
+            let reg = layout.size + layout.returnReg(i)
+            return sp.loadValue(at: reg, type: resultType)
         }
     }
 }
@@ -347,8 +375,10 @@ extension Execution {
             // Mark root stack pointer and current function as nil.
             sp.previousSP = nil
             sp.currentFunction = nil
+            let layout = FrameHeaderLayout(type: type)
             for (index, argument) in arguments.enumerated() {
-                sp[VReg(index)] = UntypedValue(argument)
+                let reg = layout.size + layout.paramReg(index)
+                sp.storeValue(argument, at: reg, type: type.parameters[index])
             }
 
             try self.execute(
@@ -358,8 +388,9 @@ extension Execution {
                 type: type
             )
 
-            return type.results.enumerated().map { (i, type) in
-                sp[VReg(i)].cast(to: type)
+            return type.results.enumerated().map { (i, resultType) in
+                let reg = layout.size + layout.returnReg(i)
+                return sp.loadValue(at: reg, type: resultType)
             }
         }
 
@@ -685,7 +716,7 @@ extension Execution {
         try checkStackBoundary(sp.advanced(by: iseq.maxStackHeight))
         sp.currentFunction = function
 
-        initializeConstSlots(sp: sp, iseq: iseq, numberOfNonParameterLocals: function.numberOfNonParameterLocals)
+        initializeConstSlots(sp: sp, iseq: iseq, numberOfNonParameterLocalSlots: function.numberOfNonParameterLocalSlots)
 
         Execution.CurrentMemory.mayUpdateCurrentInstance(
             instance: function.instance,
@@ -707,7 +738,7 @@ extension Execution {
         let newSp = try pushFrame(
             iseq: iseq,
             function: function,
-            numberOfNonParameterLocals: function.numberOfNonParameterLocals,
+            numberOfNonParameterLocalSlots: function.numberOfNonParameterLocalSlots,
             sp: sp,
             returnPC: pc,
             spAddend: spAddend
@@ -728,7 +759,7 @@ extension Execution {
         let resolvedType = store.value.engine.resolveType(function.type)
         let layout = FrameHeaderLayout(type: resolvedType)
         let parameters = resolvedType.parameters.enumerated().map { (i, type) in
-            sp[spAddend + layout.paramReg(i)].cast(to: type)
+            sp.loadValue(at: spAddend + layout.paramReg(i), type: type)
         }
         let instance = self.currentInstance(sp: sp)
         let caller = InternalCaller(
@@ -737,8 +768,18 @@ extension Execution {
             engine: store.value.engine
         )
         let results = try function.implementation(caller, Array(parameters))
+        guard resolvedType.results.count == results.count else {
+            throw Trap(.resultTypesMismatch(expected: resolvedType.results, got: results))
+        }
+        for (expected, value) in zip(resolvedType.results, results) {
+            do {
+                try value.checkType(expected)
+            } catch {
+                throw Trap(.resultTypesMismatch(expected: resolvedType.results, got: results))
+            }
+        }
         for (index, result) in results.enumerated() {
-            sp[spAddend + layout.returnReg(index)] = UntypedValue(result)
+            sp.storeValue(result, at: spAddend + layout.returnReg(index), type: resolvedType.results[index])
         }
     }
 }

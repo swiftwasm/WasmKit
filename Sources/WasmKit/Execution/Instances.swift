@@ -1,3 +1,4 @@
+import Synchronization
 import WasmParser
 
 @_exported import struct WasmParser.GlobalType
@@ -130,7 +131,7 @@ extension EntityHandle where T == MemoryEntity {
 }
 #endif
 
-extension EntityHandle: ValidatableEntity where T: ValidatableEntity {
+extension EntityHandle: ValidatableEntity where T: ValidatableEntity, T: ~Copyable {
     static func createOutOfBoundsError(index: Int, count: Int) -> T.OutOfBoundsError {
         T.createOutOfBoundsError(index: index, count: count)
     }
@@ -294,14 +295,15 @@ public struct Instance<MemorySpace: GuestMemory> {
                 fatalError("Already compiled!?")
             }
             try function.wasm.ensureCompiled(store: StoreRef(store))
-            let (iseq, locals, _) = function.assumeCompiled()
+            let (iseq, _, _) = function.assumeCompiled()
 
             // Print slot space information
+            let localTypes = code.withValue { $0.locals }
             let stackLayout: StackLayout
             do {
                 stackLayout = try StackLayout(
                     type: store.engine.funcTypeInterner.resolve(function.type),
-                    numberOfLocals: locals,
+                    locals: localTypes,
                     codeSize: code.expression.count
                 )
             } catch {
@@ -542,6 +544,7 @@ struct MemoryEntity: ~Copyable {
     private var storage: UnsafeMutableBufferPointer<UInt8>
     let maxPageCount: UInt64
     let limit: Limits
+    let sharedMutex: Mutex<Void>?
 
     init<RL: ResourceLimiter>(_ memoryType: MemoryType, resourceLimiter: RL) throws(Trap) {
         let byteSize = Int(memoryType.min) * Self.pageSize
@@ -561,6 +564,7 @@ struct MemoryEntity: ~Copyable {
         let defaultMaxPageCount = Self.maxPageCount(isMemory64: memoryType.isMemory64)
         maxPageCount = memoryType.max ?? defaultMaxPageCount
         limit = memoryType
+        sharedMutex = memoryType.shared ? Mutex<Void>(()) : nil
     }
 
     deinit {
@@ -776,16 +780,40 @@ extension Memory: GuestMemory {
 
 /// An entity representing a WebAssembly `global` instance storage.
 struct GlobalEntity /* : ~Copyable */ {
-    var rawValue: UntypedValue
+    enum Storage {
+        case scalar(UntypedValue)
+        case v128(V128Storage)
+    }
+
+    var storage: Storage
     var value: Value {
-        get { rawValue.cast(to: globalType.valueType) }
-        set { rawValue = UntypedValue(newValue) }
+        get {
+            switch storage {
+            case .scalar(let raw):
+                return raw.cast(to: globalType.valueType)
+            case .v128(let v):
+                return .v128(v.value)
+            }
+        }
+        set {
+            switch newValue {
+            case .v128(let v):
+                storage = .v128(V128Storage(v))
+            case .i32, .i64, .f32, .f64, .ref:
+                storage = .scalar(UntypedValue(newValue))
+            }
+        }
     }
     let globalType: GlobalType
 
     init(globalType: GlobalType, initialValue: Value) throws(ValidationError) {
         try initialValue.checkType(globalType.valueType)
-        rawValue = UntypedValue(initialValue)
+        switch initialValue {
+        case .v128(let v):
+            storage = .v128(V128Storage(v))
+        case .i32, .i64, .f32, .f64, .ref:
+            storage = .scalar(UntypedValue(initialValue))
+        }
         self.globalType = globalType
     }
 }
@@ -823,6 +851,7 @@ public struct Global<MemorySpace: GuestMemory>: Equatable {
             guard global.globalType.mutability == .variable else {
                 throw Trap(.cannotAssignToImmutableGlobal)
             }
+            try value.checkType(global.globalType.valueType)
             global.value = value
         }
     }

@@ -152,6 +152,81 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
             }
             return nil
         }
+
+        if try parser.takeParenBlockStart("v128.const") {
+            func appendLittleEndianBytes<T: FixedWidthInteger>(_ value: T, into bytes: inout [UInt8]) {
+                var value = value
+                for _ in 0..<(T.bitWidth / 8) {
+                    bytes.append(UInt8(truncatingIfNeeded: value))
+                    value >>= 8
+                }
+            }
+
+            let shape = try parser.expectKeyword()
+            var bytes: [UInt8] = []
+            bytes.reserveCapacity(V128.byteCount)
+            var nanLaneMask: UInt8 = 0
+            var floatShape: V128Expectation.Shape?
+
+            switch shape {
+            case "i8x16":
+                for _ in 0..<16 {
+                    let lane: Int8 = try parser.expectSignedInt(fromBitPattern: Int8.init(bitPattern:))
+                    bytes.append(UInt8(bitPattern: lane))
+                }
+            case "i16x8":
+                for _ in 0..<8 {
+                    let lane: Int16 = try parser.expectSignedInt(fromBitPattern: Int16.init(bitPattern:))
+                    appendLittleEndianBytes(UInt16(bitPattern: lane), into: &bytes)
+                }
+            case "i32x4":
+                for _ in 0..<4 {
+                    let lane: Int32 = try parser.expectSignedInt(fromBitPattern: Int32.init(bitPattern:))
+                    appendLittleEndianBytes(UInt32(bitPattern: lane), into: &bytes)
+                }
+            case "i64x2":
+                for _ in 0..<2 {
+                    let lane: Int64 = try parser.expectSignedInt(fromBitPattern: Int64.init(bitPattern:))
+                    appendLittleEndianBytes(UInt64(bitPattern: lane), into: &bytes)
+                }
+            case "f32x4":
+                floatShape = .f32x4
+                for i in 0..<4 {
+                    let lane: IEEE754.Float32
+                    if try parser.takeKeyword("nan:canonical") {
+                        nanLaneMask |= (1 << UInt8(i))
+                        lane = IEEE754.Float32(bitPattern: 0x7FC0_0000)
+                    } else if try parser.takeKeyword("nan:arithmetic") {
+                        nanLaneMask |= (1 << UInt8(i))
+                        lane = IEEE754.Float32(bitPattern: 0x7FC0_0000)
+                    } else {
+                        lane = try parser.expectFloat32()
+                    }
+                    appendLittleEndianBytes(lane.bitPattern, into: &bytes)
+                }
+            case "f64x2":
+                floatShape = .f64x2
+                for i in 0..<2 {
+                    let lane: IEEE754.Float64
+                    if try parser.takeKeyword("nan:canonical") {
+                        nanLaneMask |= (1 << UInt8(i))
+                        lane = IEEE754.Float64(bitPattern: 0x7FF8_0000_0000_0000)
+                    } else if try parser.takeKeyword("nan:arithmetic") {
+                        nanLaneMask |= (1 << UInt8(i))
+                        lane = IEEE754.Float64(bitPattern: 0x7FF8_0000_0000_0000)
+                    } else {
+                        lane = try parser.expectFloat64()
+                    }
+                    appendLittleEndianBytes(lane.bitPattern, into: &bytes)
+                }
+            default:
+                throw WatParserError("expected v128 shape type", location: parser.lexer.location())
+            }
+
+            try parser.expect(.rightParen)
+            let expectation = V128Expectation(shape: floatShape, bytes: bytes, nanLaneMask: nanLaneMask)
+            return floatShape == nil ? .v128(V128(bytes: bytes)) : .v128Pattern(expectation)
+        }
         if try parser.takeParenBlockStart("f64.const"),
             let value = try takeNaNPattern(canonical: .f64CanonicalNaN, arithmetic: .f64ArithmeticNaN)
         {

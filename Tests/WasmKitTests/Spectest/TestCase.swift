@@ -51,11 +51,10 @@ package struct TestCase: CustomStringConvertible {
             // as empty string in JSONDecoder because there is no way to express
             // it in UTF-8.
             guard fileName != "names.wast" else { return false }
-            // FIXME: Skip SIMD proposal tests for now
-            guard !fileName.starts(with: "simd_") else { return false }
             #if WASMKIT_CI_TOOLCHAIN_MAIN_NIGHTLY
                 // https://github.com/swiftwasm/WasmKit/issues/242
                 guard !filePath.path.hasSuffix("Vendor/testsuite/const.wast") else { return false }
+                guard !fileName.starts(with: "simd_") else { return false }
             #endif
 
             let patternPredicate = { pattern in filePath.path.hasSuffix(pattern) }
@@ -134,14 +133,25 @@ extension TestCase {
             assertionFailure("failed to load \(path)")
             return
         }
+        var configuration = configuration
+        let rootPath = FilePath(path).removingLastComponent()
+        let features = WastRunContext.deriveFeatureSet(rootPath: rootPath)
+        configuration.features = features
+
         let engine = Engine(configuration: configuration)
         let store = Store(engine: engine)
         let spectestInstance = try spectestModule.instantiate(store: store)
 
-        let rootPath = FilePath(path).removingLastComponent().string
-        var content = try parseWAST(String(data: data, encoding: .utf8)!)
-        let context = WastRunContext(store: store, rootPath: rootPath)
+        var content = try parseWAST(String(data: data, encoding: .utf8)!, features: features)
+        let context = WastRunContext(store: store, rootPath: rootPath.string)
         context.importsSpace.define(module: "spectest", spectestInstance.exports)
+
+        // Add shared_memory export for threads proposal tests
+        if configuration.features.contains(.threads) {
+            let sharedMemoryType = MemoryType(min: 1, max: 2, shared: true)
+            let sharedMemory = try Memory(store: store, type: sharedMemoryType)
+            context.importsSpace.define(module: "spectest", name: "shared_memory", sharedMemory)
+        }
         do {
             while let (directive, location) = try content.nextDirective() {
                 do {
@@ -355,6 +365,7 @@ extension WastRunContext {
             case .i64(let value): return .i64(value)
             case .f32(let value): return .f32(value)
             case .f64(let value): return .f64(value)
+            case .v128(let value): return .v128(value)
             case .refNull(let heapType):
                 switch heapType {
                 case .abstract(.funcRef): return .ref(.function(nil))
@@ -369,10 +380,17 @@ extension WastRunContext {
         return try function.invoke(args)
     }
 
-    private func deriveFeatureSet(rootPath: FilePath) -> WasmFeatureSet {
+    static func deriveFeatureSet(rootPath: FilePath) -> WasmFeatureSet {
         var features = WasmFeatureSet.default
         if rootPath.ends(with: "proposals/memory64") {
             features.insert(.memory64)
+        }
+        features.insert(.simd)
+        if rootPath.ends(with: "proposals/threads") {
+            // Threads proposal tests should not enable reference types by default
+            // as they test core WebAssembly features without reference types
+            features.remove(.referenceTypes)
+            features.insert(.threads)
         }
         return features
     }
@@ -381,7 +399,7 @@ extension WastRunContext {
         let rootPath = FilePath(rootPath)
         let path = rootPath.appending(filename)
 
-        let module = try parseWasm(filePath: path, features: deriveFeatureSet(rootPath: rootPath))
+        let module = try parseWasm(filePath: path, features: Self.deriveFeatureSet(rootPath: rootPath))
         return module
     }
 
@@ -397,7 +415,7 @@ extension WastRunContext {
             binary = bytes
         }
 
-        let module = try parseWasm(bytes: binary, features: deriveFeatureSet(rootPath: rootPath))
+        let module = try parseWasm(bytes: binary, features: Self.deriveFeatureSet(rootPath: rootPath))
         return module
     }
 }
@@ -417,6 +435,52 @@ extension Value {
             let lhs = Float64(bitPattern: lhs)
             let rhs = Float64(bitPattern: rhs)
             return lhs.isNaN && rhs.isNaN || lhs == rhs
+        case (.v128(let lhs), .v128(let rhs)):
+            return lhs == rhs
+        case (.v128(let actual), .v128Pattern(let expected)):
+            let actualBytes = actual.bytes
+            let expectedBytes = expected.bytes
+            guard actualBytes.count == 16, expectedBytes.count == 16 else { return false }
+            guard let shape = expected.shape else { return actualBytes == expectedBytes }
+
+            func u32LE(_ offset: Int, _ bytes: [UInt8]) -> UInt32 {
+                UInt32(bytes[offset])
+                    | (UInt32(bytes[offset + 1]) << 8)
+                    | (UInt32(bytes[offset + 2]) << 16)
+                    | (UInt32(bytes[offset + 3]) << 24)
+            }
+            func u64LE(_ offset: Int, _ bytes: [UInt8]) -> UInt64 {
+                var value: UInt64 = 0
+                for i in 0..<8 {
+                    value |= UInt64(bytes[offset + i]) << (UInt64(i) * 8)
+                }
+                return value
+            }
+
+            switch shape {
+            case .f32x4:
+                for i in 0..<4 {
+                    let a = u32LE(i * 4, actualBytes)
+                    let e = u32LE(i * 4, expectedBytes)
+                    if expected.nanLaneMask & (1 << UInt8(i)) != 0 {
+                        guard Float32(bitPattern: a).isNaN else { return false }
+                    } else if a != e {
+                        return false
+                    }
+                }
+                return true
+            case .f64x2:
+                for i in 0..<2 {
+                    let a = u64LE(i * 8, actualBytes)
+                    let e = u64LE(i * 8, expectedBytes)
+                    if expected.nanLaneMask & (1 << UInt8(i)) != 0 {
+                        guard Float64(bitPattern: a).isNaN else { return false }
+                    } else if a != e {
+                        return false
+                    }
+                }
+                return true
+            }
         case (.f64(let lhs), .f64ArithmeticNaN),
             (.f64(let lhs), .f64CanonicalNaN):
             return Float64(bitPattern: lhs).isNaN
