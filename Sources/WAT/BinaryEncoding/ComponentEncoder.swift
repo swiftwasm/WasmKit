@@ -391,6 +391,7 @@
                     )
                 }
 
+                #warning("Instance types not fully supported in component binary encoder")
                 for export in instanceType.exports {
                     encoder.output.append(0x04)  // export declaration tag
                     encoder.output.append(0x00)  // outer count (simplified)
@@ -415,6 +416,7 @@
                     )
                 }
 
+                #warning("Imports and exports not fully supported in component binary encoder")
                 for importDecl in componentType.imports {
                     encoder.output.append(0x03)  // import declaration tag
                     encoder.output.append(0x00)  // outer count (simplified)
@@ -708,6 +710,7 @@
                             idx += 1
                         }
                     }
+                    #warning("Non-core func aliases not fully supported in component binary encoder")
                     // This is a simplification - proper implementation would track assigned indices
                     coreFuncIndex = coreFunctionCount - (emittedCoreFuncAliases.count - idx)
                 }
