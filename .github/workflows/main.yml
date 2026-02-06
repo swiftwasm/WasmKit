@@ -52,7 +52,7 @@ jobs:
           swiftly install ${{ matrix.toolchain }}
           swiftly use ${{ matrix.toolchain }}
 
-          ./Vendor/checkout-dependency --category benchmark
+          ./Vendor/checkout-dependency --category benchmark --category component-model
 
           swift --version
           swift test --sanitize address --traits ComponentModel,WasmDebuggingSupport ${{ matrix.test-args }}
