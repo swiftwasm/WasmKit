@@ -204,7 +204,7 @@
             case "func":
                 // Handle function imports
                 let funcId = try parser.takeId()
-                // Skip the type constraint
+                #warning("Skipping the type constraint as unimplemented")
                 var depth = 1
                 while depth > 0 {
                     if try parser.take(.leftParen) {
@@ -847,7 +847,7 @@
                     typeDecls.append(InstanceTypeDef.TypeDecl(id: typeId, valueType: valueType))
                 case "export":
                     let exportName = try parser.expectString()
-                    // Skip the type constraint for now - just consume until closing paren
+                    #warning("Skipping the type constraint as unimplemented")
                     var depth = 1
                     while depth > 0 {
                         if try parser.take(.leftParen) {
@@ -884,7 +884,7 @@
                     typeDecls.append(ComponentInnerTypeDef.TypeDecl(id: typeId, valueType: valueType))
                 case "import":
                     let importName = try parser.expectString()
-                    // Skip the type constraint for now
+                    #warning("Skipping the type constraint as unimplemented")
                     var depth = 1
                     while depth > 0 {
                         if try parser.take(.leftParen) {
@@ -899,7 +899,8 @@
                     continue
                 case "export":
                     let exportName = try parser.expectString()
-                    // Skip the type constraint for now
+
+                    #warning("Skipping the type constraint as unimplemented")
                     var depth = 1
                     while depth > 0 {
                         if try parser.take(.leftParen) {
