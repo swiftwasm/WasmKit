@@ -126,7 +126,7 @@ enum TestSupport {
         init() throws {
             let tempdir = URL(fileURLWithPath: NSTemporaryDirectory())
             let templatePath = tempdir.appendingPathComponent("WasmKit.XXXXXX")
-            var template = [UInt8](templatePath.path.utf8).map({ Int8($0) }) + [Int8(0)]
+            var template = [UInt8](templatePath.path.utf8).map({ UInt8($0) }) + [UInt8(0)]
 
             #if os(Windows)
                 if _mktemp_s(&template, template.count) != 0 {
@@ -145,7 +145,7 @@ enum TestSupport {
                 }
             #endif
 
-            self.path = String(cString: template)
+            self.path = String(decoding: template.dropLast(), as: UTF8.self)
         }
 
         func createDir(at relativePath: String) throws {
@@ -156,7 +156,9 @@ enum TestSupport {
         func createFile(at relativePath: String, contents: String) throws {
             let fileURL = url.appendingPathComponent(relativePath)
             guard let data = contents.data(using: .utf8) else { return }
-            FileManager.default.createFile(atPath: fileURL.path, contents: data, attributes: nil)
+            guard FileManager.default.createFile(atPath: fileURL.path, contents: data, attributes: nil) else {
+                throw Error(description: "Couldn't create file at \(relativePath)")
+            }
         }
 
         func createSymlink(at relativePath: String, to target: String) throws {
