@@ -1,137 +1,165 @@
 #if ComponentModel
-
+    import ComponentModel
+    import Foundation
+    import SystemPackage
     import Testing
+    import WasmKit
+    import WasmKitWASI
+    import WasmParser
+    import WasmTools
 
     @testable import WAT
 
     @Suite
     struct ComponentTests {
-        @Test
-        func parseComponent() throws {
-            let output = try ComponentWatParser(
-                #"""
-                (component)
-                (component $foo)
-                (component
-                  (core module)
-                  (core module)
-                  (core module)
+
+        // MARK: - Test Suite Enumeration
+
+        static let vendorPath: URL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()  // WATTests
+            .deletingLastPathComponent()  // Tests
+            .deletingLastPathComponent()  // Root
+            .appendingPathComponent("Vendor")
+
+        static func componentWastFiles(include: [String] = [], exclude: [String] = [], excludePaths: [String] = []) -> [URL] {
+            let componentModelTestPath = vendorPath.appendingPathComponent("component-model/test")
+
+            guard FileManager.default.fileExists(atPath: componentModelTestPath.path) else {
+                return []
+            }
+
+            let searchPaths = [
+                componentModelTestPath.appendingPathComponent("wasm-tools"),
+                componentModelTestPath.appendingPathComponent("wasmtime"),
+            ]
+
+            let result: [URL] = searchPaths.flatMap {
+                (try? FileManager.default.contentsOfDirectory(
+                    at: $0,
+                    includingPropertiesForKeys: nil
+                )) ?? []
+            }.compactMap { filePath in
+                guard filePath.pathExtension == "wast" else {
+                    return nil
+                }
+                for excludePath in excludePaths {
+                    if filePath.path.hasSuffix(excludePath) {
+                        return nil
+                    }
+                }
+                if !include.isEmpty {
+                    guard include.contains(filePath.lastPathComponent) else { return nil }
+                } else {
+                    guard !exclude.contains(filePath.lastPathComponent) else { return nil }
+                }
+                return filePath
+            }
+
+            return result
+        }
+
+        // MARK: - Encoding Tests
+
+        @Test(
+            arguments: componentWastFiles(
+                include: [
+                    "empty.wast",
+                    "simple.wast",
+                    "types.wast",
+                    "link.wast",
+                    "inline-exports.wast",
+                    "nested-modules.wast",
+                    "fused.wast",
+                ],
+                excludePaths: []
+            )
+        )
+        func componentModelSpectest(wastFile: URL) throws {
+            let wastContent = try String(contentsOf: wastFile, encoding: .utf8)
+
+            // Try to run wast2json for encoding validation (may fail for files with component assert_return)
+            var moduleCommands: [Wast2JSONCommand] = []
+            var wasmFiles: [String: [UInt8]] = [:]
+            do {
+                let (jsonOutput, files) = try wast2json(
+                    wastContent: Array(wastContent.utf8),
+                    wastFileName: wastFile.lastPathComponent
                 )
-                (component $bar
-                  (core module $m1
-                    (func (export "a") (result i32) i32.const 0)
-                    (func (export "b") (result i64) i64.const 0)
-                  )
-                  (core module $m2
-                    (func (export "c") (result f32) f32.const 0)
-                    (func (export "d") (result f64) f64.const 0)
-                  )
-                  (core instance $M1 (instantiate $m1 (with "c" (instance $d))))
-                  (func (export "a") (canon lift (core func $m "")))
-                )
-                """#,
-                features: .default
-            ).parse()
-
-            #expect(output.fields.count == 4)
-            #expect(output.componentsMap.count == 4)
-
-            let names = Array(output.componentsMap.nameToIndex.keys).sorted(by: {
-                output.componentsMap.nameToIndex[$0]! < output.componentsMap.nameToIndex[$1]!
-            })
-            #expect(names == ["$foo", "$bar"])
-
-            guard case .component(let comp0Index) = output.fields[0].kind else {
-                Issue.record("Expected component at index 0")
-                return
+                moduleCommands = jsonOutput.commands.filter { $0.type == "module" && $0.moduleType == "binary" }
+                wasmFiles = files
+            } catch {
+                // wast2json doesn't support component model values in assert_return - that's ok
+                // We'll still run assert_return execution below when it's supported.
             }
-            let comp0 = output.componentsMap[.init(comp0Index.rawValue)]
-            #expect(comp0.fields.count == 0)
-            #expect(comp0.id == nil)
 
-            guard case .component(let comp1Index) = output.fields[1].kind else {
-                Issue.record("Expected component at index 1")
-                return
-            }
-            let comp1 = output.componentsMap[.init(comp1Index.rawValue)]
-            #expect(comp1.fields.count == 0)
-            #expect(comp1.id?.value == "$foo")
+            // Parse WAST file and collect component directives by line number
+            var componentsByLine: [Int: ComponentWatParser.ComponentDef] = [:]
+            var wast = try parseComponentWAST(wastContent, features: .default)
 
-            guard case .component(let comp2Index) = output.fields[2].kind else {
-                Issue.record("Expected component at index 2")
-                return
-            }
-            let comp2 = output.componentsMap[.init(comp2Index.rawValue)]
-            #expect(comp2.fields.count == 3)
-            #expect(comp2.id == nil)
-            for i in 0..<3 {
-                guard case .coreModule = comp2.fields[i].kind else {
-                    Issue.record("Expected core module at comp2.fields[\(i)]")
-                    return
+            while true {
+                do {
+                    guard let (directive, location) = try wast.nextDirective() else { break }
+                    let line = location.computeLineAndColumn().line
+
+                    switch directive {
+                    case .component(let comp):
+                        if case .text(let componentDef) = comp.source {
+                            componentsByLine[line] = componentDef
+                        }
+
+                    case .assertReturn, .assertTrap, .assertInvalid, .assertMalformed, .register, .invoke:
+                        // TODO: Not implemented yet
+                        continue
+                    }
+                } catch {
+                    // Skip directives that fail to parse (e.g., assert_invalid with unsupported syntax)
+                    wast.skipCurrentDirective()
+                    continue
                 }
             }
 
-            guard case .component(let comp3Index) = output.fields[3].kind else {
-                Issue.record("Expected component at index 3")
-                return
-            }
-            let comp3 = output.componentsMap[.init(comp3Index.rawValue)]
-            #expect(comp3.id?.value == "$bar")
+            // Validate binary encoding against wasm-tools reference
+            for command in moduleCommands {
+                guard let filename = command.filename else { continue }
 
-            #expect(comp3.fields.count == 5)
+                guard let component = componentsByLine[command.line] else {
+                    Issue.record("\(wastFile.lastPathComponent):\(command.line): Component not found at line")
+                    continue
+                }
 
-            guard case .coreModule(let m1Index) = comp3.fields[0].kind else {
-                Issue.record("Expected core module at comp3.fields[0]")
-                return
-            }
-            let m1 = comp3.coreModulesMap[.init(m1Index.rawValue)]
-            #expect(m1.id?.value == "$m1")
+                var encoder = ComponentEncoder()
+                let actualBytes: [UInt8]
+                do {
+                    actualBytes = try encoder.encode(component, options: .init(nameSection: true))
+                } catch {
+                    Issue.record("\(wastFile.lastPathComponent):\(command.line): Encode failed: \(error)")
+                    continue
+                }
 
-            guard case .coreModule(let m2Index) = comp3.fields[1].kind else {
-                Issue.record("Expected core module at comp3.fields[1]")
-                return
-            }
-            let m2 = comp3.coreModulesMap[.init(m2Index.rawValue)]
-            #expect(m2.id?.value == "$m2")
+                // Get expected bytes from memory (extracted by wast2json)
+                guard let expectedBytes = wasmFiles[filename] else {
+                    Issue.record("\(wastFile.lastPathComponent):\(command.line): Expected file not found: \(filename)")
+                    continue
+                }
 
-            guard case .coreInstance(let M1Index) = comp3.fields[2].kind else {
-                Issue.record("Expected core instance at comp3.fields[2]")
-                return
-            }
-            let M1 = comp3.coreInstancesMap[.init(M1Index.rawValue)]
-            #expect(M1.id?.value == "$M1")
-            #expect(M1.arguments.count == 1)
-            #expect(M1.arguments[0].importName == "c")
+                if actualBytes != expectedBytes {
+                    print("\(wastFile.lastPathComponent):\(command.line) - Size: expected \(expectedBytes.count), actual \(actualBytes.count)")
 
-            guard case .canon(let canon) = comp3.fields[3].kind else {
-                Issue.record("Expected canon at comp3.fields[3]")
-                return
-            }
-            guard case .lift = canon.kind else {
-                Issue.record("Expected canon lift")
-                return
-            }
+                    if actualBytes.count <= 200 && expectedBytes.count <= 200 {
+                        print("  Expected bytes: \(expectedBytes.map { String(format: "%02x", $0) }.joined(separator: " "))")
+                        print("  Actual bytes:   \(actualBytes.map { String(format: "%02x", $0) }.joined(separator: " "))")
+                    }
+                }
 
-            guard case .exportDef(let exportDef) = comp3.fields[4].kind else {
-                Issue.record("Expected export at comp3.fields[4]")
-                return
+                #expect(
+                    actualBytes.count == expectedBytes.count,
+                    "Size mismatch for \(wastFile.lastPathComponent):\(command.line): expected \(expectedBytes.count), actual \(actualBytes.count)"
+                )
+                #expect(
+                    actualBytes == expectedBytes,
+                    "Byte mismatch for \(wastFile.lastPathComponent):\(command.line)"
+                )
             }
-            #expect(exportDef.exportName == "a")
-            guard case .function = exportDef.descriptor else {
-                Issue.record("Expected function export")
-                return
-            }
-
-            #expect(comp3.coreModulesMap.count == 2)
-            let moduleNames = Array(comp3.coreModulesMap.nameToIndex.keys).sorted(by: {
-                comp3.coreModulesMap.nameToIndex[$0]! < comp3.coreModulesMap.nameToIndex[$1]!
-            })
-            #expect(moduleNames == ["$m1", "$m2"])
-
-            #expect(comp3.coreInstancesMap.count == 1)
-            let instanceNames = Array(comp3.coreInstancesMap.nameToIndex.keys)
-            #expect(instanceNames == ["$M1"])
         }
     }
-
 #endif

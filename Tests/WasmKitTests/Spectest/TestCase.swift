@@ -195,7 +195,7 @@ extension WastRunContext {
             } else {
                 return currentInstance
             }
-        case .wat(var wat):
+        case .wat(let wat):
             let module = try parseModule(rootPath: rootPath, moduleSource: .binary(wat.encode()))
             let instance = try instantiate(module: module)
             return instance
@@ -256,7 +256,7 @@ extension WastRunContext {
             }
             return .failed("module should not be parsed nor valid: expected \"\(message)\"")
 
-        case .assertTrap(execute: .wat(var wat), let message):
+        case .assertTrap(execute: .wat(let wat), let message):
             currentInstance = nil
 
             let module: Module
@@ -342,7 +342,7 @@ extension WastRunContext {
                 throw SpectestError("no global export with name \(globalName) in a module instance \(instance)")
             }
             return [global.value]
-        case .wat(var wat):
+        case .wat(let wat):
             let module = try parseModule(rootPath: rootPath, moduleSource: .binary(wat.encode()))
             _ = try instantiate(module: module)
             return []
@@ -402,7 +402,7 @@ extension WastRunContext {
         let rootPath = FilePath(rootPath)
         let binary: [UInt8]
         switch moduleSource {
-        case .text(var watModule):
+        case .text(let watModule):
             binary = try watModule.encode()
         case .quote(let text):
             binary = try wat2wasm(String(decoding: text, as: UTF8.self))
