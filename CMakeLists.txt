@@ -1,24 +1,26 @@
-cmake_minimum_required(VERSION 3.19.6)
+cmake_minimum_required(VERSION 3.30)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules)
 
-project(WasmKit LANGUAGES C Swift)
+project(WasmKit LANGUAGES C CXX Swift)
 
-set(SWIFT_VERSION 5)
+set(SWIFT_VERSION 6)
 set(CMAKE_Swift_LANGUAGE_VERSION ${SWIFT_VERSION})
+
+set(min_supported_swift_version 6.2)
+if(CMAKE_Swift_COMPILER_VERSION VERSION_LESS "${min_supported_swift_version}")
+  message(
+    FATAL_ERROR
+    "Outdated Swift compiler: "
+    "Swift ${min_supported_swift_version} or newer is required."
+  )
+endif()
 
 # Enable whole module optimization for Release or RelWithDebInfo builds.
 if(POLICY CMP0157)
   set(CMAKE_Swift_COMPILATION_MODE $<IF:$<CONFIG:Release,RelWithDebInfo>,wholemodule,incremental>)
 else()
   add_compile_options($<$<AND:$<COMPILE_LANGUAGE:Swift>,$<CONFIG:Release,RelWithDebInfo>>:-wmo>)
-endif()
-
-if(CMAKE_VERSION VERSION_LESS 3.21)
-  get_property(parent_dir DIRECTORY PROPERTY PARENT_DIRECTORY)
-  if(NOT parent_dir)
-    set(PROJECT_IS_TOP_LEVEL TRUE)
-  endif()
 endif()
 
 # The subdirectory into which host libraries will be installed.
@@ -52,7 +54,9 @@ add_compile_definitions(
 
 include(FetchContent)
 
-option(WASMKIT_BUILD_CLI "Build wasmkit-cli" ON)
+option(WASMKIT_BUILD_CLI "Build WasmKit CLI" ON)
+option(WASMKIT_BUILD_LLVM_BACKEND "Build WasmKit LLVM backend (experimental)" OFF)
+option(WASMKIT_LLVM_BACKEND_TARGET "WasmKit LLVM backend target architecture" "aarch64")
 
 if(WASMKIT_BUILD_CLI)
   set(BUILD_TESTING OFF) # disable ArgumentParser tests
@@ -64,6 +68,43 @@ if(WASMKIT_BUILD_CLI)
             GIT_TAG 1.6.1
     )
     FetchContent_MakeAvailable(ArgumentParser)
+  endif()
+endif()
+
+if(WASMKIT_BUILD_LLVM_BACKEND)
+  FetchContent_Declare(
+    SwiftLLVMBindings
+    GIT_REPOSITORY "https://github.com/swiftlang/swift-llvm-bindings.git"
+    GIT_TAG c1fffb92d4f9d7cb98800762631cfa354869fb46
+    GIT_SHALLOW TRUE
+    GIT_PROGRESS ON
+  )
+
+  FetchContent_MakeAvailable(SwiftLLVMBindings)
+
+  find_package(Subprocess CONFIG)
+
+  if(NOT Subprocess_FOUND)
+    message("-- Vending Subprocess")
+    FetchContent_Declare(
+      Subprocess
+      GIT_REPOSITORY https://github.com/swiftlang/swift-subprocess
+      GIT_TAG 0.2.1
+      GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(Subprocess)
+  endif()
+
+  find_package(SwiftCollections CONFIG)
+  if(NOT SwiftCollections_FOUND)
+    message("-- Vending SwiftCollections")
+    FetchContent_Declare(
+      SwiftCollections
+      GIT_REPOSITORY https://github.com/apple/swift-collections
+      GIT_TAG 1.3.0
+      GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(SwiftCollections)
   endif()
 endif()
 
