@@ -93,10 +93,23 @@ let package = Package(
             dependencies: [
                 "WasmTypes",
                 .product(name: "SystemPackage", package: "swift-system"),
+                .target(
+                    name: "ComponentModel",
+                    condition: .when(traits: ["ComponentModel"])
+                ),
             ],
             exclude: ["CMakeLists.txt"]
         ),
-        .testTarget(name: "WasmParserTests", dependencies: ["WasmParser"]),
+        .testTarget(
+            name: "WasmParserTests",
+            dependencies: [
+                "WasmParser",
+                .target(
+                    name: "ComponentModel",
+                    condition: .when(traits: ["ComponentModel"])
+                ),
+            ]
+        ),
 
         .target(name: "WasmTypes", exclude: ["CMakeLists.txt"]),
 
