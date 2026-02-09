@@ -1468,8 +1468,10 @@ public func detectWasmFileType(filePath: FilePath) throws -> WasmFileType {
     }
 
     // Check magic number: \0asm (uses WASM_MAGIC as source of truth)
-    guard header.0 == WASM_MAGIC[0] && header.1 == WASM_MAGIC[1]
-       && header.2 == WASM_MAGIC[2] && header.3 == WASM_MAGIC[3] else {
+    guard
+        header.0 == WASM_MAGIC[0] && header.1 == WASM_MAGIC[1]
+            && header.2 == WASM_MAGIC[2] && header.3 == WASM_MAGIC[3]
+    else {
         return .unknown
     }
 
