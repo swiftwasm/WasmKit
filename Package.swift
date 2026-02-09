@@ -77,7 +77,16 @@ let package = Package(
             ],
             exclude: ["CMakeLists.txt"]
         ),
-        .testTarget(name: "WATTests", dependencies: ["WAT"]),
+        .testTarget(
+            name: "WATTests",
+            dependencies: [
+                .target(
+                    name: "WasmTools",
+                    condition: .when(traits: ["ComponentModel"])
+                ),
+                "WAT",
+            ]
+        ),
 
         .target(
             name: "WasmParser",
@@ -117,10 +126,23 @@ let package = Package(
 
         .target(name: "CSystemExtras"),
 
-        // Component Model
+        // Component Model (CM)
+
+        /// `wasm-tools.wasm` wrapper used when comparing CM test suite against existing baseline implementation
+        .target(
+            name: "WasmTools",
+            dependencies: [
+                "WasmKit",
+                "WasmKitWASI",
+                .product(name: "SystemPackage", package: "swift-system"),
+            ]
+        ),
 
         .target(
-            name: "ComponentModel"
+            name: "ComponentModel",
+            dependencies: [
+                "WasmTypes"
+            ]
         ),
 
         .executableTarget(

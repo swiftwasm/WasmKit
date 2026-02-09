@@ -65,7 +65,7 @@ public enum ComponentDefSort {
     case instance
 }
 
-public enum ComponentType: Hashable {
+public enum ComponentValueType: Hashable {
     case bool
     case u8
     case u16
@@ -97,26 +97,95 @@ public enum ComponentType: Hashable {
     case variant([ComponentCaseField])
     case resource(destructor: ComponentFuncIndex)
 
-    indirect case `func`(ComponentFuncType)
-
     case indexed(ComponentTypeIndex)
+
+    /// Returns `true` if this is a primitive type that can be inlined in valtypes during binary encoding
+    package var isPrimitive: Bool {
+        switch self {
+        case .bool, .s8, .u8, .s16, .u16, .s32, .u32, .s64, .u64, .float32, .float64, .char, .string, .errorContext:
+            return true
+        case .list, .tuple, .option, .result, .future, .stream, .record, .flags, .enum, .variant, .resource, .indexed:
+            return false
+        }
+    }
 }
 
 public struct ComponentFuncType: Hashable {
-    struct Param: Hashable {
-        let name: String
-        let type: ComponentType
+    package init(params: [ComponentFuncType.Param], result: ComponentValueType?) {
+        self.params = params
+        self.result = result
     }
-    let params: [Param]
-    let result: ComponentType
+
+    public struct Param: Hashable {
+        package init(name: String, type: ComponentValueType) {
+            self.name = name
+            self.type = type
+        }
+
+        package let name: String
+        package let type: ComponentValueType
+    }
+    package let params: [Param]
+    package let result: ComponentValueType?
 }
 
 public struct ComponentRecordField: Hashable {
-    let name: String
-    let type: ComponentTypeIndex
+    package let name: String
+    package let type: ComponentTypeIndex
+
+    package init(name: String, type: ComponentTypeIndex) {
+        self.name = name
+        self.type = type
+    }
 }
 
 public struct ComponentCaseField: Hashable {
-    let name: String
-    let type: ComponentTypeIndex?
+    package let name: String
+    package let type: ComponentTypeIndex?
+
+    package init(name: String, type: ComponentTypeIndex?) {
+        self.name = name
+        self.type = type
+    }
+}
+
+/// String encoding options for the canonical ABI.
+public enum ComponentStringEncoding {
+    case utf8
+    case utf16
+    case latin1UTF16
+}
+
+/// Runtime representation of component values.
+/// These are the values that flow through component function boundaries.
+public indirect enum ComponentValue {
+    // Primitives
+    case bool(Bool)
+    case s8(Int8)
+    case s16(Int16)
+    case s32(Int32)
+    case s64(Int64)
+    case u8(UInt8)
+    case u16(UInt16)
+    case u32(UInt32)
+    case u64(UInt64)
+    case float32(Float)
+    case float64(Double)
+    case char(Unicode.Scalar)
+    case string(String)
+
+    // Composite types
+    // TODO: store strings in an interner, create a resizable bitset type for `case flags`
+    case list([ComponentValue])
+    case record([(name: String, value: ComponentValue)])
+    case variant(caseName: String, payload: ComponentValue?)
+    case tuple([ComponentValue])
+    case flags(Set<String>)
+    case `enum`(String)
+    case option(ComponentValue?)
+    case result(ok: ComponentValue?, error: ComponentValue?)
+
+    // Resource handles (future extension)
+    // case own(ResourceHandle)
+    // case borrow(ResourceHandle)
 }

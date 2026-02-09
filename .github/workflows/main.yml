@@ -52,7 +52,7 @@ jobs:
           swiftly install ${{ matrix.toolchain }}
           swiftly use ${{ matrix.toolchain }}
 
-          ./Vendor/checkout-dependency --category benchmark
+          ./Vendor/checkout-dependency --category benchmark --category component-model
 
           swift --version
           swift test --sanitize address --traits ComponentModel,WasmDebuggingSupport ${{ matrix.test-args }}
@@ -115,7 +115,7 @@ jobs:
             "hostSdkRootPath": "$(xcrun --show-sdk-path --sdk macosx)"
           }
           EOS
-      - run: ./Vendor/checkout-dependency
+      - run: ./Vendor/checkout-dependency --category default --category component-model
       - run: swift test ${{ matrix.test-args }}
 
   build-xcode:
@@ -220,7 +220,7 @@ jobs:
           }
           EOS
       - run: ./build-exec ./CI/install-wabt.sh
-      - run: ./Vendor/checkout-dependency --category benchmark
+      - run: ./Vendor/checkout-dependency --category benchmark --category component-model
       - run: ./build-exec swift test ${{ matrix.test-args }}
 
       - if: matrix.build-benchmarks
@@ -274,9 +274,9 @@ jobs:
         run: ./build-exec swift sdk install "${{ matrix.musl-swift-sdk-download }}" --checksum "${{ matrix.musl-swift-sdk-checksum }}"
 
       - name: Build (x86_64-swift-linux-musl)
-        run: ./build-exec swift build --swift-sdk x86_64-swift-linux-musl --traits ComponentModel,WasmDebuggingSupport
+        run: ./build-exec swift build --swift-sdk x86_64-swift-linux-musl --traits ComponentModel,WasmDebuggingSupport --explicit-target-dependency-import-check error
       - name: Build (aarch64-swift-linux-musl)
-        run: ./build-exec swift build --swift-sdk aarch64-swift-linux-musl --traits ComponentModel,WasmDebuggingSupport
+        run: ./build-exec swift build --swift-sdk aarch64-swift-linux-musl --traits ComponentModel,WasmDebuggingSupport --explicit-target-dependency-import-check error
 
   build-android:
     runs-on: ubuntu-24.04
@@ -306,7 +306,7 @@ jobs:
           swift-version: swift-6.2-release
           swift-build: 6.2-RELEASE
       - uses: actions/checkout@v4
-      - run: python3 ./Vendor/checkout-dependency
+      - run: python3 ./Vendor/checkout-dependency --category default
       # FIXME: CMake build is failing on CI due to "link: extra operand '/OUT:lib\\libXXXX.a'" error
       # # Check Windows build with CMake
       # - uses: Cyberboss/install-winget@v1
@@ -347,4 +347,4 @@ jobs:
       - name: Install Swift SDK
         run: swift sdk install https://download.swift.org/swift-6.2.3-release/wasm-sdk/swift-6.2.3-RELEASE/swift-6.2.3-RELEASE_wasm.artifactbundle.tar.gz --checksum 394040ecd5260e68bb02f6c20aeede733b9b90702c2204e178f3e42413edad2a
       - name: Build with the Swift SDK
-        run: swift build --swift-sdk "$(swiftc -print-target-info | jq -r '.swiftCompilerTag')_wasm" --product wasmkit-cli
+        run: swift build --swift-sdk "$(swiftc -print-target-info | jq -r '.swiftCompilerTag')_wasm" --traits ComponentModel --explicit-target-dependency-import-check error --product wasmkit-cli
