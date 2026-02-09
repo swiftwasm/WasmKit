@@ -3,6 +3,7 @@
     import ComponentModel
 
     /// A streaming parser for WebAssembly Component Model binary format.
+    /// For proposed production rules refer to https://github.com/WebAssembly/component-model/blob/7479890cb506d0f8f687595a4d41361ff8a2a194/design/mvp/Binary.md
     public struct ComponentParser<Stream: ByteStream> {
         @usableFromInline
         let stream: Stream
@@ -369,7 +370,7 @@
                 let elemIdx = try parseOptionalValType()
                 return .future(elemIdx)
 
-            // Primitive types (fall through)
+            // Primitive types
             case 0x73...0x7f, 0x64:
                 return try parsePrimValTypeFromOpcode(opcode)
 
@@ -480,6 +481,7 @@
             // Handle version suffix if present
             if prefix == 0x01 {
                 let suffixLen: UInt32 = try parseUnsigned()
+                #warning("Version suffix skipped in `parseImportExportName` as not implemented yet")
                 _ = try stream.consume(count: Int(suffixLen))  // Skip version suffix for now
             }
 

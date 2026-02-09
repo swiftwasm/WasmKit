@@ -1457,6 +1457,7 @@ public func detectWasmFileType(filePath: FilePath) throws -> WasmFileType {
     defer { try? fileHandle.close() }
 
     // Use a tuple to avoid heap allocation - 8 bytes on stack
+    // TODO: needs a `SmallArray` abstraction until `InlineArray` becomes available after dropping support for macOS 15.
     var header: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (0, 0, 0, 0, 0, 0, 0, 0)
     let bytesRead = try withUnsafeMutableBytes(of: &header) { buffer in
         try fileHandle.read(into: buffer)
