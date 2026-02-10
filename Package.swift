@@ -168,7 +168,15 @@ let package = Package(
             ]
         ),
 
-        .target(name: "WIT"),
+        .target(
+            name: "WIT",
+            dependencies: [
+                .target(
+                    name: "ComponentModel",
+                    condition: .when(traits: ["ComponentModel"])
+                )
+            ]
+        ),
         .testTarget(name: "WITTests", dependencies: ["WIT"]),
 
         .target(name: "WITOverlayGenerator", dependencies: ["WIT"]),
