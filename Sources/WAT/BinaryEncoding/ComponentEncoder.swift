@@ -818,6 +818,7 @@
                         coreFunctionCount += 1
                     case .table, .global, .type, .module, .instance:
                         // TODO: Track table and global counts
+                        #warning("Table and global counts not tracked in `encodeBatchedAlises`")
                         break
                     }
                 }
@@ -869,7 +870,13 @@
                 if !emittedCoreFuncAliases.contains(aliasIndexInArray) {
                     let alias = coreFuncAliases[aliasIndexInArray]
                     coreFuncIndex = coreFunctionCount
-                    aliasesToEmit.append(.coreFunc(instanceIndex: alias.instanceIndex, exportName: alias.exportName, assignedIndex: coreFuncIndex))
+                    aliasesToEmit.append(
+                        .coreFunc(
+                            instanceIndex: alias.instanceIndex,
+                            exportName: alias.exportName,
+                            assignedIndex: coreFuncIndex
+                        )
+                    )
                     coreFunctionCount += 1
                     emittedCoreFuncAliases.insert(aliasIndexInArray)
                 } else {
@@ -893,7 +900,13 @@
 
                         if emittedCoreMemoryAliases[key] == nil {
                             let memIndex = coreMemoryCount
-                            aliasesToEmit.append(.coreMemory(instanceIndex: memBinaryInstanceIndex, exportName: memoryRef.exportName, assignedIndex: memIndex))
+                            aliasesToEmit.append(
+                                .coreMemory(
+                                    instanceIndex: memBinaryInstanceIndex,
+                                    exportName: memoryRef.exportName,
+                                    assignedIndex: memIndex
+                                )
+                            )
                             emittedCoreMemoryAliases[key] = memIndex
                             coreMemoryCount += 1
                         }
@@ -910,7 +923,13 @@
 
                         if emittedOptionCoreFuncAliases[key] == nil {
                             let optFuncIndex = coreFunctionCount
-                            aliasesToEmit.append(.coreFunc(instanceIndex: optBinaryInstanceIndex, exportName: funcRef.exportName, assignedIndex: optFuncIndex))
+                            aliasesToEmit.append(
+                                .coreFunc(
+                                    instanceIndex: optBinaryInstanceIndex,
+                                    exportName: funcRef.exportName,
+                                    assignedIndex: optFuncIndex
+                                )
+                            )
                             emittedOptionCoreFuncAliases[key] = optFuncIndex
                             coreFunctionCount += 1
                         }
@@ -1066,6 +1085,7 @@
                     encoder.writeUnsignedLEB128(UInt32(componentFuncIndex))
 
                     // No options for now
+                    #warning("canon.lower options not emitted yet in `encodeSingleCanon`")
                     encoder.writeUnsignedLEB128(UInt32(0))  // 0 options
                 }
                 coreFunctionCount += 1  // canon.lower creates a core function
