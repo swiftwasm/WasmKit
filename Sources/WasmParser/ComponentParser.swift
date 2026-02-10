@@ -56,7 +56,7 @@
         case customSection(CustomSection)
 
         /// An embedded core module (section 1)
-        case coreModule([UInt8])
+        case coreModule(ArraySlice<UInt8>)
 
         /// Core instance definitions (section 2)
         case coreInstanceSection([CoreInstanceDefinition])
@@ -65,7 +65,7 @@
         case coreTypeSection([CoreTypeDef])
 
         /// A nested component (section 4)
-        case component([UInt8])
+        case component(ArraySlice<UInt8>)
 
         /// Component instance definitions (section 5)
         case instanceSection([ComponentInstanceDefinition])
@@ -954,7 +954,7 @@
 
                 case 1:  // core module
                     let moduleBytes = try stream.consume(count: Int(sectionSize))
-                    payload = .coreModule(Array(moduleBytes))
+                    payload = .coreModule(moduleBytes)
 
                 case 2:  // core instance
                     payload = .coreInstanceSection(try parseCoreInstanceSection())
@@ -965,7 +965,7 @@
 
                 case 4:  // component
                     let componentBytes = try stream.consume(count: Int(sectionSize))
-                    payload = .component(Array(componentBytes))
+                    payload = .component(componentBytes)
 
                 case 5:  // instance
                     payload = .instanceSection(try parseInstanceSection())
