@@ -174,7 +174,7 @@ let package = Package(
                 .target(
                     name: "ComponentModel",
                     condition: .when(traits: ["ComponentModel"])
-                ),
+                )
             ]
         ),
         .testTarget(name: "WITTests", dependencies: ["WIT"]),
