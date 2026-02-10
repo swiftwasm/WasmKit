@@ -1461,16 +1461,4 @@
         }
     }
 
-    extension ComponentWatParser.CoreAliasSort {
-        var binaryEncoding: UInt8 {
-            switch self {
-            case .func: return 0x00
-            case .table: return 0x01
-            case .memory: return 0x02
-            case .global: return 0x03
-            case .type: return 0x10
-            }
-        }
-    }
-
 #endif

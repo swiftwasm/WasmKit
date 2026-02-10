@@ -708,7 +708,7 @@
                         let bindingId = try parser.takeId()
                         try parser.expect(.rightParen)
 
-                        guard let aliasSort = CoreAliasSort(rawValue: sortKeyword) else {
+                        guard let aliasSort = CoreDefSort(rawValue: sortKeyword) else {
                             throw WatParserError("Unknown alias sort '\(sortKeyword)'", location: parser.lexer.location())
                         }
 
@@ -800,7 +800,7 @@
 
         /// Resolve an outer alias reference to a component's type
         /// Returns a tuple of (resolvedTypeIndex, outerCount) where outerCount is the distance to the target component
-        private mutating func resolveOuterReference(componentId: Parser.IndexOrId, typeIndex: Parser.IndexOrId, sort: CoreAliasSort) throws(WatParserError) -> (resolvedIndex: Int, outerCount: Int) {
+        private mutating func resolveOuterReference(componentId: Parser.IndexOrId, typeIndex: Parser.IndexOrId, sort: CoreDefSort) throws(WatParserError) -> (resolvedIndex: Int, outerCount: Int) {
             // Find the target component in the component stack
             // For now, we assume componentId refers to a parent component by name
             // TODO: Support numeric outer counts (e.g., outer 0, outer 1)
@@ -824,7 +824,7 @@
                     case .type:
                         let resolvedIndex = try component.coreTypesMap.resolveIndex(use: typeIndex)
                         return (resolvedIndex, outerCount)
-                    case .func, .table, .memory, .global:
+                    case .func, .table, .memory, .global, .module, .instance:
                         throw WatParserError("Outer alias sort '\(sort.rawValue)' not yet supported", location: componentId.location)
                     }
                 }
@@ -1460,21 +1460,13 @@
         }
 
         struct CoreModuleAlias {
-            let sort: CoreAliasSort
+            let sort: CoreDefSort
             let target: CoreModuleAliasTarget
             let bindingId: Name?
         }
 
         enum CoreModuleAliasTarget {
             case outer(componentId: Parser.IndexOrId, index: Parser.IndexOrId, resolvedIndex: Int, outerCount: Int)
-        }
-
-        enum CoreAliasSort: String {
-            case `func`
-            case table
-            case memory
-            case global
-            case type
         }
 
         struct CoreModuleImport {

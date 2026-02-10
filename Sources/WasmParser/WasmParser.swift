@@ -414,7 +414,7 @@ extension ByteStream {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/values.html#names>
 extension ByteStream {
-    fileprivate func parseName() throws -> String {
+    package func parseName() throws -> String {
         let bytes = try parseVector { () -> UInt8 in
             try consumeAny()
         }
@@ -1428,5 +1428,63 @@ public struct NameSectionParser<Stream: ByteStream> {
             nameMap[index] = name
         }
         return nameMap
+    }
+}
+
+// MARK: - File Type Detection
+
+/// The type of a WebAssembly binary file.
+public enum WasmFileType: Equatable, Sendable {
+    /// A core WebAssembly module (version 1)
+    case coreModule
+    /// A WebAssembly component (version 0x0d, layer 1)
+    case component
+    /// Unknown or invalid WebAssembly file
+    case unknown
+}
+
+/// Detect the type of a WebAssembly binary file by reading its header.
+///
+/// This function reads the 8-byte WebAssembly header to determine whether
+/// the file contains a core module or a component. Uses stack allocation
+/// only (no heap allocation for the header bytes).
+///
+/// - Parameter filePath: Path to the WebAssembly binary file
+/// - Returns: The detected file type
+/// - Throws: If the file cannot be opened or read
+public func detectWasmFileType(filePath: FilePath) throws -> WasmFileType {
+    let fileHandle = try FileDescriptor.open(filePath, .readOnly)
+    defer { try? fileHandle.close() }
+
+    // Use a tuple to avoid heap allocation - 8 bytes on stack
+    // TODO: needs a `SmallArray` abstraction until `InlineArray` becomes available after dropping support for macOS 15.
+    var header: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (0, 0, 0, 0, 0, 0, 0, 0)
+    let bytesRead = try withUnsafeMutableBytes(of: &header) { buffer in
+        try fileHandle.read(into: buffer)
+    }
+
+    // Need at least 8 bytes for a valid header
+    guard bytesRead >= 8 else {
+        return .unknown
+    }
+
+    // Check magic number: \0asm (uses WASM_MAGIC as source of truth)
+    guard
+        header.0 == WASM_MAGIC[0] && header.1 == WASM_MAGIC[1]
+            && header.2 == WASM_MAGIC[2] && header.3 == WASM_MAGIC[3]
+    else {
+        return .unknown
+    }
+
+    // Check version and layer bytes:
+    // - Core module: version=0x01, 0x00 and layer=0x00, 0x00
+    // - Component:   version=0x0d, 0x00 and layer=0x01, 0x00
+    switch (header.4, header.5, header.6, header.7) {
+    case (0x01, 0x00, 0x00, 0x00):
+        return .coreModule
+    case (0x0d, 0x00, 0x01, 0x00):
+        return .component
+    default:
+        return .unknown
     }
 }

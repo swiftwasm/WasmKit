@@ -1,9 +1,9 @@
 public struct ComponentTypeIndex: Hashable {
-    package init(rawValue: Int) {
+    public init(rawValue: Int) {
         self.rawValue = UInt32(rawValue)
     }
 
-    package let rawValue: UInt32
+    public let rawValue: UInt32
 }
 
 public struct ComponentIndex: Hashable {
@@ -111,39 +111,39 @@ public enum ComponentValueType: Hashable {
 }
 
 public struct ComponentFuncType: Hashable {
-    package init(params: [ComponentFuncType.Param], result: ComponentValueType?) {
+    public init(params: [ComponentFuncType.Param], result: ComponentValueType?) {
         self.params = params
         self.result = result
     }
 
     public struct Param: Hashable {
-        package init(name: String, type: ComponentValueType) {
+        public init(name: String, type: ComponentValueType) {
             self.name = name
             self.type = type
         }
 
-        package let name: String
-        package let type: ComponentValueType
+        public let name: String
+        public let type: ComponentValueType
     }
-    package let params: [Param]
-    package let result: ComponentValueType?
+    public let params: [Param]
+    public let result: ComponentValueType?
 }
 
 public struct ComponentRecordField: Hashable {
-    package let name: String
-    package let type: ComponentTypeIndex
+    public let name: String
+    public let type: ComponentTypeIndex
 
-    package init(name: String, type: ComponentTypeIndex) {
+    public init(name: String, type: ComponentTypeIndex) {
         self.name = name
         self.type = type
     }
 }
 
 public struct ComponentCaseField: Hashable {
-    package let name: String
-    package let type: ComponentTypeIndex?
+    public let name: String
+    public let type: ComponentTypeIndex?
 
-    package init(name: String, type: ComponentTypeIndex?) {
+    public init(name: String, type: ComponentTypeIndex?) {
         self.name = name
         self.type = type
     }

@@ -88,6 +88,7 @@ and should work on the following platforms:
 |                      | [Tail call](https://github.com/WebAssembly/tail-call/blob/master/proposals/tail-call/Overview.md) | ✅ Implemented |
 |                      | [SIMD](https://github.com/WebAssembly/simd/blob/main/proposals/simd/SIMD.md) | ✅ Implemented |
 |                      | [Threads and atomics](https://github.com/WebAssembly/threads/blob/master/proposals/threads/Overview.md) | ✅ Implemented |
+|                      | [Component Model](https://github.com/webassembly/component-model) | 🚧 In progress  |
 |                      | [Typed Function References](https://github.com/WebAssembly/function-references/blob/main/proposals/function-references/Overview.md) | 🚧 Parser implemented  |
 |                      | [Garbage Collection](https://github.com/WebAssembly/gc/blob/main/proposals/gc/Overview.md) |  📋 Todo |
 | WASI | WASI Preview 1 | 🚧 [Majority of syscalls implemented](https://github.com/swiftwasm/WasmKit/blob/d9b56a7b3f979a72682c0d37f6cc71b3493dae65/Tests/WASITests/IntegrationTests.swift#L31) |
