@@ -58,6 +58,9 @@ package struct Wat2wasm: ParsableCommand {
     )
     var output: String?
 
+    @Flag(help: "Include the name section in the output binary.")
+    var nameSection: Bool = true
+
     package init() {}
 
     package func run() throws {
@@ -80,7 +83,7 @@ package struct Wat2wasm: ParsableCommand {
             wat = String(decoding: watBuffer, as: UTF8.self)
         }
 
-        let wasm = try wat2wasm(wat)
+        let wasm = try wat2wasm(wat, options: EncodeOptions(nameSection: nameSection))
         var outputPath: FilePath
 
         if let output {
