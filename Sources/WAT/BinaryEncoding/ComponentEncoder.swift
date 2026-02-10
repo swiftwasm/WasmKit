@@ -799,6 +799,8 @@
                     case .global:
                         encoder.output.append(0x00)  // sort: core
                         encoder.output.append(0x03)  // core sort: global
+                    case .type, .module, .instance:
+                        #warning("Unhandled cases for core aliases in `encodeBatchedAliases`")
                     }
 
                     switch alias.target {
