@@ -70,6 +70,8 @@
                     "inline-exports.wast",
                     "nested-modules.wast",
                     "fused.wast",
+                    "strings.wast",
+                    "adapter.wast",
                 ],
                 excludePaths: []
             )

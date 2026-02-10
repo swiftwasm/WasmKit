@@ -672,36 +672,21 @@ struct WatParser {
     }
 
     mutating func params(mayHaveName: Bool) throws(WatParserError) -> ([UnresolvedType<ValueType>], [Name?]) {
-        var types: [UnresolvedType<ValueType>] = []
-        var names: [Name?] = []
-        while try parser.takeParenBlockStart("param") {
-            if mayHaveName {
-                if let id = try parser.takeId() {
-                    let valueType = try valueType()
-                    types.append(valueType)
-                    names.append(id)
-                    try parser.expect(.rightParen)
-                    continue
-                }
-            }
-            while try !parser.take(.rightParen) {
-                let valueType = try valueType()
-                types.append(valueType)
-                names.append(nil)
-            }
+        try parser.parseParamList(mayHaveName: mayHaveName) { parser throws(WatParserError) in
+            var tempParser = WatParser(parser: parser)
+            let type = try tempParser.valueType()
+            parser = tempParser.parser
+            return type
         }
-        return (types, names)
     }
 
     mutating func results() throws(WatParserError) -> [UnresolvedType<ValueType>] {
-        var results: [UnresolvedType<ValueType>] = []
-        while try parser.takeParenBlockStart("result") {
-            while try !parser.take(.rightParen) {
-                let valueType = try valueType()
-                results.append(valueType)
-            }
+        try parser.parseResultList { parser throws(WatParserError) in
+            var tempParser = WatParser(parser: parser)
+            let type = try tempParser.valueType()
+            parser = tempParser.parser
+            return type
         }
-        return results
     }
 
     mutating func valueType() throws(WatParserError) -> UnresolvedType<ValueType> {

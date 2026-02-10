@@ -63,6 +63,8 @@
         case invoke(ComponentWastInvoke)
         /// Get a component export value
         case get(component: String?, exportName: String)
+        /// Instantiate a component (used in assert_trap to test instantiation failures)
+        case component(ComponentDirective)
     }
 
     /// A component function invocation in WAST.
@@ -445,6 +447,9 @@
                 let exportName = try wastParser.parser.expectString()
                 try wastParser.parser.expect(.rightParen)
                 return .get(component: component?.value, exportName: exportName)
+            case "component":
+                // Parse a component definition for assert_trap (instantiation trap testing)
+                return .component(try ComponentDirective.parse(wastParser: &wastParser))
             case let keyword?:
                 throw WatParserError(
                     "unexpected component wast execute \(keyword)",
