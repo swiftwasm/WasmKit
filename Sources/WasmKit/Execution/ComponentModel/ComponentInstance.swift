@@ -1,7 +1,6 @@
 #if ComponentModel
     import ComponentModel
     import WasmTypes
-    import WIT
 
     // MARK: - Component Instance
 
