@@ -656,6 +656,11 @@ public struct Memory: Equatable {
     public var type: MemoryType {
         handle.withValue { $0.limit }
     }
+
+    /// The current size of the memory in bytes.
+    public var byteCount: Int {
+        handle.withValue { $0.byteCount }
+    }
 }
 
 extension Memory: GuestMemory {

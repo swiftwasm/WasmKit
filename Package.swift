@@ -51,6 +51,10 @@ let package = Package(
                 "WasmTypes",
                 "SystemExtras",
                 .product(name: "SystemPackage", package: "swift-system"),
+                .target(
+                    name: "ComponentModel",
+                    condition: .when(traits: ["ComponentModel"])
+                ),
             ],
             exclude: ["CMakeLists.txt"]
         ),

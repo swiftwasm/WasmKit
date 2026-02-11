@@ -787,40 +787,47 @@
 
                 for alias in aliases {
                     switch alias.sort {
-                    case .memory:
+                    case .core(let coreSort):
                         encoder.output.append(0x00)  // sort: core
-                        encoder.output.append(0x02)  // core sort: memory
-                    case .func:
-                        encoder.output.append(0x00)  // sort: core
-                        encoder.output.append(0x00)  // core sort: func
-                    case .table:
-                        encoder.output.append(0x00)  // sort: core
-                        encoder.output.append(0x01)  // core sort: table
-                    case .global:
-                        encoder.output.append(0x00)  // sort: core
-                        encoder.output.append(0x03)  // core sort: global
-                    case .type, .module, .instance:
+                        encoder.output.append(coreSort.binaryEncoding)
+                    case .func, .value, .type, .component, .instance:
                         #warning("Unhandled cases for core aliases in `encodeBatchedAliases`")
+                        // Non-core sorts not yet supported in batched aliases
+                        break
                     }
 
                     switch alias.target {
-                    case .coreExport(let instanceIndex, let exportName):
-                        encoder.output.append(0x01)  // aliastarget: core export
-                        let parserInstanceIndex = try component.coreInstancesMap.resolveIndex(use: instanceIndex)
-                        let binaryInstanceIndex = coreInstanceIndexMapping[parserInstanceIndex] ?? parserInstanceIndex
-                        encoder.writeUnsignedLEB128(UInt32(binaryInstanceIndex))
+                    case .export(let isCore, let instanceIndex, let exportName):
+                        if isCore {
+                            encoder.output.append(0x01)  // aliastarget: core export
+                            let parserInstanceIndex = try component.coreInstancesMap.resolveIndex(use: instanceIndex)
+                            let binaryInstanceIndex = coreInstanceIndexMapping[parserInstanceIndex] ?? parserInstanceIndex
+                            encoder.writeUnsignedLEB128(UInt32(binaryInstanceIndex))
+                        } else {
+                            encoder.output.append(0x00)  // aliastarget: export
+                            let parserInstanceIndex = try component.componentInstancesMap.resolveIndex(use: instanceIndex)
+                            encoder.writeUnsignedLEB128(UInt32(parserInstanceIndex))
+                        }
                         encoder.encode(exportName)
+                    case .outer:
+                        // Outer aliases handled separately
+                        break
                     }
 
                     // Track the indices created by this alias
                     switch alias.sort {
-                    case .memory:
-                        coreMemoryCount += 1
-                    case .func:
-                        coreFunctionCount += 1
-                    case .table, .global, .type, .module, .instance:
-                        // TODO: Track table and global counts
-                        #warning("Table and global counts not tracked in `encodeBatchedAlises`")
+                    case .core(let coreSort):
+                        switch coreSort {
+                        case .memory:
+                            coreMemoryCount += 1
+                        case .func:
+                            coreFunctionCount += 1
+                        case .table, .global, .type, .module, .instance:
+                            // TODO: Track table and global counts
+                            #warning("Table and global counts not tracked in `encodeBatchedAlises`")
+                            break
+                        }
+                    case .func, .value, .type, .component, .instance:
                         break
                     }
                 }

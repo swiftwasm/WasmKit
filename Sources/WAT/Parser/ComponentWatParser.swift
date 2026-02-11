@@ -308,8 +308,8 @@
             try parser.expect(.rightParen)  // Close (core <sort> ...)
 
             let alias = ComponentAlias(
-                sort: sort,
-                target: .coreExport(instanceIndex: instanceIndex, exportName: exportName),
+                sort: .core(sort),
+                target: .export(isCore: true, instanceIndex: instanceIndex, exportName: exportName),
                 bindingId: bindingId
             )
 
@@ -1568,16 +1568,19 @@
 
         /// Component-level alias definition.
         /// Syntax: (alias core export $instance "name" (core <sort> $bindingId))
+        ///         (alias export $instance "name" (<sort> $bindingId))
+        ///         (alias outer $component $idx (<sort> $bindingId))
         ///
         /// This is separate from `ComponentModel.ComponentAlias` because the parser works with
         /// unresolved symbolic references (`Parser.IndexOrId`) while the binary representation
         /// uses resolved numeric indices (`UInt32`). The encoder resolves these during binary encoding.
         struct ComponentAlias {
             enum Target {
-                case coreExport(instanceIndex: Parser.IndexOrId, exportName: String)
+                case export(isCore: Bool, instanceIndex: Parser.IndexOrId, exportName: String)
+                case outer(outerCount: Parser.IndexOrId, typeIndex: Parser.IndexOrId)
             }
 
-            let sort: CoreDefSort
+            let sort: ComponentDefSort
             let target: Target
             let bindingId: Name?
         }
