@@ -57,6 +57,9 @@
             var emittedTypes = Set<Int>()
             var liftIndex = 0
             var coreFunctionCount = 0  // Tracks core functions created (by canon.lower and aliases)
+            var coreMemoryCount = 0  // Tracks core memories created (by aliases for canon options)
+            var emittedCoreMemoryAliases: [CoreMemoryAliasKey: Int] = [:]  // Maps (instance, export) -> memory index
+            var emittedOptionCoreFuncAliases: [CoreFuncAliasKey: Int] = [:]  // Maps (instance, export) -> func index for realloc etc.
 
             // Helper to flush accumulated component types as a batched section
             var pendingComponentTypes: [Int] = []
@@ -97,9 +100,25 @@
                 }
             }
 
+            // Helper to flush accumulated aliases as a batched section
+            var pendingAliases: [ComponentWatParser.ComponentAlias] = []
+            func flushPendingAliases() throws(WatParserError) {
+                if !pendingAliases.isEmpty {
+                    try encodeBatchedAliases(
+                        pendingAliases,
+                        component: component,
+                        coreInstanceIndexMapping: coreInstanceIndexMapping,
+                        coreFunctionCount: &coreFunctionCount,
+                        coreMemoryCount: &coreMemoryCount
+                    )
+                    pendingAliases.removeAll()
+                }
+            }
+
             // Combined flush helper for all pending sections
             func flushAllPending() throws(WatParserError) {
                 try flushPendingCoreInstances()
+                try flushPendingAliases()
                 try flushPendingCoreTypes()
                 try flushPendingComponentTypes()
             }
@@ -112,6 +131,7 @@
                 case .componentType(let typeIndex):
                     // Flush other sections before component types (different section)
                     try flushPendingCoreInstances()
+                    try flushPendingAliases()
                     try flushPendingCoreTypes()
                     // Collect all unemitted types up to and including this type index
                     // This ensures anonymous dependency types (with lower indices) get batched
@@ -129,6 +149,7 @@
 
                 case .coreInstance(let index):
                     // Flush non-instance sections before accumulating
+                    try flushPendingAliases()
                     try flushPendingCoreTypes()
                     try flushPendingComponentTypes()
                     // Accumulate consecutive core instances for batching
@@ -137,6 +158,7 @@
                 case .coreType(let index):
                     // Flush other sections before core types (different section)
                     try flushPendingCoreInstances()
+                    try flushPendingAliases()
                     try flushPendingComponentTypes()
                     // Accumulate consecutive core types for batching
                     pendingCoreTypes.append(UInt32(index))
@@ -165,7 +187,10 @@
                         emittedCoreFuncAliases: &emittedCoreFuncAliases,
                         emittedComponentFuncAliases: &emittedComponentFuncAliases,
                         liftIndex: &liftIndex,
-                        coreFunctionCount: &coreFunctionCount
+                        coreFunctionCount: &coreFunctionCount,
+                        coreMemoryCount: &coreMemoryCount,
+                        emittedCoreMemoryAliases: &emittedCoreMemoryAliases,
+                        emittedOptionCoreFuncAliases: &emittedOptionCoreFuncAliases
                     )
 
                 case .importDef(let importDef):
@@ -199,6 +224,14 @@
                 case .instance(let index):
                     try flushAllPending()
                     try encodeSingleComponentInstance(index, component: component, location: field.location)
+
+                case .alias(let alias):
+                    // Flush other sections before aliases (different section)
+                    try flushPendingCoreInstances()
+                    try flushPendingCoreTypes()
+                    try flushPendingComponentTypes()
+                    // Accumulate consecutive aliases for batching
+                    pendingAliases.append(alias)
                 }
             }
 
@@ -264,16 +297,98 @@
                 let componentFunc = component.componentFunctions.decls[liftIndex]
                 let typeIndex = Int(componentFunc.type.rawValue)
 
-                // Check if this type needs to be emitted (is in the mapping and not yet emitted)
-                if typeIndexMapping[typeIndex] != nil && !emittedTypes.contains(typeIndex) {
-                    try encodeSingleComponentType(
-                        typeIndex,
-                        component: component,
-                        typeIndexMapping: typeIndexMapping,
-                        exportedTypeIndices: exportedTypeIndices
-                    )
-                    emittedTypes.insert(typeIndex)
+                // First, recursively emit all types that this function type depends on
+                try emitDependentTypesRecursively(
+                    typeIndex: typeIndex,
+                    component: component,
+                    typeIndexMapping: typeIndexMapping,
+                    exportedTypeIndices: exportedTypeIndices,
+                    emittedTypes: &emittedTypes
+                )
+            }
+        }
+
+        // Recursively emit all types that a given type depends on
+        private mutating func emitDependentTypesRecursively(
+            typeIndex: Int,
+            component: ComponentWatParser.ComponentDef,
+            typeIndexMapping: [Int: Int],
+            exportedTypeIndices: Set<Int>,
+            emittedTypes: inout Set<Int>
+        ) throws(WatParserError) {
+            // Skip if already emitted or not in mapping
+            if emittedTypes.contains(typeIndex) || typeIndexMapping[typeIndex] == nil {
+                return
+            }
+
+            guard typeIndex < component.componentTypes.decls.count else { return }
+            let typeDef = component.componentTypes.decls[typeIndex]
+
+            // Collect dependent type indices
+            var dependentIndices: [Int] = []
+
+            switch typeDef.kind {
+            case .function(let funcType):
+                // Function parameters and result may reference other types
+                for param in funcType.params {
+                    dependentIndices.append(contentsOf: collectDependentTypeIndices(from: param.type))
                 }
+                if let result = funcType.result {
+                    dependentIndices.append(contentsOf: collectDependentTypeIndices(from: result))
+                }
+
+            case .value(let valueType):
+                // Value types may reference other types
+                dependentIndices.append(contentsOf: collectDependentTypeIndices(from: valueType))
+
+            case .component, .instance:
+                // These may have dependencies but we'll handle them later if needed
+                break
+            }
+
+            // Recursively emit all dependencies first
+            for depIndex in dependentIndices {
+                try emitDependentTypesRecursively(
+                    typeIndex: depIndex,
+                    component: component,
+                    typeIndexMapping: typeIndexMapping,
+                    exportedTypeIndices: exportedTypeIndices,
+                    emittedTypes: &emittedTypes
+                )
+            }
+
+            // Now emit this type
+            try encodeSingleComponentType(
+                typeIndex,
+                component: component,
+                typeIndexMapping: typeIndexMapping,
+                exportedTypeIndices: exportedTypeIndices
+            )
+            emittedTypes.insert(typeIndex)
+        }
+
+        // Collect all type indices that a value type depends on
+        private func collectDependentTypeIndices(from valueType: ComponentValueType) -> [Int] {
+            switch valueType {
+            case .indexed(let typeIndex):
+                return [Int(typeIndex.rawValue)]
+            case .list(let typeIndex), .option(let typeIndex):
+                return [Int(typeIndex.rawValue)]
+            case .tuple(let typeIndices):
+                return typeIndices.map { Int($0.rawValue) }
+            case .result(let okType, let errorType):
+                var indices: [Int] = []
+                if let okType { indices.append(Int(okType.rawValue)) }
+                if let errorType { indices.append(Int(errorType.rawValue)) }
+                return indices
+            case .record(let fields):
+                return fields.map { Int($0.type.rawValue) }
+            case .variant(let cases):
+                return cases.compactMap { $0.type.map { Int($0.rawValue) } }
+            case .bool, .u8, .u16, .u32, .u64, .s8, .s16, .s32, .s64, .float32, .float64, .char, .string, .errorContext, .flags, .enum:
+                return []
+            case .future, .stream, .resource:
+                return []
             }
         }
 
@@ -290,28 +405,24 @@
                 // Instance imports reference a type index
                 if case .index(let index, _) = indexOrId {
                     let typeIndex = Int(index)
-                    if typeIndexMapping[typeIndex] != nil && !emittedTypes.contains(typeIndex) {
-                        try encodeSingleComponentType(
-                            typeIndex,
-                            component: component,
-                            typeIndexMapping: typeIndexMapping,
-                            exportedTypeIndices: exportedTypeIndices
-                        )
-                        emittedTypes.insert(typeIndex)
-                    }
+                    try emitDependentTypesRecursively(
+                        typeIndex: typeIndex,
+                        component: component,
+                        typeIndexMapping: typeIndexMapping,
+                        exportedTypeIndices: exportedTypeIndices,
+                        emittedTypes: &emittedTypes
+                    )
                 }
             case .function(let funcTypeIndex):
                 // Function imports also reference a type
                 let typeIndex = Int(funcTypeIndex.rawValue)
-                if typeIndexMapping[typeIndex] != nil && !emittedTypes.contains(typeIndex) {
-                    try encodeSingleComponentType(
-                        typeIndex,
-                        component: component,
-                        typeIndexMapping: typeIndexMapping,
-                        exportedTypeIndices: exportedTypeIndices
-                    )
-                    emittedTypes.insert(typeIndex)
-                }
+                try emitDependentTypesRecursively(
+                    typeIndex: typeIndex,
+                    component: component,
+                    typeIndexMapping: typeIndexMapping,
+                    exportedTypeIndices: exportedTypeIndices,
+                    emittedTypes: &emittedTypes
+                )
             default:
                 break
             }
@@ -661,8 +772,63 @@
             }
         }
 
+        // Encode multiple aliases in a single batched section
+        private mutating func encodeBatchedAliases(
+            _ aliases: [ComponentWatParser.ComponentAlias],
+            component: ComponentWatParser.ComponentDef,
+            coreInstanceIndexMapping: [Int: Int],
+            coreFunctionCount: inout Int,
+            coreMemoryCount: inout Int
+        ) throws(WatParserError) {
+            guard !aliases.isEmpty else { return }
+
+            try underlying.section(id: 0x06) { encoder throws(WatParserError) in
+                encoder.writeUnsignedLEB128(UInt32(aliases.count))
+
+                for alias in aliases {
+                    switch alias.sort {
+                    case .memory:
+                        encoder.output.append(0x00)  // sort: core
+                        encoder.output.append(0x02)  // core sort: memory
+                    case .func:
+                        encoder.output.append(0x00)  // sort: core
+                        encoder.output.append(0x00)  // core sort: func
+                    case .table:
+                        encoder.output.append(0x00)  // sort: core
+                        encoder.output.append(0x01)  // core sort: table
+                    case .global:
+                        encoder.output.append(0x00)  // sort: core
+                        encoder.output.append(0x03)  // core sort: global
+                    case .type, .module, .instance:
+                        #warning("Unhandled cases for core aliases in `encodeBatchedAliases`")
+                    }
+
+                    switch alias.target {
+                    case .coreExport(let instanceIndex, let exportName):
+                        encoder.output.append(0x01)  // aliastarget: core export
+                        let parserInstanceIndex = try component.coreInstancesMap.resolveIndex(use: instanceIndex)
+                        let binaryInstanceIndex = coreInstanceIndexMapping[parserInstanceIndex] ?? parserInstanceIndex
+                        encoder.writeUnsignedLEB128(UInt32(binaryInstanceIndex))
+                        encoder.encode(exportName)
+                    }
+
+                    // Track the indices created by this alias
+                    switch alias.sort {
+                    case .memory:
+                        coreMemoryCount += 1
+                    case .func:
+                        coreFunctionCount += 1
+                    case .table, .global, .type, .module, .instance:
+                        // TODO: Track table and global counts
+                        #warning("Table and global counts not tracked in `encodeBatchedAlises`")
+                        break
+                    }
+                }
+            }
+        }
+
         // Encode a single canon definition as its own section
-        // Also emits alias section if needed for this canon
+        // Aliases are batched together in the correct order: core func first, then memory, then realloc
         private mutating func encodeSingleCanon(
             _ canonDef: ComponentWatParser.CanonDef,
             coreFuncAliases: [CoreFuncAlias],
@@ -674,13 +840,25 @@
             emittedCoreFuncAliases: inout Set<Int>,
             emittedComponentFuncAliases: inout Set<Int>,
             liftIndex: inout Int,
-            coreFunctionCount: inout Int
+            coreFunctionCount: inout Int,
+            coreMemoryCount: inout Int,
+            emittedCoreMemoryAliases: inout [CoreMemoryAliasKey: Int],
+            emittedOptionCoreFuncAliases: inout [CoreFuncAliasKey: Int]
         ) throws(WatParserError) {
+
+            // Structure to collect aliases to be emitted in batch
+            enum AliasToEmit {
+                case coreFunc(instanceIndex: Int, exportName: String, assignedIndex: Int)
+                case coreMemory(instanceIndex: Int, exportName: String, assignedIndex: Int)
+            }
+
+            var aliasesToEmit: [AliasToEmit] = []
+
+            // Process based on canon kind
             switch canonDef.kind {
             case .lift(let funcIndex):
-                // Find the alias for this lift
+                // 1. First, collect the core func alias for the lifted function
                 let parserInstanceIndex = try component.coreInstancesMap.resolveIndex(use: funcIndex.instance)
-                // Convert to binary index for matching with coreFuncAliases
                 let binaryInstanceIndex = coreInstanceIndexMapping[parserInstanceIndex] ?? parserInstanceIndex
                 guard
                     let aliasIndexInArray = coreFuncAliases.firstIndex(where: {
@@ -690,25 +868,21 @@
                     throw WatParserError("Core function alias not found", location: location)
                 }
 
-                // Emit alias section if not already emitted
-                // The alias creates a new core function at the current coreFunctionCount
                 let coreFuncIndex: Int
                 if !emittedCoreFuncAliases.contains(aliasIndexInArray) {
                     let alias = coreFuncAliases[aliasIndexInArray]
-                    underlying.section(id: 0x06) { encoder in
-                        encoder.writeUnsignedLEB128(UInt32(1))  // count = 1
-                        encoder.output.append(0x00)  // sort: core
-                        encoder.output.append(0x00)  // core sort: func
-                        encoder.output.append(0x01)  // aliastarget: core export
-                        encoder.writeUnsignedLEB128(UInt32(alias.instanceIndex))
-                        encoder.encode(alias.exportName)
-                    }
                     coreFuncIndex = coreFunctionCount
+                    aliasesToEmit.append(
+                        .coreFunc(
+                            instanceIndex: alias.instanceIndex,
+                            exportName: alias.exportName,
+                            assignedIndex: coreFuncIndex
+                        )
+                    )
                     coreFunctionCount += 1
                     emittedCoreFuncAliases.insert(aliasIndexInArray)
                 } else {
                     // Alias already emitted - need to track what index it was assigned
-                    // For now, count emitted aliases with lower indices
                     var idx = 0
                     for i in 0..<aliasIndexInArray {
                         if emittedCoreFuncAliases.contains(i) {
@@ -716,11 +890,81 @@
                         }
                     }
                     #warning("Non-core func aliases not fully supported in component binary encoder")
-                    // This is a simplification - proper implementation would track assigned indices
                     coreFuncIndex = coreFunctionCount - (emittedCoreFuncAliases.count - idx)
                 }
 
-                // Emit canon section
+                // 2. Then collect memory alias if needed
+                for option in canonDef.options {
+                    if case .memory(let memoryRef) = option {
+                        let memParserInstanceIndex = try component.coreInstancesMap.resolveIndex(use: memoryRef.instance)
+                        let memBinaryInstanceIndex = coreInstanceIndexMapping[memParserInstanceIndex] ?? memParserInstanceIndex
+                        let key = CoreMemoryAliasKey(instanceIndex: memBinaryInstanceIndex, exportName: memoryRef.exportName)
+
+                        if emittedCoreMemoryAliases[key] == nil {
+                            let memIndex = coreMemoryCount
+                            aliasesToEmit.append(
+                                .coreMemory(
+                                    instanceIndex: memBinaryInstanceIndex,
+                                    exportName: memoryRef.exportName,
+                                    assignedIndex: memIndex
+                                )
+                            )
+                            emittedCoreMemoryAliases[key] = memIndex
+                            coreMemoryCount += 1
+                        }
+                    }
+                }
+
+                // 3. Then collect realloc/postReturn/callback func aliases
+                for option in canonDef.options {
+                    switch option {
+                    case .realloc(let funcRef), .postReturn(let funcRef), .callback(let funcRef):
+                        let optParserInstanceIndex = try component.coreInstancesMap.resolveIndex(use: funcRef.instance)
+                        let optBinaryInstanceIndex = coreInstanceIndexMapping[optParserInstanceIndex] ?? optParserInstanceIndex
+                        let key = CoreFuncAliasKey(instanceIndex: optBinaryInstanceIndex, exportName: funcRef.exportName)
+
+                        if emittedOptionCoreFuncAliases[key] == nil {
+                            let optFuncIndex = coreFunctionCount
+                            aliasesToEmit.append(
+                                .coreFunc(
+                                    instanceIndex: optBinaryInstanceIndex,
+                                    exportName: funcRef.exportName,
+                                    assignedIndex: optFuncIndex
+                                )
+                            )
+                            emittedOptionCoreFuncAliases[key] = optFuncIndex
+                            coreFunctionCount += 1
+                        }
+                    default:
+                        break
+                    }
+                }
+
+                // 4. Emit all aliases in a single batched section
+                if !aliasesToEmit.isEmpty {
+                    underlying.section(id: 0x06) { encoder in
+                        encoder.writeUnsignedLEB128(UInt32(aliasesToEmit.count))
+
+                        for aliasToEmit in aliasesToEmit {
+                            switch aliasToEmit {
+                            case .coreFunc(let instanceIndex, let exportName, _):
+                                encoder.output.append(0x00)  // sort: core
+                                encoder.output.append(0x00)  // core sort: func
+                                encoder.output.append(0x01)  // aliastarget: core export
+                                encoder.writeUnsignedLEB128(UInt32(instanceIndex))
+                                encoder.encode(exportName)
+                            case .coreMemory(let instanceIndex, let exportName, _):
+                                encoder.output.append(0x00)  // sort: core
+                                encoder.output.append(0x02)  // core sort: memory
+                                encoder.output.append(0x01)  // aliastarget: core export
+                                encoder.writeUnsignedLEB128(UInt32(instanceIndex))
+                                encoder.encode(exportName)
+                            }
+                        }
+                    }
+                }
+
+                // 5. Emit canon section
                 try underlying.section(id: 0x08) { encoder throws(WatParserError) in
                     encoder.writeUnsignedLEB128(UInt32(1))  // count = 1
                     encoder.output.append(0x00)  // canon.lift
@@ -731,14 +975,59 @@
 
                     try encoder.encodeVector(canonDef.options) { option, encoder throws(WatParserError) in
                         switch option {
-                        case .memory(let memoryId):
-                            encoder.output.append(0x00)
-                            let memoryIndex = try component.coreInstancesMap.resolveIndex(use: memoryId)
+                        case .stringEncoding(let encoding):
+                            // String encoding options are raw bytes 0x00/0x01/0x02
+                            switch encoding {
+                            case .utf8:
+                                encoder.output.append(0x00)
+                            case .utf16:
+                                encoder.output.append(0x01)
+                            case .latin1UTF16:
+                                encoder.output.append(0x02)
+                            }
+
+                        case .memory(let memoryRef):
+                            encoder.output.append(0x03)  // memory option tag
+                            let parserInstanceIndex = try component.coreInstancesMap.resolveIndex(use: memoryRef.instance)
+                            let binaryInstanceIndex = coreInstanceIndexMapping[parserInstanceIndex] ?? parserInstanceIndex
+                            let key = CoreMemoryAliasKey(instanceIndex: binaryInstanceIndex, exportName: memoryRef.exportName)
+                            guard let memoryIndex = emittedCoreMemoryAliases[key] else {
+                                throw WatParserError("Memory alias not found (should have been emitted)", location: location)
+                            }
                             encoder.writeUnsignedLEB128(UInt32(memoryIndex))
+
+                        case .realloc(let funcRef):
+                            encoder.output.append(0x04)  // realloc option tag
+                            let parserInstanceIndex = try component.coreInstancesMap.resolveIndex(use: funcRef.instance)
+                            let binaryInstanceIndex = coreInstanceIndexMapping[parserInstanceIndex] ?? parserInstanceIndex
+                            let key = CoreFuncAliasKey(instanceIndex: binaryInstanceIndex, exportName: funcRef.exportName)
+                            guard let funcIndex = emittedOptionCoreFuncAliases[key] else {
+                                throw WatParserError("Realloc func alias not found (should have been emitted)", location: location)
+                            }
+                            encoder.writeUnsignedLEB128(UInt32(funcIndex))
+
+                        case .postReturn(let funcRef):
+                            encoder.output.append(0x05)  // post-return option tag
+                            let parserInstanceIndex = try component.coreInstancesMap.resolveIndex(use: funcRef.instance)
+                            let binaryInstanceIndex = coreInstanceIndexMapping[parserInstanceIndex] ?? parserInstanceIndex
+                            let key = CoreFuncAliasKey(instanceIndex: binaryInstanceIndex, exportName: funcRef.exportName)
+                            guard let funcIndex = emittedOptionCoreFuncAliases[key] else {
+                                throw WatParserError("Post-return func alias not found (should have been emitted)", location: location)
+                            }
+                            encoder.writeUnsignedLEB128(UInt32(funcIndex))
+
                         case .async:
-                            encoder.output.append(0x05)
-                        case .realloc, .postReturn, .callback, .stringEncoding:
-                            throw WatParserError("Canon option not yet supported", location: location)
+                            encoder.output.append(0x06)  // async option tag
+
+                        case .callback(let funcRef):
+                            encoder.output.append(0x07)  // callback option tag
+                            let parserInstanceIndex = try component.coreInstancesMap.resolveIndex(use: funcRef.instance)
+                            let binaryInstanceIndex = coreInstanceIndexMapping[parserInstanceIndex] ?? parserInstanceIndex
+                            let key = CoreFuncAliasKey(instanceIndex: binaryInstanceIndex, exportName: funcRef.exportName)
+                            guard let funcIndex = emittedOptionCoreFuncAliases[key] else {
+                                throw WatParserError("Callback func alias not found (should have been emitted)", location: location)
+                            }
+                            encoder.writeUnsignedLEB128(UInt32(funcIndex))
                         }
                     }
 
@@ -758,60 +1047,50 @@
                 }
                 liftIndex += 1
 
-            case .lower(let funcRef):
-                // Find the alias for this lower
-                let instanceIndex = try component.componentInstancesMap.resolveIndex(use: funcRef.instance)
+            case .lower(let componentFuncRef):
+                // Find the component function alias for this lower
+                let parserInstanceIndex = try component.componentInstancesMap.resolveIndex(use: componentFuncRef.instance)
                 guard
                     let aliasIndexInArray = componentFuncAliases.firstIndex(where: {
-                        $0.instanceIndex == instanceIndex && $0.exportName == funcRef.exportName
+                        $0.instanceIndex == parserInstanceIndex && $0.exportName == componentFuncRef.exportName
                     })
                 else {
-                    throw WatParserError("Component function alias not found", location: location)
+                    throw WatParserError("Component function alias not found for canon lower", location: location)
                 }
 
                 // Emit alias section if not already emitted
+                let componentFuncIndex: Int
                 if !emittedComponentFuncAliases.contains(aliasIndexInArray) {
                     let alias = componentFuncAliases[aliasIndexInArray]
+                    // This needs to be a function alias, not a core func alias
                     underlying.section(id: 0x06) { encoder in
                         encoder.writeUnsignedLEB128(UInt32(1))  // count = 1
-                        encoder.output.append(0x01)  // sort: func
-                        encoder.output.append(0x00)  // aliastarget: export
+                        encoder.output.append(0x01)  // sort: function (not core)
+                        encoder.output.append(0x00)  // aliastarget: 0x00 = export (from component instance)
                         encoder.writeUnsignedLEB128(UInt32(alias.instanceIndex))
                         encoder.encode(alias.exportName)
                     }
+                    componentFuncIndex = emittedComponentFuncAliases.count
                     emittedComponentFuncAliases.insert(aliasIndexInArray)
+                } else {
+                    componentFuncIndex = emittedComponentFuncAliases.count - 1
                 }
 
-                // Emit canon section
-                try underlying.section(id: 0x08) { encoder throws(WatParserError) in
+                // Emit canon.lower section
+                underlying.section(id: 0x08) { encoder in
                     encoder.writeUnsignedLEB128(UInt32(1))  // count = 1
                     encoder.output.append(0x01)  // canon.lower
                     encoder.output.append(0x00)  // sub-opcode
 
-                    // The function index refers to the component functions index space.
-                    // Component functions come from:
-                    // 1. Function imports (at indices 0, 1, ...)
-                    // 2. Function aliases (continuing indices)
-                    // Since we emit aliases before canon.lower, the aliasIndexInArray
-                    // is the correct index (offset by any function imports)
                     #warning("No function imports in enabled test cases yet to exercise this code path fully")
-                    encoder.writeUnsignedLEB128(UInt32(aliasIndexInArray))
+                    // Reference the component function by its aliased index
+                    encoder.writeUnsignedLEB128(UInt32(componentFuncIndex))
 
-                    try encoder.encodeVector(canonDef.options) { option, encoder throws(WatParserError) in
-                        switch option {
-                        case .memory(let memoryId):
-                            encoder.output.append(0x00)
-                            let memoryIndex = try component.coreInstancesMap.resolveIndex(use: memoryId)
-                            encoder.writeUnsignedLEB128(UInt32(memoryIndex))
-                        case .async:
-                            encoder.output.append(0x05)
-                        case .realloc, .postReturn, .callback, .stringEncoding:
-                            throw WatParserError("Canon option not yet supported", location: location)
-                        }
-                    }
+                    // No options for now
+                    #warning("canon.lower options not emitted yet in `encodeSingleCanon`")
+                    encoder.writeUnsignedLEB128(UInt32(0))  // 0 options
                 }
-                // Canon.lower creates a core function - increment the count
-                coreFunctionCount += 1
+                coreFunctionCount += 1  // canon.lower creates a core function
             }
         }
 
@@ -1007,6 +1286,10 @@
                     result.instances.append((index, field.location))
                 case .componentType:
                     // Component types are handled separately in the main encoding loop
+                    // They don't need to be grouped for auxiliary calculations
+                    break
+                case .alias:
+                    // Aliases are handled in the main encoding loop with batching
                     // They don't need to be grouped for auxiliary calculations
                     break
                 }
@@ -1446,6 +1729,18 @@
 
     private typealias CoreFuncAlias = (instanceIndex: Int, exportName: String)
     private typealias ComponentFuncAlias = (instanceIndex: Int, exportName: String)
+
+    /// Key for tracking dynamically emitted core memory aliases from canon options
+    private struct CoreMemoryAliasKey: Hashable {
+        let instanceIndex: Int
+        let exportName: String
+    }
+
+    /// Key for tracking dynamically emitted core function aliases from canon options (realloc, etc.)
+    private struct CoreFuncAliasKey: Hashable {
+        let instanceIndex: Int
+        let exportName: String
+    }
 
     extension CoreDefSort {
         var binaryEncoding: UInt8 {

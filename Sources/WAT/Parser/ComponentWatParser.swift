@@ -79,9 +79,7 @@
                 case "instance":
                     try parseComponentInstance(&parser, location: location)
                 case "alias":
-                    #warning("Stub: skip unsupported component fields for now")
-                    try parser.skipParenBlock()
-                    continue  // skipParenBlock consumes the closing ), so skip expect below
+                    try parseComponentAlias(&parser, location: location)
                 default:
                     throw WatParserError(
                         "Unknown component definition keyword \(keyword)",
@@ -285,6 +283,52 @@
                             descriptor: descriptor
                         ))
                 )
+            )
+        }
+
+        /// Parse a component-level alias definition
+        /// Syntax: (alias core export $instance "name" (core <sort> $bindingId))
+        private mutating func parseComponentAlias(_ parser: inout Parser, location: Location) throws(WatParserError) {
+            // Parse: core export $instance "name"
+            try parser.expectKeyword("core")
+            try parser.expectKeyword("export")
+            let instanceIndex = try parser.expectIndexOrId()
+            let exportName = try parser.expectString()
+
+            // Parse: (core <sort> $bindingId)
+            try parser.expect(.leftParen)
+            try parser.expectKeyword("core")
+            let sortKeyword = try parser.expectKeyword()
+
+            guard let sort = CoreDefSort(rawValue: sortKeyword) else {
+                throw WatParserError("Unknown core alias sort '\(sortKeyword)'", location: parser.lexer.location())
+            }
+
+            let bindingId = try parser.takeId()
+            try parser.expect(.rightParen)  // Close (core <sort> ...)
+
+            let alias = ComponentAlias(
+                sort: sort,
+                target: .coreExport(instanceIndex: instanceIndex, exportName: exportName),
+                bindingId: bindingId
+            )
+
+            // Add to appropriate index space based on sort
+            switch sort {
+            case .func:
+                let funcDef = CoreFuncDef(id: bindingId)
+                _ = try currentComponent.coreFunctionsMap.add(funcDef)
+            case .memory:
+                let memDef = CoreMemoryAliasDef(id: bindingId)
+                _ = try currentComponent.coreMemoriesMap.add(memDef)
+            case .table, .global, .type, .module, .instance:
+                // TODO: Add support for table and global aliases
+                #warning("Not all core alias sorts supported yet")
+                break
+            }
+
+            currentComponent.fields.append(
+                .init(location: location, kind: .alias(alias))
             )
         }
 
@@ -1294,15 +1338,33 @@
             let keyword = try parser.expectKeyword()
             switch keyword {
             case "memory":
-                return .memory(try parser.expectIndexOrId())
+                return .memory(try parseCoreMemoryRef(&parser))
             case "realloc":
-                return .realloc(try parseCoreFunctionIndex(&parser))
+                return .realloc(try parseOptionFuncIndex(&parser))
             case "post-return":
-                return .postReturn(try parseCoreFunctionIndex(&parser))
+                return .postReturn(try parseOptionFuncIndex(&parser))
             case "async":
                 return .async
             case "callback":
-                return .callback(try parseCoreFunctionIndex(&parser))
+                return .callback(try parseOptionFuncIndex(&parser))
+            case "string-encoding":
+                // Parse string encoding: utf8 | utf16 | latin1+utf16
+                let encodingKeyword = try parser.expectKeyword()
+                let encoding: ComponentStringEncoding
+                switch encodingKeyword {
+                case "utf8":
+                    encoding = .utf8
+                case "utf16":
+                    encoding = .utf16
+                case "latin1+utf16":
+                    encoding = .latin1UTF16
+                default:
+                    throw WatParserError(
+                        "Unknown string encoding '\(encodingKeyword)'",
+                        location: parser.lexer.location()
+                    )
+                }
+                return .stringEncoding(encoding)
             default:
                 throw WatParserError(
                     "Unknown canon options keyword \(keyword)",
@@ -1311,9 +1373,29 @@
             }
         }
 
+        /// Parse a core memory reference: $instance "export"
+        /// Used in canon options: (memory $instance "export")
+        private mutating func parseCoreMemoryRef(_ parser: inout Parser) throws(WatParserError) -> MemoryRef {
+            let instanceId = try parser.expectIndexOrId()
+            let exportName = try parser.expectString()
+            return .init(instance: instanceId, exportName: exportName)
+        }
+
         private mutating func parseCoreFunctionIndex(_ parser: inout Parser) throws(WatParserError) -> FuncIndex {
             try parser.expect(.leftParen)
             try parser.expectKeyword("core")
+            try parser.expectKeyword("func")
+            let instanceId = try parser.expectIndexOrId()
+            let exportName = try parser.expectString()
+            try parser.expect(.rightParen)
+
+            return .init(instance: instanceId, exportName: exportName)
+        }
+
+        /// Parse a core function reference for canon options: (func $instance "export")
+        /// Used in realloc, post-return, callback options.
+        private mutating func parseOptionFuncIndex(_ parser: inout Parser) throws(WatParserError) -> FuncIndex {
+            try parser.expect(.leftParen)
             try parser.expectKeyword("func")
             let instanceId = try parser.expectIndexOrId()
             let exportName = try parser.expectString()
@@ -1347,6 +1429,7 @@
                 case canon(CanonDef)
                 case exportDef(ExportDef)
                 case importDef(ImportDef)
+                case alias(ComponentAlias)
             }
 
             let location: Location
@@ -1376,6 +1459,11 @@
             var id: Name?
         }
 
+        /// A core memory definition created via alias.
+        struct CoreMemoryAliasDef: NamedFieldDecl {
+            var id: Name?
+        }
+
         /// https://github.com/WebAssembly/component-model/blob/main/design/mvp/Explainer.md#index-spaces
         public struct ComponentDef: NamedFieldDecl {
             var id: Name?
@@ -1385,6 +1473,7 @@
             var coreInstancesMap: NameMapping<CoreInstanceDef> = .init()
             var coreTypesMap: CoreTypesMap = .init()
             var coreFunctionsMap: NameMapping<CoreFuncDef> = .init()  // Core functions created by canon lower
+            var coreMemoriesMap: NameMapping<CoreMemoryAliasDef> = .init()  // Core memories created by alias
 
             var componentFunctions: NameMapping<ComponentFuncDef> = .init()
             var valuesMap: NameMapping<ValueDef> = .init()
@@ -1469,6 +1558,30 @@
             case outer(componentId: Parser.IndexOrId, index: Parser.IndexOrId, resolvedIndex: Int, outerCount: Int)
         }
 
+        enum CoreAliasSort: String {
+            case `func`
+            case table
+            case memory
+            case global
+            case type
+        }
+
+        /// Component-level alias definition.
+        /// Syntax: (alias core export $instance "name" (core <sort> $bindingId))
+        ///
+        /// This is separate from `ComponentModel.ComponentAlias` because the parser works with
+        /// unresolved symbolic references (`Parser.IndexOrId`) while the binary representation
+        /// uses resolved numeric indices (`UInt32`). The encoder resolves these during binary encoding.
+        struct ComponentAlias {
+            enum Target {
+                case coreExport(instanceIndex: Parser.IndexOrId, exportName: String)
+            }
+
+            let sort: CoreDefSort
+            let target: Target
+            let bindingId: Name?
+        }
+
         struct CoreModuleImport {
             let moduleName: String
             let name: String
@@ -1489,6 +1602,13 @@
             var exportName: String
         }
 
+        /// Reference to a core memory via instance export.
+        /// Used in canon options: (memory $instance "export")
+        struct MemoryRef {
+            var instance: Parser.IndexOrId
+            var exportName: String
+        }
+
         /// Reference to a component function via instance export.
         /// Used in canon lower: (func $instance "export")
         struct ComponentFuncRef {
@@ -1499,7 +1619,7 @@
         struct CanonDef {
             enum Option {
                 case stringEncoding(ComponentStringEncoding)
-                case memory(Parser.IndexOrId)
+                case memory(MemoryRef)
                 case realloc(FuncIndex)
                 case postReturn(FuncIndex)
                 case `async`

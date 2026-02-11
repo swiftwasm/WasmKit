@@ -339,15 +339,10 @@ public enum ModuleSource {
     case binary([UInt8])
 
     static func parse(wastParser: inout WastParser) throws(WatParserError) -> ModuleSource {
-        if let headKeyword = try wastParser.parser.peekKeyword() {
-            if headKeyword == "binary" {
-                // (module binary "..." "..." ...)
-                try wastParser.parser.consume()
-                return .binary(try wastParser.parser.expectStringList())
-            } else if headKeyword == "quote" {
-                // (module quote "..." "..." ...)
-                try wastParser.parser.consume()
-                return .quote(try wastParser.parser.expectStringList())
+        if let rawSource = try wastParser.parser.parseBinaryOrQuote() {
+            switch rawSource {
+            case .binary(let bytes): return .binary(bytes)
+            case .quote(let bytes): return .quote(bytes)
             }
         }
 
