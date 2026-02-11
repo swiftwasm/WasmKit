@@ -41,11 +41,9 @@
     /// Test runner for WAVE golden file tests
     struct GoldenTestRunner {
         let interface: UITestInterface
-        let formatter: WAVEFormatter
 
         init(interface: UITestInterface) {
             self.interface = interface
-            self.formatter = WAVEFormatter()
         }
 
         /// Run a single test case and return the output
@@ -93,7 +91,7 @@
                 let parsedArgs = zip(params, parsedValues).map { ($0.name, $1) }
 
                 // Format output
-                let formattedArgs = parsedArgs.map { "\($0.0): \(formatter.format($0.1))" }
+                let formattedArgs = parsedArgs.map { "\($0.0): \(WAVEFormatter.format($0.1))" }
                 return funcCall.comments + "\(funcCall.name)(\(formattedArgs.joined(separator: ", ")))"
             } catch let error {
                 // Adjust span to be relative to function call start

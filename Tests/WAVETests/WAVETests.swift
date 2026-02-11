@@ -270,80 +270,77 @@
 
     @Suite
     struct WAVEFormatterTests {
-
-        let formatter = WAVEFormatter()
-
         @Test
         func formatBool() {
-            #expect(formatter.format(.bool(true)) == "true")
-            #expect(formatter.format(.bool(false)) == "false")
+            #expect(WAVEFormatter.format(.bool(true)) == "true")
+            #expect(WAVEFormatter.format(.bool(false)) == "false")
         }
 
         @Test
         func formatIntegers() {
-            #expect(formatter.format(.u32(42)) == "42")
-            #expect(formatter.format(.s32(-123)) == "-123")
+            #expect(WAVEFormatter.format(.u32(42)) == "42")
+            #expect(WAVEFormatter.format(.s32(-123)) == "-123")
         }
 
         @Test
         func formatFloats() {
-            #expect(formatter.format(.float32(.nan)) == "nan")
-            #expect(formatter.format(.float32(.infinity)) == "inf")
-            #expect(formatter.format(.float32(-.infinity)) == "-inf")
+            #expect(WAVEFormatter.format(.float32(.nan)) == "nan")
+            #expect(WAVEFormatter.format(.float32(.infinity)) == "inf")
+            #expect(WAVEFormatter.format(.float32(-.infinity)) == "-inf")
         }
 
         @Test
         func formatString() {
-            #expect(formatter.format(.string("hello")) == "\"hello\"")
-            #expect(formatter.format(.string("line\nbreak")) == "\"line\\nbreak\"")
+            #expect(WAVEFormatter.format(.string("hello")) == "\"hello\"")
+            #expect(WAVEFormatter.format(.string("line\nbreak")) == "\"line\\nbreak\"")
         }
 
         @Test
         func formatChar() {
-            #expect(formatter.format(.char("x")) == "'x'")
-            #expect(formatter.format(.char("\n")) == "'\\n'")
+            #expect(WAVEFormatter.format(.char("x")) == "'x'")
+            #expect(WAVEFormatter.format(.char("\n")) == "'\\n'")
         }
 
         @Test
         func formatList() {
             let value = ComponentValue.list([.u32(1), .u32(2), .u32(3)])
-            #expect(formatter.format(value) == "[1, 2, 3]")
+            #expect(WAVEFormatter.format(value) == "[1, 2, 3]")
         }
 
         @Test
         func formatTuple() {
             let value = ComponentValue.tuple([.string("abc"), .u32(123)])
-            #expect(formatter.format(value) == "(\"abc\", 123)")
+            #expect(WAVEFormatter.format(value) == "(\"abc\", 123)")
         }
 
         @Test
         func formatFlags() {
             let value = ComponentValue.flags(Set(["read", "write"]))
-            #expect(formatter.format(value) == "{read, write}")
+            #expect(WAVEFormatter.format(value) == "{read, write}")
 
             let empty = ComponentValue.flags(Set())
-            #expect(formatter.format(empty) == "{}")
+            #expect(WAVEFormatter.format(empty) == "{}")
         }
 
         @Test
         func formatOption() {
-            #expect(formatter.format(.option(nil)) == "none")
-            #expect(formatter.format(.option(.u32(42))) == "some(42)")  // explicit form
-            #expect(formatter.format(.option(.option(.u32(42)))) == "some(some(42))")  // nested
+            #expect(WAVEFormatter.format(.option(nil)) == "none")
+            #expect(WAVEFormatter.format(.option(.u32(42))) == "some(42)")  // explicit form
+            #expect(WAVEFormatter.format(.option(.option(.u32(42)))) == "some(some(42))")  // nested
         }
 
         @Test
         func formatResult() {
-            #expect(formatter.format(.result(ok: nil, error: nil)) == "ok")
-            #expect(formatter.format(.result(ok: .u32(42), error: nil)) == "ok(42)")  // explicit form
-            #expect(formatter.format(.result(ok: nil, error: .string("oops"))) == "err(\"oops\")")
+            #expect(WAVEFormatter.format(.result(ok: nil, error: nil)) == "ok")
+            #expect(WAVEFormatter.format(.result(ok: .u32(42), error: nil)) == "ok(42)")  // explicit form
+            #expect(WAVEFormatter.format(.result(ok: nil, error: .string("oops"))) == "err(\"oops\")")
         }
 
         @Test
         func formatEnumKeyword() {
             // Enum case that matches a keyword needs % prefix
-            #expect(formatter.format(.enum("true")) == "%true")
-            #expect(formatter.format(.enum("left")) == "left")
+            #expect(WAVEFormatter.format(.enum("true")) == "%true")
+            #expect(WAVEFormatter.format(.enum("left")) == "left")
         }
     }
 

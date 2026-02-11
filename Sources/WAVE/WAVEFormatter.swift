@@ -3,73 +3,71 @@
     import Foundation
 
     /// WAVE Formatter - Converts ComponentValues to WAVE text format
-    public struct WAVEFormatter {
+public enum WAVEFormatter {
 
-        public init() {}
+    /// Format a ComponentValue to WAVE text
+    public static func format(_ value: ComponentValue) -> String {
+        switch value {
+        case .bool(let b):
+            return b ? "true" : "false"
 
-        /// Format a ComponentValue to WAVE text
-        public func format(_ value: ComponentValue) -> String {
-            switch value {
-            case .bool(let b):
-                return b ? "true" : "false"
+        case .u8(let v):
+            return String(v)
+        case .u16(let v):
+            return String(v)
+        case .u32(let v):
+            return String(v)
+        case .u64(let v):
+            return String(v)
 
-            case .u8(let v):
-                return String(v)
-            case .u16(let v):
-                return String(v)
-            case .u32(let v):
-                return String(v)
-            case .u64(let v):
-                return String(v)
+        case .s8(let v):
+            return String(v)
+        case .s16(let v):
+            return String(v)
+        case .s32(let v):
+            return String(v)
+        case .s64(let v):
+            return String(v)
 
-            case .s8(let v):
-                return String(v)
-            case .s16(let v):
-                return String(v)
-            case .s32(let v):
-                return String(v)
-            case .s64(let v):
-                return String(v)
+        case .float32(let v):
+            return formatFloat32(v)
+        case .float64(let v):
+            return formatFloat64(v)
 
-            case .float32(let v):
-                return formatFloat32(v)
-            case .float64(let v):
-                return formatFloat64(v)
+        case .char(let scalar):
+            return formatChar(scalar)
 
-            case .char(let scalar):
-                return formatChar(scalar)
+        case .string(let str):
+            return formatString(str)
 
-            case .string(let str):
-                return formatString(str)
+        case .list(let elements):
+            let formatted = elements.map { format($0) }
+            return "[" + formatted.joined(separator: ", ") + "]"
 
-            case .list(let elements):
-                let formatted = elements.map { format($0) }
-                return "[" + formatted.joined(separator: ", ") + "]"
+        case .tuple(let elements):
+            let formatted = elements.map { format($0) }
+            return "(" + formatted.joined(separator: ", ") + ")"
 
-            case .tuple(let elements):
-                let formatted = elements.map { format($0) }
-                return "(" + formatted.joined(separator: ", ") + ")"
+        case .record(let fields):
+            return formatRecord(fields)
 
-            case .record(let fields):
-                return formatRecord(fields)
+        case .variant(let caseName, let payload):
+            return formatVariant(caseName: caseName, payload: payload)
 
-            case .variant(let caseName, let payload):
-                return formatVariant(caseName: caseName, payload: payload)
+        case .enum(let caseName):
+            return formatLabel(caseName, isKeyword: isKeyword(caseName))
 
-            case .enum(let caseName):
-                return formatLabel(caseName, isKeyword: isKeyword(caseName))
+        case .flags(let flagSet):
+            return formatFlags(flagSet)
 
-            case .flags(let flagSet):
-                return formatFlags(flagSet)
+        case .option(let inner):
+            return formatOption(inner)
 
-            case .option(let inner):
-                return formatOption(inner)
-
-            case .result(let ok, let error):
-                return formatResult(ok: ok, error: error)
-            }
+        case .result(let ok, let error):
+            return formatResult(ok: ok, error: error)
         }
-
+    }
+}
         // MARK: - Float Formatting
 
         private func formatFloat32(_ value: Float) -> String {
@@ -232,7 +230,7 @@
             }
 
             let formatted = nonNoneFields.map { field in
-                "\(field.name): \(format(field.value))"
+                "\(field.name): \(WAVEFormatter.format(field.value))"
             }
 
             return "{" + formatted.joined(separator: ", ") + "}"
@@ -244,7 +242,7 @@
             let label = formatLabel(caseName, isKeyword: isKeyword(caseName))
 
             if let payload = payload {
-                return "\(label)(\(format(payload)))"
+                return "\(label)(\(WAVEFormatter.format(payload)))"
             } else {
                 return label
             }
@@ -270,7 +268,7 @@
             }
 
             // Always use explicit some() form to match reference implementation
-            return "some(\(format(inner)))"
+            return "some(\(WAVEFormatter.format(inner)))"
         }
 
         // MARK: - Result Formatting
@@ -281,12 +279,12 @@
                 if case .tuple(let elements) = error, elements.isEmpty {
                     return "err"
                 }
-                return "err(\(format(error)))"
+                return "err(\(WAVEFormatter.format(error)))"
             }
 
             if let ok = ok {
                 // Always use explicit ok() form to match reference implementation
-                return "ok(\(format(ok)))"
+                return "ok(\(WAVEFormatter.format(ok)))"
             }
 
             return "ok"
@@ -320,11 +318,10 @@
             params: [(name: String, value: ComponentValue)]
         ) -> String {
             let formatted = params.map { param in
-                "\(param.name): \(format(param.value))"
+                "\(param.name): \(WAVEFormatter.format(param.value))"
             }
 
             return "\(name)(\(formatted.joined(separator: ", ")))"
         }
-    }
 
 #endif
