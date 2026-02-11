@@ -2,9 +2,9 @@
 // https://github.com/WebAssembly/component-model/blob/a565206aea8190e13d3a297e138261455a8b80ad/design/mvp/CanonicalABI.md
 
 #if ComponentModel
-#if canImport(Foundation)
-import Foundation
-#endif
+    #if canImport(Foundation)
+        import Foundation
+    #endif
     import ComponentModel
 
     extension ComponentValue {
@@ -874,25 +874,25 @@ import Foundation
         }
 
         fileprivate func liftUTF16LE(pointer: UInt32, byteCount: Int, codeUnitCount: Int) throws -> String {
-#if canImport(Foundation)
-            // Read UTF-16LE code units from memory
-            var codeUnits: [UInt16] = []
-            codeUnits.reserveCapacity(codeUnitCount)
+            #if canImport(Foundation)
+                // Read UTF-16LE code units from memory
+                var codeUnits: [UInt16] = []
+                codeUnits.reserveCapacity(codeUnitCount)
 
-            self.withUnsafeBufferPointer(offset: UInt(pointer), count: byteCount) { buffer in
-                for i in 0..<codeUnitCount {
-                    let offset = i * 2
-                    let low = UInt16(buffer[offset])
-                    let high = UInt16(buffer[offset + 1])
-                    let codeUnit = low | (high << 8)  // Little-endian
-                    codeUnits.append(codeUnit)
+                self.withUnsafeBufferPointer(offset: UInt(pointer), count: byteCount) { buffer in
+                    for i in 0..<codeUnitCount {
+                        let offset = i * 2
+                        let low = UInt16(buffer[offset])
+                        let high = UInt16(buffer[offset + 1])
+                        let codeUnit = low | (high << 8)  // Little-endian
+                        codeUnits.append(codeUnit)
+                    }
                 }
-            }
 
-            return String(utf16CodeUnits: codeUnits, count: codeUnits.count)
+                return String(utf16CodeUnits: codeUnits, count: codeUnits.count)
             #else
-            #warning("UTF-16 string lifting is only supported on platforms with Foundation")
-            throw CanonicalABIError("UTF-16 string lifting is only supported on platforms with Foundation")
+                #warning("UTF-16 string lifting is only supported on platforms with Foundation")
+                throw CanonicalABIError("UTF-16 string lifting is only supported on platforms with Foundation")
             #endif
         }
     }
