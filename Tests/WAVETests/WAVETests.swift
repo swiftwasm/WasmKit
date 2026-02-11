@@ -185,7 +185,7 @@
             do {
                 _ = try lexer.next()
                 Issue.record("Should have thrown error")
-            } catch let error as WAVEParserError {
+            } catch let error {
                 #expect(error.message == "invalid character escape")
             }
         }
