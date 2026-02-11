@@ -871,19 +871,19 @@
         }
 
         fileprivate func liftUTF16LE(pointer: UInt32, byteCount: Int, codeUnitCount: Int) throws -> String {
-                // Read UTF-16LE code units from memory
-                var codeUnits: [UInt16] = []
-                codeUnits.reserveCapacity(codeUnitCount)
+            // Read UTF-16LE code units from memory
+            var codeUnits: [UInt16] = []
+            codeUnits.reserveCapacity(codeUnitCount)
 
-                self.withUnsafeBufferPointer(offset: UInt(pointer), count: byteCount) { buffer in
-                    for i in 0..<codeUnitCount {
-                        let offset = i * 2
-                        let low = UInt16(buffer[offset])
-                        let high = UInt16(buffer[offset + 1])
-                        let codeUnit = low | (high << 8)  // Little-endian
-                        codeUnits.append(codeUnit)
-                    }
+            self.withUnsafeBufferPointer(offset: UInt(pointer), count: byteCount) { buffer in
+                for i in 0..<codeUnitCount {
+                    let offset = i * 2
+                    let low = UInt16(buffer[offset])
+                    let high = UInt16(buffer[offset + 1])
+                    let codeUnit = low | (high << 8)  // Little-endian
+                    codeUnits.append(codeUnit)
                 }
+            }
 
             return String(decoding: codeUnits, as: UTF16.self)
         }
