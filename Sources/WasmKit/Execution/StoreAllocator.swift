@@ -219,8 +219,8 @@ class StoreAllocator {
     let iseqAllocator: ISeqAllocator
 
     #if ComponentModel
-    private var componentInstances: BumpAllocator<ComponentInstanceEntity>
-    private var componentFunctions: BumpAllocator<ComponentFunctionEntity>
+        private var componentInstances: BumpAllocator<ComponentInstanceEntity>
+        private var componentFunctions: BumpAllocator<ComponentFunctionEntity>
     #endif
 
     /// Function type interner shared across stores associated with the same `Runtime`.
@@ -241,8 +241,8 @@ class StoreAllocator {
         self.funcTypeInterner = funcTypeInterner
 
         #if ComponentModel
-        componentInstances = BumpAllocator(initialCapacity: 2)
-        componentFunctions = BumpAllocator(initialCapacity: 16)
+            componentInstances = BumpAllocator(initialCapacity: 2)
+            componentFunctions = BumpAllocator(initialCapacity: 16)
         #endif
     }
 }
@@ -560,41 +560,41 @@ extension StoreAllocator {
 // MARK: - Component Model Allocation
 
 #if ComponentModel
-extension StoreAllocator {
-    /// Allocates a new component instance with the given entity.
-    func allocate(componentInstance: ComponentInstanceEntity) -> InternalComponentInstance {
-        let pointer = componentInstances.allocate(initializing: componentInstance)
-        return InternalComponentInstance(unsafe: pointer)
-    }
+    extension StoreAllocator {
+        /// Allocates a new component instance with the given entity.
+        func allocate(componentInstance: ComponentInstanceEntity) -> InternalComponentInstance {
+            let pointer = componentInstances.allocate(initializing: componentInstance)
+            return InternalComponentInstance(unsafe: pointer)
+        }
 
-    /// Allocates a new component function with the given entity.
-    func allocate(componentFunction: ComponentFunctionEntity) -> InternalComponentFunction {
-        let pointer = componentFunctions.allocate(initializing: componentFunction)
-        return InternalComponentFunction(unsafe: pointer)
-    }
+        /// Allocates a new component function with the given entity.
+        func allocate(componentFunction: ComponentFunctionEntity) -> InternalComponentFunction {
+            let pointer = componentFunctions.allocate(initializing: componentFunction)
+            return InternalComponentFunction(unsafe: pointer)
+        }
 
-    /// Allocates a synthetic core instance with the given exports.
-    /// Used for inline export instances in Component Model.
-    func allocateSyntheticCoreInstance(exports: [String: InternalExternalValue]) -> InternalInstance {
-        // Create a minimal InstanceEntity with only the exports
-        // All other fields are empty/default since this is purely for aggregating exports
-        let entity = InstanceEntity(
-            types: [],
-            functions: ImmutableArray(),
-            tables: ImmutableArray(),
-            memories: ImmutableArray(),
-            globals: ImmutableArray(),
-            elementSegments: ImmutableArray(),
-            dataSegments: ImmutableArray(),
-            exports: exports,
-            functionRefs: [],
-            features: .default,
-            dataCount: nil,
-            isDebuggable: false,
-            instructionMapping: DebuggerInstructionMapping()
-        )
-        let pointer = instances.allocate(initializing: entity)
-        return InternalInstance(unsafe: pointer)
+        /// Allocates a synthetic core instance with the given exports.
+        /// Used for inline export instances in Component Model.
+        func allocateSyntheticCoreInstance(exports: [String: InternalExternalValue]) -> InternalInstance {
+            // Create a minimal InstanceEntity with only the exports
+            // All other fields are empty/default since this is purely for aggregating exports
+            let entity = InstanceEntity(
+                types: [],
+                functions: ImmutableArray(),
+                tables: ImmutableArray(),
+                memories: ImmutableArray(),
+                globals: ImmutableArray(),
+                elementSegments: ImmutableArray(),
+                dataSegments: ImmutableArray(),
+                exports: exports,
+                functionRefs: [],
+                features: .default,
+                dataCount: nil,
+                isDebuggable: false,
+                instructionMapping: DebuggerInstructionMapping()
+            )
+            let pointer = instances.allocate(initializing: entity)
+            return InternalInstance(unsafe: pointer)
+        }
     }
-}
 #endif
