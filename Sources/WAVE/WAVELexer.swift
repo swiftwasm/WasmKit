@@ -88,7 +88,8 @@ struct TextCursor {
 
     func peek(at offset: Int = 0) -> Unicode.Scalar? {
         guard let index = input.index(nextIndex, offsetBy: offset, limitedBy: input.endIndex),
-              index < input.endIndex else {
+            index < input.endIndex
+        else {
             return nil
         }
         return input[index]

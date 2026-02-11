@@ -185,7 +185,7 @@ let package = Package(
                 .target(
                     name: "ComponentModel",
                     condition: .when(traits: ["ComponentModel"])
-                ),
+                )
             ]
         ),
         .testTarget(
