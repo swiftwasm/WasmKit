@@ -139,7 +139,6 @@
         private func expandToDecimal(_ value: Double, exponent: Int, significantDigits: Int) -> String {
             if exponent >= 0 {
                 // Large number - expand with trailing zeros
-                let scale = pow(10.0, Double(significantDigits - 1))
                 let mantissa = Int64((value / pow(10.0, Double(exponent - significantDigits + 1))).rounded())
                 var result = String(mantissa)
                 let trailingZeros = exponent - significantDigits + 1
@@ -150,7 +149,6 @@
             } else {
                 // Small number - expand with leading zeros
                 let leadingZeros = -exponent - 1
-                let scale = pow(10.0, Double(significantDigits - 1))
                 let mantissa = Int64((value * pow(10.0, Double(-exponent + significantDigits - 1))).rounded())
                 var mantissaStr = String(mantissa)
                 // Trim trailing zeros from mantissa
@@ -161,14 +159,14 @@
             }
         }
 
-        private func trimTrailingZeros(_ str: String) -> String {
-            var result = str
+        private func trimTrailingZeros(_ str: String) -> Substring {
+            var result = Substring(str)
             if result.contains(".") {
                 while result.hasSuffix("0") {
-                    result = String(result.dropLast())
+                    result = result.dropLast()
                 }
                 if result.hasSuffix(".") {
-                    result = String(result.dropLast())
+                    result = result.dropLast()
                 }
             }
             return result
