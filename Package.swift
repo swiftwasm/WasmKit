@@ -179,6 +179,27 @@ let package = Package(
         ),
         .testTarget(name: "WITTests", dependencies: ["WIT"]),
 
+        .target(
+            name: "WAVE",
+            dependencies: [
+                .target(
+                    name: "ComponentModel",
+                    condition: .when(traits: ["ComponentModel"])
+                ),
+            ]
+        ),
+        .testTarget(
+            name: "WAVETests",
+            dependencies: [
+                "WAVE",
+                "WIT",
+                .target(
+                    name: "ComponentModel",
+                    condition: .when(traits: ["ComponentModel"])
+                ),
+            ]
+        ),
+
         .target(name: "WITOverlayGenerator", dependencies: ["WIT"]),
         .target(name: "_CabiShims"),
 
