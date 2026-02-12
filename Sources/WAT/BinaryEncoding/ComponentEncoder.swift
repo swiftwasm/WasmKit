@@ -828,6 +828,7 @@
                             break
                         }
                     case .func, .value, .type, .component, .instance:
+                        #warning("Component-level alias counts not tracked in `encodeBatchedAlises`")
                         break
                     }
                 }
