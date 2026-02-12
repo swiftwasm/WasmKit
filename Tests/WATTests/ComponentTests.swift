@@ -327,7 +327,7 @@
             }
         }
 
-        /// Compare two ComponentValues for equality.
+        /// Compare two ComponentValues for equality. Doesn't support resources.
         private func componentValuesEqual(_ a: ComponentValue, _ b: ComponentValue) -> Bool {
             switch (a, b) {
             case (.bool(let av), .bool(let bv)): return av == bv
