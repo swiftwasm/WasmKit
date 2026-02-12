@@ -55,6 +55,10 @@ let package = Package(
                     name: "ComponentModel",
                     condition: .when(traits: ["ComponentModel"])
                 ),
+                .target(
+                    name: "WAVE",
+                    condition: .when(traits: ["ComponentModel"])
+                ),
             ],
             exclude: ["CMakeLists.txt"]
         ),
