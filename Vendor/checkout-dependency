@@ -74,7 +74,13 @@ class CheckoutDependency:
             print(f"Dependency '{dependency_name}' already exists at {dependency_path}")
         else:
             print(f"Cloning '{dependency_name}' to {dependency_path}")
-            subprocess.run(["git", "clone", dependency["repository"], dependency_path], check=True)
+            sparse_checkout = ("sparse-checkout" in dependency and dependency["sparse-checkout"]) or ""
+            if len(sparse_checkout) > 0:
+                subprocess.run(["git", "clone", "--no-checkout", "--depth=1", "--filter=tree:0", dependency["repository"], dependency_path], check=True)
+                subprocess.run(["git", "-C", dependency_path, "sparse-checkout", "set", "--no-cone", sparse_checkout], check=True)
+                subprocess.run(["git", "-C", dependency_path, "checkout"], check=True)
+            else:
+                subprocess.run(["git", "clone", dependency["repository"], dependency_path], check=True)
 
         print(f"Checking out '{dependency_name}' to {dependency['revision']}")
         subprocess.run(["git", "-C", dependency_path, "checkout", dependency["revision"]], check=True)
