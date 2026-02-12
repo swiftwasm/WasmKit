@@ -7,7 +7,7 @@ permissions: read-all
 jobs:
   PR:
     name: PR Fuzzing (${{ matrix.sanitizer }} sanitizer)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     concurrency:
       group: ${{ github.workflow }}-${{ matrix.sanitizer }}-${{ github.ref }}
       cancel-in-progress: true
