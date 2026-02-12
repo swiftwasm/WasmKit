@@ -4,8 +4,9 @@ import WAT
 import WasmKit
 import WasmKitWASI
 import WasmParser
+
 #if ComponentModel
-import ComponentModel
+    import ComponentModel
 #endif
 
 #if canImport(os.signpost)
@@ -111,14 +112,14 @@ package struct Run: AsyncParsableCommand {
     var stackSize: Int?
 
     #if ComponentModel
-    @Option(
-        name: .long,
-        help: ArgumentHelp(
-            "Invoke a component function with WAVE syntax (e.g., 'get-answer()' or 'add(1, 2)')",
-            valueName: "function-call"
+        @Option(
+            name: .long,
+            help: ArgumentHelp(
+                "Invoke a component function with WAVE syntax (e.g., 'get-answer()' or 'add(1, 2)')",
+                valueName: "function-call"
+            )
         )
-    )
-    var invoke: String?
+        var invoke: String?
     #endif
 
     #if WasmDebuggingSupport
@@ -173,10 +174,10 @@ package struct Run: AsyncParsableCommand {
         let fileType = try detectWasmFileType(filePath: filePath)
 
         #if ComponentModel
-        if fileType == .component {
-            try runComponent(filePath: filePath)
-            return
-        }
+            if fileType == .component {
+                try runComponent(filePath: filePath)
+                return
+            }
         #endif
 
         // Regular module execution
@@ -213,36 +214,36 @@ package struct Run: AsyncParsableCommand {
     }
 
     #if ComponentModel
-    /// Run a WebAssembly component.
-    func runComponent(filePath: FilePath) throws {
-        log("Detected component binary, parsing component...", verbose: true)
+        /// Run a WebAssembly component.
+        func runComponent(filePath: FilePath) throws {
+            log("Detected component binary, parsing component...", verbose: true)
 
-        let component = try parseComponent(filePath: filePath)
+            let component = try parseComponent(filePath: filePath)
 
-        let engine = Engine(configuration: deriveRuntimeConfiguration())
-        let store = Store(engine: engine)
-        let loader = ComponentLoader(store: store)
-        let instance = try loader.instantiate(component: component)
+            let engine = Engine(configuration: deriveRuntimeConfiguration())
+            let store = Store(engine: engine)
+            let loader = ComponentLoader(store: store)
+            let instance = try loader.instantiate(component: component)
 
-        // First argument is the WAVE function call expression
-        guard let waveExpression = arguments.first else {
-            // List exports if no function specified
-            log("Component loaded. Available exports:")
-            for export in component.exports {
-                log("  - \(export.name)")
+            // First argument is the WAVE function call expression
+            guard let waveExpression = arguments.first else {
+                // List exports if no function specified
+                log("Component loaded. Available exports:")
+                for export in component.exports {
+                    log("  - \(export.name)")
+                }
+                log("\nUsage: wasmkit run \(path) 'function-name(args...)'")
+                log("Example: wasmkit run \(path) 'add(1, 2)'")
+                return
             }
-            log("\nUsage: wasmkit run \(path) 'function-name(args...)'")
-            log("Example: wasmkit run \(path) 'add(1, 2)'")
-            return
-        }
-        log("Invoking: \(waveExpression)", verbose: true)
+            log("Invoking: \(waveExpression)", verbose: true)
 
-        let result = try instance.invoke(waveExpression)
-        let output = result.formatResults()
-        if !output.isEmpty {
-            print(output)
+            let result = try instance.invoke(waveExpression)
+            let output = result.formatResults()
+            if !output.isEmpty {
+                print(output)
+            }
         }
-    }
     #endif
 
     /// Derives the runtime interceptor based on the command line arguments
