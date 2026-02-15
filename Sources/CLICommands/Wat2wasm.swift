@@ -3,19 +3,19 @@ import SystemPackage
 import WAT
 
 #if ComponentModel
-private let wat2wasmDiscussion = """
-    Parse a file in WebAssembly Text Format (`.wat`), \
-    assemble it into a binary, and write the result to a given \
-    file path.
+    private let wat2wasmDiscussion = """
+        Parse a file in WebAssembly Text Format (`.wat`), \
+        assemble it into a binary, and write the result to a given \
+        file path.
 
-    Supports both core modules and Component Model components.
-    """
+        Supports both core modules and Component Model components.
+        """
 #else
-private let wat2wasmDiscussion = """
-    Parse a file in WebAssembly Text Format (`.wat`), \
-    assemble it into a binary, and write the result to a given \
-    file path.
-    """
+    private let wat2wasmDiscussion = """
+        Parse a file in WebAssembly Text Format (`.wat`), \
+        assemble it into a binary, and write the result to a given \
+        file path.
+        """
 #endif
 
 package struct Wat2wasm: ParsableCommand {
