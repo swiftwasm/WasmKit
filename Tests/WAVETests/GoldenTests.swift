@@ -145,7 +145,6 @@
         static let witPath = testDir.appendingPathComponent("ui.wit")
 
         static func goldenTestFiles() -> [GoldenTestFile] {
-            print(testDir)
             // Check if test directory exists
             guard FileManager.default.fileExists(atPath: testDir.path) else {
                 return []
