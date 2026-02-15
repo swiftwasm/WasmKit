@@ -70,7 +70,7 @@ package struct Wat2wasm: ParsableCommand {
     var output: String?
 
     @Flag(
-        inversion: .prefixedNo,
+        inversion: .prefixedEnableDisable,
         help: "Include the name section in the output binary."
     )
     var nameSection: Bool = true
