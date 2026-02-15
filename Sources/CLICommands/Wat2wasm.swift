@@ -1,16 +1,27 @@
 import ArgumentParser
 import SystemPackage
 import WAT
-import WasmKit
+
+#if ComponentModel
+private let wat2wasmDiscussion = """
+    Parse a file in WebAssembly Text Format (`.wat`), \
+    assemble it into a binary, and write the result to a given \
+    file path.
+
+    Supports both core modules and Component Model components.
+    """
+#else
+private let wat2wasmDiscussion = """
+    Parse a file in WebAssembly Text Format (`.wat`), \
+    assemble it into a binary, and write the result to a given \
+    file path.
+    """
+#endif
 
 package struct Wat2wasm: ParsableCommand {
     package static let configuration = CommandConfiguration(
         abstract: "Assemble WebAssembly text into a WebAssembly binary",
-        discussion: """
-            Parse a file in WebAssembly Text Format (`.wat`), \
-            assemble it into a binary, and write the result to a given \
-            file path.
-            """
+        discussion: wat2wasmDiscussion
     )
 
     enum Error: Swift.Error, CustomStringConvertible {
@@ -58,7 +69,10 @@ package struct Wat2wasm: ParsableCommand {
     )
     var output: String?
 
-    @Flag(help: "Include the name section in the output binary.")
+    @Flag(
+        inversion: .prefixedNo,
+        help: "Include the name section in the output binary."
+    )
     var nameSection: Bool = true
 
     package init() {}
@@ -84,6 +98,7 @@ package struct Wat2wasm: ParsableCommand {
         }
 
         let wasm = try wat2wasm(wat, options: EncodeOptions(nameSection: nameSection))
+
         var outputPath: FilePath
 
         if let output {

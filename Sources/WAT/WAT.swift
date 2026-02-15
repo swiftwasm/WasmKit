@@ -15,6 +15,10 @@ public struct EncodeOptions: Sendable {
 }
 
 /// Transforms a WebAssembly text format (WAT) string into a WebAssembly binary format byte array.
+///
+/// This function supports both core modules and Component Model components (when the ComponentModel
+/// trait is enabled). It tries to parse as a module first, then falls back to component parsing.
+///
 /// - Parameter input: The WAT string to transform
 /// - Returns: The WebAssembly binary format byte array
 ///
@@ -36,8 +40,21 @@ public func wat2wasm(
     features: WasmFeatureSet = .default,
     options: EncodeOptions = .default
 ) throws -> [UInt8] {
-    var wat = try parseWAT(input, features: features)
-    return try encode(module: &wat, options: options)
+    do {
+        var wat = try parseWAT(input, features: features)
+        return try encode(module: &wat, options: options)
+    } catch {
+        #if ComponentModel
+            // Module parsing failed, try as component
+            var parser = Parser(input)
+            let componentParser = ComponentWatParser(features: features)
+            let componentDef = try componentParser.parse(&parser)
+            var encoder = ComponentEncoder()
+            return try encoder.encode(componentDef, options: .init())
+        #else
+            throw error
+        #endif
+    }
 }
 
 /// A WAT module representation.
