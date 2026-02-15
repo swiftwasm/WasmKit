@@ -50,7 +50,7 @@ public func wat2wasm(
             let componentParser = ComponentWatParser(features: features)
             let componentDef = try componentParser.parse(&parser)
             var encoder = ComponentEncoder()
-            return try encoder.encode(componentDef, options: .init())
+            return try encoder.encode(componentDef, options: options)
         #else
             throw error
         #endif
