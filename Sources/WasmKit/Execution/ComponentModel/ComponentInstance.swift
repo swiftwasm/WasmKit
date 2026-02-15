@@ -194,6 +194,12 @@
             handle.type
         }
 
+        /// Resolves a type index to its component value type.
+        /// Used for parsing nested types in WAVE arguments.
+        public func resolveType(_ index: ComponentTypeIndex) throws -> ComponentValueType {
+            try handle.resolveType(index)
+        }
+
         /// Invokes the component function with the given arguments.
         ///
         /// - Parameter arguments: The component-level arguments to pass to the function.
