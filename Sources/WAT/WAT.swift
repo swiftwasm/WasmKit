@@ -16,7 +16,7 @@ public struct EncodeOptions: Sendable {
 
 /// Transforms a WebAssembly text format (WAT) string into a WebAssembly binary format byte array.
 ///
-/// This function supports both core modules and Component Model components (when the ComponentModel
+/// This function supports both core modules and Component Model components (when the `ComponentModel`
 /// trait is enabled). It tries to parse as a module first, then falls back to component parsing.
 ///
 /// - Parameter input: The WAT string to transform
