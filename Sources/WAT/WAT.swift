@@ -40,21 +40,30 @@ public func wat2wasm(
     features: WasmFeatureSet = .default,
     options: EncodeOptions = .default
 ) throws -> [UInt8] {
-    do {
-        var wat = try parseWAT(input, features: features)
-        return try encode(module: &wat, options: options)
-    } catch {
-        #if ComponentModel
-            // Module parsing failed, try as component
+    #if ComponentModel
+        // Look ahead to determine if this is a component or module
+        var peekParser = Parser(input)
+        let isComponent: Bool
+        if try peekParser.takeParenBlockStart("component") {
+            isComponent = true
+        } else {
+            isComponent = false
+        }
+
+        if isComponent {
             var parser = Parser(input)
             let componentParser = ComponentWatParser(features: features)
             let componentDef = try componentParser.parse(&parser)
             var encoder = ComponentEncoder()
             return try encoder.encode(componentDef, options: options)
-        #else
-            throw error
-        #endif
-    }
+        } else {
+            var wat = try parseWAT(input, features: features)
+            return try encode(module: &wat, options: options)
+        }
+    #else
+        var wat = try parseWAT(input, features: features)
+        return try encode(module: &wat, options: options)
+    #endif
 }
 
 /// A WAT module representation.
