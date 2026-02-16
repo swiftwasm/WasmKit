@@ -111,17 +111,6 @@ package struct Run: AsyncParsableCommand {
     )
     var stackSize: Int?
 
-    #if ComponentModel
-        @Option(
-            name: .long,
-            help: ArgumentHelp(
-                "Invoke a component function with WAVE syntax (e.g., 'get-answer()' or 'add(1, 2)')",
-                valueName: "function-call"
-            )
-        )
-        var invoke: String?
-    #endif
-
     #if WasmDebuggingSupport
 
         @Option(
