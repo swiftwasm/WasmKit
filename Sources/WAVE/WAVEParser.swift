@@ -68,8 +68,8 @@
         /// Parse a value with a type resolver for composite types
         public mutating func parse(
             type: ComponentValueType,
-            resolver: (ComponentTypeIndex) -> ComponentValueType
-        ) throws(WAVEParserError) -> ComponentValue {
+            resolver: (ComponentTypeIndex) throws -> ComponentValueType
+        ) throws -> ComponentValue {
             switch type {
             case .bool:
                 return try parseBool()
@@ -86,10 +86,13 @@
             case .string:
                 return try parseString()
             case .list(let elementTypeIdx):
-                let elementType = resolver(elementTypeIdx)
+                let elementType = try resolver(elementTypeIdx)
                 return try parseList(elementType: elementType, resolver: resolver)
             case .tuple(let typeIndices):
-                let types = typeIndices.map { resolver($0) }
+                var types: [ComponentValueType] = []
+                for idx in typeIndices {
+                    types.append(try resolver(idx))
+                }
                 return try parseTuple(types: types, resolver: resolver)
             case .record(let fields):
                 return try parseRecord(fields: fields, resolver: resolver)
@@ -100,14 +103,20 @@
             case .flags(let flagNames):
                 return try parseFlags(flagNames: flagNames)
             case .option(let innerTypeIdx):
-                let innerType = resolver(innerTypeIdx)
+                let innerType = try resolver(innerTypeIdx)
                 return try parseOption(innerType: innerType, resolver: resolver)
             case .result(let okTypeIdx, let errTypeIdx):
-                let okType = okTypeIdx.map { resolver($0) }
-                let errType = errTypeIdx.map { resolver($0) }
+                var okType: ComponentValueType?
+                var errType: ComponentValueType?
+                if let idx = okTypeIdx {
+                    okType = try resolver(idx)
+                }
+                if let idx = errTypeIdx {
+                    errType = try resolver(idx)
+                }
                 return try parseResult(okType: okType, errType: errType, resolver: resolver)
             case .indexed(let idx):
-                return try parse(type: resolver(idx), resolver: resolver)
+                return try parse(type: try resolver(idx), resolver: resolver)
             default:
                 throw WAVEParserError("unsupported type", span: try lexer.peek().span)
             }
@@ -251,8 +260,8 @@
 
         private mutating func parseList(
             elementType: ComponentValueType,
-            resolver: (ComponentTypeIndex) -> ComponentValueType
-        ) throws(WAVEParserError) -> ComponentValue {
+            resolver: (ComponentTypeIndex) throws -> ComponentValueType
+        ) throws -> ComponentValue {
             let open = try lexer.next()
             guard case .leftBracket = open else {
                 throw WAVEParserError("expected '['", span: open.span)
@@ -291,8 +300,8 @@
 
         private mutating func parseTuple(
             types: [ComponentValueType],
-            resolver: (ComponentTypeIndex) -> ComponentValueType
-        ) throws(WAVEParserError) -> ComponentValue {
+            resolver: (ComponentTypeIndex) throws -> ComponentValueType
+        ) throws -> ComponentValue {
             let open = try lexer.next()
             guard case .leftParen = open else {
                 throw WAVEParserError("expected '('", span: open.span)
@@ -327,8 +336,8 @@
 
         private mutating func parseRecord(
             fields: [ComponentRecordField],
-            resolver: (ComponentTypeIndex) -> ComponentValueType
-        ) throws(WAVEParserError) -> ComponentValue {
+            resolver: (ComponentTypeIndex) throws -> ComponentValueType
+        ) throws -> ComponentValue {
             let open = try lexer.next()
             guard case .leftBrace = open else {
                 throw WAVEParserError("expected '{'", span: open.span)
@@ -344,7 +353,7 @@
                 // All fields must be optional and set to none
                 var result: [(name: String, value: ComponentValue)] = []
                 for field in fields {
-                    let fieldType = resolver(field.type)
+                    let fieldType = try resolver(field.type)
                     if case .option = fieldType {
                         result.append((field.name, .option(nil)))
                     } else {
@@ -402,7 +411,7 @@
                     throw WAVEParserError("unknown field '\(fieldName)'", span: labelToken.span)
                 }
 
-                let fieldType = resolver(fieldDef.type)
+                let fieldType = try resolver(fieldDef.type)
                 let value = try parse(type: fieldType, resolver: resolver)
                 parsedFields[fieldName] = value
 
@@ -431,7 +440,7 @@
                 if let value = parsedFields[field.name] {
                     result.append((field.name, value))
                 } else {
-                    let fieldType = resolver(field.type)
+                    let fieldType = try resolver(field.type)
                     if case .option = fieldType {
                         result.append((field.name, .option(nil)))
                     } else {
@@ -445,8 +454,8 @@
 
         private mutating func parseVariant(
             cases: [ComponentCaseField],
-            resolver: (ComponentTypeIndex) -> ComponentValueType
-        ) throws(WAVEParserError) -> ComponentValue {
+            resolver: (ComponentTypeIndex) throws -> ComponentValueType
+        ) throws -> ComponentValue {
             let labelToken = try lexer.next()
             let caseName: String
             switch labelToken {
@@ -484,7 +493,7 @@
                     throw WAVEParserError("expected '(' for variant payload", span: open.span)
                 }
 
-                let payloadType = resolver(payloadTypeIdx)
+                let payloadType = try resolver(payloadTypeIdx)
                 let payload = try parse(type: payloadType, resolver: resolver)
 
                 let close = try lexer.next()
@@ -574,8 +583,8 @@
 
         private mutating func parseOption(
             innerType: ComponentValueType,
-            resolver: (ComponentTypeIndex) -> ComponentValueType
-        ) throws(WAVEParserError) -> ComponentValue {
+            resolver: (ComponentTypeIndex) throws -> ComponentValueType
+        ) throws -> ComponentValue {
             let token = try lexer.peek()
 
             switch token {
@@ -610,8 +619,8 @@
         private mutating func parseResult(
             okType: ComponentValueType?,
             errType: ComponentValueType?,
-            resolver: (ComponentTypeIndex) -> ComponentValueType
-        ) throws(WAVEParserError) -> ComponentValue {
+            resolver: (ComponentTypeIndex) throws -> ComponentValueType
+        ) throws -> ComponentValue {
             let token = try lexer.peek()
 
             switch token {
@@ -767,8 +776,8 @@
         /// - Returns: The parsed argument values
         public mutating func parseArguments(
             params: [ComponentValueType],
-            resolver: @escaping (ComponentTypeIndex) -> ComponentValueType
-        ) throws(WAVEParserError) -> [ComponentValue] {
+            resolver: @escaping (ComponentTypeIndex) throws -> ComponentValueType
+        ) throws -> [ComponentValue] {
             var parsedArgs: [ComponentValue] = []
 
             for (i, paramType) in params.enumerated() {

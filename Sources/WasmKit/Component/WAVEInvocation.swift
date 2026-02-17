@@ -125,13 +125,9 @@
             return []
         }
 
-        // Build type resolver from function signature
-        var typeTable: [ComponentValueType] = []
-        for param in params {
-            typeTable.append(param.type)
-        }
-        let resolver: (ComponentTypeIndex) -> ComponentValueType = { idx in
-            typeTable[Int(idx.rawValue)]
+        // Use the component's type resolver for nested type lookups.
+        let resolver: (ComponentTypeIndex) throws -> ComponentValueType = { idx in
+            try function.resolveType(idx)
         }
 
         // Parse arguments

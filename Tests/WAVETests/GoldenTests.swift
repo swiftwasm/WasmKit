@@ -93,11 +93,13 @@
                 // Format output
                 let formattedArgs = parsedArgs.map { "\($0.0): \(WAVEFormatter.format($0.1))" }
                 return funcCall.comments + "\(funcCall.name)(\(formattedArgs.joined(separator: ", ")))"
-            } catch let error {
+            } catch let error as WAVEParserError {
                 // Adjust span to be relative to function call start
                 let adjStart = error.span.start + spanAdjustment
                 let adjEnd = error.span.end + spanAdjustment
                 return funcCall.comments + "\(error.message) at \(adjStart)..\(adjEnd)"
+            } catch {
+                return funcCall.comments + "error: \(error)"
             }
         }
 
@@ -143,7 +145,6 @@
         static let witPath = testDir.appendingPathComponent("ui.wit")
 
         static func goldenTestFiles() -> [GoldenTestFile] {
-            print(testDir)
             // Check if test directory exists
             guard FileManager.default.fileExists(atPath: testDir.path) else {
                 return []

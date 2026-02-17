@@ -778,6 +778,81 @@
                 Issue.record("Expected string result")
             }
         }
+
+        /// Test WAVE argument parsing with nested type references.
+        /// This verifies that parseWAVEArguments uses the component's full type resolver
+        /// rather than a simplified type table that only contains parameter types.
+        ///
+        /// Regression test for: WAVE argument parsing crashed when function parameters
+        /// contained types (like lists) that reference other component types by index.
+        @Test
+        func waveArgumentParsingWithNestedTypes() throws {
+            // Same component as digitsToStringFromWAT but testing WAVE string parsing
+            let instance = try instantiateComponentWAT(
+                """
+                (component
+                    ;; Define digit variant (equivalent to enum) with all 10 digits
+                    (type $digit (variant
+                        (case "zero") (case "one") (case "two")
+                        (case "three") (case "four") (case "five")
+                        (case "six") (case "seven") (case "eight") (case "nine")
+                    ))
+
+                    (core module $m
+                        (memory (export "memory") 1)
+                        (global $heap_ptr (mut i32) (i32.const 1024))
+
+                        ;; Alignment-aware realloc for list allocation
+                        (func (export "realloc") (param $old_ptr i32) (param $old_size i32)
+                                                  (param $align i32) (param $new_size i32) (result i32)
+                            (local $ptr i32)
+                            (local.set $ptr (i32.and
+                                (i32.add (global.get $heap_ptr) (i32.sub (local.get $align) (i32.const 1)))
+                                (i32.sub (i32.const 0) (local.get $align))
+                            ))
+                            (global.set $heap_ptr (i32.add (local.get $ptr) (local.get $new_size)))
+                            (local.get $ptr)
+                        )
+
+                        ;; Core function: (list_ptr, list_len) -> result_ptr
+                        ;; Returns the count of digits in the list
+                        (func (export "count_digits") (param $list_ptr i32) (param $list_len i32) (result i32)
+                            (local.get $list_len)
+                        )
+                    )
+                    (core instance $i (instantiate $m))
+
+                    (func (export "count-digits") (param "digits" (list $digit)) (result u32)
+                        (canon lift (core func $i "count_digits")
+                            (memory $i "memory")
+                            (realloc (func $i "realloc"))
+                        )
+                    )
+                )
+                """)
+
+            guard case .function(let countFunc) = instance.export("count-digits") else {
+                Issue.record("Expected count-digits function export")
+                return
+            }
+
+            // Test WAVE parsing with empty list - this was crashing before the fix
+            // because the list element type index couldn't be resolved
+            var results = try countFunc.invoke(waveArguments: "[]")
+            if case .u32(let count) = results[0] {
+                #expect(count == 0, "Expected 0 for empty list, got \(count)")
+            } else {
+                Issue.record("Expected u32 result, got \(results[0])")
+            }
+
+            // Test with non-empty list using WAVE syntax
+            results = try countFunc.invoke(waveArguments: "[%one, %two, %three]")
+            if case .u32(let count) = results[0] {
+                #expect(count == 3, "Expected 3, got \(count)")
+            } else {
+                Issue.record("Expected u32 result, got \(results[0])")
+            }
+        }
     }
 
 #endif
