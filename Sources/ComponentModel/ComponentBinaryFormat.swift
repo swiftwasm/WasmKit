@@ -3,7 +3,7 @@
 /// Reference: `Vendor/component-model/design/mvp/Binary.md`
 
 /// Section IDs per Binary.md
-public enum ComponentSectionID: UInt8 {
+package enum ComponentSectionID: UInt8 {
     case custom = 0x00
     case coreModule = 0x01
     case coreInstance = 0x02
@@ -22,7 +22,7 @@ public enum ComponentSectionID: UInt8 {
 // MARK: - Value Type Opcodes
 
 /// Primitive value type opcodes (negative SLEB128 from 0x7f)
-public enum PrimitiveValTypeOpcode: UInt8 {
+package enum PrimitiveValTypeOpcode: UInt8 {
     case bool = 0x7f
     case s8 = 0x7e
     case u8 = 0x7d
@@ -40,7 +40,7 @@ public enum PrimitiveValTypeOpcode: UInt8 {
 }
 
 /// Composite value type opcodes
-public enum CompositeValTypeOpcode: UInt8 {
+package enum CompositeValTypeOpcode: UInt8 {
     case record = 0x72
     case variant = 0x71
     case list = 0x70
@@ -57,7 +57,7 @@ public enum CompositeValTypeOpcode: UInt8 {
 }
 
 /// Defined type opcodes (function, component, instance, resource)
-public enum DefinedTypeOpcode: UInt8 {
+package enum DefinedTypeOpcode: UInt8 {
     case funcSync = 0x40
     case componentType = 0x41
     case instanceType = 0x42
@@ -73,7 +73,7 @@ public enum DefinedTypeOpcode: UInt8 {
 // MARK: - Canonical Operations
 
 /// Canonical operation opcodes
-public enum CanonOpcode: UInt8 {
+package enum CanonOpcode: UInt8 {
     // Basic lift/lower
     case lift = 0x00
     case lower = 0x01
@@ -140,7 +140,7 @@ public enum CanonOpcode: UInt8 {
 }
 
 /// Canonical option tags
-public enum CanonOptionTag: UInt8 {
+package enum CanonOptionTag: UInt8 {
     case stringEncodingUtf8 = 0x00
     case stringEncodingUtf16 = 0x01
     case stringEncodingLatin1Utf16 = 0x02
@@ -154,7 +154,7 @@ public enum CanonOptionTag: UInt8 {
 // MARK: - Sort Values
 
 /// Core sort values (used in aliases and extern descs)
-public enum CoreSortOpcode: UInt8 {
+package enum CoreSortOpcode: UInt8 {
     case function = 0x00
     case table = 0x01
     case memory = 0x02
@@ -165,7 +165,7 @@ public enum CoreSortOpcode: UInt8 {
 }
 
 /// Component sort values (used in aliases and extern descs)
-public enum ComponentSortOpcode: UInt8 {
+package enum ComponentSortOpcode: UInt8 {
     case core = 0x00
     case function = 0x01
     case value = 0x02
@@ -175,14 +175,14 @@ public enum ComponentSortOpcode: UInt8 {
 }
 
 /// Alias target kinds
-public enum AliasTargetOpcode: UInt8 {
+package enum AliasTargetOpcode: UInt8 {
     case export = 0x00
     case coreExport = 0x01
     case outer = 0x02
 }
 
 /// Extern descriptor kinds (for imports/exports)
-public enum ExternDescKind: UInt8 {
+package enum ExternDescKind: UInt8 {
     case coreModule = 0x00
     case function = 0x01
     case value = 0x02
@@ -192,7 +192,7 @@ public enum ExternDescKind: UInt8 {
 }
 
 /// Type bound kinds
-public enum TypeBoundOpcode: UInt8 {
+package enum TypeBoundOpcode: UInt8 {
     /// Exact type match: `(eq $type)`
     case eq = 0x00
     /// Subtype bound: `(sub resource)`
@@ -200,7 +200,7 @@ public enum TypeBoundOpcode: UInt8 {
 }
 
 /// Tags for declarations inside instance/component type definitions
-public enum TypeDeclTag: UInt8 {
+package enum TypeDeclTag: UInt8 {
     /// Core type declaration (in instancedecl)
     case coreType = 0x00
     /// Component type declaration
@@ -214,7 +214,7 @@ public enum TypeDeclTag: UInt8 {
 }
 
 /// Instance expression forms
-public enum InstanceForm: UInt8 {
+package enum InstanceForm: UInt8 {
     /// Instantiate: `(instantiate $module ...)`
     case instantiate = 0x00
     /// Inline exports: `(instance (export ...) ...)`
@@ -222,7 +222,7 @@ public enum InstanceForm: UInt8 {
 }
 
 /// Result type encoding markers
-public enum ResultMarker: UInt8 {
+package enum ResultMarker: UInt8 {
     /// Has a single unnamed result
     case hasResult = 0x00
     /// Named results (followed by count; count=0 means no results)
@@ -230,13 +230,13 @@ public enum ResultMarker: UInt8 {
 }
 
 /// Optional value markers
-public enum OptionalMarker: UInt8 {
+package enum OptionalMarker: UInt8 {
     case absent = 0x00
     case present = 0x01
 }
 
 /// Import/export name encoding variants
-public enum NameVariant: UInt8 {
+package enum NameVariant: UInt8 {
     /// Plain name without version suffix
     case plain = 0x00
     /// Name with version suffix (gated: versioning)
