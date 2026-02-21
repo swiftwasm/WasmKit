@@ -306,10 +306,16 @@ extension WasmParserError.Message {
 
     @usableFromInline
     static func malformedValueType(_ byte: UInt8) -> Self {
-        Self("malformed value type: \(byte)")
+        Self("malformed value type: 0x\(String(byte, radix: 16))")
     }
 
-    @usableFromInline static func zeroExpected(actual: UInt8) -> Self {
+    @usableFromInline
+    static func unknownCanonOptionTag(_ byte: UInt8) -> Self {
+        Self("malformed canon option tag: 0x\(String(byte, radix: 16))")
+    }
+
+    @usableFromInline
+    static func zeroExpected(actual: UInt8) -> Self {
         Self("Zero expected but got \(actual)")
     }
 
@@ -337,8 +343,8 @@ extension WasmParserError.Message {
     static let unexpectedEnd = Self("Unexpected end of the stream")
 
     @usableFromInline
-    static func sectionSizeMismatch(expected: Int, actual: Int) -> Self {
-        Self("Section size mismatch: expected \(expected) but got \(actual)")
+    static func sectionSizeMismatch(sectionID: UInt8, expected: Int, actual: Int) -> Self {
+        Self("Section with ID \(sectionID) size mismatch: expected \(expected) but got \(actual)")
     }
 
     @usableFromInline static func illegalOpcode(_ opcode: [UInt8]) -> Self {
@@ -1364,7 +1370,13 @@ extension Parser {
             }
             let expectedSectionEnd = sectionStart + Int(sectionSize)
             guard expectedSectionEnd == stream.currentIndex else {
-                throw makeError(.sectionSizeMismatch(expected: expectedSectionEnd, actual: offset))
+                throw makeError(
+                    .sectionSizeMismatch(
+                        sectionID: sectionID,
+                        expected: expectedSectionEnd,
+                        actual: offset
+                    )
+                )
             }
             return payload
         }

@@ -239,48 +239,27 @@
         func parseCanonicalOptions() throws -> [CanonicalOption] {
             try parseVector {
                 let byte = try stream.consumeAny()
-                switch byte {
-                case 0x00: return .utf8
-                case 0x01: return .utf16
-                case 0x02: return .latin1UTF16
-                case 0x03:
+                guard let tag = CanonOptionTag(rawValue: byte) else {
+                    throw makeError(.unknownCanonOptionTag(byte))
+                }
+                switch tag {
+                case .stringEncodingUtf8: return .utf8
+                case .stringEncodingUtf16: return .utf16
+                case .stringEncodingLatin1Utf16: return .latin1UTF16
+                case .memory:
                     let idx: UInt32 = try parseUnsigned()
                     return .memory(memoryIndex: idx)
-                case 0x04:
+                case .realloc:
                     let idx: UInt32 = try parseUnsigned()
                     return .realloc(funcIndex: idx)
-                case 0x05:
+                case .postReturn:
                     let idx: UInt32 = try parseUnsigned()
                     return .postReturn(funcIndex: idx)
-                case 0x06: return .async
-                case 0x07:
+                case .async: return .async
+                case .callback:
                     let idx: UInt32 = try parseUnsigned()
                     return .callback(funcIndex: idx)
-                default:
-                    throw makeError(.malformedSectionID(byte))
                 }
-            }
-        }
-
-        func parsePrimValType() throws -> ComponentValueType {
-            let byte = try stream.consumeAny()
-            switch byte {
-            case 0x7f: return .bool
-            case 0x7e: return .s8
-            case 0x7d: return .u8
-            case 0x7c: return .s16
-            case 0x7b: return .u16
-            case 0x7a: return .s32
-            case 0x79: return .u32
-            case 0x78: return .s64
-            case 0x77: return .u64
-            case 0x76: return .float32
-            case 0x75: return .float64
-            case 0x74: return .char
-            case 0x73: return .string
-            case 0x64: return .errorContext
-            default:
-                throw makeError(.malformedValueType(byte))
             }
         }
 
@@ -292,7 +271,8 @@
                 let idx: UInt32 = try parseUnsigned()
                 return .indexed(ComponentTypeIndex(rawValue: Int(idx)))
             } else {
-                return try parsePrimValType()
+                let opcode = try stream.consumeAny()
+                return try parsePrimValTypeFromOpcode(opcode)
             }
         }
 
@@ -318,9 +298,17 @@
             }
 
             let opcode = try stream.consumeAny()
-            switch opcode {
-            // Primitives are handled by parsePrimValType range
-            case 0x72:  // record
+
+            // Primitive types (0x73...0x7f and 0x64 are not in CompositeValTypeOpcode)
+            if PrimitiveValTypeOpcode(rawValue: opcode) != nil {
+                return try parsePrimValTypeFromOpcode(opcode)
+            }
+
+            guard let compositeType = CompositeValTypeOpcode(rawValue: opcode) else {
+                throw makeError(.malformedValueType(opcode))
+            }
+            switch compositeType {
+            case .record:
                 let fields = try parseVector {
                     let name = try stream.parseName()
                     let typeIdx: UInt32 = try parseUnsigned()
@@ -328,7 +316,7 @@
                 }
                 return .record(fields)
 
-            case 0x71:  // variant
+            case .variant:
                 let cases = try parseVector {
                     let name = try stream.parseName()
                     let typeIdx = try parseOptionalValType()
@@ -337,67 +325,65 @@
                 }
                 return .variant(cases)
 
-            case 0x70:  // list
+            case .list:
                 let elemIdx: UInt32 = try parseUnsigned()
                 return .list(ComponentTypeIndex(rawValue: Int(elemIdx)))
 
-            case 0x6f:  // tuple
+            case .tuple:
                 let typeIndices: [UInt32] = try parseVector { try parseUnsigned() }
                 return .tuple(typeIndices.map { ComponentTypeIndex(rawValue: Int($0)) })
 
-            case 0x6e:  // flags
+            case .flags:
                 let labels = try parseVector { try stream.parseName() }
                 return .flags(labels)
 
-            case 0x6d:  // enum
+            case .enum:
                 let labels = try parseVector { try stream.parseName() }
                 return .enum(labels)
 
-            case 0x6b:  // option
+            case .option:
                 let someIdx: UInt32 = try parseUnsigned()
                 return .option(ComponentTypeIndex(rawValue: Int(someIdx)))
 
-            case 0x6a:  // result
+            case .result:
                 let okIdx = try parseOptionalValType()
                 let errIdx = try parseOptionalValType()
                 return .result(ok: okIdx, error: errIdx)
 
-            case 0x66:  // stream
+            case .stream:
                 let elemIdx = try parseOptionalValType()
                 return .stream(element: elemIdx, end: nil)
 
-            case 0x65:  // future
+            case .future:
                 let elemIdx = try parseOptionalValType()
                 return .future(elemIdx)
 
-            // Primitive types
-            case 0x73...0x7f, 0x64:
-                return try parsePrimValTypeFromOpcode(opcode)
-
-            default:
+            case .own, .borrow, .listFixed:
                 throw makeError(.malformedValueType(opcode))
             }
         }
 
         /// Parse a primitive value type from an already-consumed opcode.
         func parsePrimValTypeFromOpcode(_ opcode: UInt8) throws -> ComponentValueType {
-            switch opcode {
-            case 0x7f: return .bool
-            case 0x7e: return .s8
-            case 0x7d: return .u8
-            case 0x7c: return .s16
-            case 0x7b: return .u16
-            case 0x7a: return .s32
-            case 0x79: return .u32
-            case 0x78: return .s64
-            case 0x77: return .u64
-            case 0x76: return .float32
-            case 0x75: return .float64
-            case 0x74: return .char
-            case 0x73: return .string
-            case 0x64: return .errorContext
-            default:
+            guard let type = PrimitiveValTypeOpcode(rawValue: opcode) else {
                 throw makeError(.malformedValueType(opcode))
+            }
+
+            switch type {
+            case .bool: return .bool
+            case .s8: return .s8
+            case .u8: return .u8
+            case .s16: return .s16
+            case .u16: return .u16
+            case .s32: return .s32
+            case .u32: return .u32
+            case .s64: return .s64
+            case .u64: return .u64
+            case .float32: return .float32
+            case .float64: return .float64
+            case .char: return .char
+            case .string: return .string
+            case .errorContext: return .errorContext
             }
         }
 
@@ -943,61 +929,63 @@
                     return nil
                 }
 
-                let sectionID = try stream.consumeAny()
+                let sectionRawID = try stream.consumeAny()
                 let sectionSize: UInt32 = try parseUnsigned()
                 let sectionStart = stream.currentIndex
 
                 let payload: ComponentParsingPayload
+
+                guard let sectionID = ComponentSectionID(rawValue: sectionRawID) else {
+                    throw makeError(.malformedSectionID(sectionRawID))
+                }
+
                 switch sectionID {
-                case 0:  // custom
+                case .custom:
                     payload = .customSection(try parseCustomSection(size: sectionSize))
 
-                case 1:  // core module
+                case .coreModule:
                     let moduleBytes = try stream.consume(count: Int(sectionSize))
                     payload = .coreModule(moduleBytes)
 
-                case 2:  // core instance
+                case .coreInstance:
                     payload = .coreInstanceSection(try parseCoreInstanceSection())
 
-                case 3:  // core type
+                case .coreType:
                     let coreTypes = try parseVector { try parseCoreTypeDef() }
                     payload = .coreTypeSection(coreTypes)
 
-                case 4:  // component
+                case .component:
                     let componentBytes = try stream.consume(count: Int(sectionSize))
                     payload = .component(componentBytes)
 
-                case 5:  // instance
+                case .instance:
                     payload = .instanceSection(try parseInstanceSection())
 
-                case 6:  // alias
+                case .alias:
                     payload = .aliasSection(try parseAliasSection())
 
-                case 7:  // type
+                case .type:
                     payload = .typeSection(try parseTypeSection())
 
-                case 8:  // canon
+                case .canon:
                     payload = .canonSection(try parseCanonSection())
 
-                case 9:  // start
+                case .start:
                     payload = .startSection(try parseStartSection())
 
-                case 10:  // import
+                case .import:
                     payload = .importSection(try parseImportSection())
 
-                case 11:  // export
+                case .export:
                     payload = .exportSection(try parseExportSection())
 
-                case 12:  // value
+                case .value:
                     payload = .valueSection(try parseValueSection())
-
-                default:
-                    throw makeError(.malformedSectionID(sectionID))
                 }
 
                 let expectedSectionEnd = sectionStart + Int(sectionSize)
                 guard expectedSectionEnd == stream.currentIndex else {
-                    throw makeError(.sectionSizeMismatch(expected: expectedSectionEnd, actual: offset))
+                    throw makeError(.sectionSizeMismatch(sectionID: sectionRawID, expected: expectedSectionEnd, actual: offset))
                 }
 
                 return payload
