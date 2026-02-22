@@ -243,10 +243,11 @@ struct WatPrinter {
     }
 
     private func tableLimitsText(_ limits: Limits) -> String {
-        if let max = limits.max {
-            return "\(limits.min) \(max)"
-        }
-        return "\(limits.min)"
+        var s = ""
+        if limits.isMemory64 { s += "i64 " }
+        s += "\(limits.min)"
+        if let max = limits.max { s += " \(max)" }
+        return s
     }
 
     private func memoryLimitsText(_ limits: Limits) -> String {
@@ -286,6 +287,9 @@ struct WatPrinter {
         case .i64Const(let v): return "i64.const \(v)"
         case .f32Const(let v): return "f32.const \(formatF32(v))"
         case .f64Const(let v): return "f64.const \(formatF64(v))"
+        case .v128Const(let v):
+            let bytes = v.bytes.map { String($0) }.joined(separator: " ")
+            return "v128.const i8x16 \(bytes)"
         case .globalGet(let i): return "global.get \(i)"
         case .refNull(let ht): return "ref.null \(heapTypeName(ht))"
         case .refFunc(let fi):
