@@ -436,3 +436,28 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
         parser: parser
     )
 }
+
+// MARK: - wasm2wat
+
+/// Converts a WebAssembly binary into its WebAssembly Text (WAT) representation.
+///
+/// - Parameters:
+///   - stream: The raw bytes stream of a WebAssembly binary module, either `StaticByteStream` or `FileHandleStream`.
+///   - features: The feature set to use while parsing the binary (default: `.default`).
+/// - Returns: A `String` containing the WAT representation of the module.
+///
+/// ```swift
+/// import WAT
+///
+/// let wasm = ...  // A stream of valid .wasm binary data
+/// let wat = try wasm2wat(wasm)
+/// print(wat)
+/// ```
+public func wasm2wat<Stream: ByteStream>(
+    _ stream: Stream,
+    features: WasmFeatureSet = .default
+) throws -> String {
+    let info = try collectModule(stream: stream, features: features)
+    var printer = WatPrinter(info: info)
+    return try printer.print()
+}
