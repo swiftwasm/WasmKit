@@ -91,11 +91,11 @@ struct TextInstructionVisitor: AnyInstructionVisitor {
         case .call(let fi):
             emit("call \(funcRef(fi))")
         case .callIndirect(let ti, let tbl):
-            emit("call_indirect \(tbl == 0 ? "" : "(table \(tbl)) ")(type \(ti))")
+            emit("call_indirect \(tbl == 0 ? "" : "\(tbl) ")(type \(ti))")
         case .returnCall(let fi):
             emit("return_call \(funcRef(fi))")
         case .returnCallIndirect(let ti, let tbl):
-            emit("return_call_indirect \(tbl == 0 ? "" : "(table \(tbl)) ")(type \(ti))")
+            emit("return_call_indirect \(tbl == 0 ? "" : "\(tbl) ")(type \(ti))")
         case .callRef(let ti):
             emit("call_ref (type \(ti))")
         case .returnCallRef(let ti):
@@ -858,7 +858,7 @@ func formatF32(_ v: IEEE754.Float32) -> String {
     let f = Float32(bitPattern: v.bitPattern)
     if f.isNaN {
         // Preserve NaN payload for exact round-trip.
-        let payload = v.bitPattern & 0x3FFFFF
+        let payload = v.bitPattern & 0x7FFFFF
         let signStr = (v.bitPattern & 0x8000_0000) != 0 ? "-" : ""
         if payload == 0x400000 {
             return "\(signStr)nan"  // canonical NaN
@@ -898,7 +898,8 @@ private func hexFloat32(_ bits: UInt32) -> String {
     }
     // Normal: exponent biased by 127, implicit leading 1
     let e = exp - 127
-    let mantHex = String(format: "%06x", mantissa)
+    // f32 mantissa is 23 bits; shift left by 1 to fill 24 bits (6 hex digits).
+    let mantHex = String(format: "%06x", mantissa << 1)
     // Trim trailing zeros
     let trimmed =
         mantHex.hasSuffix("000000")
@@ -920,7 +921,9 @@ private func hexFloat64(_ bits: UInt64) -> String {
         return "\(sign)0x\(String(mantissa, radix: 16))p-1074"
     }
     let e = exp - 1023
-    let mantHex = String(format: "%013x", mantissa)
+    // Use Swift's native radix formatting to avoid %x truncating UInt64 to 32 bits.
+    let rawHex = String(mantissa, radix: 16)
+    let mantHex = String(repeating: "0", count: max(0, 13 - rawHex.count)) + rawHex
     let trimmed = String(mantHex.reversed().drop(while: { $0 == "0" }).reversed())
     let mant = trimmed.isEmpty ? "" : ".\(trimmed)"
     let eSign = e >= 0 ? "+" : ""
