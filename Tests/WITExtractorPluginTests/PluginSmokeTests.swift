@@ -3,7 +3,7 @@ import Testing
 
 @Suite struct PluginSmokeTests {
 
-    #if os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
+    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
     #else
         @Test(
             .disabled(
