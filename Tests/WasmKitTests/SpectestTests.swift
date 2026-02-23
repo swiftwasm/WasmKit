@@ -1,9 +1,9 @@
 import Foundation
 import SystemPackage
 import Testing
-import WasmParser
-import WasmKit
 import WAT
+import WasmKit
+import WasmParser
 
 @Suite
 struct SpectestTests {
