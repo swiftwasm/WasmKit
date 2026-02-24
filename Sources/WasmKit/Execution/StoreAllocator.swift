@@ -60,7 +60,7 @@ class BumpAllocator<T: ~Copyable> {
 
 protocol ValidatableEntity: ~Copyable {
     /// Create an error for an out-of-bounds access to the entity.
-    static func createOutOfBoundsError(index: Int, count: Int) -> any Error
+    static func createOutOfBoundsError(index: Int, count: Int) -> WasmKitError
 }
 
 /// A simple bump allocator for immutable arrays with various element types.
@@ -121,15 +121,15 @@ struct ImmutableArray<T> {
 
     /// Accesses the element at the specified position, with bounds checking.
     subscript(validating index: Int) -> T where T: ValidatableEntity {
-        get throws {
+        get throws(WasmKitError) {
             return try self[validating: index, T.createOutOfBoundsError]
         }
     }
 
     /// Accesses the element at the specified position, with bounds checking
     /// and a custom error creation function.
-    subscript(validating index: Int, createError: (_ index: Int, _ count: Int) -> any Error) -> T {
-        get throws {
+    subscript(validating index: Int, createError: (_ index: Int, _ count: Int) -> WasmKitError) -> T {
+        get throws(WasmKitError) {
             guard index >= 0 && index < buffer.count else {
                 throw createError(index, buffer.count)
             }

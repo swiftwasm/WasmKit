@@ -157,7 +157,7 @@ struct InternalFunction: Equatable, Hashable {
 }
 
 extension InternalFunction: ValidatableEntity {
-    static func createOutOfBoundsError(index: Int, count: Int) -> any Error {
+    static func createOutOfBoundsError(index: Int, count: Int) -> WasmKitError {
         WasmKitError(message: .indexOutOfBounds("function", index, max: count))
     }
 }

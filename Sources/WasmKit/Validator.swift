@@ -165,13 +165,13 @@ extension WasmKitError.Message {
 struct InstructionValidator {
     let context: InternalInstance
 
-    func validateMemArg(_ memarg: MemArg, naturalAlignment: Int) throws {
+    func validateMemArg(_ memarg: MemArg, naturalAlignment: Int) throws(WasmKitError) {
         if memarg.align > naturalAlignment {
             throw WasmKitError(message: .invalidMemArgAlignment(memarg: memarg, naturalAlignment: naturalAlignment))
         }
     }
 
-    func validateGlobalSet(_ type: GlobalType) throws {
+    func validateGlobalSet(_ type: GlobalType) throws(WasmKitError) {
         switch type.mutability {
         case .constant:
             throw WasmKitError(message: .globalSetConstant)
@@ -180,7 +180,7 @@ struct InstructionValidator {
         }
     }
 
-    func validateTableInit(elemIndex: UInt32, table: UInt32) throws {
+    func validateTableInit(elemIndex: UInt32, table: UInt32) throws(WasmKitError) {
         let tableType = try context.tableType(table)
         let elementType = try context.elementType(elemIndex)
         guard tableType.elementType == elementType else {
@@ -190,7 +190,7 @@ struct InstructionValidator {
         }
     }
 
-    func validateTableCopy(dest: UInt32, source: UInt32) throws {
+    func validateTableCopy(dest: UInt32, source: UInt32) throws(WasmKitError) {
         let tableType1 = try context.tableType(source)
         let tableType2 = try context.tableType(dest)
         guard tableType1.elementType == tableType2.elementType else {
@@ -204,11 +204,11 @@ struct InstructionValidator {
         }
     }
 
-    func validateRefFunc(functionIndex: UInt32) throws {
+    func validateRefFunc(functionIndex: UInt32) throws(WasmKitError) {
         try context.validateFunctionIndex(functionIndex)
     }
 
-    func validateDataSegment(_ dataIndex: DataIndex) throws {
+    func validateDataSegment(_ dataIndex: DataIndex) throws(WasmKitError) {
         guard let dataCount = context.dataCount else {
             throw WasmKitError(message: .dataCountSectionRequired)
         }
@@ -217,7 +217,7 @@ struct InstructionValidator {
         }
     }
 
-    func validateReturnCallLike(calleeType: FunctionType, callerType: FunctionType) throws {
+    func validateReturnCallLike(calleeType: FunctionType, callerType: FunctionType) throws(WasmKitError) {
         guard calleeType.results == callerType.results else {
             throw WasmKitError(
                 message: .typeMismatchOnReturnCall(expected: callerType.results, actual: calleeType.results)
