@@ -1361,10 +1361,10 @@ struct InstructionTranslator: InstructionVisitor {
             _ = try valueStack.pop(result)
         }
         guard valueStack.valueHeight == frame.valueStackHeight else {
-            throw WasmKitError(message:.valuesRemainingAtEndOfBlock)
+            throw WasmKitError(message: .valuesRemainingAtEndOfBlock)
         }
         guard valueStack.slotHeight == frame.slotStackHeight else {
-            throw WasmKitError(message:.valuesRemainingAtEndOfBlock)
+            throw WasmKitError(message: .valuesRemainingAtEndOfBlock)
         }
         _ = controlStack.popFrame()
         frame.kind = .if(elseLabel: elseLabel, endLabel: endLabel, isElse: true)
@@ -1384,10 +1384,10 @@ struct InstructionTranslator: InstructionVisitor {
         if case .block(root: true) = toBePopped.kind {
             try translateReturn()
             guard valueStack.valueHeight == toBePopped.valueStackHeight else {
-                throw WasmKitError(message:.valuesRemainingAtEndOfBlock)
+                throw WasmKitError(message: .valuesRemainingAtEndOfBlock)
             }
             guard valueStack.slotHeight == toBePopped.slotStackHeight else {
-                throw WasmKitError(message:.valuesRemainingAtEndOfBlock)
+                throw WasmKitError(message: .valuesRemainingAtEndOfBlock)
             }
             try iseqBuilder.pinLabelHere(toBePopped.continuation)
             return
@@ -1413,10 +1413,10 @@ struct InstructionTranslator: InstructionVisitor {
             _ = try valueStack.pop(result)
         }
         guard valueStack.valueHeight == toBePopped.valueStackHeight else {
-            throw WasmKitError(message:.valuesRemainingAtEndOfBlock)
+            throw WasmKitError(message: .valuesRemainingAtEndOfBlock)
         }
         guard valueStack.slotHeight == toBePopped.slotStackHeight else {
-            throw WasmKitError(message:.valuesRemainingAtEndOfBlock)
+            throw WasmKitError(message: .valuesRemainingAtEndOfBlock)
         }
         for result in toBePopped.blockType.results {
             _ = valueStack.push(result)
@@ -1433,7 +1433,7 @@ struct InstructionTranslator: InstructionVisitor {
         if _fastPath(currentFrame.reachable) {
             let count = currentHeight - Int(destination.copySlotCount) - destination.slotStackHeight
             guard count >= 0 else {
-                throw WasmKitError(message:.stackHeightUnderflow(available: currentHeight, required: destination.slotStackHeight + Int(destination.copySlotCount)))
+                throw WasmKitError(message: .stackHeightUnderflow(available: currentHeight, required: destination.slotStackHeight + Int(destination.copySlotCount)))
             }
             popCount = UInt32(count)
         } else {
@@ -1596,11 +1596,11 @@ struct InstructionTranslator: InstructionVisitor {
             // Check copyTypes consistency
             guard frame.copyTypes.count == defaultFrame.copyTypes.count else {
                 throw WasmKitError(
-                    message: 
-                            .expectedSameCopyTypes(
-                                frameCopyTypes: frame.copyTypes,
-                                defaultFrameCopyTypes: defaultFrame.copyTypes
-                            )
+                    message:
+                        .expectedSameCopyTypes(
+                            frameCopyTypes: frame.copyTypes,
+                            defaultFrameCopyTypes: defaultFrame.copyTypes
+                        )
                 )
             }
             try checkStackTop(frame.copyTypes)
@@ -2092,7 +2092,7 @@ struct InstructionTranslator: InstructionVisitor {
 
     mutating func visitI8x16Shuffle(lanes: V128ShuffleMask) throws(WasmKitError) {
         for lane in lanes.lanes where lane >= 32 {
-            throw WasmKitError(message:.invalidLaneIndex(lane: lane, laneCount: 32))
+            throw WasmKitError(message: .invalidLaneIndex(lane: lane, laneCount: 32))
         }
         try pop2PushEmit((.v128, .v128), .v128) { popped, result in
             let rhs = popped.0
@@ -2232,7 +2232,7 @@ struct InstructionTranslator: InstructionVisitor {
         case .i64x2ExtractLane, .i64x2ReplaceLane, .f64x2ExtractLane, .f64x2ReplaceLane: laneCount = 2
         }
         if lane >= laneCount {
-            throw WasmKitError(message:.invalidLaneIndex(lane: lane, laneCount: laneCount))
+            throw WasmKitError(message: .invalidLaneIndex(lane: lane, laneCount: laneCount))
         }
         switch simdLane {
         case .i8x16ExtractLaneS, .i8x16ExtractLaneU, .i16x8ExtractLaneS, .i16x8ExtractLaneU, .i32x4ExtractLane:
@@ -2286,7 +2286,7 @@ struct InstructionTranslator: InstructionVisitor {
         case .v128Load64Lane, .v128Store64Lane: (naturalAlignment, laneCount) = (3, 2)
         }
         if lane >= laneCount {
-            throw WasmKitError(message:.invalidLaneIndex(lane: lane, laneCount: laneCount))
+            throw WasmKitError(message: .invalidLaneIndex(lane: lane, laneCount: laneCount))
         }
         try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
 

@@ -212,7 +212,6 @@ public struct WasmFeatureSet: OptionSet, Sendable {
     public static let all: WasmFeatureSet = [.memory64, .referenceTypes, .threads, .tailCall, .simd]
 }
 
-
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/conventions.html#vectors>
 extension ByteStream {

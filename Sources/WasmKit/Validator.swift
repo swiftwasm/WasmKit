@@ -211,11 +211,11 @@ struct InstructionValidator {
         let tableType2 = try context.tableType(dest)
         guard tableType1.elementType == tableType2.elementType else {
             throw WasmKitError(
-                message: 
-                        .tableElementTypeMismatch(
-                            tableType: "\(tableType1.elementType)",
-                            elementType: "\(tableType2.elementType)"
-                        )
+                message:
+                    .tableElementTypeMismatch(
+                        tableType: "\(tableType1.elementType)",
+                        elementType: "\(tableType2.elementType)"
+                    )
             )
         }
     }
@@ -255,7 +255,7 @@ struct ModuleValidator {
         }
         // Multiple tables are allowed with reference types feature
         if module.tableTypes.count > 1 && !module.features.contains(.referenceTypes) {
-            throw WasmKitError(message:.multipleTablesNotPermitted)
+            throw WasmKitError(message: .multipleTablesNotPermitted)
         }
         for memoryType in module.memoryTypes {
             try Self.checkMemoryType(memoryType, features: module.features)
@@ -296,10 +296,10 @@ struct ModuleValidator {
 
         if type.shared {
             guard features.contains(.threads) else {
-                throw WasmKitError(message:.threadsFeatureRequiredForSharedMemories)
+                throw WasmKitError(message: .threadsFeatureRequiredForSharedMemories)
             }
             guard type.max != nil else {
-                throw WasmKitError(message:.sharedMemoryMustHaveMaximum)
+                throw WasmKitError(message: .sharedMemoryMustHaveMaximum)
             }
         }
     }
