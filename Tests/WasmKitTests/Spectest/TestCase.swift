@@ -152,9 +152,9 @@ extension TestCase {
                     handler(self, location, .failed("\(error)"))
                 }
             }
-        } catch let parseError as WatParserError {
-            if let location = parseError.location {
-                handler(self, location, .failed(parseError.message))
+        } catch let parseError as WasmKitError {
+            if case .utf8Index(let location) = parseError.location, case .message(let message) = parseError.kind {
+                handler(self, location, .failed(message.text))
             } else {
                 throw parseError
             }
@@ -454,7 +454,7 @@ extension Array where Element == Value {
 
 extension Swift.Error {
     var text: String {
-        if let error = self as? WasmParserError {
+        if let error = self as? WasmKitError {
             return error.description
         }
 

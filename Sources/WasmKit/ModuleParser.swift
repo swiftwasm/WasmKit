@@ -25,7 +25,7 @@ public func parseWasm(filePath: FilePath, features: WasmFeatureSet = .default) t
 
 /// Parse a given byte array as a WebAssembly binary format file
 /// > Note: <https://webassembly.github.io/spec/core/binary/index.html>
-public func parseWasm(bytes: [UInt8], features: WasmFeatureSet = .default) throws((WasmParserError)) -> Module {
+public func parseWasm(bytes: [UInt8], features: WasmFeatureSet = .default) throws((WasmKitError)) -> Module {
     let stream = StaticByteStream(bytes: bytes)
     let module = try parseModule(stream: stream, features: features)
     return module
@@ -33,7 +33,7 @@ public func parseWasm(bytes: [UInt8], features: WasmFeatureSet = .default) throw
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-module>
-func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = .default) throws(WasmParserError) -> Module {
+func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = .default) throws(WasmKitError) -> Module {
     var types: [FunctionType] = []
     var typeIndices: [TypeIndex] = []
     var codes: [Code] = []
@@ -90,7 +90,7 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
                 .inconsistentFunctionAndCodeLength(
                     functionCount: typeIndices.count,
                     codeCount: codes.count
-                )))
+                )), offset: parser.offset)
     }
 
     if let dataCount = dataCount, dataCount != UInt32(data.count) {
@@ -99,10 +99,10 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
                 .inconsistentDataCountAndDataSectionLength(
                     dataCount: dataCount,
                     dataSection: data.count
-                )))
+                )), offset: parser.offset)
     }
 
-    let functions = try codes.enumerated().map { index, code throws(WasmParserError) in
+    let functions = try codes.enumerated().map { index, code throws(WasmKitError) in
         // SAFETY: The number of typeIndices is guaranteed to be the same as the number of codes
         let funcTypeIndex = typeIndices[index]
         do {
@@ -112,7 +112,7 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
                 code: code
             )
         } catch {
-            throw .unclassified(error)
+            throw .unclassified(error, offset: parser.offset)
         }
     }
 
