@@ -249,7 +249,7 @@ extension ByteStream {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/values.html#names>
 extension ByteStream {
-    fileprivate func parseName() throws(WasmKitError) -> String {
+    package func parseName() throws(WasmKitError) -> String {
         let bytes = try parseVector { () throws(WasmKitError) -> UInt8 in
             try consumeAny()
         }

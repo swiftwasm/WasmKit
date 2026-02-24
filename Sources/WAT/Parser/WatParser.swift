@@ -675,8 +675,8 @@ struct WatParser {
         }
     }
 
-    mutating func params(mayHaveName: Bool) throws(WatParserError) -> ([UnresolvedType<ValueType>], [Name?]) {
-        try parser.parseParamList(mayHaveName: mayHaveName) { parser throws(WatParserError) in
+    mutating func params(mayHaveName: Bool) throws(WasmKitError) -> ([UnresolvedType<ValueType>], [Name?]) {
+        try parser.parseParamList(mayHaveName: mayHaveName) { parser throws(WasmKitError) in
             var tempParser = WatParser(parser: parser)
             let type = try tempParser.valueType()
             parser = tempParser.parser
@@ -684,8 +684,8 @@ struct WatParser {
         }
     }
 
-    mutating func results() throws(WatParserError) -> [UnresolvedType<ValueType>] {
-        try parser.parseResultList { parser throws(WatParserError) in
+    mutating func results() throws(WasmKitError) -> [UnresolvedType<ValueType>] {
+        try parser.parseResultList { parser throws(WasmKitError) in
             var tempParser = WatParser(parser: parser)
             let type = try tempParser.valueType()
             parser = tempParser.parser

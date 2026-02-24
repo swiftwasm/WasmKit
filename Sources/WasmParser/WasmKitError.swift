@@ -181,8 +181,12 @@ extension WasmKitError.Message {
     static let unexpectedEnd = Self("Unexpected end of the stream")
 
     @usableFromInline
-    static func sectionSizeMismatch(expected: Int, actual: Int) -> Self {
-        Self("Section size mismatch: expected \(expected) but got \(actual)")
+    static func sectionSizeMismatch(sectionID: UInt8, expected: Int, actual: Int) -> Self {
+        Self("Section size mismatch for section \(sectionID): expected \(expected) but got \(actual)")
+    }
+
+    @usableFromInline static func unknownCanonOptionTag(_ tag: UInt8) -> Self {
+        Self("Unknown canonical option tag: \(tag)")
     }
 
     @usableFromInline static func illegalOpcode(_ opcode: [UInt8]) -> Self {

@@ -29,8 +29,8 @@
         }
 
         @usableFromInline
-        internal func makeError(_ message: WasmParserError.Message) -> WasmParserError {
-            return WasmParserError(message, offset: offset)
+        internal func makeError(_ message: WasmKitError.Message) -> WasmKitError {
+            return WasmKitError(message: message, offset: offset)
         }
     }
 
@@ -172,7 +172,7 @@
     extension ComponentParser {
         /// Parse the component magic number and version.
         @usableFromInline
-        func parsePreamble() throws -> [UInt8] {
+        func parsePreamble() throws(WasmKitError) ->[UInt8] {
             // Magic number: 0x00 0x61 0x73 0x6D (same as core wasm)
             let magic = try stream.consume(count: 4)
             guard magic.elementsEqual(WASM_MAGIC) else {
@@ -190,16 +190,16 @@
         }
 
         @inlinable
-        func parseUnsigned<T: RawUnsignedInteger>(_: T.Type = T.self) throws -> T {
+        func parseUnsigned<T: RawUnsignedInteger>(_: T.Type = T.self) throws(WasmKitError) -> T {
             try stream.parseUnsigned(T.self)
         }
 
         @inlinable
-        func parseVector<Content>(content parser: () throws -> Content) throws -> [Content] {
+        func parseVector<Content>(content parser: () throws(WasmKitError) -> Content) throws(WasmKitError) -> [Content] {
             try stream.parseVector(content: parser)
         }
 
-        func parseCoreSort() throws -> CoreDefSort {
+        func parseCoreSort() throws(WasmKitError) ->CoreDefSort {
             let byte = try stream.consumeAny()
             switch byte {
             case 0x00: return .func
@@ -214,7 +214,7 @@
             }
         }
 
-        func parseSort() throws -> ComponentDefSort {
+        func parseSort() throws(WasmKitError) ->ComponentDefSort {
             let byte = try stream.consumeAny()
             switch byte {
             case 0x00:
@@ -230,13 +230,13 @@
             }
         }
 
-        func parseSortIdx() throws -> (sort: ComponentDefSort, index: UInt32) {
+        func parseSortIdx() throws(WasmKitError) ->(sort: ComponentDefSort, index: UInt32) {
             let sort = try parseSort()
             let index: UInt32 = try parseUnsigned()
             return (sort, index)
         }
 
-        func parseCanonicalOptions() throws -> [CanonicalOption] {
+        func parseCanonicalOptions() throws(WasmKitError) ->[CanonicalOption] {
             try parseVector {
                 let byte = try stream.consumeAny()
                 guard let tag = CanonOptionTag(rawValue: byte) else {
@@ -264,7 +264,7 @@
         }
 
         /// Parse a value type (primitive or type index).
-        func parseValType() throws -> ComponentValueType {
+        func parseValType() throws(WasmKitError) ->ComponentValueType {
             let byte = try stream.peek() ?? 0
             // Check if it's a type index (non-negative SLEB128)
             if byte < 0x64 {
@@ -277,7 +277,7 @@
         }
 
         /// Parse an optional value type.
-        func parseOptionalValType() throws -> ComponentTypeIndex? {
+        func parseOptionalValType() throws(WasmKitError) ->ComponentTypeIndex? {
             let present = try stream.consumeAny()
             if present == 0x00 {
                 return nil
@@ -288,7 +288,7 @@
         }
 
         /// Parse a defined value type.
-        func parseDefValType() throws -> ComponentValueType {
+        func parseDefValType() throws(WasmKitError) ->ComponentValueType {
             let byte = try stream.peek() ?? 0
 
             // Check for type index first
@@ -364,7 +364,7 @@
         }
 
         /// Parse a primitive value type from an already-consumed opcode.
-        func parsePrimValTypeFromOpcode(_ opcode: UInt8) throws -> ComponentValueType {
+        func parsePrimValTypeFromOpcode(_ opcode: UInt8) throws(WasmKitError) ->ComponentValueType {
             guard let type = PrimitiveValTypeOpcode(rawValue: opcode) else {
                 throw makeError(.malformedValueType(opcode))
             }
@@ -388,7 +388,7 @@
         }
 
         /// Parse an extern descriptor.
-        func parseExternDesc() throws -> ComponentExternDesc {
+        func parseExternDesc() throws(WasmKitError) ->ComponentExternDesc {
             let byte = try stream.consumeAny()
             switch byte {
             case 0x00:
@@ -419,7 +419,7 @@
         }
 
         /// Parse a value bound.
-        func parseValueBound() throws -> ComponentValueBound {
+        func parseValueBound() throws(WasmKitError) ->ComponentValueBound {
             let byte = try stream.consumeAny()
             switch byte {
             case 0x00:
@@ -434,7 +434,7 @@
         }
 
         /// Parse a type bound.
-        func parseTypeBound() throws -> ComponentTypeBound {
+        func parseTypeBound() throws(WasmKitError) ->ComponentTypeBound {
             let byte = try stream.consumeAny()
             switch byte {
             case 0x00:
@@ -448,7 +448,7 @@
         }
 
         /// Parse an import/export name with optional version suffix.
-        func parseImportExportName() throws -> String {
+        func parseImportExportName() throws(WasmKitError) ->String {
             let prefix = try stream.consumeAny()
             let len: UInt32 = try parseUnsigned()
             let nameBytes = try stream.consume(count: Int(len))
@@ -479,7 +479,7 @@
 
     extension ComponentParser {
         /// Parse a custom section.
-        func parseCustomSection(size: UInt32) throws -> CustomSection {
+        func parseCustomSection(size: UInt32) throws(WasmKitError) ->CustomSection {
             let preNameIndex = stream.currentIndex
             let name = try stream.parseName()
             let nameSize = stream.currentIndex - preNameIndex
@@ -494,7 +494,7 @@
         }
 
         /// Parse core instance section (section 2).
-        func parseCoreInstanceSection() throws -> [CoreInstanceDefinition] {
+        func parseCoreInstanceSection() throws(WasmKitError) ->[CoreInstanceDefinition] {
             try parseVector {
                 let kind = try stream.consumeAny()
                 switch kind {
@@ -525,7 +525,7 @@
         }
 
         /// Parse component instance section (section 5).
-        func parseInstanceSection() throws -> [ComponentInstanceDefinition] {
+        func parseInstanceSection() throws(WasmKitError) ->[ComponentInstanceDefinition] {
             try parseVector {
                 let kind = try stream.consumeAny()
                 switch kind {
@@ -551,7 +551,7 @@
         }
 
         /// Parse alias section (section 6).
-        func parseAliasSection() throws -> [ComponentAlias] {
+        func parseAliasSection() throws(WasmKitError) ->[ComponentAlias] {
             try parseVector {
                 let sort = try parseSort()
                 let targetKind = try stream.consumeAny()
@@ -577,14 +577,14 @@
         }
 
         /// Parse type section (section 7).
-        func parseTypeSection() throws -> [ComponentTypeDef] {
+        func parseTypeSection() throws(WasmKitError) ->[ComponentTypeDef] {
             try parseVector {
                 try parseTypeDef()
             }
         }
 
         /// Parse a single type definition.
-        func parseTypeDef() throws -> ComponentTypeDef {
+        func parseTypeDef() throws(WasmKitError) ->ComponentTypeDef {
             let byte = try stream.peek() ?? 0
 
             // Check if it's a defined value type (primitive or composite)
@@ -632,7 +632,7 @@
         }
 
         /// Parse component or instance declaration.
-        func parseComponentOrInstanceDecl(isComponent: Bool) throws -> ComponentOrInstanceDecl {
+        func parseComponentOrInstanceDecl(isComponent: Bool) throws(WasmKitError) ->ComponentOrInstanceDecl {
             let kind = try stream.consumeAny()
             switch kind {
             case 0x03 where isComponent:
@@ -646,13 +646,13 @@
         }
 
         /// Parse instance declaration only.
-        func parseInstanceDeclOnly() throws -> InstanceDecl {
+        func parseInstanceDeclOnly() throws(WasmKitError) ->InstanceDecl {
             let kind = try stream.consumeAny()
             return try parseInstanceDecl(fromKind: kind)
         }
 
         /// Parse instance declaration from kind byte.
-        func parseInstanceDecl(fromKind kind: UInt8) throws -> InstanceDecl {
+        func parseInstanceDecl(fromKind kind: UInt8) throws(WasmKitError) ->InstanceDecl {
             switch kind {
             case 0x00:
                 // core type
@@ -677,7 +677,7 @@
         }
 
         /// Parse a single alias (not in a vector).
-        func parseSingleAlias() throws -> ComponentAlias {
+        func parseSingleAlias() throws(WasmKitError) ->ComponentAlias {
             let sort = try parseSort()
             let targetKind = try stream.consumeAny()
             let target: ComponentAliasTarget
@@ -701,7 +701,7 @@
         }
 
         /// Parse a core type definition.
-        func parseCoreTypeDef() throws -> CoreTypeDef {
+        func parseCoreTypeDef() throws(WasmKitError) ->CoreTypeDef {
             let byte = try stream.peek() ?? 0
             if byte == 0x50 {
                 _ = try stream.consumeAny()
@@ -720,7 +720,7 @@
         }
 
         /// Parse core value type.
-        func parseCoreValueType() throws -> ValueType {
+        func parseCoreValueType() throws(WasmKitError) ->ValueType {
             let byte = try stream.consumeAny()
             switch byte {
             case 0x7F: return .i32
@@ -734,7 +734,7 @@
         }
 
         /// Parse core module declaration.
-        func parseCoreModuleDecl() throws -> CoreModuleDecl {
+        func parseCoreModuleDecl() throws(WasmKitError) ->CoreModuleDecl {
             let kind = try stream.consumeAny()
             switch kind {
             case 0x00:
@@ -765,7 +765,7 @@
         }
 
         /// Parse core import descriptor.
-        func parseCoreImportDesc() throws -> ImportDescriptor {
+        func parseCoreImportDesc() throws(WasmKitError) ->ImportDescriptor {
             let byte = try stream.consumeAny()
             switch byte {
             case 0x00:
@@ -788,7 +788,7 @@
         }
 
         /// Parse reference type.
-        func parseReferenceType() throws -> ReferenceType {
+        func parseReferenceType() throws(WasmKitError) ->ReferenceType {
             let byte = try stream.consumeAny()
             switch byte {
             case 0x70: return .funcRef
@@ -799,7 +799,7 @@
         }
 
         /// Parse limits.
-        func parseLimits() throws -> Limits {
+        func parseLimits() throws(WasmKitError) ->Limits {
             let flags = try stream.consumeAny()
             let hasMax = (flags & 0x01) != 0
             let min: UInt64 = try UInt64(parseUnsigned(UInt32.self))
@@ -808,7 +808,7 @@
         }
 
         /// Parse mutability.
-        func parseMutability() throws -> Mutability {
+        func parseMutability() throws(WasmKitError) ->Mutability {
             let byte = try stream.consumeAny()
             switch byte {
             case 0x00: return .constant
@@ -819,7 +819,7 @@
         }
 
         /// Parse canon section (section 8).
-        func parseCanonSection() throws -> [CanonicalDefinition] {
+        func parseCanonSection() throws(WasmKitError) ->[CanonicalDefinition] {
             try parseVector {
                 let kind = try stream.consumeAny()
                 switch kind {
@@ -862,7 +862,7 @@
         }
 
         /// Parse start section (section 9).
-        func parseStartSection() throws -> ComponentStart {
+        func parseStartSection() throws(WasmKitError) ->ComponentStart {
             let funcIdx: UInt32 = try parseUnsigned()
             let args: [UInt32] = try parseVector { try parseUnsigned() }
             let resultCount: UInt32 = try parseUnsigned()
@@ -870,7 +870,7 @@
         }
 
         /// Parse import section (section 10).
-        func parseImportSection() throws -> [ComponentImportDef] {
+        func parseImportSection() throws(WasmKitError) ->[ComponentImportDef] {
             try parseVector {
                 let name = try parseImportExportName()
                 let externDesc = try parseExternDesc()
@@ -879,7 +879,7 @@
         }
 
         /// Parse export section (section 11).
-        func parseExportSection() throws -> [ComponentExportDef] {
+        func parseExportSection() throws(WasmKitError) ->[ComponentExportDef] {
             try parseVector {
                 let name = try parseImportExportName()
                 let (sort, idx) = try parseSortIdx()
@@ -901,7 +901,7 @@
         }
 
         /// Parse value section (section 12).
-        func parseValueSection() throws -> [ComponentValueDef] {
+        func parseValueSection() throws(WasmKitError) ->[ComponentValueDef] {
             try parseVector {
                 let valType = try parseValType()
                 let len: UInt32 = try parseUnsigned()
@@ -917,7 +917,7 @@
         /// Attempts to parse a chunk of the component binary stream.
         ///
         /// - Returns: A `ComponentParsingPayload` if parsing was successful, otherwise `nil`.
-        public mutating func parseNext() throws -> ComponentParsingPayload? {
+        public mutating func parseNext() throws(WasmKitError) ->ComponentParsingPayload? {
             switch nextParseTarget {
             case .header:
                 let version = try parsePreamble()

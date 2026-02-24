@@ -267,28 +267,28 @@ extension TypesMap: Collection {
         private(set) var nameToIndex: [String: Int] = [:]
 
         @discardableResult
-        mutating func add(_ decl: ComponentWatParser.CoreTypeDef) throws(WatParserError) -> Int {
+        mutating func add(_ decl: ComponentWatParser.CoreTypeDef) throws(WasmKitError) -> Int {
             let index = declarations.count
             declarations.append(decl)
             if let name = decl.id {
                 guard nameToIndex[name.value] == nil else {
-                    throw WatParserError("Duplicate \(name.value) identifier", location: name.location)
+                    throw WasmKitError("Duplicate \(name.value) identifier", location: name.location)
                 }
                 nameToIndex[name.value] = index
             }
             return index
         }
 
-        func resolveIndex(use: Parser.IndexOrId) throws(WatParserError) -> Int {
+        func resolveIndex(use: Parser.IndexOrId) throws(WasmKitError) -> Int {
             switch use {
             case .id(let id, _):
                 guard let byName = nameToIndex[id.value] else {
-                    throw WatParserError("Unknown core type \(id)", location: use.location)
+                    throw WasmKitError("Unknown core type \(id)", location: use.location)
                 }
                 return byName
             case .index(let index, _):
                 guard Int(index) < declarations.count else {
-                    throw WatParserError("Core type index \(index) out of bounds", location: use.location)
+                    throw WasmKitError("Core type index \(index) out of bounds", location: use.location)
                 }
                 return Int(index)
             }

@@ -96,7 +96,7 @@
         private var savedParserBeforeDirective: Parser?
 
         /// Parse the next directive in the Component WAST script.
-        public mutating func nextDirective() throws(WatParserError) -> ComponentWastDirective? {
+        public mutating func nextDirective() throws(WasmKitError) -> ComponentWastDirective? {
             guard (try parser.peek(.leftParen)) != nil else { return nil }
             savedParserBeforeDirective = parser  // Save state before consuming opening paren
             try parser.consume()
@@ -117,7 +117,7 @@
                             location: location
                         ))
                 }
-                throw WatParserError("unexpected component wast directive token", location: parser.lexer.location())
+                throw WasmKitError("unexpected component wast directive token", location: parser.lexer.location())
             }
             let directive = try ComponentWastDirective.parse(wastParser: &self)
             savedParserBeforeDirective = nil
@@ -152,7 +152,7 @@
 
         // MARK: - Helper Methods
 
-        private func peekComponentField() throws(WatParserError) -> Bool {
+        private func peekComponentField() throws(WasmKitError) -> Bool {
             guard let keyword = try parser.peekKeyword() else { return false }
             switch keyword {
             case "core", "type", "func", "import", "export", "instance", "alias", "canon":
@@ -162,7 +162,7 @@
             }
         }
 
-        mutating func parens<T>(_ body: (inout ComponentWastParser) throws(WatParserError) -> T) throws(WatParserError) -> T {
+        mutating func parens<T>(_ body: (inout ComponentWastParser) throws(WasmKitError) -> T) throws(WasmKitError) -> T {
             try parser.expect(.leftParen)
             let result = try body(&self)
             return result
@@ -172,14 +172,14 @@
 
         /// Parse component argument values for invoke.
         /// Supports: u32.const, bool.const, char.const, etc.
-        mutating func argumentValues() throws(WatParserError) -> [ComponentValue] {
+        mutating func argumentValues() throws(WasmKitError) -> [ComponentValue] {
             var values: [ComponentValue] = []
             while try parseComponentConstValue(&values) {}
             return values
         }
 
         /// Parse component expected values for assert_return.
-        mutating func expectationValues() throws(WatParserError) -> [ComponentValue] {
+        mutating func expectationValues() throws(WasmKitError) -> [ComponentValue] {
             var values: [ComponentValue] = []
             while try parseComponentConstValue(&values) {}
             return values
@@ -189,7 +189,7 @@
 
         /// Parse a single component const value instruction.
         /// Returns true if a value was parsed.
-        private mutating func parseComponentConstValue(_ values: inout [ComponentValue]) throws(WatParserError) -> Bool {
+        private mutating func parseComponentConstValue(_ values: inout [ComponentValue]) throws(WasmKitError) -> Bool {
             // Check if we're at a left paren
             guard (try parser.peek(.leftParen)) != nil else { return false }
 
@@ -276,7 +276,7 @@
                 case "true": value = true
                 case "false": value = false
                 default:
-                    throw WatParserError("expected 'true' or 'false'", location: parser.lexer.location())
+                    throw WasmKitError("expected 'true' or 'false'", location: parser.lexer.location())
                 }
                 values.append(.bool(value))
                 try parser.expect(.rightParen)
@@ -305,7 +305,7 @@
                 try parser.expectKeyword("char.const")
                 let str = try parser.expectString()
                 guard let scalar = str.unicodeScalars.first, str.unicodeScalars.count == 1 else {
-                    throw WatParserError("char.const expects a single character", location: parser.lexer.location())
+                    throw WasmKitError("char.const expects a single character", location: parser.lexer.location())
                 }
                 values.append(.char(scalar))
                 try parser.expect(.rightParen)
@@ -329,7 +329,7 @@
     // MARK: - Directive Parsing
 
     extension ComponentWastDirective {
-        static func peek(wastParser: ComponentWastParser) throws(WatParserError) -> Bool {
+        static func peek(wastParser: ComponentWastParser) throws(WasmKitError) -> Bool {
             guard let keyword = try wastParser.parser.peekKeyword() else { return false }
             return keyword.starts(with: "assert_")
                 || keyword == "component"
@@ -339,7 +339,7 @@
 
         /// Parse a directive in a Component WAST script from "keyword ...)" form.
         /// Leading left parenthesis is already consumed.
-        static func parse(wastParser: inout ComponentWastParser) throws(WatParserError) -> ComponentWastDirective {
+        static func parse(wastParser: inout ComponentWastParser) throws(WasmKitError) -> ComponentWastDirective {
             let keyword = try wastParser.parser.peekKeyword()
             switch keyword {
             case "component":
@@ -347,7 +347,7 @@
 
             case "assert_invalid":
                 try wastParser.parser.consume()
-                let component = try wastParser.parens { wp throws(WatParserError) in
+                let component = try wastParser.parens { wp throws(WasmKitError) in
                     try ComponentDirective.parse(wastParser: &wp)
                 }
                 let message = try wastParser.parser.expectString()
@@ -356,7 +356,7 @@
 
             case "assert_malformed":
                 try wastParser.parser.consume()
-                let component = try wastParser.parens { wp throws(WatParserError) in
+                let component = try wastParser.parens { wp throws(WasmKitError) in
                     try ComponentDirective.parse(wastParser: &wp)
                 }
                 let message = try wastParser.parser.expectString()
@@ -365,7 +365,7 @@
 
             case "assert_return":
                 try wastParser.parser.consume()
-                let execute = try wastParser.parens { wp throws(WatParserError) in
+                let execute = try wastParser.parens { wp throws(WasmKitError) in
                     try ComponentWastExecute.parse(wastParser: &wp)
                 }
                 let results = try wastParser.expectationValues()
@@ -374,7 +374,7 @@
 
             case "assert_trap":
                 try wastParser.parser.consume()
-                let execute = try wastParser.parens { wp throws(WatParserError) in
+                let execute = try wastParser.parens { wp throws(WasmKitError) in
                     try ComponentWastExecute.parse(wastParser: &wp)
                 }
                 let message = try wastParser.parser.expectString()
@@ -393,12 +393,12 @@
                 return .invoke(invoke)
 
             case let keyword?:
-                throw WatParserError(
+                throw WasmKitError(
                     "unexpected component wast directive \(keyword)",
                     location: wastParser.parser.lexer.location()
                 )
             case nil:
-                throw WatParserError("unexpected eof", location: wastParser.parser.lexer.location())
+                throw WasmKitError("unexpected eof", location: wastParser.parser.lexer.location())
             }
         }
     }
@@ -406,7 +406,7 @@
     // MARK: - ComponentDirective Parsing
 
     extension ComponentDirective {
-        static func parse(wastParser: inout ComponentWastParser) throws(WatParserError) -> ComponentDirective {
+        static func parse(wastParser: inout ComponentWastParser) throws(WasmKitError) -> ComponentDirective {
             let location = wastParser.parser.lexer.location()
             try wastParser.parser.expectKeyword("component")
             let id = try wastParser.parser.takeId()
@@ -416,7 +416,7 @@
     }
 
     extension ComponentSource {
-        static func parse(wastParser: inout ComponentWastParser, id: Name?) throws(WatParserError) -> ComponentSource {
+        static func parse(wastParser: inout ComponentWastParser, id: Name?) throws(WasmKitError) -> ComponentSource {
             if let rawSource = try wastParser.parser.parseBinaryOrQuote() {
                 try wastParser.parser.expect(.rightParen)
                 switch rawSource {
@@ -436,7 +436,7 @@
     // MARK: - ComponentWastExecute Parsing
 
     extension ComponentWastExecute {
-        static func parse(wastParser: inout ComponentWastParser) throws(WatParserError) -> ComponentWastExecute {
+        static func parse(wastParser: inout ComponentWastParser) throws(WasmKitError) -> ComponentWastExecute {
             let keyword = try wastParser.parser.peekKeyword()
             switch keyword {
             case "invoke":
@@ -451,12 +451,12 @@
                 // Parse a component definition for assert_trap (instantiation trap testing)
                 return .component(try ComponentDirective.parse(wastParser: &wastParser))
             case let keyword?:
-                throw WatParserError(
+                throw WasmKitError(
                     "unexpected component wast execute \(keyword)",
                     location: wastParser.parser.lexer.location()
                 )
             case nil:
-                throw WatParserError("unexpected eof", location: wastParser.parser.lexer.location())
+                throw WasmKitError("unexpected eof", location: wastParser.parser.lexer.location())
             }
         }
     }
@@ -464,7 +464,7 @@
     // MARK: - ComponentWastInvoke Parsing
 
     extension ComponentWastInvoke {
-        static func parse(wastParser: inout ComponentWastParser) throws(WatParserError) -> ComponentWastInvoke {
+        static func parse(wastParser: inout ComponentWastParser) throws(WasmKitError) -> ComponentWastInvoke {
             try wastParser.parser.expectKeyword("invoke")
             let component = try wastParser.parser.takeId()
             let name = try wastParser.parser.expectString()

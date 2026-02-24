@@ -249,13 +249,13 @@ struct ModuleValidator {
         self.module = module
     }
 
-    func validate() throws {
+    func validate() throws(WasmKitError) {
         if module.memoryTypes.count > 1 {
             throw WasmKitError(message: .multipleMemoriesNotPermitted)
         }
         // Multiple tables are allowed with reference types feature
         if module.tableTypes.count > 1 && !module.features.contains(.referenceTypes) {
-            throw ValidationError(.multipleTablesNotPermitted)
+            throw WasmKitError(message:.multipleTablesNotPermitted)
         }
         for memoryType in module.memoryTypes {
             try Self.checkMemoryType(memoryType, features: module.features)
@@ -266,7 +266,7 @@ struct ModuleValidator {
         try checkStartFunction()
     }
 
-    func checkStartFunction() throws {
+    func checkStartFunction() throws(WasmKitError) {
         if let startFunction = module.start {
             let type = try module.resolveFunctionType(startFunction)
             guard type.parameters.isEmpty, type.results.isEmpty else {
@@ -275,7 +275,7 @@ struct ModuleValidator {
         }
     }
 
-    static func checkMemoryType(_ type: MemoryType, features: WasmFeatureSet) throws {
+    static func checkMemoryType(_ type: MemoryType, features: WasmFeatureSet) throws(WasmKitError) {
         try checkLimit(type)
 
         if type.isMemory64 {
@@ -296,15 +296,15 @@ struct ModuleValidator {
 
         if type.shared {
             guard features.contains(.threads) else {
-                throw ValidationError(.threadsFeatureRequiredForSharedMemories)
+                throw WasmKitError(message:.threadsFeatureRequiredForSharedMemories)
             }
             guard type.max != nil else {
-                throw ValidationError(.sharedMemoryMustHaveMaximum)
+                throw WasmKitError(message:.sharedMemoryMustHaveMaximum)
             }
         }
     }
 
-    static func checkTableType(_ type: TableType, features: WasmFeatureSet) throws {
+    static func checkTableType(_ type: TableType, features: WasmFeatureSet) throws(WasmKitError) {
         if type.elementType != .funcRef, !features.contains(.referenceTypes) {
             throw WasmKitError(message: .referenceTypesFeatureRequiredForNonFuncrefTables)
         }
@@ -327,7 +327,7 @@ struct ModuleValidator {
         }
     }
 
-    private static func checkLimit(_ limit: Limits) throws {
+    private static func checkLimit(_ limit: Limits) throws(WasmKitError) {
         guard let max = limit.max else { return }
         if limit.min > max {
             throw WasmKitError(message: .sizeMinimumMustNotExceedMaximum)
@@ -337,7 +337,7 @@ struct ModuleValidator {
 
 extension WasmTypes.Reference {
     /// Checks if the reference type matches the expected type.
-    func checkType(_ type: WasmTypes.ReferenceType) throws {
+    func checkType(_ type: WasmTypes.ReferenceType) throws(WasmKitError) {
         switch (self, type.heapType, type.isNullable) {
         case (.function(_?), .funcRef, _): return
         case (.function(nil), .funcRef, true): return
@@ -351,7 +351,7 @@ extension WasmTypes.Reference {
 
 extension Value {
     /// Checks if the value type matches the expected type.
-    func checkType(_ type: WasmTypes.ValueType) throws {
+    func checkType(_ type: WasmTypes.ValueType) throws(WasmKitError) {
         switch (self, type) {
         case (.i32, .i32): return
         case (.i64, .i64): return

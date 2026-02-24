@@ -338,7 +338,7 @@ public enum ModuleSource {
     /// A binary form of WebAssembly module
     case binary([UInt8])
 
-    static func parse(wastParser: inout WastParser) throws(WatParserError) -> ModuleSource {
+    static func parse(wastParser: inout WastParser) throws(WasmKitError) -> ModuleSource {
         if let rawSource = try wastParser.parser.parseBinaryOrQuote() {
             switch rawSource {
             case .binary(let bytes): return .binary(bytes)

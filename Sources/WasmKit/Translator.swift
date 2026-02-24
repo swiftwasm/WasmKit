@@ -551,7 +551,7 @@ struct InstructionTranslator: InstructionVisitor {
                 throw WasmKitError("Expected a value on stack but it's empty")
             }
             guard let startSlotOffset = self.startSlotOffsets.popLast() else {
-                throw TranslationError("Internal consistency error: missing slot offset")
+                throw WasmKitError("Internal consistency error: missing slot offset")
             }
             let width = value.type.concreteType?.stackSlotCount ?? 1
             self.slotHeight -= width
@@ -588,9 +588,9 @@ struct InstructionTranslator: InstructionVisitor {
             }
             return register
         }
-        mutating func truncate(height: Int) throws {
+        mutating func truncate(height: Int) throws(WasmKitError) {
             guard height <= self.valueHeight else {
-                throw TranslationError("Truncating to \(height) but the stack height is \(self.valueHeight)")
+                throw WasmKitError("Truncating to \(height) but the stack height is \(self.valueHeight)")
             }
             while height != self.valueHeight {
                 _ = try pop()
@@ -1006,7 +1006,7 @@ struct InstructionTranslator: InstructionVisitor {
     ///
     /// - Parameter typeHint: A type expected to be popped. Only used for diagnostic purpose.
     /// - Returns: `true` if check succeed. `false` if the pop operation is going to be performed in unreachable code path.
-    private func checkBeforePop(typeHint: ValueType?, depth: Int = 0, controlFrame: ControlStack.ControlFrame) throws -> Bool {
+    private func checkBeforePop(typeHint: ValueType?, depth: Int = 0, controlFrame: ControlStack.ControlFrame) throws(WasmKitError) -> Bool {
         if _slowPath(valueStack.valueHeight - depth <= controlFrame.valueStackHeight) {
             if controlFrame.reachable {
                 throw WasmKitError(message: .expectedTypeOnStackButEmpty(expected: typeHint))
@@ -1072,7 +1072,7 @@ struct InstructionTranslator: InstructionVisitor {
     }
 
     @discardableResult
-    private mutating func popPushValues(_ valueTypes: [ValueType]) throws -> (valueHeight: Int, slotHeight: Int) {
+    private mutating func popPushValues(_ valueTypes: [ValueType]) throws(WasmKitError) -> (valueHeight: Int, slotHeight: Int) {
         var values: [ValueSource?] = []
         for type in valueTypes.reversed() {
             values.append(try popOperand(type))
@@ -1113,7 +1113,7 @@ struct InstructionTranslator: InstructionVisitor {
     /// Pop values from the stack and copy them to the return slots.
     ///
     /// - Parameter valueTypes: The types of the values to copy.
-    private mutating func copyValuesIntoResultSlots(_ valueTypes: [ValueType], frameHeader: FrameHeaderLayout) throws {
+    private mutating func copyValuesIntoResultSlots(_ valueTypes: [ValueType], frameHeader: FrameHeaderLayout) throws(WasmKitError) {
         var copies: [(source: VReg, dest: VReg, type: ValueType)] = []
         for (index, resultType) in valueTypes.enumerated().reversed() {
             guard let operand = try popOperand(resultType) else { continue }
@@ -1137,7 +1137,7 @@ struct InstructionTranslator: InstructionVisitor {
     ///
     /// This is used by `return_call`-like instructions which rewrite the current frame header
     /// to the callee's frame header layout.
-    private mutating func copyValuesIntoParamSlots(_ valueTypes: [ValueType], frameHeader: FrameHeaderLayout) throws {
+    private mutating func copyValuesIntoParamSlots(_ valueTypes: [ValueType], frameHeader: FrameHeaderLayout) throws(WasmKitError) {
         var copies: [(source: VReg, dest: VReg, type: ValueType)] = []
         for (index, paramType) in valueTypes.enumerated().reversed() {
             guard let operand = try popOperand(paramType) else { continue }
@@ -1158,7 +1158,7 @@ struct InstructionTranslator: InstructionVisitor {
     }
 
     @discardableResult
-    private mutating func copyOnBranch(targetFrame frame: ControlStack.ControlFrame) throws -> Bool {
+    private mutating func copyOnBranch(targetFrame frame: ControlStack.ControlFrame) throws(WasmKitError) -> Bool {
         let depthValues = min(frame.copyTypes.count, valueStack.valueHeight - frame.valueStackHeight)
         preserveOnStack(depth: depthValues)
         let copyCount = VReg(frame.copySlotCount)
@@ -1361,10 +1361,10 @@ struct InstructionTranslator: InstructionVisitor {
             _ = try valueStack.pop(result)
         }
         guard valueStack.valueHeight == frame.valueStackHeight else {
-            throw ValidationError(.valuesRemainingAtEndOfBlock)
+            throw WasmKitError(message:.valuesRemainingAtEndOfBlock)
         }
         guard valueStack.slotHeight == frame.slotStackHeight else {
-            throw ValidationError(.valuesRemainingAtEndOfBlock)
+            throw WasmKitError(message:.valuesRemainingAtEndOfBlock)
         }
         _ = controlStack.popFrame()
         frame.kind = .if(elseLabel: elseLabel, endLabel: endLabel, isElse: true)
@@ -1384,10 +1384,10 @@ struct InstructionTranslator: InstructionVisitor {
         if case .block(root: true) = toBePopped.kind {
             try translateReturn()
             guard valueStack.valueHeight == toBePopped.valueStackHeight else {
-                throw ValidationError(.valuesRemainingAtEndOfBlock)
+                throw WasmKitError(message:.valuesRemainingAtEndOfBlock)
             }
             guard valueStack.slotHeight == toBePopped.slotStackHeight else {
-                throw ValidationError(.valuesRemainingAtEndOfBlock)
+                throw WasmKitError(message:.valuesRemainingAtEndOfBlock)
             }
             try iseqBuilder.pinLabelHere(toBePopped.continuation)
             return
@@ -1413,10 +1413,10 @@ struct InstructionTranslator: InstructionVisitor {
             _ = try valueStack.pop(result)
         }
         guard valueStack.valueHeight == toBePopped.valueStackHeight else {
-            throw ValidationError(.valuesRemainingAtEndOfBlock)
+            throw WasmKitError(message:.valuesRemainingAtEndOfBlock)
         }
         guard valueStack.slotHeight == toBePopped.slotStackHeight else {
-            throw ValidationError(.valuesRemainingAtEndOfBlock)
+            throw WasmKitError(message:.valuesRemainingAtEndOfBlock)
         }
         for result in toBePopped.blockType.results {
             _ = valueStack.push(result)
@@ -1433,7 +1433,7 @@ struct InstructionTranslator: InstructionVisitor {
         if _fastPath(currentFrame.reachable) {
             let count = currentHeight - Int(destination.copySlotCount) - destination.slotStackHeight
             guard count >= 0 else {
-                throw ValidationError(.stackHeightUnderflow(available: currentHeight, required: destination.slotStackHeight + Int(destination.copySlotCount)))
+                throw WasmKitError(message:.stackHeightUnderflow(available: currentHeight, required: destination.slotStackHeight + Int(destination.copySlotCount)))
             }
             popCount = UInt32(count)
         } else {
@@ -1724,7 +1724,7 @@ struct InstructionTranslator: InstructionVisitor {
         try markUnreachable()
     }
 
-    mutating func visitReturnCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws {
+    mutating func visitReturnCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws(WasmKitError) {
         let stackTopHeightToCopy = valueStack.slotHeight
         let addressType = try module.addressType(tableIndex: tableIndex)
         // Preserve function index slot on stack
@@ -1786,10 +1786,10 @@ struct InstructionTranslator: InstructionVisitor {
         let (_, value2) = try popAnyOperand()
         // TODO: Perform actual validation
         // guard value1 == ValueType(type) else {
-        //     throw TranslationError("Type mismatch on `select`. Expected \(value1) and \(type) to be same")
+        //     throw WasmKitError("Type mismatch on `select`. Expected \(value1) and \(type) to be same")
         // }
         // guard value2 == ValueType(type) else {
-        //     throw TranslationError("Type mismatch on `select`. Expected \(value2) and \(type) to be same")
+        //     throw WasmKitError("Type mismatch on `select`. Expected \(value2) and \(type) to be same")
         // }
         let result = valueStack.push(value1Type)
         if let condition = condition, let value1 = value1, let value2 = value2 {
@@ -1940,7 +1940,7 @@ struct InstructionTranslator: InstructionVisitor {
         _ pops: (ValueType, ValueType, ValueType),
         _ push: ValueType,
         _ instruction: @escaping (_ popped: (VReg, VReg, VReg), _ result: VReg) -> Instruction
-    ) throws {
+    ) throws(WasmKitError) {
         guard let pop1 = try popVRegOperand(pops.0),
             let pop2 = try popVRegOperand(pops.1),
             let pop3 = try popVRegOperand(pops.2)
@@ -2083,16 +2083,16 @@ struct InstructionTranslator: InstructionVisitor {
         try visitStore(memarg, store.type, store.naturalAlignment, instruction)
     }
 
-    mutating func visitV128Const(value: V128) throws {
+    mutating func visitV128Const(value: V128) throws(WasmKitError) {
         let storage = V128Storage(value)
         pushEmit(.v128) { result in
             .v128Const(.init(lo: storage.lo, hi: storage.hi, result: result))
         }
     }
 
-    mutating func visitI8x16Shuffle(lanes: V128ShuffleMask) throws {
+    mutating func visitI8x16Shuffle(lanes: V128ShuffleMask) throws(WasmKitError) {
         for lane in lanes.lanes where lane >= 32 {
-            throw ValidationError(.invalidLaneIndex(lane: lane, laneCount: 32))
+            throw WasmKitError(message:.invalidLaneIndex(lane: lane, laneCount: 32))
         }
         try pop2PushEmit((.v128, .v128), .v128) { popped, result in
             let rhs = popped.0
@@ -2110,21 +2110,21 @@ struct InstructionTranslator: InstructionVisitor {
         }
     }
 
-    mutating func visitSimd(_ simd: WasmParser.Instruction.Simd) throws {
+    mutating func visitSimd(_ simd: WasmParser.Instruction.Simd) throws(WasmKitError) {
         guard let opcode = SIMDOpcode.fromSimd(simd) else { preconditionFailure("missing SIMDOpcode mapping: \(simd)") }
-        func emitUnaryV128() throws {
+        func emitUnaryV128() throws(WasmKitError) {
             try popPushEmit(.v128, .v128) { v0, result in
                 .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: v0, input1: 0, input2: 0, result: result))
             }
         }
-        func emitBinaryV128() throws {
+        func emitBinaryV128() throws(WasmKitError) {
             try pop2PushEmit((.v128, .v128), .v128) { popped, result in
                 let rhs = popped.0
                 let lhs = popped.1
                 return .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: lhs, input1: rhs, input2: 0, result: result))
             }
         }
-        func emitTernaryV128() throws {
+        func emitTernaryV128() throws(WasmKitError) {
             try pop3PushEmit((.v128, .v128, .v128), .v128) { popped, result in
                 let mask = popped.0
                 let b = popped.1
@@ -2132,12 +2132,12 @@ struct InstructionTranslator: InstructionVisitor {
                 return .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: a, input1: b, input2: mask, result: result))
             }
         }
-        func emitUnaryI32() throws {
+        func emitUnaryI32() throws(WasmKitError) {
             try popPushEmit(.v128, .i32) { v0, result in
                 .simd(.init(opcode: opcode.rawValue, lane: 0, reserved: 0, offset: 0, input0: v0, input1: 0, input2: 0, result: result))
             }
         }
-        func emitShift() throws {
+        func emitShift() throws(WasmKitError) {
             try pop2PushEmit((.i32, .v128), .v128) { popped, result in
                 let shift = popped.0
                 let vec = popped.1
@@ -2222,7 +2222,7 @@ struct InstructionTranslator: InstructionVisitor {
         }
     }
 
-    mutating func visitSimdLane(_ simdLane: WasmParser.Instruction.SimdLane, lane: UInt8) throws {
+    mutating func visitSimdLane(_ simdLane: WasmParser.Instruction.SimdLane, lane: UInt8) throws(WasmKitError) {
         guard let opcode = SIMDOpcode.fromSimdLane(simdLane) else { preconditionFailure("missing SIMDOpcode mapping: \(simdLane)") }
         let laneCount: UInt8
         switch simdLane {
@@ -2232,7 +2232,7 @@ struct InstructionTranslator: InstructionVisitor {
         case .i64x2ExtractLane, .i64x2ReplaceLane, .f64x2ExtractLane, .f64x2ReplaceLane: laneCount = 2
         }
         if lane >= laneCount {
-            throw ValidationError(.invalidLaneIndex(lane: lane, laneCount: laneCount))
+            throw WasmKitError(message:.invalidLaneIndex(lane: lane, laneCount: laneCount))
         }
         switch simdLane {
         case .i8x16ExtractLaneS, .i8x16ExtractLaneU, .i16x8ExtractLaneS, .i16x8ExtractLaneU, .i32x4ExtractLane:
@@ -2274,7 +2274,7 @@ struct InstructionTranslator: InstructionVisitor {
         }
     }
 
-    mutating func visitSimdMemLane(_ simdMemLane: WasmParser.Instruction.SimdMemLane, memarg: MemArg, lane: UInt8) throws {
+    mutating func visitSimdMemLane(_ simdMemLane: WasmParser.Instruction.SimdMemLane, memarg: MemArg, lane: UInt8) throws(WasmKitError) {
         let isMemory64 = try module.isMemory64(memoryIndex: 0)
         guard let opcode = SIMDOpcode.fromSimdMemLane(simdMemLane) else { preconditionFailure("missing SIMDOpcode mapping: \(simdMemLane)") }
         let naturalAlignment: Int
@@ -2286,7 +2286,7 @@ struct InstructionTranslator: InstructionVisitor {
         case .v128Load64Lane, .v128Store64Lane: (naturalAlignment, laneCount) = (3, 2)
         }
         if lane >= laneCount {
-            throw ValidationError(.invalidLaneIndex(lane: lane, laneCount: laneCount))
+            throw WasmKitError(message:.invalidLaneIndex(lane: lane, laneCount: laneCount))
         }
         try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
 
@@ -2738,13 +2738,13 @@ struct InstructionTranslator: InstructionVisitor {
         _ type: ValueType,
         _ naturalAlignment: Int,
         _ instruction: @escaping (Instruction.RmwOperand) -> Instruction
-    ) throws {
+    ) throws(WasmKitError) {
         let isMemory64 = try module.isMemory64(memoryIndex: 0)
         try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
         let value = try popVRegOperand(type)
         let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
         guard let value = value, let pointer = pointer else {
-            throw TranslationError("missing rmw operands")
+            throw WasmKitError("missing rmw operands")
         }
         let result = valueStack.push(type)
         let rmwOperand = Instruction.RmwOperand(
@@ -2761,13 +2761,13 @@ struct InstructionTranslator: InstructionVisitor {
         _ resultType: ValueType,
         _ naturalAlignment: Int,
         _ instruction: @escaping (Instruction.RmwOperand) -> Instruction
-    ) throws {
+    ) throws(WasmKitError) {
         let isMemory64 = try module.isMemory64(memoryIndex: 0)
         try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
         let value = try popVRegOperand(resultType)
         let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
         guard let value = value, let pointer = pointer else {
-            throw TranslationError("missing rmw operands")
+            throw WasmKitError("missing rmw operands")
         }
         let result = valueStack.push(resultType)
         let rmwOperand = Instruction.RmwOperand(
@@ -2784,13 +2784,13 @@ struct InstructionTranslator: InstructionVisitor {
         _ resultType: ValueType,
         _ naturalAlignment: Int,
         _ instruction: @escaping (Instruction.RmwOperand) -> Instruction
-    ) throws {
+    ) throws(WasmKitError) {
         let isMemory64 = try module.isMemory64(memoryIndex: 0)
         try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
         let value = try popVRegOperand(resultType)
         let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
         guard let value = value, let pointer = pointer else {
-            throw TranslationError("missing rmw operands")
+            throw WasmKitError("missing rmw operands")
         }
         let result = valueStack.push(resultType)
         let rmwOperand = Instruction.RmwOperand(
@@ -2807,13 +2807,13 @@ struct InstructionTranslator: InstructionVisitor {
         _ resultType: ValueType,
         _ naturalAlignment: Int,
         _ instruction: @escaping (Instruction.RmwOperand) -> Instruction
-    ) throws {
+    ) throws(WasmKitError) {
         let isMemory64 = try module.isMemory64(memoryIndex: 0)
         try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
         let value = try popVRegOperand(resultType)
         let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
         guard let value = value, let pointer = pointer else {
-            throw TranslationError("missing rmw operands")
+            throw WasmKitError("missing rmw operands")
         }
         let result = valueStack.push(resultType)
         let rmwOperand = Instruction.RmwOperand(
@@ -2825,135 +2825,135 @@ struct InstructionTranslator: InstructionVisitor {
         emit(instruction(rmwOperand))
     }
 
-    mutating func visitI32AtomicRmwAdd(memarg: MemArg) throws -> Output {
+    mutating func visitI32AtomicRmwAdd(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw(memarg, .i32, 4) { .i32AtomicRmwAdd($0) }
     }
-    mutating func visitI64AtomicRmwAdd(memarg: MemArg) throws -> Output {
+    mutating func visitI64AtomicRmwAdd(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw(memarg, .i64, 8) { .i64AtomicRmwAdd($0) }
     }
-    mutating func visitI32AtomicRmw8AddU(memarg: MemArg) throws -> Output {
+    mutating func visitI32AtomicRmw8AddU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw8(memarg, .i32, 1) { .i32AtomicRmw8AddU($0) }
     }
-    mutating func visitI32AtomicRmw16AddU(memarg: MemArg) throws -> Output {
+    mutating func visitI32AtomicRmw16AddU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw16(memarg, .i32, 2) { .i32AtomicRmw16AddU($0) }
     }
-    mutating func visitI64AtomicRmw8AddU(memarg: MemArg) throws -> Output {
+    mutating func visitI64AtomicRmw8AddU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw8(memarg, .i64, 1) { .i64AtomicRmw8AddU($0) }
     }
-    mutating func visitI64AtomicRmw16AddU(memarg: MemArg) throws -> Output {
+    mutating func visitI64AtomicRmw16AddU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw16(memarg, .i64, 2) { .i64AtomicRmw16AddU($0) }
     }
-    mutating func visitI64AtomicRmw32AddU(memarg: MemArg) throws -> Output {
+    mutating func visitI64AtomicRmw32AddU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw32(memarg, .i64, 4) { .i64AtomicRmw32AddU($0) }
     }
 
-    mutating func visitI32AtomicRmwSub(memarg: MemArg) throws -> Output {
+    mutating func visitI32AtomicRmwSub(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw(memarg, .i32, 4) { .i32AtomicRmwSub($0) }
     }
-    mutating func visitI64AtomicRmwSub(memarg: MemArg) throws -> Output {
+    mutating func visitI64AtomicRmwSub(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw(memarg, .i64, 8) { .i64AtomicRmwSub($0) }
     }
-    mutating func visitI32AtomicRmw8SubU(memarg: MemArg) throws -> Output {
+    mutating func visitI32AtomicRmw8SubU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw8(memarg, .i32, 1) { .i32AtomicRmw8SubU($0) }
     }
-    mutating func visitI32AtomicRmw16SubU(memarg: MemArg) throws -> Output {
+    mutating func visitI32AtomicRmw16SubU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw16(memarg, .i32, 2) { .i32AtomicRmw16SubU($0) }
     }
-    mutating func visitI64AtomicRmw8SubU(memarg: MemArg) throws -> Output {
+    mutating func visitI64AtomicRmw8SubU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw8(memarg, .i64, 1) { .i64AtomicRmw8SubU($0) }
     }
-    mutating func visitI64AtomicRmw16SubU(memarg: MemArg) throws -> Output {
+    mutating func visitI64AtomicRmw16SubU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw16(memarg, .i64, 2) { .i64AtomicRmw16SubU($0) }
     }
-    mutating func visitI64AtomicRmw32SubU(memarg: MemArg) throws -> Output {
+    mutating func visitI64AtomicRmw32SubU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw32(memarg, .i64, 4) { .i64AtomicRmw32SubU($0) }
     }
 
-    mutating func visitI32AtomicRmwAnd(memarg: MemArg) throws -> Output {
+    mutating func visitI32AtomicRmwAnd(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw(memarg, .i32, 4) { .i32AtomicRmwAnd($0) }
     }
-    mutating func visitI64AtomicRmwAnd(memarg: MemArg) throws -> Output {
+    mutating func visitI64AtomicRmwAnd(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw(memarg, .i64, 8) { .i64AtomicRmwAnd($0) }
     }
-    mutating func visitI32AtomicRmw8AndU(memarg: MemArg) throws -> Output {
+    mutating func visitI32AtomicRmw8AndU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw8(memarg, .i32, 1) { .i32AtomicRmw8AndU($0) }
     }
-    mutating func visitI32AtomicRmw16AndU(memarg: MemArg) throws -> Output {
+    mutating func visitI32AtomicRmw16AndU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw16(memarg, .i32, 2) { .i32AtomicRmw16AndU($0) }
     }
-    mutating func visitI64AtomicRmw8AndU(memarg: MemArg) throws -> Output {
+    mutating func visitI64AtomicRmw8AndU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw8(memarg, .i64, 1) { .i64AtomicRmw8AndU($0) }
     }
-    mutating func visitI64AtomicRmw16AndU(memarg: MemArg) throws -> Output {
+    mutating func visitI64AtomicRmw16AndU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw16(memarg, .i64, 2) { .i64AtomicRmw16AndU($0) }
     }
-    mutating func visitI64AtomicRmw32AndU(memarg: MemArg) throws -> Output {
+    mutating func visitI64AtomicRmw32AndU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw32(memarg, .i64, 4) { .i64AtomicRmw32AndU($0) }
     }
 
-    mutating func visitI32AtomicRmwOr(memarg: MemArg) throws -> Output {
+    mutating func visitI32AtomicRmwOr(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw(memarg, .i32, 4) { .i32AtomicRmwOr($0) }
     }
-    mutating func visitI64AtomicRmwOr(memarg: MemArg) throws -> Output {
+    mutating func visitI64AtomicRmwOr(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw(memarg, .i64, 8) { .i64AtomicRmwOr($0) }
     }
-    mutating func visitI32AtomicRmw8OrU(memarg: MemArg) throws -> Output {
+    mutating func visitI32AtomicRmw8OrU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw8(memarg, .i32, 1) { .i32AtomicRmw8OrU($0) }
     }
-    mutating func visitI32AtomicRmw16OrU(memarg: MemArg) throws -> Output {
+    mutating func visitI32AtomicRmw16OrU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw16(memarg, .i32, 2) { .i32AtomicRmw16OrU($0) }
     }
-    mutating func visitI64AtomicRmw8OrU(memarg: MemArg) throws -> Output {
+    mutating func visitI64AtomicRmw8OrU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw8(memarg, .i64, 1) { .i64AtomicRmw8OrU($0) }
     }
-    mutating func visitI64AtomicRmw16OrU(memarg: MemArg) throws -> Output {
+    mutating func visitI64AtomicRmw16OrU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw16(memarg, .i64, 2) { .i64AtomicRmw16OrU($0) }
     }
-    mutating func visitI64AtomicRmw32OrU(memarg: MemArg) throws -> Output {
+    mutating func visitI64AtomicRmw32OrU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw32(memarg, .i64, 4) { .i64AtomicRmw32OrU($0) }
     }
 
-    mutating func visitI32AtomicRmwXor(memarg: MemArg) throws -> Output {
+    mutating func visitI32AtomicRmwXor(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw(memarg, .i32, 4) { .i32AtomicRmwXor($0) }
     }
-    mutating func visitI64AtomicRmwXor(memarg: MemArg) throws -> Output {
+    mutating func visitI64AtomicRmwXor(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw(memarg, .i64, 8) { .i64AtomicRmwXor($0) }
     }
-    mutating func visitI32AtomicRmw8XorU(memarg: MemArg) throws -> Output {
+    mutating func visitI32AtomicRmw8XorU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw8(memarg, .i32, 1) { .i32AtomicRmw8XorU($0) }
     }
-    mutating func visitI32AtomicRmw16XorU(memarg: MemArg) throws -> Output {
+    mutating func visitI32AtomicRmw16XorU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw16(memarg, .i32, 2) { .i32AtomicRmw16XorU($0) }
     }
-    mutating func visitI64AtomicRmw8XorU(memarg: MemArg) throws -> Output {
+    mutating func visitI64AtomicRmw8XorU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw8(memarg, .i64, 1) { .i64AtomicRmw8XorU($0) }
     }
-    mutating func visitI64AtomicRmw16XorU(memarg: MemArg) throws -> Output {
+    mutating func visitI64AtomicRmw16XorU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw16(memarg, .i64, 2) { .i64AtomicRmw16XorU($0) }
     }
-    mutating func visitI64AtomicRmw32XorU(memarg: MemArg) throws -> Output {
+    mutating func visitI64AtomicRmw32XorU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw32(memarg, .i64, 4) { .i64AtomicRmw32XorU($0) }
     }
 
-    mutating func visitI32AtomicRmwXchg(memarg: MemArg) throws -> Output {
+    mutating func visitI32AtomicRmwXchg(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw(memarg, .i32, 4) { .i32AtomicRmwXchg($0) }
     }
-    mutating func visitI64AtomicRmwXchg(memarg: MemArg) throws -> Output {
+    mutating func visitI64AtomicRmwXchg(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw(memarg, .i64, 8) { .i64AtomicRmwXchg($0) }
     }
-    mutating func visitI32AtomicRmw8XchgU(memarg: MemArg) throws -> Output {
+    mutating func visitI32AtomicRmw8XchgU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw8(memarg, .i32, 1) { .i32AtomicRmw8XchgU($0) }
     }
-    mutating func visitI32AtomicRmw16XchgU(memarg: MemArg) throws -> Output {
+    mutating func visitI32AtomicRmw16XchgU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw16(memarg, .i32, 2) { .i32AtomicRmw16XchgU($0) }
     }
-    mutating func visitI64AtomicRmw8XchgU(memarg: MemArg) throws -> Output {
+    mutating func visitI64AtomicRmw8XchgU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw8(memarg, .i64, 1) { .i64AtomicRmw8XchgU($0) }
     }
-    mutating func visitI64AtomicRmw16XchgU(memarg: MemArg) throws -> Output {
+    mutating func visitI64AtomicRmw16XchgU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw16(memarg, .i64, 2) { .i64AtomicRmw16XchgU($0) }
     }
-    mutating func visitI64AtomicRmw32XchgU(memarg: MemArg) throws -> Output {
+    mutating func visitI64AtomicRmw32XchgU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitRmw32(memarg, .i64, 4) { .i64AtomicRmw32XchgU($0) }
     }
 
@@ -2962,14 +2962,14 @@ struct InstructionTranslator: InstructionVisitor {
         _ type: ValueType,
         _ naturalAlignment: Int,
         _ instruction: @escaping (Instruction.CmpxchgOperand) -> Instruction
-    ) throws {
+    ) throws(WasmKitError) {
         let isMemory64 = try module.isMemory64(memoryIndex: 0)
         try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
         let replacement = try popVRegOperand(type)
         let expected = try popVRegOperand(type)
         let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
         guard let replacement = replacement, let expected = expected, let pointer = pointer else {
-            throw TranslationError("missing cmpxchg operands")
+            throw WasmKitError("missing cmpxchg operands")
         }
         let result = valueStack.push(type)
         let cmpxchgOperand = Instruction.CmpxchgOperand(
@@ -2987,14 +2987,14 @@ struct InstructionTranslator: InstructionVisitor {
         _ resultType: ValueType,
         _ naturalAlignment: Int,
         _ instruction: @escaping (Instruction.CmpxchgOperand) -> Instruction
-    ) throws {
+    ) throws(WasmKitError) {
         let isMemory64 = try module.isMemory64(memoryIndex: 0)
         try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
         let replacement = try popVRegOperand(resultType)
         let expected = try popVRegOperand(resultType)
         let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
         guard let replacement = replacement, let expected = expected, let pointer = pointer else {
-            throw TranslationError("missing cmpxchg operands")
+            throw WasmKitError("missing cmpxchg operands")
         }
         let result = valueStack.push(resultType)
         let cmpxchgOperand = Instruction.CmpxchgOperand(
@@ -3012,14 +3012,14 @@ struct InstructionTranslator: InstructionVisitor {
         _ resultType: ValueType,
         _ naturalAlignment: Int,
         _ instruction: @escaping (Instruction.CmpxchgOperand) -> Instruction
-    ) throws {
+    ) throws(WasmKitError) {
         let isMemory64 = try module.isMemory64(memoryIndex: 0)
         try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
         let replacement = try popVRegOperand(resultType)
         let expected = try popVRegOperand(resultType)
         let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
         guard let replacement = replacement, let expected = expected, let pointer = pointer else {
-            throw TranslationError("missing cmpxchg operands")
+            throw WasmKitError("missing cmpxchg operands")
         }
         let result = valueStack.push(resultType)
         let cmpxchgOperand = Instruction.CmpxchgOperand(
@@ -3037,14 +3037,14 @@ struct InstructionTranslator: InstructionVisitor {
         _ resultType: ValueType,
         _ naturalAlignment: Int,
         _ instruction: @escaping (Instruction.CmpxchgOperand) -> Instruction
-    ) throws {
+    ) throws(WasmKitError) {
         let isMemory64 = try module.isMemory64(memoryIndex: 0)
         try validator.validateMemArg(memarg, naturalAlignment: naturalAlignment)
         let replacement = try popVRegOperand(resultType)
         let expected = try popVRegOperand(resultType)
         let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
         guard let replacement = replacement, let expected = expected, let pointer = pointer else {
-            throw TranslationError("missing cmpxchg operands")
+            throw WasmKitError("missing cmpxchg operands")
         }
         let result = valueStack.push(resultType)
         let cmpxchgOperand = Instruction.CmpxchgOperand(
@@ -3057,36 +3057,36 @@ struct InstructionTranslator: InstructionVisitor {
         emit(instruction(cmpxchgOperand))
     }
 
-    mutating func visitI32AtomicRmwCmpxchg(memarg: MemArg) throws -> Output {
+    mutating func visitI32AtomicRmwCmpxchg(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitCmpxchg(memarg, .i32, 4) { .i32AtomicRmwCmpxchg($0) }
     }
-    mutating func visitI64AtomicRmwCmpxchg(memarg: MemArg) throws -> Output {
+    mutating func visitI64AtomicRmwCmpxchg(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitCmpxchg(memarg, .i64, 8) { .i64AtomicRmwCmpxchg($0) }
     }
-    mutating func visitI32AtomicRmw8CmpxchgU(memarg: MemArg) throws -> Output {
+    mutating func visitI32AtomicRmw8CmpxchgU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitCmpxchg8(memarg, .i32, 1) { .i32AtomicRmw8CmpxchgU($0) }
     }
-    mutating func visitI32AtomicRmw16CmpxchgU(memarg: MemArg) throws -> Output {
+    mutating func visitI32AtomicRmw16CmpxchgU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitCmpxchg16(memarg, .i32, 2) { .i32AtomicRmw16CmpxchgU($0) }
     }
-    mutating func visitI64AtomicRmw8CmpxchgU(memarg: MemArg) throws -> Output {
+    mutating func visitI64AtomicRmw8CmpxchgU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitCmpxchg8(memarg, .i64, 1) { .i64AtomicRmw8CmpxchgU($0) }
     }
-    mutating func visitI64AtomicRmw16CmpxchgU(memarg: MemArg) throws -> Output {
+    mutating func visitI64AtomicRmw16CmpxchgU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitCmpxchg16(memarg, .i64, 2) { .i64AtomicRmw16CmpxchgU($0) }
     }
-    mutating func visitI64AtomicRmw32CmpxchgU(memarg: MemArg) throws -> Output {
+    mutating func visitI64AtomicRmw32CmpxchgU(memarg: MemArg) throws(WasmKitError) -> Output {
         try visitCmpxchg32(memarg, .i64, 4) { .i64AtomicRmw32CmpxchgU($0) }
     }
 
-    mutating func visitMemoryAtomicWait32(memarg: MemArg) throws -> Output {
+    mutating func visitMemoryAtomicWait32(memarg: MemArg) throws(WasmKitError) -> Output {
         let isMemory64 = try module.isMemory64(memoryIndex: 0)
         try validator.validateMemArg(memarg, naturalAlignment: 4)
         let timeout = try popVRegOperand(.i64)
         let expected = try popVRegOperand(.i32)
         let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
         guard let timeout = timeout, let expected = expected, let pointer = pointer else {
-            throw TranslationError("missing wait operands")
+            throw WasmKitError("missing wait operands")
         }
         let result = valueStack.push(.i32)
         let waitOperand = Instruction.AtomicWaitOperand(
@@ -3099,14 +3099,14 @@ struct InstructionTranslator: InstructionVisitor {
         emit(.memoryAtomicWait32(waitOperand))
     }
 
-    mutating func visitMemoryAtomicWait64(memarg: MemArg) throws -> Output {
+    mutating func visitMemoryAtomicWait64(memarg: MemArg) throws(WasmKitError) -> Output {
         let isMemory64 = try module.isMemory64(memoryIndex: 0)
         try validator.validateMemArg(memarg, naturalAlignment: 8)
         let timeout = try popVRegOperand(.i64)
         let expected = try popVRegOperand(.i64)
         let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
         guard let timeout = timeout, let expected = expected, let pointer = pointer else {
-            throw TranslationError("missing wait operands")
+            throw WasmKitError("missing wait operands")
         }
         let result = valueStack.push(.i32)
         let waitOperand = Instruction.AtomicWaitOperand(
@@ -3119,13 +3119,13 @@ struct InstructionTranslator: InstructionVisitor {
         emit(.memoryAtomicWait64(waitOperand))
     }
 
-    mutating func visitMemoryAtomicNotify(memarg: MemArg) throws -> Output {
+    mutating func visitMemoryAtomicNotify(memarg: MemArg) throws(WasmKitError) -> Output {
         let isMemory64 = try module.isMemory64(memoryIndex: 0)
         try validator.validateMemArg(memarg, naturalAlignment: 4)
         let count = try popVRegOperand(.i32)
         let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
         guard let count = count, let pointer = pointer else {
-            throw TranslationError("missing notify operands")
+            throw WasmKitError("missing notify operands")
         }
         let result = valueStack.push(.i32)
         let notifyOperand = Instruction.AtomicNotifyOperand(
@@ -3137,7 +3137,7 @@ struct InstructionTranslator: InstructionVisitor {
         emit(.memoryAtomicNotify(notifyOperand))
     }
 
-    mutating func visitAtomicFence() throws -> Output {
+    mutating func visitAtomicFence() throws(WasmKitError) -> Output {
         // No-op: In an interpreter, instructions are executed sequentially,
         // so no reordering can occur. atomic.fence is only meaningful for
         // compiled code with actual CPU-level reordering.

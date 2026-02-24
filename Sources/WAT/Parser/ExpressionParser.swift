@@ -220,7 +220,7 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
                     appendLittleEndianBytes(lane.bitPattern, into: &bytes)
                 }
             default:
-                throw WatParserError("expected v128 shape type", location: parser.lexer.location())
+                throw WasmKitError("expected v128 shape type", location: parser.lexer.location())
             }
 
             try parser.expect(.rightParen)

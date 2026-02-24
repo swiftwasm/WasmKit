@@ -333,7 +333,7 @@ enum WasmGen {
                 keyword: String,
                 expressionParser: inout ExpressionParser<V>,
                 wat: inout Wat
-            ) throws(WasmKitError) -> ((inout V) throws(WatParserError) -> Void)? {
+            ) throws(WasmKitError) -> ((inout V) throws(WasmKitError) -> Void)? {
                 switch keyword {
 
             """
@@ -357,7 +357,7 @@ enum WasmGen {
             } else {
                 code += " "
             }
-            code += "return { visitor throws(WatParserError) in return try visitor.\(instruction.visitMethodName)("
+            code += "return { visitor throws(WasmKitError) in return try visitor.\(instruction.visitMethodName)("
             var arguments: [(label: String?, value: String)] = []
             if instruction.category != nil {
                 arguments.append((label: nil, value: ".\(instruction.name.enumCase)"))

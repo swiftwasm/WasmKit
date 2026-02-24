@@ -255,13 +255,13 @@ public func parseWAST(_ input: String, features: WasmFeatureSet = .default) thro
     public func parseComponentWAST(
         _ input: String,
         features: WasmFeatureSet = .default
-    ) throws(WatParserError) -> ComponentWast {
+    ) throws(WasmKitError) -> ComponentWast {
         return ComponentWast(input, features: features)
     }
 
 #endif
 
-func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParserError) -> Wat {
+func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WasmKitError) -> Wat {
     // This parser is 2-pass: first it collects all module items and creates a mapping of names to indices.
 
     let initialParser = parser

@@ -369,7 +369,7 @@ internal struct Parser {
     /// Parse binary or quote source if present.
     /// Returns nil if the next token is not "binary" or "quote".
     /// Consumes the keyword and string list, but NOT the closing paren.
-    mutating func parseBinaryOrQuote() throws(WatParserError) -> RawSource? {
+    mutating func parseBinaryOrQuote() throws(WasmKitError) -> RawSource? {
         guard let keyword = try peekKeyword() else { return nil }
         if keyword == "binary" {
             try consume()
@@ -387,8 +387,8 @@ extension Parser {
     /// The `parseType` closure is called for each type token.
     mutating func parseParamList<T>(
         mayHaveName: Bool,
-        parseType: (inout Parser) throws(WatParserError) -> T
-    ) throws(WatParserError) -> ([T], [Name?]) {
+        parseType: (inout Parser) throws(WasmKitError) -> T
+    ) throws(WasmKitError) -> ([T], [Name?]) {
         var types: [T] = []
         var names: [Name?] = []
         while try takeParenBlockStart("param") {
@@ -413,8 +413,8 @@ extension Parser {
     /// Parse a list of `(result ...)` clauses.
     /// The `parseType` closure is called for each type token.
     mutating func parseResultList<T>(
-        parseType: (inout Parser) throws(WatParserError) -> T
-    ) throws(WatParserError) -> [T] {
+        parseType: (inout Parser) throws(WasmKitError) -> T
+    ) throws(WasmKitError) -> [T] {
         var results: [T] = []
         while try takeParenBlockStart("result") {
             while try !take(.rightParen) {
