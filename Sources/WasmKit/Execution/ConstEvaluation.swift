@@ -58,6 +58,7 @@ extension ConstExpression {
         case .i64Const(let value): return .i64(UInt64(bitPattern: value))
         case .f32Const(let value): return .f32(value.bitPattern)
         case .f64Const(let value): return .f64(value.bitPattern)
+        case .v128Const(let value): return .v128(value)
         case .globalGet(let globalIndex):
             return try context.globalValue(globalIndex)
         case .refNull(let type):

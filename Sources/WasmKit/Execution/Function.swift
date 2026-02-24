@@ -189,7 +189,7 @@ extension InternalFunction {
         guard expectedTypes.count == values.count else { return false }
         for (expected, value) in zip(expectedTypes, values) {
             switch (expected, value) {
-            case (.i32, .i32), (.i64, .i64), (.f32, .f32), (.f64, .f64),
+            case (.i32, .i32), (.i64, .i64), (.f32, .f32), (.f64, .f64), (.v128, .v128),
                 (.ref(.funcRef), .ref(.function)), (.ref(.externRef), .ref(.extern)):
                 break
             default: return false
@@ -218,7 +218,7 @@ extension InternalFunction {
         let entity = self.wasm
         switch entity.code {
         case .compiled(let iseq), .debuggable(_, let iseq):
-            return (iseq, entity.numberOfNonParameterLocals, entity)
+            return (iseq, entity.numberOfNonParameterLocalSlots, entity)
         case .uncompiled:
             preconditionFailure()
         }
@@ -229,14 +229,14 @@ struct WasmFunctionEntity {
     let type: InternedFuncType
     let instance: InternalInstance
     let index: FunctionIndex
-    let numberOfNonParameterLocals: Int
+    let numberOfNonParameterLocalSlots: Int
     var code: CodeBody
 
     init(index: FunctionIndex, type: InternedFuncType, code: InternalUncompiledCode, instance: InternalInstance) {
         self.type = type
         self.instance = instance
         self.code = .uncompiled(code)
-        self.numberOfNonParameterLocals = code.locals.count
+        self.numberOfNonParameterLocalSlots = code.locals.reduce(into: 0) { $0 += $1.stackSlotCount }
         self.index = index
     }
 

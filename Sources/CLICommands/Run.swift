@@ -3,6 +3,11 @@ import SystemPackage
 import WAT
 import WasmKit
 import WasmKitWASI
+import WasmParser
+
+#if ComponentModel
+    import ComponentModel
+#endif
 
 #if canImport(os.signpost)
     import os.signpost
@@ -153,15 +158,27 @@ package struct Run: AsyncParsableCommand {
 
         log("Started parsing module", verbose: true)
 
+        // Detect file type (component vs module)
+        let filePath = FilePath(path)
+        let fileType = try detectWasmFileType(filePath: filePath)
+
+        #if ComponentModel
+            if fileType == .component {
+                try runComponent(filePath: filePath)
+                return
+            }
+        #endif
+
+        // Regular module execution
         let module: Module
         if verbose, #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) {
             let (parsedModule, parseTime) = try measure {
-                try parseWasm(filePath: FilePath(path))
+                try parseWasm(filePath: filePath)
             }
             log("Finished parsing module: \(parseTime)", verbose: true)
             module = parsedModule
         } else {
-            module = try parseWasm(filePath: FilePath(path))
+            module = try parseWasm(filePath: filePath)
         }
 
         let (interceptor, finalize) = try deriveInterceptor()
@@ -184,6 +201,39 @@ package struct Run: AsyncParsableCommand {
             try invoke()
         }
     }
+
+    #if ComponentModel
+        /// Run a WebAssembly component.
+        func runComponent(filePath: FilePath) throws {
+            log("Detected component binary, parsing component...", verbose: true)
+
+            let component = try parseComponent(filePath: filePath)
+
+            let engine = Engine(configuration: deriveRuntimeConfiguration())
+            let store = Store(engine: engine)
+            let loader = ComponentLoader(store: store)
+            let instance = try loader.instantiate(component: component)
+
+            // First argument is the WAVE function call expression
+            guard let waveExpression = arguments.first else {
+                // List exports if no function specified
+                log("Component loaded. Available exports:")
+                for export in component.exports {
+                    log("  - \(export.name)")
+                }
+                log("\nUsage: wasmkit run \(path) 'function-name(args...)'")
+                log("Example: wasmkit run \(path) 'add(1, 2)'")
+                return
+            }
+            log("Invoking: \(waveExpression)", verbose: true)
+
+            let result = try instance.invoke(waveExpression)
+            let output = result.formatResults()
+            if !output.isEmpty {
+                print(output)
+            }
+        }
+    #endif
 
     /// Derives the runtime interceptor based on the command line arguments
     func deriveInterceptor() throws -> (interceptor: EngineInterceptor?, finalize: () -> Void) {

@@ -213,8 +213,9 @@ protocol BinaryInstructionDecoder {
 }
 
 @inlinable
-func parseBinaryInstruction<V: InstructionVisitor, D: BinaryInstructionDecoder>(
-    visitor: inout V, decoder: inout D
+func parseBinaryInstruction(
+    visitor: inout some InstructionVisitor & ~Copyable,
+    decoder: inout some BinaryInstructionDecoder
 ) throws(WasmKitError) -> Bool {
     visitor.binaryOffset = decoder.offset
     let opcode0 = try decoder.claimNextByte()

@@ -31,6 +31,14 @@ public func parseWasm(bytes: [UInt8], features: WasmFeatureSet = .default) throw
     return module
 }
 
+/// Parse a given byte slice as a WebAssembly binary format file
+/// > Note: <https://webassembly.github.io/spec/core/binary/index.html>
+public func parseWasm(bytes: ArraySlice<UInt8>, features: WasmFeatureSet = .default) throws -> Module {
+    let stream = StaticByteStream(bytes: bytes)
+    let module = try parseModule(stream: stream, features: features)
+    return module
+}
+
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-module>
 func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = .default) throws(WasmKitError) -> Module {

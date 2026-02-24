@@ -2,15 +2,21 @@ import WasmParser
 import WasmTypes
 
 /// A name with its location in the source file
-struct Name: Equatable {
+struct Name: Equatable, Hashable {
     /// The name of the module field declaration specified in $id form
     let value: String
     /// The location of the name in the source file
     let location: Location
+
+    func hash(into hasher: inout Hasher) {
+        // Hash only by value, not location
+        hasher.combine(value)
+    }
 }
 
-/// A module field declaration that may have its name
-protocol NamedModuleFieldDecl {
+/// A module or component field declaration that may have a name identifier.
+/// Otherwise it's identified by an index.
+protocol NamedFieldDecl {
     /// The name of the module field declaration specified in $id form
     var id: Name? { get }
 }
@@ -26,9 +32,9 @@ protocol NameToIndexResolver {
 }
 
 /// A map of module field declarations indexed by their name
-struct NameMapping<Decl: NamedModuleFieldDecl>: NameToIndexResolver {
-    private var decls: [Decl] = []
-    private var nameToIndex: [String: Int] = [:]
+struct NameMapping<Decl: NamedFieldDecl>: NameToIndexResolver {
+    private(set) var decls: [Decl] = []
+    private(set) var nameToIndex: [String: Int] = [:]
 
     /// Adds a new declaration to the mapping
     /// - Parameter newDecl: The declaration to add
@@ -102,7 +108,7 @@ typealias TypesNameMapping = NameMapping<TypesMap.NamedResolvedType>
 
 /// A map of unique function types indexed by their name or type signature
 struct TypesMap {
-    struct NamedResolvedType: NamedModuleFieldDecl {
+    struct NamedResolvedType: NamedFieldDecl {
         let id: Name?
         let type: WatParser.FunctionType
     }
@@ -251,3 +257,49 @@ extension TypesMap: Collection {
         return nameMapping.makeIterator()
     }
 }
+
+#if ComponentModel
+    import ComponentModel
+
+    /// A map for core types that can be either function types or module types
+    struct CoreTypesMap {
+        private(set) var declarations: [ComponentWatParser.CoreTypeDef] = []
+        private(set) var nameToIndex: [String: Int] = [:]
+
+        @discardableResult
+        mutating func add(_ decl: ComponentWatParser.CoreTypeDef) throws(WatParserError) -> Int {
+            let index = declarations.count
+            declarations.append(decl)
+            if let name = decl.id {
+                guard nameToIndex[name.value] == nil else {
+                    throw WatParserError("Duplicate \(name.value) identifier", location: name.location)
+                }
+                nameToIndex[name.value] = index
+            }
+            return index
+        }
+
+        func resolveIndex(use: Parser.IndexOrId) throws(WatParserError) -> Int {
+            switch use {
+            case .id(let id, _):
+                guard let byName = nameToIndex[id.value] else {
+                    throw WatParserError("Unknown core type \(id)", location: use.location)
+                }
+                return byName
+            case .index(let index, _):
+                guard Int(index) < declarations.count else {
+                    throw WatParserError("Core type index \(index) out of bounds", location: use.location)
+                }
+                return Int(index)
+            }
+        }
+
+        var count: Int {
+            declarations.count
+        }
+
+        subscript(index: Int) -> ComponentWatParser.CoreTypeDef {
+            declarations[index]
+        }
+    }
+#endif

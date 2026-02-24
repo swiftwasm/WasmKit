@@ -3,6 +3,7 @@ add_wasmkit_library(WasmKit
   Imports.swift
   Module.swift
   ModuleParser.swift
+  SIMDOpcode.swift
   Translator.swift
   Validator.swift
   ResourceLimiter.swift
@@ -11,6 +12,7 @@ add_wasmkit_library(WasmKit
   Component/CanonicalCall.swift
   Component/CanonicalOptions.swift
   Component/ComponentTypes.swift
+  Execution/AtomicParkingLot.swift
   Execution/DebuggerInstructionMapping.swift
   Execution/Instructions/Control.swift
   Execution/Instructions/Instruction.swift
@@ -18,6 +20,10 @@ add_wasmkit_library(WasmKit
   Execution/Instructions/Memory.swift
   Execution/Instructions/Misc.swift
   Execution/Instructions/InstructionSupport.swift
+  Execution/Instructions/SIMDCore.swift
+  Execution/Instructions/SIMDMemoryAndLane.swift
+  Execution/Instructions/SIMDNumeric.swift
+  Execution/Instructions/V128Lanes.swift
   Execution/ConstEvaluation.swift
   Execution/DispatchInstruction.swift
   Execution/EngineInterceptor.swift
@@ -34,6 +40,7 @@ add_wasmkit_library(WasmKit
   Execution/StoreAllocator.swift
   Execution/UntypedValue.swift
   Execution/Value.swift
+  Execution/V128Storage.swift
 )
 
 target_link_wasmkit_libraries(WasmKit PUBLIC
