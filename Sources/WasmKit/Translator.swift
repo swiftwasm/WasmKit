@@ -46,7 +46,7 @@ extension InternalInstance {
 
     func resolveType(_ index: TypeIndex) throws -> FunctionType {
         guard Int(index) < self.types.count else {
-            throw ValidationError(.indexOutOfBounds("type", index, max: UInt32(self.types.count)))
+            throw WasmKitError(message: .indexOutOfBounds("type", index, max: UInt32(self.types.count)))
         }
         return self.types[Int(index)]
     }
@@ -85,7 +85,7 @@ extension InternalInstance {
     func validateFunctionIndex(_ index: FunctionIndex) throws {
         let function = try self.functions[validating: Int(index)]
         guard self.functionRefs.contains(function) else {
-            throw ValidationError(.functionIndexNotDeclared(index: index))
+            throw WasmKitError(message: .functionIndexNotDeclared(index: index))
         }
     }
     var dataCount: UInt32? {
@@ -353,14 +353,14 @@ struct InstructionTranslator: InstructionVisitor {
 
         private mutating func setReachability(_ value: Bool) throws {
             guard !self.frames.isEmpty else {
-                throw ValidationError(.controlStackEmpty)
+                throw WasmKitError(message: .controlStackEmpty)
             }
             self.frames[self.frames.count - 1].reachable = value
         }
 
         func currentFrame() throws -> ControlFrame {
             guard let frame = self.frames.last else {
-                throw ValidationError(.controlStackEmpty)
+                throw WasmKitError(message: .controlStackEmpty)
             }
             return frame
         }
@@ -368,7 +368,7 @@ struct InstructionTranslator: InstructionVisitor {
         func branchTarget(relativeDepth: UInt32) throws -> ControlFrame {
             let index = frames.count - 1 - Int(relativeDepth)
             guard frames.indices.contains(index) else {
-                throw ValidationError(.relativeDepthOutOfRange(relativeDepth: relativeDepth))
+                throw WasmKitError(message: .relativeDepthOutOfRange(relativeDepth: relativeDepth))
             }
             return frames[index]
         }
@@ -928,7 +928,7 @@ struct InstructionTranslator: InstructionVisitor {
     private func checkBeforePop(typeHint: ValueType?, depth: Int = 0, controlFrame: ControlStack.ControlFrame) throws -> Bool {
         if _slowPath(valueStack.height - depth <= controlFrame.stackHeight) {
             if controlFrame.reachable {
-                throw ValidationError(.expectedTypeOnStackButEmpty(expected: typeHint))
+                throw WasmKitError(message: .expectedTypeOnStackButEmpty(expected: typeHint))
             }
             // Too many pop on unreachable path is ignored
             return false
@@ -1018,7 +1018,7 @@ struct InstructionTranslator: InstructionVisitor {
             switch actual {
             case .some(let actualType):
                 guard actualType == type else {
-                    throw ValidationError(.expectedTypeOnStack(expected: type, actual: actualType))
+                    throw WasmKitError(message: .expectedTypeOnStack(expected: type, actual: actualType))
                 }
             case .unknown: break
             }
@@ -1089,7 +1089,7 @@ struct InstructionTranslator: InstructionVisitor {
 
     private mutating func finalize() throws -> InstructionSequence {
         if controlStack.numberOfFrames > 1 {
-            throw ValidationError(.expectedMoreEndInstructions(count: controlStack.numberOfFrames - 1))
+            throw WasmKitError(message: .expectedMoreEndInstructions(count: controlStack.numberOfFrames - 1))
         }
         // Check dangling labels
         try iseqBuilder.assertDanglingLabels()
@@ -1141,8 +1141,8 @@ struct InstructionTranslator: InstructionVisitor {
             while try parser.visit(visitor: &self) {
                 offset = parser.offset
             }
-        } catch var error as ValidationError {
-            error.offset = offset
+        } catch var error {
+            error.location = .offset(offset)
             throw error
         }
         return try finalize()
@@ -1219,7 +1219,7 @@ struct InstructionTranslator: InstructionVisitor {
     mutating func visitElse() throws -> Output {
         var frame = try controlStack.currentFrame()
         guard case .if(let elseLabel, let endLabel, _) = frame.kind else {
-            throw ValidationError(.expectedIfControlFrame)
+            throw WasmKitError(message: .expectedIfControlFrame)
         }
         preserveOnStack(depth: valueStack.height - frame.stackHeight)
         try controlStack.resetReachability()
@@ -1235,7 +1235,7 @@ struct InstructionTranslator: InstructionVisitor {
             _ = try valueStack.pop(result)
         }
         guard valueStack.height == frame.stackHeight else {
-            throw ValidationError(.valuesRemainingAtEndOfBlock)
+            throw WasmKitError(message: .valuesRemainingAtEndOfBlock)
         }
         _ = controlStack.popFrame()
         frame.kind = .if(elseLabel: elseLabel, endLabel: endLabel, isElse: true)
@@ -1255,7 +1255,7 @@ struct InstructionTranslator: InstructionVisitor {
         if case .block(root: true) = toBePopped.kind {
             try translateReturn()
             guard valueStack.height == toBePopped.stackHeight else {
-                throw ValidationError(.valuesRemainingAtEndOfBlock)
+                throw WasmKitError(message: .valuesRemainingAtEndOfBlock)
             }
             try iseqBuilder.pinLabelHere(toBePopped.continuation)
             return
@@ -1264,7 +1264,7 @@ struct InstructionTranslator: InstructionVisitor {
         if case .if(_, _, isElse: false) = toBePopped.kind {
             let blockType = toBePopped.blockType
             guard blockType.parameters == blockType.results else {
-                throw ValidationError(.parameterResultTypeMismatch(blockType: blockType))
+                throw WasmKitError(message: .parameterResultTypeMismatch(blockType: blockType))
             }
         }
 
@@ -1281,7 +1281,7 @@ struct InstructionTranslator: InstructionVisitor {
             _ = try valueStack.pop(result)
         }
         guard valueStack.height == toBePopped.stackHeight else {
-            throw ValidationError(.valuesRemainingAtEndOfBlock)
+            throw WasmKitError(message: .valuesRemainingAtEndOfBlock)
         }
         for result in toBePopped.blockType.results {
             _ = valueStack.push(result)
@@ -1298,7 +1298,13 @@ struct InstructionTranslator: InstructionVisitor {
         if _fastPath(currentFrame.reachable) {
             let count = currentHeight - Int(destination.copyCount) - destination.stackHeight
             guard count >= 0 else {
-                throw ValidationError(.stackHeightUnderflow(available: currentHeight, required: destination.stackHeight + Int(destination.copyCount)))
+                throw WasmKitError(
+                    message: 
+                            .stackHeightUnderflow(
+                                available: currentHeight,
+                                required: destination.stackHeight + Int(destination.copyCount)
+                            )
+                )
             }
             popCount = UInt32(count)
         } else {
@@ -1460,7 +1466,13 @@ struct InstructionTranslator: InstructionVisitor {
 
             // Check copyTypes consistency
             guard frame.copyTypes.count == defaultFrame.copyTypes.count else {
-                throw ValidationError(.expectedSameCopyTypes(frameCopyTypes: frame.copyTypes, defaultFrameCopyTypes: defaultFrame.copyTypes))
+                throw WasmKitError(
+                    message: 
+                            .expectedSameCopyTypes(
+                                frameCopyTypes: frame.copyTypes,
+                                defaultFrameCopyTypes: defaultFrame.copyTypes
+                            )
+                )
             }
             try checkStackTop(frame.copyTypes)
 
@@ -1619,10 +1631,10 @@ struct InstructionTranslator: InstructionVisitor {
         let (value2Type, value2) = try popAnyOperand()
         switch (value1Type, value2Type) {
         case (.some(.ref(_)), _), (_, .some(.ref(_))):
-            throw ValidationError(.cannotSelectOnReferenceTypes)
+            throw WasmKitError(message: .cannotSelectOnReferenceTypes)
         case (.some(let type1), .some(let type2)):
             guard type1 == type2 else {
-                throw ValidationError(.typeMismatchOnSelect(expected: type1, actual: type2))
+                throw WasmKitError(message: .typeMismatchOnSelect(expected: type1, actual: type2))
             }
         case (.unknown, _), (_, .unknown):
             break
@@ -1840,7 +1852,7 @@ struct InstructionTranslator: InstructionVisitor {
         case .v128Load, .v128Load8X8S, .v128Load8X8U, .v128Load16X4S, .v128Load16X4U,
             .v128Load32X2S, .v128Load32X2U, .v128Load8Splat, .v128Load16Splat, .v128Load32Splat,
             .v128Load64Splat, .v128Load32Zero, .v128Load64Zero:
-            throw ValidationError(.simdNotSupported)
+            throw WasmKitError(message: .simdNotSupported)
         case .i32Load8S: instruction = Instruction.i32Load8S
         case .i32Load8U: instruction = Instruction.i32Load8U
         case .i32Load16S: instruction = Instruction.i32Load16S
@@ -1871,7 +1883,7 @@ struct InstructionTranslator: InstructionVisitor {
         case .f32Store: instruction = Instruction.f32Store
         case .f64Store: instruction = Instruction.f64Store
         case .v128Store:
-            throw ValidationError(.simdNotSupported)
+            throw WasmKitError(message: .simdNotSupported)
         case .i32Store8: instruction = Instruction.i32Store8
         case .i32Store16: instruction = Instruction.i32Store16
         case .i64Store8: instruction = Instruction.i64Store8
@@ -1889,23 +1901,23 @@ struct InstructionTranslator: InstructionVisitor {
     }
 
     mutating func visitV128Const(value: V128) throws {
-        throw ValidationError(.simdNotSupported)
+        throw WasmKitError(message: .simdNotSupported)
     }
 
     mutating func visitI8x16Shuffle(lanes: V128ShuffleMask) throws {
-        throw ValidationError(.simdNotSupported)
+        throw WasmKitError(message: .simdNotSupported)
     }
 
     mutating func visitSimd(_ simd: WasmParser.Instruction.Simd) throws {
-        throw ValidationError(.simdNotSupported)
+        throw WasmKitError(message: .simdNotSupported)
     }
 
     mutating func visitSimdLane(_ simdLane: WasmParser.Instruction.SimdLane, lane: UInt8) throws {
-        throw ValidationError(.simdNotSupported)
+        throw WasmKitError(message: .simdNotSupported)
     }
 
     mutating func visitSimdMemLane(_ simdMemLane: WasmParser.Instruction.SimdMemLane, memarg: MemArg, lane: UInt8) throws {
-        throw ValidationError(.simdNotSupported)
+        throw WasmKitError(message: .simdNotSupported)
     }
 
     mutating func visitMemorySize(memory: UInt32) throws -> Output {
@@ -2352,7 +2364,7 @@ extension FunctionType {
         case .funcType(let typeIndex):
             let typeIndex = Int(typeIndex)
             guard typeIndex < typeSection.count else {
-                throw ValidationError(.indexOutOfBounds("type", typeIndex, max: typeSection.count))
+                throw WasmKitError(message: .indexOutOfBounds("type", typeIndex, max: typeSection.count))
             }
             let funcType = typeSection[typeIndex]
             self.init(

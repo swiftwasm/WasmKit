@@ -38,7 +38,7 @@ public struct Parser<Stream: ByteStream> {
 
     @usableFromInline
     internal func makeError(_ message: WasmKitError.Message) -> WasmKitError {
-        return WasmKitError(message, offset: offset)
+        return WasmKitError(message: message, offset: offset)
     }
 }
 
@@ -173,7 +173,7 @@ public struct ExpressionParser {
         let shouldContinue = try !parser.stream.hasReachedEnd()
         if !shouldContinue {
             guard isLastEnd == true else {
-                throw WasmKitError(.endOpcodeExpected, offset: offset)
+                throw WasmKitError(message: .endOpcodeExpected, offset: offset)
             }
         }
         return shouldContinue
@@ -265,7 +265,7 @@ extension ByteStream {
             switch decoder.decode(&iterator) {
             case .scalarValue(let scalar): name.append(Character(scalar))
             case .emptyInput: break Decode
-            case .error: throw WasmKitError(.invalidUTF8(bytes), offset: currentIndex)
+            case .error: throw WasmKitError(message: .invalidUTF8(bytes), offset: currentIndex)
             }
         }
 

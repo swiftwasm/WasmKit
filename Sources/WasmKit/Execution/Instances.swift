@@ -376,7 +376,7 @@ struct TableEntity /* : ~Copyable */ {
 
 extension TableEntity: ValidatableEntity {
     static func createOutOfBoundsError(index: Int, count: Int) -> Error {
-        ValidationError(.indexOutOfBounds("table", index, max: count))
+        WasmKitError(message: .indexOutOfBounds("table", index, max: count))
     }
 }
 
@@ -592,7 +592,7 @@ struct MemoryEntity: ~Copyable {
 
 extension MemoryEntity: ValidatableEntity {
     static func createOutOfBoundsError(index: Int, count: Int) -> Error {
-        ValidationError(.indexOutOfBounds("memory", index, max: count))
+        WasmKitError(message: .indexOutOfBounds("memory", index, max: count))
     }
 }
 
@@ -706,7 +706,7 @@ struct GlobalEntity /* : ~Copyable */ {
 
 extension GlobalEntity: ValidatableEntity {
     static func createOutOfBoundsError(index: Int, count: Int) -> Error {
-        ValidationError(.indexOutOfBounds("global", index, max: count))
+        WasmKitError(message: .indexOutOfBounds("global", index, max: count))
     }
 }
 
@@ -792,7 +792,7 @@ struct ElementSegmentEntity {
 
 extension ElementSegmentEntity: ValidatableEntity {
     static func createOutOfBoundsError(index: Int, count: Int) -> Error {
-        ValidationError(.indexOutOfBounds("element", index, max: count))
+        WasmKitError(message: .indexOutOfBounds("element", index, max: count))
     }
 }
 

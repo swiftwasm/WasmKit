@@ -1,38 +1,6 @@
 import WasmParser
 
-/// Represents an error that occurs during validation
-public struct ValidationError: Error, CustomStringConvertible {
-    /// Represents a validation error message.
-    struct Message {
-        let text: String
-
-        init(_ text: String) {
-            self.text = text
-        }
-    }
-
-    /// The error message.
-    let message: Message
-
-    /// The offset in the input WebAssembly module binary where the error occurred.
-    /// NOTE: This field is set when the error is temporarily caught by the ``InstructionTranslator``.
-    var offset: Int?
-
-    /// The error description.
-    public var description: String {
-        if let offset = offset {
-            return "\(message.text) at offset 0x\(String(offset, radix: 16))"
-        } else {
-            return message.text
-        }
-    }
-
-    init(_ message: Message) {
-        self.message = message
-    }
-}
-
-extension ValidationError.Message {
+extension WasmKitError.Message {
     static var simdNotSupported: Self {
         Self("SIMD is not supported")
     }
@@ -199,14 +167,14 @@ struct InstructionValidator {
 
     func validateMemArg(_ memarg: MemArg, naturalAlignment: Int) throws {
         if memarg.align > naturalAlignment {
-            throw ValidationError(.invalidMemArgAlignment(memarg: memarg, naturalAlignment: naturalAlignment))
+            throw WasmKitError(message: .invalidMemArgAlignment(memarg: memarg, naturalAlignment: naturalAlignment))
         }
     }
 
     func validateGlobalSet(_ type: GlobalType) throws {
         switch type.mutability {
         case .constant:
-            throw ValidationError(.globalSetConstant)
+            throw WasmKitError(message: .globalSetConstant)
         case .variable:
             break
         }
@@ -216,7 +184,9 @@ struct InstructionValidator {
         let tableType = try context.tableType(table)
         let elementType = try context.elementType(elemIndex)
         guard tableType.elementType == elementType else {
-            throw ValidationError(.tableElementTypeMismatch(tableType: "\(tableType.elementType)", elementType: "\(elementType)"))
+            throw WasmKitError(
+                message: .tableElementTypeMismatch(tableType: "\(tableType.elementType)", elementType: "\(elementType)")
+            )
         }
     }
 
@@ -224,7 +194,13 @@ struct InstructionValidator {
         let tableType1 = try context.tableType(source)
         let tableType2 = try context.tableType(dest)
         guard tableType1.elementType == tableType2.elementType else {
-            throw ValidationError(.tableElementTypeMismatch(tableType: "\(tableType1.elementType)", elementType: "\(tableType2.elementType)"))
+            throw WasmKitError(
+                message: 
+                        .tableElementTypeMismatch(
+                            tableType: "\(tableType1.elementType)",
+                            elementType: "\(tableType2.elementType)"
+                        )
+            )
         }
     }
 
@@ -234,16 +210,18 @@ struct InstructionValidator {
 
     func validateDataSegment(_ dataIndex: DataIndex) throws {
         guard let dataCount = context.dataCount else {
-            throw ValidationError(.dataCountSectionRequired)
+            throw WasmKitError(message: .dataCountSectionRequired)
         }
         guard dataIndex < dataCount else {
-            throw ValidationError(.indexOutOfBounds("data", dataIndex, max: dataCount))
+            throw WasmKitError(message: .indexOutOfBounds("data", dataIndex, max: dataCount))
         }
     }
 
     func validateReturnCallLike(calleeType: FunctionType, callerType: FunctionType) throws {
         guard calleeType.results == callerType.results else {
-            throw ValidationError(.typeMismatchOnReturnCall(expected: callerType.results, actual: calleeType.results))
+            throw WasmKitError(
+                message: .typeMismatchOnReturnCall(expected: callerType.results, actual: calleeType.results)
+            )
         }
     }
 }
@@ -257,7 +235,7 @@ struct ModuleValidator {
 
     func validate() throws {
         if module.memoryTypes.count > 1 {
-            throw ValidationError(.multipleMemoriesNotPermitted)
+            throw WasmKitError(message: .multipleMemoriesNotPermitted)
         }
         for memoryType in module.memoryTypes {
             try Self.checkMemoryType(memoryType, features: module.features)
@@ -272,7 +250,7 @@ struct ModuleValidator {
         if let startFunction = module.start {
             let type = try module.resolveFunctionType(startFunction)
             guard type.parameters.isEmpty, type.results.isEmpty else {
-                throw ValidationError(.startFunctionInvalidParameters())
+                throw WasmKitError(message: .startFunctionInvalidParameters())
             }
         }
     }
@@ -282,54 +260,54 @@ struct ModuleValidator {
 
         if type.isMemory64 {
             guard features.contains(.memory64) else {
-                throw ValidationError(.memory64FeatureRequired)
+                throw WasmKitError(message: .memory64FeatureRequired)
             }
         }
 
         let hardMax = MemoryEntity.maxPageCount(isMemory64: type.isMemory64)
 
         if type.min > hardMax {
-            throw ValidationError(.sizeMinimumExceeded(max: hardMax))
+            throw WasmKitError(message: .sizeMinimumExceeded(max: hardMax))
         }
 
         if let max = type.max, max > hardMax {
-            throw ValidationError(.sizeMaximumExceeded(max: hardMax))
+            throw WasmKitError(message: .sizeMaximumExceeded(max: hardMax))
         }
 
         if type.shared {
             guard features.contains(.threads) else {
-                throw ValidationError(.referenceTypesFeatureRequiredForSharedMemories)
+                throw WasmKitError(message: .referenceTypesFeatureRequiredForSharedMemories)
             }
         }
     }
 
     static func checkTableType(_ type: TableType, features: WasmFeatureSet) throws {
         if type.elementType != .funcRef, !features.contains(.referenceTypes) {
-            throw ValidationError(.referenceTypesFeatureRequiredForNonFuncrefTables)
+            throw WasmKitError(message: .referenceTypesFeatureRequiredForNonFuncrefTables)
         }
         try checkLimit(type.limits)
 
         if type.limits.isMemory64 {
             guard features.contains(.memory64) else {
-                throw ValidationError(.memory64FeatureRequired)
+                throw WasmKitError(message: .memory64FeatureRequired)
             }
         }
 
         let hardMax = TableEntity.maxSize(isMemory64: type.limits.isMemory64)
 
         if type.limits.min > hardMax {
-            throw ValidationError(.sizeMinimumExceeded(max: hardMax))
+            throw WasmKitError(message: .sizeMinimumExceeded(max: hardMax))
         }
 
         if let max = type.limits.max, max > hardMax {
-            throw ValidationError(.sizeMaximumExceeded(max: hardMax))
+            throw WasmKitError(message: .sizeMaximumExceeded(max: hardMax))
         }
     }
 
     private static func checkLimit(_ limit: Limits) throws {
         guard let max = limit.max else { return }
         if limit.min > max {
-            throw ValidationError(.sizeMinimumMustNotExceedMaximum)
+            throw WasmKitError(message: .sizeMinimumMustNotExceedMaximum)
         }
     }
 }
@@ -343,7 +321,7 @@ extension WasmTypes.Reference {
         case (.extern(_?), .externRef, _): return
         case (.extern(nil), .externRef, true): return
         default:
-            throw ValidationError(.expectTypeButGot(expected: "\(type)", got: "\(self)"))
+            throw WasmKitError(message: .expectTypeButGot(expected: "\(type)", got: "\(self)"))
         }
     }
 }
@@ -359,7 +337,7 @@ extension Value {
         case (.ref(let ref), .ref(let refType)):
             try ref.checkType(refType)
         default:
-            throw ValidationError(.expectTypeButGot(expected: "\(type)", got: "\(self)"))
+            throw WasmKitError(message: .expectTypeButGot(expected: "\(type)", got: "\(self)"))
         }
     }
 }
