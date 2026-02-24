@@ -50,9 +50,13 @@ extension WasmKitError {
     }
 
     @usableFromInline
-    package init(_ string: String, offset: Int) {
+    package init(_ string: String, offset: Int? = nil) {
         self.kind = .message(.init(string))
-        self.location = .offset(offset)
+        if let offset {
+            self.location = .offset(offset)
+        } else {
+            self.location = nil
+        }
     }
 
     @usableFromInline

@@ -233,7 +233,7 @@ struct StackLayout {
         self.constantSlotSize = min(max(codeSize / 20, 4), 128)
         let (maxSlots, overflow) = self.constantSlotSize.addingReportingOverflow(numberOfLocals)
         guard !overflow, maxSlots < VReg.max else {
-            throw TranslationError("The number of constant slots overflows")
+            throw WasmKitError("The number of constant slots overflows")
         }
     }
 
@@ -488,7 +488,7 @@ struct InstructionTranslator: InstructionVisitor {
 
         mutating func pop() throws -> (MetaValue, ValueSource) {
             guard let value = self.values.popLast() else {
-                throw TranslationError("Expected a value on stack but it's empty")
+                throw WasmKitError("Expected a value on stack but it's empty")
             }
             let source = makeValueSource(value)
             return (value.type, source)
@@ -498,7 +498,7 @@ struct InstructionTranslator: InstructionVisitor {
             switch value {
             case .some(let actual):
                 guard actual == expected else {
-                    throw TranslationError("Expected \(expected) on the stack top but got \(actual)")
+                    throw WasmKitError("Expected \(expected) on the stack top but got \(actual)")
                 }
             case .unknown: break  // OK
             }
@@ -509,7 +509,7 @@ struct InstructionTranslator: InstructionVisitor {
             switch value {
             case .some(let actual):
                 guard case .ref = actual else {
-                    throw TranslationError("Expected reference value on the stack top but got \(actual)")
+                    throw WasmKitError("Expected reference value on the stack top but got \(actual)")
                 }
             case .unknown: break  // OK
             }
@@ -517,11 +517,11 @@ struct InstructionTranslator: InstructionVisitor {
         }
         mutating func truncate(height: Int) throws {
             guard height <= self.height else {
-                throw TranslationError("Truncating to \(height) but the stack height is \(self.height)")
+                throw WasmKitError("Truncating to \(height) but the stack height is \(self.height)")
             }
             while height != self.height {
                 guard self.values.popLast() != nil else {
-                    throw TranslationError("Internal consistency error: Stack height is \(self.height) but failed to pop")
+                    throw WasmKitError("Internal consistency error: Stack height is \(self.height) but failed to pop")
                 }
             }
         }
@@ -587,7 +587,7 @@ struct InstructionTranslator: InstructionVisitor {
                 switch label {
                 case .unpinned(let users):
                     guard !users.isEmpty else { continue }
-                    throw TranslationError("Internal consistency error: Label (#\(ref)) is used but not pinned at finalization-time: \(users)")
+                    throw WasmKitError("Internal consistency error: Label (#\(ref)) is used but not pinned at finalization-time: \(users)")
                 case .pinned: break  // unreachable in theory
                 }
             }
@@ -679,7 +679,7 @@ struct InstructionTranslator: InstructionVisitor {
         fileprivate mutating func pinLabel(_ ref: LabelRef, pc: MetaProgramCounter) throws {
             switch self.labels[ref] {
             case .pinned(let oldPC):
-                throw TranslationError("Internal consistency error: Label \(ref) is already pinned at \(oldPC), but tried to pin at \(pc) again")
+                throw WasmKitError("Internal consistency error: Label \(ref) is already pinned at \(oldPC), but tried to pin at \(pc) again")
             case .unpinned(let users):
                 self.labels[ref] = .pinned(pc)
                 self.unpinnedLabels.remove(ref)
@@ -778,7 +778,7 @@ struct InstructionTranslator: InstructionVisitor {
 
         func type(of localIndex: UInt32) throws -> ValueType {
             guard Int(localIndex) < types.count else {
-                throw TranslationError("Local index \(localIndex) is out of range")
+                throw WasmKitError("Local index \(localIndex) is out of range")
             }
             return self.types[Int(localIndex)]
         }
@@ -1961,7 +1961,7 @@ struct InstructionTranslator: InstructionVisitor {
     mutating func visitF64Const(value: IEEE754.Float64) -> Output { visitConst(.f64, .f64(value.bitPattern)) }
     mutating func visitRefNull(type: HeapType) throws {
         guard case .abstract(let abstractType) = type else {
-            throw TranslationError("concrete heap type is not implemented yet")
+            throw WasmKitError("concrete heap type is not implemented yet")
         }
         let typeToPush = ReferenceType(isNullable: true, heapType: type)
         pushEmit(.ref(typeToPush), { .refNull(Instruction.RefNullOperand(result: $0, type: abstractType)) })
@@ -2343,14 +2343,6 @@ struct InstructionTranslator: InstructionVisitor {
         pushEmit(try module.addressType(tableIndex: table)) { result in
             return .tableSize(Instruction.TableSizeOperand(tableIndex: table, result: LVReg(result)))
         }
-    }
-}
-
-struct TranslationError: Error, CustomStringConvertible {
-    let description: String
-
-    init(_ description: String) {
-        self.description = description
     }
 }
 
