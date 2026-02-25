@@ -3132,10 +3132,7 @@ struct InstructionTranslator: InstructionVisitor {
     }
 
     mutating func visitAtomicFence() throws -> Output {
-        // No-op: In an interpreter, instructions are executed sequentially,
-        // so no reordering can occur. atomic.fence is only meaningful for
-        // compiled code with actual CPU-level reordering.
-        // Do not emit any instruction.
+        emit(.atomicFence)
     }
 }
 

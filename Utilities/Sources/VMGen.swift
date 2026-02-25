@@ -97,66 +97,66 @@ enum VMGen {
         }
 
         for op in atomicRmwOps {
-            let operation: String
+            let opEnum: String
             switch op.op {
-            case "Add": operation = "{ $0 &+ $1 }"
-            case "Sub": operation = "{ $0 &- $1 }"
-            case "And": operation = "{ $0 & $1 }"
-            case "Or": operation = "{ $0 | $1 }"
-            case "Xor": operation = "{ $0 ^ $1 }"
-            case "Xchg": operation = "{ _, new in new }"
-            default: operation = "{ $0 &+ $1 }"
+            case "Add": opEnum = ".add"
+            case "Sub": opEnum = ".sub"
+            case "And": opEnum = ".and"
+            case "Or": opEnum = ".or"
+            case "Xor": opEnum = ".xor"
+            case "Xchg": opEnum = ".xchg"
+            default: opEnum = ".add"
             }
             inlineImpls[op.instruction.name] = """
-            try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: \(op.type == "i32" ? "UInt32" : "UInt64").self, operation: \(operation), castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) })
+            try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: \(op.type == "i32" ? "UInt32" : "UInt64").self, op: \(opEnum), castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) })
             """
         }
 
         for op in atomicRmw8Ops {
-            let operation: String
+            let opEnum: String
             switch op.op {
-            case "Add": operation = "{ $0 &+ $1 }"
-            case "Sub": operation = "{ $0 &- $1 }"
-            case "And": operation = "{ $0 & $1 }"
-            case "Or": operation = "{ $0 | $1 }"
-            case "Xor": operation = "{ $0 ^ $1 }"
-            case "Xchg": operation = "{ _, new in new }"
-            default: operation = "{ $0 &+ $1 }"
+            case "Add": opEnum = ".add"
+            case "Sub": opEnum = ".sub"
+            case "And": opEnum = ".and"
+            case "Or": opEnum = ".or"
+            case "Xor": opEnum = ".xor"
+            case "Xchg": opEnum = ".xchg"
+            default: opEnum = ".add"
             }
             inlineImpls[op.instruction.name] = """
-            try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, operation: \(operation), castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) })
+            try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, op: \(opEnum), castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) })
             """
         }
 
         for op in atomicRmw16Ops {
-            let operation: String
+            let opEnum: String
             switch op.op {
-            case "Add": operation = "{ $0 &+ $1 }"
-            case "Sub": operation = "{ $0 &- $1 }"
-            case "And": operation = "{ $0 & $1 }"
-            case "Or": operation = "{ $0 | $1 }"
-            case "Xor": operation = "{ $0 ^ $1 }"
-            case "Xchg": operation = "{ _, new in new }"
-            default: operation = "{ $0 &+ $1 }"
+            case "Add": opEnum = ".add"
+            case "Sub": opEnum = ".sub"
+            case "And": opEnum = ".and"
+            case "Or": opEnum = ".or"
+            case "Xor": opEnum = ".xor"
+            case "Xchg": opEnum = ".xchg"
+            default: opEnum = ".add"
             }
             inlineImpls[op.instruction.name] = """
-            try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, operation: \(operation), castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) })
+            try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, op: \(opEnum), castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) })
             """
         }
 
         for op in atomicRmw32Ops {
-            let operation: String
+            let opEnum: String
             switch op.op {
-            case "Add": operation = "{ $0 &+ $1 }"
-            case "Sub": operation = "{ $0 &- $1 }"
-            case "And": operation = "{ $0 & $1 }"
-            case "Or": operation = "{ $0 | $1 }"
-            case "Xor": operation = "{ $0 ^ $1 }"
-            case "Xchg": operation = "{ _, new in new }"
-            default: operation = "{ $0 &+ $1 }"
+            case "Add": opEnum = ".add"
+            case "Sub": opEnum = ".sub"
+            case "And": opEnum = ".and"
+            case "Or": opEnum = ".or"
+            case "Xor": opEnum = ".xor"
+            case "Xchg": opEnum = ".xchg"
+            default: opEnum = ".add"
             }
             inlineImpls[op.instruction.name] = """
-            try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, operation: \(operation), castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) })
+            try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, op: \(opEnum), castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) })
             """
         }
 
@@ -189,6 +189,9 @@ enum VMGen {
         """
         inlineImpls["memoryAtomicNotify"] = """
         try atomicNotify(sp: sp.pointee, md: md.pointee, ms: ms.pointee, notifyOperand: immediate)
+        """
+        inlineImpls["atomicFence"] = """
+        atomicFence(sp: sp.pointee)
         """
 
         return inlineImpls
