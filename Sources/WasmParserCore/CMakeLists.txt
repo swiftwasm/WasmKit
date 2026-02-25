@@ -2,6 +2,7 @@ add_wasmkit_library(WasmParserCore
   Stream/ByteStream.swift
   Stream/Stream.swift
   BinaryInstructionDecoder.swift
+  ComponentParser.swift
   InstructionVisitor.swift
   LEB.swift
   ParsingLimits.swift
