@@ -21,6 +21,8 @@ package struct Wasm2wat: ParsableCommand {
     )
     var output: String?
 
+    @OptionGroup var featureOptions: WasmFeatureOptions
+
     package init() {}
 
     package func run() throws {
@@ -30,7 +32,7 @@ package struct Wasm2wat: ParsableCommand {
 
         let stream = try FileHandleStream(fileHandle: fileHandle)
 
-        let wat = try wasm2wat(stream)
+        let wat = try wasm2wat(stream, features: featureOptions.wasmFeatures)
 
         if let outputPath = output {
             let outPath = FilePath(outputPath)

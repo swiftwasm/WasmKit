@@ -111,38 +111,7 @@ package struct Run: AsyncParsableCommand {
     )
     var stackSize: Int?
 
-    @Option(name: .long, help: "Enable a WebAssembly feature (threads, memory64, simd, tail-call, reference-types)")
-    var enableFeature: [String] = []
-
-    @Option(name: .long, help: "Disable a WebAssembly feature")
-    var disableFeature: [String] = []
-
-    private static let featuresByName: [String: WasmFeatureSet] = [
-        "threads": .threads,
-        "memory64": .memory64,
-        "reference-types": .referenceTypes,
-        "tail-call": .tailCall,
-        "simd": .simd,
-    ]
-
-    private var wasmFeatures: WasmFeatureSet {
-        get throws {
-            var features: WasmFeatureSet = .default
-            for name in enableFeature {
-                guard let feature = Self.featuresByName[name] else {
-                    throw ValidationError("Unknown feature: '\(name)'. Available: \(Self.featuresByName.keys.sorted().joined(separator: ", "))")
-                }
-                features.insert(feature)
-            }
-            for name in disableFeature {
-                guard let feature = Self.featuresByName[name] else {
-                    throw ValidationError("Unknown feature: '\(name)'. Available: \(Self.featuresByName.keys.sorted().joined(separator: ", "))")
-                }
-                features.remove(feature)
-            }
-            return features
-        }
-    }
+    @OptionGroup var featureOptions: WasmFeatureOptions
 
     #if WasmDebuggingSupport
 
@@ -203,7 +172,7 @@ package struct Run: AsyncParsableCommand {
         #endif
 
         // Regular module execution
-        let features = try wasmFeatures
+        let features = try featureOptions.wasmFeatures
         let module: Module
         if verbose, #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) {
             let (parsedModule, parseTime) = try measure {
@@ -333,7 +302,19 @@ package struct Run: AsyncParsableCommand {
         let engine = Engine(configuration: deriveRuntimeConfiguration(), interceptor: interceptor)
         let store = Store(engine: engine)
         var imports = Imports()
-        wasi.link(to: &imports, store: store)
+
+        let features = try featureOptions.wasmFeatures
+        let threadManager: WASIThreadManager?
+        if features.contains(.threads) {
+            threadManager = WASIThreadManager(module: module)
+        } else {
+            threadManager = nil
+        }
+        wasi.link(to: &imports, store: store, threadManager: threadManager)
+        // Set the complete imports (including thread-spawn) on the thread manager
+        // so child instances can also spawn threads.
+        threadManager?.setImports(imports)
+
         let moduleInstance = try module.instantiate(store: store, imports: imports)
         return {
             let exitCode = try wasi.start(moduleInstance)
