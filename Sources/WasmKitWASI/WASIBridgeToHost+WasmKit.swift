@@ -6,12 +6,14 @@ public typealias MemoryFileSystem = WASI.MemoryFileSystem
 
 extension WASIBridgeToHost {
 
-    /// Register the WASI implementation to the given `imports`.
+    /// Register the WASI implementation to the given `imports`, optionally
+    /// including `wasi-threads` support.
     ///
     /// - Parameters:
     ///   - imports: The imports scope to register the WASI implementation.
     ///   - store: The store to create the host functions.
-    public func link(to imports: inout Imports, store: Store) {
+    ///   - threadManager: If non-nil, registers the `"wasi"."thread-spawn"` import.
+    public func link(to imports: inout Imports, store: Store, threadManager: WASIThreadManager? = nil) {
         for (moduleName, module) in wasiHostModules {
             for (name, function) in module.functions {
                 imports.define(
@@ -21,15 +23,20 @@ extension WASIBridgeToHost {
                 )
             }
         }
-    }
 
-    @available(*, deprecated, renamed: "link(to:store:)", message: "Use `Engine`-based API instead")
-    public var hostModules: [String: HostModule] {
-        wasiHostModules.mapValues { (module: WASIHostModule) -> HostModule in
-            HostModule(
-                functions: module.functions.mapValues { function -> HostFunction in
-                    HostFunction(type: function.type, implementation: makeHostFunction(function))
-                })
+        if let threadManager {
+            imports.define(
+                module: "wasi",
+                name: "thread-spawn",
+                Function(
+                    store: store,
+                    type: FunctionType(parameters: [.i32], results: [.i32])
+                ) { caller, values -> [Value] in
+                    let startArg = values[0].i32
+                    let result = threadManager.spawnThread(store: caller.store, startArg: startArg)
+                    return [.i32(UInt32(bitPattern: result))]
+                }
+            )
         }
     }
 
@@ -74,8 +81,4 @@ extension WASIBridgeToHost {
         }
     }
 
-    @available(*, deprecated, message: "Use `Engine`-based API instead")
-    public func start(_ instance: Instance, runtime: Runtime) throws -> UInt32 {
-        return try start(instance)
-    }
 }
