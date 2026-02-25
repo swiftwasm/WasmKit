@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import WasmParser
+import WasmTypes
 
 @testable import WAT
 
@@ -46,7 +47,7 @@ struct EncoderTests {
 
     /// Prints WAST file context if error contains line number information
     private static func record(wastFile: URL, error: Error) {
-        if let error = error as? WatParserError, let location = error.location {
+        if let error = error as? WasmKitError, case .utf8Index(let location)? = error.location {
             Issue.record(
                 """
                 --- \(wastFile.path):\(error.description) ---

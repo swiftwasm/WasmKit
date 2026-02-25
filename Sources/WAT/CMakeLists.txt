@@ -2,7 +2,6 @@ add_wasmkit_library(WAT
   BinaryEncoding/BinaryInstructionEncoder.swift
   BinaryEncoding/Encoder.swift
   Lexer.swift
-  Location.swift
   NameMapping.swift
   ParseTextInstruction.swift
   Parser.swift

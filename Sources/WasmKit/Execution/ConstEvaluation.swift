@@ -50,7 +50,7 @@ extension ConstExpression {
 
     private func _evaluate<C: ConstEvaluationContextProtocol>(context: C) throws -> Value {
         guard self.last == .end, self.count == 2 else {
-            throw ValidationError(.expectedEndAtOffsetExpression)
+            throw WasmKitError(message: .expectedEndAtOffsetExpression)
         }
         let constInst = self[0]
         switch constInst {
@@ -66,12 +66,12 @@ extension ConstExpression {
             case .externRef: return .ref(.extern(nil))
             case .funcRef: return .ref(.function(nil))
             default:
-                throw ValidationError(.illegalConstExpressionInstruction(constInst))
+                throw WasmKitError(message: .illegalConstExpressionInstruction(constInst))
             }
         case .refFunc(let functionIndex):
             return try .ref(context.functionRef(functionIndex))
         default:
-            throw ValidationError(.illegalConstExpressionInstruction(constInst))
+            throw WasmKitError(message: .illegalConstExpressionInstruction(constInst))
         }
     }
 }
@@ -100,10 +100,10 @@ extension WasmParser.ElementSegment {
             case .ref(.function(let addr)):
                 return .function(addr)
             default:
-                throw ValidationError(.unexpectedGlobalValueType)
+                throw WasmKitError(message: .unexpectedGlobalValueType)
             }
         default:
-            throw ValidationError(.unexpectedElementInitializer(expression: "\(expression)"))
+            throw WasmKitError(message: .unexpectedElementInitializer(expression: "\(expression)"))
         }
     }
 }
