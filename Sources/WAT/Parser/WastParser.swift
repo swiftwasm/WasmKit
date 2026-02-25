@@ -54,7 +54,6 @@ struct WastParser {
     }
 
     struct ConstExpressionCollector: WastConstInstructionVisitor {
-        typealias VisitorError = WasmKitError
         var binaryOffset: Int = 0
         let addValue: (WastConstValue) -> Void
 

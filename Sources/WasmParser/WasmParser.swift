@@ -760,9 +760,6 @@ extension Parser: BinaryInstructionDecoder {
 
     @usableFromInline
     struct InstructionFactory: AnyInstructionVisitor {
-        @usableFromInline
-        typealias VisitorError = WasmKitError
-
         @usableFromInline var binaryOffset: Int = 0
 
         @usableFromInline var insts: [Instruction] = []
