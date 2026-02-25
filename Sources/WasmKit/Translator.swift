@@ -337,6 +337,7 @@ struct StackLayout {
 }
 
 struct InstructionTranslator: InstructionVisitor {
+    typealias VisitorError = WasmKitError
     typealias Output = Void
 
     typealias LabelRef = Int
@@ -1243,14 +1244,8 @@ struct InstructionTranslator: InstructionVisitor {
             emit(.onEnter(functionIndex))
         }
         var parser = ExpressionParser(code: code)
-        var offset = parser.offset
-        do {
-            while try parser.visit(visitor: &self) {
-                offset = parser.offset
-            }
-        } catch var error {
-            error.location = .offset(offset)
-            throw error
+        while let visit = try WasmKitError.wrap({ () throws(WasmParserError) in try parser.parse() }) {
+            try visit(visitor: &self)
         }
         return try finalize()
     }
