@@ -13,6 +13,7 @@ enum WasmGen {
         let opcode: [UInt8]
         let immediates: [Immediate]
         let category: String?
+        let defaultAlign: UInt32?
 
         var visitMethodName: String {
             if let explicitCategory = category {
@@ -83,7 +84,8 @@ enum WasmGen {
             opcode = try decodeHexArray()
             let rawImmediates = try container.decode([[String]].self)
             immediates = rawImmediates.map { Immediate(label: $0[0], type: $0[1]) }
-            category = try? container.decode(String.self)
+            category = try container.decodeIfPresent(String.self)
+            defaultAlign = container.isAtEnd ? nil : try container.decode(UInt32.self)
         }
     }
 
@@ -406,6 +408,61 @@ enum WasmGen {
         return code
     }
 
+    static func generateTextInstructionPrinter(_ instructions: InstructionSet) -> String {
+        var code = """
+            import WasmParser
+            import WasmTypes
+
+
+            """
+
+        let categorized = instructions.categorized
+
+        // 1. Generate mnemonic functions for each multi-instruction category
+        for cat in categorized where cat.sourceInstructions.count > 1 {
+            guard let categoryTypeName = cat.categoryTypeName else { continue }
+            guard cat.sourceInstructions.allSatisfy({ $0.name.text != nil }) else { continue }
+
+            code += "func generatedMnemonic(for op: Instruction.\(categoryTypeName)) -> String {\n"
+            code += "    switch op {\n"
+            for instr in cat.sourceInstructions {
+                code += "    case .\(instr.name.enumCase): return \"\(instr.name.text!)\"\n"
+            }
+            code += "    }\n"
+            code += "}\n\n"
+
+            // 2. Generate defaultAlign function if this category has memarg instructions
+            let hasMemarg = cat.sourceInstructions.contains(where: { $0.defaultAlign != nil })
+            if hasMemarg {
+                code += "func generatedDefaultAlign(for op: Instruction.\(categoryTypeName)) -> UInt32 {\n"
+                code += "    switch op {\n"
+                for instr in cat.sourceInstructions {
+                    if let align = instr.defaultAlign {
+                        code += "    case .\(instr.name.enumCase): return \(align)\n"
+                    }
+                }
+                code += "    }\n"
+                code += "}\n\n"
+            }
+        }
+
+        // 3. Generate lookup for non-categorized memarg instructions (atomics etc.)
+        let nonCategorizedMemarg = instructions.filter { $0.category == nil && $0.defaultAlign != nil }
+        if !nonCategorizedMemarg.isEmpty {
+            code += "func generatedMemargInstruction(_ instruction: Instruction) -> (mnemonic: String, memarg: MemArg, defaultAlign: UInt32)? {\n"
+            code += "    switch instruction {\n"
+            for instr in nonCategorizedMemarg {
+                guard let text = instr.name.text else { continue }
+                code += "    case .\(instr.name.enumCase)(let m): return (\"\(text)\", m, \(instr.defaultAlign!))\n"
+            }
+            code += "    default: return nil\n"
+            code += "    }\n"
+            code += "}\n"
+        }
+
+        return code
+    }
+
     static func generateBinaryInstructionEncoder(_ instructions: InstructionSet) -> String {
         var code = """
             import WasmParser
@@ -645,6 +702,7 @@ enum WasmGen {
         struct ColumnInfo {
             var header: String
             var maxWidth: Int = 0
+            var isOptional: Bool = false
             var value: (Instruction) -> String
         }
 
@@ -678,6 +736,16 @@ enum WasmGen {
                         return "null"
                     }
                 }),
+            ColumnInfo(
+                header: "DefaultAlign",
+                isOptional: true,
+                value: { i in
+                    if let defaultAlign = i.defaultAlign {
+                        return String(defaultAlign)
+                    } else {
+                        return ""
+                    }
+                }),
         ]
         for instruction in instructions {
             for columnIndex in columns.indices {
@@ -690,10 +758,18 @@ enum WasmGen {
 
         for (index, instruction) in instructions.enumerated() {
             json += "  ["
-            for (columnIndex, column) in columns.enumerated() {
+            // Determine which columns to include (required + optional with values)
+            var lastColumnIndex = columns.lastIndex(where: { !$0.isOptional })!
+            for (columnIndex, column) in columns.enumerated() where column.isOptional {
+                if !column.value(instruction).isEmpty {
+                    lastColumnIndex = columnIndex
+                }
+            }
+            for columnIndex in 0...lastColumnIndex {
+                let column = columns[columnIndex]
                 let value = column.value(instruction)
                 json += value.padding(toLength: column.maxWidth, withPad: " ", startingAt: 0)
-                if columnIndex != columns.count - 1 {
+                if columnIndex != lastColumnIndex {
                     json += ", "
                 }
             }
@@ -748,8 +824,12 @@ enum WasmGen {
                 header + generateTextInstructionParser(instructions)
             ),
             GeneratedFile(
-                projectSources + ["WAT", "BinaryInstructionEncoder.swift"],
+                projectSources + ["WAT", "BinaryEncoding", "BinaryInstructionEncoder.swift"],
                 header + generateBinaryInstructionEncoder(instructions)
+            ),
+            GeneratedFile(
+                projectSources + ["WAT", "Printer", "InstructionMnemonics.swift"],
+                header + generateTextInstructionPrinter(instructions)
             ),
         ]
 
