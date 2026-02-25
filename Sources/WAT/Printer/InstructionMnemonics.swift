@@ -529,7 +529,6 @@ func generatedDefaultAlign(for op: Instruction.SimdMemLane) -> UInt32 {
     }
 }
 
-/// Auto-generated. Returns (mnemonic, memarg, defaultAlign) for non-categorized memarg instructions.
 func generatedMemargInstruction(_ instruction: Instruction) -> (mnemonic: String, memarg: MemArg, defaultAlign: UInt32)? {
     switch instruction {
     case .memoryAtomicNotify(let m): return ("memory.atomic.notify", m, 2)
