@@ -9,6 +9,12 @@ let package = Package(
         .package(path: "../")
     ],
     targets: [
+        .executableTarget(
+            name: "embedded-wat",
+            dependencies: [
+                .product(name: "WAT", package: "WasmKit")
+            ]
+        ),
         .executableTarget(name: "Factorial", dependencies: [
             .product(name: "WasmKit", package: "WasmKit"),
             .product(name: "WAT", package: "WasmKit")

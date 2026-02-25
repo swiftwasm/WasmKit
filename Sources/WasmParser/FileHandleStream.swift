@@ -1,3 +1,5 @@
+@_exported import WasmParserCore
+
 import struct SystemPackage.FileDescriptor
 
 public final class FileHandleStream: ByteStream {

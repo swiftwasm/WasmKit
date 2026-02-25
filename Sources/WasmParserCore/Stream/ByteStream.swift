@@ -14,7 +14,7 @@ extension ByteStream {
     }
 
     @usableFromInline
-    func hasReachedEnd() throws(WasmKitError) -> Bool {
+    package func hasReachedEnd() throws(WasmKitError) -> Bool {
         try peek() == nil
     }
 }
