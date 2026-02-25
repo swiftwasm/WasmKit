@@ -520,9 +520,6 @@ extension Parser {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/instructions.html>
 extension Parser: BinaryInstructionDecoder {
-    @usableFromInline
-    typealias DecoderError = WasmKitError
-
     @inlinable func parseMemoryIndex() throws(WasmKitError) -> UInt32 {
         let zero = try stream.consumeAny()
         guard zero == 0x00 else {
