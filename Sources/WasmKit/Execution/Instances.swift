@@ -1,3 +1,4 @@
+import Synchronization
 import WasmParser
 
 @_exported import struct WasmParser.GlobalType
@@ -65,8 +66,8 @@ package struct EntityHandle<T: ~Copyable>: Equatable, Hashable, Copyable {
     }
 }
 
-extension EntityHandle: ValidatableEntity where T: ValidatableEntity {
-    static func createOutOfBoundsError(index: Int, count: Int) -> Error {
+extension EntityHandle: ValidatableEntity where T: ValidatableEntity, T: ~Copyable {
+    static func createOutOfBoundsError(index: Int, count: Int) -> WasmKitError {
         T.createOutOfBoundsError(index: index, count: count)
     }
 }
@@ -229,12 +230,13 @@ public struct Instance {
                 fatalError("Already compiled!?")
             }
             try function.wasm.ensureCompiled(store: StoreRef(store))
-            let (iseq, locals, _) = function.assumeCompiled()
+            let (iseq, _, _) = function.assumeCompiled()
 
             // Print slot space information
+            let localTypes = code.withValue { $0.locals }
             let stackLayout = try StackLayout(
                 type: store.engine.funcTypeInterner.resolve(function.type),
-                numberOfLocals: locals,
+                locals: localTypes,
                 codeSize: code.expression.count
             )
             stackLayout.dump(to: &target, iseq: iseq)
@@ -375,8 +377,8 @@ struct TableEntity /* : ~Copyable */ {
 }
 
 extension TableEntity: ValidatableEntity {
-    static func createOutOfBoundsError(index: Int, count: Int) -> Error {
-        ValidationError(.indexOutOfBounds("table", index, max: count))
+    static func createOutOfBoundsError(index: Int, count: Int) -> WasmKitError {
+        WasmKitError(message: .indexOutOfBounds("table", index, max: count))
     }
 }
 
@@ -466,6 +468,7 @@ struct MemoryEntity: ~Copyable {
     private var storage: UnsafeMutableBufferPointer<UInt8>
     let maxPageCount: UInt64
     let limit: Limits
+    let sharedMutex: Mutex<Void>?
 
     init(_ memoryType: MemoryType, resourceLimiter: any ResourceLimiter) throws {
         let byteSize = Int(memoryType.min) * Self.pageSize
@@ -479,6 +482,7 @@ struct MemoryEntity: ~Copyable {
         let defaultMaxPageCount = Self.maxPageCount(isMemory64: memoryType.isMemory64)
         maxPageCount = memoryType.max ?? defaultMaxPageCount
         limit = memoryType
+        sharedMutex = memoryType.shared ? Mutex<Void>(()) : nil
     }
 
     deinit {
@@ -591,8 +595,8 @@ struct MemoryEntity: ~Copyable {
 }
 
 extension MemoryEntity: ValidatableEntity {
-    static func createOutOfBoundsError(index: Int, count: Int) -> Error {
-        ValidationError(.indexOutOfBounds("memory", index, max: count))
+    static func createOutOfBoundsError(index: Int, count: Int) -> WasmKitError {
+        WasmKitError(message: .indexOutOfBounds("memory", index, max: count))
     }
 }
 
@@ -652,6 +656,11 @@ public struct Memory: Equatable {
     public var type: MemoryType {
         handle.withValue { $0.limit }
     }
+
+    /// The current size of the memory in bytes.
+    public var byteCount: Int {
+        handle.withValue { $0.byteCount }
+    }
 }
 
 extension Memory: GuestMemory {
@@ -690,23 +699,47 @@ extension Memory: GuestMemory {
 
 /// An entity representing a WebAssembly `global` instance storage.
 struct GlobalEntity /* : ~Copyable */ {
-    var rawValue: UntypedValue
+    enum Storage {
+        case scalar(UntypedValue)
+        case v128(V128Storage)
+    }
+
+    var storage: Storage
     var value: Value {
-        get { rawValue.cast(to: globalType.valueType) }
-        set { rawValue = UntypedValue(newValue) }
+        get {
+            switch storage {
+            case .scalar(let raw):
+                return raw.cast(to: globalType.valueType)
+            case .v128(let v):
+                return .v128(v.value)
+            }
+        }
+        set {
+            switch newValue {
+            case .v128(let v):
+                storage = .v128(V128Storage(v))
+            case .i32, .i64, .f32, .f64, .ref:
+                storage = .scalar(UntypedValue(newValue))
+            }
+        }
     }
     let globalType: GlobalType
 
     init(globalType: GlobalType, initialValue: Value) throws {
         try initialValue.checkType(globalType.valueType)
-        rawValue = UntypedValue(initialValue)
+        switch initialValue {
+        case .v128(let v):
+            storage = .v128(V128Storage(v))
+        case .i32, .i64, .f32, .f64, .ref:
+            storage = .scalar(UntypedValue(initialValue))
+        }
         self.globalType = globalType
     }
 }
 
 extension GlobalEntity: ValidatableEntity {
-    static func createOutOfBoundsError(index: Int, count: Int) -> Error {
-        ValidationError(.indexOutOfBounds("global", index, max: count))
+    static func createOutOfBoundsError(index: Int, count: Int) -> WasmKitError {
+        WasmKitError(message: .indexOutOfBounds("global", index, max: count))
     }
 }
 
@@ -733,6 +766,7 @@ public struct Global: Equatable {
             guard global.globalType.mutability == .variable else {
                 throw Trap(.cannotAssignToImmutableGlobal)
             }
+            try value.checkType(global.globalType.valueType)
             global.value = value
         }
     }
@@ -791,8 +825,8 @@ struct ElementSegmentEntity {
 }
 
 extension ElementSegmentEntity: ValidatableEntity {
-    static func createOutOfBoundsError(index: Int, count: Int) -> Error {
-        ValidationError(.indexOutOfBounds("element", index, max: count))
+    static func createOutOfBoundsError(index: Int, count: Int) -> WasmKitError {
+        WasmKitError(message: .indexOutOfBounds("element", index, max: count))
     }
 }
 

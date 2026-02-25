@@ -1,8 +1,7 @@
 add_wasmkit_library(WAT
-  BinaryInstructionEncoder.swift
-  Encoder.swift
+  BinaryEncoding/BinaryInstructionEncoder.swift
+  BinaryEncoding/Encoder.swift
   Lexer.swift
-  Location.swift
   NameMapping.swift
   ParseTextInstruction.swift
   Parser.swift
@@ -13,4 +12,4 @@ add_wasmkit_library(WAT
 )
 
 target_link_wasmkit_libraries(WAT PUBLIC
-  WasmParserCore)
+  WasmParser)

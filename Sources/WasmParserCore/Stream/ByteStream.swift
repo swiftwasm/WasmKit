@@ -1,5 +1,23 @@
-public protocol ByteStream: Stream where Element == UInt8 {}
+public protocol ByteStream: ~Copyable {
+    var currentIndex: Int { get }
 
+    func consumeAny() throws(WasmKitError) -> UInt8
+    func consume(_ expected: Set<UInt8>) throws(WasmKitError) -> UInt8
+    func consume(count: Int) throws(WasmKitError) -> ArraySlice<UInt8>
+
+    func peek() throws(WasmKitError) -> UInt8?
+}
+
+extension ByteStream {
+    func consume(_ expected: UInt8) throws(WasmKitError) -> UInt8 {
+        try consume(Set([expected]))
+    }
+
+    @usableFromInline
+    package func hasReachedEnd() throws(WasmKitError) -> Bool {
+        try peek() == nil
+    }
+}
 public final class StaticByteStream: ByteStream {
     public let bytes: ArraySlice<UInt8>
     public var currentIndex: Int
@@ -15,9 +33,9 @@ public final class StaticByteStream: ByteStream {
     }
 
     @discardableResult
-    public func consumeAny() throws -> UInt8 {
+    public func consumeAny() throws(WasmKitError) -> UInt8 {
         guard bytes.indices.contains(currentIndex) else {
-            throw StreamError<Element>.unexpectedEnd(expected: nil)
+            throw WasmKitError(kind: .parserUnexpectedEnd(expected: nil), offset: self.currentIndex)
         }
 
         let consumed = bytes[currentIndex]
@@ -26,26 +44,30 @@ public final class StaticByteStream: ByteStream {
     }
 
     @discardableResult
-    public func consume(_ expected: Set<UInt8>) throws -> UInt8 {
+    public func consume(_ expected: Set<UInt8>) throws(WasmKitError) -> UInt8 {
         guard bytes.indices.contains(currentIndex) else {
-            throw StreamError<Element>.unexpectedEnd(expected: Set(expected))
+            throw WasmKitError(kind: .parserUnexpectedEnd(expected: Set(expected)), offset: currentIndex)
         }
 
         let consumed = bytes[currentIndex]
         guard expected.contains(consumed) else {
-            throw StreamError<Element>.unexpected(consumed, index: currentIndex, expected: Set(expected))
+            throw WasmKitError(
+                kind: .parserUnexpectedByte(
+                    consumed,
+                    expected: Set(expected)
+                ), offset: currentIndex)
         }
 
         currentIndex = bytes.index(after: currentIndex)
         return consumed
     }
 
-    public func consume(count: Int) throws -> ArraySlice<UInt8> {
+    public func consume(count: Int) throws(WasmKitError) -> ArraySlice<UInt8> {
         guard count > 0 else { return [] }
         let updatedIndex = currentIndex + count
 
         guard bytes.indices.contains(updatedIndex - 1) else {
-            throw StreamError<Element>.unexpectedEnd(expected: nil)
+            throw WasmKitError(kind: .parserUnexpectedEnd(expected: nil), offset: currentIndex)
         }
 
         defer { currentIndex = updatedIndex }

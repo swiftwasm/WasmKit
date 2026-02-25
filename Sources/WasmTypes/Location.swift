@@ -1,9 +1,10 @@
-/// A location in a WAT source file.
+/// A location in a source file.
 public struct Location: Equatable, CustomDebugStringConvertible, Sendable {
-    let index: Lexer.Index
+    package typealias Index = String.UnicodeScalarView.Index
+    let index: Index
     let source: String.UnicodeScalarView
 
-    init(at index: Lexer.Index, in source: String.UnicodeScalarView) {
+    package init(at index: Index, in source: String.UnicodeScalarView) {
         self.index = index
         self.source = source
     }
@@ -28,7 +29,7 @@ public struct Location: Equatable, CustomDebugStringConvertible, Sendable {
 ///   - index: The index in the source
 ///   - source: The source string
 /// - Returns: The location of the index in line-column style. Line is 1-indexed and column is 0-indexed.
-func sourceLocation(at index: Lexer.Index, in source: String.UnicodeScalarView) -> (line: Int, column: Int) {
+func sourceLocation(at index: Location.Index, in source: String.UnicodeScalarView) -> (line: Int, column: Int) {
     let slice = source[..<index]
     let lineNo = slice.split(separator: "\n", omittingEmptySubsequences: false).count
     let columnNo: Int

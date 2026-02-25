@@ -141,6 +141,11 @@ public struct BrTable: Equatable {
 public struct CustomSection: Equatable {
     public let name: String
     public let bytes: ArraySlice<UInt8>
+
+    package init(name: String, bytes: ArraySlice<UInt8>) {
+        self.name = name
+        self.bytes = bytes
+    }
 }
 
 /// > Note:
@@ -310,31 +315,31 @@ public enum ImportDescriptor: Equatable {
 }
 
 @usableFromInline
-protocol RawUnsignedInteger: FixedWidthInteger & UnsignedInteger {
+package protocol RawUnsignedInteger: FixedWidthInteger & UnsignedInteger {
     associatedtype Signed: RawSignedInteger where Signed.Unsigned == Self
     init(bitPattern: Signed)
 }
 
 @usableFromInline
-protocol RawSignedInteger: FixedWidthInteger & SignedInteger {
+package protocol RawSignedInteger: FixedWidthInteger & SignedInteger {
     associatedtype Unsigned: RawUnsignedInteger where Unsigned.Signed == Self
     init(bitPattern: Unsigned)
 }
 
 extension UInt8: RawUnsignedInteger {
-    @usableFromInline typealias Signed = Int8
+    @usableFromInline package typealias Signed = Int8
 }
 
 extension UInt16: RawUnsignedInteger {
-    @usableFromInline typealias Signed = Int16
+    @usableFromInline package typealias Signed = Int16
 }
 
 extension UInt32: RawUnsignedInteger {
-    @usableFromInline typealias Signed = Int32
+    @usableFromInline package typealias Signed = Int32
 }
 
 extension UInt64: RawUnsignedInteger {
-    @usableFromInline typealias Signed = Int64
+    @usableFromInline package typealias Signed = Int64
 }
 
 extension Int8: RawSignedInteger {}
