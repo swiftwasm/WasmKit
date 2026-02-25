@@ -111,6 +111,39 @@ package struct Run: AsyncParsableCommand {
     )
     var stackSize: Int?
 
+    @Option(name: .long, help: "Enable a WebAssembly feature (threads, memory64, simd, tail-call, reference-types)")
+    var enableFeature: [String] = []
+
+    @Option(name: .long, help: "Disable a WebAssembly feature")
+    var disableFeature: [String] = []
+
+    private static let featuresByName: [String: WasmFeatureSet] = [
+        "threads": .threads,
+        "memory64": .memory64,
+        "reference-types": .referenceTypes,
+        "tail-call": .tailCall,
+        "simd": .simd,
+    ]
+
+    private var wasmFeatures: WasmFeatureSet {
+        get throws {
+            var features: WasmFeatureSet = .default
+            for name in enableFeature {
+                guard let feature = Self.featuresByName[name] else {
+                    throw ValidationError("Unknown feature: '\(name)'. Available: \(Self.featuresByName.keys.sorted().joined(separator: ", "))")
+                }
+                features.insert(feature)
+            }
+            for name in disableFeature {
+                guard let feature = Self.featuresByName[name] else {
+                    throw ValidationError("Unknown feature: '\(name)'. Available: \(Self.featuresByName.keys.sorted().joined(separator: ", "))")
+                }
+                features.remove(feature)
+            }
+            return features
+        }
+    }
+
     #if WasmDebuggingSupport
 
         @Option(
@@ -170,15 +203,16 @@ package struct Run: AsyncParsableCommand {
         #endif
 
         // Regular module execution
+        let features = try wasmFeatures
         let module: Module
         if verbose, #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) {
             let (parsedModule, parseTime) = try measure {
-                try parseWasm(filePath: filePath)
+                try parseWasm(filePath: filePath, features: features)
             }
             log("Finished parsing module: \(parseTime)", verbose: true)
             module = parsedModule
         } else {
-            module = try parseWasm(filePath: filePath)
+            module = try parseWasm(filePath: filePath, features: features)
         }
 
         let (interceptor, finalize) = try deriveInterceptor()
@@ -348,7 +382,7 @@ package struct Run: AsyncParsableCommand {
 }
 
 /// Parses a `.wasm` or `.wat` module.
-func parseWasm(filePath: FilePath) throws -> Module {
+func parseWasm(filePath: FilePath, features: WasmFeatureSet = .default) throws -> Module {
     if filePath.extension == "wat", #available(macOS 11.0, iOS 14.0, macCatalyst 14.0, tvOS 14.0, visionOS 1.0, watchOS 7.0, *) {
         let fileHandle = try FileDescriptor.open(filePath, .readOnly)
         defer { try? fileHandle.close() }
@@ -358,9 +392,9 @@ func parseWasm(filePath: FilePath) throws -> Module {
         let wat = try String(unsafeUninitializedCapacity: Int(size)) {
             try fileHandle.read(fromAbsoluteOffset: 0, into: .init($0))
         }
-        return try WasmKit.parseWasm(bytes: wat2wasm(wat))
+        return try WasmKit.parseWasm(bytes: wat2wasm(wat), features: features)
     } else {
-        return try WasmKit.parseWasm(filePath: filePath)
+        return try WasmKit.parseWasm(filePath: filePath, features: features)
     }
 }
 
