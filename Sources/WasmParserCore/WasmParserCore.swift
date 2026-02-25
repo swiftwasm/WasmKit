@@ -1242,4 +1242,3 @@ public enum WasmFileType: Equatable, Sendable {
     /// Unknown or invalid WebAssembly file
     case unknown
 }
-
