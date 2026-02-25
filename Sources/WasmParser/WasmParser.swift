@@ -163,11 +163,7 @@ public struct ExpressionParser {
     public mutating func visit<V: InstructionVisitor>(
         visitor: inout V
     ) throws(WasmKitError) -> Bool {
-        do {
-            isLastEnd = try parser.parseInstruction(visitor: &visitor)
-        } catch {
-            throw .unclassified(error, offset: offset)
-        }
+        isLastEnd = try parser.parseInstruction(visitor: &visitor)
         let shouldContinue = try !parser.stream.hasReachedEnd()
         if !shouldContinue {
             guard isLastEnd == true else {
