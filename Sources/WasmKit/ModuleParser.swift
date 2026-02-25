@@ -117,15 +117,11 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
     let functions = try codes.enumerated().map { index, code throws(WasmKitError) in
         // SAFETY: The number of typeIndices is guaranteed to be the same as the number of codes
         let funcTypeIndex = typeIndices[index]
-        do {
-            let funcType = try Module.resolveType(funcTypeIndex, typeSection: types)
-            return GuestFunction(
-                type: funcType,
-                code: code
-            )
-        } catch {
-            throw .unclassified(error, offset: parser.offset)
-        }
+        let funcType = try Module.resolveType(funcTypeIndex, typeSection: types)
+        return GuestFunction(
+            type: funcType,
+            code: code
+        )
     }
 
     return Module(
