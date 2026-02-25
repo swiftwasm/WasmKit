@@ -1,5 +1,6 @@
 #if ComponentModel
     import ComponentModel
+    import WasmParser
     import WasmTypes
 
     /// Binary component encoder, implementing CM proposal `Binary.md` spec: https://github.com/WebAssembly/component-model/blob/main/design/mvp/Binary.md
