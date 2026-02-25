@@ -1,7 +1,7 @@
+import WasmParser
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#memory-instructions>
 import _CWasmKit
-import WasmParser
 
 enum AtomicRmwOp { case add, sub, and, or, xor, xchg }
 
@@ -124,7 +124,7 @@ extension Execution {
             let rawPtr = md.unsafelyUnwrapped.advanced(by: Int(address))
             let loaded: T
             switch T.bitWidth {
-            case 8:  loaded = T(wasmkit_atomic_load_8(rawPtr))
+            case 8: loaded = T(wasmkit_atomic_load_8(rawPtr))
             case 16: loaded = T(wasmkit_atomic_load_16(rawPtr))
             case 32: loaded = T(wasmkit_atomic_load_32(rawPtr))
             case 64: loaded = T(wasmkit_atomic_load_64(rawPtr))
@@ -153,7 +153,7 @@ extension Execution {
             let toStore = castFromValue(value)
             let rawPtr = md.unsafelyUnwrapped.advanced(by: Int(address))
             switch T.bitWidth {
-            case 8:  wasmkit_atomic_store_8(rawPtr, UInt8(truncatingIfNeeded: toStore))
+            case 8: wasmkit_atomic_store_8(rawPtr, UInt8(truncatingIfNeeded: toStore))
             case 16: wasmkit_atomic_store_16(rawPtr, UInt16(truncatingIfNeeded: toStore))
             case 32: wasmkit_atomic_store_32(rawPtr, UInt32(truncatingIfNeeded: toStore))
             case 64: wasmkit_atomic_store_64(rawPtr, UInt64(truncatingIfNeeded: toStore))
@@ -187,29 +187,29 @@ extension Execution {
             let value = castFromValue(sp[rmwOperand.value])
             let oldValue: T
             switch (T.bitWidth, op) {
-            case (8, .add):   oldValue = T(wasmkit_atomic_rmw_add_8(rawPtr, UInt8(truncatingIfNeeded: value)))
-            case (8, .sub):   oldValue = T(wasmkit_atomic_rmw_sub_8(rawPtr, UInt8(truncatingIfNeeded: value)))
-            case (8, .and):   oldValue = T(wasmkit_atomic_rmw_and_8(rawPtr, UInt8(truncatingIfNeeded: value)))
-            case (8, .or):    oldValue = T(wasmkit_atomic_rmw_or_8(rawPtr, UInt8(truncatingIfNeeded: value)))
-            case (8, .xor):   oldValue = T(wasmkit_atomic_rmw_xor_8(rawPtr, UInt8(truncatingIfNeeded: value)))
-            case (8, .xchg):  oldValue = T(wasmkit_atomic_rmw_xchg_8(rawPtr, UInt8(truncatingIfNeeded: value)))
-            case (16, .add):  oldValue = T(wasmkit_atomic_rmw_add_16(rawPtr, UInt16(truncatingIfNeeded: value)))
-            case (16, .sub):  oldValue = T(wasmkit_atomic_rmw_sub_16(rawPtr, UInt16(truncatingIfNeeded: value)))
-            case (16, .and):  oldValue = T(wasmkit_atomic_rmw_and_16(rawPtr, UInt16(truncatingIfNeeded: value)))
-            case (16, .or):   oldValue = T(wasmkit_atomic_rmw_or_16(rawPtr, UInt16(truncatingIfNeeded: value)))
-            case (16, .xor):  oldValue = T(wasmkit_atomic_rmw_xor_16(rawPtr, UInt16(truncatingIfNeeded: value)))
+            case (8, .add): oldValue = T(wasmkit_atomic_rmw_add_8(rawPtr, UInt8(truncatingIfNeeded: value)))
+            case (8, .sub): oldValue = T(wasmkit_atomic_rmw_sub_8(rawPtr, UInt8(truncatingIfNeeded: value)))
+            case (8, .and): oldValue = T(wasmkit_atomic_rmw_and_8(rawPtr, UInt8(truncatingIfNeeded: value)))
+            case (8, .or): oldValue = T(wasmkit_atomic_rmw_or_8(rawPtr, UInt8(truncatingIfNeeded: value)))
+            case (8, .xor): oldValue = T(wasmkit_atomic_rmw_xor_8(rawPtr, UInt8(truncatingIfNeeded: value)))
+            case (8, .xchg): oldValue = T(wasmkit_atomic_rmw_xchg_8(rawPtr, UInt8(truncatingIfNeeded: value)))
+            case (16, .add): oldValue = T(wasmkit_atomic_rmw_add_16(rawPtr, UInt16(truncatingIfNeeded: value)))
+            case (16, .sub): oldValue = T(wasmkit_atomic_rmw_sub_16(rawPtr, UInt16(truncatingIfNeeded: value)))
+            case (16, .and): oldValue = T(wasmkit_atomic_rmw_and_16(rawPtr, UInt16(truncatingIfNeeded: value)))
+            case (16, .or): oldValue = T(wasmkit_atomic_rmw_or_16(rawPtr, UInt16(truncatingIfNeeded: value)))
+            case (16, .xor): oldValue = T(wasmkit_atomic_rmw_xor_16(rawPtr, UInt16(truncatingIfNeeded: value)))
             case (16, .xchg): oldValue = T(wasmkit_atomic_rmw_xchg_16(rawPtr, UInt16(truncatingIfNeeded: value)))
-            case (32, .add):  oldValue = T(wasmkit_atomic_rmw_add_32(rawPtr, UInt32(truncatingIfNeeded: value)))
-            case (32, .sub):  oldValue = T(wasmkit_atomic_rmw_sub_32(rawPtr, UInt32(truncatingIfNeeded: value)))
-            case (32, .and):  oldValue = T(wasmkit_atomic_rmw_and_32(rawPtr, UInt32(truncatingIfNeeded: value)))
-            case (32, .or):   oldValue = T(wasmkit_atomic_rmw_or_32(rawPtr, UInt32(truncatingIfNeeded: value)))
-            case (32, .xor):  oldValue = T(wasmkit_atomic_rmw_xor_32(rawPtr, UInt32(truncatingIfNeeded: value)))
+            case (32, .add): oldValue = T(wasmkit_atomic_rmw_add_32(rawPtr, UInt32(truncatingIfNeeded: value)))
+            case (32, .sub): oldValue = T(wasmkit_atomic_rmw_sub_32(rawPtr, UInt32(truncatingIfNeeded: value)))
+            case (32, .and): oldValue = T(wasmkit_atomic_rmw_and_32(rawPtr, UInt32(truncatingIfNeeded: value)))
+            case (32, .or): oldValue = T(wasmkit_atomic_rmw_or_32(rawPtr, UInt32(truncatingIfNeeded: value)))
+            case (32, .xor): oldValue = T(wasmkit_atomic_rmw_xor_32(rawPtr, UInt32(truncatingIfNeeded: value)))
             case (32, .xchg): oldValue = T(wasmkit_atomic_rmw_xchg_32(rawPtr, UInt32(truncatingIfNeeded: value)))
-            case (64, .add):  oldValue = T(wasmkit_atomic_rmw_add_64(rawPtr, UInt64(truncatingIfNeeded: value)))
-            case (64, .sub):  oldValue = T(wasmkit_atomic_rmw_sub_64(rawPtr, UInt64(truncatingIfNeeded: value)))
-            case (64, .and):  oldValue = T(wasmkit_atomic_rmw_and_64(rawPtr, UInt64(truncatingIfNeeded: value)))
-            case (64, .or):   oldValue = T(wasmkit_atomic_rmw_or_64(rawPtr, UInt64(truncatingIfNeeded: value)))
-            case (64, .xor):  oldValue = T(wasmkit_atomic_rmw_xor_64(rawPtr, UInt64(truncatingIfNeeded: value)))
+            case (64, .add): oldValue = T(wasmkit_atomic_rmw_add_64(rawPtr, UInt64(truncatingIfNeeded: value)))
+            case (64, .sub): oldValue = T(wasmkit_atomic_rmw_sub_64(rawPtr, UInt64(truncatingIfNeeded: value)))
+            case (64, .and): oldValue = T(wasmkit_atomic_rmw_and_64(rawPtr, UInt64(truncatingIfNeeded: value)))
+            case (64, .or): oldValue = T(wasmkit_atomic_rmw_or_64(rawPtr, UInt64(truncatingIfNeeded: value)))
+            case (64, .xor): oldValue = T(wasmkit_atomic_rmw_xor_64(rawPtr, UInt64(truncatingIfNeeded: value)))
             case (64, .xchg): oldValue = T(wasmkit_atomic_rmw_xchg_64(rawPtr, UInt64(truncatingIfNeeded: value)))
             default: fatalError()
             }
