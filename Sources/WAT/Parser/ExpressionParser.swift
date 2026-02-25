@@ -350,9 +350,7 @@ struct ExpressionParser<Visitor: InstructionVisitor> {
     private mutating func parseTextInstruction(
         keyword: String,
         wat: inout Wat
-    ) throws(WasmKitError) -> (
-        (inout Visitor) throws(WasmKitError) -> Void
-    ) {
+    ) throws(WasmKitError) -> ((inout Visitor) throws(WasmKitError) -> Void) {
         switch keyword {
         case "select":
             // Special handling for "select", which have two variants 1. with type, 2. without type
