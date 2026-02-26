@@ -416,7 +416,7 @@ extension Import: WasmEncodable {
             globalType.encode(to: &encoder)
         case .tag(let typeIndex):
             encoder.output.append(0x04)
-            encoder.output.append(0x00) // attribute: exception
+            encoder.output.append(0x00)  // attribute: exception
             encoder.writeUnsignedLEB128(UInt32(typeIndex))
         }
     }

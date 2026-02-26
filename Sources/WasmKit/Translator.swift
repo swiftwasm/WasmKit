@@ -884,10 +884,11 @@ struct InstructionTranslator: InstructionVisitor {
             case .pinned(let pc):
                 table[index].pcOffset = Int32(pc.offsetFromHead - catchHandlersPC.offsetFromHead)
             case .unpinned(var users):
-                users.append(LabelUser(
-                    action: .fillCatchTableEntry(buildingTable: table, index: index, catchHandlersPC: catchHandlersPC),
-                    sourceLine: line
-                ))
+                users.append(
+                    LabelUser(
+                        action: .fillCatchTableEntry(buildingTable: table, index: index, catchHandlersPC: catchHandlersPC),
+                        sourceLine: line
+                    ))
                 self.labels[ref] = .unpinned(users: users)
             }
         }
@@ -1881,13 +1882,21 @@ struct InstructionTranslator: InstructionVisitor {
 
             switch clause {
             case .catch(let tIdx, let lIdx):
-                tagIndex = tIdx; labelDepth = lIdx; isRef = false
+                tagIndex = tIdx
+                labelDepth = lIdx
+                isRef = false
             case .catchRef(let tIdx, let lIdx):
-                tagIndex = tIdx; labelDepth = lIdx; isRef = true
+                tagIndex = tIdx
+                labelDepth = lIdx
+                isRef = true
             case .catchAll(let lIdx):
-                tagIndex = nil; labelDepth = lIdx; isRef = false
+                tagIndex = nil
+                labelDepth = lIdx
+                isRef = false
             case .catchAllRef(let lIdx):
-                tagIndex = nil; labelDepth = lIdx; isRef = true
+                tagIndex = nil
+                labelDepth = lIdx
+                isRef = true
             }
 
             let targetFrame = try controlStack.branchTarget(relativeDepth: labelDepth)

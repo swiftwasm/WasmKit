@@ -741,7 +741,7 @@ extension Parser: BinaryInstructionDecoder {
         return BrTable(labelIndices: labelIndices, defaultIndex: labelIndex)
     }
     @inlinable mutating func visitThrow() throws -> UInt32 { try parseUnsigned() }
-    @inlinable mutating func visitThrowRef() throws { /* no immediates */ }
+    @inlinable mutating func visitThrowRef() throws { /* no immediates */  }
     @inlinable mutating func visitTryTable() throws -> (blockType: BlockType, tryCatch: TryCatch) {
         let blockType = try parseResultType()
         let catches: [CatchClause] = try parseVector {
