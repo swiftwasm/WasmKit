@@ -204,7 +204,7 @@ public struct WasmFeatureSet: OptionSet, Sendable {
     public static var exceptionHandling: WasmFeatureSet { WasmFeatureSet(rawValue: 1 << 5) }
 
     /// The default feature set
-    public static let `default`: WasmFeatureSet = [.referenceTypes]
+    public static let `default`: WasmFeatureSet = [.referenceTypes, .exceptionHandling]
     /// The feature set with all features enabled
     public static let all: WasmFeatureSet = [.memory64, .referenceTypes, .threads, .tailCall, .simd, .exceptionHandling]
 }
