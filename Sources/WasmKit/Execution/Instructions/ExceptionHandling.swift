@@ -73,7 +73,7 @@ extension Execution {
             let isMatch: Bool
             if let handlerTag = handler.tag {
                 // catch / catch_ref: match by tag identity
-                isMatch = handlerTag == exception.tag
+                isMatch = exception.hasTag(handlerTag)
             } else {
                 // catch_all / catch_all_ref: always match
                 isMatch = true

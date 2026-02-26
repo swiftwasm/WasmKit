@@ -58,13 +58,24 @@ public struct Trap: Error, CustomStringConvertible {
 
 /// An uncaught WebAssembly exception that propagated out of a module.
 public struct WasmKitException: Error, CustomStringConvertible {
-    /// The internal tag handle.
-    let tag: InternalTag
+    /// The tag identity, stored as the bit pattern of the tag handle pointer.
+    /// Used only for equality comparison when matching catch clauses.
+    let tagIdentity: Int
     /// The exception payload values.
     let payload: [Value]
 
+    init(tag: InternalTag, payload: [Value]) {
+        self.tagIdentity = tag.bitPattern
+        self.payload = payload
+    }
+
     public var description: String {
         "wasm exception (payload: \(payload))"
+    }
+
+    /// Returns true if this exception's tag matches the given tag handle.
+    func hasTag(_ tag: InternalTag) -> Bool {
+        tagIdentity == tag.bitPattern
     }
 }
 
