@@ -183,7 +183,7 @@ extension DirEntry: WASIDir, FdWASIEntry {
                     let entry = try entry.get()
                     let name = entry.name
                     let stat = try WASIAbi.Errno.translatingPlatformErrno {
-                        try fd.attributes(at: name, options: [])
+                        try fd.attributes(at: name, options: [.noFollow])
                     }
                     let dirent = WASIAbi.Dirent(
                         // We can't use telldir and seekdir because the location data
