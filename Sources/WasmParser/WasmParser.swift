@@ -177,11 +177,14 @@ public struct WasmFeatureSet: OptionSet, Sendable {
     /// The WebAssembly SIMD proposal
     @_alwaysEmitIntoClient
     public static var simd: WasmFeatureSet { WasmFeatureSet(rawValue: 1 << 4) }
+    /// The WebAssembly exception handling proposal
+    @_alwaysEmitIntoClient
+    public static var exceptionHandling: WasmFeatureSet { WasmFeatureSet(rawValue: 1 << 5) }
 
     /// The default feature set
-    public static let `default`: WasmFeatureSet = [.referenceTypes]
+    public static let `default`: WasmFeatureSet = [.referenceTypes, .exceptionHandling]
     /// The feature set with all features enabled
-    public static let all: WasmFeatureSet = [.memory64, .referenceTypes, .threads, .tailCall, .simd]
+    public static let all: WasmFeatureSet = [.memory64, .referenceTypes, .threads, .tailCall, .simd, .exceptionHandling]
 }
 
 /// > Note:
@@ -318,6 +321,9 @@ extension Parser {
         switch byte {
         case 0x63: return try ReferenceType(isNullable: true, heapType: parseHeapType())
         case 0x64: return try ReferenceType(isNullable: false, heapType: parseHeapType())
+        case 0x69:
+            guard features.contains(.exceptionHandling) else { return nil }
+            return .exnRef
         case 0x6F: return .externRef
         case 0x70: return .funcRef
         default: return nil  // invalid discriminator
@@ -330,6 +336,9 @@ extension Parser {
     func parseHeapType() throws(WasmParserError) -> HeapType {
         let b = try stream.peek()
         switch b {
+        case 0x69:
+            _ = try stream.consumeAny()
+            return .exnRef
         case 0x6F:
             _ = try stream.consumeAny()
             return .externRef
@@ -356,7 +365,7 @@ extension Parser {
         case 0x40:
             _ = try stream.consumeAny()
             return .empty
-        case 0x7B...0x7F, 0x70, 0x6F:
+        case 0x7B...0x7F, 0x70, 0x6F, 0x69, 0x63, 0x64:
             return try .type(parseValueType())
         default:
             let rawIndex = try stream.parseVarSigned33()
@@ -521,6 +530,33 @@ extension Parser: BinaryInstructionDecoder {
         let labelIndices: [UInt32] = try parseVector { () throws(WasmParserError) in try parseUnsigned() }
         let labelIndex: UInt32 = try parseUnsigned()
         return BrTable(labelIndices: labelIndices, defaultIndex: labelIndex)
+    }
+    @inlinable mutating func visitThrow() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitThrowRef() throws(WasmParserError) { /* no immediates */  }
+    @inlinable mutating func visitTryTable() throws(WasmParserError) -> (blockType: BlockType, tryCatch: TryCatch) {
+        let blockType = try parseResultType()
+        let catches: [CatchClause] = try parseVector { () throws(WasmParserError) in
+            let clauseId: UInt8 = try parseUnsigned()
+            switch clauseId {
+            case 0x00:
+                let tagIndex: UInt32 = try parseUnsigned()
+                let label: UInt32 = try parseUnsigned()
+                return .catch(tagIndex: tagIndex, labelIndex: label)
+            case 0x01:
+                let tagIndex: UInt32 = try parseUnsigned()
+                let label: UInt32 = try parseUnsigned()
+                return .catchRef(tagIndex: tagIndex, labelIndex: label)
+            case 0x02:
+                let label: UInt32 = try parseUnsigned()
+                return .catchAll(labelIndex: label)
+            case 0x03:
+                let label: UInt32 = try parseUnsigned()
+                return .catchAllRef(labelIndex: label)
+            default:
+                throw makeError(.invalidCatchClauseId(clauseId))
+            }
+        }
+        return (blockType, TryCatch(catches: catches))
     }
     @inlinable mutating func visitCall() throws(WasmParserError) -> UInt32 { try parseUnsigned() }
     @inlinable mutating func visitCallRef() throws(WasmParserError) -> UInt32 {
@@ -787,12 +823,17 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-importdesc>
     func parseImportDescriptor() throws(WasmParserError) -> ImportDescriptor {
-        let b = try stream.consume(Set(0x00...0x03))
+        let maxKind: UInt8 = features.contains(.exceptionHandling) ? 0x04 : 0x03
+        let b = try stream.consume(Set(0x00...maxKind))
         switch b {
         case 0x00: return try .function(parseUnsigned())
         case 0x01: return try .table(parseTableType())
         case 0x02: return try .memory(parseMemoryType())
         case 0x03: return try .global(parseGlobalType())
+        case 0x04:
+            let attribute: UInt8 = try parseUnsigned()
+            guard attribute == 0 else { throw makeError(.invalidTagAttribute(attribute)) }
+            return try .tag(parseUnsigned())
         default:
             preconditionFailure("should never reach here")
         }
@@ -831,6 +872,18 @@ extension Parser {
     }
 
     /// > Note:
+    /// <https://webassembly.github.io/exception-handling/core/binary/modules.html#tag-section>
+    @usableFromInline
+    func parseTagSection() throws(WasmParserError) -> [Tag] {
+        return try parseVector { () throws(WasmParserError) in
+            let attribute: UInt8 = try parseUnsigned()
+            guard attribute == 0 else { throw makeError(.invalidTagAttribute(attribute)) }
+            let typeIndex: TypeIndex = try parseUnsigned()
+            return Tag(type: typeIndex)
+        }
+    }
+
+    /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#export-section>
     @usableFromInline
     func parseExportSection() throws(WasmParserError) -> [Export] {
@@ -844,12 +897,14 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-exportdesc>
     func parseExportDescriptor() throws(WasmParserError) -> ExportDescriptor {
-        let b = try stream.consume(Set(0x00...0x03))
+        let maxKind: UInt8 = features.contains(.exceptionHandling) ? 0x04 : 0x03
+        let b = try stream.consume(Set(0x00...maxKind))
         switch b {
         case 0x00: return try .function(parseUnsigned())
         case 0x01: return try .table(parseUnsigned())
         case 0x02: return try .memory(parseUnsigned())
         case 0x03: return try .global(parseUnsigned())
+        case 0x04: return try .tag(parseUnsigned())
         default:
             preconditionFailure("should never reach here")
         }
@@ -998,6 +1053,7 @@ public enum ParsingPayload {
     case tableSection([Table])
     case memorySection([Memory])
     case globalSection([Global])
+    case tagSection([Tag])
     case exportSection([Export])
     case startSection(FunctionIndex)
     case elementSection([ElementSegment])
@@ -1148,6 +1204,9 @@ extension Parser {
             case 12:
                 order = .dataCount
                 payload = .dataCount(try parseDataCountSection())
+            case 13 where features.contains(.exceptionHandling):
+                order = .tag
+                payload = .tagSection(try parseTagSection())
             default:
                 throw makeError(.malformedSectionID(sectionID))
             }

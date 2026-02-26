@@ -20,6 +20,8 @@ protocol BinaryInstructionDecoder {
     @inlinable mutating func visitLoop() throws(WasmParserError) -> BlockType
     /// Decode `if` immediates
     @inlinable mutating func visitIf() throws(WasmParserError) -> BlockType
+    /// Decode `throw` immediates
+    @inlinable mutating func visitThrow() throws(WasmParserError) -> UInt32
     /// Decode `br` immediates
     @inlinable mutating func visitBr() throws(WasmParserError) -> UInt32
     /// Decode `br_if` immediates
@@ -38,6 +40,8 @@ protocol BinaryInstructionDecoder {
     @inlinable mutating func visitCallRef() throws(WasmParserError) -> UInt32
     /// Decode `return_call_ref` immediates
     @inlinable mutating func visitReturnCallRef() throws(WasmParserError) -> UInt32
+    /// Decode `try_table` immediates
+    @inlinable mutating func visitTryTable() throws(WasmParserError) -> (blockType: BlockType, tryCatch: TryCatch)
     /// Decode `typedSelect` immediates
     @inlinable mutating func visitTypedSelect() throws(WasmParserError) -> ValueType
     /// Decode `local.get` immediates
@@ -233,6 +237,11 @@ func parseBinaryInstruction(
         return .if(blockType: blockType)
     case 0x05:
         return .else
+    case 0x08:
+        let (tagIndex) = try decoder.visitThrow()
+        return .throw(tagIndex: tagIndex)
+    case 0x0A:
+        return .throwRef
     case 0x0B:
         return .end
     case 0x0C:
@@ -271,6 +280,9 @@ func parseBinaryInstruction(
     case 0x1C:
         let (type) = try decoder.visitTypedSelect()
         return .typedSelect(type: type)
+    case 0x1F:
+        let (blockType, tryCatch) = try decoder.visitTryTable()
+        return .tryTable(blockType: blockType, tryCatch: tryCatch)
     case 0x20:
         let (localIndex) = try decoder.visitLocalGet()
         return .localGet(localIndex: localIndex)

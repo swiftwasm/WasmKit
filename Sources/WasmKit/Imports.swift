@@ -77,6 +77,10 @@ extension Function: ExternalValueConvertible {
     public var externalValue: ExternalValue { .function(self) }
 }
 
+extension Tag: ExternalValueConvertible {
+    public var externalValue: ExternalValue { .tag(self) }
+}
+
 extension Imports: ExpressibleByDictionaryLiteral {
     public typealias Key = String
     public struct Value: ExpressibleByDictionaryLiteral {

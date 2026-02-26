@@ -24,6 +24,7 @@ protocol BinaryInstructionEncoder: InstructionVisitor {
     mutating func encodeImmediates(memory: UInt32) throws(VisitorError)
     mutating func encodeImmediates(relativeDepth: UInt32) throws(VisitorError)
     mutating func encodeImmediates(table: UInt32) throws(VisitorError)
+    mutating func encodeImmediates(tagIndex: UInt32) throws(VisitorError)
     mutating func encodeImmediates(targets: BrTable) throws(VisitorError)
     mutating func encodeImmediates(type: HeapType) throws(VisitorError)
     mutating func encodeImmediates(type: ValueType) throws(VisitorError)
@@ -33,6 +34,7 @@ protocol BinaryInstructionEncoder: InstructionVisitor {
     mutating func encodeImmediates(value: Int32) throws(VisitorError)
     mutating func encodeImmediates(value: Int64) throws(VisitorError)
     mutating func encodeImmediates(value: V128) throws(VisitorError)
+    mutating func encodeImmediates(blockType: BlockType, tryCatch: TryCatch) throws(VisitorError)
     mutating func encodeImmediates(dstMem: UInt32, srcMem: UInt32) throws(VisitorError)
     mutating func encodeImmediates(dstTable: UInt32, srcTable: UInt32) throws(VisitorError)
     mutating func encodeImmediates(elemIndex: UInt32, table: UInt32) throws(VisitorError)
@@ -57,6 +59,11 @@ extension BinaryInstructionEncoder {
         try encodeImmediates(blockType: blockType)
     }
     mutating func visitElse() throws(VisitorError) { try encodeInstruction([0x05]) }
+    mutating func visitThrow(tagIndex: UInt32) throws(VisitorError) {
+        try encodeInstruction([0x08])
+        try encodeImmediates(tagIndex: tagIndex)
+    }
+    mutating func visitThrowRef() throws(VisitorError) { try encodeInstruction([0x0A]) }
     mutating func visitEnd() throws(VisitorError) { try encodeInstruction([0x0B]) }
     mutating func visitBr(relativeDepth: UInt32) throws(VisitorError) {
         try encodeInstruction([0x0C])
@@ -94,6 +101,10 @@ extension BinaryInstructionEncoder {
     mutating func visitReturnCallRef(typeIndex: UInt32) throws(VisitorError) {
         try encodeInstruction([0x15])
         try encodeImmediates(typeIndex: typeIndex)
+    }
+    mutating func visitTryTable(blockType: BlockType, tryCatch: TryCatch) throws(VisitorError) {
+        try encodeInstruction([0x1F])
+        try encodeImmediates(blockType: blockType, tryCatch: tryCatch)
     }
     mutating func visitDrop() throws(VisitorError) { try encodeInstruction([0x1A]) }
     mutating func visitSelect() throws(VisitorError) { try encodeInstruction([0x1B]) }
