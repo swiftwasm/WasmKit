@@ -1856,18 +1856,6 @@ struct InstructionTranslator: InstructionVisitor {
 
         let catchCount = UInt16(tryCatch.catches.count)
 
-        // Push the try_table frame BEFORE processing catch clauses so that
-        // label depths are correct (depth 0 = try_table itself, depth 1 = enclosing block, etc.)
-        controlStack.pushFrame(
-            ControlStack.ControlFrame(
-                blockType: blockType,
-                valueStackHeight: stackHeight.valueHeight,
-                slotStackHeight: stackHeight.slotHeight,
-                continuation: endLabel,
-                kind: .tryTable(catchCount: catchCount)
-            )
-        )
-
         // Allocate the catch table
         let catchTable = allocator.allocateCatchTable(capacity: tryCatch.catches.count)
 
@@ -1883,8 +1871,9 @@ struct InstructionTranslator: InstructionVisitor {
         // This is the reference point for pcOffset values.
         let catchHandlersEndPC = iseqBuilder.insertingPC
 
-        // For each catch clause, set up the handler entry.
-        // The pcOffset will be resolved lazily via the label system.
+        // Process catch clauses BEFORE pushing the try_table frame, because
+        // catch clause label depths are relative to the enclosing scope
+        // (the try_table's own label is not in scope for catch clauses per spec).
         for (i, clause) in tryCatch.catches.enumerated() {
             let tagIndex: UInt32?
             let labelDepth: UInt32
@@ -1905,10 +1894,22 @@ struct InstructionTranslator: InstructionVisitor {
 
             // Resolve the tag to get the InternalTag handle
             let tag: InternalTag?
+            var catchTypes: [ValueType]
             if let tagIndex {
                 tag = try module.tags[validating: Int(tagIndex)]
+                let tagType = funcTypeInterner.resolve(tag!.type)
+                catchTypes = tagType.parameters
             } else {
                 tag = nil
+                catchTypes = []
+            }
+            if isRef {
+                catchTypes.append(.ref(.init(isNullable: true, heapType: .abstract(.exnRef))))
+            }
+
+            // Validate that the caught value types match the target label's copy types
+            guard catchTypes == targetFrame.copyTypes else {
+                throw ValidationError(.catchTypeMismatch)
             }
 
             // The payload register base is where the handler will write values.
@@ -1930,6 +1931,18 @@ struct InstructionTranslator: InstructionVisitor {
                 catchHandlersPC: catchHandlersEndPC
             )
         }
+
+        // Push the try_table frame AFTER processing catch clauses.
+        // The try_table's own label is only in scope for the body instructions.
+        controlStack.pushFrame(
+            ControlStack.ControlFrame(
+                blockType: blockType,
+                valueStackHeight: stackHeight.valueHeight,
+                slotStackHeight: stackHeight.slotHeight,
+                continuation: endLabel,
+                kind: .tryTable(catchCount: catchCount)
+            )
+        )
     }
 
     mutating func visitDrop() throws -> Output {

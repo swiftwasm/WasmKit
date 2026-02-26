@@ -65,6 +65,10 @@ extension ValidationError.Message {
         Self("non-empty tag result type")
     }
 
+    static var catchTypeMismatch: Self {
+        Self("type mismatch")
+    }
+
     static var memory64FeatureRequired: Self {
         Self("memory64 feature is required for 64-bit memories")
     }

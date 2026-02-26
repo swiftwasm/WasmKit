@@ -552,7 +552,7 @@ extension ExpressionParser {
         return UInt32(try wat.tagsMap.resolve(use: use).index)
     }
     mutating func visitTryTable(wat: inout Wat) throws(WatParserError) -> (blockType: BlockType, tryCatch: TryCatch) {
-        self.labelStack.push(try parser.takeId())
+        let label = try parser.takeId()
         let bt = try blockType(wat: &wat)
         var catches: [CatchClause] = []
         while true {
@@ -580,6 +580,10 @@ extension ExpressionParser {
                 break
             }
         }
+        // Push the try_table's label AFTER parsing catch clauses, since catch clause
+        // labels are resolved from the enclosing scope (the try_table's own label
+        // is only in scope for the body instructions).
+        self.labelStack.push(label)
         return (bt, TryCatch(catches: catches))
     }
     mutating func visitBrOnNull(wat: inout Wat) throws(WatParserError) -> UInt32 {

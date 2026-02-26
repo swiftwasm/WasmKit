@@ -91,6 +91,7 @@ Proposals are grouped by their [phase](https://github.com/WebAssembly/meetings/b
 | Proposal | Status |
 |----------|--------|
 | [Bulk Memory Operations](https://github.com/WebAssembly/bulk-memory-operations) | ✅ Implemented |
+| [Exception Handling](https://github.com/WebAssembly/exception-handling) | ✅ Implemented |
 | [Fixed-width SIMD](https://github.com/webassembly/simd) | ✅ Implemented |
 | [Import/Export of Mutable Globals](https://github.com/WebAssembly/mutable-global) | ✅ Implemented |
 | [Memory64](https://github.com/WebAssembly/memory64) | ✅ Implemented |
@@ -103,7 +104,6 @@ Proposals are grouped by their [phase](https://github.com/WebAssembly/meetings/b
 | [Typed Function References](https://github.com/WebAssembly/function-references) | 🚧 Parser implemented |
 | [Branch Hinting](https://github.com/WebAssembly/branch-hinting) | ❌ Not implemented |
 | [Custom Annotation Syntax in the Text Format](https://github.com/WebAssembly/annotations) | ❌ Not implemented |
-| [Exception Handling](https://github.com/WebAssembly/exception-handling) | ❌ Not implemented |
 | [Extended Constant Expressions](https://github.com/WebAssembly/extended-const) | ❌ Not implemented |
 | [Garbage Collection](https://github.com/WebAssembly/gc) | ❌ Not implemented |
 | [Relaxed SIMD](https://github.com/WebAssembly/relaxed-simd) | ❌ Not implemented |
