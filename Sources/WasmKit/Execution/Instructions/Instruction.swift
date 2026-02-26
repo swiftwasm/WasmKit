@@ -555,6 +555,14 @@ enum Instruction: Equatable {
     case memoryAtomicWait64(Instruction.AtomicWaitOperand)
     /// WebAssembly Core Instruction `memory.atomic.notify`
     case memoryAtomicNotify(Instruction.AtomicNotifyOperand)
+    /// WebAssembly Exception Handling `throw`
+    case throwTag(Instruction.ThrowTagOperand)
+    /// WebAssembly Exception Handling `throw_ref`
+    case throwRef(Instruction.ThrowRefOperand)
+    /// Register exception handlers for a try_table block
+    case catchHandlers(Instruction.CatchHandlersOperand)
+    /// Unregister exception handlers for a try_table block
+    case catchHandlersEnd(Instruction.CatchHandlersEndOperand)
 }
 
 extension Instruction {
@@ -1142,6 +1150,54 @@ extension Instruction {
             emitSlot { unsafeBitCast(($0.pointer, $0.count, $0.result, 0, 0) as (VReg, VReg, VReg, UInt8, UInt8), to: CodeSlot.self) }
         }
     }
+
+    struct ThrowTagOperand: Equatable, InstructionImmediate {
+        var tagIndex: UInt32
+        var payloadBase: VReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (tagIndex, payloadBase, _, _) = pc.read((UInt32, VReg, UInt8, UInt8).self)
+            return Self(tagIndex: tagIndex, payloadBase: payloadBase)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.tagIndex, $0.payloadBase, 0, 0) as (UInt32, VReg, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
+
+    struct ThrowRefOperand: Equatable, InstructionImmediate {
+        var exnRef: VReg
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (exnRef, _, _, _, _, _, _) = pc.read((VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8).self)
+            return Self(exnRef: exnRef)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.exnRef, 0, 0, 0, 0, 0, 0) as (VReg, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
+
+    struct CatchHandlersOperand: Equatable, InstructionImmediate {
+        var rawBaseAddress: UInt64
+        var count: UInt16
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (rawBaseAddress) = pc.read((UInt64).self)
+            let (count, _, _, _, _, _, _) = pc.read((UInt16, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8).self)
+            return Self(rawBaseAddress: rawBaseAddress, count: count)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { $0.rawBaseAddress }
+            emitSlot { unsafeBitCast(($0.count, 0, 0, 0, 0, 0, 0) as (UInt16, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
+
+    struct CatchHandlersEndOperand: Equatable, InstructionImmediate {
+        var count: UInt16
+        @inline(__always) static func load(from pc: inout Pc) -> Self {
+            let (count, _, _, _, _, _, _) = pc.read((UInt16, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8).self)
+            return Self(count: count)
+        }
+        @inline(__always) static func emit(to emitSlot: ((Self) -> CodeSlot) -> Void) {
+            emitSlot { unsafeBitCast(($0.count, 0, 0, 0, 0, 0, 0) as (UInt16, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8), to: CodeSlot.self) }
+        }
+    }
 }
 
 extension Instruction {
@@ -1411,6 +1467,10 @@ extension Instruction {
         case .memoryAtomicWait32(let immediate): return immediate
         case .memoryAtomicWait64(let immediate): return immediate
         case .memoryAtomicNotify(let immediate): return immediate
+        case .throwTag(let immediate): return immediate
+        case .throwRef(let immediate): return immediate
+        case .catchHandlers(let immediate): return immediate
+        case .catchHandlersEnd(let immediate): return immediate
         default: return nil
         }
     }
@@ -1690,6 +1750,10 @@ extension Instruction {
         case .memoryAtomicWait32: return 266
         case .memoryAtomicWait64: return 267
         case .memoryAtomicNotify: return 268
+        case .throwTag: return 269
+        case .throwRef: return 270
+        case .catchHandlers: return 271
+        case .catchHandlersEnd: return 272
         }
     }
 }
@@ -1970,6 +2034,10 @@ extension Instruction {
         case 266: return .memoryAtomicWait32(Instruction.AtomicWaitOperand.load(from: &pc))
         case 267: return .memoryAtomicWait64(Instruction.AtomicWaitOperand.load(from: &pc))
         case 268: return .memoryAtomicNotify(Instruction.AtomicNotifyOperand.load(from: &pc))
+        case 269: return .throwTag(Instruction.ThrowTagOperand.load(from: &pc))
+        case 270: return .throwRef(Instruction.ThrowRefOperand.load(from: &pc))
+        case 271: return .catchHandlers(Instruction.CatchHandlersOperand.load(from: &pc))
+        case 272: return .catchHandlersEnd(Instruction.CatchHandlersEndOperand.load(from: &pc))
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -2253,6 +2321,10 @@ extension Instruction {
         case 266: return "memoryAtomicWait32"
         case 267: return "memoryAtomicWait64"
         case 268: return "memoryAtomicNotify"
+        case 269: return "throwTag"
+        case 270: return "throwRef"
+        case 271: return "catchHandlers"
+        case 272: return "catchHandlersEnd"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }

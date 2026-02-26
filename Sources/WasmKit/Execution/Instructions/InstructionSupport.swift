@@ -136,6 +136,42 @@ extension Instruction.BrTableOperand {
     }
 }
 
+/// An entry in a catch handler table for a `try_table` block.
+struct CatchTableEntry {
+    /// The tag to match, as a raw InternalTag bit pattern. 0 for catch_all/catch_all_ref.
+    var rawTag: UInt64
+    /// Non-zero if this is a catch_all or catch_all_ref clause.
+    var isCatchAll: UInt8
+    /// Non-zero if this is a catch_ref or catch_all_ref clause (pushes exnref).
+    var isRef: UInt8
+    /// PC offset from the catchHandlers instruction to the handler's target.
+    var pcOffset: Int32
+    /// Register offset where payload values should be written (relative to sp).
+    var payloadRegBase: VReg
+
+    init(tag: InternalTag?, isRef: Bool, pcOffset: Int32, payloadRegBase: VReg) {
+        self.rawTag = tag.map { UInt64(UInt(bitPattern: $0.bitPattern)) } ?? 0
+        self.isCatchAll = tag == nil ? 1 : 0
+        self.isRef = isRef ? 1 : 0
+        self.pcOffset = pcOffset
+        self.payloadRegBase = payloadRegBase
+    }
+
+    var tag: InternalTag? {
+        isCatchAll != 0 ? nil : InternalTag(bitPattern: UInt(rawTag))
+    }
+}
+
+extension Instruction.CatchHandlersOperand {
+    init(baseAddress: UnsafePointer<CatchTableEntry>, count: UInt16) {
+        self.init(rawBaseAddress: UInt64(UInt(bitPattern: baseAddress)), count: count)
+    }
+
+    var baseAddress: UnsafePointer<CatchTableEntry> {
+        UnsafePointer(bitPattern: UInt(rawBaseAddress)).unsafelyUnwrapped
+    }
+}
+
 extension Instruction.CallOperand {
     init(callee: InternalFunction, spAddend: VReg) {
         self.init(rawCallee: UInt64(UInt(bitPattern: callee.bitPattern)), spAddend: spAddend)

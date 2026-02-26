@@ -12,6 +12,13 @@ class ISeqAllocator {
         return buffer
     }
 
+    func allocateCatchTable(capacity: Int) -> UnsafeMutableBufferPointer<CatchTableEntry> {
+        assert(_isPOD(CatchTableEntry.self), "CatchTableEntry must be POD")
+        let buffer = UnsafeMutableBufferPointer<CatchTableEntry>.allocate(capacity: capacity)
+        self.buffers.append(UnsafeMutableRawBufferPointer(buffer))
+        return buffer
+    }
+
     func allocateConstants(_ slots: [UntypedValue]) -> UnsafeBufferPointer<UntypedValue> {
         let buffer = UnsafeMutableBufferPointer<UntypedValue>.allocate(capacity: slots.count)
         _ = buffer.initialize(fromContentsOf: slots)
@@ -350,6 +357,7 @@ struct InstructionTranslator: InstructionVisitor {
                 case block(root: Bool)
                 case loop
                 case `if`(elseLabel: LabelRef, endLabel: LabelRef, isElse: Bool)
+                case tryTable(catchCount: UInt16)
 
                 static var block: Kind { .block(root: false) }
             }
@@ -365,7 +373,7 @@ struct InstructionTranslator: InstructionVisitor {
 
             var copyTypes: [ValueType] {
                 switch self.kind {
-                case .block, .if:
+                case .block, .if, .tryTable:
                     return blockType.results
                 case .loop:
                     return blockType.parameters
@@ -415,6 +423,19 @@ struct InstructionTranslator: InstructionVisitor {
                 throw ValidationError(.relativeDepthOutOfRange(relativeDepth: relativeDepth))
             }
             return frames[index]
+        }
+
+        /// Count the total number of catch handlers that would be exited when
+        /// branching to the given relative depth.
+        func catchHandlersToUnwind(relativeDepth: UInt32) -> UInt16 {
+            var count: UInt16 = 0
+            let targetIndex = frames.count - 1 - Int(relativeDepth)
+            for i in (targetIndex..<frames.count).reversed() {
+                if case .tryTable(let catchCount) = frames[i].kind {
+                    count += catchCount
+                }
+            }
+            return count
         }
     }
 
@@ -608,6 +629,7 @@ struct InstructionTranslator: InstructionVisitor {
         ) -> (WasmKit.Instruction)
         typealias BrTableEntryFactory = (ISeqBuilder, MetaProgramCounter) -> Instruction.BrTableOperand.Entry
         typealias BuildingBrTable = UnsafeMutableBufferPointer<Instruction.BrTableOperand.Entry>
+        typealias BuildingCatchTable = UnsafeMutableBufferPointer<CatchTableEntry>
 
         enum OnPinAction {
             case emitInstruction(
@@ -618,6 +640,12 @@ struct InstructionTranslator: InstructionVisitor {
             case fillBrTableEntry(
                 buildingTable: BuildingBrTable,
                 index: Int, make: BrTableEntryFactory
+            )
+            case fillCatchTableEntry(
+                buildingTable: BuildingCatchTable,
+                index: Int,
+                /// The position of the catchHandlers instruction (used to compute relative offset)
+                catchHandlersPC: MetaProgramCounter
             )
         }
         struct LabelUser: CustomStringConvertible {
@@ -760,6 +788,9 @@ struct InstructionTranslator: InstructionVisitor {
                         assign(at: insertAt.offsetFromHead, make(self, source, pc))
                     case .fillBrTableEntry(let brTable, let index, let make):
                         brTable[index] = make(self, pc)
+                    case .fillCatchTableEntry(let catchTable, let index, let catchHandlersPC):
+                        // pcOffset is relative to the PC position after the catchHandlers instruction
+                        catchTable[index].pcOffset = Int32(pc.offsetFromHead - catchHandlersPC.offsetFromHead)
                     }
                 }
             }
@@ -837,6 +868,26 @@ struct InstructionTranslator: InstructionVisitor {
                 table[index] = make(self, pc)
             case .unpinned(var users):
                 users.append(LabelUser(action: .fillBrTableEntry(buildingTable: table, index: index, make: make), sourceLine: line))
+                self.labels[ref] = .unpinned(users: users)
+            }
+        }
+
+        /// Schedule to fill a catch table entry with the resolved label position.
+        mutating func fillCatchTableEntry(
+            _ ref: LabelRef,
+            table: BuildingCatchTable,
+            index: Int,
+            catchHandlersPC: MetaProgramCounter,
+            line: UInt = #line
+        ) {
+            switch self.labels[ref] {
+            case .pinned(let pc):
+                table[index].pcOffset = Int32(pc.offsetFromHead - catchHandlersPC.offsetFromHead)
+            case .unpinned(var users):
+                users.append(LabelUser(
+                    action: .fillCatchTableEntry(buildingTable: table, index: index, catchHandlersPC: catchHandlersPC),
+                    sourceLine: line
+                ))
                 self.labels[ref] = .unpinned(users: users)
             }
         }
@@ -1184,6 +1235,13 @@ struct InstructionTranslator: InstructionVisitor {
             // Emit `onExit` instruction before every `return` instruction
             emit(.onExit(functionIndex))
         }
+        // Clean up all exception handlers before returning from the function
+        let handlersToUnwind = controlStack.catchHandlersToUnwind(
+            relativeDepth: UInt32(controlStack.numberOfFrames - 1)
+        )
+        if handlersToUnwind > 0 {
+            emit(.catchHandlersEnd(Instruction.CatchHandlersEndOperand(count: handlersToUnwind)))
+        }
         try visitReturnLike()
         self.updateInstructionMapping()
         iseqBuilder.emit(._return)
@@ -1407,6 +1465,9 @@ struct InstructionTranslator: InstructionVisitor {
         case .loop: break
         case .if:
             try iseqBuilder.pinLabelHere(toBePopped.continuation)
+        case .tryTable(let catchCount):
+            emit(.catchHandlersEnd(Instruction.CatchHandlersEndOperand(count: catchCount)))
+            try iseqBuilder.pinLabelHere(toBePopped.continuation)
         }
         for result in toBePopped.blockType.results.reversed() {
             guard try checkBeforePop(typeHint: result, controlFrame: toBePopped) else { continue }
@@ -1463,6 +1524,15 @@ struct InstructionTranslator: InstructionVisitor {
             return make(Int32(relativeOffset), UInt32(copyCount), popCount)
         }
     }
+    /// Emit catchHandlersEnd instructions for any try_table blocks that
+    /// would be exited by branching to the given relative depth.
+    private mutating func emitCatchHandlersUnwind(relativeDepth: UInt32) {
+        let count = controlStack.catchHandlersToUnwind(relativeDepth: relativeDepth)
+        if count > 0 {
+            emit(.catchHandlersEnd(Instruction.CatchHandlersEndOperand(count: count)))
+        }
+    }
+
     mutating func visitBr(relativeDepth: UInt32) throws -> Output {
         let frame = try controlStack.branchTarget(relativeDepth: relativeDepth)
 
@@ -1475,6 +1545,7 @@ struct InstructionTranslator: InstructionVisitor {
         //          +---[  i32 ]<--+ copy [2]
         //              [  i64 ]---+
         try copyOnBranch(targetFrame: frame)
+        emitCatchHandlersUnwind(relativeDepth: relativeDepth)
         try emitBranch(Instruction.br, relativeDepth: relativeDepth) { offset, copyCount, popCount in
             return offset
         }
@@ -1487,10 +1558,12 @@ struct InstructionTranslator: InstructionVisitor {
     mutating func visitBrIf(relativeDepth: UInt32) throws -> Output {
         let frame = try controlStack.branchTarget(relativeDepth: relativeDepth)
         let condition = try popVRegOperand(.i32)
+        let handlersToUnwind = controlStack.catchHandlersToUnwind(relativeDepth: relativeDepth)
 
-        if frame.copySlotCount == 0 {
+        if frame.copySlotCount == 0 && handlersToUnwind == 0 {
             guard let condition else { return }
             // Optimization where we don't need copying values when the branch taken
+            // and no exception handlers need unwinding.
             self.updateInstructionMapping()
             iseqBuilder.emitWithLabel(Instruction.brIf, frame.continuation) { _, selfPC, continuation in
                 let relativeOffset = continuation.offsetFromHead - selfPC.offsetFromHead
@@ -1503,26 +1576,9 @@ struct InstructionTranslator: InstructionVisitor {
         preserveOnStack(depth: valueStack.valueHeight - frame.valueStackHeight)
 
         if let condition {
-            // If branch taken, fallthrough to landing pad, copy stack values
-            // then branch to the actual place
-            // If branch not taken, branch to the next of the landing pad
-            //
-            // (block (result i32)
-            //   (i32.const 42)
-            //   (i32.const 24)
-            //   (local.get 0)
-            //   (br_if 0) ------+
-            //   (local.get 1)   |
-            // )         <-------+
-            //
-            // [0x00] (i32.const 42 reg:0)
-            // [0x01] (i32.const 24 reg:1)
-            // [0x02] (local.get 0 result=reg:2)
-            // [0x03] (br_if_z offset=+0x3 cond=reg:2) --+
-            // [0x04] (stack.copy reg:1 -> reg:0)        |
-            // [0x05] (br offset=+0x2) --------+         |
-            // [0x06] (local.get 1 reg:2) <----|---------+
-            // [0x07] ...              <-------+
+            // If branch taken, fallthrough to landing pad, copy stack values,
+            // clean up exception handlers, then branch to the actual place.
+            // If branch not taken, branch to the next of the landing pad.
             let onBranchNotTaken = iseqBuilder.allocLabel()
             self.updateInstructionMapping()
             iseqBuilder.emitWithLabel(Instruction.brIfNot, onBranchNotTaken) { _, conditionCheckAt, continuation in
@@ -1530,6 +1586,9 @@ struct InstructionTranslator: InstructionVisitor {
                 return Instruction.BrIfOperand(condition: LVReg(condition), offset: Int32(relativeOffset))
             }
             try copyOnBranch(targetFrame: frame)
+            if handlersToUnwind > 0 {
+                emit(.catchHandlersEnd(Instruction.CatchHandlersEndOperand(count: handlersToUnwind)))
+            }
             self.updateInstructionMapping()
             try emitBranch(Instruction.br, relativeDepth: relativeDepth) { offset, copyCount, popCount in
                 return offset
@@ -1599,6 +1658,8 @@ struct InstructionTranslator: InstructionVisitor {
             }
             try checkStackTop(frame.copyTypes)
 
+            let handlersToUnwind = controlStack.catchHandlersToUnwind(relativeDepth: labelIndex)
+
             do {
                 let relativeOffset = iseqBuilder.insertingPC.offsetFromHead - brTableAt.offsetFromHead
                 tableBuffer[entryIndex] = Instruction.BrTableOperand.Entry(
@@ -1606,14 +1667,18 @@ struct InstructionTranslator: InstructionVisitor {
                 )
             }
             let emittedCopy = try copyOnBranch(targetFrame: frame)
-            if emittedCopy {
+            if emittedCopy || handlersToUnwind > 0 {
+                if handlersToUnwind > 0 {
+                    emit(.catchHandlersEnd(Instruction.CatchHandlersEndOperand(count: handlersToUnwind)))
+                }
                 self.updateInstructionMapping()
                 iseqBuilder.emitWithLabel(Instruction.br, frame.continuation) { _, brAt, continuation in
                     let relativeOffset = continuation.offsetFromHead - brAt.offsetFromHead
                     return Int32(relativeOffset)
                 }
             } else {
-                // Optimization: If no value is copied, we can directly jump to the target
+                // Optimization: If no value is copied and no handlers to unwind,
+                // we can directly jump to the target
                 iseqBuilder.fillBrTableEntry(frame.continuation, table: tableBuffer, index: entryIndex) { _, continuation in
                     return Instruction.BrTableOperand.Entry(offset: Int32(continuation.offsetFromHead - brTableAt.offsetFromHead))
                 }
@@ -1713,6 +1778,13 @@ struct InstructionTranslator: InstructionVisitor {
             // Skip actual code emission if validation-only mode
             return
         }
+        // Clean up all exception handlers before the tail call
+        let handlersToUnwind = controlStack.catchHandlersToUnwind(
+            relativeDepth: UInt32(controlStack.numberOfFrames - 1)
+        )
+        if handlersToUnwind > 0 {
+            emit(.catchHandlersEnd(Instruction.CatchHandlersEndOperand(count: handlersToUnwind)))
+        }
         try prepareFrameHeaderForReturnCall(calleeType: calleeType, stackTopHeightToCopy: valueStack.slotHeight)
         emit(.returnCall(Instruction.ReturnCallOperand(callee: callee)))
         try markUnreachable()
@@ -1728,6 +1800,13 @@ struct InstructionTranslator: InstructionVisitor {
         let calleeType = try self.module.resolveType(typeIndex)
         let internType = funcTypeInterner.intern(calleeType)
 
+        // Clean up all exception handlers before the tail call
+        let handlersToUnwind = controlStack.catchHandlersToUnwind(
+            relativeDepth: UInt32(controlStack.numberOfFrames - 1)
+        )
+        if handlersToUnwind > 0 {
+            emit(.catchHandlersEnd(Instruction.CatchHandlersEndOperand(count: handlersToUnwind)))
+        }
         try prepareFrameHeaderForReturnCall(
             calleeType: calleeType,
             // Keep the stack space including the function index slot to be
@@ -1742,6 +1821,115 @@ struct InstructionTranslator: InstructionVisitor {
         )
         emit(.returnCallIndirect(operand))
         try markUnreachable()
+    }
+
+    // MARK: - Exception handling
+
+    mutating func visitThrow(tagIndex: UInt32) throws -> Output {
+        let tag = try module.tags[validating: Int(tagIndex)]
+        let tagType = funcTypeInterner.resolve(tag.type)
+        // Pop tag parameter values and ensure they're on the physical stack
+        for param in tagType.parameters.reversed() {
+            guard (try popOnStackOperand(param)) != nil else { return }
+        }
+        let payloadBase = valueStack.stackRegBase + VReg(valueStack.slotHeight)
+        // Push the parameter values back (they've been popped for on-stack guarantee)
+        for param in tagType.parameters {
+            _ = valueStack.push(param)
+        }
+        emit(.throwTag(Instruction.ThrowTagOperand(tagIndex: tagIndex, payloadBase: payloadBase)))
+        try markUnreachable()
+    }
+
+    mutating func visitThrowRef() throws -> Output {
+        guard let exnRef = try popVRegOperand(.ref(.init(isNullable: true, heapType: .abstract(.exnRef)))) else { return }
+        emit(.throwRef(Instruction.ThrowRefOperand(exnRef: exnRef)))
+        try markUnreachable()
+    }
+
+    mutating func visitTryTable(blockType: WasmParser.BlockType, tryCatch: WasmParser.TryCatch) throws -> Output {
+        let blockType = try module.resolveBlockType(blockType)
+        let endLabel = iseqBuilder.allocLabel()
+
+        self.preserveLocalsOnStack(depth: self.valueStack.valueHeight)
+        let stackHeight = try popPushValues(blockType.parameters)
+
+        let catchCount = UInt16(tryCatch.catches.count)
+
+        // Push the try_table frame BEFORE processing catch clauses so that
+        // label depths are correct (depth 0 = try_table itself, depth 1 = enclosing block, etc.)
+        controlStack.pushFrame(
+            ControlStack.ControlFrame(
+                blockType: blockType,
+                valueStackHeight: stackHeight.valueHeight,
+                slotStackHeight: stackHeight.slotHeight,
+                continuation: endLabel,
+                kind: .tryTable(catchCount: catchCount)
+            )
+        )
+
+        // Allocate the catch table
+        let catchTable = allocator.allocateCatchTable(capacity: tryCatch.catches.count)
+
+        // Emit the catchHandlers instruction first so we know its PC position.
+        self.updateInstructionMapping()
+        let operand = Instruction.CatchHandlersOperand(
+            baseAddress: UnsafePointer(catchTable.baseAddress!),
+            count: catchCount
+        )
+        emit(.catchHandlers(operand))
+
+        // After emission, insertingPC points past the catchHandlers instruction.
+        // This is the reference point for pcOffset values.
+        let catchHandlersEndPC = iseqBuilder.insertingPC
+
+        // For each catch clause, set up the handler entry.
+        // The pcOffset will be resolved lazily via the label system.
+        for (i, clause) in tryCatch.catches.enumerated() {
+            let tagIndex: UInt32?
+            let labelDepth: UInt32
+            let isRef: Bool
+
+            switch clause {
+            case .catch(let tIdx, let lIdx):
+                tagIndex = tIdx; labelDepth = lIdx; isRef = false
+            case .catchRef(let tIdx, let lIdx):
+                tagIndex = tIdx; labelDepth = lIdx; isRef = true
+            case .catchAll(let lIdx):
+                tagIndex = nil; labelDepth = lIdx; isRef = false
+            case .catchAllRef(let lIdx):
+                tagIndex = nil; labelDepth = lIdx; isRef = true
+            }
+
+            let targetFrame = try controlStack.branchTarget(relativeDepth: labelDepth)
+
+            // Resolve the tag to get the InternalTag handle
+            let tag: InternalTag?
+            if let tagIndex {
+                tag = try module.tags[validating: Int(tagIndex)]
+            } else {
+                tag = nil
+            }
+
+            // The payload register base is where the handler will write values.
+            // This is at the target frame's stack base.
+            let payloadRegBase = valueStack.stackRegBase + VReg(targetFrame.slotStackHeight)
+
+            // Initialize the entry with a placeholder pcOffset (will be resolved)
+            catchTable[i] = CatchTableEntry(
+                tag: tag,
+                isRef: isRef,
+                pcOffset: 0,  // placeholder
+                payloadRegBase: payloadRegBase
+            )
+
+            // Schedule the pcOffset to be filled when the target label is resolved.
+            // The offset is relative to catchHandlersEndPC.
+            iseqBuilder.fillCatchTableEntry(
+                targetFrame.continuation, table: catchTable, index: i,
+                catchHandlersPC: catchHandlersEndPC
+            )
+        }
     }
 
     mutating func visitDrop() throws -> Output {

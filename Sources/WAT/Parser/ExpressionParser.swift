@@ -328,10 +328,10 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
                     this.labelStack.pop()
                     return try visitor.visitEnd()
                 })
-            case "block", "loop":
+            case "block", "loop", "try_table":
                 // Visit the block instruction itself
                 _ = try visit(&visitor)
-                // Visit child expr here because folded "block" and "loop"
+                // Visit child expr here because folded "block", "loop", and "try_table"
                 // allows unfolded child instructions unlike others.
                 try parse(visitor: &visitor, wat: &wat)
                 suspense = Suspense(visit: { visitor, this throws(WatParserError) in
@@ -462,11 +462,13 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
             return .funcRef
         } else if try parser.takeKeyword("extern") {
             return .externRef
+        } else if try parser.takeKeyword("exn") {
+            return .exnRef
         } else if let id = try parser.takeIndexOrId() {
             let (_, index) = try wat.types.resolve(use: id)
             return .concrete(typeIndex: UInt32(index))
         }
-        throw WatParserError("expected \"func\", \"extern\" or type index", location: parser.lexer.location())
+        throw WatParserError("expected \"func\", \"extern\", \"exn\" or type index", location: parser.lexer.location())
     }
 
     private mutating func memArg(defaultAlign: UInt32) throws(WatParserError) -> MemArg {
@@ -544,6 +546,41 @@ extension ExpressionParser {
     }
     mutating func visitReturnCallRef(wat: inout Wat) throws(WatParserError) -> UInt32 {
         return try visitCallRef(wat: &wat)
+    }
+    mutating func visitThrow(wat: inout Wat) throws(WatParserError) -> UInt32 {
+        let use = try parser.expectIndexOrId()
+        return UInt32(try wat.tagsMap.resolve(use: use).index)
+    }
+    mutating func visitTryTable(wat: inout Wat) throws(WatParserError) -> (blockType: BlockType, tryCatch: TryCatch) {
+        self.labelStack.push(try parser.takeId())
+        let bt = try blockType(wat: &wat)
+        var catches: [CatchClause] = []
+        while true {
+            if try parser.takeParenBlockStart("catch") {
+                let tagUse = try parser.expectIndexOrId()
+                let tagIndex = UInt32(try wat.tagsMap.resolve(use: tagUse).index)
+                let label = try labelIndex()
+                try parser.expect(.rightParen)
+                catches.append(.catch(tagIndex: tagIndex, labelIndex: label))
+            } else if try parser.takeParenBlockStart("catch_ref") {
+                let tagUse = try parser.expectIndexOrId()
+                let tagIndex = UInt32(try wat.tagsMap.resolve(use: tagUse).index)
+                let label = try labelIndex()
+                try parser.expect(.rightParen)
+                catches.append(.catchRef(tagIndex: tagIndex, labelIndex: label))
+            } else if try parser.takeParenBlockStart("catch_all") {
+                let label = try labelIndex()
+                try parser.expect(.rightParen)
+                catches.append(.catchAll(labelIndex: label))
+            } else if try parser.takeParenBlockStart("catch_all_ref") {
+                let label = try labelIndex()
+                try parser.expect(.rightParen)
+                catches.append(.catchAllRef(labelIndex: label))
+            } else {
+                break
+            }
+        }
+        return (bt, TryCatch(catches: catches))
     }
     mutating func visitBrOnNull(wat: inout Wat) throws(WatParserError) -> UInt32 {
         return try labelIndex()

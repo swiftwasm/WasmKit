@@ -15,6 +15,26 @@ struct Execution: ~Copyable {
     /// - Note: If the trap is set, it must be released manually.
     private var trap: (error: UnsafeRawPointer, sp: Sp)? = nil
 
+    /// The stack of active exception handlers for try_table blocks.
+    var exceptionHandlers: [ExceptionHandler] = []
+
+    /// Storage for caught exceptions that may be referenced via exnref.
+    var storedExceptions: [WasmKitException] = []
+
+    /// An active exception handler entry registered by a `try_table` block.
+    struct ExceptionHandler {
+        /// The tag to match, nil for catch_all/catch_all_ref.
+        let tag: InternalTag?
+        /// Whether this handler pushes an exnref (catch_ref/catch_all_ref).
+        let isRef: Bool
+        /// The SP to restore when this handler catches.
+        let sp: Sp
+        /// The PC to jump to when this handler catches.
+        let targetPC: Pc
+        /// The register offset where payload values should be written (relative to sp).
+        let payloadRegBase: VReg
+    }
+
     #if WasmDebuggingSupport
         package init(store: StoreRef, stackEnd: UnsafeMutablePointer<StackSlot>) {
             self.store = store
@@ -488,17 +508,28 @@ extension Execution {
         #if os(WASI)
             fatalError("Direct threading is not supported on WASI")
         #else
+            var sp = sp
             var pc = pc
-            let handler = pc.read(wasmkit_tc_exec.self)
-            withUnsafeMutablePointer(to: &self) { selfPtr in
-                wasmkit_tc_start(handler, sp, pc, md, ms, selfPtr)
-            }
-            if let (rawError, trappingSp) = self.trap {
+            var md = md
+            var ms = ms
+            while true {
+                let handler = pc.read(wasmkit_tc_exec.self)
+                withUnsafeMutablePointer(to: &self) { selfPtr in
+                    wasmkit_tc_start(handler, sp, pc, md, ms, selfPtr)
+                }
+                guard let (rawError, trappingSp) = self.trap else { return }
                 let error = unsafeBitCast(rawError, to: Error.self)
                 // Manually release the error object because the trap is caught in C and
                 // held as a raw pointer.
                 wasmkit_swift_errorRelease(rawError)
+                self.resetError()
 
+                if let exception = error as? WasmKitException {
+                    if handleException(exception, sp: &sp, pc: &pc, md: &md, ms: &ms) {
+                        continue
+                    }
+                    throw exception
+                }
                 guard let trap = error as? Trap else {
                     throw error
                 }
@@ -580,15 +611,23 @@ extension Execution {
             defer { stats.dump() }
         #endif
         var opcode = pc.read(OpcodeID.self)
-        do {
-            while true {
-                #if EngineStats
-                    stats.track(inst)
-                #endif
-                opcode = try doExecute(opcode, sp: &sp, pc: &pc, md: &md, ms: &ms)
+        while true {
+            do {
+                while true {
+                    #if EngineStats
+                        stats.track(inst)
+                    #endif
+                    opcode = try doExecute(opcode, sp: &sp, pc: &pc, md: &md, ms: &ms)
+                }
+            } catch let exception as WasmKitException {
+                if handleException(exception, sp: &sp, pc: &pc, md: &md, ms: &ms) {
+                    opcode = pc.read(OpcodeID.self)
+                    continue
+                }
+                throw exception
+            } catch let trap as Trap {
+                throw trap.withBacktrace(Self.captureBacktrace(sp: sp, store: store.value))
             }
-        } catch let trap as Trap {
-            throw trap.withBacktrace(Self.captureBacktrace(sp: sp, store: store.value))
         }
     }
 

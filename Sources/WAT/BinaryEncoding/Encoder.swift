@@ -131,6 +131,7 @@ extension ReferenceType: WasmEncodable {
         // Use short form when available
         case (true, .externRef): encoder.output.append(0x6F)
         case (true, .funcRef): encoder.output.append(0x70)
+        case (true, .exnRef): encoder.output.append(0x69)
         default:
             encoder.output.append(isNullable ? 0x63 : 0x64)
             encoder.encode(heapType)
@@ -143,6 +144,7 @@ extension HeapType: WasmEncodable {
         switch self {
         case .abstract(.externRef): encoder.output.append(0x6F)
         case .abstract(.funcRef): encoder.output.append(0x70)
+        case .abstract(.exnRef): encoder.output.append(0x69)
         case .concrete(let typeIndex):
             // Note that the typeIndex is decoded as s33,
             // so we need to encode it as signed.
@@ -338,6 +340,9 @@ extension Export: WasmEncodable {
         case .global(let index):
             encoder.output.append(0x03)
             encoder.writeUnsignedLEB128(UInt32(index))
+        case .tag(let index):
+            encoder.output.append(0x04)
+            encoder.writeUnsignedLEB128(UInt32(index))
         }
     }
 }
@@ -409,6 +414,10 @@ extension Import: WasmEncodable {
         case .global(let globalType):
             encoder.output.append(0x03)
             globalType.encode(to: &encoder)
+        case .tag(let typeIndex):
+            encoder.output.append(0x04)
+            encoder.output.append(0x00) // attribute: exception
+            encoder.writeUnsignedLEB128(UInt32(typeIndex))
         }
     }
 }
@@ -549,6 +558,29 @@ struct ExpressionEncoder: BinaryInstructionEncoder {
     mutating func encodeImmediates(value: WasmTypes.V128) { encoder.output.append(contentsOf: value.bytes) }
     mutating func encodeImmediates(value: WasmParser.IEEE754.Float32) { encodeFixedWidth(value.bitPattern) }
     mutating func encodeImmediates(value: WasmParser.IEEE754.Float64) { encodeFixedWidth(value.bitPattern) }
+    mutating func encodeImmediates(tagIndex: UInt32) { encodeUnsigned(tagIndex) }
+    mutating func encodeImmediates(blockType: WasmParser.BlockType, tryCatch: WasmParser.TryCatch) {
+        encodeImmediates(blockType: blockType)
+        encoder.writeUnsignedLEB128(UInt32(tryCatch.catches.count))
+        for clause in tryCatch.catches {
+            switch clause {
+            case .catch(let tagIndex, let labelIndex):
+                encoder.output.append(0x00)
+                encoder.writeUnsignedLEB128(tagIndex)
+                encoder.writeUnsignedLEB128(labelIndex)
+            case .catchRef(let tagIndex, let labelIndex):
+                encoder.output.append(0x01)
+                encoder.writeUnsignedLEB128(tagIndex)
+                encoder.writeUnsignedLEB128(labelIndex)
+            case .catchAll(let labelIndex):
+                encoder.output.append(0x02)
+                encoder.writeUnsignedLEB128(labelIndex)
+            case .catchAllRef(let labelIndex):
+                encoder.output.append(0x03)
+                encoder.writeUnsignedLEB128(labelIndex)
+            }
+        }
+    }
     mutating func encodeImmediates(dstMem: UInt32, srcMem: UInt32) {
         encodeUnsigned(dstMem)
         encodeUnsigned(srcMem)
@@ -579,6 +611,7 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
         return (locals, function)
     }
     var functionSection: [UInt32] = []
+    var tagSection: [UInt32] = []
     var hasDataSegmentInstruction = false
 
     if !functions.isEmpty {
@@ -611,6 +644,13 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
                     hasDataSegmentInstruction = hasDataSegmentInstruction || exprEncoder.hasDataSegmentInstruction
                 })
         }
+    }
+
+    // Pre-resolve tag type indices so their types are in the type section.
+    let tagDefinitions = module.tagsMap.definitions()
+    for tag in tagDefinitions {
+        let typeIndex = try module.types.resolveIndex(use: tag.typeUse)
+        tagSection.append(UInt32(typeIndex))
     }
 
     // Section 1: Type section
@@ -651,6 +691,18 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
     if !memories.isEmpty {
         encoder.section(id: 0x05) { encoder in
             encoder.encodeVector(memories)
+        }
+    }
+
+    // Section 13: Tag section
+    // Note: tagsec is placed between memsec and globalsec in the module grammar.
+    // https://webassembly.github.io/exception-handling/core/binary/modules.html#binary-module
+    if !tagSection.isEmpty {
+        encoder.section(id: 0x0D) { encoder in
+            encoder.encodeVector(tagSection) { typeIndex, encoder in
+                encoder.output.append(0x00)  // attribute: exception
+                encoder.writeUnsignedLEB128(typeIndex)
+            }
         }
     }
 

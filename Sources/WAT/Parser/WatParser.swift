@@ -28,11 +28,17 @@ struct WatParser {
         case imported(ImportNames)
     }
 
+    enum TagKind {
+        case definition
+        case imported(ImportNames)
+    }
+
     enum ExternalKind {
         case function
         case table
         case memory
         case global
+        case tag
     }
 
     struct UnresolvedType<T> {
@@ -188,6 +194,20 @@ struct WatParser {
         }
     }
 
+    struct TagDecl: NamedFieldDecl, ImportableModuleFieldDecl {
+        var id: Name?
+        var exports: [String]
+        var typeUse: TypeUse
+        var kind: TagKind
+
+        var importNames: WatParser.ImportNames? {
+            switch kind {
+            case .definition: return nil
+            case .imported(let importNames): return importNames
+            }
+        }
+    }
+
     struct MemoryDecl: NamedFieldDecl, ImportableModuleFieldDecl {
         var id: Name?
         var exports: [String]
@@ -213,6 +233,7 @@ struct WatParser {
         case table(TableDecl)
         case memory(MemoryDecl)
         case global(GlobalDecl)
+        case tag(TagDecl)
         case export(ExportDecl)
         case start(id: Parser.IndexOrId)
         case element(ElementDecl)
@@ -247,6 +268,9 @@ struct WatParser {
             } else if try parser.takeParenBlockStart("global") {
                 let id = try parser.takeId()
                 kind = .global(GlobalDecl(id: id, exports: [], type: try globalType(), kind: .imported(importNames)))
+            } else if try parser.takeParenBlockStart("tag") {
+                let id = try parser.takeId()
+                kind = .tag(TagDecl(id: id, exports: [], typeUse: try typeUse(mayHaveName: false), kind: .imported(importNames)))
             } else {
                 throw WatParserError("unexpected token", location: parser.lexer.location())
             }
@@ -374,6 +398,19 @@ struct WatParser {
                 try parser.skipParenBlock()
             }
             kind = .global(GlobalDecl(id: id, exports: exports, type: type, kind: globalKind))
+        case "tag":
+            let id = try parser.takeId()
+            let exports = try inlineExports()
+            let importNames = try inlineImport()
+            let tagTypeUse = try typeUse(mayHaveName: false)
+            let tagKind: TagKind
+            if let importNames {
+                tagKind = .imported(importNames)
+            } else {
+                tagKind = .definition
+            }
+            kind = .tag(TagDecl(id: id, exports: exports, typeUse: tagTypeUse, kind: tagKind))
+            try parser.expect(.rightParen)
         case "export":
             let name = try parser.expectString()
             let decl: ExportDecl
@@ -393,6 +430,10 @@ struct WatParser {
                 let index = try parser.expectIndexOrId()
                 try parser.expect(.rightParen)
                 decl = ExportDecl(name: name, id: index, kind: .global)
+            } else if try parser.takeParenBlockStart("tag") {
+                let index = try parser.expectIndexOrId()
+                try parser.expect(.rightParen)
+                decl = ExportDecl(name: name, id: index, kind: .tag)
             } else {
                 throw WatParserError("unexpected token", location: parser.lexer.location())
             }
@@ -722,6 +763,8 @@ struct WatParser {
             return UnresolvedType(.funcRef)
         } else if try parser.takeKeyword("externref") {
             return UnresolvedType(.externRef)
+        } else if try parser.takeKeyword("exnref") {
+            return UnresolvedType(.exnRef)
         } else if try parser.takeParenBlockStart("ref") {
             let isNullable = try parser.takeKeyword("null")
             let heapType = try heapType()
@@ -740,6 +783,8 @@ struct WatParser {
             return UnresolvedType(.abstract(.funcRef))
         } else if try parser.takeKeyword("extern") {
             return UnresolvedType(.abstract(.externRef))
+        } else if try parser.takeKeyword("exn") {
+            return UnresolvedType(.abstract(.exnRef))
         } else if let id = try parser.takeIndexOrId() {
             return UnresolvedType(make: { resolver in
                 Result { () throws(WatParserError) in try .concrete(typeIndex: UInt32(resolver.resolveIndex(use: id))) }

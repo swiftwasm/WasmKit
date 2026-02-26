@@ -160,6 +160,8 @@ public typealias GlobalIndex = UInt32
 public typealias ElementIndex = UInt32
 /// Index type for data segments within a module
 public typealias DataIndex = UInt32
+/// Index type for tags within a module
+public typealias TagIndex = UInt32
 
 public typealias ConstExpression = [Instruction]
 
@@ -186,6 +188,41 @@ public struct Memory: Equatable {
 public struct Global: Equatable {
     public let type: GlobalType
     public let initializer: ConstExpression
+}
+
+/// Tag entry in a module
+/// > Note:
+/// <https://webassembly.github.io/exception-handling/core/syntax/modules.html#tags>
+public struct Tag: Equatable {
+    /// The type index of the tag's function type (parameters = exception payload, results must be empty).
+    public let type: TypeIndex
+
+    public init(type: TypeIndex) {
+        self.type = type
+    }
+}
+
+/// Catch clause within a `try_table` instruction.
+/// > Note:
+/// <https://webassembly.github.io/exception-handling/core/binary/instructions.html#control-instructions>
+public enum CatchClause: Equatable {
+    /// Catches an exception matching the given tag and branches with payload values.
+    case `catch`(tagIndex: TagIndex, labelIndex: UInt32)
+    /// Like `catch`, but also passes an `exnref`.
+    case catchRef(tagIndex: TagIndex, labelIndex: UInt32)
+    /// Catches any exception and branches with no extra values.
+    case catchAll(labelIndex: UInt32)
+    /// Like `catchAll`, but also passes an `exnref`.
+    case catchAllRef(labelIndex: UInt32)
+}
+
+/// The catch clause vector associated with a `try_table` instruction.
+public struct TryCatch: Equatable {
+    public let catches: [CatchClause]
+
+    public init(catches: [CatchClause]) {
+        self.catches = catches
+    }
 }
 
 /// Segment of elements that are initialized in a table
@@ -277,6 +314,8 @@ public enum ExportDescriptor: Equatable {
     case memory(MemoryIndex)
     /// Global export
     case global(GlobalIndex)
+    /// Tag export
+    case tag(TagIndex)
 }
 
 /// Import entity in a module
@@ -307,6 +346,8 @@ public enum ImportDescriptor: Equatable {
     case memory(MemoryType)
     /// Global import
     case global(GlobalType)
+    /// Tag import
+    case tag(TypeIndex)
 }
 
 @usableFromInline

@@ -56,6 +56,18 @@ public struct Trap: Error, CustomStringConvertible {
     }
 }
 
+/// An uncaught WebAssembly exception that propagated out of a module.
+public struct WasmKitException: Error, CustomStringConvertible {
+    /// The internal tag handle.
+    let tag: InternalTag
+    /// The exception payload values.
+    let payload: [Value]
+
+    public var description: String {
+        "wasm exception (payload: \(payload))"
+    }
+}
+
 /// A reason for a trap that occurred during execution of a WebAssembly module.
 package enum TrapReason: Error, CustomStringConvertible {
     package struct Message {
@@ -177,6 +189,8 @@ extension ImportError.Message {
             expected = "memory"
         case .table:
             expected = "table"
+        case .tag:
+            expected = "tag"
         }
         let got: String
         switch entity {
@@ -188,6 +202,8 @@ extension ImportError.Message {
             got = "memory"
         case .table:
             got = "table"
+        case .tag:
+            got = "tag"
         }
         return Self("incompatible import type for \(importEntry.module).\(importEntry.name), expected \(expected), got \(got)")
     }

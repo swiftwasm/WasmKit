@@ -212,6 +212,7 @@ class StoreAllocator {
     private var tables: BumpAllocator<TableEntity>
     private var memories: BumpAllocator<MemoryEntity>
     private var globals: BumpAllocator<GlobalEntity>
+    private var tags: BumpAllocator<TagEntity>
     private var elements: BumpAllocator<ElementSegmentEntity>
     private var datas: BumpAllocator<DataSegmentEntity>
     private var codes: BumpAllocator<Code>
@@ -234,6 +235,7 @@ class StoreAllocator {
         tables = BumpAllocator(initialCapacity: 2)
         memories = BumpAllocator(initialCapacity: 2)
         globals = BumpAllocator(initialCapacity: 256)
+        tags = BumpAllocator(initialCapacity: 2)
         elements = BumpAllocator(initialCapacity: 2)
         datas = BumpAllocator(initialCapacity: 64)
         arrayAllocator = ImmutableArrayAllocator()
@@ -271,6 +273,7 @@ extension StoreAllocator {
         var importedTables: [InternalTable] = []
         var importedMemories: [InternalMemory] = []
         var importedGlobals: [InternalGlobal] = []
+        var importedTags: [InternalTag] = []
 
         // External values imported in this module should be included in corresponding index spaces before definitions
         // local to to the module are added.
@@ -331,6 +334,16 @@ extension StoreAllocator {
                     throw ImportError(.incompatibleGlobalType(importEntry, actual: global.globalType, expected: globalType))
                 }
                 importedGlobals.append(global)
+
+            case (.tag(let typeIndex), .tag(let tag)):
+                guard typeIndex < module.types.count else {
+                    throw ValidationError(.indexOutOfBounds("type", typeIndex, max: module.types.count))
+                }
+                let expected = module.types[Int(typeIndex)]
+                guard engine.internType(expected) == tag.type else {
+                    throw ImportError(.incompatibleFunctionType(importEntry, actual: engine.resolveType(tag.type), expected: expected))
+                }
+                importedTags.append(tag)
 
             default:
                 throw ImportError(.incompatibleType(importEntry, entity: external))
@@ -411,6 +424,16 @@ extension StoreAllocator {
             }
         )
 
+        // Allocate tags.
+        let tags = try allocateEntities(
+            imports: importedTags,
+            internals: module.tagTypes[module.moduleImports.numberOfTags...],
+            allocateHandle: { typeIndex, _ in
+                let funcType = try Module.resolveType(typeIndex, typeSection: module.types)
+                return allocate(tagType: funcType, engine: engine)
+            }
+        )
+
         // Step 6.
         let elements = try ImmutableArray<InternalElementSegment>(allocator: arrayAllocator, count: module.elements.count) { buffer in
             for (index, element) in module.elements.enumerated() {
@@ -458,6 +481,9 @@ extension StoreAllocator {
             case .global(let index):
                 let handle = try globals[validating: Int(index)]
                 return .global(handle)
+            case .tag(let index):
+                let handle = try tags[validating: Int(index)]
+                return .tag(handle)
             }
         }
 
@@ -475,6 +501,7 @@ extension StoreAllocator {
             tables: tables,
             memories: memories,
             globals: globals,
+            tags: tags,
             elementSegments: elements,
             dataSegments: dataSegments,
             exports: exports,
@@ -543,6 +570,13 @@ extension StoreAllocator {
     }
 
     /// > Note:
+    /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-tag>
+    func allocate(tagType: FunctionType, engine: Engine) -> InternalTag {
+        let pointer = tags.allocate(initializing: TagEntity(type: engine.internType(tagType)))
+        return InternalTag(unsafe: pointer)
+    }
+
+    /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#element-segments>
     private func allocate(elementType: ReferenceType, references: [Reference]) -> InternalElementSegment {
         let pointer = elements.allocate(initializing: ElementSegmentEntity(type: elementType, references: references))
@@ -584,6 +618,7 @@ extension StoreAllocator {
                 tables: ImmutableArray(),
                 memories: ImmutableArray(),
                 globals: ImmutableArray(),
+                tags: ImmutableArray(),
                 elementSegments: ImmutableArray(),
                 dataSegments: ImmutableArray(),
                 exports: exports,

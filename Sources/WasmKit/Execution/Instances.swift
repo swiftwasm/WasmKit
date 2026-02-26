@@ -78,6 +78,7 @@ package struct InstanceEntity /* : ~Copyable */ {
     var tables: ImmutableArray<InternalTable>
     var memories: ImmutableArray<InternalMemory>
     var globals: ImmutableArray<InternalGlobal>
+    var tags: ImmutableArray<InternalTag>
     var elementSegments: ImmutableArray<InternalElementSegment>
     var dataSegments: ImmutableArray<InternalDataSegment>
     var exports: [String: InternalExternalValue]
@@ -95,6 +96,7 @@ package struct InstanceEntity /* : ~Copyable */ {
             tables: ImmutableArray(),
             memories: ImmutableArray(),
             globals: ImmutableArray(),
+            tags: ImmutableArray(),
             elementSegments: ImmutableArray(),
             dataSegments: ImmutableArray(),
             exports: [:],
@@ -286,8 +288,10 @@ struct TableEntity /* : ~Copyable */ {
             emptyElement = .function(nil)
         case .abstract(.externRef):
             emptyElement = .extern(nil)
+        case .abstract(.exnRef):
+            emptyElement = .exception(nil)
         case .concrete:
-            throw Trap(.unimplemented(feature: "heap type other than `func` and `extern`"))
+            throw Trap(.unimplemented(feature: "heap type other than `func`, `extern`, and `exn`"))
         }
 
         let numberOfElements = Int(tableType.limits.min)
@@ -813,6 +817,29 @@ public struct Global: Equatable {
     }
 }
 
+/// A WebAssembly `tag` instance.
+/// > Note:
+/// <https://webassembly.github.io/spec/core/exec/runtime.html#syntax-taginst>
+public struct Tag: Equatable {
+    let handle: InternalTag
+    let allocator: StoreAllocator
+
+    init(handle: InternalTag, allocator: StoreAllocator) {
+        self.handle = handle
+        self.allocator = allocator
+    }
+
+    /// Create a new WebAssembly `tag` instance.
+    ///
+    /// - Parameters:
+    ///   - store: The store to allocate the tag instance in.
+    ///   - type: The function type describing the tag's parameters.
+    public init(store: Store, type: FunctionType) {
+        let handle = store.allocator.allocate(tagType: type, engine: store.engine)
+        self.init(handle: handle, allocator: store.allocator)
+    }
+}
+
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#element-instances>
 struct ElementSegmentEntity {
@@ -846,12 +873,27 @@ struct DataSegmentEntity {
 typealias InternalDataSegment = EntityHandle<DataSegmentEntity>
 
 /// > Note:
+/// <https://webassembly.github.io/spec/core/exec/runtime.html#syntax-taginst>
+struct TagEntity {
+    let type: InternedFuncType
+}
+
+extension TagEntity: ValidatableEntity {
+    static func createOutOfBoundsError(index: Int, count: Int) -> Error {
+        ValidationError(.indexOutOfBounds("tag", index, max: count))
+    }
+}
+
+typealias InternalTag = EntityHandle<TagEntity>
+
+/// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#syntax-externval>
 public enum ExternalValue: Equatable {
     case function(Function)
     case table(Table)
     case memory(Memory)
     case global(Global)
+    case tag(Tag)
 
     init(handle: InternalExternalValue, store: Store) {
         switch handle {
@@ -863,6 +905,8 @@ public enum ExternalValue: Equatable {
             self = .memory(Memory(handle: memory, allocator: store.allocator))
         case .global(let global):
             self = .global(Global(handle: global, allocator: store.allocator))
+        case .tag(let tag):
+            self = .tag(Tag(handle: tag, allocator: store.allocator))
         }
     }
 
@@ -876,6 +920,8 @@ public enum ExternalValue: Equatable {
             return (.memory(memory.handle), memory.allocator)
         case .global(let global):
             return (.global(global.handle), global.allocator)
+        case .tag(let tag):
+            return (.tag(tag.handle), tag.allocator)
         }
     }
 }
@@ -885,4 +931,5 @@ enum InternalExternalValue {
     case table(InternalTable)
     case memory(InternalMemory)
     case global(InternalGlobal)
+    case tag(InternalTag)
 }
