@@ -90,23 +90,27 @@ Proposals are grouped by their [phase](https://github.com/WebAssembly/meetings/b
 
 | Proposal | Status | WasmKit version |
 |----------|--------|-----------------|
-| [Bulk Memory Operations](https://github.com/WebAssembly/bulk-memory-operations) | ✅ Implemented | 0.0.2 |
+| [Bulk Memory Operations](https://github.com/WebAssembly/bulk-memory-operations) | ✅ Implemented | [0.0.2] |
 | [Fixed-width SIMD](https://github.com/webassembly/simd) | ✅ Implemented | `main` branch |
-| [Import/Export of Mutable Globals](https://github.com/WebAssembly/mutable-global) | ✅ Implemented | 0.0.2 |
-| [Memory64](https://github.com/WebAssembly/memory64) | ✅ Implemented | 0.0.2 |
-| [Multi-value](https://github.com/WebAssembly/multi-value) | ✅ Implemented | 0.0.2 |
-| [Multiple Memories](https://github.com/WebAssembly/multi-memory) | ✅ Implemented | `main` branch |
-| [Non-trapping Float-to-Int Conversions](https://github.com/WebAssembly/nontrapping-float-to-int-conversions) | ✅ Implemented | 0.0.2 |
-| [Reference Types](https://github.com/WebAssembly/reference-types) | ✅ Implemented | 0.0.2 |
-| [Sign-extension Operators](https://github.com/WebAssembly/sign-extension-ops) | ✅ Implemented | 0.0.2 |
-| [Tail Call](https://github.com/WebAssembly/tail-call) | ✅ Implemented | 0.1.4 |
-| [Typed Function References](https://github.com/WebAssembly/function-references) | 🚧 Parser implemented | 0.2.0 |
+| [Import/Export of Mutable Globals](https://github.com/WebAssembly/mutable-global) | ✅ Implemented | [0.0.2] |
+| [Memory64](https://github.com/WebAssembly/memory64) | ✅ Implemented | [0.0.2] |
+| [Multi-value](https://github.com/WebAssembly/multi-value) | ✅ Implemented | [0.0.2] |
+| [Non-trapping Float-to-Int Conversions](https://github.com/WebAssembly/nontrapping-float-to-int-conversions) | ✅ Implemented | [0.0.2] |
+| [Reference Types](https://github.com/WebAssembly/reference-types) | ✅ Implemented | [0.0.2] |
+| [Sign-extension Operators](https://github.com/WebAssembly/sign-extension-ops) | ✅ Implemented | [0.0.2] |
+| [Tail Call](https://github.com/WebAssembly/tail-call) | ✅ Implemented | [0.1.4] |
+| [Typed Function References](https://github.com/WebAssembly/function-references) | 🚧 Parser implemented | [0.2.0] |
 | [Branch Hinting](https://github.com/WebAssembly/branch-hinting) | ❌ Not implemented | |
 | [Custom Annotation Syntax in the Text Format](https://github.com/WebAssembly/annotations) | ❌ Not implemented | |
 | [Exception Handling](https://github.com/WebAssembly/exception-handling) | ❌ Not implemented | |
 | [Extended Constant Expressions](https://github.com/WebAssembly/extended-const) | ❌ Not implemented | |
 | [Garbage Collection](https://github.com/WebAssembly/gc) | ❌ Not implemented | |
+| [Multiple Memories](https://github.com/WebAssembly/multi-memory) | ❌ Not implemented | |
 | [Relaxed SIMD](https://github.com/WebAssembly/relaxed-simd) | ❌ Not implemented | |
+
+[0.0.2]: https://github.com/swiftwasm/WasmKit/releases/tag/0.0.2
+[0.1.4]: https://github.com/swiftwasm/WasmKit/releases/tag/0.1.4
+[0.2.0]: https://github.com/swiftwasm/WasmKit/releases/tag/0.2.0
 
 #### Phase 4 - Standardize the Feature (WG)
 
@@ -124,7 +128,7 @@ Proposals are grouped by their [phase](https://github.com/WebAssembly/meetings/b
 
 | Feature | Status | WasmKit version |
 |---------|--------|-----------------|
-| [WASI 0.1](https://github.com/WebAssembly/WASI/tree/wasi-0.1) | 🚧 [Majority of syscalls implemented](https://github.com/swiftwasm/WasmKit/blob/d9b56a7b3f979a72682c0d37f6cc71b3493dae65/Tests/WASITests/IntegrationTests.swift#L31) | 0.0.2 |
+| [WASI 0.1](https://github.com/WebAssembly/WASI/tree/wasi-0.1) | 🚧 [Majority of syscalls implemented](https://github.com/swiftwasm/WasmKit/blob/d9b56a7b3f979a72682c0d37f6cc71b3493dae65/Tests/WASITests/IntegrationTests.swift#L31) | [0.0.2] |
 | [WASI Threads](https://github.com/WebAssembly/wasi-threads) | ❌ Not implemented | |
 
 
