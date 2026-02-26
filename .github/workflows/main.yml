@@ -125,7 +125,7 @@ jobs:
       - name: Prepare Xcode platforms
         run: |
           set -euxo pipefail
-          sudo xcode-select -s /Applications/Xcode_26.2.app
+          sudo xcode-select -s /Applications/Xcode_26.3.app
           sudo xcodebuild -runFirstLaunch || true
           for PLAT in iOS tvOS watchOS visionOS; do
             if ! xcodebuild -showsdks | grep -q "$PLAT"; then
