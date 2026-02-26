@@ -136,7 +136,25 @@ extension Instruction.BrTableOperand {
     }
 }
 
-/// An entry in a catch handler table for a `try_table` block.
+/// An entry in the catch table for a `try_table` block.
+///
+/// A Wasm `try_table` instruction declares inline catch clauses (catch, catch_ref,
+/// catch_all, catch_all_ref). During translation, the translator compiles these clauses
+/// into an array of `CatchTableEntry` values — the "catch table" — which is the runtime
+/// representation used for exception dispatch.
+///
+/// The pipeline:
+/// 1. **Parse**: `try_table` is decoded into a `TryCatch` with a vector of `CatchClause` enums.
+/// 2. **Translate** (`visitTryTable`): Allocates a `CatchTableEntry` array, resolves tags to
+///    `InternalTag` handles, computes `payloadRegBase`, and schedules `pcOffset` fixups for
+///    when target labels are pinned. Catch clause label depths are resolved relative to the
+///    *enclosing* scope (the `try_table`'s own label is not yet in scope), so clauses are
+///    processed before pushing the `try_table` control frame.
+/// 3. **Execute**: The `catchHandlers` instruction registers entries as `ExceptionHandler`
+///    values on a handler stack. On `throw`, `handleException` walks the stack top-down to
+///    find a matching handler (by tag identity, or catch_all), unwinds SP, writes the
+///    exception payload into the target registers, and jumps to the handler PC.
+///    `catchHandlersEnd` pops handlers when control exits the `try_table` normally or via branch.
 struct CatchTableEntry {
     /// The tag to match, as a raw InternalTag bit pattern. 0 for catch_all/catch_all_ref.
     var rawTag: UInt64

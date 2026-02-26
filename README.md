@@ -96,7 +96,6 @@ Proposals are grouped by their [phase](https://github.com/WebAssembly/meetings/b
 | [Import/Export of Mutable Globals](https://github.com/WebAssembly/mutable-global) | ✅ Implemented | [0.0.2] |
 | [Memory64](https://github.com/WebAssembly/memory64) | ✅ Implemented | [0.0.2] |
 | [Multi-value](https://github.com/WebAssembly/multi-value) | ✅ Implemented | [0.0.2] |
-| [Multiple Memories](https://github.com/WebAssembly/multi-memory) | ❌ Not implemented | |
 | [Non-trapping Float-to-Int Conversions](https://github.com/WebAssembly/nontrapping-float-to-int-conversions) | ✅ Implemented | [0.0.2] |
 | [Reference Types](https://github.com/WebAssembly/reference-types) | ✅ Implemented | [0.0.2] |
 | [Sign-extension Operators](https://github.com/WebAssembly/sign-extension-ops) | ✅ Implemented | [0.0.2] |
@@ -106,6 +105,7 @@ Proposals are grouped by their [phase](https://github.com/WebAssembly/meetings/b
 | [Custom Annotation Syntax in the Text Format](https://github.com/WebAssembly/annotations) | ❌ Not implemented | |
 | [Extended Constant Expressions](https://github.com/WebAssembly/extended-const) | ❌ Not implemented | |
 | [Garbage Collection](https://github.com/WebAssembly/gc) | ❌ Not implemented | |
+| [Multiple Memories](https://github.com/WebAssembly/multi-memory) | ❌ Not implemented | |
 | [Relaxed SIMD](https://github.com/WebAssembly/relaxed-simd) | ❌ Not implemented | |
 
 [0.0.2]: https://github.com/swiftwasm/WasmKit/releases/tag/0.0.2
