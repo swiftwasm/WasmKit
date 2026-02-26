@@ -2,7 +2,7 @@
 
 # WasmKit
 
-**WasmKit** is a standalone and embeddable [WebAssembly](https://webassembly.org) runtime (virtual machine) implementation and related tooling written in Swift. Starting with Swift 6.2, WasmKit CLI executable is included in [Swift toolchains distributed at swift.org](https://swift.org/install) for Linux and macOS. 
+**WasmKit** is a standalone and embeddable [WebAssembly](https://webassembly.org) runtime (virtual machine) implementation and related tooling written in Swift. Starting with Swift 6.2, WasmKit CLI executable is included in [Swift toolchains distributed at swift.org](https://swift.org/install) for Linux and macOS.
 
 ## Usage
 
@@ -73,25 +73,59 @@ and should work on the following platforms:
 
 ## Implementation Status
 
-| Category | Feature | Status |
-|----------|---------|--------|
-| WebAssembly MVP | Parsing binary format | ✅ Implemented |
-|                 | Parsing text format (WAT) | ✅ Implemented |
-|                 | Execution | ✅ Implemented |
-|                 | Validation | ✅ Implemented  |
-| WebAssembly Proposal | [Reference types](https://github.com/WebAssembly/reference-types/blob/master/proposals/reference-types/Overview.md) | ✅ Implemented |
-|                      | [Bulk memory operations](https://github.com/WebAssembly/bulk-memory-operations/blob/master/proposals/bulk-memory-operations/Overview.md) | ✅ Implemented |
-|                      | [Mutable globals](https://github.com/WebAssembly/mutable-global/blob/master/proposals/mutable-global/Overview.md) | ✅ Implemented |
-|                      | [Sign-extension operators](https://github.com/WebAssembly/spec/blob/master/proposals/sign-extension-ops/Overview.md) | ✅ Implemented |
-|                      | [Non-trapping float-to-int conversions](https://github.com/WebAssembly/nontrapping-float-to-int-conversions/blob/main/proposals/nontrapping-float-to-int-conversion/Overview.md) | ✅ Implemented |
-|                      | [Memory64](https://github.com/WebAssembly/memory64/blob/main/proposals/memory64/Overview.md) | ✅ Implemented |
-|                      | [Tail call](https://github.com/WebAssembly/tail-call/blob/master/proposals/tail-call/Overview.md) | ✅ Implemented |
-|                      | [SIMD](https://github.com/WebAssembly/simd/blob/main/proposals/simd/SIMD.md) | ✅ Implemented |
-|                      | [Threads and atomics](https://github.com/WebAssembly/threads/blob/master/proposals/threads/Overview.md) | ✅ Implemented |
-|                      | [Component Model](https://github.com/webassembly/component-model) | 🚧 In progress  |
-|                      | [Typed Function References](https://github.com/WebAssembly/function-references/blob/main/proposals/function-references/Overview.md) | 🚧 Parser implemented  |
-|                      | [Garbage Collection](https://github.com/WebAssembly/gc/blob/main/proposals/gc/Overview.md) |  📋 Todo |
-| WASI | WASI Preview 1 | 🚧 [Majority of syscalls implemented](https://github.com/swiftwasm/WasmKit/blob/d9b56a7b3f979a72682c0d37f6cc71b3493dae65/Tests/WASITests/IntegrationTests.swift#L31) |
+### WebAssembly MVP
+
+| Feature | Status |
+|---------|--------|
+| Parsing binary format | ✅ Implemented |
+| Parsing text format (WAT) | ✅ Implemented |
+| Execution | ✅ Implemented |
+| Validation | ✅ Implemented |
+
+### WebAssembly Proposals
+
+Proposals are grouped by their [phase](https://github.com/WebAssembly/meetings/blob/main/process/phases.md) in the standardization process. See the [WebAssembly proposals repository](https://github.com/WebAssembly/proposals) for details.
+
+#### Finished (Merged into the spec)
+
+| Proposal | Status |
+|----------|--------|
+| [Bulk Memory Operations](https://github.com/WebAssembly/bulk-memory-operations) | ✅ Implemented |
+| [Fixed-width SIMD](https://github.com/webassembly/simd) | ✅ Implemented |
+| [Import/Export of Mutable Globals](https://github.com/WebAssembly/mutable-global) | ✅ Implemented |
+| [Memory64](https://github.com/WebAssembly/memory64) | ✅ Implemented |
+| [Multi-value](https://github.com/WebAssembly/multi-value) | ✅ Implemented |
+| [Multiple Memories](https://github.com/WebAssembly/multi-memory) | ✅ Implemented |
+| [Non-trapping Float-to-Int Conversions](https://github.com/WebAssembly/nontrapping-float-to-int-conversions) | ✅ Implemented |
+| [Reference Types](https://github.com/WebAssembly/reference-types) | ✅ Implemented |
+| [Sign-extension Operators](https://github.com/WebAssembly/sign-extension-ops) | ✅ Implemented |
+| [Tail Call](https://github.com/WebAssembly/tail-call) | ✅ Implemented |
+| [Typed Function References](https://github.com/WebAssembly/function-references) | 🚧 Parser implemented |
+| [Branch Hinting](https://github.com/WebAssembly/branch-hinting) | ❌ Not implemented |
+| [Custom Annotation Syntax in the Text Format](https://github.com/WebAssembly/annotations) | ❌ Not implemented |
+| [Exception Handling](https://github.com/WebAssembly/exception-handling) | ❌ Not implemented |
+| [Extended Constant Expressions](https://github.com/WebAssembly/extended-const) | ❌ Not implemented |
+| [Garbage Collection](https://github.com/WebAssembly/gc) | ❌ Not implemented |
+| [Relaxed SIMD](https://github.com/WebAssembly/relaxed-simd) | ❌ Not implemented |
+
+#### Phase 4 - Standardize the Feature (WG)
+
+| Proposal | Status |
+|----------|--------|
+| [Threads and Atomics](https://github.com/webassembly/threads) | ✅ Implemented |
+
+#### Phase 1 - Feature Proposal (CG)
+
+| Proposal | Status |
+|----------|--------|
+| [Component Model](https://github.com/webassembly/component-model) | 🚧 In progress |
+
+### WASI
+
+| Feature | Status |
+|---------|--------|
+| WASI Preview 1 | 🚧 [Majority of syscalls implemented](https://github.com/swiftwasm/WasmKit/blob/d9b56a7b3f979a72682c0d37f6cc71b3493dae65/Tests/WASITests/IntegrationTests.swift#L31) |
+| [WASI Threads](https://github.com/WebAssembly/wasi-threads) | ❌ Not implemented |
 
 
 ## Minimum Supported Swift Version (MSSV)
