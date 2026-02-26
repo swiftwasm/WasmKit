@@ -122,10 +122,10 @@ Proposals are grouped by their [phase](https://github.com/WebAssembly/meetings/b
 
 ### WASI
 
-| Feature | Status |
-|---------|--------|
-| WASI Preview 1 | 🚧 [Majority of syscalls implemented](https://github.com/swiftwasm/WasmKit/blob/d9b56a7b3f979a72682c0d37f6cc71b3493dae65/Tests/WASITests/IntegrationTests.swift#L31) |
-| [WASI Threads](https://github.com/WebAssembly/wasi-threads) | ❌ Not implemented |
+| Feature | Status | WasmKit version |
+|---------|--------|-----------------|
+| [WASI 0.1](https://github.com/WebAssembly/WASI/tree/wasi-0.1) | 🚧 [Majority of syscalls implemented](https://github.com/swiftwasm/WasmKit/blob/d9b56a7b3f979a72682c0d37f6cc71b3493dae65/Tests/WASITests/IntegrationTests.swift#L31) | 0.0.2 |
+| [WASI Threads](https://github.com/WebAssembly/wasi-threads) | ❌ Not implemented | |
 
 
 ## Minimum Supported Swift Version (MSSV)
