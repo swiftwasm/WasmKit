@@ -3,8 +3,6 @@ import WasmParser
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#memory-instructions>
 import _CWasmKit
 
-enum AtomicRmwOp { case add, sub, and, or, xor, xchg }
-
 extension Execution {
     @inline(never) func throwOutOfBoundsMemoryAccess() throws -> Never {
         throw Trap(.memoryOutOfBounds)
@@ -170,7 +168,7 @@ extension Execution {
     mutating func atomicRmw<T: FixedWidthInteger>(
         sp: Sp, md: Md, ms: Ms, rmwOperand: Instruction.RmwOperand,
         loadAs _: T.Type = T.self,
-        op: AtomicRmwOp,
+        atomicOp: (UnsafeMutableRawPointer, T) -> T,
         castFromValue: (UntypedValue) -> T,
         castToValue: (T) -> UntypedValue
     ) throws {
@@ -185,34 +183,7 @@ extension Execution {
         if _fastPath(!isEndOverflow && endAddress <= ms) {
             let rawPtr = md.unsafelyUnwrapped.advanced(by: Int(address))
             let value = castFromValue(sp[rmwOperand.value])
-            let oldValue: T
-            switch (T.bitWidth, op) {
-            case (8, .add): oldValue = T(wasmkit_atomic_rmw_add_8(rawPtr, UInt8(truncatingIfNeeded: value)))
-            case (8, .sub): oldValue = T(wasmkit_atomic_rmw_sub_8(rawPtr, UInt8(truncatingIfNeeded: value)))
-            case (8, .and): oldValue = T(wasmkit_atomic_rmw_and_8(rawPtr, UInt8(truncatingIfNeeded: value)))
-            case (8, .or): oldValue = T(wasmkit_atomic_rmw_or_8(rawPtr, UInt8(truncatingIfNeeded: value)))
-            case (8, .xor): oldValue = T(wasmkit_atomic_rmw_xor_8(rawPtr, UInt8(truncatingIfNeeded: value)))
-            case (8, .xchg): oldValue = T(wasmkit_atomic_rmw_xchg_8(rawPtr, UInt8(truncatingIfNeeded: value)))
-            case (16, .add): oldValue = T(wasmkit_atomic_rmw_add_16(rawPtr, UInt16(truncatingIfNeeded: value)))
-            case (16, .sub): oldValue = T(wasmkit_atomic_rmw_sub_16(rawPtr, UInt16(truncatingIfNeeded: value)))
-            case (16, .and): oldValue = T(wasmkit_atomic_rmw_and_16(rawPtr, UInt16(truncatingIfNeeded: value)))
-            case (16, .or): oldValue = T(wasmkit_atomic_rmw_or_16(rawPtr, UInt16(truncatingIfNeeded: value)))
-            case (16, .xor): oldValue = T(wasmkit_atomic_rmw_xor_16(rawPtr, UInt16(truncatingIfNeeded: value)))
-            case (16, .xchg): oldValue = T(wasmkit_atomic_rmw_xchg_16(rawPtr, UInt16(truncatingIfNeeded: value)))
-            case (32, .add): oldValue = T(wasmkit_atomic_rmw_add_32(rawPtr, UInt32(truncatingIfNeeded: value)))
-            case (32, .sub): oldValue = T(wasmkit_atomic_rmw_sub_32(rawPtr, UInt32(truncatingIfNeeded: value)))
-            case (32, .and): oldValue = T(wasmkit_atomic_rmw_and_32(rawPtr, UInt32(truncatingIfNeeded: value)))
-            case (32, .or): oldValue = T(wasmkit_atomic_rmw_or_32(rawPtr, UInt32(truncatingIfNeeded: value)))
-            case (32, .xor): oldValue = T(wasmkit_atomic_rmw_xor_32(rawPtr, UInt32(truncatingIfNeeded: value)))
-            case (32, .xchg): oldValue = T(wasmkit_atomic_rmw_xchg_32(rawPtr, UInt32(truncatingIfNeeded: value)))
-            case (64, .add): oldValue = T(wasmkit_atomic_rmw_add_64(rawPtr, UInt64(truncatingIfNeeded: value)))
-            case (64, .sub): oldValue = T(wasmkit_atomic_rmw_sub_64(rawPtr, UInt64(truncatingIfNeeded: value)))
-            case (64, .and): oldValue = T(wasmkit_atomic_rmw_and_64(rawPtr, UInt64(truncatingIfNeeded: value)))
-            case (64, .or): oldValue = T(wasmkit_atomic_rmw_or_64(rawPtr, UInt64(truncatingIfNeeded: value)))
-            case (64, .xor): oldValue = T(wasmkit_atomic_rmw_xor_64(rawPtr, UInt64(truncatingIfNeeded: value)))
-            case (64, .xchg): oldValue = T(wasmkit_atomic_rmw_xchg_64(rawPtr, UInt64(truncatingIfNeeded: value)))
-            default: fatalError()
-            }
+            let oldValue = atomicOp(rawPtr, value)
             sp[rmwOperand.result] = castToValue(oldValue)
         } else {
             try throwOutOfBoundsMemoryAccess()
@@ -223,6 +194,7 @@ extension Execution {
     mutating func atomicCmpxchg<T: FixedWidthInteger>(
         sp: Sp, md: Md, ms: Ms, cmpxchgOperand: Instruction.CmpxchgOperand,
         loadAs _: T.Type = T.self,
+        atomicCmpxchg: (UnsafeMutableRawPointer, T, T) -> T,
         castFromValue: (UntypedValue) -> T,
         castToValue: (T) -> UntypedValue
     ) throws {
@@ -238,28 +210,7 @@ extension Execution {
             let rawPtr = md.unsafelyUnwrapped.advanced(by: Int(address))
             let expectedValue = castFromValue(sp[cmpxchgOperand.expected])
             let replacementValue = castFromValue(sp[cmpxchgOperand.replacement])
-            // After the CAS call, `expected` holds the old value from memory
-            // (unchanged on success, updated to actual value on failure).
-            let resultValue: T
-            switch T.bitWidth {
-            case 8:
-                var expected = UInt8(truncatingIfNeeded: expectedValue)
-                _ = wasmkit_atomic_cmpxchg_8(rawPtr, &expected, UInt8(truncatingIfNeeded: replacementValue))
-                resultValue = T(expected)
-            case 16:
-                var expected = UInt16(truncatingIfNeeded: expectedValue)
-                _ = wasmkit_atomic_cmpxchg_16(rawPtr, &expected, UInt16(truncatingIfNeeded: replacementValue))
-                resultValue = T(expected)
-            case 32:
-                var expected = UInt32(truncatingIfNeeded: expectedValue)
-                _ = wasmkit_atomic_cmpxchg_32(rawPtr, &expected, UInt32(truncatingIfNeeded: replacementValue))
-                resultValue = T(expected)
-            case 64:
-                var expected = UInt64(truncatingIfNeeded: expectedValue)
-                _ = wasmkit_atomic_cmpxchg_64(rawPtr, &expected, UInt64(truncatingIfNeeded: replacementValue))
-                resultValue = T(expected)
-            default: fatalError()
-            }
+            let resultValue = atomicCmpxchg(rawPtr, expectedValue, replacementValue)
             sp[cmpxchgOperand.result] = castToValue(resultValue)
         } else {
             try throwOutOfBoundsMemoryAccess()

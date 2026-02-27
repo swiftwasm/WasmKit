@@ -97,89 +97,59 @@ enum VMGen {
         }
 
         for op in atomicRmwOps {
-            let opEnum: String
-            switch op.op {
-            case "Add": opEnum = ".add"
-            case "Sub": opEnum = ".sub"
-            case "And": opEnum = ".and"
-            case "Or": opEnum = ".or"
-            case "Xor": opEnum = ".xor"
-            case "Xchg": opEnum = ".xchg"
-            default: opEnum = ".add"
-            }
+            let opLower = op.op.lowercased()
+            let width = op.type == "i32" ? "32" : "64"
+            let loadAs = op.type == "i32" ? "UInt32" : "UInt64"
+            let cFunc = "wasmkit_atomic_rmw_\(opLower)_\(width)"
             inlineImpls[op.instruction.name] = """
-            try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: \(op.type == "i32" ? "UInt32" : "UInt64").self, op: \(opEnum), castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) })
+            try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: \(loadAs).self, atomicOp: { \(cFunc)($0, $1) }, castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) })
             """
         }
 
         for op in atomicRmw8Ops {
-            let opEnum: String
-            switch op.op {
-            case "Add": opEnum = ".add"
-            case "Sub": opEnum = ".sub"
-            case "And": opEnum = ".and"
-            case "Or": opEnum = ".or"
-            case "Xor": opEnum = ".xor"
-            case "Xchg": opEnum = ".xchg"
-            default: opEnum = ".add"
-            }
+            let opLower = op.op.lowercased()
+            let cFunc = "wasmkit_atomic_rmw_\(opLower)_8"
             inlineImpls[op.instruction.name] = """
-            try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, op: \(opEnum), castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) })
+            try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, atomicOp: { \(cFunc)($0, $1) }, castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) })
             """
         }
 
         for op in atomicRmw16Ops {
-            let opEnum: String
-            switch op.op {
-            case "Add": opEnum = ".add"
-            case "Sub": opEnum = ".sub"
-            case "And": opEnum = ".and"
-            case "Or": opEnum = ".or"
-            case "Xor": opEnum = ".xor"
-            case "Xchg": opEnum = ".xchg"
-            default: opEnum = ".add"
-            }
+            let opLower = op.op.lowercased()
+            let cFunc = "wasmkit_atomic_rmw_\(opLower)_16"
             inlineImpls[op.instruction.name] = """
-            try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, op: \(opEnum), castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) })
+            try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, atomicOp: { \(cFunc)($0, $1) }, castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) })
             """
         }
 
         for op in atomicRmw32Ops {
-            let opEnum: String
-            switch op.op {
-            case "Add": opEnum = ".add"
-            case "Sub": opEnum = ".sub"
-            case "And": opEnum = ".and"
-            case "Or": opEnum = ".or"
-            case "Xor": opEnum = ".xor"
-            case "Xchg": opEnum = ".xchg"
-            default: opEnum = ".add"
-            }
+            let opLower = op.op.lowercased()
+            let cFunc = "wasmkit_atomic_rmw_\(opLower)_32"
             inlineImpls[op.instruction.name] = """
-            try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, op: \(opEnum), castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) })
+            try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, atomicOp: { \(cFunc)($0, $1) }, castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) })
             """
         }
 
         inlineImpls["i32AtomicRmwCmpxchg"] = """
-        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt32.self, castFromValue: { $0.i32 }, castToValue: { .i32($0) })
+        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt32.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_32(ptr, &exp, desired); return exp }, castFromValue: { $0.i32 }, castToValue: { .i32($0) })
         """
         inlineImpls["i64AtomicRmwCmpxchg"] = """
-        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt64.self, castFromValue: { $0.i64 }, castToValue: { .i64($0) })
+        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt64.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_64(ptr, &exp, desired); return exp }, castFromValue: { $0.i64 }, castToValue: { .i64($0) })
         """
         inlineImpls["i32AtomicRmw8CmpxchgU"] = """
-        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt8.self, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
+        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt8.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_8(ptr, &exp, desired); return exp }, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
         """
         inlineImpls["i32AtomicRmw16CmpxchgU"] = """
-        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt16.self, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
+        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt16.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_16(ptr, &exp, desired); return exp }, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
         """
         inlineImpls["i64AtomicRmw8CmpxchgU"] = """
-        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt8.self, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
+        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt8.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_8(ptr, &exp, desired); return exp }, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
         """
         inlineImpls["i64AtomicRmw16CmpxchgU"] = """
-        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt16.self, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
+        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt16.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_16(ptr, &exp, desired); return exp }, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
         """
         inlineImpls["i64AtomicRmw32CmpxchgU"] = """
-        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt32.self, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
+        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt32.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_32(ptr, &exp, desired); return exp }, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
         """
         inlineImpls["memoryAtomicWait32"] = """
         try atomicWait32(sp: sp.pointee, md: md.pointee, ms: ms.pointee, waitOperand: immediate)
