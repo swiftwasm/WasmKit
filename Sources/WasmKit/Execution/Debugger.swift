@@ -363,10 +363,11 @@
             let sp = breakpoint.iseq.sp
 
             if let opcodeID = headSlotToOpcodeID[savedHead],
-               let targets = Instruction.predictNextPcs(
-                   opcodeID: opcodeID, operandPc: operandPc, sp: sp,
-                   predictor: &self
-               ) {
+                let targets = Instruction.predictNextPcs(
+                    opcodeID: opcodeID, operandPc: operandPc, sp: sp,
+                    predictor: &self
+                )
+            {
                 // Control instruction with predicted targets.
                 // Empty targets means terminal (unreachable, endOfExecution) — no breakpoints to set.
                 for pc in targets {
@@ -445,7 +446,7 @@
             let value = sp[index].asAddressOffset(table.limits.isMemory64)
             let elementIndex = Int(value)
             guard elementIndex < table.elements.count,
-                  case .function(let rawBitPattern?) = table.elements[elementIndex]
+                case .function(let rawBitPattern?) = table.elements[elementIndex]
             else { return nil }
             let function = InternalFunction(bitPattern: rawBitPattern)
             guard function.isWasm else { return nil }
