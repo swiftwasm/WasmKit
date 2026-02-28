@@ -77,6 +77,8 @@ package enum TrapReason: Error, CustomStringConvertible {
     case tableOutOfBounds(Int)
     /// Out of bounds memory access
     case memoryOutOfBounds
+    /// Unaligned atomic memory access
+    case unalignedAtomic
     /// `call_indirect` instruction called an uninitialized table element.
     case indirectCallToNull(Int)
     /// Indirect call type mismatch
@@ -99,6 +101,8 @@ package enum TrapReason: Error, CustomStringConvertible {
             return "call stack exhausted"
         case .memoryOutOfBounds:
             return "out of bounds memory access"
+        case .unalignedAtomic:
+            return "unaligned atomic"
         case .integerDividedByZero:
             return "integer divide by zero"
         case .integerOverflow:

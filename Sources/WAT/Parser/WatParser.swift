@@ -83,7 +83,7 @@ struct WatParser {
         let location: Location
     }
 
-    struct LocalDecl: NamedModuleFieldDecl {
+    struct LocalDecl: NamedFieldDecl {
         var id: Name?
         var type: UnresolvedType<ValueType>
 
@@ -91,12 +91,12 @@ struct WatParser {
             try ResolvedLocalDecl(id: id, type: type.resolve(typeMap))
         }
     }
-    struct ResolvedLocalDecl: NamedModuleFieldDecl {
+    struct ResolvedLocalDecl: NamedFieldDecl {
         var id: Name?
         var type: ValueType
     }
 
-    struct FunctionDecl: NamedModuleFieldDecl, ImportableModuleFieldDecl {
+    struct FunctionDecl: NamedFieldDecl, ImportableModuleFieldDecl {
         var id: Name?
         var exports: [String]
         var typeUse: TypeUse
@@ -131,12 +131,12 @@ struct WatParser {
         }
     }
 
-    struct FunctionTypeDecl: NamedModuleFieldDecl {
+    struct FunctionTypeDecl: NamedFieldDecl {
         let id: Name?
         let type: UnresolvedType<FunctionType>
     }
 
-    struct TableDecl: NamedModuleFieldDecl, ImportableModuleFieldDecl {
+    struct TableDecl: NamedFieldDecl, ImportableModuleFieldDecl {
         var id: Name?
         var exports: [String]
         var type: UnresolvedType<TableType>
@@ -144,7 +144,7 @@ struct WatParser {
         var inlineElement: ElementDecl?
     }
 
-    struct ElementDecl: NamedModuleFieldDecl {
+    struct ElementDecl: NamedFieldDecl {
         enum Offset {
             case expression(Lexer)
             case singleInstruction(Lexer)
@@ -174,7 +174,7 @@ struct WatParser {
         var kind: ExternalKind
     }
 
-    struct GlobalDecl: NamedModuleFieldDecl, ImportableModuleFieldDecl {
+    struct GlobalDecl: NamedFieldDecl, ImportableModuleFieldDecl {
         var id: Name?
         var exports: [String]
         var type: UnresolvedType<GlobalType>
@@ -188,7 +188,7 @@ struct WatParser {
         }
     }
 
-    struct MemoryDecl: NamedModuleFieldDecl, ImportableModuleFieldDecl {
+    struct MemoryDecl: NamedFieldDecl, ImportableModuleFieldDecl {
         var id: Name?
         var exports: [String]
         var type: MemoryType
@@ -196,7 +196,7 @@ struct WatParser {
         var inlineData: DataSegmentDecl?
     }
 
-    struct DataSegmentDecl: NamedModuleFieldDecl {
+    struct DataSegmentDecl: NamedFieldDecl {
         var id: Name?
         var memory: Parser.IndexOrId?
         enum Offset {
@@ -672,36 +672,21 @@ struct WatParser {
     }
 
     mutating func params(mayHaveName: Bool) throws(WatParserError) -> ([UnresolvedType<ValueType>], [Name?]) {
-        var types: [UnresolvedType<ValueType>] = []
-        var names: [Name?] = []
-        while try parser.takeParenBlockStart("param") {
-            if mayHaveName {
-                if let id = try parser.takeId() {
-                    let valueType = try valueType()
-                    types.append(valueType)
-                    names.append(id)
-                    try parser.expect(.rightParen)
-                    continue
-                }
-            }
-            while try !parser.take(.rightParen) {
-                let valueType = try valueType()
-                types.append(valueType)
-                names.append(nil)
-            }
+        try parser.parseParamList(mayHaveName: mayHaveName) { parser throws(WatParserError) in
+            var tempParser = WatParser(parser: parser)
+            let type = try tempParser.valueType()
+            parser = tempParser.parser
+            return type
         }
-        return (types, names)
     }
 
     mutating func results() throws(WatParserError) -> [UnresolvedType<ValueType>] {
-        var results: [UnresolvedType<ValueType>] = []
-        while try parser.takeParenBlockStart("result") {
-            while try !parser.take(.rightParen) {
-                let valueType = try valueType()
-                results.append(valueType)
-            }
+        try parser.parseResultList { parser throws(WatParserError) in
+            var tempParser = WatParser(parser: parser)
+            let type = try tempParser.valueType()
+            parser = tempParser.parser
+            return type
         }
-        return results
     }
 
     mutating func valueType() throws(WatParserError) -> UnresolvedType<ValueType> {

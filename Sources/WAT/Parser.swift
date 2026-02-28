@@ -27,6 +27,21 @@ internal struct Parser {
         return token.text(from: lexer)
     }
 
+    /// Peek at the keyword after a left paren without consuming any tokens.
+    /// Returns nil if the next token is not `(` or the token after that is not a keyword.
+    func peekKeywordAfterLeftParen() throws(WatParserError) -> String? {
+        var lexer = lexer
+        // First token should be (
+        guard let first = try lexer.lex(), first.kind == .leftParen else {
+            return nil
+        }
+        // Second token should be a keyword
+        guard let second = try lexer.lex(), second.kind == .keyword else {
+            return nil
+        }
+        return second.text(from: self.lexer)
+    }
+
     mutating func take(_ kind: TokenKind) throws(WatParserError) -> Bool {
         guard try peek(kind) != nil else { return false }
         try consume()
@@ -293,6 +308,14 @@ internal struct Parser {
                 return location
             }
         }
+        var name: Name? {
+            switch self {
+            case .id(let name, _):
+                return name
+            case .index:
+                return nil
+            }
+        }
     }
 
     mutating func expectIndexOrId() throws(WatParserError) -> IndexOrId {
@@ -334,6 +357,71 @@ internal struct Parser {
                 break
             }
         }
+    }
+
+    /// Raw source representation for binary or quote forms in WAST.
+    enum RawSource {
+        case binary([UInt8])
+        case quote([UInt8])
+    }
+
+    /// Parse binary or quote source if present.
+    /// Returns nil if the next token is not "binary" or "quote".
+    /// Consumes the keyword and string list, but NOT the closing paren.
+    mutating func parseBinaryOrQuote() throws(WatParserError) -> RawSource? {
+        guard let keyword = try peekKeyword() else { return nil }
+        if keyword == "binary" {
+            try consume()
+            return .binary(try expectStringList())
+        } else if keyword == "quote" {
+            try consume()
+            return .quote(try expectStringList())
+        }
+        return nil
+    }
+}
+
+extension Parser {
+    /// Parse a list of `(param ...)` clauses with optional names.
+    /// The `parseType` closure is called for each type token.
+    mutating func parseParamList<T>(
+        mayHaveName: Bool,
+        parseType: (inout Parser) throws(WatParserError) -> T
+    ) throws(WatParserError) -> ([T], [Name?]) {
+        var types: [T] = []
+        var names: [Name?] = []
+        while try takeParenBlockStart("param") {
+            if mayHaveName {
+                if let id = try takeId() {
+                    let valueType = try parseType(&self)
+                    types.append(valueType)
+                    names.append(id)
+                    try expect(.rightParen)
+                    continue
+                }
+            }
+            while try !take(.rightParen) {
+                let valueType = try parseType(&self)
+                types.append(valueType)
+                names.append(nil)
+            }
+        }
+        return (types, names)
+    }
+
+    /// Parse a list of `(result ...)` clauses.
+    /// The `parseType` closure is called for each type token.
+    mutating func parseResultList<T>(
+        parseType: (inout Parser) throws(WatParserError) -> T
+    ) throws(WatParserError) -> [T] {
+        var results: [T] = []
+        while try takeParenBlockStart("result") {
+            while try !take(.rightParen) {
+                let valueType = try parseType(&self)
+                results.append(valueType)
+            }
+        }
+        return results
     }
 }
 

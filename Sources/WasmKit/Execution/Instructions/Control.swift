@@ -81,7 +81,7 @@ extension Execution {
         sp = try pushFrame(
             iseq: iseq,
             function: instance,
-            numberOfNonParameterLocals: locals,
+            numberOfNonParameterLocalSlots: locals,
             sp: sp, returnPC: pc,
             spAddend: internalCallOperand.spAddend
         )

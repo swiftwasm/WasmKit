@@ -121,7 +121,7 @@ extension Code {
     /// }
     /// ````
     @inlinable
-    public func parseExpression<V: InstructionVisitor>(visitor: inout V) throws {
+    public func parseExpression(visitor: inout some InstructionVisitor & ~Copyable) throws {
         var parser = Parser(stream: StaticByteStream(bytes: self.expression), features: self.features)
         var lastIsEnd: Bool?
         while try !parser.stream.hasReachedEnd() {
@@ -217,19 +217,64 @@ public struct WasmParserError: Swift.Error {
         }
     }
 
-    let message: Message
-    let offset: Int
+    @usableFromInline
+    enum Kind: Sendable {
+        case message(Message)
+        case unexpectedEnd(expected: Set<UInt8>?)
+        case unexpectedByte(UInt8, index: Int, expected: Set<UInt8>?)
+        case unclassified(any Error)
+    }
+
+    let kind: Kind
+    let offset: Int?
 
     @usableFromInline
-    init(_ message: Message, offset: Int) {
-        self.message = message
+    init(kind: Kind, offset: Int) {
+        self.kind = kind
         self.offset = offset
+    }
+}
+
+extension WasmParserError {
+    @usableFromInline
+    init(_ message: Message, offset: Int) {
+        self.kind = .message(message)
+        self.offset = offset
+    }
+}
+
+extension BinaryInteger {
+    var hexString: String {
+        "0x\(String(self, radix: 16))"
     }
 }
 
 extension WasmParserError: CustomStringConvertible {
     public var description: String {
-        return "\"\(message)\" at offset 0x\(String(offset, radix: 16))"
+        var result: String
+        switch self.kind {
+        case .message(let message):
+            result = message.text
+        case .unexpectedEnd(let expected):
+            var result = "Unexpected end of byte sequence."
+            if let expected, expected.count > 0 {
+                result.append(contentsOf: " Expected one of \(expected.map {$0.hexString}).")
+            }
+            return result
+        case .unexpectedByte(let byte, let index, let expected):
+            result = "Unexpected byte \(byte.hexString) at index \(index.hexString)."
+            if let expected, expected.count > 0 {
+                result.append(contentsOf: " Expected one of \(expected.map {$0.hexString}).")
+            }
+        case .unclassified(let error):
+            result = "\(error)"
+        }
+
+        if let offset {
+            return "\"\(result)\" raised at offset 0x\(String(offset, radix: 16))"
+        } else {
+            return result
+        }
     }
 }
 
@@ -261,10 +306,16 @@ extension WasmParserError.Message {
 
     @usableFromInline
     static func malformedValueType(_ byte: UInt8) -> Self {
-        Self("malformed value type: \(byte)")
+        Self("malformed value type: 0x\(String(byte, radix: 16))")
     }
 
-    @usableFromInline static func zeroExpected(actual: UInt8) -> Self {
+    @usableFromInline
+    static func unknownCanonOptionTag(_ byte: UInt8) -> Self {
+        Self("malformed canon option tag: 0x\(String(byte, radix: 16))")
+    }
+
+    @usableFromInline
+    static func zeroExpected(actual: UInt8) -> Self {
         Self("Zero expected but got \(actual)")
     }
 
@@ -292,8 +343,8 @@ extension WasmParserError.Message {
     static let unexpectedEnd = Self("Unexpected end of the stream")
 
     @usableFromInline
-    static func sectionSizeMismatch(expected: Int, actual: Int) -> Self {
-        Self("Section size mismatch: expected \(expected) but got \(actual)")
+    static func sectionSizeMismatch(sectionID: UInt8, expected: Int, actual: Int) -> Self {
+        Self("Section with ID \(sectionID) size mismatch: expected \(expected) but got \(actual)")
     }
 
     @usableFromInline static func illegalOpcode(_ opcode: [UInt8]) -> Self {
@@ -369,7 +420,7 @@ extension ByteStream {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/values.html#names>
 extension ByteStream {
-    fileprivate func parseName() throws -> String {
+    package func parseName() throws -> String {
         let bytes = try parseVector { () -> UInt8 in
             try consumeAny()
         }
@@ -505,7 +556,7 @@ extension Parser {
         case 0x40:
             _ = try stream.consumeAny()
             return .empty
-        case 0x7C...0x7F, 0x70, 0x6F:
+        case 0x7B...0x7F, 0x70, 0x6F:
             return try .type(parseValueType())
         default:
             let rawIndex = try stream.parseVarSigned33()
@@ -595,7 +646,10 @@ extension Parser {
         case 0x6F:
             elementType = .externRef
         default:
-            throw StreamError.unexpected(b, index: offset, expected: [0x6F, 0x70])
+            throw WasmParserError(
+                kind: .unexpectedByte(b, index: offset, expected: [0x6F, 0x70]),
+                offset: stream.currentIndex
+            )
         }
 
         let limits = try parseLimits()
@@ -872,7 +926,7 @@ extension Parser: BinaryInstructionDecoder {
     /// Returns: `true` if the parsed instruction is the block end instruction.
     @inline(__always)
     @inlinable
-    mutating func parseInstruction<V: InstructionVisitor>(visitor v: inout V) throws -> Bool {
+    mutating func parseInstruction(visitor v: inout some InstructionVisitor & ~Copyable) throws -> Bool {
         return try parseBinaryInstruction(visitor: &v, decoder: &self)
     }
 
@@ -1316,7 +1370,13 @@ extension Parser {
             }
             let expectedSectionEnd = sectionStart + Int(sectionSize)
             guard expectedSectionEnd == stream.currentIndex else {
-                throw makeError(.sectionSizeMismatch(expected: expectedSectionEnd, actual: offset))
+                throw makeError(
+                    .sectionSizeMismatch(
+                        sectionID: sectionID,
+                        expected: expectedSectionEnd,
+                        actual: offset
+                    )
+                )
             }
             return payload
         }
@@ -1380,5 +1440,63 @@ public struct NameSectionParser<Stream: ByteStream> {
             nameMap[index] = name
         }
         return nameMap
+    }
+}
+
+// MARK: - File Type Detection
+
+/// The type of a WebAssembly binary file.
+public enum WasmFileType: Equatable, Sendable {
+    /// A core WebAssembly module (version 1)
+    case coreModule
+    /// A WebAssembly component (version 0x0d, layer 1)
+    case component
+    /// Unknown or invalid WebAssembly file
+    case unknown
+}
+
+/// Detect the type of a WebAssembly binary file by reading its header.
+///
+/// This function reads the 8-byte WebAssembly header to determine whether
+/// the file contains a core module or a component. Uses stack allocation
+/// only (no heap allocation for the header bytes).
+///
+/// - Parameter filePath: Path to the WebAssembly binary file
+/// - Returns: The detected file type
+/// - Throws: If the file cannot be opened or read
+public func detectWasmFileType(filePath: FilePath) throws -> WasmFileType {
+    let fileHandle = try FileDescriptor.open(filePath, .readOnly)
+    defer { try? fileHandle.close() }
+
+    // Use a tuple to avoid heap allocation - 8 bytes on stack
+    // TODO: needs a `SmallArray` abstraction until `InlineArray` becomes available after dropping support for macOS 15.
+    var header: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (0, 0, 0, 0, 0, 0, 0, 0)
+    let bytesRead = try withUnsafeMutableBytes(of: &header) { buffer in
+        try fileHandle.read(into: buffer)
+    }
+
+    // Need at least 8 bytes for a valid header
+    guard bytesRead >= 8 else {
+        return .unknown
+    }
+
+    // Check magic number: \0asm (uses WASM_MAGIC as source of truth)
+    guard
+        header.0 == WASM_MAGIC[0] && header.1 == WASM_MAGIC[1]
+            && header.2 == WASM_MAGIC[2] && header.3 == WASM_MAGIC[3]
+    else {
+        return .unknown
+    }
+
+    // Check version and layer bytes:
+    // - Core module: version=0x01, 0x00 and layer=0x00, 0x00
+    // - Component:   version=0x0d, 0x00 and layer=0x01, 0x00
+    switch (header.4, header.5, header.6, header.7) {
+    case (0x01, 0x00, 0x00, 0x00):
+        return .coreModule
+    case (0x0d, 0x00, 0x01, 0x00):
+        return .component
+    default:
+        return .unknown
     }
 }

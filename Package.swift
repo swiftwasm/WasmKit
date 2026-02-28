@@ -20,7 +20,7 @@ let cliCommandsTarget = Target.target(
 
 let package = Package(
     name: "WasmKit",
-    platforms: [.macOS(.v14), .iOS(.v13)],
+    platforms: [.macOS(.v15), .iOS(.v18)],
     products: [
         .executable(name: "wasmkit-cli", targets: ["CLI"]),
         .library(name: "WasmKit", targets: ["WasmKit"]),
@@ -33,6 +33,7 @@ let package = Package(
     ],
     traits: [
         .default(enabledTraits: []),
+        "ComponentModel",
         "WasmDebuggingSupport",
     ],
     targets: [
@@ -50,6 +51,14 @@ let package = Package(
                 "WasmTypes",
                 "SystemExtras",
                 .product(name: "SystemPackage", package: "swift-system"),
+                .target(
+                    name: "ComponentModel",
+                    condition: .when(traits: ["ComponentModel"])
+                ),
+                .target(
+                    name: "WAVE",
+                    condition: .when(traits: ["ComponentModel"])
+                ),
             ],
             exclude: ["CMakeLists.txt"],
             cSettings: [
@@ -78,20 +87,48 @@ let package = Package(
 
         .target(
             name: "WAT",
-            dependencies: ["WasmParser"],
+            dependencies: [
+                "WasmParser",
+                .target(
+                    name: "ComponentModel",
+                    condition: .when(traits: ["ComponentModel"])
+                ),
+            ],
             exclude: ["CMakeLists.txt"]
         ),
-        .testTarget(name: "WATTests", dependencies: ["WAT"]),
+        .testTarget(
+            name: "WATTests",
+            dependencies: [
+                .target(
+                    name: "WasmTools",
+                    condition: .when(traits: ["ComponentModel"])
+                ),
+                "WAT",
+            ]
+        ),
 
         .target(
             name: "WasmParser",
             dependencies: [
                 "WasmTypes",
                 .product(name: "SystemPackage", package: "swift-system"),
+                .target(
+                    name: "ComponentModel",
+                    condition: .when(traits: ["ComponentModel"])
+                ),
             ],
             exclude: ["CMakeLists.txt"]
         ),
-        .testTarget(name: "WasmParserTests", dependencies: ["WasmParser"]),
+        .testTarget(
+            name: "WasmParserTests",
+            dependencies: [
+                "WasmParser",
+                .target(
+                    name: "ComponentModel",
+                    condition: .when(traits: ["ComponentModel"])
+                ),
+            ]
+        ),
 
         .target(name: "WasmTypes", exclude: ["CMakeLists.txt"]),
 
@@ -121,6 +158,25 @@ let package = Package(
 
         .target(name: "CSystemExtras"),
 
+        // Component Model (CM)
+
+        /// `wasm-tools.wasm` wrapper used when comparing CM test suite against existing baseline implementation
+        .target(
+            name: "WasmTools",
+            dependencies: [
+                "WasmKit",
+                "WasmKitWASI",
+                .product(name: "SystemPackage", package: "swift-system"),
+            ]
+        ),
+
+        .target(
+            name: "ComponentModel",
+            dependencies: [
+                "WasmTypes"
+            ]
+        ),
+
         .executableTarget(
             name: "WITTool",
             dependencies: [
@@ -131,8 +187,37 @@ let package = Package(
             ]
         ),
 
-        .target(name: "WIT"),
+        .target(
+            name: "WIT",
+            dependencies: [
+                .target(
+                    name: "ComponentModel",
+                    condition: .when(traits: ["ComponentModel"])
+                )
+            ]
+        ),
         .testTarget(name: "WITTests", dependencies: ["WIT"]),
+
+        .target(
+            name: "WAVE",
+            dependencies: [
+                .target(
+                    name: "ComponentModel",
+                    condition: .when(traits: ["ComponentModel"])
+                )
+            ]
+        ),
+        .testTarget(
+            name: "WAVETests",
+            dependencies: [
+                "WAVE",
+                "WIT",
+                .target(
+                    name: "ComponentModel",
+                    condition: .when(traits: ["ComponentModel"])
+                ),
+            ]
+        ),
 
         .target(name: "WITOverlayGenerator", dependencies: ["WIT"]),
         .target(name: "_CabiShims"),

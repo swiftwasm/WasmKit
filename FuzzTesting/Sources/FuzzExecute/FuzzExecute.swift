@@ -31,8 +31,18 @@ extension ValueType {
         case .i64: return .i64(0)
         case .f32: return .f32(0)
         case .f64: return .f64(0)
-        case .ref(.funcRef): return .ref(.function(0))
-        case .ref(.externRef): return .ref(.extern(0))
+        case .v128:
+            return .v128(V128(bytes: Array(repeating: 0, count: V128.byteCount)))
+        case .ref(let referenceType):
+            switch referenceType.heapType {
+            case .abstract(.funcRef):
+                return .ref(.function(nil))
+            case .abstract(.externRef):
+                return .ref(.extern(nil))
+            case .concrete:
+                // We don't model GC reference heap types yet; use a null externref.
+                return .ref(.extern(nil))
+            }
         }
     }
 }
