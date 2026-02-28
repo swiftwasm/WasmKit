@@ -2,7 +2,9 @@
 
     #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
         import Darwin
-    #elseif os(Linux)
+    #elseif canImport(Musl)
+        import Musl
+    #elseif canImport(Glibc)
         import Glibc
     #endif
 
