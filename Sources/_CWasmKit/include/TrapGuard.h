@@ -3,6 +3,18 @@
 
 #include <stddef.h>
 
+#ifndef _Nullable
+#  ifndef __clang__
+#    define _Nullable
+#  endif
+#endif
+
+#ifndef _Nonnull
+#  ifndef __clang__
+#    define _Nonnull
+#  endif
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif

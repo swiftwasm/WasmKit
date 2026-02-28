@@ -25,6 +25,8 @@ add_wasmkit_library(WasmKit
   Execution/Execution.swift
   Execution/Function.swift
   Execution/Instances.swift
+  Execution/MprotectLinearMemory.swift
+  Execution/MprotectTrapGuard.swift
   Execution/IO.swift
   Execution/NameRegistry.swift
   Execution/Profiler.swift
@@ -35,6 +37,11 @@ add_wasmkit_library(WasmKit
   Execution/UntypedValue.swift
   Execution/Value.swift
 )
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  target_compile_options(WasmKit PRIVATE
+    $<$<COMPILE_LANGUAGE:Swift>:-DWASMKIT_MPROTECT_BOUND_CHECKING>)
+endif()
 
 target_link_wasmkit_libraries(WasmKit PUBLIC
   _CWasmKit WasmParser SystemExtras WasmTypes SystemPackage)
