@@ -82,7 +82,10 @@ let package = Package(
         .testTarget(
             name: "WasmKitTests",
             dependencies: ["WasmKit", "WAT", "WasmKitFuzzing"],
-            exclude: ["ExtraSuite", "CMakeLists.txt"]
+            exclude: ["ExtraSuite", "CMakeLists.txt"],
+            swiftSettings: [
+                .define("WASMKIT_MPROTECT_BOUND_CHECKING", .when(platforms: [.macOS, .linux]))
+            ]
         ),
 
         .target(
