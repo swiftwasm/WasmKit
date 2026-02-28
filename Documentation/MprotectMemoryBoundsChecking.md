@@ -91,6 +91,7 @@ Planned initial support:
 
 Disabled (fallback to software checks):
 
+- Windows (requires a separate implementation for WinAPI)
 - WASI (no `mprotect`/signals)
 - `memory64` (uses software bounds checks)
 
