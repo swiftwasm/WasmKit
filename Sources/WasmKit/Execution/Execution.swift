@@ -505,10 +505,11 @@ extension Execution {
         #else
             var pc = pc
             let handler = pc.read(wasmkit_tc_exec.self)
-            let storeValue = store.value
-            let shouldUseMprotectTrapGuards = self.shouldUseMprotectTrapGuards(sp: sp)
+            #if WASMKIT_MPROTECT_BOUND_CHECKING && !os(WASI)
+                let storeValue = store.value
+                let shouldUseMprotectTrapGuards = self.shouldUseMprotectTrapGuards(sp: sp)
+            #endif
             try withUnsafeMutablePointer(to: &self) { execution in
-                wasmkit_tc_start(handler, sp, pc, md, ms, execution)
                 #if WASMKIT_MPROTECT_BOUND_CHECKING && !os(WASI)
                     if shouldUseMprotectTrapGuards {
                         let trapKind: Int32 = {
