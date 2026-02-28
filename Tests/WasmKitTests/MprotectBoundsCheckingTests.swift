@@ -12,14 +12,16 @@
             EngineConfiguration.MemoryBoundsChecking.software,
         ])
         func outOfBoundsTrapsWithBothModes(mode: EngineConfiguration.MemoryBoundsChecking) throws {
-            let module = try parseWasm(bytes: wat2wasm("""
-                (module
-                    (memory 1)
-                    (func (export "oob") (result i32)
-                        (i32.load (i32.const 0x10000))
+            let module = try parseWasm(
+                bytes: wat2wasm(
+                    """
+                    (module
+                        (memory 1)
+                        (func (export "oob") (result i32)
+                            (i32.load (i32.const 0x10000))
+                        )
                     )
-                )
-                """))
+                    """))
             let engine = Engine(configuration: .init(memoryBoundsChecking: mode))
             let store = Store(engine: engine)
             let instance = try module.instantiate(store: store)
@@ -29,14 +31,16 @@
 
         @Test
         func mprotectGuardPageTraps() throws {
-            let module = try parseWasm(bytes: wat2wasm("""
-                (module
-                    (memory (export "memory") 1)
-                    (func (export "store_at") (param i32)
-                        (i32.store8 (local.get 0) (i32.const 42))
+            let module = try parseWasm(
+                bytes: wat2wasm(
+                    """
+                    (module
+                        (memory (export "memory") 1)
+                        (func (export "store_at") (param i32)
+                            (i32.store8 (local.get 0) (i32.const 42))
+                        )
                     )
-                )
-                """))
+                    """))
             let engine = Engine(configuration: .init(memoryBoundsChecking: .mprotect))
             let store = Store(engine: engine)
             let instance = try module.instantiate(store: store)
