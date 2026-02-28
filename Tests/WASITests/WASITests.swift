@@ -1,4 +1,5 @@
 import Testing
+import WasmTypes
 
 @testable import WASI
 
@@ -1316,5 +1317,34 @@ struct WASITests {
         #expect(stat.atim == specificTime)
         #expect(stat.mtim == specificTime)
     }
+
+    #if !os(Windows)
+        /// https://github.com/swiftwasm/WasmKit/issues/274
+        @Test
+        func readdirWithCyclicSymlink() throws {
+            let t = try TestSupport.TemporaryDirectory()
+
+            try t.createDir(at: "foo")
+            try t.createFile(at: "foo/a", contents: "hello")
+            try t.createSymlink(at: "foo/b", to: "b")  // cyclic symlink
+
+            let wasi = try WASIBridgeToHost(
+                fileSystem: .host().withPreopens([
+                    .init(guestPath: "/foo", hostPath: t.url.appendingPathComponent("foo").path)
+                ])
+            ).underlying
+            let preopenFd: WASIAbi.Fd = 3
+
+            let memory = TestSupport.TestGuestMemory()
+            let buffer = UnsafeGuestBufferPointer<UInt8>(
+                baseAddress: UnsafeGuestPointer<UInt8>(memorySpace: memory, offset: 0),
+                count: 4096
+            )
+
+            // Without the noFollow fix, this throws ELOOP due to the cyclic symlink
+            let nwritten = try wasi.fd_readdir(fd: preopenFd, buffer: buffer, cookie: 0)
+            #expect(nwritten > 0)
+        }
+    #endif
 
 }
