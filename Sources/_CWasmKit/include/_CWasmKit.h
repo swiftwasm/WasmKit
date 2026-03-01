@@ -9,6 +9,55 @@
 
 #include "Platform.h"
 
+// MARK: - Hardware Atomic Operations for Wasm Shared Memory
+
+#if __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
+#error "WasmKit atomic operations only support little-endian platforms"
+#endif
+
+#define WASMKIT_DEFINE_ATOMICS(WIDTH, CTYPE) \
+static inline CTYPE wasmkit_atomic_load_##WIDTH(const void *_Nonnull ptr) { \
+    return __atomic_load_n((const CTYPE *)ptr, __ATOMIC_SEQ_CST); \
+} \
+static inline void wasmkit_atomic_store_##WIDTH(void *_Nonnull ptr, CTYPE val) { \
+    __atomic_store_n((CTYPE *)ptr, val, __ATOMIC_SEQ_CST); \
+} \
+static inline CTYPE wasmkit_atomic_rmw_add_##WIDTH(void *_Nonnull ptr, CTYPE val) { \
+    return __atomic_fetch_add((CTYPE *)ptr, val, __ATOMIC_SEQ_CST); \
+} \
+static inline CTYPE wasmkit_atomic_rmw_sub_##WIDTH(void *_Nonnull ptr, CTYPE val) { \
+    return __atomic_fetch_sub((CTYPE *)ptr, val, __ATOMIC_SEQ_CST); \
+} \
+static inline CTYPE wasmkit_atomic_rmw_and_##WIDTH(void *_Nonnull ptr, CTYPE val) { \
+    return __atomic_fetch_and((CTYPE *)ptr, val, __ATOMIC_SEQ_CST); \
+} \
+static inline CTYPE wasmkit_atomic_rmw_or_##WIDTH(void *_Nonnull ptr, CTYPE val) { \
+    return __atomic_fetch_or((CTYPE *)ptr, val, __ATOMIC_SEQ_CST); \
+} \
+static inline CTYPE wasmkit_atomic_rmw_xor_##WIDTH(void *_Nonnull ptr, CTYPE val) { \
+    return __atomic_fetch_xor((CTYPE *)ptr, val, __ATOMIC_SEQ_CST); \
+} \
+static inline CTYPE wasmkit_atomic_rmw_xchg_##WIDTH(void *_Nonnull ptr, CTYPE val) { \
+    return __atomic_exchange_n((CTYPE *)ptr, val, __ATOMIC_SEQ_CST); \
+} \
+static inline _Bool wasmkit_atomic_cmpxchg_##WIDTH( \
+    void *_Nonnull ptr, CTYPE *_Nonnull expected, CTYPE desired \
+) { \
+    return __atomic_compare_exchange_n( \
+        (CTYPE *)ptr, expected, desired, 0, \
+        __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST); \
+}
+
+WASMKIT_DEFINE_ATOMICS(8,  uint8_t)
+WASMKIT_DEFINE_ATOMICS(16, uint16_t)
+WASMKIT_DEFINE_ATOMICS(32, uint32_t)
+WASMKIT_DEFINE_ATOMICS(64, uint64_t)
+#undef WASMKIT_DEFINE_ATOMICS
+
+static inline void wasmkit_atomic_fence(void) {
+    __atomic_thread_fence(__ATOMIC_SEQ_CST);
+}
+
 // MARK: - Execution Parameters
 // See ExecutionContext.swift for more information about each execution
 // parameter.
