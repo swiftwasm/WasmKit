@@ -1347,4 +1347,34 @@ struct WASITests {
         }
     #endif
 
+    #if !os(Windows)
+        // https://github.com/swiftwasm/WasmKit/issues/275
+        @Test
+        func fileDescriptorLeakTest() throws {
+            let t = try TestSupport.TemporaryDirectory()
+
+            let wasi = try WASIBridgeToHost(
+                fileSystem: .host().withPreopens([
+                    .init(guestPath: "/", hostPath: t.url.path)
+                ])
+            ).underlying
+            let preopenFd: WASIAbi.Fd = 3
+
+            for _ in 0...10000 {
+                try wasi.path_create_directory(dirFd: preopenFd, path: "foo")
+                let fd = try wasi.path_open(
+                    dirFd: preopenFd,
+                    dirFlags: [],
+                    path: "foo/bar",
+                    oflags: [.CREAT],
+                    fsRightsBase: [.FD_WRITE],
+                    fsRightsInheriting: [],
+                    fdflags: []
+                )
+                try wasi.fd_close(fd: fd)
+                try wasi.path_unlink_file(dirFd: preopenFd, path: "foo/bar")
+                try wasi.path_remove_directory(dirFd: preopenFd, path: "foo")
+            }
+        }
+    #endif
 }
