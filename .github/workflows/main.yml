@@ -331,10 +331,97 @@ jobs:
       - name: Install CMake
         run: |
           apt-get install -y curl
-          curl -L https://github.com/Kitware/CMake/releases/download/v3.29.2/cmake-3.29.2-linux-x86_64.tar.gz | tar xz --strip-component 1 -C /usr/local/
+          curl -L https://github.com/Kitware/CMake/releases/download/v3.30.2/cmake-3.30.2-linux-x86_64.tar.gz | tar xz --strip-component 1 -C /usr/local/
       - run: cmake -G Ninja -B ./build
       - run: cmake --build ./build
       - run: ./build/bin/wasmkit --version
+
+  build-llvm-ubuntu:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            llvm-target: X86
+          - os: ubuntu-24.04-arm
+            llvm-target: AArch64
+    runs-on: ${{ matrix.os }}
+    container:
+      image: swift:6.2-noble
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: apt-get update && apt-get install -y ninja-build python3
+      - name: Install CMake
+        run: |
+          apt-get install -y curl
+          if [[ "${{ matrix.llvm-target }}" == "AArch64" ]]; then
+            export CMAKE_ARCH=aarch64
+          elif [[ "${{ matrix.llvm-target }}" == "X86" ]]; then
+            export CMAKE_ARCH=x86_64
+          else
+            exit 1
+          fi
+
+          curl -L "https://github.com/Kitware/CMake/releases/download/v3.30.2/cmake-3.30.2-linux-${CMAKE_ARCH}.tar.gz" | tar xz --strip-component 1 -C /usr/local/
+      - name: Cache LLVM
+        id: cache-llvm
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/Vendor/llvm-project
+          # IMPORTANT: Update the key when updating LLVM tag below in the build step.
+          key: llvm-${{ matrix.os }}-${{ matrix.llvm-target }}-swift-main-2026-01-04
+      - name: Build LLVM
+        if: steps.cache-llvm.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p $GITHUB_WORKSPACE/Vendor/llvm-project
+          curl -L https://github.com/swiftlang/llvm-project/archive/refs/tags/swift-DEVELOPMENT-SNAPSHOT-2026-01-04-a.tar.gz | tar xz --strip-component 1 -C $GITHUB_WORKSPACE/Vendor/llvm-project
+          cmake -DLLVM_TARGETS_TO_BUILD=${{ matrix.llvm-target }} -DLLVM_INCLUDE_TESTS=OFF -DCMAKE_BUILD_TYPE=Release -G Ninja -S $GITHUB_WORKSPACE/Vendor/llvm-project/llvm -B $GITHUB_WORKSPACE/Vendor/llvm-project/llvm/build
+          cmake --build $GITHUB_WORKSPACE/Vendor/llvm-project/llvm/build
+      - name: Build WasmKit with LLVM
+        run: |
+          LLVM_DIR="$GITHUB_WORKSPACE/Vendor/llvm-project/llvm/build/lib/cmake/llvm/" cmake -DWASMKIT_BUILD_LLVM_BACKEND=ON -DWASMKIT_LLVM_BACKEND_TARGET=${{ matrix.llvm-target }} -DWASMKIT_BUILD_CLI=ON -G Ninja -B ./build
+          cmake --build ./build
+      - name: Run a smoke test
+        run: |
+          ./build/bin/wasmkit-llvm wat2wasm Examples/wasm/factorial.wat
+          ./build/bin/wasmkit-llvm run Examples/wasm/factorial.wasm fac i64:5
+
+  build-llvm-macos:
+    strategy:
+      matrix:
+        include:
+          - os: macos-26
+            llvm-target: AArch64
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache LLVM
+        id: cache-llvm
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/Vendor/llvm-project
+          # IMPORTANT: Update the key when updating LLVM tag below in the build step.
+          key: llvm-${{ matrix.os }}-${{ matrix.llvm-target }}-swift-main-2026-01-04
+      - name: Build LLVM
+        if: steps.cache-llvm.outputs.cache-hit != 'true'
+        run: |
+          sudo xcode-select -s /Applications/Xcode_26.2.app
+          mkdir -p $GITHUB_WORKSPACE/Vendor/llvm-project
+          curl -L https://github.com/swiftlang/llvm-project/archive/refs/tags/swift-DEVELOPMENT-SNAPSHOT-2026-01-04-a.tar.gz | tar xz --strip-component 1 -C $GITHUB_WORKSPACE/Vendor/llvm-project
+          cmake -DLLVM_TARGETS_TO_BUILD=${{ matrix.llvm-target }} -DLLVM_INCLUDE_TESTS=OFF -DCMAKE_BUILD_TYPE=Release -G Ninja -S $GITHUB_WORKSPACE/Vendor/llvm-project/llvm -B $GITHUB_WORKSPACE/Vendor/llvm-project/llvm/build
+          cmake --build $GITHUB_WORKSPACE/Vendor/llvm-project/llvm/build
+      - name: Build WasmKit with LLVM
+        run: |
+          LLVM_DIR="$GITHUB_WORKSPACE/Vendor/llvm-project/llvm/build/lib/cmake/llvm/" cmake -DWASMKIT_BUILD_LLVM_BACKEND=ON -DWASMKIT_LLVM_BACKEND_TARGET=${{ matrix.llvm-target }} -DWASMKIT_BUILD_CLI=ON -G Ninja -B ./build
+          cmake --build ./build
+      - name: Run a smoke test
+        run: |
+          ./build/bin/wasmkit-llvm wat2wasm Examples/wasm/factorial.wat
+          ./build/bin/wasmkit-llvm run Examples/wasm/factorial.wasm fac i64:5
 
   build-wasi:
     runs-on: ubuntu-24.04
