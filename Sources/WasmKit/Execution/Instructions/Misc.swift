@@ -43,6 +43,8 @@ extension Execution {
             value = .ref(.extern(nil))
         case .funcRef:
             value = .ref(.function(nil))
+        case .exnRef:
+            value = .ref(.exception(nil))
         }
         sp[immediate.result] = UntypedValue(value)
     }

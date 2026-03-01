@@ -233,6 +233,7 @@ public enum WastDirective {
     case assertReturn(execute: WastExecute, results: [WastExpectValue])
     case assertTrap(execute: WastExecute, message: String)
     case assertExhaustion(call: WastInvoke, message: String)
+    case assertException(execute: WastExecute)
     case assertUnlinkable(module: Wat, message: String)
     case register(name: String, moduleId: String?)
     case invoke(WastInvoke)
@@ -279,6 +280,11 @@ public enum WastDirective {
             let message = try wastParser.parser.expectString()
             try wastParser.parser.expect(.rightParen)
             return .assertExhaustion(call: call, message: message)
+        case "assert_exception":
+            try wastParser.parser.consume()
+            let execute = try wastParser.parens { wastParser throws(WatParserError) in try WastExecute.parse(wastParser: &wastParser) }
+            try wastParser.parser.expect(.rightParen)
+            return .assertException(execute: execute)
         case "assert_unlinkable":
             try wastParser.parser.consume()
             let features = wastParser.features

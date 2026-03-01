@@ -65,6 +65,7 @@ extension ConstExpression {
             switch type {
             case .externRef: return .ref(.extern(nil))
             case .funcRef: return .ref(.function(nil))
+            case .exnRef: return .ref(.exception(nil))
             default:
                 throw ValidationError(.illegalConstExpressionInstruction(constInst))
             }
@@ -94,6 +95,8 @@ extension WasmParser.ElementSegment {
             return .function(nil)
         case .refNull(.externRef):
             return .extern(nil)
+        case .refNull(.exnRef):
+            return .exception(nil)
         case .globalGet(let index):
             let value = try context.globalValue(index)
             switch value {

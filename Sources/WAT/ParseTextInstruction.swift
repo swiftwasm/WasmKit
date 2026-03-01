@@ -30,6 +30,10 @@ func parseTextInstruction<V: InstructionVisitor>(
         let (blockType) = try expressionParser.visitIf(wat: &wat)
         return { visitor throws(WatParserError) in return try visitor.visitIf(blockType: blockType) }
     case "else": return { visitor throws(WatParserError) in return try visitor.visitElse() }
+    case "throw":
+        let (tagIndex) = try expressionParser.visitThrow(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitThrow(tagIndex: tagIndex) }
+    case "throw_ref": return { visitor throws(WatParserError) in return try visitor.visitThrowRef() }
     case "end": return { visitor throws(WatParserError) in return try visitor.visitEnd() }
     case "br":
         let (relativeDepth) = try expressionParser.visitBr(wat: &wat)
@@ -59,6 +63,9 @@ func parseTextInstruction<V: InstructionVisitor>(
     case "return_call_ref":
         let (typeIndex) = try expressionParser.visitReturnCallRef(wat: &wat)
         return { visitor throws(WatParserError) in return try visitor.visitReturnCallRef(typeIndex: typeIndex) }
+    case "try_table":
+        let (blockType, tryCatch) = try expressionParser.visitTryTable(wat: &wat)
+        return { visitor throws(WatParserError) in return try visitor.visitTryTable(blockType: blockType, tryCatch: tryCatch) }
     case "drop": return { visitor throws(WatParserError) in return try visitor.visitDrop() }
     case "select": return { visitor throws(WatParserError) in return try visitor.visitSelect() }
     case "local.get":

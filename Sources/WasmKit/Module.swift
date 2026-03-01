@@ -5,18 +5,21 @@ struct ModuleImports {
     let numberOfGlobals: Int
     let numberOfMemories: Int
     let numberOfTables: Int
+    let numberOfTags: Int
 
     static func build(
         from imports: [Import],
         functionTypeIndices: inout [TypeIndex],
         globalTypes: inout [GlobalType],
         memoryTypes: inout [MemoryType],
-        tableTypes: inout [TableType]
+        tableTypes: inout [TableType],
+        tagTypes: inout [TypeIndex]
     ) -> ModuleImports {
         var numberOfFunctions: Int = 0
         var numberOfGlobals: Int = 0
         var numberOfMemories: Int = 0
         var numberOfTables: Int = 0
+        var numberOfTags: Int = 0
         for item in imports {
             switch item.descriptor {
             case .function(let typeIndex):
@@ -31,13 +34,17 @@ struct ModuleImports {
             case .global(let globalType):
                 numberOfGlobals += 1
                 globalTypes.append(globalType)
+            case .tag(let typeIndex):
+                numberOfTags += 1
+                tagTypes.append(typeIndex)
             }
         }
         return ModuleImports(
             numberOfFunctions: numberOfFunctions,
             numberOfGlobals: numberOfGlobals,
             numberOfMemories: numberOfMemories,
-            numberOfTables: numberOfTables
+            numberOfTables: numberOfTables,
+            numberOfTags: numberOfTags
         )
     }
 }
@@ -52,6 +59,7 @@ public struct Module {
     let data: [DataSegment]
     let start: FunctionIndex?
     let globals: [WasmParser.Global]
+    let tags: [WasmParser.Tag]
     public let imports: [Import]
     public let exports: [Export]
     public let customSections: [CustomSection]
@@ -61,6 +69,7 @@ public struct Module {
     let importedFunctionTypes: [TypeIndex]
     let memoryTypes: [MemoryType]
     let tableTypes: [TableType]
+    let tagTypes: [TypeIndex]
     let features: WasmFeatureSet
     let dataCount: UInt32?
 
@@ -75,6 +84,7 @@ public struct Module {
         globals: [WasmParser.Global],
         memories: [MemoryType],
         tables: [TableType],
+        tags: [WasmParser.Tag] = [],
         customSections: [CustomSection],
         features: WasmFeatureSet,
         dataCount: UInt32?
@@ -86,6 +96,7 @@ public struct Module {
         self.imports = imports
         self.exports = exports
         self.globals = globals
+        self.tags = tags
         self.customSections = customSections
         self.features = features
         self.dataCount = dataCount
@@ -94,18 +105,21 @@ public struct Module {
         var globalTypes: [GlobalType] = []
         var memoryTypes: [MemoryType] = []
         var tableTypes: [TableType] = []
+        var tagTypes: [TypeIndex] = []
 
         self.moduleImports = ModuleImports.build(
             from: imports,
             functionTypeIndices: &importedFunctionTypes,
             globalTypes: &globalTypes,
             memoryTypes: &memoryTypes,
-            tableTypes: &tableTypes
+            tableTypes: &tableTypes,
+            tagTypes: &tagTypes
         )
         self.types = types
         self.importedFunctionTypes = importedFunctionTypes
         self.memoryTypes = memoryTypes + memories
         self.tableTypes = tableTypes + tables
+        self.tagTypes = tagTypes + tags.map(\.type)
     }
 
     static func resolveType(_ index: TypeIndex, typeSection: [FunctionType]) throws -> FunctionType {

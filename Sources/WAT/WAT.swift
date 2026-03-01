@@ -74,6 +74,7 @@ public struct Wat {
     let tables: [Table]
     let memories: NameMapping<WatParser.MemoryDecl>
     let globals: NameMapping<WatParser.GlobalDecl>
+    let tagsMap: NameMapping<WatParser.TagDecl>
     let elementsMap: NameMapping<WatParser.ElementDecl>
     let data: NameMapping<WatParser.DataSegmentDecl>
     let start: FunctionIndex?
@@ -92,6 +93,7 @@ public struct Wat {
             tables: [],
             memories: NameMapping<WatParser.MemoryDecl>(),
             globals: NameMapping<WatParser.GlobalDecl>(),
+            tagsMap: NameMapping<WatParser.TagDecl>(),
             elementsMap: NameMapping<WatParser.ElementDecl>(),
             data: NameMapping<WatParser.DataSegmentDecl>(),
             start: nil,
@@ -291,6 +293,7 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
     var elementSegmentsMap = NameMapping<WatParser.ElementDecl>()
     var dataSegmentsMap = NameMapping<WatParser.DataSegmentDecl>()
     var globalsMap = NameMapping<WatParser.GlobalDecl>()
+    var tagsMap = NameMapping<WatParser.TagDecl>()
     var start: Parser.IndexOrId?
 
     var exportDecls: [WatParser.ExportDecl] = []
@@ -376,6 +379,18 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
             case .imported(let importNames):
                 addImport(importNames) { () throws(WatParserError) in try .global(decl.type.resolve(typesMap)) }
             }
+        case .tag(let decl):
+            try checkImportOrder(decl.importNames)
+            let index = try tagsMap.add(decl)
+            addExports(decl.exports, index: index, kind: .tag)
+            switch decl.kind {
+            case .definition: break
+            case .imported(let importNames):
+                addImport(importNames) { () throws(WatParserError) in
+                    let typeIndex = try typesMap.resolveIndex(use: decl.typeUse)
+                    return .tag(TypeIndex(typeIndex))
+                }
+            }
         case .element(let decl):
             try elementSegmentsMap.add(decl)
         case .export(let decl):
@@ -409,6 +424,8 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
             descriptor = try .memory(MemoryIndex(memoriesMap.resolveIndex(use: decl.id)))
         case .global:
             descriptor = try .global(GlobalIndex(globalsMap.resolveIndex(use: decl.id)))
+        case .tag:
+            descriptor = try .tag(TagIndex(tagsMap.resolveIndex(use: decl.id)))
         }
         return Export(name: decl.name, descriptor: descriptor)
     }
@@ -427,6 +444,7 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
         },
         memories: memoriesMap,
         globals: globalsMap,
+        tagsMap: tagsMap,
         elementsMap: elementSegmentsMap,
         data: dataSegmentsMap,
         start: startIndex,

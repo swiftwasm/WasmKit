@@ -48,6 +48,7 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
     var tables: [TableType] = []
     var memories: [MemoryType] = []
     var globals: [WasmParser.Global] = []
+    var tags: [WasmParser.Tag] = []
     var elements: [ElementSegment] = []
     var data: [DataSegment] = []
     var start: FunctionIndex?
@@ -77,6 +78,8 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
             memories = memorySection.map(\.type)
         case .globalSection(let globalSection):
             globals = globalSection
+        case .tagSection(let tagSection):
+            tags = tagSection
         case .exportSection(let exportSection):
             exports = exportSection
         case .startSection(let functionIndex):
@@ -129,6 +132,7 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
         globals: globals,
         memories: memories,
         tables: tables,
+        tags: tags,
         customSections: customSections,
         features: features,
         dataCount: dataCount

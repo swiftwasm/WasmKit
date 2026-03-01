@@ -15,6 +15,7 @@ add_wasmkit_library(WasmKit
   Execution/AtomicParkingLot.swift
   Execution/DebuggerInstructionMapping.swift
   Execution/Instructions/Control.swift
+  Execution/Instructions/ExceptionHandling.swift
   Execution/Instructions/Instruction.swift
   Execution/Instructions/Table.swift
   Execution/Instructions/Memory.swift
