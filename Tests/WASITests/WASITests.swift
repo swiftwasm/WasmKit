@@ -1375,37 +1375,34 @@ struct WASITests {
             let writeData = Array("hello".utf8)
             let writeVecs = memory.writeIOVecs([writeData])
 
-            let before = try TestSupport.getCurrentFDs()
+            for _ in 0..<1000 {
+                let fd = try wasi.path_open(
+                    dirFd: dir1Fd,
+                    dirFlags: [],
+                    path: "foo/bar",
+                    oflags: [.CREAT],
+                    fsRightsBase: [.FD_WRITE],
+                    fsRightsInheriting: [],
+                    fdflags: []
+                )
+                #expect(try wasi.fd_write(fileDescriptor: fd, ioVectors: writeVecs) > 0)
+                try wasi.fd_close(fd: fd)
 
-            let fd = try wasi.path_open(
-                dirFd: dir1Fd,
-                dirFlags: [],
-                path: "foo/bar",
-                oflags: [.CREAT],
-                fsRightsBase: [.FD_WRITE],
-                fsRightsInheriting: [],
-                fdflags: []
-            )
-            #expect(try wasi.fd_write(fileDescriptor: fd, ioVectors: writeVecs) > 0)
-            try wasi.fd_close(fd: fd)
+                try wasi.path_rename(oldFd: dir1Fd, oldPath: "foo/bar", newFd: dir2Fd, newPath: "foo/baz")
 
-            try wasi.path_rename(oldFd: dir1Fd, oldPath: "foo/bar", newFd: dir2Fd, newPath: "foo/baz")
+                try wasi.path_symlink(oldPath: "baz", dirFd: dir2Fd, newPath: "foo/quux")
+                let stat = try wasi.path_filestat_get(dirFd: dir2Fd, flags: .SYMLINK_FOLLOW, path: "foo/quux")
+                #expect(stat.size == 5)  // hello
+                let count = try Int(wasi.path_readlink(fd: dir2Fd, path: "foo/quux", buffer: buffer))
+                buffer.withHostPointer { ptr in
+                    #expect(String(decoding: ptr[..<count], as: UTF8.self) == "baz")
+                }
+                try wasi.path_unlink_file(dirFd: dir2Fd, path: "foo/baz")
+                try wasi.path_unlink_file(dirFd: dir2Fd, path: "foo/quux")
 
-            try wasi.path_symlink(oldPath: "baz", dirFd: dir2Fd, newPath: "foo/quux")
-            let stat = try wasi.path_filestat_get(dirFd: dir2Fd, flags: .SYMLINK_FOLLOW, path: "foo/quux")
-            #expect(stat.size == 5)  // hello
-            let count = try Int(wasi.path_readlink(fd: dir2Fd, path: "foo/quux", buffer: buffer))
-            buffer.withHostPointer { ptr in
-                #expect(String(decoding: ptr[..<count], as: UTF8.self) == "baz")
+                try wasi.path_create_directory(dirFd: dir1Fd, path: "foo/bar")
+                try wasi.path_remove_directory(dirFd: dir1Fd, path: "foo/bar")
             }
-            try wasi.path_unlink_file(dirFd: dir2Fd, path: "foo/baz")
-            try wasi.path_unlink_file(dirFd: dir2Fd, path: "foo/quux")
-
-            try wasi.path_create_directory(dirFd: dir1Fd, path: "foo/bar")
-            try wasi.path_remove_directory(dirFd: dir1Fd, path: "foo/bar")
-
-            let after = try TestSupport.getCurrentFDs()
-            #expect(before == after)
         }
     #endif
 }
