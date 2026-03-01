@@ -178,4 +178,14 @@ enum TestSupport {
             _ = try? FileManager.default.removeItem(atPath: path)
         }
     }
+
+    #if os(macOS)
+        static func getCurrentFDs() throws -> Set<String> {
+            try Set(FileManager.default.contentsOfDirectory(atPath: "/dev/fd"))
+        }
+    #elseif os(Linux)
+        static func getCurrentFDs() throws -> Set<String> {
+            try Set(FileManager.default.contentsOfDirectory(atPath: "/proc/self/fd"))
+        }
+    #endif
 }
