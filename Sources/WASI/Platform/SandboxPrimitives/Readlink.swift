@@ -29,12 +29,9 @@ extension SandboxPrimitives {
             let initialBufferCapacity = 256
             let maxBufferCapacity = max(initialBufferCapacity, Int(PATH_MAX))
 
-            let (dir, basename) = try openParent(start: start, path: path)
-            defer {
-                if dir.rawValue != start.rawValue {
-                    try? dir.close()
-                }
-            }
+            let result = try openParent(start: start, path: path)
+            let dir = result.parentFd
+            let basename = result.basename
 
             return try basename.withCString { cBasename in
                 var capacity = min(initialBufferCapacity, maxBufferCapacity)
