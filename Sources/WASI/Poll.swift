@@ -11,6 +11,8 @@ import WasmTypes
     import Android
 #elseif os(Windows)
     import ucrt
+#elseif os(WASI)
+    import WASILibc
 #else
     #error("Unsupported Platform")
 #endif
