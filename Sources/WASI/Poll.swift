@@ -17,7 +17,7 @@ import WasmTypes
 
 extension FdTable {
     func fileDescriptor(fd: WASIAbi.Fd) throws -> FileDescriptor {
-        guard case let .file(entry) = self[fd], let fd = (entry as? FdWASIEntry)?.fd else {
+        guard case .file(let entry) = self[fd], let fd = (entry as? FdWASIEntry)?.fd else {
             throw WASIAbi.Errno.EBADF
         }
 
