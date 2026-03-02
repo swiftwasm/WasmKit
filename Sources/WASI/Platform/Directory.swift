@@ -111,6 +111,7 @@ extension DirEntry: WASIDir, FdWASIEntry {
         #if os(Windows)
             throw WASIAbi.Errno.ENOSYS
         #else
+            let path = SandboxPrimitives.stripDirSuffix(path)
             let result = try SandboxPrimitives.openParent(start: fd, path: path)
             let dir = result.parentFd
             let basename = result.basename
