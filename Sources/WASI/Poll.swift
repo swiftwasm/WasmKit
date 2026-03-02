@@ -61,13 +61,17 @@ func poll(
             events[0] = .init(userData: clockUserData, error: .SUCCESS, eventType: .clock, fdReadWrite: .init(nBytes: 0, flags: .init(rawValue: 0)))
         } else if result > 0 {
             for (i, fd) in pollfds.enumerated() {
+                guard fd.revents != 0 else { continue }
+                let eventIndex = updatedEvents
                 updatedEvents += 1
-                switch fd.revents {
-                case .init(POLLIN):
-                    events[.init(i)] = .init(userData: fdUserData[i], error: .SUCCESS, eventType: .fdRead, fdReadWrite: .init(nBytes: 0, flags: []))
-                case .init(POLLOUT):
-                    events[.init(i)] = .init(userData: fdUserData[i], error: .SUCCESS, eventType: .fdWrite, fdReadWrite: .init(nBytes: 0, flags: []))
-                default: throw WASIAbi.Errno.ENOTSUP
+                let hangup: WASIAbi.Event.FdReadWrite.Flags = fd.revents & Int16(POLLHUP) != 0 ? [.hangup] : []
+                if fd.revents & Int16(POLLIN) != 0 || (fd.events & Int16(POLLIN) != 0 && fd.revents & Int16(POLLHUP) != 0) {
+                    events[.init(eventIndex)] = .init(userData: fdUserData[i], error: .SUCCESS, eventType: .fdRead, fdReadWrite: .init(nBytes: 0, flags: hangup))
+                } else if fd.revents & Int16(POLLOUT) != 0 || (fd.events & Int16(POLLOUT) != 0 && fd.revents & Int16(POLLHUP) != 0) {
+                    events[.init(eventIndex)] = .init(userData: fdUserData[i], error: .SUCCESS, eventType: .fdWrite, fdReadWrite: .init(nBytes: 0, flags: hangup))
+                } else if fd.revents & Int16(POLLERR | POLLNVAL) != 0 {
+                    let eventType: WASIAbi.EventType = fd.events & Int16(POLLIN) != 0 ? .fdRead : .fdWrite
+                    events[.init(eventIndex)] = .init(userData: fdUserData[i], error: .EBADF, eventType: eventType, fdReadWrite: .init(nBytes: 0, flags: []))
                 }
             }
         } else {

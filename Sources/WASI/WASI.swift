@@ -281,6 +281,8 @@ enum WASIAbi {
             static func readFromGuest(_ pointer: UnsafeGuestRawPointer) -> Self {
                 var pointer = pointer
                 let tag = UInt8.readFromGuest(&pointer)
+                // Align to variant content area (max alignment of all variant payloads)
+                pointer = pointer.alignedUp(toMultipleOf: Clock.alignInGuest)
 
                 switch tag {
                 case 0:
@@ -303,12 +305,15 @@ enum WASIAbi {
                 switch value {
                 case .clock(let clock):
                     UInt8.writeToGuest(at: &pointer, value: 0)
+                    pointer = pointer.alignedUp(toMultipleOf: Clock.alignInGuest)
                     Clock.writeToGuest(at: &pointer, value: clock)
                 case .fdRead(let fd):
                     UInt8.writeToGuest(at: &pointer, value: 1)
+                    pointer = pointer.alignedUp(toMultipleOf: Clock.alignInGuest)
                     Fd.writeToGuest(at: &pointer, value: fd)
                 case .fdWrite(let fd):
                     UInt8.writeToGuest(at: &pointer, value: 2)
+                    pointer = pointer.alignedUp(toMultipleOf: Clock.alignInGuest)
                     Fd.writeToGuest(at: &pointer, value: fd)
                 }
             }
