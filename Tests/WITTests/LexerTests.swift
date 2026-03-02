@@ -1,8 +1,9 @@
-import XCTest
+import Testing
 
 @testable import WIT
 
-class LexerTests: XCTestCase {
+@Suite
+struct LexerTests {
     func collectToken(_ s: String) throws -> [TokenKind] {
         let cursor = Lexer.Cursor(input: s)
         var lexer = Lexer(cursor: cursor)
@@ -13,62 +14,58 @@ class LexerTests: XCTestCase {
         return tokens
     }
 
-    func testLexIdentifier() {
-        try XCTAssertEqual(collectToken(""), [])
-        try XCTAssertEqual(collectToken("_"), [.underscore])
-        try XCTAssertEqual(collectToken("a"), [.id])
-        try XCTAssertEqual(collectToken("a1"), [.id])
-        try XCTAssertEqual(collectToken("a1b"), [.id])
-        try XCTAssertEqual(collectToken("apple"), [.id])
-        try XCTAssertEqual(collectToken("apple-banana"), [.id])
-        try XCTAssertEqual(collectToken("_a_p_p_l_e_"), [.id])
-        try XCTAssertEqual(collectToken("アップル"), [.id])
+    @Test func lexIdentifier() throws {
+        #expect(try collectToken("") == [])
+        #expect(try collectToken("_") == [.underscore])
+        #expect(try collectToken("a") == [.id])
+        #expect(try collectToken("a1") == [.id])
+        #expect(try collectToken("a1b") == [.id])
+        #expect(try collectToken("apple") == [.id])
+        #expect(try collectToken("apple-banana") == [.id])
+        #expect(try collectToken("_a_p_p_l_e_") == [.id])
+        #expect(try collectToken("アップル") == [.id])
 
-        try XCTAssertEqual(collectToken("%a"), [.explicitId])
-        try XCTAssertEqual(collectToken("%a-b"), [.explicitId])
-        try XCTAssertEqual(collectToken("%"), [.explicitId])
+        #expect(try collectToken("%a") == [.explicitId])
+        #expect(try collectToken("%a-b") == [.explicitId])
+        #expect(try collectToken("%") == [.explicitId])
 
-        try XCTAssertEqual(collectToken("func-tion"), [.id])
-        try XCTAssertEqual(collectToken("a:"), [.id, .colon])
+        #expect(try collectToken("func-tion") == [.id])
+        #expect(try collectToken("a:") == [.id, .colon])
     }
 
-    func testLexKeyword() {
-        try XCTAssertEqual(collectToken("func"), [.func])
-        try XCTAssertEqual(collectToken("func()"), [.func, .leftParen, .rightParen])
+    @Test func lexKeyword() throws {
+        #expect(try collectToken("func") == [.func])
+        #expect(try collectToken("func()") == [.func, .leftParen, .rightParen])
 
-        try XCTAssertEqual(collectToken("resource"), [.resource])
+        #expect(try collectToken("resource") == [.resource])
 
-        try XCTAssertEqual(collectToken("own"), [.own])
-        try XCTAssertEqual(collectToken("borrow"), [.borrow])
+        #expect(try collectToken("own") == [.own])
+        #expect(try collectToken("borrow") == [.borrow])
 
-        try XCTAssertEqual(
-            collectToken("own<file>"),
-            [.own, .lessThan, .id, .greaterThan]
+        #expect(
+            try collectToken("own<file>") == [.own, .lessThan, .id, .greaterThan]
         )
     }
 
-    func testLexInteger() {
-        try XCTAssertEqual(collectToken("0"), [.integer])
-        try XCTAssertEqual(collectToken("0123"), [.integer])
-        try XCTAssertEqual(collectToken("0123a"), [.integer, .id])
+    @Test func lexInteger() throws {
+        #expect(try collectToken("0") == [.integer])
+        #expect(try collectToken("0123") == [.integer])
+        #expect(try collectToken("0123a") == [.integer, .id])
     }
 
-    func testLexFunction() {
-        try XCTAssertEqual(
-            collectToken("stat-file: func()"),
-            [
+    @Test func lexFunction() throws {
+        #expect(
+            try collectToken("stat-file: func()") == [
                 .id, .colon, .func, .leftParen, .rightParen,
             ])
-        try XCTAssertEqual(
-            collectToken("stat-file: func(path: string)"),
-            [
+        #expect(
+            try collectToken("stat-file: func(path: string)") == [
                 .id, .colon, .func,
                 .leftParen, .id, .colon, .string_, .rightParen,
             ])
 
-        try XCTAssertEqual(
-            collectToken("stat-file: func() -> result<stat>"),
-            [
+        #expect(
+            try collectToken("stat-file: func() -> result<stat>") == [
                 .id, .colon, .func, .leftParen, .rightParen,
                 .rArrow, .result_, .lessThan, .id, .greaterThan,
             ])
@@ -91,12 +88,11 @@ class LexerTests: XCTestCase {
         return spans
     }
 
-    func testTextRange() throws {
-        try XCTAssertEqual(tokenSpan("a"), [.init(offset: 0, length: 1)])
-        try XCTAssertEqual(tokenSpan("ab"), [.init(offset: 0, length: 2)])
-        try XCTAssertEqual(
-            tokenSpan("a b"),
-            [
+    @Test func textRange() throws {
+        #expect(try tokenSpan("a") == [.init(offset: 0, length: 1)])
+        #expect(try tokenSpan("ab") == [.init(offset: 0, length: 2)])
+        #expect(
+            try tokenSpan("a b") == [
                 .init(offset: 0, length: 1),
                 .init(offset: 2, length: 1),
             ])

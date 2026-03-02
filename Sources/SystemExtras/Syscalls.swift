@@ -12,6 +12,8 @@ import Android
 #elseif os(Windows)
 import ucrt
 import WinSDK
+#elseif os(WASI)
+import WASILibc
 #else
 #error("Unsupported Platform")
 #endif
@@ -97,6 +99,14 @@ internal func system_unlinkat(
   return unlinkat(fd, path, flags)
 }
 
+// renameat
+internal func system_renameat(
+  _ oldfd: Int32, _ oldpath: UnsafePointer<CInterop.PlatformChar>,
+  _ newfd: Int32, _ newpath: UnsafePointer<CInterop.PlatformChar>
+) -> CInt {
+  return renameat(oldfd, oldpath, newfd, newpath)
+}
+
 // ftruncate
 internal func system_ftruncate(_ fd: Int32, _ size: off_t) -> CInt {
   return ftruncate(fd, size)
@@ -119,7 +129,7 @@ internal func system_symlinkat(
 extension CInterop {
   #if SYSTEM_PACKAGE_DARWIN
   public typealias DirP = UnsafeMutablePointer<DIR>
-  #elseif os(Linux) || os(Android)
+  #elseif os(Linux) || os(Android) || os(WASI)
   public typealias DirP = OpaquePointer
   #else
   #error("Unsupported Platform")

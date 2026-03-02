@@ -16,37 +16,41 @@ enum Spectest {
         testsuitePath.appendingPathComponent(file)
     }
 
-    static func wastFiles(include: [String] = [], exclude: [String] = ["annotations.wast"]) -> AnyIterator<URL> {
-        var allFiles = [
-            testsuitePath,
-            testsuitePath.appendingPathComponent("proposals/memory64"),
-            testsuitePath.appendingPathComponent("proposals/tail-call"),
-            rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite"),
-        ].flatMap {
-            try! FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil)
-        }.makeIterator()
-
-        return AnyIterator {
-            while let filePath = allFiles.next() {
+    static func wastFiles(include: [String] = [], exclude: [String] = ["annotations.wast"]) -> [URL] {
+        #if os(Android)
+            return []
+        #else
+            return [
+                testsuitePath,
+                testsuitePath.appendingPathComponent("proposals/memory64"),
+                testsuitePath.appendingPathComponent("proposals/tail-call"),
+                testsuitePath.appendingPathComponent("proposals/threads"),
+                rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite"),
+            ].flatMap {
+                try! FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil)
+            }.compactMap { filePath in
                 guard filePath.pathExtension == "wast" else {
-                    continue
+                    return nil
                 }
-                guard !filePath.lastPathComponent.starts(with: "simd_") else { continue }
+                guard !filePath.lastPathComponent.starts(with: "simd_") else { return nil }
+
                 if !include.isEmpty {
-                    guard include.contains(filePath.lastPathComponent) else { continue }
+                    guard include.contains(filePath.lastPathComponent) else { return nil }
                 } else {
-                    guard !exclude.contains(filePath.lastPathComponent) else { continue }
+                    guard !exclude.contains(filePath.lastPathComponent) else { return nil }
                 }
                 return filePath
             }
-            return nil
-        }
+        #endif
     }
 
     static func deriveFeatureSet(wast: URL) -> WasmFeatureSet {
         var features = WasmFeatureSet.default
         if wast.deletingLastPathComponent().path.hasSuffix("proposals/memory64") {
             features.insert(.memory64)
+        }
+        if wast.deletingLastPathComponent().path.hasSuffix("proposals/threads") {
+            features.insert(.threads)
         }
         return features
     }

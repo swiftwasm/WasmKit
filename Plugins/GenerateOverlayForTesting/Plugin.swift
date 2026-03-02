@@ -4,23 +4,23 @@ import Foundation
 @main
 struct Plugin: BuildToolPlugin {
     func createBuildCommands(context: PluginContext, target: Target) async throws -> [Command] {
-        let witTool = try context.tool(named: "WITTool").path
-        let fixturesDir = target.directory.appending("Fixtures")
-        let hostOverlayDir = context.pluginWorkDirectory.appending("GeneratedHostOverlay")
-        return try FileManager.default.contentsOfDirectory(atPath: fixturesDir.string).compactMap { singleFixture in
-            let outputFile = hostOverlayDir.appending(singleFixture + "HostOverlay.swift")
-            let inputFileDir = fixturesDir.appending(singleFixture, "wit")
-            guard FileManager.default.isDirectory(filePath: inputFileDir.string) else { return nil }
+        let witTool = try context.tool(named: "WITTool").url
+        let fixturesDir = target.directoryURL.appendingPathComponent("Fixtures")
+        let hostOverlayDir = context.pluginWorkDirectoryURL.appendingPathComponent("GeneratedHostOverlay")
+        return try FileManager.default.contentsOfDirectory(atPath: fixturesDir.path).compactMap { singleFixture in
+            let outputFile = hostOverlayDir.appendingPathComponent(singleFixture + "HostOverlay.swift")
+            let inputFileDir = fixturesDir.appendingPathComponent(singleFixture).appendingPathComponent("wit")
+            guard FileManager.default.isDirectory(filePath: inputFileDir.path) else { return nil }
 
-            let inputFiles = try FileManager.default.subpathsOfDirectory(atPath: inputFileDir.string).map {
-                inputFileDir.appending(subpath: $0)
+            let inputFiles = try FileManager.default.subpathsOfDirectory(atPath: inputFileDir.path).map {
+                inputFileDir.appendingPathComponent($0)
             }
             return Command.buildCommand(
                 displayName: "Generating host overlay for \(singleFixture)",
                 executable: witTool,
                 arguments: [
                     "generate-overlay", "--target", "host",
-                    inputFileDir, "-o", outputFile
+                    inputFileDir.path, "-o", outputFile.path
                 ],
                 inputFiles: inputFiles,
                 outputFiles: [outputFile]

@@ -1,15 +1,14 @@
+import Foundation
+import Testing
 import WIT
-import XCTest
 
 @testable import WITOverlayGenerator
 
-class HostGeneratorTests: XCTestCase {
+@Suite(TestEnvironmentTraits.hostGeneratorAvailability)
+struct HostGeneratorTests {
     // Host generators are already executed before running this test suite by SwiftPM build tool plugin,
     // but execute again here to collect coverage data.
-    func testGenerateFromFixtures() throws {
-        #if os(Android)
-            throw XCTSkip("unable to run spectest on Android due to missing files on emulator")
-        #endif
+    @Test func generateFromFixtures() throws {
         let fixturesDir = RuntimeTestHarness.testsDirectory.appendingPathComponent("Fixtures")
         for fixture in try FileManager.default.contentsOfDirectory(atPath: fixturesDir.path) {
             let inputFileDir = fixturesDir.appendingPathComponent(fixture).appendingPathComponent("wit")

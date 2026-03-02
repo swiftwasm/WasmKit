@@ -10,34 +10,82 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  check-autogen-diff:
+    runs-on: ubuntu-latest
+    container:
+      image: swift:6.2-noble
+    steps:
+      - uses: actions/checkout@v4
+      - name: Re-generate auto-generated code checks
+        run: |
+          swift run -q --package-path Utilities WasmKitDevUtils
+      - name: Check for changes
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git diff --exit-code || {
+            echo "::error::The auto-generated code utilities changed some files. Please see \`Utilities/README.md\`, re-run the tools, and commit the changes."
+            exit 1
+          }
+
+  build-macos-snapshots:
+    runs-on: macos-26
+    strategy:
+      matrix:
+        include:
+          - toolchain: 6.3-snapshot
+            test-args: ""
+          - toolchain: main-snapshot
+            test-args: "-Xswiftc -DWASMKIT_CI_TOOLCHAIN_MAIN_NIGHTLY"
+    steps:
+      - uses: actions/checkout@v4
+      - id: setup-development
+        run: |
+          brew install wabt jemalloc
+          curl -O https://download.swift.org/swiftly/darwin/swiftly.pkg && \
+            installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
+
+      - name: Build with selected toolchain
+        run: |
+          ~/.swiftly/bin/swiftly init --quiet-shell-followup --skip-install && \
+            . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh" && \
+            hash -r
+          swiftly install ${{ matrix.toolchain }}
+          swiftly use ${{ matrix.toolchain }}
+
+          ./Vendor/checkout-dependency --category benchmark --category component-model
+
+          swift --version
+          swift test --sanitize address --traits ComponentModel,WasmDebuggingSupport ${{ matrix.test-args }}
+          cd Benchmarks && swift package benchmark
+
   build-macos:
     strategy:
       matrix:
         include:
-          # Swift 5.10
-          - os: macos-14
-            xcode: Xcode_15.4
-            development-toolchain-tag: swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a
-            wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi.artifactbundle.zip"
-            wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi
-            wasi-swift-sdk-checksum: "37516de837411ea46e4f9e75d52bd742f6941febac49981aac0c4f20f02b8b54"
-            test-args: ""
-          # Swift 6.0
-          - os: macos-14
-            xcode: Xcode_16.2
-            development-toolchain-tag: swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a
-            wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi.artifactbundle.zip"
-            wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi
-            wasi-swift-sdk-checksum: "37516de837411ea46e4f9e75d52bd742f6941febac49981aac0c4f20f02b8b54"
-            test-args: ""
           # Swift 6.1
           - os: macos-15
             xcode: Xcode_16.4
-            development-toolchain-tag: swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a
-            wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi.artifactbundle.zip"
-            wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi
-            wasi-swift-sdk-checksum: "37516de837411ea46e4f9e75d52bd742f6941febac49981aac0c4f20f02b8b54"
-            test-args: "--sanitize address"
+            development-toolchain-tag: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a
+            wasi-swift-sdk-download: "https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm.artifactbundle.tar.gz"
+            wasi-swift-sdk-id: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm
+            wasi-swift-sdk-checksum: "b64dfad9e1c9ccdf06f35cf9b1a00317e000df0c0de0b3eb9f49d6db0fcba4d9"
+            test-args: "--sanitize address --traits ComponentModel,WasmDebuggingSupport"
+          # Swift 6.2
+          - os: macos-15
+            xcode: Xcode_26.1
+            development-toolchain-tag: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a
+            wasi-swift-sdk-download: "https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm.artifactbundle.tar.gz"
+            wasi-swift-sdk-id: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm
+            wasi-swift-sdk-checksum: "b64dfad9e1c9ccdf06f35cf9b1a00317e000df0c0de0b3eb9f49d6db0fcba4d9"
+            test-args: "--sanitize address --traits ComponentModel,WasmDebuggingSupport"
+          # Swift 6.2.4
+          - os: macos-26
+            xcode: Xcode_26.3
+            development-toolchain-tag: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a
+            wasi-swift-sdk-download: "https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm.artifactbundle.tar.gz"
+            wasi-swift-sdk-id: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm
+            wasi-swift-sdk-checksum: "b64dfad9e1c9ccdf06f35cf9b1a00317e000df0c0de0b3eb9f49d6db0fcba4d9"
+            test-args: "--sanitize address --traits ComponentModel,WasmDebuggingSupport"
 
     runs-on: ${{ matrix.os }}
     name: "build-macos (${{ matrix.xcode }})"
@@ -67,13 +115,26 @@ jobs:
             "hostSdkRootPath": "$(xcrun --show-sdk-path --sdk macosx)"
           }
           EOS
-      - run: ./Vendor/checkout-dependency
+      - run: ./Vendor/checkout-dependency --category default --category component-model
       - run: swift test ${{ matrix.test-args }}
 
   build-xcode:
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
+      - name: Prepare Xcode platforms
+        run: |
+          set -euxo pipefail
+          sudo xcode-select -s /Applications/Xcode_26.3.app
+          sudo xcodebuild -runFirstLaunch || true
+          for PLAT in iOS tvOS watchOS visionOS; do
+            if ! xcodebuild -showsdks | grep -q "$PLAT"; then
+              echo "Downloading $PLAT platform..."
+              sudo xcodebuild -downloadPlatform "$PLAT"
+            fi
+          done
+          xcodebuild -showsdks
+          xcodebuild -scheme WasmKit-Package -showdestinations || true
       - run: xcrun xcodebuild -skipMacroValidation -skipPackagePluginValidation build -scheme WasmKit-Package -destination generic/platform=macOS
       - run: xcrun xcodebuild -skipMacroValidation -skipPackagePluginValidation build -scheme WasmKit-Package -destination generic/platform=iOS
       - run: xcrun xcodebuild -skipMacroValidation -skipPackagePluginValidation build -scheme WasmKit-Package -destination generic/platform=watchOS
@@ -84,32 +145,51 @@ jobs:
     strategy:
       matrix:
         include:
-          - swift: "swift:5.10-focal"
-            development-toolchain-download: "https://download.swift.org/development/ubuntu2004/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a-ubuntu20.04.tar.gz"
-            wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi.artifactbundle.zip"
-            wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi
-            wasi-swift-sdk-checksum: "37516de837411ea46e4f9e75d52bd742f6941febac49981aac0c4f20f02b8b54"
-          - swift: "swift:5.10-amazonlinux2"
-            development-toolchain-download: "https://download.swift.org/development/amazonlinux2/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a-amazonlinux2.tar.gz"
-            wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi.artifactbundle.zip"
-            wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi
-            wasi-swift-sdk-checksum: "37516de837411ea46e4f9e75d52bd742f6941febac49981aac0c4f20f02b8b54"
-          - swift: "swift:6.0-focal"
-            development-toolchain-download: "https://download.swift.org/development/ubuntu2004/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a-ubuntu20.04.tar.gz"
-            wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi.artifactbundle.zip"
-            wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi
-            wasi-swift-sdk-checksum: "37516de837411ea46e4f9e75d52bd742f6941febac49981aac0c4f20f02b8b54"
-            test-args: "--enable-code-coverage"
+          - swift: "swift:6.1-noble"
+            development-toolchain-download: "https://download.swift.org/development/ubuntu2404/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a-ubuntu24.04.tar.gz"
+            wasi-swift-sdk-download: "https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm.artifactbundle.tar.gz"
+            wasi-swift-sdk-id: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm
+            wasi-swift-sdk-checksum: "b64dfad9e1c9ccdf06f35cf9b1a00317e000df0c0de0b3eb9f49d6db0fcba4d9"
+            test-args: "--traits ComponentModel,WasmDebuggingSupport"
+            build-benchmarks: true
+          - swift: "swift:6.2-amazonlinux2"
+            development-toolchain-download: "https://download.swift.org/development/amazonlinux2/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a-amazonlinux2.tar.gz"
+            wasi-swift-sdk-download: "https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm.artifactbundle.tar.gz"
+            wasi-swift-sdk-id: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm
+            wasi-swift-sdk-checksum: "b64dfad9e1c9ccdf06f35cf9b1a00317e000df0c0de0b3eb9f49d6db0fcba4d9"
+            test-args: "--traits ComponentModel,WasmDebuggingSupport"
+          - swift: "swift:6.2-noble"
+            development-toolchain-download: "https://download.swift.org/development/ubuntu2404/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a-ubuntu24.04.tar.gz"
+            wasi-swift-sdk-download: "https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm.artifactbundle.tar.gz"
+            wasi-swift-sdk-id: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm
+            wasi-swift-sdk-checksum: "b64dfad9e1c9ccdf06f35cf9b1a00317e000df0c0de0b3eb9f49d6db0fcba4d9"
+            test-args: "--traits ComponentModel,WasmDebuggingSupport --enable-code-coverage"
+            build-benchmarks: true
             build-dev-dashboard: true
-          - swift: "swiftlang/swift:nightly-main-jammy"
-            development-toolchain-download: "https://download.swift.org/development/ubuntu2204/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a-ubuntu22.04.tar.gz"
-            wasi-swift-sdk-download: "https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi.artifactbundle.zip"
-            wasi-swift-sdk-id: DEVELOPMENT-SNAPSHOT-2025-06-22-a-wasm32-unknown-wasi
-            wasi-swift-sdk-checksum: "37516de837411ea46e4f9e75d52bd742f6941febac49981aac0c4f20f02b8b54"
-            test-args: "-Xswiftc -DWASMKIT_CI_TOOLCHAIN_NIGHTLY"
+          - swift: "swiftlang/swift:nightly-6.3-noble"
+            development-toolchain-download: "https://download.swift.org/development/ubuntu2404/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a-ubuntu24.04.tar.gz"
+            wasi-swift-sdk-download: "https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm.artifactbundle.tar.gz"
+            wasi-swift-sdk-id: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm
+            wasi-swift-sdk-checksum: "b64dfad9e1c9ccdf06f35cf9b1a00317e000df0c0de0b3eb9f49d6db0fcba4d9"
+            test-args: "--traits ComponentModel,WasmDebuggingSupport -Xswiftc -DWASMKIT_CI_TOOLCHAIN_NIGHTLY"
+            build-benchmarks: true
+          - swift: "swiftlang/swift:nightly-main-noble"
+            development-toolchain-download: "https://download.swift.org/development/ubuntu2404/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a-ubuntu24.04.tar.gz"
+            wasi-swift-sdk-download: "https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm.artifactbundle.tar.gz"
+            wasi-swift-sdk-id: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm
+            wasi-swift-sdk-checksum: "b64dfad9e1c9ccdf06f35cf9b1a00317e000df0c0de0b3eb9f49d6db0fcba4d9"
+            test-args: "--traits ComponentModel,WasmDebuggingSupport -Xswiftc -DWASMKIT_CI_TOOLCHAIN_NIGHTLY -Xswiftc -DWASMKIT_CI_TOOLCHAIN_MAIN_NIGHTLY"
+            build-benchmarks: true
+          - swift: "swiftlang/swift:nightly-main-noble"
+            development-toolchain-download: "https://download.swift.org/development/ubuntu2404/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a-ubuntu24.04.tar.gz"
+            wasi-swift-sdk-download: "https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a/swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm.artifactbundle.tar.gz"
+            wasi-swift-sdk-id: swift-DEVELOPMENT-SNAPSHOT-2025-10-02-a_wasm
+            wasi-swift-sdk-checksum: "b64dfad9e1c9ccdf06f35cf9b1a00317e000df0c0de0b3eb9f49d6db0fcba4d9"
+            test-args: "--traits ComponentModel,WasmDebuggingSupport -Xswiftc -DWASMKIT_CI_TOOLCHAIN_NIGHTLY -Xswiftc -DWASMKIT_CI_TOOLCHAIN_MAIN_NIGHTLY --build-system swiftbuild"
+            label: " --build-system swiftbuild"
 
-    runs-on: ubuntu-22.04
-    name: "build-linux (${{ matrix.swift }})"
+    runs-on: ubuntu-24.04
+    name: "build-linux (${{ matrix.swift }}${{ matrix.label }})"
 
     steps:
       - uses: actions/checkout@v4
@@ -140,8 +220,14 @@ jobs:
           }
           EOS
       - run: ./build-exec ./CI/install-wabt.sh
-      - run: ./Vendor/checkout-dependency
+      - run: ./Vendor/checkout-dependency --category benchmark --category component-model
       - run: ./build-exec swift test ${{ matrix.test-args }}
+
+      - if: matrix.build-benchmarks
+        run: |
+          ./build-exec apt-get update
+          ./build-exec apt-get install -y libjemalloc-dev
+          ./build-exec swift package --package-path Benchmarks benchmark
 
       - if: matrix.build-dev-dashboard
         run: ./build-exec ./CI/build-dev-dashboard.sh
@@ -150,7 +236,7 @@ jobs:
         run: sudo chown -R $USER .build/html
       - if: matrix.build-dev-dashboard
         id: deployment
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: .build/html
 
@@ -173,9 +259,9 @@ jobs:
     strategy:
       matrix:
         include:
-          - swift: 6.0.1-jammy
-            musl-swift-sdk-download: "https://download.swift.org/swift-6.0.1-release/static-sdk/swift-6.0.1-RELEASE/swift-6.0.1-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz"
-            musl-swift-sdk-checksum: "d4f46ba40e11e697387468e18987ee622908bc350310d8af54eb5e17c2ff5481"
+          - swift: 6.2-noble
+            musl-swift-sdk-download: "https://download.swift.org/swift-6.2.3-release/static-sdk/swift-6.2.3-RELEASE/swift-6.2.3-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz"
+            musl-swift-sdk-checksum: "f30ec724d824ef43b5546e02ca06a8682dafab4b26a99fbb0e858c347e507a2c"
     steps:
       - uses: actions/checkout@v4
       - name: Configure container
@@ -188,26 +274,39 @@ jobs:
         run: ./build-exec swift sdk install "${{ matrix.musl-swift-sdk-download }}" --checksum "${{ matrix.musl-swift-sdk-checksum }}"
 
       - name: Build (x86_64-swift-linux-musl)
-        run: ./build-exec swift build --swift-sdk x86_64-swift-linux-musl
+        run: ./build-exec swift build --swift-sdk x86_64-swift-linux-musl --traits ComponentModel,WasmDebuggingSupport --explicit-target-dependency-import-check error
       - name: Build (aarch64-swift-linux-musl)
-        run: ./build-exec swift build --swift-sdk aarch64-swift-linux-musl
+        run: ./build-exec swift build --swift-sdk aarch64-swift-linux-musl --traits ComponentModel,WasmDebuggingSupport --explicit-target-dependency-import-check error
 
   build-android:
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        include:
+          - swift-version: "6.2"
+          - swift-version: "nightly-6.3"
+          - swift-version: nightly-main
+
     steps:
       - uses: actions/checkout@v4
+      - name: Free up disk space
+        run: ./CI/gha-free-disk-space.sh
       - name: Run Tests on Android emulator
         uses: skiptools/swift-android-action@v2
+        with:
+          android-api-level: 30
+          swift-version: "${{ matrix.swift-version }}"
 
   build-windows:
     runs-on: windows-latest
     steps:
       - uses: compnerd/gha-setup-swift@main
         with:
-          branch: swift-6.0.3-release
-          tag: 6.0.3-RELEASE
+          swift-version: swift-6.2-release
+          swift-build: 6.2-RELEASE
       - uses: actions/checkout@v4
-      - run: python3 ./Vendor/checkout-dependency
+      - run: python3 ./Vendor/checkout-dependency --category default
       # FIXME: CMake build is failing on CI due to "link: extra operand '/OUT:lib\\libXXXX.a'" error
       # # Check Windows build with CMake
       # - uses: Cyberboss/install-winget@v1
@@ -219,22 +318,12 @@ jobs:
       # - run: cmake --build .build/cmake
       # Run tests with SwiftPM
       - name: Run tests with SwiftPM
-        run: |
-          # Workaround for https://github.com/compnerd/swift-build/issues/909
-          $Win10SdkRoot = Get-ItemPropertyValue `
-            -Path "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows Kits\Installed Roots" `
-            -Name "KitsRoot10"
-          $WinSDKVersion = "10.0.22621.0"
-          $ExtraFlags = @("-Xswiftc", "-windows-sdk-version", "-Xswiftc", "${WinSDKVersion}",
-              "-Xswiftc", "-windows-sdk-root", "-Xswiftc", "${Win10SdkRoot}",
-              "-Xbuild-tools-swiftc", "-windows-sdk-version", "-Xbuild-tools-swiftc", "${WinSDKVersion}",
-              "-Xbuild-tools-swiftc", "-windows-sdk-root", "-Xbuild-tools-swiftc", "${Win10SdkRoot}")
-          swift test @ExtraFlags
+        run: swift test
 
   build-cmake:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     container:
-      image: swift:5.8-focal
+      image: swift:6.2-noble
     steps:
       - uses: actions/checkout@v4
       - name: Install Ninja
@@ -245,4 +334,17 @@ jobs:
           curl -L https://github.com/Kitware/CMake/releases/download/v3.29.2/cmake-3.29.2-linux-x86_64.tar.gz | tar xz --strip-component 1 -C /usr/local/
       - run: cmake -G Ninja -B ./build
       - run: cmake --build ./build
-      - run: ./build/bin/wasmkit-cli --version
+      - run: ./build/bin/wasmkit --version
+
+  build-wasi:
+    runs-on: ubuntu-24.04
+    container:
+      image: swift:6.2-noble
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install jq
+        run: apt-get update && apt-get install -y jq
+      - name: Install Swift SDK
+        run: swift sdk install https://download.swift.org/swift-6.2.4-release/wasm-sdk/swift-6.2.4-RELEASE/swift-6.2.4-RELEASE_wasm.artifactbundle.tar.gz --checksum 32fdb8772d73bb174f77b5c59bc88a0d55003d75712832129394d3465158fb43
+      - name: Build with the Swift SDK
+        run: swift build --swift-sdk "$(swiftc -print-target-info | jq -r '.swiftCompilerTag')_wasm" --traits ComponentModel --explicit-target-dependency-import-check error --product wasmkit-cli

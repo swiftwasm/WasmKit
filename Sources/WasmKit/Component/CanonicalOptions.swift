@@ -36,7 +36,7 @@ public struct CanonicalOptions {
     /// in an encoded component at componetizing-time. (e.g. wit-component tool is one of the componetizers)
     /// Remove this temporary method after we will accept binary form of component file.
     public static func _derive(from instance: Instance, exportName: String) -> CanonicalOptions {
-        guard case let .memory(memory) = instance.exports["memory"] else {
+        guard case .memory(let memory) = instance.exports["memory"] else {
             fatalError("Missing required \"memory\" export")
         }
         return CanonicalOptions(

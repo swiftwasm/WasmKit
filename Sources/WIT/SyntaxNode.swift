@@ -1,10 +1,10 @@
 /// An AST node that can be wrapped by ``SyntaxNode`` as a reference
-public protocol SyntaxNodeProtocol {}
+public protocol SyntaxNodeProtocol: Sendable {}
 
 /// An AST node with reference semantics to provide identity of a node.
 @dynamicMemberLookup
-public struct SyntaxNode<Syntax: SyntaxNodeProtocol>: Equatable, Hashable {
-    class Ref {
+public struct SyntaxNode<Syntax: SyntaxNodeProtocol>: Equatable, Hashable, Sendable {
+    final class Ref: Sendable {
         fileprivate let syntax: Syntax
         init(syntax: Syntax) {
             self.syntax = syntax

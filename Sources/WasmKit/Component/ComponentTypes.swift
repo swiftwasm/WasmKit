@@ -1,5 +1,5 @@
 /// Error type raised from Component Model operations
-public struct ComponentError<Content>: Error {
+public struct ComponentError<Content: Sendable>: Error {
     /// The content of the error
     public let content: Content
 

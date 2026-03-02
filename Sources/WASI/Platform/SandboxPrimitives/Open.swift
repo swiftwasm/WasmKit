@@ -15,6 +15,8 @@ import SystemPackage
 #elseif os(Windows)
     import CSystem
     import ucrt
+#elseif os(WASI)
+    import WASILibc
 #else
     #error("Unsupported Platform")
 #endif
@@ -24,6 +26,7 @@ struct PathResolution {
     private let options: FileDescriptor.OpenOptions
     private let permissions: FilePermissions
 
+    private let startFd: FileDescriptor
     private var baseFd: FileDescriptor
     private let path: FilePath
     private var openDirectories: [FileDescriptor]
@@ -50,6 +53,7 @@ struct PathResolution {
         permissions: FilePermissions,
         path: FilePath
     ) {
+        self.startFd = baseDirFd
         self.baseFd = baseDirFd
         self.mode = mode
         self.options = options
@@ -57,6 +61,29 @@ struct PathResolution {
         self.path = path
         self.openDirectories = []
         self.components = FilePath.ComponentView(path.components.reversed())
+    }
+
+    mutating func cleanup(keeping keptFd: FileDescriptor?) {
+        var keepRawValues = Set<CInt>()
+        keepRawValues.insert(startFd.rawValue)
+        if let keptFd {
+            keepRawValues.insert(keptFd.rawValue)
+        }
+
+        var closedRawValues = Set<CInt>()
+        func closeIfNeeded(_ fd: FileDescriptor) {
+            let rawValue = fd.rawValue
+            guard !keepRawValues.contains(rawValue) else { return }
+            guard !closedRawValues.contains(rawValue) else { return }
+            closedRawValues.insert(rawValue)
+            try? fd.close()
+        }
+
+        closeIfNeeded(baseFd)
+        for fd in openDirectories {
+            closeIfNeeded(fd)
+        }
+        openDirectories.removeAll(keepingCapacity: false)
     }
 
     mutating func parentDirectory() throws {
@@ -127,13 +154,17 @@ struct PathResolution {
                         throw openErrno
                     }
 
-                    try self.symlink(component: component)
+                    #if os(WASI)
+                        throw Errno.notSupported
+                    #else
+                        try self.symlink(component: component)
+                    #endif
                 #endif
             }
         }
     }
 
-    #if !os(Windows)
+    #if !os(Windows) && !os(WASI)
         mutating func symlink(component: FilePath.Component) throws {
             /// Thin wrapper around readlinkat(2)
             func _readlinkat(_ fd: CInt, _ path: UnsafePointer<CChar>) throws -> FilePath {
@@ -149,7 +180,9 @@ struct PathResolution {
                 guard length >= 0 else {
                     throw try WASIAbi.Errno(platformErrno: errno)
                 }
-                return FilePath(String(cString: buffer))
+                // Ensure null termination for platformString initializer
+                buffer[length] = 0
+                return buffer.withUnsafeBufferPointer { FilePath(platformString: $0.baseAddress!) }
             }
 
             guard resolvedSymlinks < Self.MAX_SYMLINKS else {
@@ -176,6 +209,9 @@ struct PathResolution {
     #endif
 
     mutating func resolve() throws -> FileDescriptor {
+        var resultFd: FileDescriptor? = nil
+        defer { cleanup(keeping: resultFd) }
+
         if path.isAbsolute {
             // POSIX openat(2) interprets absolute path ignoring base directory fd
             // but it leads sandbox-escaping, so reject absolute path here.
@@ -191,6 +227,7 @@ struct PathResolution {
             case .regular: try regular(component: component)
             }
         }
+        resultFd = self.baseFd
         return self.baseFd
     }
 }

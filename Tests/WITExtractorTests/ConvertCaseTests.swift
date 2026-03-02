@@ -1,15 +1,17 @@
-import XCTest
+import Testing
 
 @testable import WITExtractor
 
-class ConvertCaseTests: XCTestCase {
-    func testPascalToKebab() {
-        XCTAssertEqual(ConvertCase.kebabCase(identifier: "PascalCase"), "pascal-case")
-        XCTAssertEqual(ConvertCase.kebabCase(identifier: "camelCase"), "camel-case")
-        XCTAssertEqual(ConvertCase.kebabCase(identifier: "libXML2"), "lib-XML2")
+@Suite
+
+struct ConvertCaseTests {
+    @Test func pascalToKebab() {
+        #expect(ConvertCase.kebabCase(identifier: "PascalCase") == "pascal-case")
+        #expect(ConvertCase.kebabCase(identifier: "camelCase") == "camel-case")
+        #expect(ConvertCase.kebabCase(identifier: "libXML2") == "lib-XML2")
         // underscore is not allowed in WIT kebab-case
-        XCTAssertEqual(ConvertCase.kebabCase(identifier: "iso9899_1990"), "iso98991990")
-        XCTAssertEqual(ConvertCase.kebabCase(identifier: "v4_2"), "v42")
-        XCTAssertEqual(ConvertCase.kebabCase(identifier: "CXXConfig"), "C-X-X-config")
+        #expect(ConvertCase.kebabCase(identifier: "iso9899_1990") == "iso98991990")
+        #expect(ConvertCase.kebabCase(identifier: "v4_2") == "v42")
+        #expect(ConvertCase.kebabCase(identifier: "CXXConfig") == "C-X-X-config")
     }
 }

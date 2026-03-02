@@ -1,37 +1,20 @@
 import Foundation
 import SystemPackage
+import Testing
 import WasmKit
 import WasmKitWASI
-import XCTest
 
-final class IntegrationTests: XCTestCase {
-    func testRunAll() throws {
-        #if os(Android)
-            throw XCTSkip("unable to run spectest on Android due to missing files on emulator")
-        #endif
-        let testDir = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-            .appendingPathComponent("Vendor/wasi-testsuite")
-        var failedTests = [FailedTest]()
-        for testSuitePath in ["tests/assemblyscript/testsuite", "tests/c/testsuite", "tests/rust/testsuite"] {
-            let suitePath = testDir.appendingPathComponent(testSuitePath)
-            failedTests.append(contentsOf: try runTestSuite(path: suitePath))
+@Suite
+struct IntegrationTests {
+
+    #if !os(Android)
+        @Test(
+            arguments: try IntegrationTests.discoverAllTests()
+        )
+        func run(test: URL) throws {
+            try runTest(path: test)
         }
-
-        if !failedTests.isEmpty {
-            XCTFail("Failed tests: \(failedTests.map { "\($0.suite)/\($0.name)" }.joined(separator: ", "))")
-
-            if ProcessInfo.processInfo.environment["WASMKIT_WASI_DUMP_SKIPS"] != nil {
-                var itemsToSkip = [String: [String: String]]()
-                for test in failedTests {
-                    itemsToSkip[test.suite, default: [:]][test.name] = "Not implemented"
-                }
-                let encoder = JSONEncoder()
-                encoder.outputFormatting = .prettyPrinted
-                print(String(data: try encoder.encode(itemsToSkip), encoding: .utf8)!)
-            }
-        }
-    }
+    #endif
 
     struct FailedTest {
         let suite: String
@@ -110,8 +93,6 @@ final class IntegrationTests: XCTestCase {
                 "WASI Rust tests": [
                     "path_link",
                     "dir_fd_op_failures",
-                    "path_rename_dir_trailing_slashes",
-                    "path_rename",
                     "pwrite-with-append",
                     "overwrite_preopen",
                     "path_filestat",
@@ -124,7 +105,6 @@ final class IntegrationTests: XCTestCase {
                     "stdio",
                     "remove_directory_trailing_slashes",
                     "symlink_create",
-                    "readlink",
                     "sched_yield",
                 ],
                 "WASI C tests": [
@@ -139,7 +119,19 @@ final class IntegrationTests: XCTestCase {
         #endif
     }
 
-    func runTestSuite(path: URL) throws -> [FailedTest] {
+    static func discoverAllTests() throws -> [URL] {
+        let testDir = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Vendor/wasi-testsuite")
+        var tests = [URL]()
+        for testSuitePath in ["tests/assemblyscript/testsuite", "tests/c/testsuite", "tests/rust/testsuite"] {
+            let suitePath = testDir.appendingPathComponent(testSuitePath)
+            tests.append(contentsOf: try discoverTestsFromSuite(path: suitePath))
+        }
+        return tests
+    }
+
+    static func discoverTestsFromSuite(path: URL) throws -> [URL] {
         let manifestPath = path.appendingPathComponent("manifest.json")
         let manifest = try JSONDecoder().decode(SuiteManifest.self, from: Data(contentsOf: manifestPath))
 
@@ -153,26 +145,20 @@ final class IntegrationTests: XCTestCase {
             }
         }
 
-        print("Running test suite: \(manifest.name)")
         let tests = try FileManager.default.contentsOfDirectory(at: path, includingPropertiesForKeys: nil, options: [])
 
         let skipTests = Self.skipTests[manifest.name] ?? []
 
-        var failedTests = [FailedTest]()
+        var testCases = [URL]()
         for test in tests {
             guard test.pathExtension == "wasm" else { continue }
             let testName = test.deletingPathExtension().lastPathComponent
             if skipTests.contains(testName) {
-                print("Skipping test \(testName)")
                 continue
             }
-            do {
-                try runTest(path: test)
-            } catch {
-                failedTests.append(FailedTest(suite: manifest.name, name: testName, path: test, reason: String(describing: error)))
-            }
+            testCases.append(test)
         }
-        return failedTests
+        return testCases
     }
 
     struct CaseManifest: Codable {
@@ -204,14 +190,17 @@ final class IntegrationTests: XCTestCase {
 
         let suitePath = path.deletingLastPathComponent()
 
-        print("Testing \(path.path)")
+        let preopens = (manifest.dirs ?? []).map {
+            WASIBridgeToHost.Preopen(
+                guestPath: $0,
+                hostPath: suitePath.appendingPathComponent($0).path
+            )
+        }
 
         let wasi = try WASIBridgeToHost(
             args: [path.path] + (manifest.args ?? []),
             environment: manifest.env ?? [:],
-            preopens: (manifest.dirs ?? []).reduce(into: [String: String]()) {
-                $0[$1] = suitePath.appendingPathComponent($1).path
-            }
+            preopens: preopens
         )
         let engine = Engine()
         let store = Store(engine: engine)
@@ -220,6 +209,6 @@ final class IntegrationTests: XCTestCase {
         let module = try parseWasm(filePath: FilePath(path.path))
         let instance = try module.instantiate(store: store, imports: imports)
         let exitCode = try wasi.start(instance)
-        XCTAssertEqual(exitCode, manifest.exitCode ?? 0, path.path)
+        #expect(exitCode == manifest.exitCode ?? 0, "\(path.path)")
     }
 }

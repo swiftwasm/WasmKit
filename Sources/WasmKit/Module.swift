@@ -138,9 +138,23 @@ public struct Module {
         Instance(handle: try self.instantiateHandle(store: store, imports: imports), store: store)
     }
 
+    #if WasmDebuggingSupport
+        /// Instantiate this module with the given imports.
+        ///
+        /// - Parameters:
+        ///   - store: The ``Store`` to allocate the instance in.
+        ///   - imports: The imports to use for instantiation. All imported entities
+        ///     must be allocated in the given store.
+        ///   - isDebuggable: Whether the module should support debugging actions
+        ///     (breakpoints etc) after instantiation.
+        public func instantiate(store: Store, imports: Imports = [:], isDebuggable: Bool) throws -> Instance {
+            Instance(handle: try self.instantiateHandle(store: store, imports: imports, isDebuggable: isDebuggable), store: store)
+        }
+    #endif
+
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#instantiation>
-    private func instantiateHandle(store: Store, imports: Imports) throws -> InternalInstance {
+    private func instantiateHandle(store: Store, imports: Imports, isDebuggable: Bool = false) throws -> InternalInstance {
         try ModuleValidator(module: self).validate()
 
         // Steps 5-8.
@@ -152,7 +166,8 @@ public struct Module {
         let instance = try store.allocator.allocate(
             module: self, engine: store.engine,
             resourceLimiter: store.resourceLimiter,
-            imports: imports
+            imports: imports,
+            isDebuggable: isDebuggable
         )
 
         if let nameSection = customSections.first(where: { $0.name == "name" }) {
@@ -166,7 +181,7 @@ public struct Module {
 
         // Steps 14-15.
         for element in elements {
-            guard case let .active(tableIndex, offset) = element.mode else { continue }
+            guard case .active(let tableIndex, let offset) = element.mode else { continue }
             let table = try instance.tables[validating: Int(tableIndex)]
             let offsetValue = try offset.evaluate(
                 context: constEvalContext,
@@ -194,16 +209,17 @@ public struct Module {
         }
 
         // Step 16.
-        for case let .active(data) in data {
-            let memory = try instance.memories[validating: Int(data.index)]
+        for case .active(let data) in data {
+            let memory = try instance.memories[validating: Int(data.index), MemoryEntity.createOutOfBoundsError]
+            let isMemory64 = memory.withValue { $0.limit.isMemory64 }
             let offsetValue = try data.offset.evaluate(
                 context: constEvalContext,
-                expectedType: .addressType(isMemory64: memory.limit.isMemory64)
+                expectedType: .addressType(isMemory64: isMemory64)
             )
             try memory.withValue { memory in
-                guard let offset = offsetValue.maybeAddressOffset(memory.limit.isMemory64) else {
+                guard let offset = offsetValue.maybeAddressOffset(isMemory64) else {
                     throw ValidationError(
-                        .unexpectedOffsetInitializer(expected: .addressType(isMemory64: memory.limit.isMemory64), got: offsetValue)
+                        .unexpectedOffsetInitializer(expected: .addressType(isMemory64: isMemory64), got: offsetValue)
                     )
                 }
                 try memory.write(offset: Int(offset), bytes: data.initializer)

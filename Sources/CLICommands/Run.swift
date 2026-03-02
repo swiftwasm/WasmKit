@@ -1,14 +1,20 @@
 import ArgumentParser
 import SystemPackage
+import WAT
 import WasmKit
 import WasmKitWASI
+import WasmParser
+
+#if ComponentModel
+    import ComponentModel
+#endif
 
 #if canImport(os.signpost)
     import os.signpost
 #endif
 
-struct Run: ParsableCommand {
-    static let configuration = CommandConfiguration(
+package struct Run: AsyncParsableCommand {
+    package static let configuration = CommandConfiguration(
         abstract: "Run a WebAssembly module",
         discussion: """
             This command will parse a WebAssembly module and run it.
@@ -59,12 +65,16 @@ struct Run: ParsableCommand {
     var directories: [String] = []
 
     enum ThreadingModel: String, ExpressibleByArgument, CaseIterable {
-        case direct
+        #if !os(WASI)
+            case direct
+        #endif
         case token
 
         func resolve() -> EngineConfiguration.ThreadingModel {
             switch self {
-            case .direct: return .direct
+            #if !os(WASI)
+                case .direct: return .direct
+            #endif
             case .token: return .token
             }
         }
@@ -101,6 +111,17 @@ struct Run: ParsableCommand {
     )
     var stackSize: Int?
 
+    #if WasmDebuggingSupport
+
+        @Option(
+            help: """
+                TCP port that a debugger client supporting GDP Remote Protocol (like GDB or LLDB) can connect to. \
+                Only WASI Command modules are currently supported by WasmKit debugging facilities.
+                """)
+        var debuggerPort: Int?
+
+    #endif
+
     @Argument
     var path: String
 
@@ -113,18 +134,51 @@ struct Run: ParsableCommand {
     )
     var arguments: [String] = []
 
-    func run() throws {
+    package init() {}
+
+    package func run() async throws {
+        #if WasmDebuggingSupport
+
+            if let debuggerPort {
+                guard !self.signpost && self.profileOutput == nil else {
+                    fatalError("Signpost logging and profiling are currently not supported while debugging Wasm modules.")
+                }
+
+                let debuggerServer = DebuggerServer(
+                    port: debuggerPort,
+                    logLevel: self.verbose ? .trace : .info,
+                    wasmModulePath: FilePath(self.path),
+                    engineConfiguration: self.deriveRuntimeConfiguration()
+                )
+                try await debuggerServer.run()
+                return
+            }
+
+        #endif
+
         log("Started parsing module", verbose: true)
 
+        // Detect file type (component vs module)
+        let filePath = FilePath(path)
+        let fileType = try detectWasmFileType(filePath: filePath)
+
+        #if ComponentModel
+            if fileType == .component {
+                try runComponent(filePath: filePath)
+                return
+            }
+        #endif
+
+        // Regular module execution
         let module: Module
         if verbose, #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) {
             let (parsedModule, parseTime) = try measure {
-                try parseWasm(filePath: FilePath(path))
+                try parseWasm(filePath: filePath)
             }
             log("Finished parsing module: \(parseTime)", verbose: true)
             module = parsedModule
         } else {
-            module = try parseWasm(filePath: FilePath(path))
+            module = try parseWasm(filePath: filePath)
         }
 
         let (interceptor, finalize) = try deriveInterceptor()
@@ -147,6 +201,39 @@ struct Run: ParsableCommand {
             try invoke()
         }
     }
+
+    #if ComponentModel
+        /// Run a WebAssembly component.
+        func runComponent(filePath: FilePath) throws {
+            log("Detected component binary, parsing component...", verbose: true)
+
+            let component = try parseComponent(filePath: filePath)
+
+            let engine = Engine(configuration: deriveRuntimeConfiguration())
+            let store = Store(engine: engine)
+            let loader = ComponentLoader(store: store)
+            let instance = try loader.instantiate(component: component)
+
+            // First argument is the WAVE function call expression
+            guard let waveExpression = arguments.first else {
+                // List exports if no function specified
+                log("Component loaded. Available exports:")
+                for export in component.exports {
+                    log("  - \(export.name)")
+                }
+                log("\nUsage: wasmkit run \(path) 'function-name(args...)'")
+                log("Example: wasmkit run \(path) 'add(1, 2)'")
+                return
+            }
+            log("Invoking: \(waveExpression)", verbose: true)
+
+            let result = try instance.invoke(waveExpression)
+            let output = result.formatResults()
+            if !output.isEmpty {
+                print(output)
+            }
+        }
+    #endif
 
     /// Derives the runtime interceptor based on the command line arguments
     func deriveInterceptor() throws -> (interceptor: EngineInterceptor?, finalize: () -> Void) {
@@ -196,8 +283,8 @@ struct Run: ParsableCommand {
 
     private func deriveRuntimeConfiguration() -> EngineConfiguration {
         return EngineConfiguration(
-            threadingModel: threadingModel?.resolve(),
-            compilationMode: compilationMode?.resolve(),
+            threadingModel: self.threadingModel?.resolve(),
+            compilationMode: self.compilationMode?.resolve(),
             stackSize: self.stackSize
         )
     }
@@ -207,9 +294,7 @@ struct Run: ParsableCommand {
         let environment = environment.reduce(into: [String: String]()) {
             $0[$1.key] = $1.value
         }
-        let preopens = directories.reduce(into: [String: String]()) {
-            $0[$1] = $1
-        }
+        let preopens = directories.map { WASIBridgeToHost.Preopen(guestPath: $0, hostPath: $0) }
         let wasi = try WASIBridgeToHost(args: [path] + arguments, environment: environment, preopens: preopens)
         let engine = Engine(configuration: deriveRuntimeConfiguration(), interceptor: interceptor)
         let store = Store(engine: engine)
@@ -223,23 +308,7 @@ struct Run: ParsableCommand {
     }
 
     func instantiateNonWASI(module: Module, interceptor: EngineInterceptor?) throws -> (() throws -> Void)? {
-        let functionName = arguments.first
-        let arguments = arguments.dropFirst()
-
-        var parameters: [Value] = []
-        for argument in arguments {
-            let parameter: Value
-            let type = argument.prefix { $0 != ":" }
-            let value = argument.drop { $0 != ":" }.dropFirst()
-            switch type {
-            case "i32": parameter = Value(signed: Int32(value)!)
-            case "i64": parameter = Value(signed: Int64(value)!)
-            case "f32": parameter = .f32(Float32(value)!.bitPattern)
-            case "f64": parameter = .f64(Float64(value)!.bitPattern)
-            default: fatalError("unknown type")
-            }
-            parameters.append(parameter)
-        }
+        let (functionName, parameters) = Run.parseInvocation(arguments: self.arguments)
         guard let functionName else {
             log("Error: No function specified to run in a given module.")
             return nil
@@ -275,5 +344,46 @@ struct Run: ParsableCommand {
         if !verbose || self.verbose {
             try! FileDescriptor.standardError.writeAll((message + "\n").utf8)
         }
+    }
+}
+
+/// Parses a `.wasm` or `.wat` module.
+func parseWasm(filePath: FilePath) throws -> Module {
+    if filePath.extension == "wat", #available(macOS 11.0, iOS 14.0, macCatalyst 14.0, tvOS 14.0, visionOS 1.0, watchOS 7.0, *) {
+        let fileHandle = try FileDescriptor.open(filePath, .readOnly)
+        defer { try? fileHandle.close() }
+
+        let size = try fileHandle.seek(offset: 0, from: .end)
+
+        let wat = try String(unsafeUninitializedCapacity: Int(size)) {
+            try fileHandle.read(fromAbsoluteOffset: 0, into: .init($0))
+        }
+        return try WasmKit.parseWasm(bytes: wat2wasm(wat))
+    } else {
+        return try WasmKit.parseWasm(filePath: filePath)
+    }
+}
+
+extension Run {
+    package static func parseInvocation(arguments: [String]) -> (functionName: String?, parameters: [Value]) {
+        let functionName = arguments.first
+        let arguments = arguments.dropFirst()
+
+        var parameters: [Value] = []
+        for argument in arguments {
+            let parameter: Value
+            let type = argument.prefix { $0 != ":" }
+            let value = argument.drop { $0 != ":" }.dropFirst()
+            switch type {
+            case "i32": parameter = Value(signed: Int32(value)!)
+            case "i64": parameter = Value(signed: Int64(value)!)
+            case "f32": parameter = .f32(Float32(value)!.bitPattern)
+            case "f64": parameter = .f64(Float64(value)!.bitPattern)
+            default: fatalError("unknown type")
+            }
+            parameters.append(parameter)
+        }
+
+        return (functionName, parameters)
     }
 }

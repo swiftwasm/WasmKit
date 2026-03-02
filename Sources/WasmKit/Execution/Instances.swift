@@ -1,3 +1,4 @@
+import Synchronization
 import WasmParser
 
 @_exported import struct WasmParser.GlobalType
@@ -39,7 +40,7 @@ import WasmParser
 /// This type is designed to eliminate ARC retain/release for entities
 /// known to be alive during a VM execution.
 @dynamicMemberLookup
-struct EntityHandle<T>: Equatable, Hashable {
+package struct EntityHandle<T: ~Copyable>: Equatable, Hashable, Copyable {
     private let pointer: UnsafeMutablePointer<T>
 
     init(unsafe pointer: UnsafeMutablePointer<T>) {
@@ -51,12 +52,12 @@ struct EntityHandle<T>: Equatable, Hashable {
         self.pointer = pointer
     }
 
-    subscript<R>(dynamicMember keyPath: KeyPath<T, R>) -> R {
-        pointer.pointee[keyPath: keyPath]
+    package subscript<R>(dynamicMember keyPath: KeyPath<T, R>) -> R where T: Copyable {
+        withValue { $0[keyPath: keyPath] }
     }
 
     @inline(__always)
-    func withValue<R>(_ body: (inout T) throws -> R) rethrows -> R {
+    package func withValue<R>(_ body: (inout T) throws -> R) rethrows -> R {
         return try body(&pointer.pointee)
     }
 
@@ -65,13 +66,13 @@ struct EntityHandle<T>: Equatable, Hashable {
     }
 }
 
-extension EntityHandle: ValidatableEntity where T: ValidatableEntity {
+extension EntityHandle: ValidatableEntity where T: ValidatableEntity, T: ~Copyable {
     static func createOutOfBoundsError(index: Int, count: Int) -> Error {
         T.createOutOfBoundsError(index: index, count: count)
     }
 }
 
-struct InstanceEntity /* : ~Copyable */ {
+package struct InstanceEntity /* : ~Copyable */ {
     var types: [FunctionType]
     var functions: ImmutableArray<InternalFunction>
     var tables: ImmutableArray<InternalTable>
@@ -83,6 +84,9 @@ struct InstanceEntity /* : ~Copyable */ {
     var functionRefs: Set<InternalFunction>
     var features: WasmFeatureSet
     var dataCount: UInt32?
+    var isDebuggable: Bool
+
+    var instructionMapping: DebuggerInstructionMapping
 
     static var empty: InstanceEntity {
         InstanceEntity(
@@ -96,11 +100,13 @@ struct InstanceEntity /* : ~Copyable */ {
             exports: [:],
             functionRefs: [],
             features: [],
-            dataCount: nil
+            dataCount: nil,
+            isDebuggable: false,
+            instructionMapping: .init()
         )
     }
 
-    internal func compileAllFunctions(store: Store) throws {
+    package func compileAllFunctions(store: Store) throws {
         let store = StoreRef(store)
         for function in functions {
             guard function.isWasm else { continue }
@@ -109,7 +115,7 @@ struct InstanceEntity /* : ~Copyable */ {
     }
 }
 
-typealias InternalInstance = EntityHandle<InstanceEntity>
+package typealias InternalInstance = EntityHandle<InstanceEntity>
 
 /// A map of exported entities by name.
 public struct Exports: Sequence {
@@ -176,7 +182,7 @@ public struct Exports: Sequence {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#module-instances>
 public struct Instance {
-    let handle: InternalInstance
+    package let handle: InternalInstance
     let store: Store
 
     init(handle: InternalInstance, store: Store) {
@@ -197,7 +203,7 @@ public struct Instance {
     ///
     /// - Parameter name: The name of the exported function.
     /// - Returns: The address of the exported function if found, otherwise `nil`.
-    func exportedFunction(name: String) -> Function? {
+    package func exportedFunction(name: String) -> Function? {
         guard case .function(let function) = self.export(name) else { return nil }
         return function
     }
@@ -224,12 +230,13 @@ public struct Instance {
                 fatalError("Already compiled!?")
             }
             try function.wasm.ensureCompiled(store: StoreRef(store))
-            let (iseq, locals, _) = function.assumeCompiled()
+            let (iseq, _, _) = function.assumeCompiled()
 
             // Print slot space information
+            let localTypes = code.withValue { $0.locals }
             let stackLayout = try StackLayout(
                 type: store.engine.funcTypeInterner.resolve(function.type),
-                numberOfLocals: locals,
+                locals: localTypes,
                 codeSize: code.expression.count
             )
             stackLayout.dump(to: &target, iseq: iseq)
@@ -274,11 +281,13 @@ struct TableEntity /* : ~Copyable */ {
 
     init(_ tableType: TableType, resourceLimiter: any ResourceLimiter) throws {
         let emptyElement: Reference
-        switch tableType.elementType {
-        case .funcRef:
+        switch tableType.elementType.heapType {
+        case .abstract(.funcRef):
             emptyElement = .function(nil)
-        case .externRef:
+        case .abstract(.externRef):
             emptyElement = .extern(nil)
+        case .concrete:
+            throw Trap(.unimplemented(feature: "heap type other than `func` and `extern`"))
         }
 
         let numberOfElements = Int(tableType.limits.min)
@@ -449,32 +458,53 @@ public struct Table: Equatable {
     }
 }
 
-struct MemoryEntity /* : ~Copyable */ {
+struct MemoryEntity: ~Copyable {
     static let pageSize = 64 * 1024
 
     static func maxPageCount(isMemory64: Bool) -> UInt64 {
         isMemory64 ? UInt64.max : UInt64(1 << 32) / UInt64(pageSize)
     }
 
-    var data: [UInt8]
+    private var storage: UnsafeMutableBufferPointer<UInt8>
     let maxPageCount: UInt64
     let limit: Limits
+    let sharedMutex: Mutex<Void>?
 
     init(_ memoryType: MemoryType, resourceLimiter: any ResourceLimiter) throws {
         let byteSize = Int(memoryType.min) * Self.pageSize
         guard try resourceLimiter.limitMemoryGrowth(to: byteSize) else {
             throw Trap(.initialMemorySizeExceedsLimit(byteSize: byteSize))
         }
-        data = Array(repeating: 0, count: byteSize)
+        storage = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: byteSize)
+        if byteSize > 0 {
+            storage.initialize(repeating: 0)
+        }
         let defaultMaxPageCount = Self.maxPageCount(isMemory64: memoryType.isMemory64)
         maxPageCount = memoryType.max ?? defaultMaxPageCount
         limit = memoryType
+        sharedMutex = memoryType.shared ? Mutex<Void>(()) : nil
+    }
+
+    deinit {
+        storage.deallocate()
+    }
+
+    var data: UnsafeBufferPointer<UInt8> {
+        UnsafeBufferPointer(storage)
+    }
+
+    var baseAddress: UnsafeMutableRawPointer? {
+        UnsafeMutableRawPointer(storage.baseAddress)
+    }
+
+    var byteCount: Int {
+        storage.count
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#grow-mem>
     mutating func grow(by pageCount: Int, resourceLimiter: any ResourceLimiter) throws -> Value {
-        let newPageCount = data.count / Self.pageSize + pageCount
+        let newPageCount = storage.count / Self.pageSize + pageCount
 
         guard newPageCount <= maxPageCount else {
             return limit.isMemory64 ? .i64((-1 as Int64).unsigned) : .i32((-1 as Int32).unsigned)
@@ -483,8 +513,17 @@ struct MemoryEntity /* : ~Copyable */ {
             return limit.isMemory64 ? .i64((-1 as Int64).unsigned) : .i32((-1 as Int32).unsigned)
         }
 
-        let result = Int32(data.count / MemoryEntity.pageSize).unsigned
-        data.append(contentsOf: Array(repeating: 0, count: Int(pageCount) * MemoryEntity.pageSize))
+        let result = Int32(storage.count / MemoryEntity.pageSize).unsigned
+        let oldStorage = storage
+        let newByteCount = newPageCount * MemoryEntity.pageSize
+        storage = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: newByteCount)
+        if newByteCount > 0 {
+            storage.initialize(repeating: 0)
+        }
+        if oldStorage.count > 0 {
+            storage.baseAddress!.update(from: oldStorage.baseAddress!, count: oldStorage.count)
+        }
+        oldStorage.deallocate()
 
         return limit.isMemory64 ? .i64(UInt64(result)) : .i32(result)
     }
@@ -493,16 +532,24 @@ struct MemoryEntity /* : ~Copyable */ {
         let (destinationEnd, destinationOverflow) = destination.addingReportingOverflow(count)
         let (sourceEnd, sourceOverflow) = source.addingReportingOverflow(count)
 
-        guard !destinationOverflow, destinationEnd <= data.count,
-            !sourceOverflow, sourceEnd <= data.count
+        guard !destinationOverflow, destinationEnd <= storage.count,
+            !sourceOverflow, sourceEnd <= storage.count
         else {
             throw Trap(.memoryOutOfBounds)
         }
-        data.withUnsafeMutableBufferPointer {
-            guard let base = UnsafeMutableRawPointer($0.baseAddress) else { return }
-            let dest = base.advanced(by: Int(destination))
-            let src = base.advanced(by: Int(source))
-            dest.copyMemory(from: src, byteCount: Int(count))
+        let count = Int(count)
+        guard count > 0 else { return }
+        guard let baseAddress = storage.baseAddress else { return }
+        let destination = Int(destination)
+        let source = Int(source)
+        if destination < source {
+            for i in 0..<count {
+                baseAddress[destination + i] = baseAddress[source + i]
+            }
+        } else if destination > source {
+            for i in stride(from: count - 1, through: 0, by: -1) {
+                baseAddress[destination + i] = baseAddress[source + i]
+            }
         }
     }
 
@@ -510,30 +557,40 @@ struct MemoryEntity /* : ~Copyable */ {
         let (destinationEnd, destinationOverflow) = destination.addingReportingOverflow(UInt64(count))
         let (sourceEnd, sourceOverflow) = source.addingReportingOverflow(count)
 
-        guard !destinationOverflow, destinationEnd <= data.count,
+        guard !destinationOverflow, destinationEnd <= storage.count,
             !sourceOverflow, sourceEnd <= segment.data.count
         else {
             throw Trap(.memoryOutOfBounds)
         }
-        data.withUnsafeMutableBufferPointer { memory in
-            segment.data.withUnsafeBufferPointer { segment in
-                guard
-                    let memory = UnsafeMutableRawPointer(memory.baseAddress),
-                    let segment = UnsafeRawPointer(segment.baseAddress)
-                else { return }
-                let dest = memory.advanced(by: Int(destination))
-                let src = segment.advanced(by: Int(source))
-                dest.copyMemory(from: src, byteCount: Int(count))
-            }
+        segment.data.withUnsafeBufferPointer { segment in
+            guard
+                let memory = UnsafeMutableRawPointer(storage.baseAddress),
+                let segment = UnsafeRawPointer(segment.baseAddress)
+            else { return }
+            let dest = memory.advanced(by: Int(destination))
+            let src = segment.advanced(by: Int(source))
+            dest.copyMemory(from: src, byteCount: Int(count))
         }
     }
 
     mutating func write(offset: Int, bytes: ArraySlice<UInt8>) throws {
         let endOffset = offset + bytes.count
-        guard endOffset <= data.count else {
+        guard endOffset <= storage.count else {
             throw Trap(.memoryOutOfBounds)
         }
-        data[offset..<endOffset] = bytes
+        guard bytes.count > 0 else { return }
+        bytes.withUnsafeBufferPointer { source in
+            storage.baseAddress!.advanced(by: offset).update(from: source.baseAddress!, count: bytes.count)
+        }
+    }
+
+    mutating func fill(offset: Int, value: UInt8, count: Int) throws {
+        let endOffset = offset + count
+        guard endOffset <= storage.count else {
+            throw Trap(.memoryOutOfBounds)
+        }
+        guard count > 0 else { return }
+        storage.baseAddress!.advanced(by: offset).update(repeating: value, count: count)
     }
 }
 
@@ -590,43 +647,92 @@ public struct Memory: Equatable {
     }
 
     /// Returns a copy of the memory data.
+    @available(*, deprecated, message: "Use `withUnsafeBufferPointer(offset:count:_:)` or `withUnsafeMutableBufferPointer(offset:count:_:)` instead")
     public var data: [UInt8] {
-        handle.data
+        handle.withValue { Array($0.data) }
     }
 
     /// The type of the memory instance.
     public var type: MemoryType {
-        handle.limit
+        handle.withValue { $0.limit }
+    }
+
+    /// The current size of the memory in bytes.
+    public var byteCount: Int {
+        handle.withValue { $0.byteCount }
     }
 }
 
 extension Memory: GuestMemory {
+    /// Executes the given closure with an immutable buffer pointer to the host memory region mapped as guest memory.
+    public func withUnsafeBufferPointer<T>(
+        offset: UInt,
+        count: Int,
+        _ body: (UnsafeRawBufferPointer) throws -> T
+    ) rethrows -> T {
+        return try handle.withValue { memory in
+            precondition(Int(offset) + count <= memory.byteCount, "Memory access out of bounds")
+            guard let base = memory.baseAddress else {
+                preconditionFailure("Memory has no base address")
+            }
+            let start = base.advanced(by: Int(offset))
+            return try body(UnsafeRawBufferPointer(start: UnsafeRawPointer(start), count: count))
+        }
+    }
+
     /// Executes the given closure with a mutable buffer pointer to the host memory region mapped as guest memory.
     public func withUnsafeMutableBufferPointer<T>(
         offset: UInt,
         count: Int,
         _ body: (UnsafeMutableRawBufferPointer) throws -> T
     ) rethrows -> T {
-        try handle.withValue { memory in
-            try memory.data.withUnsafeMutableBufferPointer { buffer in
-                try body(UnsafeMutableRawBufferPointer(start: buffer.baseAddress! + Int(offset), count: count))
+        return try handle.withValue { memory in
+            precondition(Int(offset) + count <= memory.byteCount, "Memory access out of bounds")
+            guard let base = memory.baseAddress else {
+                preconditionFailure("Memory has no base address")
             }
+            let start = base.advanced(by: Int(offset))
+            return try body(UnsafeMutableRawBufferPointer(start: start, count: count))
         }
     }
 }
 
 /// An entity representing a WebAssembly `global` instance storage.
 struct GlobalEntity /* : ~Copyable */ {
-    var rawValue: UntypedValue
+    enum Storage {
+        case scalar(UntypedValue)
+        case v128(V128Storage)
+    }
+
+    var storage: Storage
     var value: Value {
-        get { rawValue.cast(to: globalType.valueType) }
-        set { rawValue = UntypedValue(newValue) }
+        get {
+            switch storage {
+            case .scalar(let raw):
+                return raw.cast(to: globalType.valueType)
+            case .v128(let v):
+                return .v128(v.value)
+            }
+        }
+        set {
+            switch newValue {
+            case .v128(let v):
+                storage = .v128(V128Storage(v))
+            case .i32, .i64, .f32, .f64, .ref:
+                storage = .scalar(UntypedValue(newValue))
+            }
+        }
     }
     let globalType: GlobalType
 
     init(globalType: GlobalType, initialValue: Value) throws {
         try initialValue.checkType(globalType.valueType)
-        rawValue = UntypedValue(initialValue)
+        switch initialValue {
+        case .v128(let v):
+            storage = .v128(V128Storage(v))
+        case .i32, .i64, .f32, .f64, .ref:
+            storage = .scalar(UntypedValue(initialValue))
+        }
         self.globalType = globalType
     }
 }
@@ -660,6 +766,7 @@ public struct Global: Equatable {
             guard global.globalType.mutability == .variable else {
                 throw Trap(.cannotAssignToImmutableGlobal)
             }
+            try value.checkType(global.globalType.valueType)
             global.value = value
         }
     }

@@ -124,6 +124,8 @@ struct InternalFunction: Equatable, Hashable {
         _storage = bitPattern
     }
 
+    /// Returns `true` if the function is defined as a Wasm function in its original module.
+    /// Returns `false` if the function is implemented by the host.
     var isWasm: Bool {
         _storage & 0b1 == 0
     }
@@ -170,8 +172,7 @@ extension InternalFunction {
                 store: store,
                 function: self,
                 type: resolvedType,
-                arguments: arguments,
-                callerInstance: entity.instance
+                arguments: arguments
             )
         } else {
             let entity = host
@@ -188,7 +189,7 @@ extension InternalFunction {
         guard expectedTypes.count == values.count else { return false }
         for (expected, value) in zip(expectedTypes, values) {
             switch (expected, value) {
-            case (.i32, .i32), (.i64, .i64), (.f32, .f32), (.f64, .f64),
+            case (.i32, .i32), (.i64, .i64), (.f32, .f32), (.f64, .f64), (.v128, .v128),
                 (.ref(.funcRef), .ref(.function)), (.ref(.externRef), .ref(.extern)):
                 break
             default: return false
@@ -215,10 +216,12 @@ extension InternalFunction {
         function: EntityHandle<WasmFunctionEntity>
     ) {
         let entity = self.wasm
-        guard case let .compiled(iseq) = entity.code else {
+        switch entity.code {
+        case .compiled(let iseq), .debuggable(_, let iseq):
+            return (iseq, entity.numberOfNonParameterLocalSlots, entity)
+        case .uncompiled:
             preconditionFailure()
         }
-        return (iseq, entity.numberOfNonParameterLocals, entity)
     }
 }
 
@@ -226,14 +229,14 @@ struct WasmFunctionEntity {
     let type: InternedFuncType
     let instance: InternalInstance
     let index: FunctionIndex
-    let numberOfNonParameterLocals: Int
+    let numberOfNonParameterLocalSlots: Int
     var code: CodeBody
 
     init(index: FunctionIndex, type: InternedFuncType, code: InternalUncompiledCode, instance: InternalInstance) {
         self.type = type
         self.instance = instance
         self.code = .uncompiled(code)
-        self.numberOfNonParameterLocals = code.locals.count
+        self.numberOfNonParameterLocalSlots = code.locals.reduce(into: 0) { $0 += $1.stackSlotCount }
         self.index = index
     }
 
@@ -241,7 +244,7 @@ struct WasmFunctionEntity {
         switch code {
         case .uncompiled(let code):
             return try compile(store: store, code: code)
-        case .compiled(let iseq):
+        case .compiled(let iseq), .debuggable(_, let iseq):
             return iseq
         }
     }
@@ -260,10 +263,10 @@ struct WasmFunctionEntity {
             locals: code.locals,
             functionIndex: index,
             codeSize: code.expression.count,
-            intercepting: engine.interceptor != nil
+            isIntercepting: engine.interceptor != nil
         )
         let iseq = try code.withValue { code in
-            try translator.translate(code: code, instance: instance)
+            try translator.translate(code: code)
         }
         self.code = .compiled(iseq)
         return iseq
@@ -278,10 +281,15 @@ extension EntityHandle<WasmFunctionEntity> {
         case .uncompiled(let code):
             return try self.withValue {
                 let iseq = try $0.compile(store: store, code: code)
-                $0.code = .compiled(iseq)
+                if $0.instance.isDebuggable {
+                    $0.code = .debuggable(code, iseq)
+                } else {
+                    $0.code = .compiled(iseq)
+                }
                 return iseq
             }
-        case .compiled(let iseq): return iseq
+        case .compiled(let iseq), .debuggable(_, let iseq):
+            return iseq
         }
     }
 }
@@ -313,6 +321,7 @@ struct InstructionSequence {
 enum CodeBody {
     case uncompiled(InternalUncompiledCode)
     case compiled(InstructionSequence)
+    case debuggable(InternalUncompiledCode, InstructionSequence)
 }
 
 extension Reference {

@@ -73,6 +73,9 @@ struct UntypedValue: Equatable, Hashable {
         case .i64(let value): self = .i64(value)
         case .f32(let value): self = .rawF32(value)
         case .f64(let value): self = .rawF64(value)
+        case .v128:
+            assertionFailure("v128 cannot be represented in UntypedValue; use stack-slot based storage")
+            storage = 0
         case .ref(.function(let value)), .ref(.extern(let value)):
             storage = encodeOptionalInt(value)
         }
@@ -114,11 +117,13 @@ struct UntypedValue: Equatable, Hashable {
             guard storage & Self.isNullMaskPattern == 0 else { return nil }
             return Int(storage)
         }
-        switch type {
-        case .funcRef:
+        switch type.heapType {
+        case .abstract(.funcRef):
             return .function(decodeOptionalInt())
-        case .externRef:
+        case .abstract(.externRef):
             return .extern(decodeOptionalInt())
+        case .concrete:
+            fatalError("heap type other than `func` and `extern` is not implemented yet")
         }
     }
 

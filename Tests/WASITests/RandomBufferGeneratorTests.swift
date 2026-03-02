@@ -1,8 +1,9 @@
-import XCTest
+import Testing
 
 @testable import WASI
 
-final class RandomBufferGeneratorTests: XCTestCase {
+@Suite
+struct RandomBufferGeneratorTests {
     struct DeterministicGenerator: RandomNumberGenerator, RandomBufferGenerator {
         var items: [UInt64]
 
@@ -10,7 +11,8 @@ final class RandomBufferGeneratorTests: XCTestCase {
             items.removeFirst()
         }
     }
-    func testDefaultFill() {
+    @Test
+    func defaultFill() {
         var generator = DeterministicGenerator(items: [
             0x0123_4567_89ab_cdef, 0xfedc_ba98_7654_3210, 0xdead_beef_badd_cafe,
         ])
@@ -29,7 +31,7 @@ final class RandomBufferGeneratorTests: XCTestCase {
             #else
                 expected = Array(expectedBytes.reversed())
             #endif
-            XCTAssertEqual(buffer, expected)
+            #expect(buffer == expected)
         }
     }
 }

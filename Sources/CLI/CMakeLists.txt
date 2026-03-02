@@ -1,11 +1,13 @@
-add_executable(wasmkit-cli
-    Commands/Run.swift
-    Commands/Explore.swift
+add_executable(wasmkit
     CLI.swift
 )
 
-target_link_wasmkit_libraries(wasmkit-cli PUBLIC
-  ArgumentParser WAT WasmKitWASI)
+target_compile_options(wasmkit PRIVATE
+    -package-name WasmKitPackage
+)
 
-install(TARGETS wasmkit-cli
+target_link_wasmkit_libraries(wasmkit PUBLIC
+  CLICommands)
+
+install(TARGETS wasmkit
   RUNTIME DESTINATION bin)

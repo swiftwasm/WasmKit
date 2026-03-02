@@ -1,10 +1,11 @@
 import Foundation
+import Testing
 import WasmParser
-import XCTest
 
 @testable import WAT
 
-class ParserTests: XCTestCase {
+@Suite
+struct ParserTests {
     func parseWast(_ source: String, features: WasmFeatureSet = .default) throws -> [WastDirective] {
         var parser = WastParser(source, features: features)
         var directives: [WastDirective] = []
@@ -16,8 +17,8 @@ class ParserTests: XCTestCase {
 
     func parseModule(_ source: String) throws -> ModuleDirective? {
         let directives = try parseWast(source)
-        guard case let .module(moduleDirective) = directives.first else {
-            XCTFail("Expected module directive")
+        guard case .module(let moduleDirective) = directives.first else {
+            #expect((false), "Expected module directive")
             return nil
         }
         return moduleDirective
@@ -25,35 +26,35 @@ class ParserTests: XCTestCase {
 
     func parseBinaryModule(_ source: String) throws -> (source: [UInt8], id: String?)? {
         guard let module = try parseModule(source) else { return nil }
-        guard case let .binary(content) = module.source else { return nil }
+        guard case .binary(let content) = module.source else { return nil }
         return (content, module.id)
     }
 
-    func testParseWastBinaryModule() throws {
-        try XCTAssertEqual(
-            parseBinaryModule(#"(module binary "\00asm\01\00\00\00")"#)?.source,
-            [0, 97, 115, 109, 1, 0, 0, 0]
+    @Test
+    func parseWastBinaryModule() throws {
+        #expect(
+            try parseBinaryModule(#"(module binary "\00asm\01\00\00\00")"#)?.source == [0, 97, 115, 109, 1, 0, 0, 0]
         )
-        try XCTAssertEqual(
-            parseBinaryModule(
+        #expect(
+            try parseBinaryModule(
                 #"""
                 (module binary
                 "\00asm" "\01\00\00\00"
                 ;; comment between strings
                 "foo"
                 )
-                """#)?.source,
-            [0, 97, 115, 109, 1, 0, 0, 0, 102, 111, 111]
+                """#)?.source == [0, 97, 115, 109, 1, 0, 0, 0, 102, 111, 111]
         )
 
         do {
             let m1 = try parseBinaryModule(#"(module $M1 binary "\00asm\01\00\00\00")"#)
-            XCTAssertEqual(m1?.id, "$M1")
-            XCTAssertEqual(m1?.source, [0, 97, 115, 109, 1, 0, 0, 0])
+            #expect(m1?.id == "$M1")
+            #expect(m1?.source == [0, 97, 115, 109, 1, 0, 0, 0])
         }
     }
 
-    func testParseWastModule() throws {
+    @Test
+    func parseWastModule() throws {
         var parser = WastParser(
             #"""
             (module
@@ -72,16 +73,17 @@ class ParserTests: XCTestCase {
             switch directive {
             case .module(let directive):
                 guard case .text(_) = directive.source else {
-                    XCTFail("Expected text module field")
+                    #expect((false), "Expected text module field")
                     return
                 }
             case _:
-                XCTFail("Expected only module directive")
+                #expect((false), "Expected only module directive")
             }
         }
     }
 
-    func testParseWastModuleSkip() throws {
+    @Test
+    func parseWastModuleSkip() throws {
         let directives = try parseWast(
             #"""
             (module
@@ -97,16 +99,17 @@ class ParserTests: XCTestCase {
             (module binary "ok")
             """#)
 
-        XCTAssertEqual(directives.count, 2)
-        guard case let .module(directive) = try XCTUnwrap(directives.last),
-            case let .binary(content) = directive.source
+        #expect(directives.count == 2)
+        guard case .module(let directive) = try #require(directives.last),
+            case .binary(let content) = directive.source
         else {
             return
         }
-        XCTAssertEqual(content, Array("ok".utf8))
+        #expect(content == Array("ok".utf8))
     }
 
-    func testSpecForward() throws {
+    @Test
+    func specForward() throws {
         let source = """
             (module
               (func $even (export "even") (param $n i32) (result i32)
@@ -130,20 +133,21 @@ class ParserTests: XCTestCase {
             (assert_return (invoke "odd" (i32.const 20)) (i32.const 0))
             """
         let wast = try parseWast(source)
-        XCTAssertEqual(wast.count, 5)
-        guard case let .module(module) = wast.first, case var .text(wat) = module.source else {
-            XCTFail("expect a module directive")
+        #expect(wast.count == 5)
+        guard case .module(let module) = wast.first, case .text(var wat) = module.source else {
+            #expect((false), "expect a module directive")
             return
         }
-        XCTAssertEqual(wat.functionsMap.count, 2)
+        #expect(wat.functionsMap.count == 2)
         let even = wat.functionsMap[0]
         let (evenType, _) = try wat.types.resolve(use: even.typeUse)
-        XCTAssertEqual(evenType.signature.parameters, [.i32])
-        XCTAssertEqual(evenType.signature.results.first, .i32)
-        XCTAssertEqual(evenType.parameterNames.map(\.?.value), ["$n"])
+        #expect(evenType.signature.parameters == [.i32])
+        #expect(evenType.signature.results.first == .i32)
+        #expect(evenType.parameterNames.map(\.?.value) == ["$n"])
     }
 
-    func testFuncIdBinding() throws {
+    @Test
+    func funcIdBinding() throws {
         let source = """
             (module
               (table $t 10 funcref)
@@ -171,35 +175,21 @@ class ParserTests: XCTestCase {
             )
             """
         let wat = try parseWAT(source)
-        XCTAssertEqual(wat.tables.count, 1)
+        #expect(wat.tables.count == 1)
         let table = wat.tables[0]
-        XCTAssertEqual(table.type, TableType(elementType: .funcRef, limits: Limits(min: 10, max: nil)))
-        XCTAssertEqual(wat.elementsMap.count, 14)
+        #expect(table.type == TableType(elementType: .funcRef, limits: Limits(min: 10, max: nil)))
+        #expect(wat.elementsMap.count == 14)
     }
 
-    func testParseSpectest() throws {
-        // NOTE: We do the same check as a part of the EncoderTests, so it's
-        // usually redundant and time-wasting to run this test every time.
-        // Keeping it here just for local unit testing purposes.
-        try XCTSkipIf(
-            ProcessInfo.processInfo.environment["WASMKIT_PARSER_SPECTEST"] != "1"
-        )
-        var failureCount = 0
-        var totalCount = 0
-        for filePath in Spectest.wastFiles(include: []) {
-            print("Parsing \(filePath.path)...")
-            totalCount += 1
-            let source = try String(contentsOf: filePath)
-            do {
-                _ = try parseWast(source, features: Spectest.deriveFeatureSet(wast: filePath))
-            } catch {
-                failureCount += 1
-                XCTFail("Failed to parse \(filePath.path):\(error)")
-            }
-        }
-
-        if failureCount > 0 {
-            XCTFail("Failed to parse \(failureCount) / \(totalCount) files")
-        }
+    // NOTE: We do the same check as a part of the EncoderTests, so it's
+    // usually redundant and time-wasting to run this test every time.
+    // Keeping it here just for local unit testing purposes.
+    @Test(
+        .enabled(if: ProcessInfo.processInfo.environment["WASMKIT_PARSER_SPECTEST"] == "1"),
+        arguments: Spectest.wastFiles(include: [])
+    )
+    func parseSpectest(wastFile: URL) throws {
+        let source = try String(contentsOf: wastFile)
+        _ = try parseWast(source, features: Spectest.deriveFeatureSet(wast: wastFile))
     }
 }

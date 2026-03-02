@@ -1,11 +1,13 @@
+import Testing
 import WAT
 import WasmParser
-import XCTest
 
 @testable import WasmKit
 
-final class StoreAllocatorTests: XCTestCase {
-    func testBumpAllocatorDeallocates() {
+@Suite
+struct StoreAllocatorTests {
+    @Test
+    func bumpAllocatorDeallocates() {
         class NonTrivialEntity {}
         weak var weakEntity: NonTrivialEntity?
         do {
@@ -21,13 +23,14 @@ final class StoreAllocatorTests: XCTestCase {
                 weakEntity = entity
             }
             // The entity is still alive because the allocator retains it
-            XCTAssertNotNil(weakEntity)
+            #expect(weakEntity != nil)
         }
         // The entity should be deallocated when the allocator is deallocated
-        XCTAssertNil(weakEntity)
+        #expect(weakEntity == nil)
     }
 
-    func testStoreAllocatorLeak() throws {
+    @Test
+    func storeAllocatorLeak() throws {
         weak var weakAllocator: StoreAllocator?
         do {
             let module = try parseWasm(
@@ -42,6 +45,6 @@ final class StoreAllocatorTests: XCTestCase {
             _ = try module.instantiate(store: store)
             weakAllocator = store.allocator
         }
-        XCTAssertNil(weakAllocator)
+        #expect(weakAllocator == nil)
     }
 }

@@ -4,15 +4,23 @@ import _CWasmKit
 ///
 /// Each new invocation through exported function has a separate ``Execution``
 /// even though the invocation happens during another invocation.
-struct Execution {
+struct Execution: ~Copyable {
     /// The reference to the ``Store`` associated with the execution.
     let store: StoreRef
+
     /// The end of the VM stack space.
-    private var stackEnd: UnsafeMutablePointer<StackSlot>
+    private let stackEnd: UnsafeMutablePointer<StackSlot>
     /// The error trap thrown during execution.
     /// This property must not be assigned to be non-nil more than once.
     /// - Note: If the trap is set, it must be released manually.
     private var trap: (error: UnsafeRawPointer, sp: Sp)? = nil
+
+    #if WasmDebuggingSupport
+        package init(store: StoreRef, stackEnd: UnsafeMutablePointer<StackSlot>) {
+            self.store = store
+            self.stackEnd = stackEnd
+        }
+    #endif
 
     /// Executes the given closure with a new execution state associated with
     /// the given ``Store`` instance.
@@ -35,58 +43,62 @@ struct Execution {
         sp.currentInstance.unsafelyUnwrapped
     }
 
-    /// An iterator for the call frames in the VM stack.
-    struct FrameIterator: IteratorProtocol {
-        struct Element {
-            let pc: Pc
-            let function: EntityHandle<WasmFunctionEntity>?
-        }
-
-        /// The stack pointer currently traversed.
-        private var sp: Sp?
-
-        init(sp: Sp) {
-            self.sp = sp
-        }
-
-        mutating func next() -> Element? {
-            guard let sp = self.sp, let pc = sp.returnPC else {
-                // Reached the root frame, whose stack pointer is nil.
-                return nil
+    struct CallStack: Sequence {
+        /// An iterator for the call frames in the VM stack.
+        struct FrameIterator: IteratorProtocol {
+            struct Element {
+                let pc: Pc
+                let sp: Sp
             }
-            self.sp = sp.previousSP
-            return Element(pc: pc, function: sp.currentFunction)
+
+            /// The stack pointer currently traversed.
+            private var sp: Sp?
+
+            init(sp: Sp) {
+                self.sp = sp
+            }
+
+            mutating func next() -> Element? {
+                guard let sp = self.sp, let pc = sp.returnPC else {
+                    // Reached the root frame, whose stack pointer is nil.
+                    return nil
+                }
+                self.sp = sp.previousSP
+                return Element(pc: pc, sp: sp)
+            }
+        }
+
+        let sp: Sp
+
+        func makeIterator() -> FrameIterator {
+            FrameIterator(sp: self.sp)
         }
     }
 
     static func captureBacktrace(sp: Sp, store: Store) -> Backtrace {
-        var frames = FrameIterator(sp: sp)
-        var symbols: [Backtrace.Symbol?] = []
-        while let frame = frames.next() {
-            guard let function = frame.function else {
-                symbols.append(nil)
+        let callStack = CallStack(sp: sp)
+        var symbols: [Backtrace.Symbol] = []
+
+        for frame in callStack {
+            guard let function = frame.sp.currentFunction else {
+                symbols.append(.init(name: nil, address: frame.pc))
                 continue
             }
             let symbolName = store.nameRegistry.symbolicate(.wasm(function))
-            symbols.append(
-                Backtrace.Symbol(
-                    function: Function(handle: .wasm(function), store: store),
-                    name: symbolName
-                )
-            )
+            symbols.append(.init(name: symbolName, address: frame.pc))
         }
         return Backtrace(symbols: symbols)
     }
 
     private func initializeConstSlots(
         sp: Sp, iseq: InstructionSequence,
-        numberOfNonParameterLocals: Int
+        numberOfNonParameterLocalSlots: Int
     ) {
         // Initialize the locals with zeros (all types of value have the same representation)
-        sp.initialize(repeating: UntypedValue.default.storage, count: numberOfNonParameterLocals)
+        sp.initialize(repeating: UntypedValue.default.storage, count: numberOfNonParameterLocalSlots)
         if let constants = iseq.constants.baseAddress {
             let count = iseq.constants.count
-            sp.advanced(by: numberOfNonParameterLocals).withMemoryRebound(to: UntypedValue.self, capacity: count) {
+            sp.advanced(by: numberOfNonParameterLocalSlots).withMemoryRebound(to: UntypedValue.self, capacity: count) {
                 $0.initialize(from: constants, count: count)
             }
         }
@@ -97,13 +109,13 @@ struct Execution {
     func pushFrame(
         iseq: InstructionSequence,
         function: EntityHandle<WasmFunctionEntity>,
-        numberOfNonParameterLocals: Int,
+        numberOfNonParameterLocalSlots: Int,
         sp: Sp, returnPC: Pc,
         spAddend: VReg
     ) throws -> Sp {
         let newSp = sp.advanced(by: Int(spAddend))
         try checkStackBoundary(newSp.advanced(by: iseq.maxStackHeight))
-        initializeConstSlots(sp: newSp, iseq: iseq, numberOfNonParameterLocals: numberOfNonParameterLocals)
+        initializeConstSlots(sp: newSp, iseq: iseq, numberOfNonParameterLocalSlots: numberOfNonParameterLocalSlots)
         newSp.previousSP = sp
         newSp.returnPC = returnPC
         newSp.currentFunction = function
@@ -229,10 +241,35 @@ extension Sp {
         nonmutating set { write(index, .f64(newValue)) }
     }
 
+    func loadValue(at reg: VReg, type: ValueType) -> Value {
+        switch type {
+        case .v128:
+            let lo = self[Int(reg)]
+            let hi = self[Int(reg) + 1]
+            return .v128(V128Storage(lo: lo, hi: hi).value)
+        case .i32, .i64, .f32, .f64, .ref:
+            return self[reg].cast(to: type)
+        }
+    }
+
+    func storeValue(_ value: Value, at reg: VReg, type: ValueType) {
+        switch type {
+        case .v128:
+            guard case .v128(let v) = value else {
+                preconditionFailure("type mismatch: expected v128, got \(value)")
+            }
+            let storage = V128Storage(v)
+            self[Int(reg)] = storage.lo
+            self[Int(reg) + 1] = storage.hi
+        case .i32, .i64, .f32, .f64, .ref:
+            self[reg] = UntypedValue(value)
+        }
+    }
+
     // MARK: - Special slots
 
     /// The current executing function.
-    fileprivate var currentFunction: EntityHandle<WasmFunctionEntity>? {
+    var currentFunction: EntityHandle<WasmFunctionEntity>? {
         get { return EntityHandle<WasmFunctionEntity>(bitPattern: UInt(self[-3].i64)) }
         nonmutating set { self[-3] = UInt64(UInt(bitPattern: newValue?.bitPattern ?? 0)) }
     }
@@ -249,7 +286,7 @@ extension Sp {
         nonmutating set { self[-1] = UInt64(UInt(bitPattern: newValue)) }
     }
 
-    fileprivate var currentInstance: InternalInstance? {
+    var currentInstance: InternalInstance? {
         currentFunction?.instance
     }
 }
@@ -282,8 +319,7 @@ func executeWasm(
     store: Store,
     function handle: InternalFunction,
     type: FunctionType,
-    arguments: [Value],
-    callerInstance: InternalInstance
+    arguments: [Value]
 ) throws -> [Value] {
     // NOTE: `store` variable must not outlive this function
     let store = StoreRef(store)
@@ -294,8 +330,10 @@ func executeWasm(
         // Mark root stack pointer and current function as nil.
         sp.previousSP = nil
         sp.currentFunction = nil
+        let layout = FrameHeaderLayout(type: type)
         for (index, argument) in arguments.enumerated() {
-            sp[VReg(index)] = UntypedValue(argument)
+            let reg = layout.size + layout.paramReg(index)
+            sp.storeValue(argument, at: reg, type: type.parameters[index])
         }
 
         try withUnsafeTemporaryAllocation(of: CodeSlot.self, capacity: 2) { rootISeq in
@@ -309,13 +347,54 @@ func executeWasm(
                 type: type
             )
         }
-        return type.results.enumerated().map { (i, type) in
-            sp[VReg(i)].cast(to: type)
+        return type.results.enumerated().map { (i, resultType) in
+            let reg = layout.size + layout.returnReg(i)
+            return sp.loadValue(at: reg, type: resultType)
         }
     }
 }
 
 extension Execution {
+
+    #if WasmDebuggingSupport
+
+        /// Counterpart to the free `executeWasm` function but implemented as a method of `Execution`,
+        /// Useful for representation of debugger state that needs to own `Execution`'s memory.
+        mutating func executeWasm(
+            threadingModel: EngineConfiguration.ThreadingModel,
+            function handle: InternalFunction,
+            type: FunctionType,
+            arguments: [Value],
+            sp: Sp,
+            pc: Pc
+        ) throws -> [Value] {
+            // Advance the stack pointer to be able to reference negative indices
+            // for saving slots.
+            let sp = sp.advanced(by: FrameHeaderLayout.numberOfSavingSlots)
+            // Mark root stack pointer and current function as nil.
+            sp.previousSP = nil
+            sp.currentFunction = nil
+            let layout = FrameHeaderLayout(type: type)
+            for (index, argument) in arguments.enumerated() {
+                let reg = layout.size + layout.paramReg(index)
+                sp.storeValue(argument, at: reg, type: type.parameters[index])
+            }
+
+            try self.execute(
+                sp: sp,
+                pc: pc,
+                handle: handle,
+                type: type
+            )
+
+            return type.results.enumerated().map { (i, resultType) in
+                let reg = layout.size + layout.returnReg(i)
+                return sp.loadValue(at: reg, type: resultType)
+            }
+        }
+
+    #endif
+
     /// A namespace for the "current memory" (Md and Ms) management.
     enum CurrentMemory {
         /// Assigns the current memory to the given internal memory.
@@ -327,8 +406,8 @@ extension Execution {
         /// Assigns the current memory to the given memory entity.
         @inline(__always)
         static func assign(md: inout Md, ms: inout Ms, memory: inout MemoryEntity) {
-            md = UnsafeMutableRawPointer(memory.data._baseAddressIfContiguous)
-            ms = memory.data.count
+            md = memory.baseAddress
+            ms = memory.byteCount
         }
 
         /// Assigns the current memory to nil.
@@ -361,8 +440,16 @@ extension Execution {
         }
     }
 
-    /// A ``Error`` thrown when the execution normally ends.
-    struct EndOfExecution: Error {}
+    /// An ``Error`` thrown when the execution normally ends.
+    struct EndOfExecution: Error, @unchecked Sendable {
+        let sp: Sp
+    }
+
+    /// An ``Error`` thrown when a breakpoint is triggered.
+    struct Breakpoint: Error, @unchecked Sendable {
+        let sp: Sp
+        let pc: Pc
+    }
 
     /// The entry point for the execution of the WebAssembly function.
     @inline(never)
@@ -398,21 +485,27 @@ extension Execution {
     mutating func runDirectThreaded(
         sp: Sp, pc: Pc, md: Md, ms: Ms
     ) throws {
-        var pc = pc
-        let handler = pc.read(wasmkit_tc_exec.self)
-        wasmkit_tc_start(handler, sp, pc, md, ms, &self)
-        if let (rawError, trappingSp) = self.trap {
-            let error = unsafeBitCast(rawError, to: Error.self)
-            // Manually release the error object because the trap is caught in C and
-            // held as a raw pointer.
-            wasmkit_swift_errorRelease(rawError)
-
-            guard let trap = error as? Trap else {
-                throw error
+        #if os(WASI)
+            fatalError("Direct threading is not supported on WASI")
+        #else
+            var pc = pc
+            let handler = pc.read(wasmkit_tc_exec.self)
+            withUnsafeMutablePointer(to: &self) { selfPtr in
+                wasmkit_tc_start(handler, sp, pc, md, ms, selfPtr)
             }
-            // Attach backtrace if the thrown error is a trap
-            throw trap.withBacktrace(Self.captureBacktrace(sp: trappingSp, store: store.value))
-        }
+            if let (rawError, trappingSp) = self.trap {
+                let error = unsafeBitCast(rawError, to: Error.self)
+                // Manually release the error object because the trap is caught in C and
+                // held as a raw pointer.
+                wasmkit_swift_errorRelease(rawError)
+
+                guard let trap = error as? Trap else {
+                    throw error
+                }
+                // Attach backtrace if the thrown error is a trap
+                throw trap.withBacktrace(Self.captureBacktrace(sp: trappingSp, store: store.value))
+            }
+        #endif
     }
 
     #if EngineStats
@@ -510,6 +603,11 @@ extension Execution {
         self.trap = (rawError, sp)
     }
 
+    /// Used by the debugger to resume execution after breakpoints.
+    mutating func resetError() {
+        self.trap = nil
+    }
+
     @inline(__always)
     func checkStackBoundary(_ sp: Sp) throws {
         guard sp < stackEnd else { throw Trap(.callStackExhausted) }
@@ -565,7 +663,7 @@ extension Execution {
         try checkStackBoundary(sp.advanced(by: iseq.maxStackHeight))
         sp.currentFunction = function
 
-        initializeConstSlots(sp: sp, iseq: iseq, numberOfNonParameterLocals: function.numberOfNonParameterLocals)
+        initializeConstSlots(sp: sp, iseq: iseq, numberOfNonParameterLocalSlots: function.numberOfNonParameterLocalSlots)
 
         Execution.CurrentMemory.mayUpdateCurrentInstance(
             instance: function.instance,
@@ -587,7 +685,7 @@ extension Execution {
         let newSp = try pushFrame(
             iseq: iseq,
             function: function,
-            numberOfNonParameterLocals: function.numberOfNonParameterLocals,
+            numberOfNonParameterLocalSlots: function.numberOfNonParameterLocalSlots,
             sp: sp,
             returnPC: pc,
             spAddend: spAddend
@@ -608,7 +706,7 @@ extension Execution {
         let resolvedType = store.value.engine.resolveType(function.type)
         let layout = FrameHeaderLayout(type: resolvedType)
         let parameters = resolvedType.parameters.enumerated().map { (i, type) in
-            sp[spAddend + layout.paramReg(i)].cast(to: type)
+            sp.loadValue(at: spAddend + layout.paramReg(i), type: type)
         }
         let instance = self.currentInstance(sp: sp)
         let caller = Caller(
@@ -616,8 +714,18 @@ extension Execution {
             store: store.value
         )
         let results = try function.implementation(caller, Array(parameters))
+        guard resolvedType.results.count == results.count else {
+            throw Trap(.resultTypesMismatch(expected: resolvedType.results, got: results))
+        }
+        for (expected, value) in zip(resolvedType.results, results) {
+            do {
+                try value.checkType(expected)
+            } catch {
+                throw Trap(.resultTypesMismatch(expected: resolvedType.results, got: results))
+            }
+        }
         for (index, result) in results.enumerated() {
-            sp[spAddend + layout.returnReg(index)] = UntypedValue(result)
+            sp.storeValue(result, at: spAddend + layout.returnReg(index), type: resolvedType.results[index])
         }
     }
 }

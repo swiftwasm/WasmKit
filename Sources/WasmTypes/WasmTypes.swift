@@ -2,7 +2,7 @@
 ///
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#function-types>
-public struct FunctionType: Equatable, Hashable {
+public struct FunctionType: Equatable, Hashable, Sendable {
     public init(parameters: [ValueType], results: [ValueType] = []) {
         self.parameters = parameters
         self.results = results
@@ -14,15 +14,47 @@ public struct FunctionType: Equatable, Hashable {
     public let results: [ValueType]
 }
 
-/// Reference types
-public enum ReferenceType: UInt8, Equatable, Hashable {
-    /// A nullable reference type to a function.
-    case funcRef
-    /// A nullable external reference type.
-    case externRef
+public enum AbstractHeapType: UInt8, Equatable, Hashable, Sendable {
+    /// A reference to any kind of function.
+    case funcRef  // -> to be renamed func
+
+    /// An external host data.
+    case externRef  // -> to be renamed extern
 }
 
-public enum ValueType: Equatable, Hashable {
+public enum HeapType: Equatable, Hashable, Sendable {
+    case abstract(AbstractHeapType)
+    case concrete(typeIndex: UInt32)
+
+    public static var funcRef: HeapType {
+        return .abstract(.funcRef)
+    }
+
+    public static var externRef: HeapType {
+        return .abstract(.externRef)
+    }
+}
+
+/// Reference types
+public struct ReferenceType: Equatable, Hashable, Sendable {
+    public var isNullable: Bool
+    public var heapType: HeapType
+
+    public static var funcRef: ReferenceType {
+        ReferenceType(isNullable: true, heapType: .funcRef)
+    }
+
+    public static var externRef: ReferenceType {
+        ReferenceType(isNullable: true, heapType: .externRef)
+    }
+
+    public init(isNullable: Bool, heapType: HeapType) {
+        self.isNullable = isNullable
+        self.heapType = heapType
+    }
+}
+
+public enum ValueType: Equatable, Hashable, Sendable {
     /// 32-bit signed or unsigned integer.
     case i32
     /// 64-bit signed or unsigned integer.
@@ -35,6 +67,30 @@ public enum ValueType: Equatable, Hashable {
     case v128
     /// Reference value type.
     case ref(ReferenceType)
+}
+
+/// A 128-bit vector value, represented by its raw bytes.
+public struct V128: Equatable, Hashable, Sendable {
+    public static let byteCount = 16
+
+    public let bytes: [UInt8]
+
+    public init(bytes: [UInt8]) {
+        precondition(bytes.count == Self.byteCount, "V128 must be exactly \(Self.byteCount) bytes")
+        self.bytes = bytes
+    }
+}
+
+/// The 16 lane indices used by `i8x16.shuffle`.
+public struct V128ShuffleMask: Equatable, Hashable, Sendable {
+    public static let laneCount = 16
+
+    public let lanes: [UInt8]
+
+    public init(lanes: [UInt8]) {
+        precondition(lanes.count == Self.laneCount, "V128ShuffleMask must be exactly \(Self.laneCount) bytes")
+        self.lanes = lanes
+    }
 }
 
 /// Runtime representation of a WebAssembly function reference.
@@ -53,7 +109,7 @@ public typealias ElementAddress = Int
 @available(*, unavailable, message: "Address-based APIs has been removed")
 public typealias DataAddress = Int
 
-public enum Reference: Hashable {
+public enum Reference: Hashable, Sendable {
     /// A reference to a function.
     case function(FunctionAddress?)
     /// A reference to an external entity.
@@ -61,7 +117,7 @@ public enum Reference: Hashable {
 }
 
 /// Runtime representation of a value.
-public enum Value: Hashable {
+public enum Value: Hashable, Sendable {
     /// Value of a 32-bit signed or unsigned integer.
     case i32(UInt32)
     /// Value of a 64-bit signed or unsigned integer.
@@ -70,6 +126,8 @@ public enum Value: Hashable {
     case f32(UInt32)
     /// Value of a 64-bit IEEE 754 floating-point number.
     case f64(UInt64)
+    /// 128-bit vector of packed integer or floating-point data.
+    case v128(V128)
     /// Reference value.
     case ref(Reference)
 }
@@ -98,28 +156,28 @@ extension Value {
     /// Returns the value as a 32-bit signed integer.
     /// - Precondition: The value is of type `i32`.
     public var i32: UInt32 {
-        guard case let .i32(result) = self else { fatalError() }
+        guard case .i32(let result) = self else { fatalError() }
         return result
     }
 
     /// Returns the value as a 64-bit signed integer.
     /// - Precondition: The value is of type `i64`.
     public var i64: UInt64 {
-        guard case let .i64(result) = self else { fatalError() }
+        guard case .i64(let result) = self else { fatalError() }
         return result
     }
 
     /// Returns the value as a 32-bit floating-point number.
     /// - Precondition: The value is of type `f32`.
     public var f32: UInt32 {
-        guard case let .f32(result) = self else { fatalError() }
+        guard case .f32(let result) = self else { fatalError() }
         return result
     }
 
     /// Returns the value as a 64-bit floating-point number.
     /// - Precondition: The value is of type `f64`.
     public var f64: UInt64 {
-        guard case let .f64(result) = self else { fatalError() }
+        guard case .f64(let result) = self else { fatalError() }
         return result
     }
 }

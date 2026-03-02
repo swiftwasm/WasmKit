@@ -129,7 +129,7 @@ public final class Runtime {
     /// ```
     @available(*, deprecated, message: "Use `Instance.export` and `Global.value` instead")
     public func getGlobal(_ instance: Instance, globalName: String) throws -> Value {
-        guard case let .global(global) = instance.export(globalName) else {
+        guard case .global(let global) = instance.export(globalName) else {
             throw Trap(.noGlobalExportWithName(globalName: globalName, instance: instance))
         }
         return global.value
@@ -137,7 +137,7 @@ public final class Runtime {
 
     /// Invokes a function in a given module instance.
     public func invoke(_ instance: Instance, function: String, with arguments: [Value] = []) throws -> [Value] {
-        guard case let .function(function)? = instance.export(function) else {
+        guard case .function(let function)? = instance.export(function) else {
             throw Trap(.exportedFunctionNotFound(name: function, instance: instance))
         }
         return try function.invoke(arguments)

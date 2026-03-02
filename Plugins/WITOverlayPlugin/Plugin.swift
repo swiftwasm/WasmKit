@@ -7,18 +7,18 @@ struct Plugin: BuildToolPlugin {
         if !target.recursiveTargetDependencies.contains(where: { $0.name == "_CabiShims" }) {
             Diagnostics.emit(.error, "\"_CabiShims\" must be included as a dependency")
         }
-        let witTool = try context.tool(named: "WITTool").path
-        let witDir = target.directory.appending("wit")
-        let inputFiles = try FileManager.default.subpathsOfDirectory(atPath: witDir.string).map {
-            witDir.appending(subpath: $0)
+        let witTool = try context.tool(named: "WITTool").url
+        let witDir = target.directoryURL.appendingPathComponent("wit")
+        let inputFiles = try FileManager.default.subpathsOfDirectory(atPath: witDir.path).map {
+            witDir.appendingPathComponent($0)
         }
-        let outputFile = context.pluginWorkDirectory.appending("GeneratedOverlay", "\(target.name)Overlay.swift")
+        let outputFile = context.pluginWorkDirectoryURL.appendingPathComponent("GeneratedOverlay").appendingPathComponent("\(target.name)Overlay.swift")
         let command = Command.buildCommand(
             displayName: "Generating WIT overlay for \(target.name)",
             executable: witTool,
             arguments: [
                 "generate-overlay", "--target", "guest",
-                witDir, "-o", outputFile
+                witDir.path, "-o", outputFile.path
             ],
             inputFiles: inputFiles,
             outputFiles: [outputFile]

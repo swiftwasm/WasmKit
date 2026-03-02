@@ -49,6 +49,8 @@ protocol WASIDir: WASIEntry {
 
     var preopenPath: String? { get }
 
+    func readlink(atPath path: String) throws -> [UInt8]
+
     func openFile(
         symlinkFollow: Bool,
         path: String,
@@ -61,6 +63,7 @@ protocol WASIDir: WASIEntry {
     func removeDirectory(atPath path: String) throws
     func removeFile(atPath path: String) throws
     func symlink(from sourcePath: String, to destPath: String) throws
+    func rename(from sourcePath: String, toDir newDir: any WASIDir, to destPath: String) throws
     func readEntries(cookie: WASIAbi.DirCookie) throws -> AnyIterator<Result<ReaddirElement, any Error>>
     func attributes(path: String, symlinkFollow: Bool) throws -> WASIAbi.Filestat
     func setFilestatTimes(
@@ -81,6 +84,13 @@ enum FdEntry {
         case .directory(let directory):
             return directory
         }
+    }
+
+    func asFile() -> (any WASIFile)? {
+        if case .file(let entry) = self {
+            return entry
+        }
+        return nil
     }
 }
 
@@ -118,4 +128,29 @@ struct FdTable {
             return fd
         }
     }
+}
+
+/// Content of a file that can be retrieved from the file system.
+public enum FileContent {
+    case bytes([UInt8])
+    case handle(FileDescriptor)
+}
+
+/// Protocol for file system implementations used by WASI.
+///
+/// This protocol contains WASI-specific implementation details.
+protocol FileSystemImplementation: ~Copyable {
+    /// Preopens a directory and returns a WASIDir implementation.
+    func preopenDirectory(guestPath: String, hostPath: String) throws -> any WASIDir
+
+    /// Opens a file or directory from a directory file descriptor.
+    func openAt(
+        dirFd: any WASIDir,
+        path: String,
+        oflags: WASIAbi.Oflags,
+        fsRightsBase: WASIAbi.Rights,
+        fsRightsInheriting: WASIAbi.Rights,
+        fdflags: WASIAbi.Fdflags,
+        symlinkFollow: Bool
+    ) throws -> FdEntry
 }

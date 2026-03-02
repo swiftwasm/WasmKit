@@ -118,7 +118,7 @@ struct SwiftAPIDigester {
 
     @available(macOS 11, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
     func dumpSDK(moduleName: String, arguments: [String]) throws -> Output {
-        #if os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
+        #if os(iOS) || os(watchOS) || os(tvOS) || os(visionOS) || os(WASI)
             fatalError("WITExtractor does not support platforms where Foundation.Process is unavailable")
         #else
             var args = [

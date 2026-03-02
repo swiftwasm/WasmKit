@@ -1,75 +1,84 @@
-import XCTest
+import Testing
 
 @testable import WIT
 
-class ParseVersionTests: XCTestCase {
+@Suite
+struct ParseVersionTests {
 
     func parse(_ text: String) throws -> Version? {
         var lexer = Lexer(cursor: .init(input: text))
         return try Version.parse(lexer: &lexer)
     }
 
-    func testParse() throws {
+    @Test func parse() throws {
         do {
-            let version = try XCTUnwrap(parse("1.0.0"))
-            XCTAssertEqual(version.major, 1)
-            XCTAssertEqual(version.minor, 0)
-            XCTAssertEqual(version.patch, 0)
+            let version = try #require(try parse("1.0.0"))
+            #expect(version.major == 1)
+            #expect(version.minor == 0)
+            #expect(version.patch == 0)
         }
         do {
-            let version = try XCTUnwrap(parse("12.222.4444"))
-            XCTAssertEqual(version.major, 12)
-            XCTAssertEqual(version.minor, 222)
-            XCTAssertEqual(version.patch, 4444)
-        }
-    }
-
-    func testParseInvalid() throws {
-        XCTAssertThrowsError(try parse("0.0.01"))
-        XCTAssertThrowsError(try parse("0.0.x"))
-        XCTAssertThrowsError(try parse("0.0.0-"))
-        XCTAssertThrowsError(try parse("0.0.0-+"))
-    }
-
-    func testParsePrerelease() throws {
-        do {
-            let version = try XCTUnwrap(parse("1.0.0-alpha"))
-            XCTAssertEqual(version.prerelease, "alpha")
-        }
-        do {
-            let version = try XCTUnwrap(parse("1.0.0-alpha.1"))
-            XCTAssertEqual(version.prerelease, "alpha.1")
-        }
-        do {
-            let version = try XCTUnwrap(parse("1.0.0-0.3.7"))
-            XCTAssertEqual(version.prerelease, "0.3.7")
-        }
-        do {
-            let version = try XCTUnwrap(parse("1.0.0-x-y-z.--"))
-            XCTAssertEqual(version.prerelease, "x-y-z.--")
+            let version = try #require(try parse("12.222.4444"))
+            #expect(version.major == 12)
+            #expect(version.minor == 222)
+            #expect(version.patch == 4444)
         }
     }
 
-    func testParseBuildMetadata() throws {
+    @Test func parseInvalid() throws {
+        #expect(throws: (any Error).self) {
+            try parse("0.0.01")
+        }
+        #expect(throws: (any Error).self) {
+            try parse("0.0.x")
+        }
+        #expect(throws: (any Error).self) {
+            try parse("0.0.0-")
+        }
+        #expect(throws: (any Error).self) {
+            try parse("0.0.0-+")
+        }
+    }
+
+    @Test func parsePrerelease() throws {
         do {
-            let version = try XCTUnwrap(parse("1.0.0-alpha+001"))
-            XCTAssertEqual(version.prerelease, "alpha")
-            XCTAssertEqual(version.buildMetadata, "001")
+            let version = try #require(try parse("1.0.0-alpha"))
+            #expect(version.prerelease == "alpha")
         }
         do {
-            let version = try XCTUnwrap(parse("1.0.0+20130313144700"))
-            XCTAssertEqual(version.prerelease, nil)
-            XCTAssertEqual(version.buildMetadata, "20130313144700")
+            let version = try #require(try parse("1.0.0-alpha.1"))
+            #expect(version.prerelease == "alpha.1")
         }
         do {
-            let version = try XCTUnwrap(parse("1.0.0-beta+exp.sha.5114f85"))
-            XCTAssertEqual(version.prerelease, "beta")
-            XCTAssertEqual(version.buildMetadata, "exp.sha.5114f85")
+            let version = try #require(try parse("1.0.0-0.3.7"))
+            #expect(version.prerelease == "0.3.7")
         }
         do {
-            let version = try XCTUnwrap(parse("1.0.0+21AF26D3----117B344092BD"))
-            XCTAssertEqual(version.prerelease, nil)
-            XCTAssertEqual(version.buildMetadata, "21AF26D3----117B344092BD")
+            let version = try #require(try parse("1.0.0-x-y-z.--"))
+            #expect(version.prerelease == "x-y-z.--")
+        }
+    }
+
+    @Test func parseBuildMetadata() throws {
+        do {
+            let version = try #require(try parse("1.0.0-alpha+001"))
+            #expect(version.prerelease == "alpha")
+            #expect(version.buildMetadata == "001")
+        }
+        do {
+            let version = try #require(try parse("1.0.0+20130313144700"))
+            #expect(version.prerelease == nil)
+            #expect(version.buildMetadata == "20130313144700")
+        }
+        do {
+            let version = try #require(try parse("1.0.0-beta+exp.sha.5114f85"))
+            #expect(version.prerelease == "beta")
+            #expect(version.buildMetadata == "exp.sha.5114f85")
+        }
+        do {
+            let version = try #require(try parse("1.0.0+21AF26D3----117B344092BD"))
+            #expect(version.prerelease == nil)
+            #expect(version.buildMetadata == "21AF26D3----117B344092BD")
         }
     }
 }

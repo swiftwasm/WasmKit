@@ -1,8 +1,10 @@
-import XCTest
+import Testing
 
 @testable import WIT
 
-class PackageResolverTests: XCTestCase {
+@Suite
+
+struct PackageResolverTests {
     class InMemoryLoader: PackageFileLoader {
         enum Node: ExpressibleByDictionaryLiteral, ExpressibleByStringLiteral {
             case directory(children: [String: Node])
@@ -55,7 +57,7 @@ class PackageResolverTests: XCTestCase {
         }
     }
 
-    func testLoadDependencies() throws {
+    @Test func loadDependencies() throws {
         let loader = InMemoryLoader()
         let (mainPackage, packageResolver) = try PackageResolver.parse(
             directory: .init(
@@ -104,15 +106,15 @@ class PackageResolverTests: XCTestCase {
         )
         do {
             let lookup = TypeNameLookup(context: declContext, name: "check1", evaluator: context.evaluator)
-            XCTAssertEqual(try lookup.lookup(), WITType.u32)
+            #expect(try lookup.lookup() == WITType.u32)
         }
         do {
             let lookup = TypeNameLookup(context: declContext, name: "check2", evaluator: context.evaluator)
-            XCTAssertEqual(try lookup.lookup(), WITType.string)
+            #expect(try lookup.lookup() == WITType.string)
         }
     }
 
-    func testLoadDependenciesWithVersion() throws {
+    @Test func loadDependenciesWithVersion() throws {
         let loader = InMemoryLoader()
         let (mainPackage, packageResolver) = try PackageResolver.parse(
             directory: .init(
@@ -162,11 +164,11 @@ class PackageResolverTests: XCTestCase {
 
         do {
             let lookup = TypeNameLookup(context: declContext, name: "check1", evaluator: context.evaluator)
-            XCTAssertEqual(try lookup.lookup(), .u32)
+            #expect(try lookup.lookup() == .u32)
         }
         do {
             let lookup = TypeNameLookup(context: declContext, name: "check2", evaluator: context.evaluator)
-            XCTAssertEqual(try lookup.lookup(), .u8)
+            #expect(try lookup.lookup() == .u8)
         }
     }
 }

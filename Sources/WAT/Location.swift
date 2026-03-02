@@ -1,5 +1,5 @@
 /// A location in a WAT source file.
-public struct Location: Equatable, CustomDebugStringConvertible {
+public struct Location: Equatable, CustomDebugStringConvertible, Sendable {
     let index: Lexer.Index
     let source: String.UnicodeScalarView
 

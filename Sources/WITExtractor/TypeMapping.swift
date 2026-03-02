@@ -81,7 +81,7 @@ struct TypeMapping {
         func genericParameters() -> some Collection<String> {
             let children = node.parent.parent.children ?? []
             return children.lazy.compactMap { child in
-                guard case let .typeNominal(typeNode) = child else {
+                guard case .typeNominal(let typeNode) = child else {
                     diagnostics.add(.warning("Missing generic parameter type node for \(node.parent.parent.printedName)"))
                     return nil
                 }
@@ -139,7 +139,7 @@ struct TypeMapping {
         var cleanup: (inout TypeMapping) -> Void = { _ in }
         defer { cleanup(&self) }
 
-        if case let .typeDecl(typeDecl) = node {
+        if case .typeDecl(let typeDecl) = node {
             collect(node: typeDecl.parent)
             declScope.append(typeDecl.parent)
             cleanup = {

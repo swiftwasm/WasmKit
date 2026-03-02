@@ -52,7 +52,7 @@ extension Execution {
     }
 
     mutating func endOfExecution(sp: inout Sp, pc: Pc) throws -> (Pc, CodeSlot) {
-        throw EndOfExecution()
+        throw EndOfExecution(sp: sp)
     }
 
     @inline(__always)
@@ -81,7 +81,7 @@ extension Execution {
         sp = try pushFrame(
             iseq: iseq,
             function: instance,
-            numberOfNonParameterLocals: locals,
+            numberOfNonParameterLocalSlots: locals,
             sp: sp, returnPC: pc,
             spAddend: internalCallOperand.spAddend
         )
@@ -121,7 +121,7 @@ extension Execution {
         guard elementIndex < table.elements.count else {
             throw Trap(.tableOutOfBounds(elementIndex))
         }
-        guard case let .function(rawBitPattern?) = table.elements[elementIndex]
+        guard case .function(let rawBitPattern?) = table.elements[elementIndex]
         else {
             throw Trap(.indirectCallToNull(elementIndex))
         }
@@ -221,6 +221,14 @@ extension Execution {
         let function = currentInstance(sp: sp).functions[Int(immediate)]
         self.store.value.engine.interceptor?.onExitFunction(
             Function(handle: function, store: store.value)
+        )
+    }
+
+    mutating func breakpoint(sp: inout Sp, pc: Pc) throws -> (Pc, CodeSlot) {
+        throw Breakpoint(
+            sp: sp,
+            // Throw `pc` value before the breakpoint was triggered to allow resumption in same place
+            pc: pc - 1
         )
     }
 }

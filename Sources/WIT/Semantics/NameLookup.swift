@@ -150,7 +150,7 @@ struct LookupInterfaceInPackageRequest: EvaluationRequest {
         sourceFile: SyntaxNode<SourceFileSyntax>
     ) {
         for sourceFile in packageUnit.sourceFiles {
-            for case let .interface(iface) in sourceFile.items {
+            for case .interface(let iface) in sourceFile.items {
                 if iface.name.text == name { return (iface, sourceFile) }
             }
         }
@@ -210,7 +210,7 @@ struct LookupLocalInterfaceRequest: EvaluationRequest {
         sourceFile: SyntaxNode<SourceFileSyntax>
     ) {
         if let sourceFile {
-            for case let .use(use) in sourceFile.items {
+            for case .use(let use) in sourceFile.items {
                 let found: Bool
                 if let asName = use.asName {
                     found = name == asName.text
@@ -231,7 +231,7 @@ struct LookupLocalInterfaceRequest: EvaluationRequest {
             }
         }
         for sourceFile in packageUnit.sourceFiles {
-            for case let .interface(iface) in sourceFile.items {
+            for case .interface(let iface) in sourceFile.items {
                 if iface.name.text == name { return (iface, sourceFile) }
             }
         }

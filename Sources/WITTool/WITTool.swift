@@ -65,10 +65,10 @@ struct GenerateOverlay: ParsableCommand {
         case host
     }
 
-    @Option
+    @Option(help: "Whether bindings should be generated for a Wasm guest component or a host Wasm runtime. Possible values: `guest`, `host`. ")
     var target: Target
 
-    @Argument
+    @Argument(help: "Path to a `wit` directory or a `.wit` file.")
     var path: String
 
     @Option(name: .shortAndLong)
@@ -178,7 +178,7 @@ struct SwiftSourceSummaryProvider: SourceSummaryProvider {
     let typeMapping: (String) -> String?
 
     func enumCaseNames(byWITName witName: String) -> [String]? {
-        guard case let .enumType(enumType) = summary.lookupType(byWITName: witName) else {
+        guard case .enumType(let enumType) = summary.lookupType(byWITName: witName) else {
             return nil
         }
         return enumType.cases.map(\.name)

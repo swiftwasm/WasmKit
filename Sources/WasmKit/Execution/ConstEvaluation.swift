@@ -58,12 +58,15 @@ extension ConstExpression {
         case .i64Const(let value): return .i64(UInt64(bitPattern: value))
         case .f32Const(let value): return .f32(value.bitPattern)
         case .f64Const(let value): return .f64(value.bitPattern)
+        case .v128Const(let value): return .v128(value)
         case .globalGet(let globalIndex):
             return try context.globalValue(globalIndex)
         case .refNull(let type):
             switch type {
             case .externRef: return .ref(.extern(nil))
             case .funcRef: return .ref(.function(nil))
+            default:
+                throw ValidationError(.illegalConstExpressionInstruction(constInst))
             }
         case .refFunc(let functionIndex):
             return try .ref(context.functionRef(functionIndex))
@@ -85,7 +88,7 @@ extension WasmParser.ElementSegment {
         context: C, expression: ConstExpression
     ) throws -> Reference {
         switch expression[0] {
-        case let .refFunc(index):
+        case .refFunc(let index):
             return try context.functionRef(index)
         case .refNull(.funcRef):
             return .function(nil)

@@ -3,24 +3,22 @@ import WasmTypes
 import struct WasmParser.Import
 
 /// The backtrace of the trap.
-struct Backtrace: CustomStringConvertible {
+struct Backtrace: CustomStringConvertible, Sendable {
     /// A symbol in the backtrace.
-    struct Symbol {
-        /// The function that the symbol represents.
-        let function: Function
-
+    struct Symbol: @unchecked Sendable {
         /// The name of the symbol.
         let name: String?
+        let address: Pc
     }
 
     /// The symbols in the backtrace.
-    let symbols: [Symbol?]
+    let symbols: [Symbol]
 
     /// Textual description of the backtrace.
     var description: String {
         symbols.enumerated().map { (index, symbol) in
-            let name = symbol?.name ?? "unknown"
-            return "    \(index): \(name)"
+            let name = symbol.name ?? "unknown"
+            return "    \(index): (\(symbol.address)) \(name)"
         }.joined(separator: "\n")
     }
 }
@@ -28,7 +26,7 @@ struct Backtrace: CustomStringConvertible {
 /// An error that occurs during execution of a WebAssembly module.
 public struct Trap: Error, CustomStringConvertible {
     /// The reason for the trap.
-    var reason: TrapReason
+    package private(set) var reason: TrapReason
 
     /// The backtrace of the trap.
     private(set) var backtrace: Backtrace?
@@ -59,8 +57,8 @@ public struct Trap: Error, CustomStringConvertible {
 }
 
 /// A reason for a trap that occurred during execution of a WebAssembly module.
-enum TrapReason: Error, CustomStringConvertible {
-    struct Message {
+package enum TrapReason: Error, CustomStringConvertible {
+    package struct Message {
         let text: String
 
         init(_ text: String) {
@@ -79,6 +77,8 @@ enum TrapReason: Error, CustomStringConvertible {
     case tableOutOfBounds(Int)
     /// Out of bounds memory access
     case memoryOutOfBounds
+    /// Unaligned atomic memory access
+    case unalignedAtomic
     /// `call_indirect` instruction called an uninitialized table element.
     case indirectCallToNull(Int)
     /// Indirect call type mismatch
@@ -91,7 +91,7 @@ enum TrapReason: Error, CustomStringConvertible {
     case invalidConversionToInteger
 
     /// The description of the trap reason.
-    var description: String {
+    package var description: String {
         switch self {
         case .message(let message):
             return message.text
@@ -101,13 +101,15 @@ enum TrapReason: Error, CustomStringConvertible {
             return "call stack exhausted"
         case .memoryOutOfBounds:
             return "out of bounds memory access"
+        case .unalignedAtomic:
+            return "unaligned atomic"
         case .integerDividedByZero:
             return "integer divide by zero"
         case .integerOverflow:
             return "integer overflow"
         case .invalidConversionToInteger:
             return "invalid conversion to integer"
-        case let .indirectCallToNull(elementIndex):
+        case .indirectCallToNull(let elementIndex):
             return "indirect call to null element (uninitialized element \(elementIndex))"
         case .typeMismatchCall(let actual, let expected):
             return "indirect call type mismatch, expected \(expected), got \(actual)"
@@ -139,18 +141,21 @@ extension TrapReason.Message {
     static func exportedFunctionNotFound(name: String, instance: Instance) -> Self {
         Self("exported function \(name) not found in instance \(instance)")
     }
+    static func unimplemented(feature: String) -> Self {
+        Self("\(feature) is not implemented yet")
+    }
 }
 
-struct ImportError: Error {
-    struct Message {
-        let text: String
+package struct ImportError: Error {
+    package struct Message {
+        package let text: String
 
         init(_ text: String) {
             self.text = text
         }
     }
 
-    let message: Message
+    package let message: Message
 
     init(_ message: Message) {
         self.message = message

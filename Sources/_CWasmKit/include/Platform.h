@@ -5,7 +5,7 @@
 // rather than a language standard feature after LLVM 19. We check
 // `__has_attribute(swiftasynccc)` too for compatibility with older versions.
 // See https://github.com/llvm/llvm-project/pull/85347
-#if __has_feature(swiftasynccc) || __has_extension(swiftasynccc)
+#if !defined(__wasi__) && (__has_feature(swiftasynccc) || __has_extension(swiftasynccc))
 #  define WASMKIT_HAS_SWIFTASYNCCC 1
 #else
 #  define WASMKIT_HAS_SWIFTASYNCCC 0

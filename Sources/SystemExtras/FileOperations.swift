@@ -12,6 +12,8 @@ import Android
 #elseif os(Windows)
 import ucrt
 import WinSDK
+#elseif os(WASI)
+import WASILibc
 #else
 #error("Unsupported Platform")
 #endif
@@ -247,7 +249,16 @@ extension FileDescriptor {
 
     @_alwaysEmitIntoClient
     public var device: UInt64 {
-      UInt64(rawValue.st_dev)
+      // Preserve bit pattern for dev_t (may be signed or unsigned depending on platform)
+      let dev = rawValue.st_dev
+      return withUnsafeBytes(of: dev) { bytes in
+        var result: UInt64 = 0
+        let copyCount = min(bytes.count, MemoryLayout<UInt64>.size)
+        withUnsafeMutableBytes(of: &result) { resultBytes in
+          resultBytes.prefix(copyCount).copyBytes(from: bytes.prefix(copyCount))
+        }
+        return result
+      }
     }
 
     @_alwaysEmitIntoClient
@@ -344,6 +355,8 @@ extension FileDescriptor {
     #if os(Windows)
     // FIXME: Need to query by `NtQueryInformationFile`?
     return .success(OpenOptions(rawValue: 0))
+    #elseif os(WASI)
+    return .failure(Errno.notSupported)
     #else
     valueOrErrno(retryOnInterrupt: false) {
       system_fcntl(self.rawValue, _F_GETFL)
@@ -511,15 +524,31 @@ extension FileDescriptor {
 
     @_alwaysEmitIntoClient
     public var name: String {
+#if os(WASI)
+      // ClangImporter can't handle `char d_name[]`, but it's right after `unsigned char d_type`.
+      withUnsafePointer(to: &rawValue.pointee.d_type) { dType in
+        let dName = dType + 1
+        return dName.withMemoryRebound(to: UInt8.self, capacity: MemoryLayout.size(ofValue: dName)) {
+          // String initializer copies the given buffer contents, so it's safe.
+          return String(cString: $0)
+        }
+      }
+#else
       withUnsafePointer(to: &rawValue.pointee.d_name) { dName in
         dName.withMemoryRebound(to: UInt8.self, capacity: MemoryLayout.size(ofValue: dName)) {
           // String initializer copies the given buffer contents, so it's safe.
           return String(cString: $0)
         }
       }
+      #endif
     }
 
     public var fileType: FileType {
+#if os(WASI)
+      // https://github.com/WebAssembly/WASI/blob/main/legacy/preview1/docs.md#-filetype-variant
+      // https://github.com/WebAssembly/wasi-libc/blob/6b45da5b05bc0edda355a6de46101d4b21631985/libc-bottom-half/headers/public/wasi/api.h#L780C9-L780C32
+      FileType(rawValue: .init(rawValue.pointee.d_type))
+#else
       switch CInt(rawValue.pointee.d_type) {
       case _DT_REG: return .file
       case _DT_BLK: return .blockDevice
@@ -529,6 +558,7 @@ extension FileDescriptor {
       case _DT_SOCK: return .socket
       default: return .unknown
       }
+#endif
     }
   }
 
@@ -657,7 +687,7 @@ public enum FileTime {
 public typealias FileTime = Clock.TimeSpec
 #endif
 
-#if !os(Windows)
+#if !os(Windows) && !os(WASI)
 
 // MARK: - Synchronized Input and Output
 

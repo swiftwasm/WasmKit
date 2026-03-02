@@ -1,18 +1,16 @@
 import Foundation
 import SystemPackage
 import WAT
+import WasmKit
 import WasmParser
 
-@testable import WasmKit
-
-struct TestCase {
-    enum Error: Swift.Error {
+package struct TestCase: CustomStringConvertible {
+    package enum Error: Swift.Error {
         case invalidPath
     }
 
-    let content: Wast
-    let path: String
-    var relativePath: String {
+    package let path: String
+    package var relativePath: String {
         // Relative path from the current working directory
         let currentDirectory = FileManager.default.currentDirectoryPath
         if path.hasPrefix(currentDirectory) {
@@ -21,7 +19,11 @@ struct TestCase {
         return path
     }
 
-    static func load(include: [String], exclude: [String], in path: [String], log: ((String) -> Void)? = nil) throws -> [TestCase] {
+    package var description: String {
+        return relativePath
+    }
+
+    package static func load(include: [String], exclude: [String], in path: [String]) throws -> [TestCase] {
         let fileManager = FileManager.default
         var filePaths: [URL] = []
         for path in path {
@@ -49,8 +51,6 @@ struct TestCase {
             // as empty string in JSONDecoder because there is no way to express
             // it in UTF-8.
             guard fileName != "names.wast" else { return false }
-            // FIXME: Skip SIMD proposal tests for now
-            guard !fileName.starts(with: "simd_") else { return false }
 
             let patternPredicate = { pattern in filePath.path.hasSuffix(pattern) }
             if !include.isEmpty {
@@ -62,13 +62,7 @@ struct TestCase {
 
         var testCases: [TestCase] = []
         for filePath in filePaths where try matchesPattern(filePath) {
-            guard let data = fileManager.contents(atPath: filePath.path) else {
-                assertionFailure("failed to load \(filePath)")
-                continue
-            }
-
-            let wast = try parseWAST(String(data: data, encoding: .utf8)!)
-            let spec = TestCase(content: wast, path: filePath.path)
+            let spec = TestCase(path: filePath.path)
             testCases.append(spec)
         }
 
@@ -83,12 +77,12 @@ struct TestCase {
     }
 }
 
-enum Result {
+package enum Result {
     case passed
     case failed(String)
     case skipped(String)
 
-    var banner: String {
+    package var banner: String {
         switch self {
         case .passed:
             return "[PASSED]"
@@ -100,9 +94,9 @@ enum Result {
     }
 }
 
-struct SpectestError: Error, CustomStringConvertible {
-    var description: String
-    init(_ description: String) {
+package struct SpectestError: Error, CustomStringConvertible {
+    package let description: String
+    package init(_ description: String) {
         self.description = description
     }
 }
@@ -130,14 +124,29 @@ class WastRunContext {
 
 extension TestCase {
     func run(spectestModule: Module, configuration: EngineConfiguration, handler: @escaping (TestCase, Location, Result) -> Void) throws {
+        guard let data = FileManager.default.contents(atPath: path) else {
+            assertionFailure("failed to load \(path)")
+            return
+        }
+        var configuration = configuration
+        let rootPath = FilePath(path).removingLastComponent()
+        let features = WastRunContext.deriveFeatureSet(rootPath: rootPath)
+        configuration.features = features
+
         let engine = Engine(configuration: configuration)
         let store = Store(engine: engine)
         let spectestInstance = try spectestModule.instantiate(store: store)
 
-        let rootPath = FilePath(path).removingLastComponent().string
-        var content = content
-        let context = WastRunContext(store: store, rootPath: rootPath)
+        var content = try parseWAST(String(data: data, encoding: .utf8)!, features: features)
+        let context = WastRunContext(store: store, rootPath: rootPath.string)
         context.importsSpace.define(module: "spectest", spectestInstance.exports)
+
+        // Add shared_memory export for threads proposal tests
+        if configuration.features.contains(.threads) {
+            let sharedMemoryType = MemoryType(min: 1, max: 2, shared: true)
+            let sharedMemory = try Memory(store: store, type: sharedMemoryType)
+            context.importsSpace.define(module: "spectest", name: "shared_memory", sharedMemory)
+        }
         do {
             while let (directive, location) = try content.nextDirective() {
                 do {
@@ -186,7 +195,7 @@ extension WastRunContext {
             } else {
                 return currentInstance
             }
-        case .wat(var wat):
+        case .wat(let wat):
             let module = try parseModule(rootPath: rootPath, moduleSource: .binary(wat.encode()))
             let instance = try instantiate(module: module)
             return instance
@@ -247,7 +256,7 @@ extension WastRunContext {
             }
             return .failed("module should not be parsed nor valid: expected \"\(message)\"")
 
-        case .assertTrap(execute: .wat(var wat), let message):
+        case .assertTrap(execute: .wat(let wat), let message):
             currentInstance = nil
 
             let module: Module
@@ -268,8 +277,7 @@ extension WastRunContext {
             }
             return .passed
 
-        case .assertReturn(let execute, let results):
-            let expected = parseValues(args: results)
+        case .assertReturn(let execute, let expected):
             let actual = try wastExecute(execute: execute)
             guard actual.isTestEquivalent(to: expected) else {
                 return .failed("invoke result mismatch: expected: \(expected), actual: \(actual)")
@@ -330,11 +338,11 @@ extension WastRunContext {
             return try wastInvoke(call: invoke)
         case .get(let module, let globalName):
             let instance = try deriveInstance(by: module)
-            guard case let .global(global) = instance.export(globalName) else {
+            guard case .global(let global) = instance.export(globalName) else {
                 throw SpectestError("no global export with name \(globalName) in a module instance \(instance)")
             }
             return [global.value]
-        case .wat(var wat):
+        case .wat(let wat):
             let module = try parseModule(rootPath: rootPath, moduleSource: .binary(wat.encode()))
             _ = try instantiate(module: module)
             return []
@@ -346,13 +354,38 @@ extension WastRunContext {
         guard let function = instance.exportedFunction(name: call.name) else {
             throw SpectestError("function \(call.name) not exported")
         }
-        return try function.invoke(call.args)
+        let args = try call.args.map { arg -> Value in
+            switch arg {
+            case .i32(let value): return .i32(value)
+            case .i64(let value): return .i64(value)
+            case .f32(let value): return .f32(value)
+            case .f64(let value): return .f64(value)
+            case .v128(let value): return .v128(value)
+            case .refNull(let heapType):
+                switch heapType {
+                case .abstract(.funcRef): return .ref(.function(nil))
+                case .abstract(.externRef): return .ref(.extern(nil))
+                case .concrete:
+                    throw SpectestError("concrete ref.null is not supported yet")
+                }
+            case .refExtern(let value): return .ref(.extern(Int(value)))
+            case .refFunc(let value): return .ref(.function(Int(value)))
+            }
+        }
+        return try function.invoke(args)
     }
 
-    private func deriveFeatureSet(rootPath: FilePath) -> WasmFeatureSet {
+    static func deriveFeatureSet(rootPath: FilePath) -> WasmFeatureSet {
         var features = WasmFeatureSet.default
         if rootPath.ends(with: "proposals/memory64") {
             features.insert(.memory64)
+        }
+        features.insert(.simd)
+        if rootPath.ends(with: "proposals/threads") {
+            // Threads proposal tests should not enable reference types by default
+            // as they test core WebAssembly features without reference types
+            features.remove(.referenceTypes)
+            features.insert(.threads)
         }
         return features
     }
@@ -361,7 +394,7 @@ extension WastRunContext {
         let rootPath = FilePath(rootPath)
         let path = rootPath.appending(filename)
 
-        let module = try parseWasm(filePath: path, features: deriveFeatureSet(rootPath: rootPath))
+        let module = try parseWasm(filePath: path, features: Self.deriveFeatureSet(rootPath: rootPath))
         return module
     }
 
@@ -369,7 +402,7 @@ extension WastRunContext {
         let rootPath = FilePath(rootPath)
         let binary: [UInt8]
         switch moduleSource {
-        case .text(var watModule):
+        case .text(let watModule):
             binary = try watModule.encode()
         case .quote(let text):
             binary = try wat2wasm(String(decoding: text, as: UTF8.self))
@@ -377,40 +410,85 @@ extension WastRunContext {
             binary = bytes
         }
 
-        let module = try parseWasm(bytes: binary, features: deriveFeatureSet(rootPath: rootPath))
+        let module = try parseWasm(bytes: binary, features: Self.deriveFeatureSet(rootPath: rootPath))
         return module
-    }
-
-    private func parseValues(args: [WastExpectValue]) -> [WasmKit.Value] {
-        return args.compactMap {
-            switch $0 {
-            case .value(let value): return value
-            case .f32CanonicalNaN, .f32ArithmeticNaN: return .f32(Float.nan.bitPattern)
-            case .f64CanonicalNaN, .f64ArithmeticNaN: return .f64(Double.nan.bitPattern)
-            }
-        }
     }
 }
 
 extension Value {
-    func isTestEquivalent(to value: Self) -> Bool {
+    func isTestEquivalent(to value: WastExpectValue) -> Bool {
         switch (self, value) {
-        case let (.i32(lhs), .i32(rhs)):
+        case (.i32(let lhs), .i32(let rhs)):
             return lhs == rhs
-        case let (.i64(lhs), .i64(rhs)):
+        case (.i64(let lhs), .i64(let rhs)):
             return lhs == rhs
-        case let (.f32(lhs), .f32(rhs)):
+        case (.f32(let lhs), .f32(let rhs)):
             let lhs = Float32(bitPattern: lhs)
             let rhs = Float32(bitPattern: rhs)
             return lhs.isNaN && rhs.isNaN || lhs == rhs
-        case let (.f64(lhs), .f64(rhs)):
+        case (.f64(let lhs), .f64(let rhs)):
             let lhs = Float64(bitPattern: lhs)
             let rhs = Float64(bitPattern: rhs)
             return lhs.isNaN && rhs.isNaN || lhs == rhs
-        case let (.ref(.extern(lhs)), .ref(.extern(rhs))):
+        case (.v128(let lhs), .v128(let rhs)):
             return lhs == rhs
-        case let (.ref(.function(lhs)), .ref(.function(rhs))):
-            return lhs == rhs
+        case (.v128(let actual), .v128Pattern(let expected)):
+            let actualBytes = actual.bytes
+            let expectedBytes = expected.bytes
+            guard actualBytes.count == 16, expectedBytes.count == 16 else { return false }
+            guard let shape = expected.shape else { return actualBytes == expectedBytes }
+
+            func u32LE(_ offset: Int, _ bytes: [UInt8]) -> UInt32 {
+                UInt32(bytes[offset])
+                    | (UInt32(bytes[offset + 1]) << 8)
+                    | (UInt32(bytes[offset + 2]) << 16)
+                    | (UInt32(bytes[offset + 3]) << 24)
+            }
+            func u64LE(_ offset: Int, _ bytes: [UInt8]) -> UInt64 {
+                var value: UInt64 = 0
+                for i in 0..<8 {
+                    value |= UInt64(bytes[offset + i]) << (UInt64(i) * 8)
+                }
+                return value
+            }
+
+            switch shape {
+            case .f32x4:
+                for i in 0..<4 {
+                    let a = u32LE(i * 4, actualBytes)
+                    let e = u32LE(i * 4, expectedBytes)
+                    if expected.nanLaneMask & (1 << UInt8(i)) != 0 {
+                        guard Float32(bitPattern: a).isNaN else { return false }
+                    } else if a != e {
+                        return false
+                    }
+                }
+                return true
+            case .f64x2:
+                for i in 0..<2 {
+                    let a = u64LE(i * 8, actualBytes)
+                    let e = u64LE(i * 8, expectedBytes)
+                    if expected.nanLaneMask & (1 << UInt8(i)) != 0 {
+                        guard Float64(bitPattern: a).isNaN else { return false }
+                    } else if a != e {
+                        return false
+                    }
+                }
+                return true
+            }
+        case (.f64(let lhs), .f64ArithmeticNaN),
+            (.f64(let lhs), .f64CanonicalNaN):
+            return Float64(bitPattern: lhs).isNaN
+        case (.f32(let lhs), .f32ArithmeticNaN),
+            (.f32(let lhs), .f32CanonicalNaN):
+            return Float32(bitPattern: lhs).isNaN
+        case (.ref(.extern(let lhs?)), .refExtern(let rhs)):
+            return rhs.map { lhs == $0 } ?? true
+        case (.ref(.function(let lhs?)), .refFunc(let rhs)):
+            return rhs.map { lhs == $0 } ?? true
+        case (.ref(.extern(nil)), .refNull(.abstract(.externRef))),
+            (.ref(.function(nil)), .refNull(.abstract(.funcRef))):
+            return true
         default:
             return false
         }
@@ -418,7 +496,7 @@ extension Value {
 }
 
 extension Array where Element == Value {
-    func isTestEquivalent(to arrayOfValues: Self) -> Bool {
+    func isTestEquivalent(to arrayOfValues: [WastExpectValue]) -> Bool {
         guard count == arrayOfValues.count else {
             return false
         }

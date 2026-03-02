@@ -1,10 +1,13 @@
+import Testing
 import WAT
-import XCTest
 
 @testable import WasmKit
 
-final class ExecutionTests: XCTestCase {
-    func testDropWithRelinkingOptimization() throws {
+@Suite
+struct ExecutionTests {
+
+    @Test
+    func dropWithRelinkingOptimization() throws {
         let module = try parseWasm(
             bytes: wat2wasm(
                 """
@@ -24,12 +27,13 @@ final class ExecutionTests: XCTestCase {
         let engine = Engine()
         let store = Store(engine: engine)
         let instance = try module.instantiate(store: store)
-        let _start = try XCTUnwrap(instance.exports[function: "_start"])
+        let _start = try #require(instance.exports[function: "_start"])
         let results = try _start()
-        XCTAssertEqual(results, [.i32(42)])
+        #expect(results == [.i32(42)])
     }
 
-    func testUpdateCurrentMemoryCacheOnGrow() throws {
+    @Test
+    func updateCurrentMemoryCacheOnGrow() throws {
         let module = try parseWasm(
             bytes: wat2wasm(
                 """
@@ -47,9 +51,9 @@ final class ExecutionTests: XCTestCase {
         let engine = Engine()
         let store = Store(engine: engine)
         let instance = try module.instantiate(store: store)
-        let _start = try XCTUnwrap(instance.exports[function: "_start"])
+        let _start = try #require(instance.exports[function: "_start"])
         let results = try _start()
-        XCTAssertEqual(results, [.i32(42)])
+        #expect(results == [.i32(42)])
     }
 
     func expectTrap(_ wat: String, assertTrap: (Trap) throws -> Void) throws {
@@ -72,20 +76,24 @@ final class ExecutionTests: XCTestCase {
             imports.define(importEntry, .function(function))
         }
         let instance = try module.instantiate(store: store, imports: imports)
-        let _start = try XCTUnwrap(instance.exports[function: "_start"])
+        let _start = try #require(instance.exports[function: "_start"])
 
         let trap: Trap
         do {
-            try _start()
-            XCTFail("expect unreachable trap")
+            let _ = try _start()
+            #expect((false), "Expected trap")
             return
-        } catch let error {
-            trap = try XCTUnwrap(error as? Trap)
+        } catch let _trap as Trap {
+            trap = _trap
+        } catch {
+            #expect((false), "Expected trap: \(error)")
+            return
         }
         try assertTrap(trap)
     }
 
-    func testBacktraceBasic() throws {
+    @Test
+    func backtraceBasic() throws {
         try expectTrap(
             """
             (module
@@ -101,9 +109,8 @@ final class ExecutionTests: XCTestCase {
             )
             """
         ) { trap in
-            XCTAssertEqual(
-                trap.backtrace?.symbols.compactMap(\.?.name),
-                [
+            #expect(
+                trap.backtrace?.symbols.compactMap(\.name) == [
                     "foo",
                     "bar",
                     "_start",
@@ -111,7 +118,8 @@ final class ExecutionTests: XCTestCase {
         }
     }
 
-    func testBacktraceWithImports() throws {
+    @Test
+    func backtraceWithImports() throws {
         try expectTrap(
             """
             (module
@@ -128,9 +136,8 @@ final class ExecutionTests: XCTestCase {
             )
             """
         ) { trap in
-            XCTAssertEqual(
-                trap.backtrace?.symbols.compactMap(\.?.name),
-                [
+            #expect(
+                trap.backtrace?.symbols.compactMap(\.name) == [
                     "wasm function[1]",
                     "bar",
                     "_start",

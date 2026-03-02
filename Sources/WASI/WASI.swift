@@ -12,212 +12,11 @@ import WasmTypes
     import Android
 #elseif os(Windows)
     import ucrt
+#elseif os(WASI)
+    import WASILibc
 #else
     #error("Unsupported Platform")
 #endif
-
-protocol WASI {
-    /// Reads command-line argument data.
-    /// - Parameters:
-    ///   - argv: Pointer to an array of argument strings to be written
-    ///   - argvBuffer: Pointer to a buffer of argument strings to be written
-    func args_get(
-        argv: UnsafeGuestPointer<UnsafeGuestPointer<UInt8>>,
-        argvBuffer: UnsafeGuestPointer<UInt8>
-    )
-
-    /// Return command-line argument data sizes.
-    /// - Returns: Tuple of number of arguments and required buffer size
-    func args_sizes_get() -> (WASIAbi.Size, WASIAbi.Size)
-
-    /// Read environment variable data.
-    func environ_get(
-        environ: UnsafeGuestPointer<UnsafeGuestPointer<UInt8>>,
-        environBuffer: UnsafeGuestPointer<UInt8>
-    )
-
-    /// Return environment variable data sizes.
-    /// - Returns: Tuple of number of environment variables and required buffer size
-    func environ_sizes_get() -> (WASIAbi.Size, WASIAbi.Size)
-
-    /// Return the resolution of a clock.
-    func clock_res_get(id: WASIAbi.ClockId) throws -> WASIAbi.Timestamp
-
-    /// Return the time value of a clock.
-    func clock_time_get(
-        id: WASIAbi.ClockId, precision: WASIAbi.Timestamp
-    ) throws -> WASIAbi.Timestamp
-
-    /// Provide file advisory information on a file descriptor.
-    func fd_advise(
-        fd: WASIAbi.Fd, offset: WASIAbi.FileSize,
-        length: WASIAbi.FileSize, advice: WASIAbi.Advice
-    ) throws
-
-    /// Force the allocation of space in a file.
-    func fd_allocate(fd: WASIAbi.Fd, offset: WASIAbi.FileSize, length: WASIAbi.FileSize) throws
-
-    /// Close a file descriptor.
-    func fd_close(fd: WASIAbi.Fd) throws
-
-    /// Synchronize the data of a file to disk.
-    func fd_datasync(fd: WASIAbi.Fd) throws
-
-    /// Get the attributes of a file descriptor.
-    /// - Parameter fileDescriptor: File descriptor to get attribute.
-    func fd_fdstat_get(fileDescriptor: UInt32) throws -> WASIAbi.FdStat
-
-    /// Adjust the flags associated with a file descriptor.
-    func fd_fdstat_set_flags(fd: WASIAbi.Fd, flags: WASIAbi.Fdflags) throws
-
-    /// Adjust the rights associated with a file descriptor.
-    func fd_fdstat_set_rights(
-        fd: WASIAbi.Fd,
-        fsRightsBase: WASIAbi.Rights,
-        fsRightsInheriting: WASIAbi.Rights
-    ) throws
-
-    /// Return the attributes of an open file.
-    func fd_filestat_get(fd: WASIAbi.Fd) throws -> WASIAbi.Filestat
-
-    ///  Adjust the size of an open file. If this increases the file's size, the extra bytes are filled with zeros.
-    func fd_filestat_set_size(fd: WASIAbi.Fd, size: WASIAbi.FileSize) throws
-
-    /// Adjust the timestamps of an open file or directory.
-    func fd_filestat_set_times(
-        fd: WASIAbi.Fd,
-        atim: WASIAbi.Timestamp,
-        mtim: WASIAbi.Timestamp,
-        fstFlags: WASIAbi.FstFlags
-    ) throws
-
-    /// Read from a file descriptor, without using and updating the file descriptor's offset.
-    func fd_pread(
-        fd: WASIAbi.Fd, iovs: UnsafeGuestBufferPointer<WASIAbi.IOVec>,
-        offset: WASIAbi.FileSize
-    ) throws -> WASIAbi.Size
-
-    /// Return a description of the given preopened file descriptor.
-    func fd_prestat_get(fd: WASIAbi.Fd) throws -> WASIAbi.Prestat
-
-    /// Return a directory name of the given preopened file descriptor
-    func fd_prestat_dir_name(fd: WASIAbi.Fd, path: UnsafeGuestPointer<UInt8>, maxPathLength: WASIAbi.Size) throws
-
-    /// Write to a file descriptor, without using and updating the file descriptor's offset.
-    func fd_pwrite(
-        fd: WASIAbi.Fd, iovs: UnsafeGuestBufferPointer<WASIAbi.IOVec>,
-        offset: WASIAbi.FileSize
-    ) throws -> WASIAbi.Size
-
-    /// Read from a file descriptor.
-    func fd_read(
-        fd: WASIAbi.Fd, iovs: UnsafeGuestBufferPointer<WASIAbi.IOVec>
-    ) throws -> WASIAbi.Size
-
-    /// Read directory entries from a directory.
-    func fd_readdir(
-        fd: WASIAbi.Fd,
-        buffer: UnsafeGuestBufferPointer<UInt8>,
-        cookie: WASIAbi.DirCookie
-    ) throws -> WASIAbi.Size
-
-    /// Atomically replace a file descriptor by renumbering another file descriptor.
-    func fd_renumber(fd: WASIAbi.Fd, to toFd: WASIAbi.Fd) throws
-
-    /// Move the offset of a file descriptor.
-    func fd_seek(fd: WASIAbi.Fd, offset: WASIAbi.FileDelta, whence: WASIAbi.Whence) throws -> WASIAbi.FileSize
-
-    /// Synchronize the data and metadata of a file to disk.
-    func fd_sync(fd: WASIAbi.Fd) throws
-
-    /// Return the current offset of a file descriptor.
-    func fd_tell(fd: WASIAbi.Fd) throws -> WASIAbi.FileSize
-
-    /// POSIX `writev` equivalent.
-    /// - Parameters:
-    ///   - fileDescriptor: File descriptor to write to.
-    ///   - ioVectors: Buffer pointer to an array of byte buffers to write.
-    /// - Returns: Number of bytes written.
-    func fd_write(
-        fileDescriptor: WASIAbi.Fd,
-        ioVectors: UnsafeGuestBufferPointer<WASIAbi.IOVec>
-    ) throws -> UInt32
-
-    /// Create a directory.
-    func path_create_directory(
-        dirFd: WASIAbi.Fd,
-        path: String
-    ) throws
-
-    /// Return the attributes of a file or directory.
-    func path_filestat_get(
-        dirFd: WASIAbi.Fd,
-        flags: WASIAbi.LookupFlags,
-        path: String
-    ) throws -> WASIAbi.Filestat
-
-    /// Adjust the timestamps of a file or directory.
-    func path_filestat_set_times(
-        dirFd: WASIAbi.Fd,
-        flags: WASIAbi.LookupFlags,
-        path: String,
-        atim: WASIAbi.Timestamp,
-        mtim: WASIAbi.Timestamp,
-        fstFlags: WASIAbi.FstFlags
-    ) throws
-
-    /// Create a hard link.
-    func path_link(
-        oldFd: WASIAbi.Fd, oldFlags: WASIAbi.LookupFlags, oldPath: String,
-        newFd: WASIAbi.Fd, newPath: String
-    ) throws
-
-    /// Open a file or directory.
-    func path_open(
-        dirFd: WASIAbi.Fd,
-        dirFlags: WASIAbi.LookupFlags,
-        path: String,
-        oflags: WASIAbi.Oflags,
-        fsRightsBase: WASIAbi.Rights,
-        fsRightsInheriting: WASIAbi.Rights,
-        fdflags: WASIAbi.Fdflags
-    ) throws -> WASIAbi.Fd
-
-    /// Read the contents of a symbolic link.
-    func path_readlink(
-        fd: WASIAbi.Fd, path: String,
-        buffer: UnsafeGuestBufferPointer<UInt8>
-    ) throws -> WASIAbi.Size
-
-    /// Remove a directory.
-    func path_remove_directory(dirFd: WASIAbi.Fd, path: String) throws
-
-    /// Rename a file or directory.
-    func path_rename(
-        oldFd: WASIAbi.Fd, oldPath: String,
-        newFd: WASIAbi.Fd, newPath: String
-    ) throws
-
-    /// Create a symbolic link.
-    func path_symlink(
-        oldPath: String, dirFd: WASIAbi.Fd, newPath: String
-    ) throws
-
-    /// Unlink a file.
-    func path_unlink_file(
-        dirFd: WASIAbi.Fd,
-        path: String
-    ) throws
-
-    /// Concurrently poll for the occurrence of a set of events.
-    func poll_oneoff(
-        subscriptions: UnsafeGuestBufferPointer<WASIAbi.Subscription>,
-        events: UnsafeGuestBufferPointer<WASIAbi.Event>
-    ) throws -> WASIAbi.Size
-
-    /// Write high-quality random data into a buffer.
-    func random_get(buffer: UnsafeGuestPointer<UInt8>, length: WASIAbi.Size)
-}
 
 enum WASIAbi {
     enum Errno: UInt16, Error, GuestPointee {
@@ -517,8 +316,8 @@ enum WASIAbi {
 
         let userData: UserData
         let union: Union
-        static var sizeInGuest: UInt32 = 48
-        static var alignInGuest: UInt32 = max(UserData.alignInGuest, Union.alignInGuest)
+        static let sizeInGuest: UInt32 = 48
+        static let alignInGuest: UInt32 = max(UserData.alignInGuest, Union.alignInGuest)
 
         static func readFromGuest(_ pointer: UnsafeGuestRawPointer) -> Self {
             var pointer = pointer
@@ -965,7 +764,7 @@ public struct WASIHostModule {
     public let functions: [String: WASIHostFunction]
 }
 
-extension WASI {
+extension WASIImplementation {
     var _hostModules: [String: WASIHostModule] {
         let unimplementedFunctionTypes: [String: FunctionType] = [
             "proc_raise": .init(parameters: [.i32], results: [.i32]),
@@ -1528,58 +1327,37 @@ extension WASI {
     }
 }
 
-public class WASIBridgeToHost: WASI {
+final class WASIImplementation {
     private let args: [String]
     private let environment: [String: String]
-    private var fdTable: FdTable
     private let wallClock: WallClock
     private let monotonicClock: MonotonicClock
     private var randomGenerator: RandomBufferGenerator
+    internal var fdTable: FdTable
+    internal let fileSystem: FileSystemImplementation
 
-    public init(
+    init(
         args: [String] = [],
         environment: [String: String] = [:],
-        preopens: [String: String] = [:],
-        stdin: FileDescriptor = .standardInput,
-        stdout: FileDescriptor = .standardOutput,
-        stderr: FileDescriptor = .standardError,
-        wallClock: WallClock = SystemWallClock(),
-        monotonicClock: MonotonicClock = SystemMonotonicClock(),
-        randomGenerator: RandomBufferGenerator = SystemRandomNumberGenerator()
+        fileSystem: FileSystemImplementation,
+        wallClock: WallClock,
+        monotonicClock: MonotonicClock,
+        randomGenerator: RandomBufferGenerator
     ) throws {
         self.args = args
         self.environment = environment
-        var fdTable = FdTable()
-        fdTable[0] = .file(StdioFileEntry(fd: stdin, accessMode: .read))
-        fdTable[1] = .file(StdioFileEntry(fd: stdout, accessMode: .write))
-        fdTable[2] = .file(StdioFileEntry(fd: stderr, accessMode: .write))
+        self.fileSystem = fileSystem
 
-        for (guestPath, hostPath) in preopens {
-            #if os(Windows)
-                let fd = try FileDescriptor.open(FilePath(hostPath), .readWrite)
-            #else
-                let fd = try hostPath.withCString { cHostPath in
-                    let fd = open(cHostPath, O_DIRECTORY)
-                    if fd < 0 {
-                        let errno = errno
-                        throw WASIError(description: "Failed to open preopen path '\(hostPath)': \(String(cString: strerror(errno)))")
-                    }
-                    return FileDescriptor(rawValue: fd)
-                }
-            #endif
-
-            if try fd.attributes().fileType.isDirectory {
-                _ = try fdTable.push(.directory(DirEntry(preopenPath: guestPath, fd: fd)))
-            }
-        }
-        self.fdTable = fdTable
+        self.fdTable = FdTable()
         self.wallClock = wallClock
         self.monotonicClock = monotonicClock
         self.randomGenerator = randomGenerator
     }
 
-    public var wasiHostModules: [String: WASIHostModule] { _hostModules }
-
+    /// Reads command-line argument data.
+    /// - Parameters:
+    ///   - argv: Pointer to an array of argument strings to be written
+    ///   - argvBuffer: Pointer to a buffer of argument strings to be written
     func args_get(
         argv: UnsafeGuestPointer<UnsafeGuestPointer<UInt8>>,
         argvBuffer: UnsafeGuestPointer<UInt8>
@@ -1600,6 +1378,8 @@ public class WASIBridgeToHost: WASI {
         }
     }
 
+    /// Return command-line argument data sizes.
+    /// - Returns: Tuple of number of arguments and required buffer size
     func args_sizes_get() -> (WASIAbi.Size, WASIAbi.Size) {
         let bufferSize = args.reduce(0) {
             // `utf8CString` returns null-terminated bytes and WASI also expect it
@@ -1608,6 +1388,7 @@ public class WASIBridgeToHost: WASI {
         return (WASIAbi.Size(args.count), WASIAbi.Size(bufferSize))
     }
 
+    /// Read environment variable data.
     func environ_get(environ: UnsafeGuestPointer<UnsafeGuestPointer<UInt8>>, environBuffer: UnsafeGuestPointer<UInt8>) {
         var offsets = environ
         var buffer = environBuffer
@@ -1625,6 +1406,8 @@ public class WASIBridgeToHost: WASI {
         }
     }
 
+    /// Return environment variable data sizes.
+    /// - Returns: Tuple of number of environment variables and required buffer size
     func environ_sizes_get() -> (WASIAbi.Size, WASIAbi.Size) {
         let bufferSize = environment.reduce(0) {
             // `utf8CString` returns null-terminated bytes and WASI also expect it
@@ -1633,6 +1416,7 @@ public class WASIBridgeToHost: WASI {
         return (WASIAbi.Size(environment.count), WASIAbi.Size(bufferSize))
     }
 
+    /// Return the resolution of a clock.
     func clock_res_get(id: WASIAbi.ClockId) throws -> WASIAbi.Timestamp {
         switch id {
         case .REALTIME:
@@ -1644,6 +1428,7 @@ public class WASIBridgeToHost: WASI {
         }
     }
 
+    /// Return the time value of a clock.
     func clock_time_get(
         id: WASIAbi.ClockId, precision: WASIAbi.Timestamp
     ) throws -> WASIAbi.Timestamp {
@@ -1657,13 +1442,15 @@ public class WASIBridgeToHost: WASI {
         }
     }
 
+    /// Provide file advisory information on a file descriptor.
     func fd_advise(fd: WASIAbi.Fd, offset: WASIAbi.FileSize, length: WASIAbi.FileSize, advice: WASIAbi.Advice) throws {
-        guard case let .file(fileEntry) = fdTable[fd] else {
+        guard case .file(let fileEntry) = fdTable[fd] else {
             throw WASIAbi.Errno.EBADF
         }
         try fileEntry.advise(offset: offset, length: length, advice: advice)
     }
 
+    /// Force the allocation of space in a file.
     func fd_allocate(fd: WASIAbi.Fd, offset: WASIAbi.FileSize, length: WASIAbi.FileSize) throws {
         guard fdTable[fd] != nil else {
             throw WASIAbi.Errno.EBADF
@@ -1673,6 +1460,7 @@ public class WASIBridgeToHost: WASI {
         throw WASIAbi.Errno.ENOTSUP
     }
 
+    /// Close a file descriptor.
     func fd_close(fd: WASIAbi.Fd) throws {
         guard let entry = fdTable[fd] else {
             throw WASIAbi.Errno.EBADF
@@ -1681,17 +1469,20 @@ public class WASIBridgeToHost: WASI {
         try entry.asEntry().close()
     }
 
+    /// Synchronize the data of a file to disk.
     func fd_datasync(fd: WASIAbi.Fd) throws {
-        guard case let .file(fileEntry) = fdTable[fd] else {
+        guard case .file(let fileEntry) = fdTable[fd] else {
             throw WASIAbi.Errno.EBADF
         }
         return try fileEntry.datasync()
     }
 
+    /// Get the attributes of a file descriptor.
+    /// - Parameter fileDescriptor: File descriptor to get attribute.
     func fd_fdstat_get(fileDescriptor: UInt32) throws -> WASIAbi.FdStat {
         let entry = self.fdTable[fileDescriptor]
         switch entry {
-        case let .file(entry):
+        case .file(let entry):
             return try entry.fdStat()
         case .directory:
             return WASIAbi.FdStat(
@@ -1705,13 +1496,15 @@ public class WASIBridgeToHost: WASI {
         }
     }
 
+    /// Adjust the flags associated with a file descriptor.
     func fd_fdstat_set_flags(fd: WASIAbi.Fd, flags: WASIAbi.Fdflags) throws {
-        guard case let .file(fileEntry) = fdTable[fd] else {
+        guard case .file(let fileEntry) = fdTable[fd] else {
             throw WASIAbi.Errno.EBADF
         }
         try fileEntry.setFdStatFlags(flags)
     }
 
+    /// Adjust the rights associated with a file descriptor.
     func fd_fdstat_set_rights(
         fd: WASIAbi.Fd,
         fsRightsBase: WASIAbi.Rights,
@@ -1720,6 +1513,7 @@ public class WASIBridgeToHost: WASI {
         throw WASIAbi.Errno.ENOTSUP
     }
 
+    /// Return the attributes of an open file.
     func fd_filestat_get(fd: WASIAbi.Fd) throws -> WASIAbi.Filestat {
         guard let entry = fdTable[fd] else {
             throw WASIAbi.Errno.EBADF
@@ -1727,13 +1521,15 @@ public class WASIBridgeToHost: WASI {
         return try entry.asEntry().attributes()
     }
 
+    /// Adjust the size of an open file. If this increases the file's size, the extra bytes are filled with zeros.
     func fd_filestat_set_size(fd: WASIAbi.Fd, size: WASIAbi.FileSize) throws {
-        guard case let .file(entry) = fdTable[fd] else {
+        guard case .file(let entry) = fdTable[fd] else {
             throw WASIAbi.Errno.EBADF
         }
         return try entry.setFilestatSize(size)
     }
 
+    /// Adjust the timestamps of an open file or directory.
     func fd_filestat_set_times(
         fd: WASIAbi.Fd, atim: WASIAbi.Timestamp, mtim: WASIAbi.Timestamp,
         fstFlags: WASIAbi.FstFlags
@@ -1744,18 +1540,20 @@ public class WASIBridgeToHost: WASI {
         try entry.asEntry().setTimes(atim: atim, mtim: mtim, fstFlags: fstFlags)
     }
 
+    /// Read from a file descriptor, without using and updating the file descriptor's offset.
     func fd_pread(
         fd: WASIAbi.Fd, iovs: UnsafeGuestBufferPointer<WASIAbi.IOVec>,
         offset: WASIAbi.FileSize
     ) throws -> WASIAbi.Size {
-        guard case let .file(fileEntry) = fdTable[fd] else {
+        guard case .file(let fileEntry) = fdTable[fd] else {
             throw WASIAbi.Errno.EBADF
         }
         return try fileEntry.pread(into: iovs, offset: offset)
     }
 
+    /// Return a description of the given preopened file descriptor.
     func fd_prestat_get(fd: WASIAbi.Fd) throws -> WASIAbi.Prestat {
-        guard case let .directory(entry) = fdTable[fd],
+        guard case .directory(let entry) = fdTable[fd],
             let preopenPath = entry.preopenPath
         else {
             throw WASIAbi.Errno.EBADF
@@ -1763,8 +1561,9 @@ public class WASIBridgeToHost: WASI {
         return .dir(WASIAbi.PrestatDir(preopenPath.utf8.count))
     }
 
+    /// Return a directory name of the given preopened file descriptor
     func fd_prestat_dir_name(fd: WASIAbi.Fd, path: UnsafeGuestPointer<UInt8>, maxPathLength: WASIAbi.Size) throws {
-        guard case let .directory(entry) = fdTable[fd],
+        guard case .directory(let entry) = fdTable[fd],
             var preopenPath = entry.preopenPath
         else {
             throw WASIAbi.Errno.EBADF
@@ -1780,32 +1579,35 @@ public class WASIBridgeToHost: WASI {
         }
     }
 
+    /// Write to a file descriptor, without using and updating the file descriptor's offset.
     func fd_pwrite(
         fd: WASIAbi.Fd, iovs: UnsafeGuestBufferPointer<WASIAbi.IOVec>,
         offset: WASIAbi.FileSize
     ) throws -> WASIAbi.Size {
-        guard case let .file(fileEntry) = fdTable[fd] else {
+        guard case .file(let fileEntry) = fdTable[fd] else {
             throw WASIAbi.Errno.EBADF
         }
         return try fileEntry.pwrite(vectored: iovs, offset: offset)
     }
 
+    /// Read from a file descriptor.
     func fd_read(
         fd: WASIAbi.Fd,
         iovs: UnsafeGuestBufferPointer<WASIAbi.IOVec>
     ) throws -> WASIAbi.Size {
-        guard case let .file(fileEntry) = fdTable[fd] else {
+        guard case .file(let fileEntry) = fdTable[fd] else {
             throw WASIAbi.Errno.EBADF
         }
         return try fileEntry.read(into: iovs)
     }
 
+    /// Read directory entries from a directory.
     func fd_readdir(
         fd: WASIAbi.Fd,
         buffer: UnsafeGuestBufferPointer<UInt8>,
         cookie: WASIAbi.DirCookie
     ) throws -> WASIAbi.Size {
-        guard case let .directory(dirEntry) = fdTable[fd] else {
+        guard case .directory(let dirEntry) = fdTable[fd] else {
             throw WASIAbi.Errno.EBADF
         }
 
@@ -1852,52 +1654,63 @@ public class WASIBridgeToHost: WASI {
         return bufferUsed
     }
 
+    /// Atomically replace a file descriptor by renumbering another file descriptor.
     func fd_renumber(fd: WASIAbi.Fd, to toFd: WASIAbi.Fd) throws {
         throw WASIAbi.Errno.ENOTSUP
     }
 
+    /// Move the offset of a file descriptor.
     func fd_seek(fd: WASIAbi.Fd, offset: WASIAbi.FileDelta, whence: WASIAbi.Whence) throws -> WASIAbi.FileSize {
-        guard case let .file(fileEntry) = fdTable[fd] else {
+        guard case .file(let fileEntry) = fdTable[fd] else {
             throw WASIAbi.Errno.EBADF
         }
         return try fileEntry.seek(offset: offset, whence: whence)
     }
 
+    /// Synchronize the data and metadata of a file to disk.
     func fd_sync(fd: WASIAbi.Fd) throws {
-        guard case let .file(fileEntry) = fdTable[fd] else {
+        guard case .file(let fileEntry) = fdTable[fd] else {
             throw WASIAbi.Errno.EBADF
         }
         return try fileEntry.sync()
     }
 
+    /// Return the current offset of a file descriptor.
     func fd_tell(fd: WASIAbi.Fd) throws -> WASIAbi.FileSize {
-        guard case let .file(fileEntry) = fdTable[fd] else {
+        guard case .file(let fileEntry) = fdTable[fd] else {
             throw WASIAbi.Errno.EBADF
         }
         return try fileEntry.tell()
     }
 
+    /// POSIX `writev` equivalent.
+    /// - Parameters:
+    ///   - fileDescriptor: File descriptor to write to.
+    ///   - ioVectors: Buffer pointer to an array of byte buffers to write.
+    /// - Returns: Number of bytes written.
     func fd_write(
         fileDescriptor: WASIAbi.Fd,
         ioVectors: UnsafeGuestBufferPointer<WASIAbi.IOVec>
     ) throws -> UInt32 {
-        guard case let .file(entry) = self.fdTable[fileDescriptor] else {
+        guard case .file(let entry) = self.fdTable[fileDescriptor] else {
             throw WASIAbi.Errno.EBADF
         }
         return try entry.write(vectored: ioVectors)
     }
 
+    /// Create a directory.
     func path_create_directory(dirFd: WASIAbi.Fd, path: String) throws {
-        guard case let .directory(dirEntry) = fdTable[dirFd] else {
+        guard case .directory(let dirEntry) = fdTable[dirFd] else {
             throw WASIAbi.Errno.ENOTDIR
         }
         try dirEntry.createDirectory(atPath: path)
     }
 
+    /// Return the attributes of a file or directory.
     func path_filestat_get(
         dirFd: WASIAbi.Fd, flags: WASIAbi.LookupFlags, path: String
     ) throws -> WASIAbi.Filestat {
-        guard case let .directory(dirEntry) = fdTable[dirFd] else {
+        guard case .directory(let dirEntry) = fdTable[dirFd] else {
             throw WASIAbi.Errno.ENOTDIR
         }
         return try dirEntry.attributes(
@@ -1905,12 +1718,13 @@ public class WASIBridgeToHost: WASI {
         )
     }
 
+    /// Adjust the timestamps of a file or directory.
     func path_filestat_set_times(
         dirFd: WASIAbi.Fd, flags: WASIAbi.LookupFlags,
         path: String, atim: WASIAbi.Timestamp, mtim: WASIAbi.Timestamp,
         fstFlags: WASIAbi.FstFlags
     ) throws {
-        guard case let .directory(dirEntry) = fdTable[dirFd] else {
+        guard case .directory(let dirEntry) = fdTable[dirFd] else {
             throw WASIAbi.Errno.ENOTDIR
         }
         try dirEntry.setFilestatTimes(
@@ -1920,6 +1734,7 @@ public class WASIBridgeToHost: WASI {
         )
     }
 
+    /// Create a hard link.
     func path_link(
         oldFd: WASIAbi.Fd, oldFlags: WASIAbi.LookupFlags, oldPath: String,
         newFd: WASIAbi.Fd, newPath: String
@@ -1927,6 +1742,7 @@ public class WASIBridgeToHost: WASI {
         throw WASIAbi.Errno.ENOTSUP
     }
 
+    /// Open a file or directory.
     func path_open(
         dirFd: WASIAbi.Fd,
         dirFlags: WASIAbi.LookupFlags,
@@ -1936,75 +1752,82 @@ public class WASIBridgeToHost: WASI {
         fsRightsInheriting: WASIAbi.Rights,
         fdflags: WASIAbi.Fdflags
     ) throws -> WASIAbi.Fd {
-        #if os(Windows)
-            throw WASIAbi.Errno.ENOTSUP
-        #else
-            guard case let .directory(dirEntry) = fdTable[dirFd] else {
-                throw WASIAbi.Errno.ENOTDIR
-            }
-            var accessMode: FileAccessMode = []
-            if fsRightsBase.contains(.FD_READ) {
-                accessMode.insert(.read)
-            }
-            if fsRightsBase.contains(.FD_WRITE) {
-                accessMode.insert(.write)
-            }
-            let hostFd = try dirEntry.openFile(
-                symlinkFollow: dirFlags.contains(.SYMLINK_FOLLOW),
-                path: path, oflags: oflags, accessMode: accessMode,
-                fdflags: fdflags
-            )
+        guard case .directory(let dirEntry) = fdTable[dirFd] else {
+            throw WASIAbi.Errno.ENOTDIR
+        }
 
-            let actualFileType = try hostFd.attributes().fileType
-            if oflags.contains(.DIRECTORY), actualFileType != .directory {
-                // Check O_DIRECTORY validity just in case when the host system
-                // doesn't respects O_DIRECTORY.
-                throw WASIAbi.Errno.ENOTDIR
-            }
+        let newEntry = try fileSystem.openAt(
+            dirFd: dirEntry,
+            path: path,
+            oflags: oflags,
+            fsRightsBase: fsRightsBase,
+            fsRightsInheriting: fsRightsInheriting,
+            fdflags: fdflags,
+            symlinkFollow: dirFlags.contains(.SYMLINK_FOLLOW)
+        )
 
-            let newEntry: FdEntry
-            if actualFileType == .directory {
-                newEntry = .directory(DirEntry(preopenPath: nil, fd: hostFd))
-            } else {
-                newEntry = .file(RegularFileEntry(fd: hostFd, accessMode: accessMode))
-            }
-            let guestFd = try fdTable.push(newEntry)
-            return guestFd
-        #endif
+        let guestFd = try fdTable.push(newEntry)
+        return guestFd
     }
 
+    /// Read the contents of a symbolic link.
     func path_readlink(fd: WASIAbi.Fd, path: String, buffer: UnsafeGuestBufferPointer<UInt8>) throws -> WASIAbi.Size {
-        throw WASIAbi.Errno.ENOTSUP
+        guard case .directory(let dirEntry) = fdTable[fd] else {
+            throw WASIAbi.Errno.ENOTDIR
+        }
+
+        let linkBytes = try dirEntry.readlink(atPath: path)
+        let bytesWritten = min(Int(buffer.count), linkBytes.count)
+        if bytesWritten > 0 {
+            buffer.withHostPointer { hostBuffer in
+                linkBytes.withUnsafeBytes { linkBytes in
+                    guard let source = linkBytes.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
+                    hostBuffer.baseAddress?.update(from: source, count: bytesWritten)
+                }
+            }
+        }
+        return WASIAbi.Size(bytesWritten)
     }
 
+    /// Remove a directory.
     func path_remove_directory(dirFd: WASIAbi.Fd, path: String) throws {
-        guard case let .directory(dirEntry) = fdTable[dirFd] else {
+        guard case .directory(let dirEntry) = fdTable[dirFd] else {
             throw WASIAbi.Errno.ENOTDIR
         }
         try dirEntry.removeDirectory(atPath: path)
     }
 
+    /// Rename a file or directory.
     func path_rename(
         oldFd: WASIAbi.Fd, oldPath: String,
         newFd: WASIAbi.Fd, newPath: String
     ) throws {
-        throw WASIAbi.Errno.ENOTSUP
+        guard case .directory(let oldDirEntry) = fdTable[oldFd] else {
+            throw WASIAbi.Errno.ENOTDIR
+        }
+        guard case .directory(let newDirEntry) = fdTable[newFd] else {
+            throw WASIAbi.Errno.ENOTDIR
+        }
+        try oldDirEntry.rename(from: oldPath, toDir: newDirEntry, to: newPath)
     }
 
+    /// Create a symbolic link.
     func path_symlink(oldPath: String, dirFd: WASIAbi.Fd, newPath: String) throws {
-        guard case let .directory(dirEntry) = fdTable[dirFd] else {
+        guard case .directory(let dirEntry) = fdTable[dirFd] else {
             throw WASIAbi.Errno.ENOTDIR
         }
         try dirEntry.symlink(from: oldPath, to: newPath)
     }
 
+    /// Unlink a file.
     func path_unlink_file(dirFd: WASIAbi.Fd, path: String) throws {
-        guard case let .directory(dirEntry) = fdTable[dirFd] else {
+        guard case .directory(let dirEntry) = fdTable[dirFd] else {
             throw WASIAbi.Errno.ENOTDIR
         }
         try dirEntry.removeFile(atPath: path)
     }
 
+    /// Concurrently poll for the occurrence of a set of events.
     func poll_oneoff(
         subscriptions: UnsafeGuestBufferPointer<WASIAbi.Subscription>,
         events: UnsafeGuestBufferPointer<WASIAbi.Event>
@@ -2013,6 +1836,7 @@ public class WASIBridgeToHost: WASI {
         return try poll(subscriptions: subscriptions, events: events, self.fdTable)
     }
 
+    /// Write high-quality random data into a buffer.
     func random_get(buffer: UnsafeGuestPointer<UInt8>, length: WASIAbi.Size) {
         guard length > 0 else { return }
         buffer.withHostPointer(count: Int(length)) {

@@ -1,8 +1,9 @@
+import Foundation
+import Testing
 import WasmKit
-import XCTest
 
-@available(macOS 11, iOS 14.0, watchOS 7.0, tvOS 14.0, *)
-final class SpectestTests: XCTestCase {
+@Suite
+struct SpectestTests {
     static let projectDir = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     static let testsuite =
@@ -13,40 +14,32 @@ final class SpectestTests: XCTestCase {
             Self.testsuite.path,
             Self.testsuite.appendingPathComponent("proposals/memory64").path,
             Self.testsuite.appendingPathComponent("proposals/tail-call").path,
+            Self.testsuite.appendingPathComponent("proposals/threads").path,
             Self.projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite").path,
         ]
     }
 
-    /// Run all the tests in the spectest suite.
-    func testRunAll() async throws {
-        #if os(Android)
-            throw XCTSkip("unable to run spectest on Android due to missing files on emulator")
-        #endif
-        let defaultConfig = EngineConfiguration()
-        let ok = try await spectest(
-            path: Self.testPaths,
-            include: [],
-            exclude: [],
-            parallel: true,
-            configuration: defaultConfig
+    #if !os(Android)
+        @Test(
+            .disabled("unable to run spectest on Android due to missing files on emulator", platforms: [.android]),
+            arguments: try SpectestDiscovery(path: SpectestTests.testPaths).discover()
         )
-        XCTAssertTrue(ok)
-    }
+        func run(test: TestCase) throws {
+            let defaultConfig = EngineConfiguration()
+            let runner = try SpectestRunner(configuration: defaultConfig)
+            try runner.run(test: test, reporter: NullSpectestProgressReporter())
+        }
 
-    func testRunAllWithTokenThreading() async throws {
-        #if os(Android)
-            throw XCTSkip("unable to run spectest on Android due to missing files on emulator")
-        #endif
-        let defaultConfig = EngineConfiguration()
-        guard defaultConfig.threadingModel != .token else { return }
-        // Sanity check that non-default threading models work.
-        var config = defaultConfig
-        config.threadingModel = .token
-        let ok = try await spectest(
-            path: Self.testPaths,
-            parallel: true,
-            configuration: config
+        @Test(
+            .disabled("unable to run spectest on Android due to missing files on emulator", platforms: [.android]),
+            arguments: try SpectestDiscovery(path: SpectestTests.testPaths).discover()
         )
-        XCTAssertTrue(ok)
-    }
+        func runWithTokenThreading(test: TestCase) throws {
+            let defaultConfig = EngineConfiguration()
+            guard defaultConfig.threadingModel != .token else { return }
+            // Sanity check that non-default threading models work.
+            let runner = try SpectestRunner(configuration: defaultConfig)
+            try runner.run(test: test, reporter: NullSpectestProgressReporter())
+        }
+    #endif
 }

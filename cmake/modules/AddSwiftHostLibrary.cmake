@@ -73,6 +73,7 @@ function(add_wasmkit_library name)
   # Configure the emission of the Swift module files.
   target_compile_options("${name}" PRIVATE
     $<$<COMPILE_LANGUAGE:Swift>:
+      -package-name;WasmKitPackage;
       -module-name;${name};
       -emit-module-path;${module_file};
       -emit-module-source-info-path;${module_sourceinfo_file}

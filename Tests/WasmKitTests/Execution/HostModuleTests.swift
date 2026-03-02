@@ -1,11 +1,13 @@
+import Testing
 import WAT
-import XCTest
 
 @testable import WasmKit
 @testable import WasmParser
 
-final class HostModuleTests: XCTestCase {
-    func testImportMemory() throws {
+@Suite
+struct HostModuleTests {
+    @Test
+    func importMemory() throws {
         let engine = Engine()
         let store = Store(engine: engine)
         let memoryType = MemoryType(min: 1, max: nil)
@@ -21,12 +23,13 @@ final class HostModuleTests: XCTestCase {
                     (import "env" "memory" (memory 1))
                 )
                 """))
-        XCTAssertNoThrow(try module.instantiate(store: store, imports: imports))
+        #expect(throws: Never.self) { try module.instantiate(store: store, imports: imports) }
         // Ensure the allocated address is valid
         _ = memory.data
     }
 
-    func testReentrancy() throws {
+    @Test
+    func reentrancy() throws {
         let engine = Engine()
         let store = Store(engine: engine)
         let voidSignature = WasmTypes.FunctionType(parameters: [], results: [])
@@ -54,15 +57,15 @@ final class HostModuleTests: XCTestCase {
             "env": [
                 "bar": Function(store: store, type: voidSignature) { caller, _ in
                     // Ensure "invoke" executes instructions under the current call
-                    XCTAssertFalse(isExecutingFoo, "bar should not be called recursively")
+                    #expect(isExecutingFoo == false, "bar should not be called recursively")
                     isExecutingFoo = true
                     defer { isExecutingFoo = false }
-                    let foo = try XCTUnwrap(caller.instance?.exportedFunction(name: "baz"))
+                    let foo = try #require(caller.instance?.exportedFunction(name: "baz"))
                     _ = try foo()
                     return []
                 },
                 "qux": Function(store: store, type: voidSignature) { caller, _ in
-                    XCTAssertTrue(isExecutingFoo)
+                    #expect(isExecutingFoo == true)
                     isQuxCalled = true
                     return []
                 },
@@ -70,8 +73,8 @@ final class HostModuleTests: XCTestCase {
         ]
         let instance = try module.instantiate(store: store, imports: imports)
         // Check foo(wasm) -> bar(host) -> baz(wasm) -> qux(host)
-        let foo = try XCTUnwrap(instance.exports[function: "foo"])
+        let foo = try #require(instance.exports[function: "foo"])
         try foo()
-        XCTAssertTrue(isQuxCalled)
+        #expect(isQuxCalled == true)
     }
 }

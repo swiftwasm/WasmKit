@@ -121,7 +121,7 @@ extension Code {
     /// }
     /// ````
     @inlinable
-    public func parseExpression<V: InstructionVisitor>(visitor: inout V) throws {
+    public func parseExpression(visitor: inout some InstructionVisitor & ~Copyable) throws {
         var parser = Parser(stream: StaticByteStream(bytes: self.expression), features: self.features)
         var lastIsEnd: Bool?
         while try !parser.stream.hasReachedEnd() {
@@ -175,7 +175,7 @@ public struct ExpressionParser {
 let WASM_MAGIC: [UInt8] = [0x00, 0x61, 0x73, 0x6D]
 
 /// Flags for enabling/disabling WebAssembly features
-public struct WasmFeatureSet: OptionSet {
+public struct WasmFeatureSet: OptionSet, Sendable {
     /// The raw value of the feature set
     public let rawValue: Int
 
@@ -196,17 +196,20 @@ public struct WasmFeatureSet: OptionSet {
     /// The WebAssembly tail-call proposal
     @_alwaysEmitIntoClient
     public static var tailCall: WasmFeatureSet { WasmFeatureSet(rawValue: 1 << 3) }
+    /// The WebAssembly SIMD proposal
+    @_alwaysEmitIntoClient
+    public static var simd: WasmFeatureSet { WasmFeatureSet(rawValue: 1 << 4) }
 
     /// The default feature set
     public static let `default`: WasmFeatureSet = [.referenceTypes]
     /// The feature set with all features enabled
-    public static let all: WasmFeatureSet = [.memory64, .referenceTypes, .threads, .tailCall]
+    public static let all: WasmFeatureSet = [.memory64, .referenceTypes, .threads, .tailCall, .simd]
 }
 
 /// An error that occurs during parsing of a WebAssembly binary
 public struct WasmParserError: Swift.Error {
     @usableFromInline
-    struct Message {
+    struct Message: Sendable {
         let text: String
 
         init(_ text: String) {
@@ -214,19 +217,64 @@ public struct WasmParserError: Swift.Error {
         }
     }
 
-    let message: Message
-    let offset: Int
+    @usableFromInline
+    enum Kind: Sendable {
+        case message(Message)
+        case unexpectedEnd(expected: Set<UInt8>?)
+        case unexpectedByte(UInt8, index: Int, expected: Set<UInt8>?)
+        case unclassified(any Error)
+    }
+
+    let kind: Kind
+    let offset: Int?
 
     @usableFromInline
-    init(_ message: Message, offset: Int) {
-        self.message = message
+    init(kind: Kind, offset: Int) {
+        self.kind = kind
         self.offset = offset
+    }
+}
+
+extension WasmParserError {
+    @usableFromInline
+    init(_ message: Message, offset: Int) {
+        self.kind = .message(message)
+        self.offset = offset
+    }
+}
+
+extension BinaryInteger {
+    var hexString: String {
+        "0x\(String(self, radix: 16))"
     }
 }
 
 extension WasmParserError: CustomStringConvertible {
     public var description: String {
-        return "\"\(message)\" at offset 0x\(String(offset, radix: 16))"
+        var result: String
+        switch self.kind {
+        case .message(let message):
+            result = message.text
+        case .unexpectedEnd(let expected):
+            var result = "Unexpected end of byte sequence."
+            if let expected, expected.count > 0 {
+                result.append(contentsOf: " Expected one of \(expected.map {$0.hexString}).")
+            }
+            return result
+        case .unexpectedByte(let byte, let index, let expected):
+            result = "Unexpected byte \(byte.hexString) at index \(index.hexString)."
+            if let expected, expected.count > 0 {
+                result.append(contentsOf: " Expected one of \(expected.map {$0.hexString}).")
+            }
+        case .unclassified(let error):
+            result = "\(error)"
+        }
+
+        if let offset {
+            return "\"\(result)\" raised at offset 0x\(String(offset, radix: 16))"
+        } else {
+            return result
+        }
     }
 }
 
@@ -256,7 +304,18 @@ extension WasmParserError.Message {
         Self("malformed section id: \(id)")
     }
 
-    @usableFromInline static func zeroExpected(actual: UInt8) -> Self {
+    @usableFromInline
+    static func malformedValueType(_ byte: UInt8) -> Self {
+        Self("malformed value type: 0x\(String(byte, radix: 16))")
+    }
+
+    @usableFromInline
+    static func unknownCanonOptionTag(_ byte: UInt8) -> Self {
+        Self("malformed canon option tag: 0x\(String(byte, radix: 16))")
+    }
+
+    @usableFromInline
+    static func zeroExpected(actual: UInt8) -> Self {
         Self("Zero expected but got \(actual)")
     }
 
@@ -284,8 +343,8 @@ extension WasmParserError.Message {
     static let unexpectedEnd = Self("Unexpected end of the stream")
 
     @usableFromInline
-    static func sectionSizeMismatch(expected: Int, actual: Int) -> Self {
-        Self("Section size mismatch: expected \(expected) but got \(actual)")
+    static func sectionSizeMismatch(sectionID: UInt8, expected: Int, actual: Int) -> Self {
+        Self("Section with ID \(sectionID) size mismatch: expected \(expected) but got \(actual)")
     }
 
     @usableFromInline static func illegalOpcode(_ opcode: [UInt8]) -> Self {
@@ -361,7 +420,7 @@ extension ByteStream {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/values.html#names>
 extension ByteStream {
-    fileprivate func parseName() throws -> String {
+    package func parseName() throws -> String {
         let bytes = try parseVector { () -> UInt8 in
             try consumeAny()
         }
@@ -373,7 +432,7 @@ extension ByteStream {
         var decoder = UTF8()
         Decode: while true {
             switch decoder.decode(&iterator) {
-            case let .scalarValue(scalar): name.append(Character(scalar))
+            case .scalarValue(let scalar): name.append(Character(scalar))
             case .emptyInput: break Decode
             case .error: throw WasmParserError(.invalidUTF8(bytes), offset: currentIndex)
             }
@@ -442,11 +501,47 @@ extension Parser {
         case 0x7E: return .i64
         case 0x7D: return .f32
         case 0x7C: return .f64
-        case 0x7B: return .f64
-        case 0x70: return .ref(.funcRef)
-        case 0x6F: return .ref(.externRef)
+        case 0x7B: return .v128
         default:
-            throw StreamError<Stream.Element>.unexpected(b, index: offset, expected: Set(0x7C...0x7F))
+            guard let refType = try parseReferenceType(byte: b) else {
+                throw makeError(.malformedValueType(b))
+            }
+            return .ref(refType)
+        }
+    }
+
+    /// - Returns: `nil` if the given `byte` discriminator is malformed
+    /// > Note:
+    /// <https://webassembly.github.io/function-references/core/binary/types.html#reference-types>
+    @usableFromInline
+    func parseReferenceType(byte: UInt8) throws -> ReferenceType? {
+        switch byte {
+        case 0x63: return try ReferenceType(isNullable: true, heapType: parseHeapType())
+        case 0x64: return try ReferenceType(isNullable: false, heapType: parseHeapType())
+        case 0x6F: return .externRef
+        case 0x70: return .funcRef
+        default: return nil  // invalid discriminator
+        }
+    }
+
+    /// > Note:
+    /// <https://webassembly.github.io/function-references/core/binary/types.html#heap-types>
+    @usableFromInline
+    func parseHeapType() throws -> HeapType {
+        let b = try stream.peek()
+        switch b {
+        case 0x6F:
+            _ = try stream.consumeAny()
+            return .externRef
+        case 0x70:
+            _ = try stream.consumeAny()
+            return .funcRef
+        default:
+            let rawIndex = try stream.parseVarSigned33()
+            guard let index = TypeIndex(exactly: rawIndex) else {
+                throw makeError(.invalidFunctionType(rawIndex))
+            }
+            return .concrete(typeIndex: index)
         }
     }
 
@@ -461,7 +556,7 @@ extension Parser {
         case 0x40:
             _ = try stream.consumeAny()
             return .empty
-        case 0x7C...0x7F, 0x70, 0x6F:
+        case 0x7B...0x7F, 0x70, 0x6F:
             return try .type(parseValueType())
         default:
             let rawIndex = try stream.parseVarSigned33()
@@ -551,7 +646,10 @@ extension Parser {
         case 0x6F:
             elementType = .externRef
         default:
-            throw StreamError.unexpected(b, index: offset, expected: [0x6F, 0x70])
+            throw WasmParserError(
+                kind: .unexpectedByte(b, index: offset, expected: [0x6F, 0x70]),
+                offset: stream.currentIndex
+            )
         }
 
         let limits = try parseLimits()
@@ -606,8 +704,12 @@ extension Parser: BinaryInstructionDecoder {
         return 0
     }
 
-    @inlinable func visitUnknown(_ opcode: [UInt8]) throws {
+    @inlinable func throwUnknown(_ opcode: [UInt8]) throws -> Never {
         throw makeError(.illegalOpcode(opcode))
+    }
+
+    @inlinable func visitUnknown(_ opcode: [UInt8]) throws -> Bool {
+        try throwUnknown(opcode)
     }
 
     @inlinable mutating func visitBlock() throws -> BlockType { try parseResultType() }
@@ -621,6 +723,11 @@ extension Parser: BinaryInstructionDecoder {
         return BrTable(labelIndices: labelIndices, defaultIndex: labelIndex)
     }
     @inlinable mutating func visitCall() throws -> UInt32 { try parseUnsigned() }
+    @inlinable mutating func visitCallRef() throws -> UInt32 {
+        // TODO reference types checks
+        // traps on nil
+        try parseUnsigned()
+    }
 
     @inlinable mutating func visitCallIndirect() throws -> (typeIndex: UInt32, tableIndex: UInt32) {
         let typeIndex: TypeIndex = try parseUnsigned()
@@ -640,6 +747,10 @@ extension Parser: BinaryInstructionDecoder {
         let typeIndex: TypeIndex = try parseUnsigned()
         let tableIndex: TableIndex = try parseUnsigned()
         return (typeIndex, tableIndex)
+    }
+
+    @inlinable mutating func visitReturnCallRef() throws -> UInt32 {
+        return 0
     }
 
     @inlinable mutating func visitTypedSelect() throws -> WasmTypes.ValueType {
@@ -679,12 +790,14 @@ extension Parser: BinaryInstructionDecoder {
         let n = try parseDouble()
         return IEEE754.Float64(bitPattern: n)
     }
-    @inlinable mutating func visitRefNull() throws -> WasmTypes.ReferenceType {
-        let type = try parseValueType()
-        guard case let .ref(refType) = type else {
-            throw makeError(.expectedRefType(actual: type))
-        }
-        return refType
+    @inlinable mutating func visitRefNull() throws -> WasmTypes.HeapType {
+        return try parseHeapType()
+    }
+    @inlinable mutating func visitBrOnNull() throws -> UInt32 {
+        return 0
+    }
+    @inlinable mutating func visitBrOnNonNull() throws -> UInt32 {
+        return 0
     }
 
     @inlinable mutating func visitRefFunc() throws -> UInt32 { try parseUnsigned() }
@@ -740,24 +853,96 @@ extension Parser: BinaryInstructionDecoder {
     @inlinable mutating func visitTableSize() throws -> UInt32 {
         try parseUnsigned()
     }
+    @inlinable mutating func visitMemoryAtomicNotify() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitMemoryAtomicWait32() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitMemoryAtomicWait64() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmwAdd() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmwAdd() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw8AddU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw16AddU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw8AddU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw16AddU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw32AddU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmwSub() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmwSub() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw8SubU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw16SubU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw8SubU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw16SubU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw32SubU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmwAnd() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmwAnd() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw8AndU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw16AndU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw8AndU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw16AndU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw32AndU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmwOr() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmwOr() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw8OrU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw16OrU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw8OrU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw16OrU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw32OrU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmwXor() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmwXor() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw8XorU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw16XorU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw8XorU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw16XorU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw32XorU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmwXchg() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmwXchg() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw8XchgU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw16XchgU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw8XchgU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw16XchgU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw32XchgU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmwCmpxchg() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmwCmpxchg() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw8CmpxchgU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI32AtomicRmw16CmpxchgU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw8CmpxchgU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw16CmpxchgU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitI64AtomicRmw32CmpxchgU() throws -> MemArg { try parseMemarg() }
+    @inlinable mutating func visitV128Const() throws -> V128 {
+        return V128(bytes: Array(try stream.consume(count: V128.byteCount)))
+    }
+    @inlinable mutating func visitI8x16Shuffle() throws -> V128ShuffleMask {
+        return V128ShuffleMask(lanes: Array(try stream.consume(count: V128ShuffleMask.laneCount)))
+    }
+    @inlinable mutating func visitSimdLane(_: Instruction.SimdLane) throws -> UInt8 {
+        return try stream.consumeAny()
+    }
+    @inlinable mutating func visitSimdMemLane(_: Instruction.SimdMemLane) throws -> (memarg: MemArg, lane: UInt8) {
+        let memarg = try parseMemarg()
+        let lane = try stream.consumeAny()
+        return (memarg: memarg, lane: lane)
+    }
     @inlinable func claimNextByte() throws -> UInt8 {
         return try stream.consumeAny()
     }
 
+    /// Returns: `true` if the parsed instruction is the block end instruction.
     @inline(__always)
     @inlinable
-    mutating func parseInstruction<V: InstructionVisitor>(visitor v: inout V) throws -> Bool {
+    mutating func parseInstruction(visitor v: inout some InstructionVisitor & ~Copyable) throws -> Bool {
         return try parseBinaryInstruction(visitor: &v, decoder: &self)
     }
 
     @usableFromInline
     struct InstructionFactory: AnyInstructionVisitor {
+        @usableFromInline
+        typealias VisitorError = Never
+
+        @usableFromInline var binaryOffset: Int = 0
+
         @usableFromInline var insts: [Instruction] = []
 
         @inlinable init() {}
 
         @inlinable
-        mutating func visit(_ instruction: Instruction) throws {
+        mutating func visit(_ instruction: Instruction) {
             insts.append(instruction)
         }
     }
@@ -924,7 +1109,7 @@ extension Parser {
             if flag.segmentHasRefType {
                 let valueType = try parseValueType()
 
-                guard case let .ref(refType) = valueType else {
+                guard case .ref(let refType) = valueType else {
                     throw makeError(.expectedRefType(actual: valueType))
                 }
 
@@ -1185,7 +1370,13 @@ extension Parser {
             }
             let expectedSectionEnd = sectionStart + Int(sectionSize)
             guard expectedSectionEnd == stream.currentIndex else {
-                throw makeError(.sectionSizeMismatch(expected: expectedSectionEnd, actual: offset))
+                throw makeError(
+                    .sectionSizeMismatch(
+                        sectionID: sectionID,
+                        expected: expectedSectionEnd,
+                        actual: offset
+                    )
+                )
             }
             return payload
         }
@@ -1249,5 +1440,63 @@ public struct NameSectionParser<Stream: ByteStream> {
             nameMap[index] = name
         }
         return nameMap
+    }
+}
+
+// MARK: - File Type Detection
+
+/// The type of a WebAssembly binary file.
+public enum WasmFileType: Equatable, Sendable {
+    /// A core WebAssembly module (version 1)
+    case coreModule
+    /// A WebAssembly component (version 0x0d, layer 1)
+    case component
+    /// Unknown or invalid WebAssembly file
+    case unknown
+}
+
+/// Detect the type of a WebAssembly binary file by reading its header.
+///
+/// This function reads the 8-byte WebAssembly header to determine whether
+/// the file contains a core module or a component. Uses stack allocation
+/// only (no heap allocation for the header bytes).
+///
+/// - Parameter filePath: Path to the WebAssembly binary file
+/// - Returns: The detected file type
+/// - Throws: If the file cannot be opened or read
+public func detectWasmFileType(filePath: FilePath) throws -> WasmFileType {
+    let fileHandle = try FileDescriptor.open(filePath, .readOnly)
+    defer { try? fileHandle.close() }
+
+    // Use a tuple to avoid heap allocation - 8 bytes on stack
+    // TODO: needs a `SmallArray` abstraction until `InlineArray` becomes available after dropping support for macOS 15.
+    var header: (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) = (0, 0, 0, 0, 0, 0, 0, 0)
+    let bytesRead = try withUnsafeMutableBytes(of: &header) { buffer in
+        try fileHandle.read(into: buffer)
+    }
+
+    // Need at least 8 bytes for a valid header
+    guard bytesRead >= 8 else {
+        return .unknown
+    }
+
+    // Check magic number: \0asm (uses WASM_MAGIC as source of truth)
+    guard
+        header.0 == WASM_MAGIC[0] && header.1 == WASM_MAGIC[1]
+            && header.2 == WASM_MAGIC[2] && header.3 == WASM_MAGIC[3]
+    else {
+        return .unknown
+    }
+
+    // Check version and layer bytes:
+    // - Core module: version=0x01, 0x00 and layer=0x00, 0x00
+    // - Component:   version=0x0d, 0x00 and layer=0x01, 0x00
+    switch (header.4, header.5, header.6, header.7) {
+    case (0x01, 0x00, 0x00, 0x00):
+        return .coreModule
+    case (0x0d, 0x00, 0x01, 0x00):
+        return .component
+    default:
+        return .unknown
     }
 }

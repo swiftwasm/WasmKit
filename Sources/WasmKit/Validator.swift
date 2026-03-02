@@ -33,6 +33,14 @@ struct ValidationError: Error, CustomStringConvertible {
 }
 
 extension ValidationError.Message {
+    static var simdNotSupported: Self {
+        Self("SIMD is not supported")
+    }
+
+    static func invalidLaneIndex(lane: UInt8, laneCount: UInt8) -> Self {
+        Self("invalid lane index \(lane) (laneCount: \(laneCount))")
+    }
+
     static func invalidMemArgAlignment(memarg: MemArg, naturalAlignment: Int) -> Self {
         Self("alignment 2**\(memarg.align) is out of limit \(naturalAlignment)")
     }
@@ -43,6 +51,10 @@ extension ValidationError.Message {
 
     static var multipleMemoriesNotPermitted: Self {
         Self("multiple memories are not permitted")
+    }
+
+    static var multipleTablesNotPermitted: Self {
+        Self("multiple tables")
     }
 
     static func startFunctionInvalidParameters() -> Self {
@@ -63,6 +75,14 @@ extension ValidationError.Message {
 
     static var referenceTypesFeatureRequiredForSharedMemories: Self {
         Self("reference-types feature is required for shared memories")
+    }
+
+    static var threadsFeatureRequiredForSharedMemories: Self {
+        Self("threads feature is required for shared memories")
+    }
+
+    static var sharedMemoryMustHaveMaximum: Self {
+        Self("shared memory must have maximum")
     }
 
     static var referenceTypesFeatureRequiredForNonFuncrefTables: Self {
@@ -190,8 +210,8 @@ extension ValidationError.Message {
 }
 
 /// Validates instructions within a given context.
-struct InstructionValidator<Context: TranslatorContext> {
-    let context: Context
+struct InstructionValidator {
+    let context: InternalInstance
 
     func validateMemArg(_ memarg: MemArg, naturalAlignment: Int) throws {
         if memarg.align > naturalAlignment {
@@ -255,6 +275,10 @@ struct ModuleValidator {
         if module.memoryTypes.count > 1 {
             throw ValidationError(.multipleMemoriesNotPermitted)
         }
+        // Multiple tables are allowed with reference types feature
+        if module.tableTypes.count > 1 && !module.features.contains(.referenceTypes) {
+            throw ValidationError(.multipleTablesNotPermitted)
+        }
         for memoryType in module.memoryTypes {
             try Self.checkMemoryType(memoryType, features: module.features)
         }
@@ -294,7 +318,10 @@ struct ModuleValidator {
 
         if type.shared {
             guard features.contains(.threads) else {
-                throw ValidationError(.referenceTypesFeatureRequiredForSharedMemories)
+                throw ValidationError(.threadsFeatureRequiredForSharedMemories)
+            }
+            guard type.max != nil else {
+                throw ValidationError(.sharedMemoryMustHaveMaximum)
             }
         }
     }
@@ -333,9 +360,11 @@ struct ModuleValidator {
 extension WasmTypes.Reference {
     /// Checks if the reference type matches the expected type.
     func checkType(_ type: WasmTypes.ReferenceType) throws {
-        switch (self, type) {
-        case (.function, .funcRef): return
-        case (.extern, .externRef): return
+        switch (self, type.heapType, type.isNullable) {
+        case (.function(_?), .funcRef, _): return
+        case (.function(nil), .funcRef, true): return
+        case (.extern(_?), .externRef, _): return
+        case (.extern(nil), .externRef, true): return
         default:
             throw ValidationError(.expectTypeButGot(expected: "\(type)", got: "\(self)"))
         }
@@ -350,6 +379,7 @@ extension Value {
         case (.i64, .i64): return
         case (.f32, .f32): return
         case (.f64, .f64): return
+        case (.v128, .v128): return
         case (.ref(let ref), .ref(let refType)):
             try ref.checkType(refType)
         default:

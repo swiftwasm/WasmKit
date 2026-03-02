@@ -15,6 +15,10 @@ public struct Code {
     @usableFromInline
     internal let features: WasmFeatureSet
 
+    #if WasmDebuggingSupport
+        package var originalAddress: Int { self.offset }
+    #endif
+
     @inlinable
     init(locals: [ValueType], expression: ArraySlice<UInt8>, offset: Int, features: WasmFeatureSet) {
         self.locals = locals
@@ -49,10 +53,10 @@ public enum BlockType: Equatable {
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#limits>
 public struct Limits: Equatable {
-    public let min: UInt64
-    public let max: UInt64?
-    public let isMemory64: Bool
-    public let shared: Bool
+    public var min: UInt64
+    public var max: UInt64?
+    public var isMemory64: Bool
+    public var shared: Bool
 
     public init(min: UInt64, max: UInt64? = nil, isMemory64: Bool = false, shared: Bool = false) {
         self.min = min
@@ -69,8 +73,8 @@ public typealias MemoryType = Limits
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#table-types>
 public struct TableType: Equatable {
-    public let elementType: ReferenceType
-    public let limits: Limits
+    public var elementType: ReferenceType
+    public var limits: Limits
 
     public init(elementType: ReferenceType, limits: Limits) {
         self.elementType = elementType
@@ -189,7 +193,7 @@ public struct Global: Equatable {
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#element-segments>
 public struct ElementSegment: Equatable {
     @usableFromInline
-    struct Flag: OptionSet {
+    struct Flag: OptionSet, Sendable {
         @usableFromInline let rawValue: UInt32
 
         @inlinable
@@ -350,20 +354,30 @@ extension Instruction.Load {
     @_alwaysEmitIntoClient
     public var naturalAlignment: Int {
         switch self {
-        case .i32Load: return 2
-        case .i64Load: return 3
+        case .i32Load, .i32AtomicLoad: return 2
+        case .i64Load, .i64AtomicLoad: return 3
         case .f32Load: return 2
         case .f64Load: return 3
+        case .v128Load: return 4
+        case .v128Load8X8S, .v128Load8X8U: return 3
+        case .v128Load16X4S, .v128Load16X4U: return 3
+        case .v128Load32X2S, .v128Load32X2U: return 3
+        case .v128Load8Splat: return 0
+        case .v128Load16Splat: return 1
+        case .v128Load32Splat: return 2
+        case .v128Load64Splat: return 3
+        case .v128Load32Zero: return 2
+        case .v128Load64Zero: return 3
         case .i32Load8S: return 0
-        case .i32Load8U: return 0
+        case .i32Load8U, .i32AtomicLoad8U: return 0
         case .i32Load16S: return 1
-        case .i32Load16U: return 1
+        case .i32Load16U, .i32AtomicLoad16U: return 1
         case .i64Load8S: return 0
-        case .i64Load8U: return 0
+        case .i64Load8U, .i64AtomicLoad8U: return 0
         case .i64Load16S: return 1
-        case .i64Load16U: return 1
+        case .i64Load16U, .i64AtomicLoad16U: return 1
         case .i64Load32S: return 2
-        case .i64Load32U: return 2
+        case .i64Load32U, .i64AtomicLoad32U: return 2
         }
     }
 
@@ -371,20 +385,24 @@ extension Instruction.Load {
     @_alwaysEmitIntoClient
     public var type: ValueType {
         switch self {
-        case .i32Load: return .i32
-        case .i64Load: return .i64
+        case .i32Load, .i32AtomicLoad: return .i32
+        case .i64Load, .i64AtomicLoad: return .i64
         case .f32Load: return .f32
         case .f64Load: return .f64
+        case .v128Load, .v128Load8X8S, .v128Load8X8U, .v128Load16X4S, .v128Load16X4U,
+            .v128Load32X2S, .v128Load32X2U, .v128Load8Splat, .v128Load16Splat, .v128Load32Splat,
+            .v128Load64Splat, .v128Load32Zero, .v128Load64Zero:
+            return .v128
         case .i32Load8S: return .i32
-        case .i32Load8U: return .i32
+        case .i32Load8U, .i32AtomicLoad8U: return .i32
         case .i32Load16S: return .i32
-        case .i32Load16U: return .i32
+        case .i32Load16U, .i32AtomicLoad16U: return .i32
         case .i64Load8S: return .i64
-        case .i64Load8U: return .i64
+        case .i64Load8U, .i64AtomicLoad8U: return .i64
         case .i64Load16S: return .i64
-        case .i64Load16U: return .i64
+        case .i64Load16U, .i64AtomicLoad16U: return .i64
         case .i64Load32S: return .i64
-        case .i64Load32U: return .i64
+        case .i64Load32U, .i64AtomicLoad32U: return .i64
         }
     }
 }
@@ -395,15 +413,16 @@ extension Instruction.Store {
     @_alwaysEmitIntoClient
     public var naturalAlignment: Int {
         switch self {
-        case .i32Store: return 2
-        case .i64Store: return 3
+        case .i32Store, .i32AtomicStore: return 2
+        case .i64Store, .i64AtomicStore: return 3
         case .f32Store: return 2
         case .f64Store: return 3
-        case .i32Store8: return 0
-        case .i32Store16: return 1
-        case .i64Store8: return 0
-        case .i64Store16: return 1
-        case .i64Store32: return 2
+        case .v128Store: return 4
+        case .i32Store8, .i32AtomicStore8: return 0
+        case .i32Store16, .i32AtomicStore16: return 1
+        case .i64Store8, .i64AtomicStore8: return 0
+        case .i64Store16, .i64AtomicStore16: return 1
+        case .i64Store32, .i64AtomicStore32: return 2
         }
     }
 
@@ -411,15 +430,16 @@ extension Instruction.Store {
     @_alwaysEmitIntoClient
     public var type: ValueType {
         switch self {
-        case .i32Store: return .i32
-        case .i64Store: return .i64
+        case .i32Store, .i32AtomicStore: return .i32
+        case .i64Store, .i64AtomicStore: return .i64
         case .f32Store: return .f32
         case .f64Store: return .f64
-        case .i32Store8: return .i32
-        case .i32Store16: return .i32
-        case .i64Store8: return .i64
-        case .i64Store16: return .i64
-        case .i64Store32: return .i64
+        case .v128Store: return .v128
+        case .i32Store8, .i32AtomicStore8: return .i32
+        case .i32Store16, .i32AtomicStore16: return .i32
+        case .i64Store8, .i64AtomicStore8: return .i64
+        case .i64Store16, .i64AtomicStore16: return .i64
+        case .i64Store32, .i64AtomicStore32: return .i64
         }
     }
 }

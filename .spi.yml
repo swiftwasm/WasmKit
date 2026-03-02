@@ -5,6 +5,7 @@ builder:
         - WasmKit
         - WasmKitWASI
         - WasmParser
+        - WasmTypes
         - WASI
         - WAT
         - WIT

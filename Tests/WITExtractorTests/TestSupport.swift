@@ -1,5 +1,5 @@
 import Foundation
-import XCTest
+import Testing
 
 @testable import WIT
 @testable import WITExtractor
@@ -76,7 +76,7 @@ struct TestSupport {
         config: Configuration
     ) throws {
         #if os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
-            throw XCTSkip("WITExtractor does not support platforms where Foundation.Process is unavailable")
+            throw Error(description: "WITExtractor requires Foundation.Process")
         #else
             let process = Process()
             let stdinPipe = Pipe()
@@ -112,10 +112,10 @@ struct TestSupport {
         line: UInt = #line
     ) throws {
         #if os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
-            throw XCTSkip("WITExtractor does not support platforms where Foundation.Process is unavailable")
+            throw Error(description: "WITExtractor requires Foundation.Process")
         #else
             guard let config = Configuration.default else {
-                throw XCTSkip("Please create 'Tests/default.json'")
+                throw Error(description: "Please create 'Tests/default.json'")
             }
             var digesterArgs: [String] = []
             if let sdkRoot = config.hostSdkRootPath {
@@ -140,10 +140,12 @@ struct TestSupport {
                 return try extractor.runWithoutHeader(moduleName: moduleName).witContents
             }
 
-            XCTAssertEqual(output, expectedWIT, file: file, line: line)
+            #expect(output == expectedWIT)
 
             var lexer = Lexer(cursor: Lexer.Cursor(input: output))
-            XCTAssertNoThrow(try SourceFileSyntax.parse(lexer: &lexer, fileName: "test.wit"), "Extracted WIT file is invalid")
+            #expect(throws: Never.self, "Extracted WIT file is invalid") {
+                try SourceFileSyntax.parse(lexer: &lexer, fileName: "test.wit")
+            }
         #endif
     }
 }

@@ -1,9 +1,10 @@
-import XCTest
+import Testing
 
 @testable import WITExtractor
 
-class TypeTranslationTests: XCTestCase {
-    func testStructEmpty() throws {
+@Suite(TestEnvironmentTraits.witExtractorAvailability)
+struct TypeTranslationTests {
+    @Test func structEmpty() throws {
         try TestSupport.assertTranslation(
             """
             @_spi(WIT) public struct EmptyStruct {
@@ -26,7 +27,7 @@ class TypeTranslationTests: XCTestCase {
             """)
     }
 
-    func testStructField() throws {
+    @Test func structField() throws {
         try TestSupport.assertTranslation(
             """
             @_spi(WIT) public struct StructFields {
@@ -56,7 +57,7 @@ class TypeTranslationTests: XCTestCase {
             """)
     }
 
-    func testNonExposed() throws {
+    @Test func nonExposed() throws {
         try TestSupport.assertTranslation(
             """
             public struct NonExposed {
@@ -71,7 +72,7 @@ class TypeTranslationTests: XCTestCase {
             """)
     }
 
-    func testStructFieldNumberTypes() throws {
+    @Test func structFieldNumberTypes() throws {
         try TestSupport.assertTranslation(
             """
             @_spi(WIT) public struct NumberFields {
@@ -116,7 +117,7 @@ class TypeTranslationTests: XCTestCase {
             """)
     }
 
-    func testOptionalType() throws {
+    @Test func optionalType() throws {
         try TestSupport.assertTranslation(
             """
             @_spi(WIT) public struct OptionalTypes {
@@ -138,7 +139,7 @@ class TypeTranslationTests: XCTestCase {
             """)
     }
 
-    func testArrayType() throws {
+    @Test func arrayType() throws {
         try TestSupport.assertTranslation(
             """
             @_spi(WIT) public struct ArrayTypes {
@@ -160,7 +161,7 @@ class TypeTranslationTests: XCTestCase {
             """)
     }
 
-    func testDictionaryType() throws {
+    @Test func dictionaryType() throws {
         try TestSupport.assertTranslation(
             """
             @_spi(WIT) public struct DictionaryTypes {
@@ -182,7 +183,7 @@ class TypeTranslationTests: XCTestCase {
             """)
     }
 
-    func testEnumType() throws {
+    @Test func enumType() throws {
         try TestSupport.assertTranslation(
             """
             @_spi(WIT) public enum EmptyEnum {
@@ -204,7 +205,7 @@ class TypeTranslationTests: XCTestCase {
             """)
     }
 
-    func testEnumTypeWithoutPayload() throws {
+    @Test func enumTypeWithoutPayload() throws {
         try TestSupport.assertTranslation(
             """
             @_spi(WIT) public enum EnumType {
@@ -224,7 +225,7 @@ class TypeTranslationTests: XCTestCase {
             """)
     }
 
-    func testEnumTypeWithListPayload() throws {
+    @Test func enumTypeWithListPayload() throws {
         try TestSupport.assertTranslation(
             """
             @_spi(WIT) public enum EnumType: Codable {
@@ -242,7 +243,7 @@ class TypeTranslationTests: XCTestCase {
             """)
     }
 
-    func testMultipleTypes() throws {
+    @Test func multipleTypes() throws {
         try TestSupport.assertTranslation(
             """
             @_spi(WIT) public struct A {
