@@ -387,8 +387,17 @@ struct Lexer {
         return .blockComment
     }
 
-    /// Skip the body of an annotation, tracking paren depth.
+    /// Skip the body of an unrecognized annotation, tracking paren depth.
     /// Called after the annotation ID has been consumed.
+    ///
+    /// This method has its own token dispatch rather than delegating to
+    /// `classifyToken` because annotation bodies differ from top-level WAT
+    /// in three ways:
+    /// - A lone `;` is legal body content (not the start of a line comment).
+    /// - Non-ASCII and control characters must be rejected (`classifyToken`
+    ///   returns `.unknown` instead).
+    /// - `(@)` is a valid parenthesized group (not a malformed annotation),
+    ///   so `(@` must peek ahead before consuming the annotation ID.
     private mutating func skipAnnotationBody() throws(WatParserError) {
         var depth = 1
         while true {
@@ -431,14 +440,7 @@ struct Lexer {
                 }
             // A lone `;` is just a regular character in annotation body
             default:
-                // Non-ASCII scalars are illegal in WAT outside of strings.
-                let value = char.value
-                if value <= 0x08
-                    || (value >= 0x0B && value <= 0x0C)
-                    || (value >= 0x0E && value <= 0x1F)
-                    || value == 0x7F
-                    || value >= 0x80
-                {
+                if isIllegalWATChar(char) {
                     throw cursor.createError("illegal character")
                 }
                 _ = cursor.next()
@@ -458,6 +460,17 @@ struct Lexer {
             char = newChar
         }
         return (start, char)
+    }
+
+    /// Returns true if the scalar is not a legal WAT character outside of strings.
+    /// Legal: U+09 (tab), U+0A (LF), U+0D (CR), U+20..U+7E (printable ASCII).
+    private func isIllegalWATChar(_ char: Unicode.Scalar) -> Bool {
+        let value = char.value
+        return value <= 0x08
+            || (value >= 0x0B && value <= 0x0C)
+            || (value >= 0x0E && value <= 0x1F)
+            || value == 0x7F
+            || value >= 0x80
     }
 
     // https://webassembly.github.io/spec/core/text/values.html#text-idchar
