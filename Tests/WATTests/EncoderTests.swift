@@ -633,17 +633,17 @@ struct EncoderTests {
     @Test
     func nameAnnotationWast() throws {
         let wastContent = """
-        (module (@name "Modül"))
-        (module $moduel (@name "Modül"))
-        (assert_malformed_custom
-          (module quote "(module (@name \\"M1\\") (@name \\"M2\\"))")
-          "@name annotation: multiple module"
-        )
-        (assert_malformed_custom
-          (module quote "(module (func) (@name \\"M\\"))")
-          "misplaced @name annotation"
-        )
-        """
+            (module (@name "Modül"))
+            (module $moduel (@name "Modül"))
+            (assert_malformed_custom
+              (module quote "(module (@name \\"M1\\") (@name \\"M2\\"))")
+              "@name annotation: multiple module"
+            )
+            (assert_malformed_custom
+              (module quote "(module (func) (@name \\"M\\"))")
+              "misplaced @name annotation"
+            )
+            """
         var wast = try parseWAST(wastContent)
         var moduleCount = 0
         var assertCount = 0
