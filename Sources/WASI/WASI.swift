@@ -18,6 +18,13 @@ import WasmTypes
     #error("Unsupported Platform")
 #endif
 
+#if !os(Windows)
+    /// Free function wrapper to call the C sched_yield(2) without name collision.
+    @inline(__always) private func _platform_sched_yield() -> Int32 {
+        return sched_yield()
+    }
+#endif
+
 enum WASIAbi {
     enum Errno: UInt16, Error, GuestPointee {
         /// No error occurred. System call completed successfully.
@@ -773,12 +780,9 @@ extension WASIImplementation {
     var _hostModules: [String: WASIHostModule] {
         let unimplementedFunctionTypes: [String: FunctionType] = [
             "proc_raise": .init(parameters: [.i32], results: [.i32]),
-            "sched_yield": .init(parameters: [], results: [.i32]),
             "sock_accept": .init(parameters: [.i32, .i32, .i32], results: [.i32]),
             "sock_recv": .init(parameters: [.i32, .i32, .i32, .i32, .i32, .i32], results: [.i32]),
             "sock_send": .init(parameters: [.i32, .i32, .i32, .i32, .i32], results: [.i32]),
-            "sock_shutdown": .init(parameters: [.i32, .i32], results: [.i32]),
-
         ]
 
         var preview1: [String: WASIHostFunction] = unimplementedFunctionTypes.reduce(into: [:]) { functions, entry in
@@ -1296,6 +1300,13 @@ extension WASIImplementation {
             throw WASIExitCode(code: exitCode)
         }
 
+        preview1["sched_yield"] = wasiFunction(
+            type: .init(parameters: [], results: [.i32])
+        ) { _, _ in
+            try self.sched_yield()
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
+        }
+
         preview1["random_get"] = wasiFunction(
             type: .init(parameters: [.i32, .i32], results: [.i32])
         ) { caller, arguments in
@@ -1324,6 +1335,13 @@ extension WASIImplementation {
 
                 return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
             }
+        }
+
+        preview1["sock_shutdown"] = wasiFunction(
+            type: .init(parameters: [.i32, .i32], results: [.i32])
+        ) { _, arguments in
+            try self.sock_shutdown(fd: arguments[0].i32)
+            return [.i32(.init(WASIAbi.Errno.SUCCESS.rawValue))]
         }
 
         return [
@@ -1661,7 +1679,15 @@ final class WASIImplementation {
 
     /// Atomically replace a file descriptor by renumbering another file descriptor.
     func fd_renumber(fd: WASIAbi.Fd, to toFd: WASIAbi.Fd) throws {
-        throw WASIAbi.Errno.ENOTSUP
+        guard let entry = fdTable[fd] else {
+            throw WASIAbi.Errno.EBADF
+        }
+        guard fdTable[toFd] != nil else {
+            throw WASIAbi.Errno.EBADF
+        }
+        try fdTable[toFd]!.asEntry().close()
+        fdTable[toFd] = entry
+        fdTable[fd] = nil
     }
 
     /// Move the offset of a file descriptor.
@@ -1839,6 +1865,27 @@ final class WASIImplementation {
     ) throws -> WASIAbi.Size {
         guard !subscriptions.isEmpty else { throw WASIAbi.Errno.EINVAL }
         return try poll(subscriptions: subscriptions, events: events, self.fdTable)
+    }
+
+    /// Shut down socket send and receive channels.
+    /// Since WasmKit has no socket support, any valid fd is not a socket.
+    func sock_shutdown(fd: WASIAbi.Fd) throws {
+        guard fdTable[fd] != nil else {
+            throw WASIAbi.Errno.EBADF
+        }
+        throw WASIAbi.Errno.ENOTSOCK
+    }
+
+    /// Temporarily yield execution of the calling thread.
+    func sched_yield() throws {
+        #if os(Windows)
+            #warning("sched_yield is not implemented on Windows")
+        #else
+            let result = _platform_sched_yield()
+            guard result == 0 else {
+                throw try WASIAbi.Errno(platformErrno: errno)
+            }
+        #endif
     }
 
     /// Write high-quality random data into a buffer.
