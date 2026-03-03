@@ -49,5 +49,11 @@
     "repository": "https://github.com/eembc/coremark.git",
     "revision": "d5fad6bd094899101a4e5fd53af7298160ced6ab",
     "categories": ["benchmark"]
+  },
+  "annotations": {
+    "repository": "https://github.com/WebAssembly/annotations.git",
+    "revision": "20a8e4f125d5d856aac392105c35055af9ed49f7",
+    "sparse-checkout": "test/custom",
+    "categories": ["default"]
   }
 }

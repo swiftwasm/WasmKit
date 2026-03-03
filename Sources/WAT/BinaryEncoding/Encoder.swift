@@ -841,9 +841,9 @@ private func encodeNameSection(
     encoder.section(id: 0) { encoder in
         encoder.encode("name")
 
-        if let moduleId = module.id {
+        if let moduleName = module.id {
             encoder.section(id: 0) { encoder in
-                encoder.encode(String(moduleId.dropFirst()))  // Drop "$" prefix
+                encoder.encode(moduleName.nameValue)
             }
         }
         if !functionNames.isEmpty {

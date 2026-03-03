@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import WasmParser
+import WasmTools
 
 @testable import WAT
 
@@ -13,6 +14,7 @@ struct EncoderTests {
         "--enable-memory64",
         "--enable-tail-call",
         "--enable-threads",
+        "--enable-annotations",
     ]
 
     // MARK: - Supporting Types
@@ -111,7 +113,13 @@ struct EncoderTests {
             }
         case .quote(let bytes):
             #expect(throws: (any Error).self, diagnostic()) {
-                _ = try wat2wasm(String(decoding: bytes, as: UTF8.self))
+                // Validate UTF-8 encoding before attempting to parse as WAT text.
+                // String(decoding:as:UTF8.self) silently replaces invalid bytes,
+                // masking malformed UTF-8 that the spec expects to be rejected.
+                guard let text = String(bytes: bytes, encoding: .utf8) else {
+                    throw WatParserError("malformed UTF-8 encoding", location: nil)
+                }
+                _ = try wat2wasm(text)
                 recordFail()
             }
         case .binary:
@@ -126,7 +134,9 @@ struct EncoderTests {
         moduleBinaryFiles: [(binary: URL, name: String?)],
         wast: URL,
         tempDir: String,
-        stats: inout CompatibilityTestStats
+        stats: inout CompatibilityTestStats,
+        encodeOptions: EncodeOptions = .default,
+        stripModuleNamePrefix: Bool = false
     ) throws {
         func recordFail() {
             stats.failed.insert(wast.lastPathComponent)
@@ -146,9 +156,15 @@ struct EncoderTests {
             let expectedBytes = try Array(Data(contentsOf: moduleFile.binary))
 
             do {
-                // Check module name
+                // Check module name (strip "$" prefix when comparing against WasmTools)
+                let actualName: String?
+                if stripModuleNamePrefix {
+                    actualName = watModule.moduleName?.nameValue
+                } else {
+                    actualName = watModule.id
+                }
                 Self.assertEqual(
-                    watModule.id,
+                    actualName,
                     moduleFile.name,
                     description: "module name",
                     watModule: watModule,
@@ -157,7 +173,7 @@ struct EncoderTests {
                 )
 
                 // Encode and compare module bytes
-                let moduleBytes = try encodeModule(watModule: watModule)
+                let moduleBytes = try encodeModule(watModule: watModule, options: encodeOptions)
                 try Self.compareModuleBytes(
                     expected: expectedBytes,
                     actual: moduleBytes,
@@ -291,14 +307,19 @@ struct EncoderTests {
 
     // MARK: - Module Encoding
 
-    private func encodeModule(watModule: ModuleDirective) throws -> [UInt8] {
+    private func encodeModule(watModule: ModuleDirective, options: EncodeOptions = .default) throws -> [UInt8] {
         switch watModule.source {
-        case .text(var watModule):
-            return try encode(module: &watModule, options: .default)
+        case .text(var wat):
+            // The WAST parser consumes the module $id before parsing the WAT body,
+            // so inject it back into the Wat struct for the name section encoder.
+            if options.nameSection, wat.id == nil, let moduleId = watModule.id {
+                wat.id = .identifier(moduleId)
+            }
+            return try encode(module: &wat, options: options)
         case .binary(let bytes):
             return bytes
         case .quote(let watText):
-            return try wat2wasm(String(decoding: watText, as: UTF8.self))
+            return try WAT.wat2wasm(String(decoding: watText, as: UTF8.self), options: options)
         }
     }
 
@@ -306,7 +327,14 @@ struct EncoderTests {
 
     #if !(os(iOS) || os(watchOS) || os(tvOS) || os(visionOS))
         @Test(
-            arguments: Spectest.wastFiles(include: [], exclude: [])
+            arguments: Spectest.wastFiles(
+                include: [],
+                exclude: [
+                    // Tested separately by annotationProposal() since wast2json (WABT) doesn't support the annotations proposal
+                    "annotations.wast", "token.wast",
+                    // Tested separately by dedicated tests since wast2json doesn't support assert_malformed_custom
+                    "name_annot.wast",
+                ])
         )
         func spectest(wastFile: URL) throws {
             guard let wast2json = TestSupport.lookupExecutable("wast2json") else {
@@ -367,6 +395,73 @@ struct EncoderTests {
             process.waitUntilExit()
         }
     #endif
+
+    /// Test annotation proposal files using WasmTools as reference for binary comparison.
+    /// WABT's wast2json doesn't support the annotations proposal, so WasmTools is used as fallback.
+    @Test(
+        arguments: Spectest.wastFiles(include: ["annotations.wast", "token.wast"])
+    )
+    func annotationProposal(wastFile: URL) throws {
+        var stats = CompatibilityTestStats()
+        try TestSupport.withTemporaryDirectory { tempDir, shouldRetain in
+            let watModules: [ModuleDirective]
+            do {
+                watModules = try parseWastFile(wast: wastFile, stats: &stats)
+            } catch {
+                stats.failed.insert(wastFile.lastPathComponent)
+                shouldRetain = true
+                Self.record(wastFile: wastFile, error: error)
+                return
+            }
+
+            // Use WasmTools for binary comparison
+            let wastContent = try Array(Data(contentsOf: wastFile))
+            let (json, wasmFiles) = try wast2json(
+                wastContent: wastContent,
+                wastFileName: wastFile.lastPathComponent
+            )
+
+            // Write reference wasm files to temp dir, skipping text-form modules
+            // (WasmTools stores "module quote" forms as raw text, not compiled Wasm)
+            var moduleBinaryFiles: [(binary: URL, name: String?)] = []
+            for command in json.commands where command.type == "module" {
+                guard command.moduleType != "text" else { continue }
+                guard let filename = command.filename, let bytes = wasmFiles[filename] else { continue }
+                let binaryURL = URL(fileURLWithPath: tempDir).appendingPathComponent(filename)
+                try Data(bytes).write(to: binaryURL)
+                moduleBinaryFiles.append((binary: binaryURL, name: command.name))
+            }
+
+            // Filter out quote modules from our parsed modules to match
+            let binaryWatModules = watModules.filter {
+                switch $0.source {
+                case .quote: return false
+                default: return true
+                }
+            }
+
+            do {
+                try compareModules(
+                    watModules: binaryWatModules,
+                    moduleBinaryFiles: moduleBinaryFiles,
+                    wast: wastFile,
+                    tempDir: tempDir,
+                    stats: &stats,
+                    encodeOptions: EncodeOptions(nameSection: true),
+                    stripModuleNamePrefix: true
+                )
+            } catch {
+                stats.failed.insert(wastFile.lastPathComponent)
+                shouldRetain = true
+                Self.record(wastFile: wastFile, error: error)
+            }
+
+            if !stats.failed.isEmpty {
+                Issue.record("Failed test cases: \(stats.failed.sorted())")
+                shouldRetain = true
+            }
+        }
+    }
 
     @Test
     func encodeNameSection() throws {
@@ -476,5 +571,101 @@ struct EncoderTests {
         #expect(globalNames == [0: "myglob"])
         #expect(elemNames == [0: "myelem"])
         #expect(dataNames == [0: "mydata"])
+    }
+
+    /// Helper to extract the module name from the name section of a compiled Wasm binary.
+    private func extractModuleName(from bytes: [UInt8]) throws -> String? {
+        var parser = WasmParser.Parser(bytes: bytes)
+        var nameBytes: ArraySlice<UInt8>?
+        while let payload = try parser.parseNext() {
+            if case .customSection(let section) = payload, section.name == "name" {
+                nameBytes = section.bytes
+            }
+        }
+        guard let sectionBytes = nameBytes else { return nil }
+        let nameParser = NameSectionParser(
+            stream: StaticByteStream(bytes: Array(sectionBytes))
+        )
+        let parsed = try nameParser.parseAll()
+        for entry in parsed {
+            if case .moduleName(let name) = entry {
+                return name
+            }
+        }
+        return nil
+    }
+
+    @Test
+    func encodeNameAnnotation() throws {
+        // @name alone
+        let bytes1 = try wat2wasm(
+            #"(module (@name "Modül"))"#,
+            options: EncodeOptions(nameSection: true)
+        )
+        #expect(try extractModuleName(from: bytes1) == "Modül")
+
+        // @name with $id — @name takes precedence
+        let bytes2 = try wat2wasm(
+            #"(module $moduel (@name "Modül"))"#,
+            options: EncodeOptions(nameSection: true)
+        )
+        #expect(try extractModuleName(from: bytes2) == "Modül")
+    }
+
+    @Test
+    func nameAnnotationMalformed() throws {
+        // Multiple @name annotations
+        #expect(throws: (any Error).self) {
+            _ = try wat2wasm(#"(module (@name "M1") (@name "M2"))"#)
+        }
+
+        // Misplaced @name after module fields
+        #expect(throws: (any Error).self) {
+            _ = try wat2wasm(#"(module (func) (@name "M"))"#)
+        }
+
+        // Misplaced @name inside a field
+        #expect(throws: (any Error).self) {
+            _ = try wat2wasm(#"(module (start $f (@name "M")) (func $f))"#)
+        }
+    }
+
+    @Test
+    func nameAnnotationWast() throws {
+        let wastContent = """
+        (module (@name "Modül"))
+        (module $moduel (@name "Modül"))
+        (assert_malformed_custom
+          (module quote "(module (@name \\"M1\\") (@name \\"M2\\"))")
+          "@name annotation: multiple module"
+        )
+        (assert_malformed_custom
+          (module quote "(module (func) (@name \\"M\\"))")
+          "misplaced @name annotation"
+        )
+        """
+        var wast = try parseWAST(wastContent)
+        var moduleCount = 0
+        var assertCount = 0
+        while let (directive, _) = try wast.nextDirective() {
+            switch directive {
+            case .module:
+                moduleCount += 1
+            case .assertMalformed(let module, _):
+                assertCount += 1
+                // Verify the quoted module actually fails to parse
+                if case .quote(let bytes) = module.source {
+                    if let text = String(bytes: bytes, encoding: .utf8) {
+                        #expect(throws: (any Error).self) {
+                            _ = try wat2wasm(text)
+                        }
+                    }
+                }
+            default:
+                break
+            }
+        }
+        #expect(moduleCount == 2)
+        #expect(assertCount == 2)
     }
 }
