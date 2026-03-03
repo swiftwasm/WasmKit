@@ -13,6 +13,14 @@ package struct Encoder {
         ])
     }
 
+    package mutating func writeComponentHeader() {
+        output.append(contentsOf: [
+            0x00, 0x61, 0x73, 0x6D,  // magic
+            0x0D, 0x00,  // version 13
+            0x01, 0x00,  // layer 1 (component)
+        ])
+    }
+
     package mutating func section<E: Error>(id: UInt8, _ sectionContent: (inout Encoder) throws(E) -> Void) throws(E) {
         output.append(id)
         var contentEncoder = Encoder()

@@ -8,19 +8,11 @@
 
         public init() {}
 
-        mutating func writeHeader() {
-            underlying.output.append(contentsOf: [
-                0x00, 0x61, 0x73, 0x6D,  // magic
-                0x0d, 0x00,  // version
-                0x01, 0x00,  // layer
-            ])
-        }
-
         public mutating func encode(
             _ component: ComponentWatParser.ComponentDef,
             options: EncodeOptions
         ) throws(WatParserError) -> [UInt8] {
-            writeHeader()
+            underlying.writeComponentHeader()
 
             // Collect metadata needed for encoding
             let fields = try groupFields(component.fields)

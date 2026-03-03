@@ -32,11 +32,7 @@
             var encoder = Encoder()
 
             // Component header (8 bytes)
-            encoder.output.append(contentsOf: [
-                0x00, 0x61, 0x73, 0x6D,  // magic
-                0x0D, 0x00,  // version 13
-                0x01, 0x00,  // layer 1 (component)
-            ])
+            encoder.writeComponentHeader()
 
             // Custom section: wit-component-encoding + version
             encoder.section(id: ComponentSectionID.custom.rawValue) { enc in

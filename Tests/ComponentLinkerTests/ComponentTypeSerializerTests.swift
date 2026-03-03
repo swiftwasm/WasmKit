@@ -101,46 +101,6 @@
             }
         }
 
-        /// Read an unsigned LEB128 value from bytes at the given offset.
-        private func readLEB128(_ bytes: [UInt8], offset: Int) -> (value: Int, consumed: Int) {
-            var result = 0
-            var shift = 0
-            var pos = offset
-            while pos < bytes.count {
-                let byte = bytes[pos]
-                result |= Int(byte & 0x7F) << shift
-                pos += 1
-                if byte & 0x80 == 0 { break }
-                shift += 7
-            }
-            return (result, pos - offset)
-        }
-
-        /// Read a name (LEB128 length + UTF-8 bytes) from position in bytes.
-        private func readName(_ bytes: [UInt8], offset: Int) -> (name: String, consumed: Int) {
-            let (len, lenBytes) = readLEB128(bytes, offset: offset)
-            let start = offset + lenBytes
-            let name = String(bytes: bytes[start..<start + len], encoding: .utf8) ?? ""
-            return (name, lenBytes + len)
-        }
-
-        /// Find a section by ID in component binary bytes (after the 8-byte header).
-        private func findSection(id: UInt8, in bytes: [UInt8]) -> (offset: Int, size: Int, contentStart: Int)? {
-            var pos = 8  // skip header
-            while pos < bytes.count {
-                let sectionId = bytes[pos]
-                pos += 1
-                let (size, consumed) = readLEB128(bytes, offset: pos)
-                pos += consumed
-                let contentStart = pos
-                if sectionId == id {
-                    return (offset: contentStart - consumed - 1, size: size, contentStart: contentStart)
-                }
-                pos += size
-            }
-            return nil
-        }
-
         // MARK: - Basic structure tests
 
         @Test func emptyWorldStructure() throws {
@@ -155,50 +115,45 @@
             // Should have header, custom section, type section, export section
             #expect(payloads.count == 4)
 
-            let customs = customSections(from: payloads)
-            #expect(customs.count == 1)
-            #expect(typeSection(from: payloads) != nil)
-            #expect(exportSection(from: payloads) != nil)
-
-            // Inner componenttype should have 0 declarations
-            let decls = try innerWorldDecls(from: payloads)
-            #expect(decls.isEmpty)
-        }
-
-        @Test func witComponentEncodingCustomSection() throws {
-            let bytes = try encode(
-                """
-                package test:pkg
-                world my-world {}
-                """, worldName: "my-world", encodingVersion: 4)
-
-            let payloads = try parseOutput(bytes)
+            // Custom section: wit-component-encoding with default version 4
             let customs = customSections(from: payloads)
             #expect(customs.count == 1)
             #expect(customs[0].name == "wit-component-encoding")
+            #expect(customs[0].bytes.first == 4)
 
-            // Verify encoding version by reading the payload bytes
-            let payload = Array(customs[0].bytes)
-            let (version, _) = readLEB128(payload, offset: 0)
-            #expect(version == 4)
-        }
-
-        @Test func exportSectionContainsWorldName() throws {
-            let bytes = try encode(
-                """
-                package test:pkg
-                world my-world {}
-                """, worldName: "my-world")
-
-            let payloads = try parseOutput(bytes)
+            // Export section: world name with type sort at index 0
             let exports = try #require(exportSection(from: payloads))
             #expect(exports.count == 1)
-            #expect(exports[0].name == "my-world")
+            #expect(exports[0].name == "empty")
             if case .type = exports[0].sort {
             } else {
                 Issue.record("Expected type sort, got \(exports[0].sort)")
             }
             #expect(exports[0].index == 0)
+
+            // Type section: 1 outer componenttype with 2 declarations
+            let types = try #require(typeSection(from: payloads))
+            #expect(types.count == 1)
+            guard case .component(let outerDecl) = types[0] else {
+                Issue.record("Expected componenttype")
+                return
+            }
+            #expect(outerDecl.declarations.count == 2)
+
+            // Inner componenttype should have 0 declarations
+            let decls = try innerWorldDecls(from: payloads)
+            #expect(decls.isEmpty)
+
+            // Custom encoding version: verify non-default version
+            let v5Bytes = try encode(
+                """
+                package test:pkg
+                world empty {}
+                """, worldName: "empty", encodingVersion: 5)
+            let v5Payloads = try parseOutput(v5Bytes)
+            let v5Customs = customSections(from: v5Payloads)
+            #expect(v5Customs[0].name == "wit-component-encoding")
+            #expect(v5Customs[0].bytes.first == 5)
         }
 
         @Test func worldNotFoundError() throws {
@@ -212,27 +167,6 @@
                     context: ctx, worldName: "nonexistent"
                 )
             }
-        }
-
-        // MARK: - Type section structure tests
-
-        @Test func typeSectionContainsOuterComponentType() throws {
-            let bytes = try encode(
-                """
-                package test:pkg
-                world my-world {}
-                """, worldName: "my-world")
-
-            let payloads = try parseOutput(bytes)
-            let types = try #require(typeSection(from: payloads))
-            #expect(types.count == 1)
-
-            // Outer should be a componenttype with 2 declarations
-            guard case .component(let outerDecl) = types[0] else {
-                Issue.record("Expected componenttype")
-                return
-            }
-            #expect(outerDecl.declarations.count == 2)
         }
 
         // MARK: - Function export tests
@@ -621,9 +555,6 @@
                 }
                 """, worldName: "my-world")
 
-            // Verify structure via section presence
-            #expect(findSection(id: 0x07, in: bytes) != nil)
-
             // Verify the functype contains: list opcode (0x70) followed by u32 opcode (0x79)
             let listU32Sequence: [UInt8] = [0x70, 0x79]
             #expect(
@@ -639,8 +570,6 @@
                     export maybe-greet: func(name: option<string>) -> string
                 }
                 """, worldName: "my-world")
-
-            #expect(findSection(id: 0x07, in: bytes) != nil)
 
             // option opcode (0x6B) followed by string opcode (0x73)
             let optionStringSequence: [UInt8] = [0x6B, 0x73]
@@ -658,8 +587,6 @@
                 }
                 """, worldName: "my-world")
 
-            #expect(findSection(id: 0x07, in: bytes) != nil)
-
             // result opcode (0x6A) + ok present (0x01) + u32 (0x79) + err present (0x01) + string (0x73)
             let resultSequence: [UInt8] = [0x6A, 0x01, 0x79, 0x01, 0x73]
             #expect(
@@ -675,8 +602,6 @@
                     export swap: func(pair: tuple<u32, u64>) -> tuple<u64, u32>
                 }
                 """, worldName: "my-world")
-
-            #expect(findSection(id: 0x07, in: bytes) != nil)
 
             // tuple opcode (0x6F) + count(2) + u32(0x79) + u64(0x77)
             let tupleSequence: [UInt8] = [0x6F, 0x02, 0x79, 0x77]
@@ -868,24 +793,6 @@
             // point is type index 0 in this instancetype
             #expect(lineFields[0].type.rawValue == 0)
             #expect(lineFields[1].type.rawValue == 0)
-        }
-
-        // MARK: - Encoding version
-
-        @Test func customEncodingVersion() throws {
-            let bytes = try encode(
-                """
-                package test:pkg
-                world my-world {}
-                """, worldName: "my-world", encodingVersion: 5)
-
-            let payloads = try parseOutput(bytes)
-            let customs = customSections(from: payloads)
-            #expect(customs[0].name == "wit-component-encoding")
-
-            let payload = Array(customs[0].bytes)
-            let (version, _) = readLEB128(payload, offset: 0)
-            #expect(version == 5)
         }
 
         // MARK: - Error path tests
