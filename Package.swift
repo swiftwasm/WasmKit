@@ -208,6 +208,30 @@ let package = Package(
             ]
         ),
 
+        .target(
+            name: "ComponentLinker",
+            dependencies: [
+                "WAT",
+                "WIT",
+                .target(
+                    name: "ComponentModel",
+                    condition: .when(traits: ["ComponentModel"])
+                ),
+            ]
+        ),
+        .testTarget(
+            name: "ComponentLinkerTests",
+            dependencies: [
+                "ComponentLinker",
+                "WasmParser",
+                "WIT",
+                .target(
+                    name: "ComponentModel",
+                    condition: .when(traits: ["ComponentModel"])
+                ),
+            ]
+        ),
+
         .target(name: "WITOverlayGenerator", dependencies: ["WIT"]),
         .target(name: "_CabiShims"),
 

@@ -1,17 +1,19 @@
 import WasmParser
 import WasmTypes
 
-struct Encoder {
-    var output: [UInt8] = []
+package struct Encoder {
+    package var output: [UInt8] = []
 
-    mutating func writeHeader() {
+    package init() {}
+
+    package mutating func writeHeader() {
         output.append(contentsOf: [
             0x00, 0x61, 0x73, 0x6D,  // magic
             0x01, 0x00, 0x00, 0x00,  // version
         ])
     }
 
-    mutating func section<E: Error>(id: UInt8, _ sectionContent: (inout Encoder) throws(E) -> Void) throws(E) {
+    package mutating func section<E: Error>(id: UInt8, _ sectionContent: (inout Encoder) throws(E) -> Void) throws(E) {
         output.append(id)
         var contentEncoder = Encoder()
         try sectionContent(&contentEncoder)
@@ -19,7 +21,7 @@ struct Encoder {
         output.append(contentsOf: contentEncoder.output)
     }
 
-    mutating func encodeVector<Source: Collection, E: Error>(
+    package mutating func encodeVector<Source: Collection, E: Error>(
         _ values: Source, encodeElement: (Source.Element, inout Encoder) throws(E) -> Void
     ) throws(E) {
         writeUnsignedLEB128(UInt32(values.count))
@@ -28,7 +30,7 @@ struct Encoder {
         }
     }
 
-    mutating func encodeVector<Source: Collection, Element: WasmEncodable>(_ values: Source, transform: (Source.Element) -> (Element)) {
+    package mutating func encodeVector<Source: Collection, Element: WasmEncodable>(_ values: Source, transform: (Source.Element) -> (Element)) {
         encodeVector(
             values,
             encodeElement: { element, encoder in
@@ -36,20 +38,20 @@ struct Encoder {
             })
     }
 
-    mutating func encodeVector<Source: Collection>(_ values: Source) where Source.Element: WasmEncodable {
+    package mutating func encodeVector<Source: Collection>(_ values: Source) where Source.Element: WasmEncodable {
         encodeVector(values, encodeElement: { $0.encode(to: &$1) })
     }
 
-    mutating func encodeByteVector(_ values: [UInt8]) {
+    package mutating func encodeByteVector(_ values: [UInt8]) {
         writeUnsignedLEB128(UInt32(values.count))
         output.append(contentsOf: values)
     }
 
-    mutating func encode<T: WasmEncodable>(_ value: T) {
+    package mutating func encode<T: WasmEncodable>(_ value: T) {
         value.encode(to: &self)
     }
 
-    mutating func writeUnsignedLEB128<T: UnsignedInteger & FixedWidthInteger>(_ value: T) {
+    package mutating func writeUnsignedLEB128<T: UnsignedInteger & FixedWidthInteger>(_ value: T) {
         var value = value
         repeat {
             var byte = UInt8(value & 0b0111_1111)
@@ -61,7 +63,7 @@ struct Encoder {
         } while value != 0
     }
 
-    mutating func writeSignedLEB128<T: SignedInteger & FixedWidthInteger>(_ value: T) {
+    package mutating func writeSignedLEB128<T: SignedInteger & FixedWidthInteger>(_ value: T) {
         func leb128LoopUntil(_ until: (T, UInt8) -> Bool) {
             var value = value
             while true {
@@ -108,12 +110,12 @@ struct Encoder {
     }
 }
 
-protocol WasmEncodable {
+package protocol WasmEncodable {
     func encode(to encoder: inout Encoder)
 }
 
 extension ValueType: WasmEncodable {
-    func encode(to encoder: inout Encoder) {
+    package func encode(to encoder: inout Encoder) {
         switch self {
         case .i32: encoder.output.append(0x7F)
         case .i64: encoder.output.append(0x7E)
@@ -126,7 +128,7 @@ extension ValueType: WasmEncodable {
 }
 
 extension ReferenceType: WasmEncodable {
-    func encode(to encoder: inout Encoder) {
+    package func encode(to encoder: inout Encoder) {
         switch (isNullable, heapType) {
         // Use short form when available
         case (true, .externRef): encoder.output.append(0x6F)
@@ -139,7 +141,7 @@ extension ReferenceType: WasmEncodable {
 }
 
 extension HeapType: WasmEncodable {
-    func encode(to encoder: inout Encoder) {
+    package func encode(to encoder: inout Encoder) {
         switch self {
         case .abstract(.externRef): encoder.output.append(0x6F)
         case .abstract(.funcRef): encoder.output.append(0x70)
@@ -152,7 +154,7 @@ extension HeapType: WasmEncodable {
 }
 
 extension FunctionType: WasmEncodable {
-    func encode(to encoder: inout Encoder) {
+    package func encode(to encoder: inout Encoder) {
         encoder.output.append(0x60)
         encoder.writeUnsignedLEB128(UInt32(parameters.count))
         for param in parameters {
@@ -166,7 +168,7 @@ extension FunctionType: WasmEncodable {
 }
 
 extension TableType: WasmEncodable {
-    func encode(to encoder: inout Encoder) {
+    package func encode(to encoder: inout Encoder) {
         elementType.encode(to: &encoder)
         limits.encode(to: &encoder)
     }
@@ -316,14 +318,14 @@ extension WAT.WatParser.ElementDecl {
 }
 
 extension String: WasmEncodable {
-    func encode(to encoder: inout Encoder) {
+    package func encode(to encoder: inout Encoder) {
         encoder.writeUnsignedLEB128(UInt32(utf8.count))
         encoder.output.append(contentsOf: utf8)
     }
 }
 
 extension Export: WasmEncodable {
-    func encode(to encoder: inout Encoder) {
+    package func encode(to encoder: inout Encoder) {
         encoder.encode(name)
         switch descriptor {
         case .function(let index):
@@ -354,13 +356,13 @@ extension WatParser.GlobalDecl {
 }
 
 extension WatParser.MemoryDecl: WasmEncodable {
-    func encode(to encoder: inout Encoder) {
+    package func encode(to encoder: inout Encoder) {
         encoder.encode(type)
     }
 }
 
 extension Limits: WasmEncodable {
-    func encode(to encoder: inout Encoder) {
+    package func encode(to encoder: inout Encoder) {
         var flags = 0
         if max != nil {
             flags |= 0b0001
@@ -381,7 +383,7 @@ extension Limits: WasmEncodable {
 }
 
 extension GlobalType: WasmEncodable {
-    func encode(to encoder: inout Encoder) {
+    package func encode(to encoder: inout Encoder) {
         encoder.encode(self.valueType)
         switch self.mutability {
         case .constant:
@@ -393,7 +395,7 @@ extension GlobalType: WasmEncodable {
 }
 
 extension Import: WasmEncodable {
-    func encode(to encoder: inout Encoder) {
+    package func encode(to encoder: inout Encoder) {
         encoder.encode(module)
         encoder.encode(name)
         switch descriptor {
