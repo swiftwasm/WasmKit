@@ -17,6 +17,10 @@ struct NameRegistry {
                 switch result {
                 case .functions(let nameMap):
                     registry.register(instance: instance, nameMap: nameMap)
+                default:
+                    // TODO: Store other name subsections (module, locals, globals, etc.)
+                    // for richer diagnostics when callers need them.
+                    break
                 }
             }
 
