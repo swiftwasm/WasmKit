@@ -1,4 +1,5 @@
 import Testing
+import WasmKit
 import WasmTypes
 
 @testable import WASI
@@ -344,6 +345,54 @@ struct WASITests {
         } catch let error as WASIAbi.Errno {
             #expect(error == .EEXIST)
         }
+    }
+
+    @Test
+    func wasiAbi() throws {
+        let engine = Engine()
+        let store = Store(engine: engine)
+        let memory = try Memory(store: store, type: .init(min: 1))
+
+        // Test union size and alignment end-to-end
+        let start = UnsafeGuestRawPointer(memorySpace: memory, offset: 0)
+        var pointer = start
+        let read = WASIAbi.Subscription.Union.fdRead(.init(0))
+        let write = WASIAbi.Subscription.Union.fdWrite(.init(0))
+        let writeOffset = WASIAbi.Subscription.sizeInGuest
+        let timeout: WASIAbi.Timestamp = 100_000_000
+        let clock = WASIAbi.Subscription.Union.clock(.init(id: .REALTIME, timeout: timeout, precision: 0, flags: []))
+        let clockOffset = writeOffset + WASIAbi.Subscription.sizeInGuest
+        let event = WASIAbi.Event(userData: 3, error: .EIO, eventType: .fdRead, fdReadWrite: .init(nBytes: 37, flags: [.hangup]))
+        let eventOffset = clockOffset + WASIAbi.Subscription.sizeInGuest
+        let finalOffset = eventOffset + WASIAbi.Event.sizeInGuest
+        WASIAbi.Subscription.writeToGuest(at: &pointer, value: .init(userData: 1, union: read))
+        #expect(pointer.offset == writeOffset)
+        WASIAbi.Subscription.writeToGuest(at: &pointer, value: .init(userData: 2, union: write))
+        #expect(pointer.offset == clockOffset)
+        WASIAbi.Subscription.writeToGuest(at: &pointer, value: .init(userData: 3, union: clock))
+        #expect(pointer.offset == eventOffset)
+        WASIAbi.Event.writeToGuest(at: &pointer, value: event)
+        #expect(pointer.offset == finalOffset)
+
+        // Test that reading back yields same result
+        pointer = start
+        #expect(WASIAbi.Subscription.readFromGuest(&pointer) == .init(userData: 1, union: read))
+        #expect(pointer.offset == writeOffset)
+        #expect(WASIAbi.Subscription.readFromGuest(&pointer) == .init(userData: 2, union: write))
+        #expect(pointer.offset == clockOffset)
+        #expect(WASIAbi.Subscription.readFromGuest(&pointer) == .init(userData: 3, union: clock))
+        #expect(pointer.offset == eventOffset)
+        #expect(WASIAbi.Event.readFromGuest(&pointer) == event)
+        #expect(pointer.offset == finalOffset)
+
+        #if !os(Windows)
+            let elapsed = try ContinuousClock().measure {
+                let clockPointer = UnsafeGuestBufferPointer<WASIAbi.Subscription>(baseAddress: .init(memorySpace: memory, offset: clockOffset), count: 1)
+                let result = try WASIBridgeToHost().underlying.poll_oneoff(subscriptions: clockPointer, events: .init(baseAddress: .init(memorySpace: memory, offset: finalOffset), count: 1))
+                #expect(result == 1)
+            }
+            #expect(elapsed > .nanoseconds(timeout))
+        #endif
     }
 
     @Test
