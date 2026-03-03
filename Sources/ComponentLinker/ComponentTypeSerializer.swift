@@ -5,9 +5,9 @@ import WIT
 
 /// Serializes WIT world definitions into the component-type custom section
 /// binary format for WasmKit component linking.
-public enum ComponentTypeSerializer {
+package enum ComponentTypeSerializer {
 
-    public enum Error: Swift.Error, Equatable {
+    package enum Error: Swift.Error, Equatable {
         case worldNotFound(String)
         case unsupportedFeature(String)
     }
@@ -17,7 +17,7 @@ public enum ComponentTypeSerializer {
     /// The returned bytes form a complete component binary (header + sections)
     /// suitable for embedding as a `"component-type"` custom section in a core
     /// Wasm module.
-    public static func encodeComponentType(
+    package static func encodeComponentType(
         context: SemanticsContext,
         worldName: String,
         encodingVersion: UInt32 = 4
