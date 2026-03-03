@@ -28,7 +28,7 @@ protocol ImportableModuleFieldDecl {
 }
 
 protocol NameToIndexResolver {
-    func resolveIndex(use: Parser.IndexOrId) throws(WatParserError) -> Int
+    func resolveIndex(use: Parser.IndexOrId) throws(WasmKitError) -> Int
 }
 
 /// A map of module field declarations indexed by their name
@@ -40,23 +40,23 @@ struct NameMapping<Decl: NamedFieldDecl>: NameToIndexResolver {
     /// - Parameter newDecl: The declaration to add
     /// - Returns: The index of the added declaration
     @discardableResult
-    mutating func add(_ newDecl: Decl) throws(WatParserError) -> Int {
+    mutating func add(_ newDecl: Decl) throws(WasmKitError) -> Int {
         let index = decls.count
         decls.append(newDecl)
         if let name = newDecl.id {
             guard nameToIndex[name.value] == nil else {
-                throw WatParserError("Duplicate \(name.value) identifier", location: name.location)
+                throw WasmKitError("Duplicate \(name.value) identifier", location: name.location)
             }
             nameToIndex[name.value] = index
         }
         return index
     }
 
-    func resolveIndex(use: Parser.IndexOrId) throws(WatParserError) -> Int {
+    func resolveIndex(use: Parser.IndexOrId) throws(WasmKitError) -> Int {
         switch use {
         case .id(let id, _):
             guard let byName = nameToIndex[id.value] else {
-                throw WatParserError("Unknown \(Decl.self) \(id)", location: use.location)
+                throw WasmKitError("Unknown \(Decl.self) \(id)", location: use.location)
             }
             return byName
         case .index(let value, _):
@@ -67,10 +67,10 @@ struct NameMapping<Decl: NamedFieldDecl>: NameToIndexResolver {
     /// Resolves a declaration by its name or index
     /// - Parameter use: The name or index of the declaration
     /// - Returns: The declaration and its index
-    func resolve(use: Parser.IndexOrId) throws(WatParserError) -> (decl: Decl, index: Int) {
+    func resolve(use: Parser.IndexOrId) throws(WasmKitError) -> (decl: Decl, index: Int) {
         let index = try resolveIndex(use: use)
         guard index < decls.count else {
-            throw WatParserError("Invalid \(Decl.self) index \(index)", location: use.location)
+            throw WasmKitError("Invalid \(Decl.self) index \(index)", location: use.location)
         }
         return (decls[index], index)
     }
@@ -118,7 +118,7 @@ struct TypesMap {
 
     /// Adds a new function type to the mapping
     @discardableResult
-    mutating func add(_ decl: NamedResolvedType) throws(WatParserError) -> Int {
+    mutating func add(_ decl: NamedResolvedType) throws(WasmKitError) -> Int {
         try nameMapping.add(decl)
         // Normalize the function type signature without parameter names
         if let existing = indices[decl.type.signature] {
@@ -131,7 +131,7 @@ struct TypesMap {
     }
 
     /// Adds a new function type to the mapping without parameter names
-    private mutating func addAnonymousSignature(_ signature: FunctionType) throws(WatParserError) -> Int {
+    private mutating func addAnonymousSignature(_ signature: FunctionType) throws(WasmKitError) -> Int {
         if let existing = indices[signature] {
             return existing
         }
@@ -145,8 +145,8 @@ struct TypesMap {
 
     private mutating func resolveBlockType(
         results: [ValueType],
-        resolveSignatureIndex: (inout TypesMap) throws(WatParserError) -> Int
-    ) throws(WatParserError) -> BlockType {
+        resolveSignatureIndex: (inout TypesMap) throws(WasmKitError) -> Int
+    ) throws(WasmKitError) -> BlockType {
         if let result = results.first {
             guard results.count > 1 else { return .type(result) }
             return try .funcType(UInt32(resolveSignatureIndex(&self)))
@@ -155,8 +155,8 @@ struct TypesMap {
     }
     private mutating func resolveBlockType(
         signature: WasmTypes.FunctionType,
-        resolveSignatureIndex: (inout TypesMap) throws(WatParserError) -> Int
-    ) throws(WatParserError) -> BlockType {
+        resolveSignatureIndex: (inout TypesMap) throws(WasmKitError) -> Int
+    ) throws(WasmKitError) -> BlockType {
         if signature.parameters.isEmpty {
             return try resolveBlockType(results: signature.results, resolveSignatureIndex: resolveSignatureIndex)
         }
@@ -164,26 +164,26 @@ struct TypesMap {
     }
 
     /// Resolves a block type from a list of result types
-    mutating func resolveBlockType(results: [ValueType]) throws(WatParserError) -> BlockType {
+    mutating func resolveBlockType(results: [ValueType]) throws(WasmKitError) -> BlockType {
         return try resolveBlockType(
             results: results,
-            resolveSignatureIndex: { resolver throws(WatParserError) in
+            resolveSignatureIndex: { resolver throws(WasmKitError) in
                 let signature = FunctionType(parameters: [], results: results)
                 return try resolver.addAnonymousSignature(signature)
             })
     }
 
     /// Resolves a block type from a function type signature
-    mutating func resolveBlockType(signature: WasmTypes.FunctionType) throws(WatParserError) -> BlockType {
+    mutating func resolveBlockType(signature: WasmTypes.FunctionType) throws(WasmKitError) -> BlockType {
         return try resolveBlockType(
             signature: signature,
-            resolveSignatureIndex: { resolver throws(WatParserError) in
+            resolveSignatureIndex: { resolver throws(WasmKitError) in
                 return try resolver.addAnonymousSignature(signature)
             })
     }
 
     /// Resolves a block type from a type use
-    mutating func resolveBlockType(use: WatParser.TypeUse) throws(WatParserError) -> BlockType {
+    mutating func resolveBlockType(use: WatParser.TypeUse) throws(WasmKitError) -> BlockType {
         switch (use.index, use.inline) {
         case (let indexOrId?, let inline):
             let (type, index) = try resolveAndCheck(use: indexOrId, inline: inline?.resolve(nameMapping))
@@ -194,7 +194,7 @@ struct TypesMap {
         }
     }
 
-    mutating func resolveIndex(use: WatParser.TypeUse) throws(WatParserError) -> Int {
+    mutating func resolveIndex(use: WatParser.TypeUse) throws(WasmKitError) -> Int {
         switch (use.index, use.inline) {
         case (let indexOrId?, _):
             return try nameMapping.resolveIndex(use: indexOrId)
@@ -205,24 +205,24 @@ struct TypesMap {
     }
 
     /// Resolves a function type from a type use
-    func resolve(use: Parser.IndexOrId) throws(WatParserError) -> (decl: WatParser.FunctionType, index: Int) {
+    func resolve(use: Parser.IndexOrId) throws(WasmKitError) -> (decl: WatParser.FunctionType, index: Int) {
         let (decl, index) = try nameMapping.resolve(use: use)
         return (decl.type, index)
     }
 
-    private func resolveAndCheck(use indexOrId: Parser.IndexOrId, inline: WatParser.FunctionType?) throws(WatParserError) -> (type: WatParser.FunctionType, index: Int) {
+    private func resolveAndCheck(use indexOrId: Parser.IndexOrId, inline: WatParser.FunctionType?) throws(WasmKitError) -> (type: WatParser.FunctionType, index: Int) {
         let (found, index) = try resolve(use: indexOrId)
         if let inline {
             // If both index and inline type, then they must match
             guard found.signature == inline.signature else {
-                throw WatParserError("Type mismatch \(found) != \(inline)", location: indexOrId.location)
+                throw WasmKitError("Type mismatch \(found) != \(inline)", location: indexOrId.location)
             }
         }
         return (found, Int(index))
     }
 
     /// Resolves a function type from a type use with an optional inline type
-    mutating func resolve(use: WatParser.TypeUse) throws(WatParserError) -> (type: WatParser.FunctionType, index: Int) {
+    mutating func resolve(use: WatParser.TypeUse) throws(WasmKitError) -> (type: WatParser.FunctionType, index: Int) {
         switch (use.index, use.inline) {
         case (let indexOrId?, let inline):
             return try resolveAndCheck(use: indexOrId, inline: inline?.resolve(nameMapping))
@@ -267,28 +267,28 @@ extension TypesMap: Collection {
         private(set) var nameToIndex: [String: Int] = [:]
 
         @discardableResult
-        mutating func add(_ decl: ComponentWatParser.CoreTypeDef) throws(WatParserError) -> Int {
+        mutating func add(_ decl: ComponentWatParser.CoreTypeDef) throws(WasmKitError) -> Int {
             let index = declarations.count
             declarations.append(decl)
             if let name = decl.id {
                 guard nameToIndex[name.value] == nil else {
-                    throw WatParserError("Duplicate \(name.value) identifier", location: name.location)
+                    throw WasmKitError("Duplicate \(name.value) identifier", location: name.location)
                 }
                 nameToIndex[name.value] = index
             }
             return index
         }
 
-        func resolveIndex(use: Parser.IndexOrId) throws(WatParserError) -> Int {
+        func resolveIndex(use: Parser.IndexOrId) throws(WasmKitError) -> Int {
             switch use {
             case .id(let id, _):
                 guard let byName = nameToIndex[id.value] else {
-                    throw WatParserError("Unknown core type \(id)", location: use.location)
+                    throw WasmKitError("Unknown core type \(id)", location: use.location)
                 }
                 return byName
             case .index(let index, _):
                 guard Int(index) < declarations.count else {
-                    throw WatParserError("Core type index \(index) out of bounds", location: use.location)
+                    throw WasmKitError("Core type index \(index) out of bounds", location: use.location)
                 }
                 return Int(index)
             }

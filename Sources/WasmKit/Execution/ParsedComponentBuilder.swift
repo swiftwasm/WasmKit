@@ -13,7 +13,7 @@
     ///   - filePath: Path to the WebAssembly component binary file
     ///   - features: Enabled WebAssembly features for parsing
     /// - Returns: A `ParsedComponent` ready for instantiation
-    /// - Throws: `WasmParserError` if parsing fails, `ComponentParseError` for semantic errors
+    /// - Throws: `WasmKitError` if parsing fails, `ComponentParseError` for semantic errors
     public func parseComponent(
         filePath: FilePath,
         features: WasmFeatureSet = .default
@@ -33,7 +33,7 @@
     ///   - bytes: The WebAssembly component binary bytes
     ///   - features: Enabled WebAssembly features for parsing
     /// - Returns: A `ParsedComponent` ready for instantiation
-    /// - Throws: `WasmParserError` if parsing fails, `ComponentParseError` for semantic errors
+    /// - Throws: `WasmKitError` if parsing fails, `ComponentParseError` for semantic errors
     public func parseComponent(
         bytes: [UInt8],
         features: WasmFeatureSet = .default
@@ -50,7 +50,7 @@
     ///   - bytes: The WebAssembly component binary bytes as an ArraySlice
     ///   - features: Enabled WebAssembly features for parsing
     /// - Returns: A `ParsedComponent` ready for instantiation
-    /// - Throws: `WasmParserError` if parsing fails, `ComponentParseError` for semantic errors
+    /// - Throws: `WasmKitError` if parsing fails, `ComponentParseError` for semantic errors
     func parseComponent(
         bytes: ArraySlice<UInt8>,
         features: WasmFeatureSet = .default

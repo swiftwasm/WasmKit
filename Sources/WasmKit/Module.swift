@@ -108,16 +108,16 @@ public struct Module {
         self.tableTypes = tableTypes + tables
     }
 
-    static func resolveType(_ index: TypeIndex, typeSection: [FunctionType]) throws -> FunctionType {
+    static func resolveType(_ index: TypeIndex, typeSection: [FunctionType]) throws(WasmKitError) -> FunctionType {
         guard Int(index) < typeSection.count else {
-            throw TranslationError("Type index \(index) is out of range")
+            throw WasmKitError("Type index \(index) is out of range")
         }
         return typeSection[Int(index)]
     }
 
-    internal func resolveFunctionType(_ index: FunctionIndex) throws -> FunctionType {
+    internal func resolveFunctionType(_ index: FunctionIndex) throws(WasmKitError) -> FunctionType {
         guard Int(index) < functions.count + self.moduleImports.numberOfFunctions else {
-            throw TranslationError("Function index \(index) is out of range")
+            throw WasmKitError("Function index \(index) is out of range")
         }
         if Int(index) < self.moduleImports.numberOfFunctions {
             return try Self.resolveType(
@@ -189,15 +189,22 @@ public struct Module {
             )
             try table.withValue { table in
                 guard let offset = offsetValue.maybeAddressOffset(table.limits.isMemory64) else {
-                    throw ValidationError(
-                        .unexpectedOffsetInitializer(expected: .addressType(isMemory64: table.limits.isMemory64), got: offsetValue)
+                    throw WasmKitError(
+                        kind: .message(
+                            .unexpectedOffsetInitializer(
+                                expected: .addressType(isMemory64: table.limits.isMemory64),
+                                got: offsetValue
+                            )
+                        )
                     )
                 }
                 guard table.tableType.elementType == element.type else {
-                    throw ValidationError(
-                        .elementSegmentTypeMismatch(
-                            elementType: element.type,
-                            tableElementType: table.tableType.elementType
+                    throw WasmKitError(
+                        kind: .message(
+                            .elementSegmentTypeMismatch(
+                                elementType: element.type,
+                                tableElementType: table.tableType.elementType
+                            )
                         )
                     )
                 }
@@ -218,8 +225,13 @@ public struct Module {
             )
             try memory.withValue { memory in
                 guard let offset = offsetValue.maybeAddressOffset(isMemory64) else {
-                    throw ValidationError(
-                        .unexpectedOffsetInitializer(expected: .addressType(isMemory64: isMemory64), got: offsetValue)
+                    throw WasmKitError(
+                        kind: .message(
+                            .unexpectedOffsetInitializer(
+                                expected: .addressType(isMemory64: isMemory64),
+                                got: offsetValue
+                            )
+                        )
                     )
                 }
                 try memory.write(offset: Int(offset), bytes: data.initializer)

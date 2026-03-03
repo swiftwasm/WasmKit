@@ -13,6 +13,7 @@ enum WasmGen {
         let opcode: [UInt8]
         let immediates: [Immediate]
         let category: String?
+        let defaultAlign: UInt32?
 
         var visitMethodName: String {
             if let explicitCategory = category {
@@ -83,7 +84,8 @@ enum WasmGen {
             opcode = try decodeHexArray()
             let rawImmediates = try container.decode([[String]].self)
             immediates = rawImmediates.map { Immediate(label: $0[0], type: $0[1]) }
-            category = try? container.decode(String.self)
+            category = try container.decodeIfPresent(String.self)
+            defaultAlign = container.isAtEnd ? nil : try container.decode(UInt32.self)
         }
     }
 
@@ -96,7 +98,6 @@ enum WasmGen {
             /// The visitor pattern is used while parsing WebAssembly expressions to allow for easy extensibility.
             /// See the expression parsing method ``Code/parseExpression(visitor:)``
             public protocol InstructionVisitor: ~Copyable {
-                associatedtype VisitorError: Error
                 /// Current offset in visitor's instruction stream.
                 var binaryOffset: Int { get set }
 
@@ -109,13 +110,13 @@ enum WasmGen {
             code += instruction.associatedValues.map { i in
                 "\(i.argumentName ?? "_"): \(i.type)"
             }.joined(separator: ", ")
-            code += ") throws(VisitorError)"
+            code += ") throws(WasmKitError)"
         }
 
         code += """
 
                 /// Returns: `true` if the parser should silently proceed parsing.
-                mutating func visitUnknown(_ opcode: [UInt8]) throws(VisitorError) -> Bool
+                mutating func visitUnknown(_ opcode: [UInt8]) throws(WasmKitError) -> Bool
             }
             """
 
@@ -124,7 +125,7 @@ enum WasmGen {
 
             extension InstructionVisitor where Self: ~Copyable {
                 /// Visits an instruction.
-                public mutating func visit(_ instruction: Instruction) throws(VisitorError) {
+                public mutating func visit(_ instruction: Instruction) throws(WasmKitError) {
                     switch instruction {
 
             """
@@ -166,10 +167,10 @@ enum WasmGen {
                     return "\(i.argumentName ?? "_") \(i.parameterName): \(i.type)"
                 }
             }.joined(separator: ", ")
-            code += ") throws(VisitorError) {}\n"
+            code += ") throws(WasmKitError) {}\n"
         }
         code += """
-            public mutating func visitUnknown(_ opcode: [UInt8]) throws(VisitorError) -> Bool { false }
+            public mutating func visitUnknown(_ opcode: [UInt8]) throws(WasmKitError) -> Bool { false }
         }
 
         """
@@ -241,7 +242,7 @@ enum WasmGen {
             /// A visitor that visits all instructions by a single visit method.
             public protocol AnyInstructionVisitor: InstructionVisitor {
                 /// Visiting any instruction.
-                mutating func visit(_ instruction: Instruction) throws(VisitorError)
+                mutating func visit(_ instruction: Instruction) throws(WasmKitError)
             }
 
             extension AnyInstructionVisitor {
@@ -257,7 +258,7 @@ enum WasmGen {
                     return "\(i.argumentName ?? "_") \(i.parameterName): \(i.type)"
                 }
             }.joined(separator: ", ")
-            code += ") throws(VisitorError) { "
+            code += ") throws(WasmKitError) { "
             code += "return try self.visit(" + buildInstructionInstanceFromContext(instruction) + ")"
             code += " }\n"
         }
@@ -271,7 +272,6 @@ enum WasmGen {
         var code = """
             /// A visitor that traces the instructions visited.
             public struct InstructionTracingVisitor<V: InstructionVisitor>: InstructionVisitor {
-                typealias VisitorError = V.VisitorError
                 /// A closure that is invoked with the visited instruction.
                 public let trace: (Instruction) -> Void
                 /// The visitor to forward the instructions to.
@@ -298,7 +298,7 @@ enum WasmGen {
                     return "\(i.argumentName ?? "_") \(i.parameterName): \(i.type)"
                 }
             }.joined(separator: ", ")
-            code += ") throws(V.VisitorError) {\n"
+            code += ") throws(WasmKitError) {\n"
             code += "       trace("
             code += buildInstructionInstanceFromContext(instruction)
             code += ")\n"
@@ -335,7 +335,7 @@ enum WasmGen {
                 keyword: String,
                 expressionParser: inout ExpressionParser<V>,
                 wat: inout Wat
-            ) throws(WatParserError) -> ((inout V) throws(WatParserError) -> Void)? where V.VisitorError == WatParserError {
+            ) throws(WasmKitError) -> ((inout V) throws(WasmKitError) -> Void)? {
                 switch keyword {
 
             """
@@ -359,7 +359,7 @@ enum WasmGen {
             } else {
                 code += " "
             }
-            code += "return { visitor throws(WatParserError) in return try visitor.\(instruction.visitMethodName)("
+            code += "return { visitor throws(WasmKitError) in return try visitor.\(instruction.visitMethodName)("
             var arguments: [(label: String?, value: String)] = []
             if instruction.category != nil {
                 arguments.append((label: nil, value: ".\(instruction.name.enumCase)"))
@@ -408,6 +408,61 @@ enum WasmGen {
         return code
     }
 
+    static func generateTextInstructionPrinter(_ instructions: InstructionSet) -> String {
+        var code = """
+            import WasmParser
+            import WasmTypes
+
+
+            """
+
+        let categorized = instructions.categorized
+
+        // 1. Generate mnemonic functions for each multi-instruction category
+        for cat in categorized where cat.sourceInstructions.count > 1 {
+            guard let categoryTypeName = cat.categoryTypeName else { continue }
+            guard cat.sourceInstructions.allSatisfy({ $0.name.text != nil }) else { continue }
+
+            code += "func generatedMnemonic(for op: Instruction.\(categoryTypeName)) -> String {\n"
+            code += "    switch op {\n"
+            for instr in cat.sourceInstructions {
+                code += "    case .\(instr.name.enumCase): return \"\(instr.name.text!)\"\n"
+            }
+            code += "    }\n"
+            code += "}\n\n"
+
+            // 2. Generate defaultAlign function if this category has memarg instructions
+            let hasMemarg = cat.sourceInstructions.contains(where: { $0.defaultAlign != nil })
+            if hasMemarg {
+                code += "func generatedDefaultAlign(for op: Instruction.\(categoryTypeName)) -> UInt32 {\n"
+                code += "    switch op {\n"
+                for instr in cat.sourceInstructions {
+                    if let align = instr.defaultAlign {
+                        code += "    case .\(instr.name.enumCase): return \(align)\n"
+                    }
+                }
+                code += "    }\n"
+                code += "}\n\n"
+            }
+        }
+
+        // 3. Generate lookup for non-categorized memarg instructions (atomics etc.)
+        let nonCategorizedMemarg = instructions.filter { $0.category == nil && $0.defaultAlign != nil }
+        if !nonCategorizedMemarg.isEmpty {
+            code += "func generatedMemargInstruction(_ instruction: Instruction) -> (mnemonic: String, memarg: MemArg, defaultAlign: UInt32)? {\n"
+            code += "    switch instruction {\n"
+            for instr in nonCategorizedMemarg {
+                guard let text = instr.name.text else { continue }
+                code += "    case .\(instr.name.enumCase)(let m): return (\"\(text)\", m, \(instr.defaultAlign!))\n"
+            }
+            code += "    default: return nil\n"
+            code += "    }\n"
+            code += "}\n"
+        }
+
+        return code
+    }
+
     static func generateBinaryInstructionEncoder(_ instructions: InstructionSet) -> String {
         var code = """
             import WasmParser
@@ -417,7 +472,7 @@ enum WasmGen {
             /// in Wasm binary format.
             protocol BinaryInstructionEncoder: InstructionVisitor {
                 /// Encodes an instruction opcode.
-                mutating func encodeInstruction(_ opcode: [UInt8]) throws(VisitorError)
+                mutating func encodeInstruction(_ opcode: [UInt8]) throws(WasmKitError)
 
                 // MARK: - Immediates encoding
 
@@ -447,7 +502,7 @@ enum WasmGen {
             code += immediates.map { i in
                 "\(i.label): \(i.type)"
             }.joined(separator: ", ")
-            code += ") throws(VisitorError)\n"
+            code += ") throws(WasmKitError)\n"
         }
 
         code += """
@@ -467,7 +522,7 @@ enum WasmGen {
                     return "\(i.argumentName ?? "_") \(i.parameterName): \(i.type)"
                 }
             }.joined(separator: ", ")
-            code += ") throws(VisitorError) {"
+            code += ") throws(WasmKitError) {"
 
             var encodeInstrCall: String
             if let category = instruction.explicitCategory {
@@ -544,10 +599,10 @@ enum WasmGen {
             var offset: Int { get }
 
             /// Claim the next byte to be decoded
-            @inlinable func claimNextByte() throws -> UInt8
+            @inlinable func claimNextByte() throws(WasmKitError) -> UInt8
 
             /// Throw an error due to unknown opcode.
-            func throwUnknown(_ opcode: [UInt8]) throws -> Never
+            func throwUnknown(_ opcode: [UInt8]) throws(WasmKitError) -> Never
 
         """
         for instruction in instructions.categorized {
@@ -557,7 +612,7 @@ enum WasmGen {
             if let categoryType = instruction.categoryTypeName {
                 code += "_: Instruction.\(categoryType)"
             }
-            code += ") throws -> "
+            code += ") throws(WasmKitError) -> "
             if instruction.immediates.count == 1 {
                 code += "\(instruction.immediates[0].type)"
             } else {
@@ -576,7 +631,7 @@ enum WasmGen {
         func parseBinaryInstruction(
             visitor: inout some InstructionVisitor & ~Copyable,
             decoder: inout some BinaryInstructionDecoder
-        ) throws -> Bool {
+        ) throws(WasmKitError) -> Bool {
             visitor.binaryOffset = decoder.offset
         """
 
@@ -647,6 +702,7 @@ enum WasmGen {
         struct ColumnInfo {
             var header: String
             var maxWidth: Int = 0
+            var isOptional: Bool = false
             var value: (Instruction) -> String
         }
 
@@ -680,6 +736,16 @@ enum WasmGen {
                         return "null"
                     }
                 }),
+            ColumnInfo(
+                header: "DefaultAlign",
+                isOptional: true,
+                value: { i in
+                    if let defaultAlign = i.defaultAlign {
+                        return String(defaultAlign)
+                    } else {
+                        return ""
+                    }
+                }),
         ]
         for instruction in instructions {
             for columnIndex in columns.indices {
@@ -692,10 +758,18 @@ enum WasmGen {
 
         for (index, instruction) in instructions.enumerated() {
             json += "  ["
-            for (columnIndex, column) in columns.enumerated() {
+            // Determine which columns to include (required + optional with values)
+            var lastColumnIndex = columns.lastIndex(where: { !$0.isOptional })!
+            for (columnIndex, column) in columns.enumerated() where column.isOptional {
+                if !column.value(instruction).isEmpty {
+                    lastColumnIndex = columnIndex
+                }
+            }
+            for columnIndex in 0...lastColumnIndex {
+                let column = columns[columnIndex]
                 let value = column.value(instruction)
                 json += value.padding(toLength: column.maxWidth, withPad: " ", startingAt: 0)
-                if columnIndex != columns.count - 1 {
+                if columnIndex != lastColumnIndex {
                     json += ", "
                 }
             }
@@ -750,8 +824,12 @@ enum WasmGen {
                 header + generateTextInstructionParser(instructions)
             ),
             GeneratedFile(
-                projectSources + ["WAT", "BinaryInstructionEncoder.swift"],
+                projectSources + ["WAT", "BinaryEncoding", "BinaryInstructionEncoder.swift"],
                 header + generateBinaryInstructionEncoder(instructions)
+            ),
+            GeneratedFile(
+                projectSources + ["WAT", "Printer", "InstructionMnemonics.swift"],
+                header + generateTextInstructionPrinter(instructions)
             ),
         ]
 
