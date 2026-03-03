@@ -344,6 +344,18 @@ internal struct Parser {
         return Name(value: token.text(from: lexer), location: token.location(in: lexer))
     }
 
+    /// Consumes a `(@name "string")` annotation if present.
+    /// Returns the annotation's string argument, or nil if no such annotation is next.
+    mutating func takeNameAnnotation() throws(WatParserError) -> String? {
+        guard let token = try peek(), case .annotation("name") = token.kind else {
+            return nil
+        }
+        try consume()
+        let name = try expectString()
+        try expect(.rightParen)
+        return name
+    }
+
     mutating func skipParenBlock() throws(WatParserError) {
         var depth = 1
         while depth > 0 {

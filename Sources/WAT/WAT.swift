@@ -66,10 +66,26 @@ public func wat2wasm(
     #endif
 }
 
+/// The origin of a module name — either from a `$id` identifier or an `@name` annotation.
+public enum ModuleName: Equatable {
+    /// From `$id` — value includes the `$` prefix.
+    case identifier(String)
+    /// From `(@name "...")` — raw UTF-8 string, no prefix.
+    case annotation(String)
+
+    /// The name for the name section (`$` prefix stripped for identifiers).
+    var nameValue: String {
+        switch self {
+        case .identifier(let s): String(s.dropFirst())
+        case .annotation(let s): s
+        }
+    }
+}
+
 /// A WAT module representation.
 public struct Wat {
-    /// The module name from `(module $name ...)`, including the `$` prefix.
-    var id: String? = nil
+    /// The module name from `(module $name ...)` or `(module (@name "...") ...)`.
+    var id: ModuleName? = nil
     var types: TypesMap
     let functionsMap: NameMapping<WatParser.FunctionDecl>
     let tablesMap: NameMapping<WatParser.TableDecl>
@@ -142,8 +158,18 @@ public func parseWAT(_ input: String, features: WasmFeatureSet = .default) throw
     var wat: Wat
     if try parser.takeParenBlockStart("module") {
         let moduleId = try parser.takeId()
+        let nameAnnot = try parser.takeNameAnnotation()
+        // Reject duplicate @name
+        if nameAnnot != nil, try parser.takeNameAnnotation() != nil {
+            throw WatParserError("@name annotation: multiple module names", location: parser.lexer.location())
+        }
         wat = try parseWAT(&parser, features: features)
-        wat.id = moduleId?.value
+        // @name takes precedence over $id for the name section
+        if let nameAnnot {
+            wat.id = .annotation(nameAnnot)
+        } else if let moduleId {
+            wat.id = .identifier(moduleId.value)
+        }
         try parser.skipParenBlock()
     } else {
         // The root (module) may be omitted
