@@ -123,16 +123,25 @@
                 try flushPendingComponentTypes()
             }
 
-            // Encode fields in order, producing interleaved sections
-            // This matches wasm-tools normalization behavior where sections follow semantic order
-            // Consecutive component types are batched into a single section
+            // Flush all pending sections except those matching the given section kind.
+            // Batchable sections (type, coreType, coreInstance, alias) keep their own
+            // pending buffer intact so consecutive same-kind items accumulate.
+            // Non-batchable sections have no pending buffer, so this flushes everything.
+            func flushPendingSectionsExcept(_ kind: ComponentSectionID) throws(WatParserError) {
+                if kind != .coreInstance { try flushPendingCoreInstances() }
+                if kind != .alias { try flushPendingAliases() }
+                if kind != .coreType { try flushPendingCoreTypes() }
+                if kind != .type { try flushPendingComponentTypes() }
+            }
+
+            // Encode fields in order, producing interleaved sections.
+            // Consecutive same-section-kind fields are batched into a single section.
+            // NormalizedDefinition.sectionKind drives which pending buffers to flush.
             for field in component.fields {
+                try flushPendingSectionsExcept(field.kind.sectionKind)
+
                 switch field.kind {
                 case .componentType(let typeIndex):
-                    // Flush other sections before component types (different section)
-                    try flushPendingCoreInstances()
-                    try flushPendingAliases()
-                    try flushPendingCoreTypes()
                     // Collect all unemitted types up to and including this type index
                     // This ensures anonymous dependency types (with lower indices) get batched
                     // with the types that reference them
@@ -144,28 +153,15 @@
                     }
 
                 case .coreModule(let index):
-                    try flushAllPending()
                     try encodeSingleCoreModule(index, component: component, options: options)
 
                 case .coreInstance(let index):
-                    // Flush non-instance sections before accumulating
-                    try flushPendingAliases()
-                    try flushPendingCoreTypes()
-                    try flushPendingComponentTypes()
-                    // Accumulate consecutive core instances for batching
                     pendingCoreInstances.append((index, field.location))
 
                 case .coreType(let index):
-                    // Flush other sections before core types (different section)
-                    try flushPendingCoreInstances()
-                    try flushPendingAliases()
-                    try flushPendingComponentTypes()
-                    // Accumulate consecutive core types for batching
                     pendingCoreTypes.append(UInt32(index))
 
                 case .canon(let canonDef):
-                    try flushAllPending()
-                    // Emit required types before the canon
                     try emitRequiredTypesForCanon(
                         canonDef,
                         component: component,
@@ -174,8 +170,6 @@
                         emittedTypes: &emittedTypes,
                         liftIndex: liftIndex
                     )
-
-                    // Canon definitions may emit both alias and canon sections
                     try encodeSingleCanon(
                         canonDef,
                         coreFuncAliases: coreFuncAliases,
@@ -193,9 +187,7 @@
                         emittedOptionCoreFuncAliases: &emittedOptionCoreFuncAliases
                     )
 
-                case .importDef(let importDef):
-                    try flushAllPending()
-                    // Emit required types before the import
+                case .componentImport(let importDef):
                     try emitRequiredTypesForImport(
                         importDef,
                         component: component,
@@ -205,8 +197,7 @@
                     )
                     try encodeSingleImport(importDef, typeIndexMapping: typeIndexMapping, location: field.location)
 
-                case .exportDef(let exportDef):
-                    try flushAllPending()
+                case .componentExport(let exportDef):
                     try encodeSingleExport(
                         exportDef,
                         typeIndexMapping: typeIndexMapping,
@@ -218,19 +209,12 @@
                     )
 
                 case .component(let index):
-                    try flushAllPending()
                     try encodeSingleComponent(index, component: component, options: options)
 
                 case .instance(let index):
-                    try flushAllPending()
                     try encodeSingleComponentInstance(index, component: component, location: field.location)
 
                 case .alias(let alias):
-                    // Flush other sections before aliases (different section)
-                    try flushPendingCoreInstances()
-                    try flushPendingCoreTypes()
-                    try flushPendingComponentTypes()
-                    // Accumulate consecutive aliases for batching
                     pendingAliases.append(alias)
                 }
             }
@@ -1286,9 +1270,9 @@
                     result.components.append((index, field.location))
                 case .canon(let canonDef):
                     result.canons.append((canonDef, field.location))
-                case .exportDef(let exportDef):
+                case .componentExport(let exportDef):
                     result.exports.append((exportDef, field.location))
-                case .importDef(let importDef):
+                case .componentImport(let importDef):
                     result.imports.append((importDef, field.location))
                 case .instance(let index):
                     result.instances.append((index, field.location))
