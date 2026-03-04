@@ -15,7 +15,7 @@ package let defaultWasmToolsPath: String = {
     let vendorPath = rootPath.appendingPathComponent("Vendor")
     return
         vendorPath
-        .appendingPathComponent("wasm-tools/wasm-tools-1.244.0-wasm32-wasip1/wasm-tools.wasm")
+        .appendingPathComponent("wasm-tools-prebuilt/wasm-tools-1.244.0-wasm32-wasip1/wasm-tools.wasm")
         .path
 }()
 
