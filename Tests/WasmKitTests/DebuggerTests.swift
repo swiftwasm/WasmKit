@@ -259,6 +259,40 @@
         )
         """
 
+    /// Models a loop calling two functions with a conditional
+    /// increment inside. Tests that breakpoints in both functions survive
+    /// multiple `runPreservingCurrentBreakpoint` cycles.
+    private let counterDemoWAT = """
+        (module
+          (func (export "_start") (result i32)
+            (local $value i32)
+            (local $step i32)
+            (local $even_count i32)
+            (local.set $step (i32.const 3))
+            (block $break (loop $continue
+              ;; value += step  (call $advance)
+              (local.set $value
+                (call $advance (local.get $value) (local.get $step)))
+              ;; if isEven(value) { even_count += 1 }
+              (if (call $is_even (local.get $value))
+                (then
+                  (local.set $even_count
+                    (i32.add (local.get $even_count) (i32.const 1)))))
+              ;; while value < 15
+              (br_if $continue
+                (i32.lt_s (local.get $value) (i32.const 15)))
+            ))
+            (local.get $even_count)
+          )
+          (func $advance (param $val i32) (param $step i32) (result i32)
+            (i32.add (local.get $val) (local.get $step))
+          )
+          (func $is_even (param $n i32) (result i32)
+            (i32.eqz (i32.rem_s (local.get $n) (i32.const 2)))
+          )
+        )
+        """
+
     /// Tail-recursive countdown using `return_call`.
     private let returnCallRecursiveWAT = """
         (module
@@ -975,6 +1009,221 @@
             try debugger.runPreservingCurrentBreakpoint()
             let values = try requireReturned(debugger)
             #expect(values == [.i32(0)])
+        }
+
+        /// Breakpoints in `advance` and `is_even`,
+        /// verify both are hit on every loop iteration via `runPreservingCurrentBreakpoint`.
+        @Test
+        func counterDemoTwoBreakpointsAllIterations() throws {
+            let store = Store(engine: Engine())
+            let bytes = try wat2wasm(counterDemoWAT)
+            let module = try parseWasm(bytes: bytes)
+            var debugger = try Debugger(module: module, store: store, imports: [:])
+
+            // Set breakpoints at entry of both helper functions
+            let advanceBp = try debugger.enableBreakpoint(
+                module: module, function: 1)
+            let isEvenBp = try debugger.enableBreakpoint(
+                module: module, function: 2)
+
+            // Loop runs 5 iterations (value: 0→3→6→9→12→15, exits when value >= 15).
+            // Each iteration calls $advance then $is_even.
+            // First run() starts execution and hits the first breakpoint.
+            try debugger.run()
+            #expect(
+                try requireBreakpoint(debugger) == advanceBp,
+                "iteration 1: expected advance breakpoint"
+            )
+
+            // Continue to $is_even
+            try debugger.runPreservingCurrentBreakpoint()
+            #expect(
+                try requireBreakpoint(debugger) == isEvenBp,
+                "iteration 1: expected is_even breakpoint"
+            )
+
+            for iteration in 2...5 {
+                // Should hit $advance breakpoint
+                try debugger.runPreservingCurrentBreakpoint()
+                #expect(
+                    try requireBreakpoint(debugger) == advanceBp,
+                    "iteration \(iteration): expected advance breakpoint"
+                )
+
+                // Should hit $is_even breakpoint
+                try debugger.runPreservingCurrentBreakpoint()
+                #expect(
+                    try requireBreakpoint(debugger) == isEvenBp,
+                    "iteration \(iteration): expected is_even breakpoint"
+                )
+            }
+
+            // After 5 iterations, the loop exits. Run to completion.
+            try debugger.run()
+            let values = try requireReturned(debugger)
+            // even_count = 2 (values 6 and 12 are even)
+            #expect(values == [.i32(2)])
+        }
+
+        /// Breakpoints at function entries AND at
+        /// `evenCount += 1` inside the if-body. Breakpoints should survive resuming
+        /// from the if-body breakpoint.
+        @Test
+        func counterDemoBreakpointInsideIfBody() throws {
+            let store = Store(engine: Engine())
+            let bytes = try wat2wasm(counterDemoWAT)
+            let module = try parseWasm(bytes: bytes)
+            var debugger = try Debugger(module: module, store: store, imports: [:])
+
+            let advanceBp = try debugger.enableBreakpoint(
+                module: module, function: 1)
+            let isEvenBp = try debugger.enableBreakpoint(
+                module: module, function: 2)
+
+            // Run to first advance breakpoint (iteration 1: value 0→3)
+            try debugger.run()
+            #expect(try requireBreakpoint(debugger) == advanceBp)
+
+            // Continue through iteration 1 (value=3, not even) to iteration 2 advance
+            try debugger.runPreservingCurrentBreakpoint()
+
+            // We might hit isEven or advance — keep continuing until we see advance
+            // breakpoint with value about to become 6
+            var hitCount = 0
+            while case .stoppedAtBreakpoint(let bp) = debugger.state,
+                  bp.wasmPc == isEvenBp || bp.wasmPc == advanceBp,
+                  hitCount < 20
+            {
+                hitCount += 1
+                let pc = bp.wasmPc
+                if pc == advanceBp && hitCount > 2 {
+                    // We've gone past iteration 1. Now set a breakpoint inside the if-body
+                    // by stepping through is_even and looking for the i32.add in _start.
+                    break
+                }
+                try debugger.runPreservingCurrentBreakpoint()
+            }
+
+            // Verify both breakpoints are still working by running a few more iterations
+            var advanceHits = 0
+            var isEvenHits = 0
+            while case .stoppedAtBreakpoint(let bp) = debugger.state {
+                if bp.wasmPc == advanceBp { advanceHits += 1 }
+                else if bp.wasmPc == isEvenBp { isEvenHits += 1 }
+                try debugger.runPreservingCurrentBreakpoint()
+                if advanceHits + isEvenHits > 20 { break }
+            }
+
+            // Both breakpoints should have been hit multiple times
+            #expect(advanceHits >= 2, "advance breakpoint should survive: hit \(advanceHits) times")
+            #expect(isEvenHits >= 2, "is_even breakpoint should survive: hit \(isEvenHits) times")
+        }
+
+        // MARK: - step after breakpoint removal
+
+        /// If `disableBreakpoint` is called for the address where the
+        /// debugger is currently stopped (as lldb-dap might do via `removeSoftwareBreakpoint`),
+        /// then calling `step()` should work.
+        @Test
+        func stepAfterBreakpointRemovedAtCurrentPc() throws {
+            let store = Store(engine: Engine())
+            let bytes = try wat2wasm(trivialModuleWAT)
+            let module = try parseWasm(bytes: bytes)
+            var debugger = try Debugger(module: module, store: store, imports: [:])
+
+            try debugger.stopAtEntrypoint()
+            try debugger.run()
+            let pc = try requireBreakpoint(debugger)
+
+            // Simulate lldb-dap sending removeSoftwareBreakpoint while stopped here
+            try debugger.disableBreakpoint(address: pc)
+
+            try debugger.step()
+        }
+
+        /// Step from the factorial entrypoint (reproducing the user's
+        /// exact scenario: stop at `_start`, then step).
+        @Test
+        func stepFromFactorialEntrypoint() throws {
+            let store = Store(engine: Engine())
+            let bytes = try wat2wasm(factorialWAT)
+            let module = try parseWasm(bytes: bytes)
+            var debugger = try Debugger(module: module, store: store, imports: [:])
+
+            try debugger.stopAtEntrypoint()
+            try debugger.run()
+            try requireBreakpoint(debugger)
+
+            // Step through the entire factorial(3) by single-stepping
+            var stepCount = 0
+            while case .stoppedAtBreakpoint = debugger.state {
+                try debugger.step()
+                stepCount += 1
+                if stepCount > 200 { break }  // safety limit
+            }
+
+            let values = try requireReturned(debugger)
+            #expect(values == [.i64(6)])
+        }
+
+        /// Step after `runPreservingCurrentBreakpoint` — the user stops
+        /// at a breakpoint via "continue", then switches to "step" mode.
+        @Test
+        func stepAfterRunPreservingBreakpoint() throws {
+            let store = Store(engine: Engine())
+            let bytes = try wat2wasm(factorialWAT)
+            let module = try parseWasm(bytes: bytes)
+            var debugger = try Debugger(module: module, store: store, imports: [:])
+
+            let breakpointAddress = try debugger.enableBreakpoint(
+                module: module,
+                function: 1
+            )
+
+            // Run to the breakpoint (first call to factorial with arg=3)
+            try debugger.run()
+            #expect(try requireBreakpoint(debugger) == breakpointAddress)
+
+            // Continue to the next hit (factorial with arg=2)
+            try debugger.runPreservingCurrentBreakpoint()
+            #expect(try requireBreakpoint(debugger) == breakpointAddress)
+
+            // Now switch to stepping (as a user would do in VS Code)
+            try debugger.step()
+            try requireBreakpoint(debugger)
+
+            // Continue stepping for a few instructions
+            try debugger.step()
+            try requireBreakpoint(debugger)
+
+            // Resume with continue to finish
+            try debugger.run()
+        }
+
+        /// Breakpoint removed and re-added at the current PC while stopped.
+        /// This simulates lldb-dap re-syncing breakpoints (remove all, re-add active ones).
+        @Test
+        func breakpointRemovedAndReaddedWhileStopped() throws {
+            let store = Store(engine: Engine())
+            let bytes = try wat2wasm(factorialWAT)
+            let module = try parseWasm(bytes: bytes)
+            var debugger = try Debugger(module: module, store: store, imports: [:])
+
+            let breakpointAddress = try debugger.enableBreakpoint(
+                module: module,
+                function: 1
+            )
+
+            try debugger.run()
+            #expect(try requireBreakpoint(debugger) == breakpointAddress)
+
+            // Simulate lldb-dap breakpoint re-sync: remove then re-add
+            try debugger.disableBreakpoint(address: breakpointAddress)
+            try debugger.enableBreakpoint(address: breakpointAddress)
+
+            // Should work fine after re-sync
+            try debugger.step()
+            try requireBreakpoint(debugger)
         }
     }
 

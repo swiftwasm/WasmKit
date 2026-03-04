@@ -358,7 +358,10 @@
         /// Analyzes the control-flow instruction at the given breakpoint and sets breakpoints
         /// at all possible next instruction locations.
         private mutating func setNextInstructionBreakpoints(breakpoint: BreakpointState) throws {
-            let savedHead = self.breakpoints[breakpoint.wasmPc]!
+            // If the breakpoint was externally removed (e.g. via disableBreakpoint
+            // while stopped), the original instruction has already been restored at the
+            // iseq PC, so read it directly.
+            let savedHead = self.breakpoints[breakpoint.wasmPc] ?? breakpoint.iseq.pc.pointee
             let operandPc = breakpoint.iseq.pc.advanced(by: 1)
             let sp = breakpoint.iseq.sp
 
