@@ -52,6 +52,7 @@ package struct GDBHostCommand: Equatable {
         case detach
 
         case generalRegisters
+        case unsupported
 
         /// Decodes kind of a command from a raw string sent from a host.
         package init?(rawValue: String) {
@@ -169,7 +170,7 @@ package struct GDBHostCommand: Equatable {
     /// - Parameters:
     ///   - kindString: raw ``String`` that denotes kind of the command.
     ///   - arguments: raw arguments that immediately follow kind of the command.
-    package init(kindString: String, arguments: String) throws(GDBHostCommandDecoder.Error) {
+    package init(kindString: String, arguments: String) {
         for rule in Self.parsingRules {
             if kindString.starts(with: rule.prefix) {
                 self.kind = rule.kind
@@ -186,11 +187,11 @@ package struct GDBHostCommand: Equatable {
 
         if let kind = Kind(rawValue: kindString) {
             self.kind = kind
+            self.arguments = arguments
         } else {
-            throw GDBHostCommandDecoder.Error.unknownCommand(kind: kindString, arguments: arguments)
+            self.kind = .unsupported
+            self.arguments = arguments.isEmpty ? kindString : "\(kindString):\(arguments)"
         }
-
-        self.arguments = arguments
     }
 
     /// Member-wise initializer of `GDBHostCommand` type.
