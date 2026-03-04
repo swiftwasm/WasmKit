@@ -1091,8 +1091,8 @@
             // breakpoint with value about to become 6
             var hitCount = 0
             while case .stoppedAtBreakpoint(let bp) = debugger.state,
-                  bp.wasmPc == isEvenBp || bp.wasmPc == advanceBp,
-                  hitCount < 20
+                bp.wasmPc == isEvenBp || bp.wasmPc == advanceBp,
+                hitCount < 20
             {
                 hitCount += 1
                 let pc = bp.wasmPc
@@ -1108,8 +1108,7 @@
             var advanceHits = 0
             var isEvenHits = 0
             while case .stoppedAtBreakpoint(let bp) = debugger.state {
-                if bp.wasmPc == advanceBp { advanceHits += 1 }
-                else if bp.wasmPc == isEvenBp { isEvenHits += 1 }
+                if bp.wasmPc == advanceBp { advanceHits += 1 } else if bp.wasmPc == isEvenBp { isEvenHits += 1 }
                 try debugger.runPreservingCurrentBreakpoint()
                 if advanceHits + isEvenHits > 20 { break }
             }
