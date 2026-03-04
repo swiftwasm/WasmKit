@@ -70,8 +70,8 @@
                     componentStack.append(ComponentDef(id: nestedId))
                     try parseComponentFields(&parser)  // Recursive call for nested components
                     let nested = componentStack.removeLast()
-                    let idx = try currentComponent.componentsMap.add(nested)
-                    currentComponent.fields.append(.init(location: location, kind: .component(.init(idx))))
+                    _ = try currentComponent.componentsMap.add(nested)
+                    currentComponent.fields.append(.init(location: location, kind: .component(nested)))
                 case "import":
                     try parseComponentImport(&parser, location: location)
                 case "export":
@@ -97,23 +97,23 @@
             switch coreKeyword {
             case "module":
                 let moduleDef = try self.parseModuleDef(&parser)
-                let index = try self.currentComponent.coreModulesMap.add(moduleDef)
+                _ = try self.currentComponent.coreModulesMap.add(moduleDef)
                 self.currentComponent.fields.append(
-                    .init(location: location, kind: .coreModule(.init(index)))
+                    .init(location: location, kind: .coreModule(moduleDef))
                 )
 
             case "instance":
                 let instanceDef = try self.parseCoreInstanceDef(&parser)
-                let index = try self.currentComponent.coreInstancesMap.add(instanceDef)
+                _ = try self.currentComponent.coreInstancesMap.add(instanceDef)
                 self.currentComponent.fields.append(
-                    .init(location: location, kind: .coreInstance(.init(index)))
+                    .init(location: location, kind: .coreInstance(instanceDef))
                 )
 
             case "type":
                 let coreTypeDef = try self.parseCoreTypeDef(&parser)
-                let resolvedId = try self.currentComponent.coreTypesMap.add(coreTypeDef)
+                _ = try self.currentComponent.coreTypesMap.add(coreTypeDef)
                 self.currentComponent.fields.append(
-                    .init(location: location, kind: .coreType(TypeIndex(resolvedId)))
+                    .init(location: location, kind: .coreType(coreTypeDef))
                 )
 
             case "func":
@@ -364,9 +364,9 @@
             try parser.expect(.rightParen)  // Close (instantiate ...)
 
             let instanceDef = ComponentInstanceDef(id: instanceId, componentRef: componentRef, arguments: arguments)
-            let index = try currentComponent.componentInstancesMap.add(instanceDef)
+            _ = try currentComponent.componentInstancesMap.add(instanceDef)
             currentComponent.fields.append(
-                .init(location: location, kind: .instance(.init(index)))
+                .init(location: location, kind: .instance(instanceDef))
             )
         }
 
@@ -589,7 +589,7 @@
             self.currentComponent.fields.append(
                 .init(
                     location: typeLocation,
-                    kind: .componentType(ComponentTypeIndex(rawValue: typeIndex))
+                    kind: .componentType(typeDef, typeIndex: typeIndex)
                 )
             )
 
