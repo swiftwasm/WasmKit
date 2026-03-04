@@ -343,7 +343,7 @@ struct Lexer {
     }
 
     /// Recognized annotation IDs that the parser needs to handle.
-    private static let recognizedAnnotations: Set<String> = ["name"]
+    private static let recognizedAnnotations: Set<String> = ["name", "custom"]
 
     /// Read an annotation ID after `(@` has been consumed.
     /// Handles both idchar-form (`@id`) and string-form (`@"id"`).

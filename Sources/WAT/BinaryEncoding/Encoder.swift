@@ -615,21 +615,37 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
         }
     }
 
+    let cs = module.customSections
+
+    func emitCustomSections(placement: CustomSectionDecl.Placement, encoder: inout Encoder) {
+        for section in cs where section.placement == placement {
+            encoder.section(id: 0) { encoder in
+                section.name.encode(to: &encoder)
+                encoder.output.append(contentsOf: section.content)
+            }
+        }
+    }
+
     // Section 1: Type section
+    emitCustomSections(placement: .before(.type), encoder: &encoder)
     if !module.types.isEmpty {
         encoder.section(id: 0x01) { encoder in
             encoder.encodeVector(module.types, transform: \.type.signature)
         }
     }
+    emitCustomSections(placement: .after(.type), encoder: &encoder)
 
     // Section 2: Import section
+    emitCustomSections(placement: .before(.import), encoder: &encoder)
     if !module.imports.isEmpty {
         encoder.section(id: 0x02) { encoder in
             encoder.encodeVector(module.imports)
         }
     }
+    emitCustomSections(placement: .after(.import), encoder: &encoder)
 
     // Section 3: Function section
+    emitCustomSections(placement: .before(.func), encoder: &encoder)
     if !functionSection.isEmpty {
         encoder.section(id: 0x03) { encoder in
             encoder.encodeVector(functionSection) { typeIndex, encoder in
@@ -637,8 +653,10 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
             }
         }
     }
+    emitCustomSections(placement: .after(.func), encoder: &encoder)
 
     // Section 4: Table section
+    emitCustomSections(placement: .before(.table), encoder: &encoder)
     let tables = module.tablesMap.definitions()
     if !tables.isEmpty {
         try encoder.section(id: 0x04) { encoder throws(WatParserError) in
@@ -647,16 +665,20 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
             }
         }
     }
+    emitCustomSections(placement: .after(.table), encoder: &encoder)
 
     // Section 5: Memory section
+    emitCustomSections(placement: .before(.memory), encoder: &encoder)
     let memories = module.memories.definitions()
     if !memories.isEmpty {
         encoder.section(id: 0x05) { encoder in
             encoder.encodeVector(memories)
         }
     }
+    emitCustomSections(placement: .after(.memory), encoder: &encoder)
 
     // Section 6: Global section
+    emitCustomSections(placement: .before(.global), encoder: &encoder)
     let globals = module.globals.definitions()
     if !globals.isEmpty {
         try encoder.section(id: 0x06) { encoder throws(WatParserError) in
@@ -665,8 +687,10 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
             }
         }
     }
+    emitCustomSections(placement: .after(.global), encoder: &encoder)
 
     // Section 7: Export section
+    emitCustomSections(placement: .before(.export), encoder: &encoder)
     if !module.exports.isEmpty {
         encoder.section(id: 0x07) { encoder in
             encoder.encodeVector(module.exports) { export, encoder in
@@ -674,15 +698,19 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
             }
         }
     }
+    emitCustomSections(placement: .after(.export), encoder: &encoder)
 
     // Section 8: Start section
+    emitCustomSections(placement: .before(.start), encoder: &encoder)
     if let start = module.start {
         encoder.section(id: 0x08) { encoder in
             encoder.writeUnsignedLEB128(start)
         }
     }
+    emitCustomSections(placement: .after(.start), encoder: &encoder)
 
     // Section 9: Element section
+    emitCustomSections(placement: .before(.elem), encoder: &encoder)
     if !module.elementsMap.isEmpty {
         try encoder.section(id: 0x09) { encoder throws(WatParserError) in
             try encoder.encodeVector(module.elementsMap) { element, encoder throws(WatParserError) in
@@ -690,6 +718,7 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
             }
         }
     }
+    emitCustomSections(placement: .after(.elem), encoder: &encoder)
 
     // Section 12: DataCount section
     if !module.data.isEmpty, hasDataSegmentInstruction {
@@ -699,9 +728,12 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
     }
 
     // Section 10: Code section
+    emitCustomSections(placement: .before(.code), encoder: &encoder)
     encoder.output.append(contentsOf: codeEncoder.output)
+    emitCustomSections(placement: .after(.code), encoder: &encoder)
 
     // Section 11: Data section
+    emitCustomSections(placement: .before(.data), encoder: &encoder)
     if !module.data.isEmpty {
         try encoder.section(id: 0x0B) { encoder throws(WatParserError) in
             try encoder.encodeVector(module.data) { data, encoder throws(WatParserError) in
@@ -709,11 +741,19 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
             }
         }
     }
+    emitCustomSections(placement: .after(.data), encoder: &encoder)
+
+    // Unplaced custom sections go after all standard sections
+    emitCustomSections(placement: .unplaced, encoder: &encoder)
 
     // (Optional) Name Section
     if options.nameSection {
         try encodeNameSection(module: &module, options: options, encoder: &encoder, functions: functions, functionLabelNames: functionLabelNames)
     }
+
+    // "last" placement goes after everything including the name section
+    emitCustomSections(placement: .before(.last), encoder: &encoder)
+    emitCustomSections(placement: .after(.last), encoder: &encoder)
 
     return encoder.output
 }

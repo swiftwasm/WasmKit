@@ -1,5 +1,35 @@
 import WasmParser
 
+/// A `@custom` annotation declaring an inline custom section in WAT.
+struct CustomSectionDecl {
+    /// Standard section kinds used in placement directives.
+    enum SectionKind: String {
+        case type
+        case `import`
+        case `func`
+        case table
+        case memory
+        case global
+        case export
+        case start
+        case elem
+        case code
+        case data
+        case last
+    }
+
+    /// Where this custom section should be placed in the binary.
+    enum Placement: Equatable {
+        case unplaced
+        case before(SectionKind)
+        case after(SectionKind)
+    }
+
+    let name: String
+    let placement: Placement
+    let content: [UInt8]
+}
+
 /// Options for encoding a WebAssembly module into a binary format.
 public struct EncodeOptions: Sendable {
     /// Whether to include the name section.
@@ -97,7 +127,7 @@ public struct Wat {
     let start: FunctionIndex?
     let imports: [Import]
     let exports: [Export]
-    let customSections = [CustomSection]()
+    let customSections: [CustomSectionDecl]
     let features: WasmFeatureSet
 
     let parser: Parser
@@ -115,6 +145,7 @@ public struct Wat {
             start: nil,
             imports: [],
             exports: [],
+            customSections: [],
             features: features,
             parser: Parser("")
         )
@@ -328,6 +359,7 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
     var start: Parser.IndexOrId?
 
     var exportDecls: [WatParser.ExportDecl] = []
+    var customSections: [CustomSectionDecl] = []
 
     var hasNonImport = false
     func visitDecl(decl: WatParser.ModuleField) throws(WatParserError) {
@@ -421,6 +453,8 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
                 throw WatParserError("Multiple start sections", location: location)
             }
             start = startIndex
+        case .custom(let decl):
+            customSections.append(decl)
         }
     }
 
@@ -466,6 +500,7 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
         start: startIndex,
         imports: imports,
         exports: exports,
+        customSections: customSections,
         features: features,
         parser: parser
     )

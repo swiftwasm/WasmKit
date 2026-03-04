@@ -338,6 +338,73 @@ internal struct Parser {
         return token
     }
 
+    /// Consumes a `(@custom "name" [(before|after kind)] "content"*)` annotation if present.
+    /// Returns the parsed declaration, or nil if no `@custom` annotation is next.
+    mutating func takeCustomAnnotation() throws(WatParserError) -> CustomSectionDecl? {
+        guard let token = try peek(), case .annotation("custom") = token.kind else {
+            return nil
+        }
+        try consume()
+
+        // Section name (must be a string literal)
+        guard let nameBytes = try takeStringBytes() else {
+            throw WatParserError(
+                "@custom annotation: missing section name", location: lexer.location()
+            )
+        }
+        let name = try nameBytes.withUnsafeBufferPointer { buffer throws(WatParserError) in
+            guard let value = String._tryFromUTF8(buffer) else {
+                throw WatParserError(
+                    "@custom annotation: malformed UTF-8 encoding", location: lexer.location()
+                )
+            }
+            return value
+        }
+
+        // Optional placement directive: (before|after sectionKind)
+        var placement: CustomSectionDecl.Placement = .unplaced
+        if try peek(.leftParen) != nil {
+            try consume()  // consume (
+            let kw = try expectKeyword()
+            guard kw == "before" || kw == "after" else {
+                throw WatParserError(
+                    "@custom annotation: malformed placement", location: lexer.location()
+                )
+            }
+            guard let sectionKw = try peekKeyword() else {
+                throw WatParserError(
+                    "@custom annotation: malformed section kind", location: lexer.location()
+                )
+            }
+            guard let sectionKind = CustomSectionDecl.SectionKind(rawValue: sectionKw) else {
+                throw WatParserError(
+                    "@custom annotation: malformed section kind", location: lexer.location()
+                )
+            }
+            try consume()  // consume section kind keyword
+            try expect(.rightParen)
+            placement = kw == "before" ? .before(sectionKind) : .after(sectionKind)
+        }
+
+        // Content strings (zero or more)
+        var content: [UInt8] = []
+        while let bytes = try takeStringBytes() {
+            content.append(contentsOf: bytes)
+        }
+
+        // If the next token is not ) then something unexpected is here
+        if try peek(.rightParen) == nil {
+            throw WatParserError(
+                "@custom annotation: unexpected token", location: lexer.location()
+            )
+        }
+        try expect(.rightParen)
+
+        return CustomSectionDecl(
+            name: name, placement: placement, content: content
+        )
+    }
+
     mutating func takeId() throws(WatParserError) -> Name? {
         guard let token = try peek(.id) else { return nil }
         try consume()
@@ -365,6 +432,11 @@ internal struct Parser {
                 depth += 1
             case .rightParen:
                 depth -= 1
+            case .annotation:
+                // Recognized annotations consume their opening `(` during lexing,
+                // so we must account for it in the depth count. The annotation's
+                // closing `)` will naturally decrement depth later.
+                depth += 1
             default:
                 break
             }

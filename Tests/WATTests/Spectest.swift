@@ -27,6 +27,7 @@ enum Spectest {
                 testsuitePath.appendingPathComponent("proposals/threads"),
                 testsuitePath.appendingPathComponent("proposals/annotations"),
                 vendorDirectory.appendingPathComponent("annotations/test/custom/name"),
+                vendorDirectory.appendingPathComponent("annotations/test/custom/custom"),
                 rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite"),
             ].flatMap {
                 try! FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil)
