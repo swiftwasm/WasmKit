@@ -386,6 +386,87 @@ enum VMGen {
         return output
     }
 
+    static func generateNextInstructionPredictor(instructions: [Instruction]) -> String {
+        let controlInstructions = instructions.enumerated().filter { $0.element.isControl }
+
+        var output = """
+
+        #if WasmDebuggingSupport
+
+        /// A protocol for predicting the next instruction(s) that will execute after a control-flow instruction.
+        ///
+        /// Each `isControl` instruction in VMSpec gets a dedicated method in this protocol.
+        /// Adding a new control instruction automatically adds a new protocol requirement,
+        /// so any conforming type will fail to compile until it implements the new prediction.
+        protocol NextInstructionPredictor: ~Copyable {
+
+        """
+        for (_, inst) in controlInstructions {
+            output += "    mutating func predictNext_\(inst.name)(operandPc: Pc, sp: Sp) -> [Pc]\n"
+        }
+        output += """
+        }
+
+        extension Instruction {
+            /// Dispatches to the appropriate `NextInstructionPredictor` method based on the opcode ID.
+            /// - Returns: The predicted next Pc(s), or `nil` if the opcode is not a control instruction.
+            static func predictNextPcs(
+                opcodeID: OpcodeID, operandPc: Pc, sp: Sp,
+                predictor: inout some NextInstructionPredictor & ~Copyable
+            ) -> [Pc]? {
+                switch opcodeID {
+
+        """
+        for (opcode, inst) in controlInstructions {
+            output += "        case \(opcode): return predictor.predictNext_\(inst.name)(operandPc: operandPc, sp: sp)\n"
+        }
+        output += """
+                default: return nil
+                }
+            }
+
+            /// Builds a map from head code slot to opcode ID for all control-flow instructions.
+            ///
+            /// This is generated so that adding a new `isControl` instruction automatically
+            /// includes it in the map without manual updates.
+            static func buildControlHeadSlotMap(
+                threadingModel: EngineConfiguration.ThreadingModel
+            ) -> [CodeSlot: OpcodeID] {
+                var map = [CodeSlot: OpcodeID]()
+
+        """
+        for (_, inst) in controlInstructions {
+            let dummyExpr: String
+            if let layout = inst.immediateLayout {
+                let fields = layout.fields.map { field in
+                    "\(field.name): \(field.type.name)(0)"
+                }.joined(separator: ", ")
+                dummyExpr = ".\(inst.name)(.init(\(fields)))"
+            } else if let immediate = inst.immediate {
+                // Simple immediate type (e.g. BrOperand = Int32)
+                dummyExpr = ".\(inst.name)(\(immediate.type)(0))"
+            } else {
+                dummyExpr = ".\(inst.name)"
+            }
+            output += """
+                        do {
+                            let inst = Instruction\(dummyExpr)
+                            map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+                        }
+
+            """
+        }
+        output += """
+                    return map
+                }
+            }
+
+            #endif // WasmDebuggingSupport
+
+            """
+        return output
+    }
+
     static func generateImmediateDefinitions(instructions: [Instruction]) -> String {
         var output = ""
 
@@ -580,6 +661,7 @@ enum VMGen {
             GeneratedFile(
                 projectSources + ["WasmKit", "Execution", "Instructions", "Instruction.swift"],
                 header + generateEnumDefinition(instructions: instructions)
+                + generateNextInstructionPredictor(instructions: instructions)
             ),
         ]
 
