@@ -6,14 +6,15 @@
 
     extension ComponentWatParser {
         /// A definition in normalized order, ready for binary encoding.
-        /// Each case maps to a component binary section.
+        /// Each case maps to a component binary section and carries
+        /// the full definition, not just an index.
         enum NormalizedDefinition {
-            case coreModule(CoreModuleIndex)
-            case coreInstance(CoreInstanceIndex)
-            case coreType(TypeIndex)
-            case component(ComponentIndex)
-            case instance(ComponentInstanceIndex)
-            case componentType(ComponentTypeIndex)
+            case coreModule(ModuleDef)
+            case coreInstance(CoreInstanceDef)
+            case coreType(CoreTypeDef)
+            case component(ComponentDef)
+            case instance(ComponentInstanceDef)
+            case componentType(ComponentTypeDef, typeIndex: Int)
             case canon(CanonDef)
             case componentExport(ExportDef)
             case componentImport(ImportDef)
@@ -40,12 +41,12 @@
     extension ComponentWatParser.NormalizedDefinition: CustomStringConvertible {
         var description: String {
             switch self {
-            case .coreModule(let idx): return "coreModule(\(idx))"
-            case .coreInstance(let idx): return "coreInstance(\(idx))"
-            case .coreType(let idx): return "coreType(\(idx))"
-            case .component(let idx): return "component(\(idx))"
-            case .instance(let idx): return "instance(\(idx))"
-            case .componentType(let idx): return "componentType(\(idx))"
+            case .coreModule(let def): return "coreModule(\(def.id?.value ?? "(unnamed)"))"
+            case .coreInstance(let def): return "coreInstance(\(def.id?.value ?? "(unnamed)"))"
+            case .coreType(let def): return "coreType(\(def.id?.value ?? "(unnamed)"))"
+            case .component(let def): return "component(\(def.id?.value ?? "(unnamed)"))"
+            case .instance(let def): return "instance(\(def.id?.value ?? "(unnamed)"))"
+            case .componentType(let def, _): return "componentType(\(def.id?.value ?? "(unnamed)"))"
             case .canon(let def):
                 switch def.kind {
                 case .lift: return "canon lift"
