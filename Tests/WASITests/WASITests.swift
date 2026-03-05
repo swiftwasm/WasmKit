@@ -1397,6 +1397,56 @@ struct WASITests {
     #endif
 
     #if os(macOS) || os(Linux)
+        @Test
+        func setFilestatTimesDoesNotLeakFds() throws {
+            let t = try TestSupport.TemporaryDirectory()
+            try t.createFile(at: "test.txt", contents: "hello")
+
+            let wasi = try WASIBridgeToHost(
+                fileSystem: .host().withPreopens([
+                    .init(guestPath: "/dir", hostPath: t.url.path)
+                ])
+            ).underlying
+            let dirFd: WASIAbi.Fd = 3
+
+            let fdCountBefore = TestSupport.countOpenFileDescriptors()
+
+            for _ in 0..<200 {
+                try wasi.path_filestat_set_times(
+                    dirFd: dirFd, flags: [],
+                    path: "test.txt",
+                    atim: 1_000_000_000, mtim: 1_000_000_000,
+                    fstFlags: [.ATIM, .MTIM]
+                )
+            }
+
+            let fdCountAfter = TestSupport.countOpenFileDescriptors()
+            #expect(
+                fdCountAfter - fdCountBefore < 10,
+                "Leaked \(fdCountAfter - fdCountBefore) file descriptors in path_filestat_set_times"
+            )
+        }
+
+        @Test
+        func wasiInstanceDeinitClosesFds() throws {
+            let fdCountBefore = TestSupport.countOpenFileDescriptors()
+
+            for _ in 0..<100 {
+                let t = try TestSupport.TemporaryDirectory()
+                let _ = try WASIBridgeToHost(
+                    fileSystem: .host().withPreopens([
+                        .init(guestPath: "/dir", hostPath: t.url.path)
+                    ])
+                )
+            }
+
+            let fdCountAfter = TestSupport.countOpenFileDescriptors()
+            #expect(
+                fdCountAfter - fdCountBefore < 10,
+                "Leaked \(fdCountAfter - fdCountBefore) file descriptors from WASIBridgeToHost deinit"
+            )
+        }
+
         // https://github.com/swiftwasm/WasmKit/issues/275
         @Test
         func fileDescriptorLeakTest() throws {
