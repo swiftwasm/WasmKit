@@ -1223,6 +1223,9 @@
             // Should work fine after re-sync
             try debugger.step()
             try requireBreakpoint(debugger)
+            try debugger.run()
+            let values = try requireReturned(debugger)
+            #expect(values == [.i64(6)])
         }
     }
 
