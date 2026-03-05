@@ -60,6 +60,12 @@
         /// was not compiled yet in lazy compilation mode).
         private let functionAddresses: [(address: Int, instanceFunctionIndex: Int)]
 
+        /// Reverse map from a head code slot to its opcode ID, used for resolving
+        /// which control-flow instruction is at a breakpoint site.
+        /// For token threading the head slot is the opcode ID itself; for direct
+        /// threading it is a function pointer that we map back.
+        private let headSlotToOpcodeID: [CodeSlot: OpcodeID]
+
         /// Initializes a new debugger state instance.
         /// - Parameters:
         ///   - module: Wasm module to instantiate.
@@ -92,6 +98,11 @@
             )
             self.threadingModel = store.engine.configuration.threadingModel
             self.endOfExecution = Instruction.endOfExecution.headSlot(threadingModel: threadingModel)
+
+            self.headSlotToOpcodeID = Instruction.buildControlHeadSlotMap(
+                threadingModel: self.threadingModel
+            )
+
             self.state = .instantiated
         }
 
@@ -251,8 +262,7 @@
                 return
             }
 
-            // TODO: analyze actual instruction branching to set the breakpoint correctly.
-            try self.enableBreakpoint(address: breakpoint.wasmPc + 1)
+            try self.setNextInstructionBreakpoints(breakpoint: breakpoint)
             try self.run()
         }
 
@@ -264,8 +274,7 @@
                 return
             }
 
-            // TODO: analyze actual instruction branching to set the breakpoint correctly.
-            try self.enableBreakpoint(address: breakpoint.wasmPc + 1)
+            try self.setNextInstructionBreakpoints(breakpoint: breakpoint)
             try self.run()
             try self.enableBreakpoint(address: breakpoint.wasmPc)
             try self.run()
@@ -346,9 +355,138 @@
             return result
         }
 
+        /// Analyzes the control-flow instruction at the given breakpoint and sets breakpoints
+        /// at all possible next instruction locations.
+        private mutating func setNextInstructionBreakpoints(breakpoint: BreakpointState) throws {
+            let savedHead = self.breakpoints[breakpoint.wasmPc]!
+            let operandPc = breakpoint.iseq.pc.advanced(by: 1)
+            let sp = breakpoint.iseq.sp
+
+            if let opcodeID = headSlotToOpcodeID[savedHead],
+                let targets = Instruction.predictNextPcs(
+                    opcodeID: opcodeID, operandPc: operandPc, sp: sp,
+                    predictor: &self
+                )
+            {
+                // Control instruction with predicted targets.
+                // Empty targets means terminal (unreachable, endOfExecution) — no breakpoints to set.
+                for pc in targets {
+                    if let wasmAddr = self.instance.handle.instructionMapping.findWasm(forIseqAddress: pc) {
+                        try self.enableBreakpoint(address: wasmAddr)
+                    }
+                }
+                return
+            }
+
+            // Non-control instruction: fall back to next Wasm address
+            try self.enableBreakpoint(address: breakpoint.wasmPc + 1)
+        }
+
         deinit {
             self.valueStack.deallocate()
         }
+    }
+
+    extension Debugger: NextInstructionPredictor {
+        mutating func predictNext_br(operandPc: Pc, sp: Sp) -> [Pc] {
+            var pc = operandPc
+            let offset = Instruction.BrOperand.load(from: &pc)
+            return [pc.advanced(by: Int(offset))]
+        }
+
+        mutating func predictNext_brIf(operandPc: Pc, sp: Sp) -> [Pc] {
+            var pc = operandPc
+            let op = Instruction.BrIfOperand.load(from: &pc)
+            // Both fall-through (pc after operand) and branch target are possible
+            return [pc, pc.advanced(by: Int(op.offset))]
+        }
+
+        mutating func predictNext_brIfNot(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_brIf(operandPc: operandPc, sp: sp)
+        }
+
+        mutating func predictNext_brTable(operandPc: Pc, sp: Sp) -> [Pc] {
+            var pc = operandPc
+            let op = Instruction.BrTableOperand.load(from: &pc)
+            return (0..<Int(op.count)).map { pc.advanced(by: Int(op.baseAddress[$0].offset)) }
+        }
+
+        mutating func predictNext_call(operandPc: Pc, sp: Sp) -> [Pc] {
+            var pc = operandPc
+            let op = Instruction.CallOperand.load(from: &pc)
+            let (iseq, _, _) = op.callee.assumeCompiled()
+            return [iseq.instructions.baseAddress!]
+        }
+
+        mutating func predictNext_compilingCall(operandPc: Pc, sp: Sp) -> [Pc] {
+            var pc = operandPc
+            let op = Instruction.CallOperand.load(from: &pc)
+            _ = try? op.callee.wasm.ensureCompiled(store: StoreRef(self.store))
+            let (iseq, _, _) = op.callee.assumeCompiled()
+            return [iseq.instructions.baseAddress!]
+        }
+
+        mutating func predictNext_internalCall(operandPc: Pc, sp: Sp) -> [Pc] {
+            predictNext_call(operandPc: operandPc, sp: sp)
+        }
+
+        mutating func predictNext__return(operandPc: Pc, sp: Sp) -> [Pc] {
+            // returnPC is stored at sp[-2]
+            let returnPc = Pc(bitPattern: UInt(sp.advanced(by: -2).pointee))
+            return returnPc.map { [$0] } ?? []
+        }
+
+        /// Resolves a callee function from a table and returns its iseq base address.
+        /// Returns `nil` if the callee is a host function or the resolution fails.
+        private mutating func resolveIndirectCallee(
+            tableIndex: UInt32, index: VReg, sp: Sp
+        ) -> Pc? {
+            let callerInstance = self.instance.handle
+            let table = callerInstance.tables[Int(tableIndex)]
+            let value = sp[index].asAddressOffset(table.limits.isMemory64)
+            let elementIndex = Int(value)
+            guard elementIndex < table.elements.count,
+                case .function(let rawBitPattern?) = table.elements[elementIndex]
+            else { return nil }
+            let function = InternalFunction(bitPattern: rawBitPattern)
+            guard function.isWasm else { return nil }
+            _ = try? function.wasm.ensureCompiled(store: StoreRef(self.store))
+            let (iseq, _, _) = function.assumeCompiled()
+            return iseq.instructions.baseAddress!
+        }
+
+        mutating func predictNext_callIndirect(operandPc: Pc, sp: Sp) -> [Pc] {
+            var pc = operandPc
+            let op = Instruction.CallIndirectOperand.load(from: &pc)
+            guard let target = resolveIndirectCallee(tableIndex: op.tableIndex, index: op.index, sp: sp) else {
+                return []
+            }
+            return [target]
+        }
+
+        mutating func predictNext_returnCall(operandPc: Pc, sp: Sp) -> [Pc] {
+            var pc = operandPc
+            let op = Instruction.ReturnCallOperand.load(from: &pc)
+            let callee = op.callee
+            guard callee.isWasm else { return [] }
+            _ = try? callee.wasm.ensureCompiled(store: StoreRef(self.store))
+            let (iseq, _, _) = callee.assumeCompiled()
+            return [iseq.instructions.baseAddress!]
+        }
+
+        mutating func predictNext_returnCallIndirect(operandPc: Pc, sp: Sp) -> [Pc] {
+            var pc = operandPc
+            let op = Instruction.ReturnCallIndirectOperand.load(from: &pc)
+            guard let target = resolveIndirectCallee(tableIndex: op.tableIndex, index: op.index, sp: sp) else {
+                return []
+            }
+            return [target]
+        }
+
+        // Terminal instructions — no successor exists
+        mutating func predictNext_unreachable(operandPc: Pc, sp: Sp) -> [Pc] { [] }
+        mutating func predictNext_endOfExecution(operandPc: Pc, sp: Sp) -> [Pc] { [] }
+        mutating func predictNext_breakpoint(operandPc: Pc, sp: Sp) -> [Pc] { [] }
     }
 
 #endif
