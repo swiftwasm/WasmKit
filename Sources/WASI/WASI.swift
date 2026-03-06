@@ -1377,6 +1377,10 @@ final class WASIImplementation {
         self.randomGenerator = randomGenerator
     }
 
+    deinit {
+        fdTable.closeAll(skipping: [0, 1, 2])
+    }
+
     /// Reads command-line argument data.
     /// - Parameters:
     ///   - argv: Pointer to an array of argument strings to be written

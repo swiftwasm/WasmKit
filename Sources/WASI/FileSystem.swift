@@ -128,6 +128,14 @@ struct FdTable {
             return fd
         }
     }
+
+    /// Closes all file descriptors except those in `skipFds`.
+    mutating func closeAll(skipping skipFds: Set<WASIAbi.Fd> = []) {
+        for (fd, entry) in map where !skipFds.contains(fd) {
+            try? entry.asEntry().close()
+        }
+        map = map.filter { skipFds.contains($0.key) }
+    }
 }
 
 /// Content of a file that can be retrieved from the file system.
