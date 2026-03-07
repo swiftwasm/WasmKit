@@ -1,4 +1,5 @@
 import WasmParser
+import WasmTypes
 
 /// Options for encoding a WebAssembly module into a binary format.
 public struct EncodeOptions: Sendable {
@@ -305,7 +306,10 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
             }
         }
 
-        func addImport(_ importNames: WatParser.ImportNames, makeDescriptor: @escaping () throws(WatParserError) -> ImportDescriptor) {
+        func addImport(
+            _ importNames: WatParser.ImportNames,
+            makeDescriptor: @escaping () throws(WatParserError) -> ImportDescriptor
+        ) {
             importFactories.append {
                 return Result { () throws(WatParserError) in
                     Import(

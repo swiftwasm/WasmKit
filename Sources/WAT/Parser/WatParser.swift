@@ -113,7 +113,11 @@ struct WatParser {
         /// This method may modify TypesMap of the given WATModule
         ///
         /// - Returns: Type index of this function
-        func parse<V: InstructionVisitor>(visitor: inout V, wat: inout Wat, features: WasmFeatureSet) throws(WatParserError) -> Int where V.VisitorError == WatParserError {
+        func parse<V: InstructionVisitor>(
+            visitor: inout V,
+            wat: inout Wat,
+            features: WasmFeatureSet
+        ) throws(WatParserError) -> Int where V.VisitorError == WatParserError {
             guard case .definition(let locals, let body) = kind else {
                 fatalError("Imported functions cannot be parsed")
             }

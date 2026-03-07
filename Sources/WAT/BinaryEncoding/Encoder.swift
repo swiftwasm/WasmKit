@@ -174,8 +174,6 @@ extension TableType: WasmEncodable {
 
 struct ElementExprCollector: AnyInstructionVisitor {
     typealias VisitorError = WatParserError
-    typealias Output = Void
-
     var binaryOffset: Int = 0
     var isAllRefFunc: Bool = true
     var instructions: [Instruction] = []
@@ -301,7 +299,7 @@ extension WAT.WatParser.ElementDecl {
                 case .refNull(let type):
                     try exprEncoder.visitRefNull(type: type)
                 default:
-                    throw WatParserError("unexpected instruction in element expression (\(instruction)", location: nil)
+                    throw WatParserError("unexpected instruction in element expression \(instruction)", location: nil)
                 }
                 try exprEncoder.visitEnd()
                 encoder.output.append(contentsOf: exprEncoder.encoder.output)
@@ -465,7 +463,6 @@ extension WatParser.DataSegmentDecl {
 
 struct ExpressionEncoder: BinaryInstructionEncoder {
     typealias VisitorError = WatParserError
-
     var binaryOffset: Int = 0
     var encoder = Encoder()
     var hasDataSegmentInstruction: Bool = false

@@ -67,7 +67,7 @@ package struct EntityHandle<T: ~Copyable>: Equatable, Hashable, Copyable {
 }
 
 extension EntityHandle: ValidatableEntity where T: ValidatableEntity, T: ~Copyable {
-    static func createOutOfBoundsError(index: Int, count: Int) -> Error {
+    static func createOutOfBoundsError(index: Int, count: Int) -> WasmKitError {
         T.createOutOfBoundsError(index: index, count: count)
     }
 }
@@ -377,8 +377,8 @@ struct TableEntity /* : ~Copyable */ {
 }
 
 extension TableEntity: ValidatableEntity {
-    static func createOutOfBoundsError(index: Int, count: Int) -> Error {
-        ValidationError(.indexOutOfBounds("table", index, max: count))
+    static func createOutOfBoundsError(index: Int, count: Int) -> WasmKitError {
+        WasmKitError(message: .indexOutOfBounds("table", index, max: count))
     }
 }
 
@@ -595,8 +595,8 @@ struct MemoryEntity: ~Copyable {
 }
 
 extension MemoryEntity: ValidatableEntity {
-    static func createOutOfBoundsError(index: Int, count: Int) -> Error {
-        ValidationError(.indexOutOfBounds("memory", index, max: count))
+    static func createOutOfBoundsError(index: Int, count: Int) -> WasmKitError {
+        WasmKitError(message: .indexOutOfBounds("memory", index, max: count))
     }
 }
 
@@ -738,8 +738,8 @@ struct GlobalEntity /* : ~Copyable */ {
 }
 
 extension GlobalEntity: ValidatableEntity {
-    static func createOutOfBoundsError(index: Int, count: Int) -> Error {
-        ValidationError(.indexOutOfBounds("global", index, max: count))
+    static func createOutOfBoundsError(index: Int, count: Int) -> WasmKitError {
+        WasmKitError(message: .indexOutOfBounds("global", index, max: count))
     }
 }
 
@@ -825,8 +825,8 @@ struct ElementSegmentEntity {
 }
 
 extension ElementSegmentEntity: ValidatableEntity {
-    static func createOutOfBoundsError(index: Int, count: Int) -> Error {
-        ValidationError(.indexOutOfBounds("element", index, max: count))
+    static func createOutOfBoundsError(index: Int, count: Int) -> WasmKitError {
+        WasmKitError(message: .indexOutOfBounds("element", index, max: count))
     }
 }
 

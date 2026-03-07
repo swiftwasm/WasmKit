@@ -10,6 +10,7 @@ add_wasmkit_library(WAT
   Parser/WastParser.swift
   Parser/WatParser.swift
   WAT.swift
+  WatParserError.swift
 )
 
 target_link_wasmkit_libraries(WAT PUBLIC

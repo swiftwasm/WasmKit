@@ -347,7 +347,10 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
     }
 
     /// Parse a single instruction without consuming the surrounding parentheses and instruction keyword.
-    private mutating func parseTextInstruction(keyword: String, wat: inout Wat) throws(WatParserError) -> ((inout Visitor) throws(WatParserError) -> Void) {
+    private mutating func parseTextInstruction(
+        keyword: String,
+        wat: inout Wat
+    ) throws(WatParserError) -> ((inout Visitor) throws(WatParserError) -> Void) {
         switch keyword {
         case "select":
             // Special handling for "select", which have two variants 1. with type, 2. without type
