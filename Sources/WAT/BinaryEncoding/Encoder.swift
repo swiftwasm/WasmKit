@@ -580,6 +580,7 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
     }
     var functionSection: [UInt32] = []
     var hasDataSegmentInstruction = false
+    var functionLabelNames: [[(Int, String)]] = []
 
     if !functions.isEmpty {
         try codeEncoder.section(id: 0x0A) { encoder throws(WatParserError) in
@@ -602,8 +603,9 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
                         encoder.writeUnsignedLEB128(local.count)
                         local.type.encode(to: &encoder)
                     }
-                    let funcTypeIndex = try function.parse(visitor: &exprEncoder, wat: &module, features: module.features)
-                    functionSection.append(UInt32(funcTypeIndex))
+                    let parseResult = try function.parse(visitor: &exprEncoder, wat: &module, features: module.features)
+                    functionSection.append(UInt32(parseResult.typeIndex))
+                    functionLabelNames.append(parseResult.labelNames)
                     // TODO?
                     try exprEncoder.visitEnd()
                     encoder.writeUnsignedLEB128(UInt(exprEncoder.encoder.output.count))
@@ -709,43 +711,187 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
     }
 
     // (Optional) Name Section
-    let hasFunctionNames = module.functionsMap.contains { $0.id != nil }
-    let hasGlobalNames = module.globals.contains { $0.id != nil }
-    if options.nameSection && (hasFunctionNames || hasGlobalNames) {
-        encoder.section(id: 0) { encoder in
-            encoder.encode("name")
-            // Subsection 1: Function names
-            if hasFunctionNames {
-                encoder.section(id: 1) { encoder in
-                    let functionNames = module.functionsMap.enumerated().compactMap { i, decl -> (Int, String)? in
-                        guard let name = decl.id else { return nil }
-                        return (i, name.value)
-                    }
-                    encoder.encodeVector(functionNames) { entry, encoder in
-                        let (index, name) = entry
-                        encoder.writeUnsignedLEB128(UInt(index))
-                        // Drop initial "$"
-                        encoder.encode(String(name.dropFirst()))
-                    }
+    if options.nameSection {
+        try encodeNameSection(module: &module, options: options, encoder: &encoder, functions: functions, functionLabelNames: functionLabelNames)
+    }
+
+    return encoder.output
+}
+
+/// Helper to encode a name map subsection (index → name pairs with "$" prefix stripped)
+private func encodeNameMapSubsection(
+    id: UInt8,
+    entries: some Collection<(Int, String)>,
+    encoder: inout Encoder
+) {
+    encoder.section(id: id) { encoder in
+        encoder.encodeVector(Array(entries)) { entry, encoder in
+            let (index, name) = entry
+            encoder.writeUnsignedLEB128(UInt(index))
+            // Drop initial "$"
+            encoder.encode(String(name.dropFirst()))
+        }
+    }
+}
+
+/// Encodes the name custom section with all available name subsections.
+/// Subsections are emitted in ascending ID order as required by the spec.
+private func encodeNameSection(
+    module: inout Wat,
+    options: EncodeOptions,
+    encoder: inout Encoder,
+    functions: [([WatParser.LocalDecl], WatParser.FunctionDecl)],
+    functionLabelNames: [[(Int, String)]]
+) throws(WatParserError) {
+    let hasModuleName = module.id != nil
+    let functionNames = module.functionsMap.enumerated().compactMap { i, decl -> (Int, String)? in
+        guard let name = decl.id else { return nil }
+        return (i, name.value)
+    }
+    var localNames: [(Int, [(Int, String)])] = []
+    for (funcDefIndex, entry) in functions.enumerated() {
+        let (locals, function) = entry
+        // Find the function's index in the module (accounting for imports)
+        let importFuncCount = module.functionsMap.count(where: { decl in
+            if case .imported = decl.kind { return true }
+            return false
+        })
+        let funcIndex = importFuncCount + funcDefIndex
+
+        // Collect parameter names from the function's type use
+        var paramNames: [(Int, String)] = []
+        if let inline = function.typeUse.inline {
+            let resolved = try inline.resolve(module.types)
+            for (i, name) in resolved.parameterNames.enumerated() {
+                if let name {
+                    paramNames.append((i, name.value))
                 }
             }
-            // Subsection 7: Global names
-            if hasGlobalNames {
-                encoder.section(id: 7) { encoder in
-                    let globalNames = module.globals.enumerated().compactMap { i, decl -> (Int, String)? in
-                        guard let name = decl.id else { return nil }
-                        return (i, name.value)
-                    }
-                    encoder.encodeVector(globalNames) { entry, encoder in
-                        let (index, name) = entry
-                        encoder.writeUnsignedLEB128(UInt(index))
-                        // Drop initial "$"
+        }
+
+        // Collect local names (offset by parameter count)
+        let paramCount: Int
+        if let inline = function.typeUse.inline {
+            paramCount = try inline.resolve(module.types).signature.parameters.count
+        } else if let typeIndex = function.typeUse.index {
+            let resolvedIndex: Int
+            switch typeIndex {
+            case .index(let idx, _): resolvedIndex = Int(idx)
+            case .id: resolvedIndex = 0  // Approximate; full resolution not needed for name count
+            }
+            if resolvedIndex < module.types.count {
+                paramCount = module.types[resolvedIndex].type.signature.parameters.count
+            } else {
+                paramCount = 0
+            }
+        } else {
+            paramCount = 0
+        }
+
+        for (i, local) in locals.enumerated() {
+            if let name = local.id {
+                paramNames.append((paramCount + i, name.value))
+            }
+        }
+
+        if !paramNames.isEmpty {
+            localNames.append((funcIndex, paramNames))
+        }
+    }
+    let importFuncCount = module.functionsMap.count(where: { decl in
+        if case .imported = decl.kind { return true }
+        return false
+    })
+    let labelNames: [(Int, [(Int, String)])] = functionLabelNames.enumerated().compactMap { funcDefIndex, names in
+        guard !names.isEmpty else { return nil }
+        return (importFuncCount + funcDefIndex, names)
+    }
+    let typeNames = module.types.enumerated().compactMap { i, decl -> (Int, String)? in
+        guard let name = decl.id else { return nil }
+        return (i, name.value)
+    }
+    let tableNames = module.tablesMap.enumerated().compactMap { i, decl -> (Int, String)? in
+        guard let name = decl.id else { return nil }
+        return (i, name.value)
+    }
+    let memoryNames = module.memories.enumerated().compactMap { i, decl -> (Int, String)? in
+        guard let name = decl.id else { return nil }
+        return (i, name.value)
+    }
+    let globalNames = module.globals.enumerated().compactMap { i, decl -> (Int, String)? in
+        guard let name = decl.id else { return nil }
+        return (i, name.value)
+    }
+    let elemNames = module.elementsMap.enumerated().compactMap { i, decl -> (Int, String)? in
+        guard let name = decl.id else { return nil }
+        return (i, name.value)
+    }
+    let dataNames = module.data.enumerated().compactMap { i, decl -> (Int, String)? in
+        guard let name = decl.id else { return nil }
+        return (i, name.value)
+    }
+
+    let hasAnyNames =
+        hasModuleName || !functionNames.isEmpty || !localNames.isEmpty
+        || !labelNames.isEmpty || !typeNames.isEmpty || !tableNames.isEmpty || !memoryNames.isEmpty
+        || !globalNames.isEmpty || !elemNames.isEmpty || !dataNames.isEmpty
+
+    guard hasAnyNames else { return }
+
+    encoder.section(id: 0) { encoder in
+        encoder.encode("name")
+
+        if let moduleId = module.id {
+            encoder.section(id: 0) { encoder in
+                encoder.encode(String(moduleId.dropFirst()))  // Drop "$" prefix
+            }
+        }
+        if !functionNames.isEmpty {
+            encodeNameMapSubsection(id: 1, entries: functionNames, encoder: &encoder)
+        }
+        if !localNames.isEmpty {
+            encoder.section(id: 2) { encoder in
+                encoder.encodeVector(localNames) { entry, encoder in
+                    let (funcIndex, names) = entry
+                    encoder.writeUnsignedLEB128(UInt(funcIndex))
+                    encoder.encodeVector(names) { local, encoder in
+                        let (localIndex, name) = local
+                        encoder.writeUnsignedLEB128(UInt(localIndex))
                         encoder.encode(String(name.dropFirst()))
                     }
                 }
             }
         }
+        if !labelNames.isEmpty {
+            encoder.section(id: 3) { encoder in
+                encoder.encodeVector(labelNames) { entry, encoder in
+                    let (funcIndex, names) = entry
+                    encoder.writeUnsignedLEB128(UInt(funcIndex))
+                    encoder.encodeVector(names) { label, encoder in
+                        let (labelIndex, name) = label
+                        encoder.writeUnsignedLEB128(UInt(labelIndex))
+                        encoder.encode(String(name.dropFirst()))
+                    }
+                }
+            }
+        }
+        if !typeNames.isEmpty {
+            encodeNameMapSubsection(id: 4, entries: typeNames, encoder: &encoder)
+        }
+        if !tableNames.isEmpty {
+            encodeNameMapSubsection(id: 5, entries: tableNames, encoder: &encoder)
+        }
+        if !memoryNames.isEmpty {
+            encodeNameMapSubsection(id: 6, entries: memoryNames, encoder: &encoder)
+        }
+        if !globalNames.isEmpty {
+            encodeNameMapSubsection(id: 7, entries: globalNames, encoder: &encoder)
+        }
+        if !elemNames.isEmpty {
+            encodeNameMapSubsection(id: 8, entries: elemNames, encoder: &encoder)
+        }
+        if !dataNames.isEmpty {
+            encodeNameMapSubsection(id: 9, entries: dataNames, encoder: &encoder)
+        }
     }
-
-    return encoder.output
 }

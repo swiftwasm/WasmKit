@@ -401,4 +401,80 @@ struct EncoderTests {
         }
         #expect(functionNames == [0: "foo", 2: "bar"])
     }
+
+    @Test
+    func encodeNameSectionAllSubsections() throws {
+        // Module exercising all 10 name subsections (0–9)
+        let bytes = try wat2wasm(
+            """
+            (module $testmod
+                (type $mytype (func (param i32) (result i32)))
+                (import "env" "imported" (func $imported (param i32)))
+                (table $mytable 1 funcref)
+                (memory $mymem 1)
+                (global $myglob i32 (i32.const 0))
+                (func $myfunc (param $p i32) (local $l i32)
+                    (block $myblock
+                        nop
+                    )
+                )
+                (elem $myelem (i32.const 0) func $myfunc)
+                (data $mydata (i32.const 0) "hello")
+            )
+            """,
+            options: EncodeOptions(nameSection: true)
+        )
+
+        // Extract the name custom section bytes
+        var parser = WasmParser.Parser(bytes: bytes)
+        var nameBytes: ArraySlice<UInt8>?
+        while let payload = try parser.parseNext() {
+            if case .customSection(let section) = payload, section.name == "name" {
+                nameBytes = section.bytes
+            }
+        }
+        let sectionBytes = try #require(Array(nameBytes ?? []))
+        let nameParser = NameSectionParser(
+            stream: StaticByteStream(bytes: sectionBytes)
+        )
+        let parsed = try nameParser.parseAll()
+        #expect(parsed.count == 10)
+
+        // Collect into a lookup by discriminator for readable assertions
+        var moduleName: String?
+        var functionNames: NameMap?
+        var localNames: [UInt32: NameMap]?
+        var labelNames: [UInt32: NameMap]?
+        var typeNames: NameMap?
+        var tableNames: NameMap?
+        var memoryNames: NameMap?
+        var globalNames: NameMap?
+        var elemNames: NameMap?
+        var dataNames: NameMap?
+        for entry in parsed {
+            switch entry {
+            case .moduleName(let v): moduleName = v
+            case .functions(let v): functionNames = v
+            case .locals(let v): localNames = v
+            case .labels(let v): labelNames = v
+            case .types(let v): typeNames = v
+            case .tables(let v): tableNames = v
+            case .memories(let v): memoryNames = v
+            case .globals(let v): globalNames = v
+            case .elements(let v): elemNames = v
+            case .dataSegments(let v): dataNames = v
+            }
+        }
+
+        #expect(moduleName == "testmod")
+        #expect(functionNames == [0: "imported", 1: "myfunc"])
+        #expect(localNames == [1: [0: "p", 1: "l"]])
+        #expect(labelNames == [1: [0: "myblock"]])
+        #expect(try #require(typeNames).values.contains("mytype"))
+        #expect(tableNames == [0: "mytable"])
+        #expect(memoryNames == [0: "mymem"])
+        #expect(globalNames == [0: "myglob"])
+        #expect(elemNames == [0: "myelem"])
+        #expect(dataNames == [0: "mydata"])
+    }
 }
