@@ -791,6 +791,7 @@
         func parseReferenceType() throws -> ReferenceType {
             let byte = try stream.consumeAny()
             switch byte {
+            case 0x69: return .exnRef
             case 0x70: return .funcRef
             case 0x6F: return .externRef
             default:

@@ -804,6 +804,8 @@
                     internalExports[name] = .memory(memory.handle)
                 case .global(let global):
                     internalExports[name] = .global(global.handle)
+                case .tag(let tag):
+                    internalExports[name] = .tag(tag.handle)
                 }
             }
 

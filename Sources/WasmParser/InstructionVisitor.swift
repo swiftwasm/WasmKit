@@ -434,6 +434,8 @@ public enum Instruction: Equatable {
     case `loop`(blockType: BlockType)
     case `if`(blockType: BlockType)
     case `else`
+    case `throw`(tagIndex: UInt32)
+    case `throwRef`
     case `end`
     case `br`(relativeDepth: UInt32)
     case `brIf`(relativeDepth: UInt32)
@@ -445,6 +447,7 @@ public enum Instruction: Equatable {
     case `returnCallIndirect`(typeIndex: UInt32, tableIndex: UInt32)
     case `callRef`(typeIndex: UInt32)
     case `returnCallRef`(typeIndex: UInt32)
+    case `tryTable`(blockType: BlockType, tryCatch: TryCatch)
     case `drop`
     case `select`
     case `typedSelect`(type: ValueType)
@@ -558,6 +561,8 @@ extension AnyInstructionVisitor {
     public mutating func visitLoop(blockType: BlockType) throws(VisitorError) { return try self.visit(.loop(blockType: blockType)) }
     public mutating func visitIf(blockType: BlockType) throws(VisitorError) { return try self.visit(.if(blockType: blockType)) }
     public mutating func visitElse() throws(VisitorError) { return try self.visit(.else) }
+    public mutating func visitThrow(tagIndex: UInt32) throws(VisitorError) { return try self.visit(.throw(tagIndex: tagIndex)) }
+    public mutating func visitThrowRef() throws(VisitorError) { return try self.visit(.throwRef) }
     public mutating func visitEnd() throws(VisitorError) { return try self.visit(.end) }
     public mutating func visitBr(relativeDepth: UInt32) throws(VisitorError) { return try self.visit(.br(relativeDepth: relativeDepth)) }
     public mutating func visitBrIf(relativeDepth: UInt32) throws(VisitorError) { return try self.visit(.brIf(relativeDepth: relativeDepth)) }
@@ -569,6 +574,7 @@ extension AnyInstructionVisitor {
     public mutating func visitReturnCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws(VisitorError) { return try self.visit(.returnCallIndirect(typeIndex: typeIndex, tableIndex: tableIndex)) }
     public mutating func visitCallRef(typeIndex: UInt32) throws(VisitorError) { return try self.visit(.callRef(typeIndex: typeIndex)) }
     public mutating func visitReturnCallRef(typeIndex: UInt32) throws(VisitorError) { return try self.visit(.returnCallRef(typeIndex: typeIndex)) }
+    public mutating func visitTryTable(blockType: BlockType, tryCatch: TryCatch) throws(VisitorError) { return try self.visit(.tryTable(blockType: blockType, tryCatch: tryCatch)) }
     public mutating func visitDrop() throws(VisitorError) { return try self.visit(.drop) }
     public mutating func visitSelect() throws(VisitorError) { return try self.visit(.select) }
     public mutating func visitTypedSelect(type: ValueType) throws(VisitorError) { return try self.visit(.typedSelect(type: type)) }
@@ -690,6 +696,10 @@ public protocol InstructionVisitor: ~Copyable {
     mutating func visitIf(blockType: BlockType) throws(VisitorError)
     /// Visiting `else` instruction.
     mutating func visitElse() throws(VisitorError)
+    /// Visiting `throw` instruction.
+    mutating func visitThrow(tagIndex: UInt32) throws(VisitorError)
+    /// Visiting `throw_ref` instruction.
+    mutating func visitThrowRef() throws(VisitorError)
     /// Visiting `end` instruction.
     mutating func visitEnd() throws(VisitorError)
     /// Visiting `br` instruction.
@@ -712,6 +722,8 @@ public protocol InstructionVisitor: ~Copyable {
     mutating func visitCallRef(typeIndex: UInt32) throws(VisitorError)
     /// Visiting `return_call_ref` instruction.
     mutating func visitReturnCallRef(typeIndex: UInt32) throws(VisitorError)
+    /// Visiting `try_table` instruction.
+    mutating func visitTryTable(blockType: BlockType, tryCatch: TryCatch) throws(VisitorError)
     /// Visiting `drop` instruction.
     mutating func visitDrop() throws(VisitorError)
     /// Visiting `select` instruction.
@@ -922,6 +934,8 @@ extension InstructionVisitor where Self: ~Copyable {
         case let .loop(blockType): return try visitLoop(blockType: blockType)
         case let .if(blockType): return try visitIf(blockType: blockType)
         case .else: return try visitElse()
+        case let .throw(tagIndex): return try visitThrow(tagIndex: tagIndex)
+        case .throwRef: return try visitThrowRef()
         case .end: return try visitEnd()
         case let .br(relativeDepth): return try visitBr(relativeDepth: relativeDepth)
         case let .brIf(relativeDepth): return try visitBrIf(relativeDepth: relativeDepth)
@@ -933,6 +947,7 @@ extension InstructionVisitor where Self: ~Copyable {
         case let .returnCallIndirect(typeIndex, tableIndex): return try visitReturnCallIndirect(typeIndex: typeIndex, tableIndex: tableIndex)
         case let .callRef(typeIndex): return try visitCallRef(typeIndex: typeIndex)
         case let .returnCallRef(typeIndex): return try visitReturnCallRef(typeIndex: typeIndex)
+        case let .tryTable(blockType, tryCatch): return try visitTryTable(blockType: blockType, tryCatch: tryCatch)
         case .drop: return try visitDrop()
         case .select: return try visitSelect()
         case let .typedSelect(type): return try visitTypedSelect(type: type)
@@ -1043,6 +1058,8 @@ extension InstructionVisitor where Self: ~Copyable {
     public mutating func visitLoop(blockType: BlockType) throws(VisitorError) {}
     public mutating func visitIf(blockType: BlockType) throws(VisitorError) {}
     public mutating func visitElse() throws(VisitorError) {}
+    public mutating func visitThrow(tagIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitThrowRef() throws(VisitorError) {}
     public mutating func visitEnd() throws(VisitorError) {}
     public mutating func visitBr(relativeDepth: UInt32) throws(VisitorError) {}
     public mutating func visitBrIf(relativeDepth: UInt32) throws(VisitorError) {}
@@ -1054,6 +1071,7 @@ extension InstructionVisitor where Self: ~Copyable {
     public mutating func visitReturnCallIndirect(typeIndex: UInt32, tableIndex: UInt32) throws(VisitorError) {}
     public mutating func visitCallRef(typeIndex: UInt32) throws(VisitorError) {}
     public mutating func visitReturnCallRef(typeIndex: UInt32) throws(VisitorError) {}
+    public mutating func visitTryTable(blockType: BlockType, tryCatch: TryCatch) throws(VisitorError) {}
     public mutating func visitDrop() throws(VisitorError) {}
     public mutating func visitSelect() throws(VisitorError) {}
     public mutating func visitTypedSelect(type: ValueType) throws(VisitorError) {}

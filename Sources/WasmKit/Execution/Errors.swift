@@ -56,6 +56,29 @@ public struct Trap: Error, CustomStringConvertible {
     }
 }
 
+/// An uncaught WebAssembly exception that propagated out of a module.
+public struct WasmKitException: Error, CustomStringConvertible {
+    /// The tag identity, stored as the bit pattern of the tag handle pointer.
+    /// Used only for equality comparison when matching catch clauses.
+    let tagIdentity: Int
+    /// The exception payload values.
+    let payload: [Value]
+
+    init(tag: InternalTag, payload: [Value]) {
+        self.tagIdentity = tag.bitPattern
+        self.payload = payload
+    }
+
+    public var description: String {
+        "wasm exception (payload: \(payload))"
+    }
+
+    /// Returns true if this exception's tag matches the given tag handle.
+    func hasTag(_ tag: InternalTag) -> Bool {
+        tagIdentity == tag.bitPattern
+    }
+}
+
 /// A reason for a trap that occurred during execution of a WebAssembly module.
 package enum TrapReason: Error, CustomStringConvertible {
     package struct Message {
@@ -177,6 +200,8 @@ extension ImportError.Message {
             expected = "memory"
         case .table:
             expected = "table"
+        case .tag:
+            expected = "tag"
         }
         let got: String
         switch entity {
@@ -188,6 +213,8 @@ extension ImportError.Message {
             got = "memory"
         case .table:
             got = "table"
+        case .tag:
+            got = "tag"
         }
         return Self("incompatible import type for \(importEntry.module).\(importEntry.name), expected \(expected), got \(got)")
     }

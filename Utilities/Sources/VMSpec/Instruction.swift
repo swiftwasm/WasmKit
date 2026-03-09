@@ -643,6 +643,28 @@ extension VMGen {
         ),
     ]
 
+    // MARK: - Exception handling instructions
+
+    static let exceptionHandlingInsts: [Instruction] = [
+        Instruction(name: "throwTag", documentation: "WebAssembly Exception Handling `throw`",
+                    isControl: true, mayThrow: true) {
+            $0.field(name: "tagIndex", type: .UInt32)
+            $0.field(name: "payloadBase", type: .VReg)
+        },
+        Instruction(name: "throwRef", documentation: "WebAssembly Exception Handling `throw_ref`",
+                    isControl: true, mayThrow: true) {
+            $0.field(name: "exnRef", type: .VReg)
+        },
+        Instruction(name: "catchHandlers", documentation: "Register exception handlers for a try_table block",
+                    isControl: true) {
+            $0.field(name: "rawBaseAddress", type: .UInt64)
+            $0.field(name: "count", type: .UInt16)
+        },
+        Instruction(name: "catchHandlersEnd", documentation: "Unregister exception handlers for a try_table block") {
+            $0.field(name: "count", type: .UInt16)
+        },
+    ]
+
     // MARK: - Instruction generation
 
     static func buildInstructions() -> [Instruction] {
@@ -750,6 +772,8 @@ extension VMGen {
         instructions += atomicRmw32Ops.map(\.instruction)
         instructions += atomicCmpxchgOps
         instructions += atomicWaitNotifyInsts
+        // Exception handling
+        instructions += exceptionHandlingInsts
         return instructions
     }
 

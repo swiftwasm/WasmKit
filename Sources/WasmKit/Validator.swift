@@ -61,6 +61,14 @@ extension ValidationError.Message {
         Self("start function must have no parameters and no results")
     }
 
+    static var nonEmptyTagResultType: Self {
+        Self("non-empty tag result type")
+    }
+
+    static var catchTypeMismatch: Self {
+        Self("type mismatch")
+    }
+
     static var memory64FeatureRequired: Self {
         Self("memory64 feature is required for 64-bit memories")
     }
@@ -285,6 +293,12 @@ struct ModuleValidator {
         for tableType in module.tableTypes {
             try Self.checkTableType(tableType, features: module.features)
         }
+        for tagTypeIndex in module.tagTypes {
+            let tagType = try Module.resolveType(tagTypeIndex, typeSection: module.types)
+            guard tagType.results.isEmpty else {
+                throw ValidationError(.nonEmptyTagResultType)
+            }
+        }
         try checkStartFunction()
     }
 
@@ -365,6 +379,8 @@ extension WasmTypes.Reference {
         case (.function(nil), .funcRef, true): return
         case (.extern(_?), .externRef, _): return
         case (.extern(nil), .externRef, true): return
+        case (.exception(_?), .exnRef, _): return
+        case (.exception(nil), .exnRef, true): return
         default:
             throw ValidationError(.expectTypeButGot(expected: "\(type)", got: "\(self)"))
         }
