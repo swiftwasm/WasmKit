@@ -94,6 +94,23 @@ public struct EngineConfiguration: Sendable {
     /// The WebAssembly features that can be used by Wasm modules running on this engine.
     public var features: WasmFeatureSet
 
+    /// Linear memory bounds checking strategy.
+    public enum MemoryBoundsChecking: Sendable {
+        /// Prefer `mprotect` + signal based traps when supported, otherwise use software bounds checks.
+        case auto
+        /// Request `mprotect` + signal based traps, but fall back to software checks if unavailable.
+        case mprotect
+        /// Always use software bounds checks.
+        case software
+    }
+
+    /// The memory bounds checking strategy to use.
+    public var memoryBoundsChecking: MemoryBoundsChecking
+
+    /// The maximum constant `memarg.offset` range (in bytes) for which unchecked
+    /// (mprotect-based) memory loads/stores are allowed.
+    public var memoryOffsetGuardSize: Int
+
     /// Initializes a new instance of `EngineConfiguration`.
     ///
     /// - Parameter threadingModel: The threading model to use for the virtual
@@ -109,12 +126,16 @@ public struct EngineConfiguration: Sendable {
         threadingModel: ThreadingModel? = nil,
         compilationMode: CompilationMode? = nil,
         stackSize: Int? = nil,
-        features: WasmFeatureSet = .default
+        features: WasmFeatureSet = .default,
+        memoryBoundsChecking: MemoryBoundsChecking = .auto,
+        memoryOffsetGuardSize: Int = 64 * 1024
     ) {
         self.threadingModel = threadingModel ?? .defaultForCurrentPlatform
         self.compilationMode = compilationMode ?? .lazy
         self.stackSize = stackSize ?? (1 << 19)
         self.features = features
+        self.memoryBoundsChecking = memoryBoundsChecking
+        self.memoryOffsetGuardSize = memoryOffsetGuardSize
     }
 }
 

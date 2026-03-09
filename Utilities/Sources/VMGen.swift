@@ -78,10 +78,16 @@ enum VMGen {
             inlineImpls[op.instruction.name] = """
             try memoryLoad(sp: sp.pointee, md: md.pointee, ms: ms.pointee, loadOperand: immediate, loadAs: \(op.loadAs).self, castToValue: { \(op.castToValue) })
             """
+            inlineImpls["\(op.type)\(op.op)Unchecked"] = """
+            try memoryLoadUnchecked(sp: sp.pointee, md: md.pointee, loadOperand: immediate, loadAs: \(op.loadAs).self, castToValue: { \(op.castToValue) })
+            """
         }
         for op in memoryStoreOps {
             inlineImpls[op.instruction.name] = """
             try memoryStore(sp: sp.pointee, md: md.pointee, ms: ms.pointee, storeOperand: immediate, castFromValue: { \(op.castFromValue) })
+            """
+            inlineImpls["\(op.type)\(op.op)Unchecked"] = """
+            try memoryStoreUnchecked(sp: sp.pointee, md: md.pointee, storeOperand: immediate, castFromValue: { \(op.castFromValue) })
             """
         }
 
