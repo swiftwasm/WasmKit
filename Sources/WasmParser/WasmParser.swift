@@ -1386,10 +1386,28 @@ extension Parser {
 /// A map of names by its index.
 public typealias NameMap = [UInt32: String]
 
-/// Parsed names.
+/// Parsed names from a name section subsection.
 public enum ParsedNames {
-    /// Function names.
+    /// Subsection 0: Module name.
+    case moduleName(String)
+    /// Subsection 1: Function names.
     case functions(NameMap)
+    /// Subsection 2: Local names (funcIndex → [localIndex → name]).
+    case locals([UInt32: NameMap])
+    /// Subsection 3: Label names (funcIndex → [labelIndex → name]).
+    case labels([UInt32: NameMap])
+    /// Subsection 4: Type names.
+    case types(NameMap)
+    /// Subsection 5: Table names.
+    case tables(NameMap)
+    /// Subsection 6: Memory names.
+    case memories(NameMap)
+    /// Subsection 7: Global names.
+    case globals(NameMap)
+    /// Subsection 8: Element segment names.
+    case elements(NameMap)
+    /// Subsection 9: Data segment names.
+    case dataSegments(NameMap)
 }
 
 /// A parser for the name custom section.
@@ -1421,12 +1439,17 @@ public struct NameSectionParser<Stream: ByteStream> {
     func parseNameSubsection(type: UInt8) throws -> ParsedNames? {
         let size = try stream.parseUnsigned(UInt32.self)
         switch type {
-        case 1:  // function names
-            return .functions(try parseNameMap())
-        case 0, 2:  // local names
-            fallthrough
+        case 0: return .moduleName(try stream.parseName())
+        case 1: return .functions(try parseNameMap())
+        case 2: return .locals(try parseIndirectNameMap())
+        case 3: return .labels(try parseIndirectNameMap())
+        case 4: return .types(try parseNameMap())
+        case 5: return .tables(try parseNameMap())
+        case 6: return .memories(try parseNameMap())
+        case 7: return .globals(try parseNameMap())
+        case 8: return .elements(try parseNameMap())
+        case 9: return .dataSegments(try parseNameMap())
         default:
-            // Just skip other sections for now
             _ = try stream.consume(count: Int(size))
             return nil
         }
@@ -1440,6 +1463,15 @@ public struct NameSectionParser<Stream: ByteStream> {
             nameMap[index] = name
         }
         return nameMap
+    }
+
+    func parseIndirectNameMap() throws -> [UInt32: NameMap] {
+        var map: [UInt32: NameMap] = [:]
+        _ = try stream.parseVector {
+            let outerIndex = try stream.parseUnsigned(UInt32.self)
+            map[outerIndex] = try parseNameMap()
+        }
+        return map
     }
 }
 
