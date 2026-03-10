@@ -711,7 +711,8 @@ extension Execution {
         let instance = self.currentInstance(sp: sp)
         let caller = Caller(
             instanceHandle: instance,
-            store: store.value
+            store: store.value,
+            sp: sp
         )
         let results = try function.implementation(caller, Array(parameters))
         guard resolvedType.results.count == results.count else {
