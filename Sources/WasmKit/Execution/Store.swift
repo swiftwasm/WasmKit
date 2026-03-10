@@ -36,8 +36,10 @@ extension Store: Equatable {
 }
 
 /// A caller context passed to host functions
-public struct Caller {
+public struct Caller: ~Copyable {
     private let instanceHandle: InternalInstance?
+    /// The stack pointer at the point of the host function call.
+    private let sp: Sp?
     /// The instance that called the host function.
     /// - Note: This property is `nil` if a `Function` backed by a host function is called directly.
     public var instance: Instance? {
@@ -55,15 +57,25 @@ public struct Caller {
     @available(*, unavailable, message: "Use `engine` instead")
     public var runtime: Runtime { fatalError() }
 
-    init(instanceHandle: InternalInstance?, store: Store) {
+    init(instanceHandle: InternalInstance?, store: Store, sp: Sp? = nil) {
         self.instanceHandle = instanceHandle
         self.store = store
+        self.sp = sp
+    }
+
+    /// Captures the current WebAssembly call stack backtrace.
+    ///
+    /// Returns `nil` if the caller context does not have stack pointer information
+    /// (e.g., when a host function is called directly rather than from WebAssembly).
+    public func captureBacktrace() -> Backtrace? {
+        guard let sp else { return nil }
+        return Execution.captureBacktrace(sp: sp, store: store)
     }
 }
 
 struct HostFunctionEntity {
     let type: InternedFuncType
-    let implementation: (Caller, [Value]) throws -> [Value]
+    let implementation: Function.Implementation
 }
 
 extension Store {
