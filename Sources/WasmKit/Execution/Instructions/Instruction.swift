@@ -555,6 +555,8 @@ enum Instruction: Equatable {
     case memoryAtomicWait64(Instruction.AtomicWaitOperand)
     /// WebAssembly Core Instruction `memory.atomic.notify`
     case memoryAtomicNotify(Instruction.AtomicNotifyOperand)
+    /// WebAssembly Core Instruction `atomic.fence`
+    case atomicFence
 }
 
 extension Instruction {
@@ -1690,6 +1692,7 @@ extension Instruction {
         case .memoryAtomicWait32: return 266
         case .memoryAtomicWait64: return 267
         case .memoryAtomicNotify: return 268
+        case .atomicFence: return 269
         }
     }
 }
@@ -1970,6 +1973,7 @@ extension Instruction {
         case 266: return .memoryAtomicWait32(Instruction.AtomicWaitOperand.load(from: &pc))
         case 267: return .memoryAtomicWait64(Instruction.AtomicWaitOperand.load(from: &pc))
         case 268: return .memoryAtomicNotify(Instruction.AtomicNotifyOperand.load(from: &pc))
+        case 269: return .atomicFence
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -2253,6 +2257,7 @@ extension Instruction {
         case 266: return "memoryAtomicWait32"
         case 267: return "memoryAtomicWait64"
         case 268: return "memoryAtomicNotify"
+        case 269: return "atomicFence"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }

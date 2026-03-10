@@ -750,7 +750,7 @@ enum WasmGen {
                 header + generateTextInstructionParser(instructions)
             ),
             GeneratedFile(
-                projectSources + ["WAT", "BinaryInstructionEncoder.swift"],
+                projectSources + ["WAT", "BinaryEncoding", "BinaryInstructionEncoder.swift"],
                 header + generateBinaryInstructionEncoder(instructions)
             ),
         ]

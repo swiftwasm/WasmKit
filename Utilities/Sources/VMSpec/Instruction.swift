@@ -529,6 +529,7 @@ extension VMGen {
                     mayThrow: true, useCurrentMemory: .read, immediateLayout: .atomicWait),
         Instruction(name: "memoryAtomicNotify", documentation: "WebAssembly Core Instruction `memory.atomic.notify`",
                     mayThrow: true, useCurrentMemory: .read, immediateLayout: .atomicNotify),
+        Instruction(name: "atomicFence", documentation: "WebAssembly Core Instruction `atomic.fence`"),
     ]
     static let memoryOpInsts: [Instruction] = [
         Instruction(name: "memorySize", documentation: "WebAssembly Core Instruction `memory.size`") {
