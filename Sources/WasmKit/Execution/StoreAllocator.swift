@@ -510,7 +510,7 @@ extension StoreAllocator {
 
     internal func allocate(
         type: FunctionType,
-        implementation: @escaping (Caller, [Value]) throws -> [Value],
+        implementation: @escaping Function.Implementation,
         engine: Engine
     ) -> InternalFunction {
         let pointer = hostFunctions.allocate(
