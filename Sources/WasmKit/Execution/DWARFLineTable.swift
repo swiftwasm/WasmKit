@@ -716,14 +716,15 @@ private struct Cursor {
 
     mutating func readU64() throws -> UInt64 {
         guard offset + 8 <= data.endIndex else { throw DWARFError.unexpectedEnd }
-        let value = UInt64(data[offset])
-            | (UInt64(data[offset + 1]) << 8)
-            | (UInt64(data[offset + 2]) << 16)
-            | (UInt64(data[offset + 3]) << 24)
-            | (UInt64(data[offset + 4]) << 32)
-            | (UInt64(data[offset + 5]) << 40)
-            | (UInt64(data[offset + 6]) << 48)
-            | (UInt64(data[offset + 7]) << 56)
+        let b0 = UInt64(data[offset])
+        let b1 = UInt64(data[offset + 1]) << 8
+        let b2 = UInt64(data[offset + 2]) << 16
+        let b3 = UInt64(data[offset + 3]) << 24
+        let b4 = UInt64(data[offset + 4]) << 32
+        let b5 = UInt64(data[offset + 5]) << 40
+        let b6 = UInt64(data[offset + 6]) << 48
+        let b7 = UInt64(data[offset + 7]) << 56
+        let value = b0 | b1 | b2 | b3 | b4 | b5 | b6 | b7
         offset += 8
         return value
     }
