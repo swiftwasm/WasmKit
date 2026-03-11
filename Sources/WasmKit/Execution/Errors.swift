@@ -9,6 +9,8 @@ public struct Backtrace: CustomStringConvertible, Sendable {
         /// The name of the symbol.
         public let name: String?
         let address: Pc
+        /// The source location resolved from DWARF debug info, if available.
+        public let sourceLocation: DWARFLineTable.SourceLocation?
     }
 
     /// The symbols in the backtrace.
@@ -18,6 +20,9 @@ public struct Backtrace: CustomStringConvertible, Sendable {
     public var description: String {
         symbols.enumerated().map { (index, symbol) in
             let name = symbol.name ?? "unknown"
+            if let loc = symbol.sourceLocation {
+                return "    \(index): \(name) (\(loc))"
+            }
             return "    \(index): (\(symbol.address)) \(name)"
         }.joined(separator: "\n")
     }

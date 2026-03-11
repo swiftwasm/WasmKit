@@ -64,6 +64,10 @@ public struct Module {
     let features: WasmFeatureSet
     let dataCount: UInt32?
 
+    /// File-level byte offset of the Code section content (after section ID + size LEB).
+    /// Used to convert between file-level Code.offset values and DWARF code-section-relative addresses.
+    var codeSectionStart: Int = 0
+
     init(
         types: [FunctionType],
         functions: [GuestFunction],
@@ -128,33 +132,21 @@ public struct Module {
         return functions[Int(index) - self.moduleImports.numberOfFunctions].type
     }
 
-    /// Instantiate this module in the given imports.
+    /// Instantiate this module with the given imports.
     ///
     /// - Parameters:
     ///   - store: The ``Store`` to allocate the instance in.
     ///   - imports: The imports to use for instantiation. All imported entities
     ///     must be allocated in the given store.
-    public func instantiate(store: Store, imports: Imports = [:]) throws -> Instance {
-        Instance(handle: try self.instantiateHandle(store: store, imports: imports), store: store)
+    ///   - isDebuggable: Whether the module should support debugging actions
+    ///     (breakpoints, instruction mapping, source-level backtraces) after instantiation.
+    public func instantiate(store: Store, imports: Imports = [:], isDebuggable: Bool = false) throws -> Instance {
+        Instance(handle: try self.instantiateHandle(store: store, imports: imports, isDebuggable: isDebuggable), store: store)
     }
-
-    #if WasmDebuggingSupport
-        /// Instantiate this module with the given imports.
-        ///
-        /// - Parameters:
-        ///   - store: The ``Store`` to allocate the instance in.
-        ///   - imports: The imports to use for instantiation. All imported entities
-        ///     must be allocated in the given store.
-        ///   - isDebuggable: Whether the module should support debugging actions
-        ///     (breakpoints etc) after instantiation.
-        public func instantiate(store: Store, imports: Imports = [:], isDebuggable: Bool) throws -> Instance {
-            Instance(handle: try self.instantiateHandle(store: store, imports: imports, isDebuggable: isDebuggable), store: store)
-        }
-    #endif
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#instantiation>
-    private func instantiateHandle(store: Store, imports: Imports, isDebuggable: Bool = false) throws -> InternalInstance {
+    private func instantiateHandle(store: Store, imports: Imports, isDebuggable: Bool) throws -> InternalInstance {
         try ModuleValidator(module: self).validate()
 
         // Steps 5-8.
@@ -174,6 +166,22 @@ public struct Module {
             // FIXME?: Just ignore parsing error of name section for now.
             // Should emit warning instead of just discarding it?
             try? store.nameRegistry.register(instance: instance, nameSection: nameSection)
+        }
+
+        // Parse DWARF line table from debug custom sections if present
+        if let debugLineSection = customSections.first(where: { $0.name == ".debug_line" }) {
+            let sections = DWARFLineTable.Sections(
+                debugLine: debugLineSection.bytes,
+                debugInfo: customSections.first(where: { $0.name == ".debug_info" })?.bytes,
+                debugAbbrev: customSections.first(where: { $0.name == ".debug_abbrev" })?.bytes,
+                debugRanges: customSections.first(where: { $0.name == ".debug_ranges" })?.bytes
+            )
+            if let lineTable = try? DWARFLineTable(sections: sections) {
+                lineTable.codeSectionOffset = self.codeSectionStart
+                instance.withValue {
+                    $0.dwarfLineTable = lineTable
+                }
+            }
         }
 
         let constEvalContext = ConstEvaluationContext(instance: instance, moduleImports: moduleImports)

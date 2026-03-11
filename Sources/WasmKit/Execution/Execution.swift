@@ -77,15 +77,61 @@ struct Execution: ~Copyable {
 
     static func captureBacktrace(sp: Sp, store: Store) -> Backtrace {
         let callStack = CallStack(sp: sp)
-        var symbols: [Backtrace.Symbol] = []
 
-        for frame in callStack {
+        // Collect all frames. Each frame has:
+        //   - sp.currentFunction: the function executing in this frame
+        //   - pc (= sp.returnPC): the return address, in the CALLER's code
+        // So frame[i].pc points to code inside frame[i+1]'s function.
+        let frames = Array(callStack)
+
+        var symbols: [Backtrace.Symbol] = []
+        for i in 0..<frames.count {
+            let frame = frames[i]
             guard let function = frame.sp.currentFunction else {
-                symbols.append(.init(name: nil, address: frame.pc))
+                symbols.append(.init(name: nil, address: frame.pc, sourceLocation: nil))
                 continue
             }
             let symbolName = store.nameRegistry.symbolicate(.wasm(function))
-            symbols.append(.init(name: symbolName, address: frame.pc))
+
+            // Resolve source location from DWARF line table.
+            // Two strategies:
+            //   1. Function start address (Code.originalAddress) → correct file, first line
+            //   2. Instruction mapping PC → precise line, but may attribute to wrong file
+            // Use #1 for the file, and #2 for the line if it agrees on the file.
+            var sourceLocation: DWARFLineTable.SourceLocation?
+            #if WasmDebuggingSupport
+                if let instance = frame.sp.currentInstance,
+                   let lineTable = instance.dwarfLineTable
+                {
+                    // Get the function's file from its start address (reliable)
+                    var functionStart: DWARFLineTable.SourceLocation?
+                    switch function.code {
+                    case .debuggable(let code, _), .uncompiled(let code):
+                        functionStart = lineTable.lookup(fileOffset: code.originalAddress)
+                    case .compiled:
+                        break
+                    }
+
+                    // Try precise location from instruction mapping.
+                    // Instruction mapping stores file-level offsets (corrected in Translator).
+                    let pcForLocation: Pc? = (i > 0) ? frames[i - 1].pc : nil
+                    if let pc = pcForLocation,
+                       let wasmOffset = instance.instructionMapping.findWasm(forIseqAddress: pc)
+                    {
+                        let precise = lineTable.lookup(fileOffset: wasmOffset)
+                        if let precise, let functionStart, precise.file == functionStart.file {
+                            sourceLocation = precise
+                        }
+                    }
+
+                    // Fall back to function start
+                    if sourceLocation == nil {
+                        sourceLocation = functionStart
+                    }
+                }
+            #endif
+
+            symbols.append(.init(name: symbolName, address: frame.pc, sourceLocation: sourceLocation))
         }
         return Backtrace(symbols: symbols)
     }
