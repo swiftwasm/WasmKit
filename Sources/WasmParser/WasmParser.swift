@@ -1215,7 +1215,7 @@ public enum ParsingPayload {
     case exportSection([Export])
     case startSection(FunctionIndex)
     case elementSection([ElementSegment])
-    case codeSection([Code])
+    case codeSection([Code], sectionStart: Int)
     case dataSection([DataSegment])
     case dataCount(UInt32)
 }
@@ -1355,7 +1355,7 @@ extension Parser {
                 payload = .elementSection(try parseElementSection())
             case 10:
                 order = .code
-                payload = .codeSection(try parseCodeSection())
+                payload = .codeSection(try parseCodeSection(), sectionStart: sectionStart)
             case 11:
                 order = .data
                 payload = .dataSection(try parseDataSection())

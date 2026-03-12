@@ -482,7 +482,8 @@ extension StoreAllocator {
             features: module.features,
             dataCount: module.dataCount,
             isDebuggable: isDebuggable,
-            instructionMapping: .init()
+            instructionMapping: .init(),
+            dwarfLineTable: nil
         )
         instancePointer.initialize(to: instanceEntity)
         instanceInitialized = true
@@ -591,7 +592,8 @@ extension StoreAllocator {
                 features: .default,
                 dataCount: nil,
                 isDebuggable: false,
-                instructionMapping: DebuggerInstructionMapping()
+                instructionMapping: DebuggerInstructionMapping(),
+                dwarfLineTable: nil
             )
             let pointer = instances.allocate(initializing: entity)
             return InternalInstance(unsafe: pointer)
