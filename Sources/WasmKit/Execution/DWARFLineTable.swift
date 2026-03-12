@@ -127,7 +127,7 @@ public final class DWARFLineTable {
 
         // If .debug_info is available, build CU → address range mappings
         if let debugInfo = sections.debugInfo,
-           let debugAbbrev = sections.debugAbbrev
+            let debugAbbrev = sections.debugAbbrev
         {
             let cuEntries = try Self.parseCUEntries(
                 debugInfo: debugInfo,
@@ -152,13 +152,14 @@ public final class DWARFLineTable {
                 let fileBase = allFiles.count
                 allFiles.append(contentsOf: lt.files)
                 for row in lt.rows {
-                    allRows.append(Row(
-                        address: row.address,
-                        fileIndex: UInt(fileBase) + row.fileIndex,
-                        line: row.line,
-                        column: row.column,
-                        isEndSequence: row.isEndSequence
-                    ))
+                    allRows.append(
+                        Row(
+                            address: row.address,
+                            fileIndex: UInt(fileBase) + row.fileIndex,
+                            line: row.line,
+                            column: row.column,
+                            isEndSequence: row.isEndSequence
+                        ))
                 }
             }
             fallbackTable = CULineTable(files: allFiles, rows: allRows.sorted())
@@ -231,8 +232,8 @@ public final class DWARFLineTable {
         }
 
         if version == 5 {
-            _ = try cursor.readU8() // address_size
-            _ = try cursor.readU8() // segment_selector_size
+            _ = try cursor.readU8()  // address_size
+            _ = try cursor.readU8()  // segment_selector_size
         }
 
         let prologueLength = try cursor.readU32()
@@ -240,7 +241,7 @@ public final class DWARFLineTable {
 
         let minInstructionLength = try cursor.readU8()
         if version >= 4 {
-            _ = try cursor.readU8() // max_operations_per_instruction
+            _ = try cursor.readU8()  // max_operations_per_instruction
         }
         let defaultIsStmt = try cursor.readU8() != 0
         let lineBase = Int8(bitPattern: try cursor.readU8())
@@ -265,8 +266,8 @@ public final class DWARFLineTable {
                 let name = try cursor.readNullTerminatedString()
                 if name.isEmpty { break }
                 let dirIndex = try cursor.readULEB128()
-                _ = try cursor.readULEB128() // mod_time
-                _ = try cursor.readULEB128() // length
+                _ = try cursor.readULEB128()  // mod_time
+                _ = try cursor.readULEB128()  // length
                 let dir = dirIndex < directories.count ? directories[Int(dirIndex)] : ""
                 if dir.isEmpty || name.hasPrefix("/") {
                     files.append(name)
@@ -297,16 +298,20 @@ public final class DWARFLineTable {
                 let extEnd = cursor.offset + Int(length)
                 let extOpcode = try cursor.readU8()
                 switch extOpcode {
-                case 1: // DW_LNE_end_sequence
+                case 1:  // DW_LNE_end_sequence
                     rows.append(Row(address: address, fileIndex: file, line: line, column: column, isEndSequence: true))
-                    address = 0; file = 1; line = 1; column = 0; isStmt = defaultIsStmt
-                case 2: // DW_LNE_set_address
+                    address = 0
+                    file = 1
+                    line = 1
+                    column = 0
+                    isStmt = defaultIsStmt
+                case 2:  // DW_LNE_set_address
                     if extEnd - cursor.offset >= 8 {
                         address = try cursor.readU64()
                     } else {
                         address = UInt64(try cursor.readU32())
                     }
-                case 4: _ = try cursor.readULEB128() // DW_LNE_set_discriminator
+                case 4: _ = try cursor.readULEB128()  // DW_LNE_set_discriminator
                 default: break
                 }
                 cursor.seek(to: extEnd)
@@ -371,7 +376,7 @@ public final class DWARFLineTable {
             let addressSize: UInt8
 
             if version == 5 {
-                _ = try cursor.readU8() // unit_type
+                _ = try cursor.readU8()  // unit_type
                 addressSize = try cursor.readU8()
                 abbrevOffset = Int(try cursor.readU32())
             } else {
@@ -399,14 +404,14 @@ public final class DWARFLineTable {
             for (attr, form) in abbrev.attributes {
                 let value = try readAttributeValue(&cursor, form: form, addressSize: addressSize)
                 switch attr {
-                case 0x10: // DW_AT_stmt_list
+                case 0x10:  // DW_AT_stmt_list
                     stmtList = value.asInt
-                case 0x11: // DW_AT_low_pc
+                case 0x11:  // DW_AT_low_pc
                     lowPC = value.asUInt64
-                case 0x12: // DW_AT_high_pc
+                case 0x12:  // DW_AT_high_pc
                     highPC = value.asUInt64
-                    highPCIsOffset = form == 0x0b || form == 0x05 || form == 0x06 || form == 0x07 || form == 0x0f // data forms
-                case 0x55: // DW_AT_ranges
+                    highPCIsOffset = form == 0x0b || form == 0x05 || form == 0x06 || form == 0x07 || form == 0x0f  // data forms
+                case 0x55:  // DW_AT_ranges
                     rangesOffset = value.asInt
                 default:
                     break
@@ -458,7 +463,7 @@ public final class DWARFLineTable {
             if code == 0 { break }
 
             let tag = try cursor.readULEB128()
-            _ = try cursor.readU8() // children flag
+            _ = try cursor.readU8()  // children flag
 
             var attributes: [(attr: UInt, form: UInt)] = []
             while true {
@@ -496,66 +501,66 @@ public final class DWARFLineTable {
 
     private static func readAttributeValue(_ cursor: inout Cursor, form: UInt, addressSize: UInt8) throws -> AttributeValue {
         switch form {
-        case 0x01: // DW_FORM_addr
+        case 0x01:  // DW_FORM_addr
             if addressSize == 8 { return .uint64(try cursor.readU64()) }
             return .uint64(UInt64(try cursor.readU32()))
-        case 0x03: // DW_FORM_block2
+        case 0x03:  // DW_FORM_block2
             let len = try cursor.readU16()
             cursor.seek(to: cursor.offset + Int(len))
             return .skipped
-        case 0x04: // DW_FORM_block4
+        case 0x04:  // DW_FORM_block4
             let len = try cursor.readU32()
             cursor.seek(to: cursor.offset + Int(len))
             return .skipped
-        case 0x05: // DW_FORM_data2
+        case 0x05:  // DW_FORM_data2
             return .int(Int(try cursor.readU16()))
-        case 0x06: // DW_FORM_data4
+        case 0x06:  // DW_FORM_data4
             return .int(Int(try cursor.readU32()))
-        case 0x07: // DW_FORM_data8
+        case 0x07:  // DW_FORM_data8
             return .uint64(try cursor.readU64())
-        case 0x08: // DW_FORM_string
+        case 0x08:  // DW_FORM_string
             _ = try cursor.readNullTerminatedString()
             return .skipped
-        case 0x09: // DW_FORM_block
+        case 0x09:  // DW_FORM_block
             let len = try cursor.readULEB128()
             cursor.seek(to: cursor.offset + Int(len))
             return .skipped
-        case 0x0a: // DW_FORM_block1
+        case 0x0a:  // DW_FORM_block1
             let len = try cursor.readU8()
             cursor.seek(to: cursor.offset + Int(len))
             return .skipped
-        case 0x0b: // DW_FORM_data1
+        case 0x0b:  // DW_FORM_data1
             return .int(Int(try cursor.readU8()))
-        case 0x0c: // DW_FORM_flag
+        case 0x0c:  // DW_FORM_flag
             return .int(Int(try cursor.readU8()))
-        case 0x0d: // DW_FORM_sdata
+        case 0x0d:  // DW_FORM_sdata
             return .int(Int(try cursor.readSLEB128()))
-        case 0x0e: // DW_FORM_strp
+        case 0x0e:  // DW_FORM_strp
             return .int(Int(try cursor.readU32()))
-        case 0x0f: // DW_FORM_udata
+        case 0x0f:  // DW_FORM_udata
             return .uint64(try cursor.readULEB128())
-        case 0x10: // DW_FORM_ref_addr
+        case 0x10:  // DW_FORM_ref_addr
             if addressSize == 8 { _ = try cursor.readU64() } else { _ = try cursor.readU32() }
             return .skipped
-        case 0x11: // DW_FORM_ref1
+        case 0x11:  // DW_FORM_ref1
             return .int(Int(try cursor.readU8()))
-        case 0x12: // DW_FORM_ref2
+        case 0x12:  // DW_FORM_ref2
             return .int(Int(try cursor.readU16()))
-        case 0x13: // DW_FORM_ref4
+        case 0x13:  // DW_FORM_ref4
             return .int(Int(try cursor.readU32()))
-        case 0x14: // DW_FORM_ref8
+        case 0x14:  // DW_FORM_ref8
             return .uint64(try cursor.readU64())
-        case 0x15: // DW_FORM_ref_udata
+        case 0x15:  // DW_FORM_ref_udata
             return .uint64(try cursor.readULEB128())
-        case 0x17: // DW_FORM_sec_offset
+        case 0x17:  // DW_FORM_sec_offset
             return .int(Int(try cursor.readU32()))
-        case 0x18: // DW_FORM_exprloc
+        case 0x18:  // DW_FORM_exprloc
             let len = try cursor.readULEB128()
             cursor.seek(to: cursor.offset + Int(len))
             return .skipped
-        case 0x19: // DW_FORM_flag_present
+        case 0x19:  // DW_FORM_flag_present
             return .int(1)
-        case 0x20: // DW_FORM_ref_sig8
+        case 0x20:  // DW_FORM_ref_sig8
             _ = try cursor.readU64()
             return .skipped
         default:
@@ -580,11 +585,11 @@ public final class DWARFLineTable {
 
         while cursor.hasMore {
             guard let start = try? (addressSize == 8 ? cursor.readU64() : UInt64(cursor.readU32())),
-                  let end = try? (addressSize == 8 ? cursor.readU64() : UInt64(cursor.readU32()))
+                let end = try? (addressSize == 8 ? cursor.readU64() : UInt64(cursor.readU32()))
             else { break }
 
-            if start == 0 && end == 0 { break } // End of list
-            if start == maxAddr { // Base address selection
+            if start == 0 && end == 0 { break }  // End of list
+            if start == maxAddr {  // Base address selection
                 base = end
                 continue
             }
@@ -644,7 +649,9 @@ public final class DWARFLineTable {
     private static func readLineFormValue(_ cursor: inout Cursor, form: UInt) throws -> String {
         switch form {
         case 0x08: return try cursor.readNullTerminatedString()
-        case 0x0e, 0x1f: _ = try cursor.readU32(); return ""
+        case 0x0e, 0x1f:
+            _ = try cursor.readU32()
+            return ""
         case 0x0b: return String(try cursor.readU8())
         case 0x05: return String(try cursor.readU16())
         case 0x06: return String(try cursor.readU32())
@@ -706,7 +713,8 @@ private struct Cursor {
 
     mutating func readU32() throws -> UInt32 {
         guard offset + 4 <= data.endIndex else { throw DWARFError.unexpectedEnd }
-        let value = UInt32(data[offset])
+        let value =
+            UInt32(data[offset])
             | (UInt32(data[offset + 1]) << 8)
             | (UInt32(data[offset + 2]) << 16)
             | (UInt32(data[offset + 3]) << 24)

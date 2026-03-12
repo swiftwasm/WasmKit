@@ -101,7 +101,7 @@ struct Execution: ~Copyable {
             var sourceLocation: DWARFLineTable.SourceLocation?
             #if WasmDebuggingSupport
                 if let instance = frame.sp.currentInstance,
-                   let lineTable = instance.dwarfLineTable
+                    let lineTable = instance.dwarfLineTable
                 {
                     // Get the function's file from its start address (reliable)
                     var functionStart: DWARFLineTable.SourceLocation?
@@ -116,7 +116,7 @@ struct Execution: ~Copyable {
                     // Instruction mapping stores file-level offsets (corrected in Translator).
                     let pcForLocation: Pc? = (i > 0) ? frames[i - 1].pc : nil
                     if let pc = pcForLocation,
-                       let wasmOffset = instance.instructionMapping.findWasm(forIseqAddress: pc)
+                        let wasmOffset = instance.instructionMapping.findWasm(forIseqAddress: pc)
                     {
                         let precise = lineTable.lookup(fileOffset: wasmOffset)
                         if let precise, let functionStart, precise.file == functionStart.file {

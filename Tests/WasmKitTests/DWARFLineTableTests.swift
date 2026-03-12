@@ -62,18 +62,18 @@ struct DWARFLineTableTests {
         var bytes: [UInt8] = []
 
         let unitLengthOffset = bytes.count
-        bytes.append(contentsOf: [0, 0, 0, 0]) // unit_length placeholder
+        bytes.append(contentsOf: [0, 0, 0, 0])  // unit_length placeholder
         let afterUnitLength = bytes.count
 
-        bytes.append(contentsOf: [4, 0]) // version: 4
+        bytes.append(contentsOf: [4, 0])  // version: 4
 
         let prologueLengthOffset = bytes.count
-        bytes.append(contentsOf: [0, 0, 0, 0]) // prologue_length placeholder
+        bytes.append(contentsOf: [0, 0, 0, 0])  // prologue_length placeholder
         let afterPrologueLength = bytes.count
 
-        bytes.append(1) // minimum_instruction_length
-        bytes.append(1) // maximum_operations_per_instruction
-        bytes.append(1) // default_is_stmt
+        bytes.append(1)  // minimum_instruction_length
+        bytes.append(1)  // maximum_operations_per_instruction
+        bytes.append(1)  // default_is_stmt
         bytes.append(UInt8(bitPattern: lineBase))
         bytes.append(lineRange)
         bytes.append(opcodeBase)
@@ -86,17 +86,17 @@ struct DWARFLineTableTests {
             bytes.append(contentsOf: Array(dir.utf8))
             bytes.append(0)
         }
-        bytes.append(0) // end of directories
+        bytes.append(0)  // end of directories
 
         // Files
         for file in files {
             bytes.append(contentsOf: Array(file.name.utf8))
             bytes.append(0)
-            bytes.append(file.dirIndex) // dir_index
-            bytes.append(0) // mod_time
-            bytes.append(0) // length
+            bytes.append(file.dirIndex)  // dir_index
+            bytes.append(0)  // mod_time
+            bytes.append(0)  // length
         }
-        bytes.append(0) // end of files
+        bytes.append(0)  // end of files
 
         // Patch prologue_length
         let prologueEnd = bytes.count
@@ -122,9 +122,9 @@ struct DWARFLineTableTests {
 
     /// Emit DW_LNE_set_address (extended opcode 2)
     private static func emitSetAddress(_ bytes: inout [UInt8], _ address: UInt32) {
-        bytes.append(0) // extended opcode marker
-        bytes.append(5) // length: 1 byte opcode + 4 byte address
-        bytes.append(2) // DW_LNE_set_address
+        bytes.append(0)  // extended opcode marker
+        bytes.append(5)  // length: 1 byte opcode + 4 byte address
+        bytes.append(2)  // DW_LNE_set_address
         bytes.append(UInt8(address & 0xFF))
         bytes.append(UInt8((address >> 8) & 0xFF))
         bytes.append(UInt8((address >> 16) & 0xFF))
@@ -151,11 +151,11 @@ struct DWARFLineTableTests {
             Self.emitSetAddress(&bytes, 0x100)
 
             // Advance line to 10 (from default 1, advance by 9)
-            bytes.append(3) // DW_LNS_advance_line
+            bytes.append(3)  // DW_LNS_advance_line
             bytes.append(contentsOf: encodeSLEB128(9))
 
             // Copy -> emit row at 0x100, line 10
-            bytes.append(1) // DW_LNS_copy
+            bytes.append(1)  // DW_LNS_copy
 
             // Special opcode: address +5, line +2
             bytes.append(specialOpcode(addressAdvance: 5, lineAdvance: 2, opcodeBase: opcodeBase, lineRange: lineRange, lineBase: lineBase)!)
@@ -184,9 +184,9 @@ struct DWARFLineTableTests {
     @Test func addressBetweenRowsResolvesToPreviousRow() throws {
         let bytes = Self.buildV4Section { bytes, opcodeBase, lineRange, lineBase in
             Self.emitSetAddress(&bytes, 0x100)
-            bytes.append(3) // DW_LNS_advance_line
+            bytes.append(3)  // DW_LNS_advance_line
             bytes.append(contentsOf: encodeSLEB128(9))
-            bytes.append(1) // DW_LNS_copy — row at 0x100, line 10
+            bytes.append(1)  // DW_LNS_copy — row at 0x100, line 10
 
             bytes.append(specialOpcode(addressAdvance: 10, lineAdvance: 5, opcodeBase: opcodeBase, lineRange: lineRange, lineBase: lineBase)!)
             // -> 0x10A, line 15
@@ -206,7 +206,7 @@ struct DWARFLineTableTests {
             Self.emitSetAddress(&bytes, 0x100)
             bytes.append(3)
             bytes.append(contentsOf: encodeSLEB128(9))
-            bytes.append(1) // row at 0x100, line 10
+            bytes.append(1)  // row at 0x100, line 10
             Self.emitEndSequence(&bytes)
         }
 
@@ -219,8 +219,8 @@ struct DWARFLineTableTests {
             Self.emitSetAddress(&bytes, 0x100)
             bytes.append(3)
             bytes.append(contentsOf: encodeSLEB128(9))
-            bytes.append(1) // row at 0x100, line 10
-            Self.emitEndSequence(&bytes) // end_sequence at 0x100
+            bytes.append(1)  // row at 0x100, line 10
+            Self.emitEndSequence(&bytes)  // end_sequence at 0x100
         }
 
         let table = try DWARFLineTable(data: ArraySlice(bytes))
@@ -231,11 +231,11 @@ struct DWARFLineTableTests {
     @Test func columnTracking() throws {
         let bytes = Self.buildV4Section { bytes, opcodeBase, lineRange, lineBase in
             Self.emitSetAddress(&bytes, 0x200)
-            bytes.append(3) // DW_LNS_advance_line
-            bytes.append(contentsOf: encodeSLEB128(19)) // line 20
-            bytes.append(5) // DW_LNS_set_column
-            bytes.append(contentsOf: encodeULEB128(15)) // column 15
-            bytes.append(1) // DW_LNS_copy — row at 0x200, line 20, column 15
+            bytes.append(3)  // DW_LNS_advance_line
+            bytes.append(contentsOf: encodeSLEB128(19))  // line 20
+            bytes.append(5)  // DW_LNS_set_column
+            bytes.append(contentsOf: encodeULEB128(15))  // column 15
+            bytes.append(1)  // DW_LNS_copy — row at 0x200, line 20, column 15
             Self.emitEndSequence(&bytes)
         }
 
@@ -252,20 +252,20 @@ struct DWARFLineTableTests {
         ) { bytes, opcodeBase, lineRange, lineBase in
             Self.emitSetAddress(&bytes, 0x100)
             // File 1 (alpha.swift), line 5
-            bytes.append(4) // DW_LNS_set_file
+            bytes.append(4)  // DW_LNS_set_file
             bytes.append(contentsOf: encodeULEB128(1))
-            bytes.append(3) // DW_LNS_advance_line
+            bytes.append(3)  // DW_LNS_advance_line
             bytes.append(contentsOf: encodeSLEB128(4))
-            bytes.append(1) // copy -> 0x100, file 1, line 5
+            bytes.append(1)  // copy -> 0x100, file 1, line 5
 
             // Switch to file 2 (beta.swift)
-            bytes.append(2) // DW_LNS_advance_pc
+            bytes.append(2)  // DW_LNS_advance_pc
             bytes.append(contentsOf: encodeULEB128(8))
-            bytes.append(4) // DW_LNS_set_file
+            bytes.append(4)  // DW_LNS_set_file
             bytes.append(contentsOf: encodeULEB128(2))
-            bytes.append(3) // DW_LNS_advance_line
-            bytes.append(contentsOf: encodeSLEB128(5)) // line 10
-            bytes.append(1) // copy -> 0x108, file 2, line 10
+            bytes.append(3)  // DW_LNS_advance_line
+            bytes.append(contentsOf: encodeSLEB128(5))  // line 10
+            bytes.append(1)  // copy -> 0x108, file 2, line 10
 
             Self.emitEndSequence(&bytes)
         }
@@ -286,15 +286,15 @@ struct DWARFLineTableTests {
             Self.emitSetAddress(&bytes, 0x100)
             bytes.append(3)
             bytes.append(contentsOf: encodeSLEB128(9))
-            bytes.append(1) // row at 0x100, line 10
+            bytes.append(1)  // row at 0x100, line 10
 
             // DW_LNS_const_add_pc: advance by (255 - opcode_base) / line_range
             // = (255 - 13) / 14 = 242 / 14 = 17
-            bytes.append(8) // DW_LNS_const_add_pc
+            bytes.append(8)  // DW_LNS_const_add_pc
 
-            bytes.append(3) // DW_LNS_advance_line
+            bytes.append(3)  // DW_LNS_advance_line
             bytes.append(contentsOf: encodeSLEB128(5))
-            bytes.append(1) // row at 0x111, line 15
+            bytes.append(1)  // row at 0x111, line 15
 
             Self.emitEndSequence(&bytes)
         }
@@ -313,16 +313,16 @@ struct DWARFLineTableTests {
             Self.emitSetAddress(&bytes, 0x100)
             bytes.append(3)
             bytes.append(contentsOf: encodeSLEB128(9))
-            bytes.append(1) // row at 0x100, line 10
+            bytes.append(1)  // row at 0x100, line 10
 
             // DW_LNS_fixed_advance_pc with 16-bit operand
-            bytes.append(9) // DW_LNS_fixed_advance_pc
-            bytes.append(0x00) // advance = 0x200 (little-endian)
+            bytes.append(9)  // DW_LNS_fixed_advance_pc
+            bytes.append(0x00)  // advance = 0x200 (little-endian)
             bytes.append(0x02)
 
             bytes.append(3)
             bytes.append(contentsOf: encodeSLEB128(10))
-            bytes.append(1) // row at 0x300, line 20
+            bytes.append(1)  // row at 0x300, line 20
 
             Self.emitEndSequence(&bytes)
         }
@@ -341,7 +341,7 @@ struct DWARFLineTableTests {
             Self.emitSetAddress(&bytes, 0x100)
             bytes.append(3)
             bytes.append(contentsOf: encodeSLEB128(4))
-            bytes.append(1) // 0x100, line 5
+            bytes.append(1)  // 0x100, line 5
             Self.emitEndSequence(&bytes)
         }
 
@@ -352,7 +352,7 @@ struct DWARFLineTableTests {
             Self.emitSetAddress(&bytes, 0x500)
             bytes.append(3)
             bytes.append(contentsOf: encodeSLEB128(29))
-            bytes.append(1) // 0x500, line 30
+            bytes.append(1)  // 0x500, line 30
             Self.emitEndSequence(&bytes)
         }
 
@@ -375,9 +375,9 @@ struct DWARFLineTableTests {
         let bytes = Self.buildV4Section { bytes, _, _, _ in
             Self.emitSetAddress(&bytes, 0x100)
             // Line stays at default 1, then set to 0
-            bytes.append(3) // DW_LNS_advance_line
-            bytes.append(contentsOf: encodeSLEB128(-1)) // line = 0
-            bytes.append(1) // copy row at 0x100, line 0
+            bytes.append(3)  // DW_LNS_advance_line
+            bytes.append(contentsOf: encodeSLEB128(-1))  // line = 0
+            bytes.append(1)  // copy row at 0x100, line 0
 
             Self.emitEndSequence(&bytes)
         }
@@ -395,7 +395,7 @@ struct DWARFLineTableTests {
             Self.emitSetAddress(&bytes, 0x100)
             bytes.append(3)
             bytes.append(contentsOf: encodeSLEB128(4))
-            bytes.append(1) // 0x100, line 5
+            bytes.append(1)  // 0x100, line 5
             Self.emitEndSequence(&bytes)
         }
 
@@ -407,9 +407,9 @@ struct DWARFLineTableTests {
     @Test func unsupportedVersionThrows() throws {
         // Build bytes with version 3
         var bytes: [UInt8] = []
-        bytes.append(contentsOf: [10, 0, 0, 0]) // unit_length = 10
-        bytes.append(contentsOf: [3, 0]) // version: 3
-        bytes.append(contentsOf: [0, 0, 0, 0, 0, 0, 0, 0]) // padding to fill
+        bytes.append(contentsOf: [10, 0, 0, 0])  // unit_length = 10
+        bytes.append(contentsOf: [3, 0])  // version: 3
+        bytes.append(contentsOf: [0, 0, 0, 0, 0, 0, 0, 0])  // padding to fill
 
         #expect(throws: DWARFError.self) {
             try DWARFLineTable(data: ArraySlice(bytes))
