@@ -1258,11 +1258,6 @@ struct InstructionTranslator: InstructionVisitor {
         var offset = parser.offset
         do {
             while try parser.visit(visitor: &self) {
-                // Record a mapping entry for every Wasm instruction, even those
-                // that don't emit iseq instructions (e.g., local.get, block, end).
-                // This ensures breakpoints can be set at any source line whose
-                // DWARF entry points at a folded/structural Wasm instruction.
-                self.updateInstructionMapping()
                 offset = parser.offset
             }
         } catch var error as ValidationError {
