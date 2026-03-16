@@ -2,12 +2,13 @@ import Foundation
 import Testing
 import WAT
 import WasmParser
-#if ComponentModel
-    import WasmTools
-#endif
 import WasmTypes
 
 @testable import WAT
+
+#if ComponentModel
+    import WasmTools
+#endif
 
 @Suite
 struct EncoderTests {
@@ -401,72 +402,72 @@ struct EncoderTests {
     #endif
 
     #if ComponentModel
-    /// Test annotation proposal files using WasmTools as reference for binary comparison.
-    /// WABT's wast2json doesn't support the annotations proposal, so WasmTools is used as fallback.
-    @Test(
-        arguments: Spectest.wastFiles(include: ["annotations.wast", "token.wast", "id.wast"])
-    )
-    func annotationProposal(wastFile: URL) throws {
-        var stats = CompatibilityTestStats()
-        try TestSupport.withTemporaryDirectory { tempDir, shouldRetain in
-            let watModules: [ModuleDirective]
-            do {
-                watModules = try parseWastFile(wast: wastFile, stats: &stats)
-            } catch {
-                stats.failed.insert(wastFile.lastPathComponent)
-                shouldRetain = true
-                Self.record(wastFile: wastFile, error: error)
-                return
-            }
+        /// Test annotation proposal files using WasmTools as reference for binary comparison.
+        /// WABT's wast2json doesn't support the annotations proposal, so WasmTools is used as fallback.
+        @Test(
+            arguments: Spectest.wastFiles(include: ["annotations.wast", "token.wast", "id.wast"])
+        )
+        func annotationProposal(wastFile: URL) throws {
+            var stats = CompatibilityTestStats()
+            try TestSupport.withTemporaryDirectory { tempDir, shouldRetain in
+                let watModules: [ModuleDirective]
+                do {
+                    watModules = try parseWastFile(wast: wastFile, stats: &stats)
+                } catch {
+                    stats.failed.insert(wastFile.lastPathComponent)
+                    shouldRetain = true
+                    Self.record(wastFile: wastFile, error: error)
+                    return
+                }
 
-            // Use WasmTools for binary comparison
-            let wastContent = try Array(Data(contentsOf: wastFile))
-            let (json, wasmFiles) = try wast2json(
-                wastContent: wastContent,
-                wastFileName: wastFile.lastPathComponent
-            )
+                // Use WasmTools for binary comparison
+                let wastContent = try Array(Data(contentsOf: wastFile))
+                let (json, wasmFiles) = try wast2json(
+                    wastContent: wastContent,
+                    wastFileName: wastFile.lastPathComponent
+                )
 
-            // Write reference wasm files to temp dir, skipping text-form modules
-            // (WasmTools stores "module quote" forms as raw text, not compiled Wasm)
-            var moduleBinaryFiles: [(binary: URL, name: String?)] = []
-            for command in json.commands where command.type == "module" {
-                guard command.moduleType != "text" else { continue }
-                guard let filename = command.filename, let bytes = wasmFiles[filename] else { continue }
-                let binaryURL = URL(fileURLWithPath: tempDir).appendingPathComponent(filename)
-                try Data(bytes).write(to: binaryURL)
-                moduleBinaryFiles.append((binary: binaryURL, name: command.name))
-            }
+                // Write reference wasm files to temp dir, skipping text-form modules
+                // (WasmTools stores "module quote" forms as raw text, not compiled Wasm)
+                var moduleBinaryFiles: [(binary: URL, name: String?)] = []
+                for command in json.commands where command.type == "module" {
+                    guard command.moduleType != "text" else { continue }
+                    guard let filename = command.filename, let bytes = wasmFiles[filename] else { continue }
+                    let binaryURL = URL(fileURLWithPath: tempDir).appendingPathComponent(filename)
+                    try Data(bytes).write(to: binaryURL)
+                    moduleBinaryFiles.append((binary: binaryURL, name: command.name))
+                }
 
-            // Filter out quote modules from our parsed modules to match
-            let binaryWatModules = watModules.filter {
-                switch $0.source {
-                case .quote: return false
-                default: return true
+                // Filter out quote modules from our parsed modules to match
+                let binaryWatModules = watModules.filter {
+                    switch $0.source {
+                    case .quote: return false
+                    default: return true
+                    }
+                }
+
+                do {
+                    try compareModules(
+                        watModules: binaryWatModules,
+                        moduleBinaryFiles: moduleBinaryFiles,
+                        wast: wastFile,
+                        tempDir: tempDir,
+                        stats: &stats,
+                        encodeOptions: EncodeOptions(nameSection: true),
+                        stripModuleNamePrefix: true
+                    )
+                } catch {
+                    stats.failed.insert(wastFile.lastPathComponent)
+                    shouldRetain = true
+                    Self.record(wastFile: wastFile, error: error)
+                }
+
+                if !stats.failed.isEmpty {
+                    Issue.record("Failed test cases: \(stats.failed.sorted())")
+                    shouldRetain = true
                 }
             }
-
-            do {
-                try compareModules(
-                    watModules: binaryWatModules,
-                    moduleBinaryFiles: moduleBinaryFiles,
-                    wast: wastFile,
-                    tempDir: tempDir,
-                    stats: &stats,
-                    encodeOptions: EncodeOptions(nameSection: true),
-                    stripModuleNamePrefix: true
-                )
-            } catch {
-                stats.failed.insert(wastFile.lastPathComponent)
-                shouldRetain = true
-                Self.record(wastFile: wastFile, error: error)
-            }
-
-            if !stats.failed.isEmpty {
-                Issue.record("Failed test cases: \(stats.failed.sorted())")
-                shouldRetain = true
-            }
         }
-    }
     #endif
 
     @Test
