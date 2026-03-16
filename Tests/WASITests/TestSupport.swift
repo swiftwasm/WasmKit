@@ -1,5 +1,8 @@
 import Foundation
 
+@testable import WASI
+@testable import WasmKit
+
 #if canImport(Darwin)
     import Darwin
 #elseif canImport(Glibc)
@@ -7,9 +10,6 @@ import Foundation
 #elseif canImport(Musl)
     import Musl
 #endif
-
-@testable import WASI
-@testable import WasmKit
 
 #if canImport(System)
     import SystemPackage
