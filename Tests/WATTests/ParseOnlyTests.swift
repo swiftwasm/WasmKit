@@ -26,7 +26,7 @@ struct ParseOnlyTests {
         #if os(Android)
             return []
         #else
-            return UnsupportedSpectests.affectedFiles.filter { $0 != "annotations.wast" }.map(Spectest.path)
+            return UnsupportedSpectests.affectedFiles.filter { !$0.contains("/") }.map(Spectest.path)
         #endif
     }
 

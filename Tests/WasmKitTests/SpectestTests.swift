@@ -25,6 +25,7 @@ struct SpectestTests {
             // Wasm 3.0, which includes memory64, tail calls, exception handling, extended
             // constant expressions, relaxed SIMD, typed function references and multi-memory.
             Self.testsuite.path,
+            Self.testsuite.appendingPathComponent("custom").path,
             Self.projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite").path,
             Self.projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/memory64").path,
             Self.projectDir.appendingPathComponent("Tests/WasmKitTests/ExtraSuite/function-references").path,
@@ -51,9 +52,8 @@ struct SpectestTests {
     }
 
     static func run(test: TestCase, configuration: EngineConfiguration) throws {
-        let fileName = URL(fileURLWithPath: test.path).lastPathComponent
-        let isTopLevel = test.path.hasSuffix("Vendor/testsuite/\(fileName)")
-        let skip = isTopLevel ? UnsupportedSpectests.directives[fileName] ?? [:] : [:]
+        let skip =
+            UnsupportedSpectests.directives.first { test.path.hasSuffix("Vendor/testsuite/\($0.key)") }?.value ?? [:]
         try SpectestRunner(configuration: configuration)
             .run(test: test, reporter: NullSpectestProgressReporter(), skip: skip)
     }

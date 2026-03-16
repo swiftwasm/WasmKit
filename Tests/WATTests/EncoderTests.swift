@@ -21,8 +21,6 @@ struct EncoderTests {
 
     /// Files whose output wast2json cannot produce or encodes differently.
     private static let excludedFiles: [String] = [
-        // WAT does not parse custom annotations.
-        "annotations.wast",
         // wast2json 1.0.42 cannot parse these: an `exnref` result, and a global read from a table
         // initializer. wasm-tools encodes them differently from wabt, whose choices WAT follows: it
         // keeps an empty `else`, and writes `(elem funcref ...)` in a form that leaves it nullable.
@@ -35,13 +33,15 @@ struct EncoderTests {
         "proposals/threads/memory.wast",
     ]
 
-    /// Files with GC types, which wast2json 1.0.42 cannot parse, so they are compared with
-    /// wasm-tools instead.
+    /// Files with GC types or annotations, which wast2json 1.0.42 cannot parse, so they are
+    /// compared with wasm-tools instead.
     private static let wasmToolsFiles: Set<String> = [
         "array.wast", "array_copy.wast", "array_fill.wast", "array_init_data.wast", "array_init_elem.wast",
         "array_new_data.wast", "array_new_elem.wast", "br_on_cast.wast", "br_on_cast_fail.wast", "extern.wast",
         "i31.wast", "ref_cast.wast", "ref_eq.wast", "ref_null.wast", "ref_test.wast", "struct.wast", "tag.wast",
         "type-canon.wast", "type-equivalence.wast", "type-rec.wast", "type-subtyping.wast",
+        // wast2json cannot lex arbitrary annotation bodies.
+        "annotations.wast",
     ]
 
     // MARK: - Supporting Types
@@ -153,7 +153,11 @@ struct EncoderTests {
             }
         case .quote(let bytes):
             #expect(throws: (any Error).self, diagnostic()) {
-                _ = try wat2wasm(String(decoding: bytes, as: UTF8.self))
+                // String(decoding:as:) would replace malformed UTF-8 that must be rejected.
+                guard let text = String(bytes: bytes, encoding: .utf8) else {
+                    throw WatParserError("malformed UTF-8 encoding", location: nil)
+                }
+                _ = try wat2wasm(text)
                 recordFail()
             }
         case .binary:
@@ -301,8 +305,8 @@ struct EncoderTests {
                     }
                 }
             case 0 where content.starts(with: [4] + Array("name".utf8)):
-                // WAT does not write module (0) or tag (11) names yet.
-                for (id, subsection) in try sections(of: content.dropFirst(5)) where id != 0 && id != 11 {
+                // WAT does not write tag (11) names yet.
+                for (id, subsection) in try sections(of: content.dropFirst(5)) where id != 11 {
                     parts.append(.nameSubsection(id: id, content: subsection))
                 }
             default:
