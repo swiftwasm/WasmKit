@@ -20,10 +20,20 @@ struct SpectestTests {
         ]
     }
 
+    /// Annotation-proposal `.wast` files vendored into ExtraSuite for WAT-level
+    /// testing only. The runtime spectest harness uses WABT's `wast2json`, which
+    /// doesn't understand `(@name ...)` / `(@custom ...)` syntax.
+    static let unsupportedSpecFiles: [String] = [
+        "ExtraSuite/annotations.wast",
+        "ExtraSuite/custom_annot.wast",
+        "ExtraSuite/id.wast",
+        "ExtraSuite/token.wast",
+    ]
+
     #if !os(Android)
         @Test(
             .disabled("unable to run spectest on Android due to missing files on emulator", platforms: [.android]),
-            arguments: try SpectestDiscovery(path: SpectestTests.testPaths).discover()
+            arguments: try SpectestDiscovery(path: SpectestTests.testPaths, exclude: SpectestTests.unsupportedSpecFiles).discover()
         )
         func run(test: TestCase) throws {
             let defaultConfig = EngineConfiguration()
@@ -33,7 +43,7 @@ struct SpectestTests {
 
         @Test(
             .disabled("unable to run spectest on Android due to missing files on emulator", platforms: [.android]),
-            arguments: try SpectestDiscovery(path: SpectestTests.testPaths).discover()
+            arguments: try SpectestDiscovery(path: SpectestTests.testPaths, exclude: SpectestTests.unsupportedSpecFiles).discover()
         )
         func runWithTokenThreading(test: TestCase) throws {
             let defaultConfig = EngineConfiguration()

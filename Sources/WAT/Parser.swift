@@ -12,9 +12,30 @@ internal struct Parser {
         self.lexer = lexer
     }
 
+    /// Annotation IDs the parser knows how to handle. Tokens with any other
+    /// `.annotation(id, _)` kind are skipped transparently by `nextToken`, so
+    /// callers never see them.
+    private static let recognizedAnnotations: Set<String> = ["custom", "name"]
+
+    /// Fetch the next token from `lexer`, skipping past any annotations whose
+    /// id isn't in `recognizedAnnotations`. Shared by `peek`-family methods
+    /// (which call this on a temporary copy of the lexer) and `consume`
+    /// (which calls this on `self.lexer` directly).
+    private static func nextToken(from lexer: inout Lexer) throws(WatParserError) -> Token? {
+        while let token = try lexer.lex() {
+            if case .annotation(let id, _) = token.kind,
+                !Parser.recognizedAnnotations.contains(id)
+            {
+                continue
+            }
+            return token
+        }
+        return nil
+    }
+
     func peek(_ kind: TokenKind? = nil) throws(WatParserError) -> Token? {
         var lexer = lexer
-        guard let token = try lexer.lex() else { return nil }
+        guard let token = try Self.nextToken(from: &lexer) else { return nil }
         if let kind {
             guard token.kind == kind else { return nil }
         }
@@ -33,11 +54,11 @@ internal struct Parser {
     func peekKeywordAfterLeftParen() throws(WatParserError) -> String? {
         var lexer = lexer
         // First token should be (
-        guard let first = try lexer.lex(), first.kind == .leftParen else {
+        guard let first = try Self.nextToken(from: &lexer), first.kind == .leftParen else {
             return nil
         }
         // Second token should be a keyword
-        guard let second = try lexer.lex(), second.kind == .keyword else {
+        guard let second = try Self.nextToken(from: &lexer), second.kind == .keyword else {
             return nil
         }
         return second.text(from: self.lexer)
@@ -141,7 +162,7 @@ internal struct Parser {
 
     @discardableResult
     mutating func expect(_ kind: TokenKind) throws(WatParserError) -> Token {
-        guard let token = try lexer.lex() else {
+        guard let token = try Self.nextToken(from: &lexer) else {
             throw WatParserError("expected \(kind)", location: lexer.location())
         }
         guard token.kind == kind else {
@@ -163,7 +184,7 @@ internal struct Parser {
     }
 
     mutating func expectStringBytes() throws(WatParserError) -> [UInt8] {
-        guard let token = try lexer.lex() else {
+        guard let token = try Self.nextToken(from: &lexer) else {
             throw WatParserError("expected string", location: lexer.location())
         }
         guard case .string(let text) = token.kind else {
@@ -333,16 +354,120 @@ internal struct Parser {
 
     @discardableResult
     mutating func consume() throws(WatParserError) -> Token {
-        guard let token = try lexer.lex() else {
+        guard let token = try Self.nextToken(from: &lexer) else {
             throw WatParserError("unexpected EOF", location: lexer.location())
         }
         return token
     }
 
-    mutating func takeId() throws(WatParserError) -> Name? {
-        guard let token = try peek(.id) else { return nil }
+    /// Consumes a `(@custom "name" [(before|after kind)] "content"*)` annotation if present.
+    /// Returns the parsed declaration, or nil if no `@custom` annotation is next.
+    mutating func takeCustomAnnotation() throws(WatParserError) -> CustomSectionDecl? {
+        guard let token = try peek(), case .annotation(id: "custom", body: let body) = token.kind else {
+            return nil
+        }
         try consume()
-        return Name(value: token.text(from: lexer), location: token.location(in: lexer))
+
+        var subParser = Parser(Lexer(parent: lexer, range: body))
+
+        guard let nameBytes = try subParser.takeStringBytes() else {
+            throw WatParserError(
+                "@custom annotation: missing section name", location: token.location(in: lexer)
+            )
+        }
+        let name = try nameBytes.withUnsafeBufferPointer { buffer throws(WatParserError) in
+            guard let value = String._tryFromUTF8(buffer) else {
+                throw WatParserError(
+                    "@custom annotation: malformed UTF-8 encoding", location: token.location(in: lexer)
+                )
+            }
+            return value
+        }
+
+        // Optional placement directive: (before|after sectionKind)
+        var placement: CustomSectionDecl.Placement = .unplaced
+        if try subParser.peek(.leftParen) != nil {
+            try subParser.consume()
+            let kw = try subParser.expectKeyword()
+            guard kw == "before" || kw == "after" else {
+                throw WatParserError(
+                    "@custom annotation: malformed placement", location: token.location(in: lexer)
+                )
+            }
+            guard let sectionKw = try subParser.peekKeyword() else {
+                throw WatParserError(
+                    "@custom annotation: malformed section kind", location: token.location(in: lexer)
+                )
+            }
+            guard let sectionKind = CustomSectionDecl.SectionKind(rawValue: sectionKw) else {
+                throw WatParserError(
+                    "@custom annotation: malformed section kind", location: token.location(in: lexer)
+                )
+            }
+            try subParser.consume()
+            try subParser.expect(.rightParen)
+            placement = kw == "before" ? .before(sectionKind) : .after(sectionKind)
+        }
+
+        var content: [UInt8] = []
+        while let bytes = try subParser.takeStringBytes() {
+            content.append(contentsOf: bytes)
+        }
+
+        if try subParser.peek() != nil {
+            throw WatParserError(
+                "@custom annotation: unexpected token", location: token.location(in: lexer)
+            )
+        }
+
+        return CustomSectionDecl(
+            name: name, placement: placement, content: content
+        )
+    }
+
+    mutating func takeId() throws(WatParserError) -> Name? {
+        guard let token = try peek() else { return nil }
+        let value: String
+        switch token.kind {
+        case .id:
+            try consume()
+            value = token.text(from: lexer)
+        case .quotedId:
+            try consume()
+            // $"..." form: re-decode the string body from the source range.
+            // token.text is `$"<escaped>"`; drop `$"` then let the WAT string
+            // decoder handle escapes and stop at the closing `"`.
+            let source = token.text(from: lexer).dropFirst(2)
+            var subLexer = Lexer(input: String(source))
+            let bytes = try subLexer.readString()
+            guard !bytes.isEmpty else {
+                throw WatParserError("empty identifier", location: token.location(in: lexer))
+            }
+            guard let decoded = String(validating: bytes, as: UTF8.self) else {
+                throw WatParserError("malformed UTF-8 encoding", location: token.location(in: lexer))
+            }
+            value = "$" + decoded
+        default:
+            return nil
+        }
+        return Name(value: value, location: token.location(in: lexer))
+    }
+
+    /// Consumes a `(@name "string")` annotation if present.
+    /// Returns the annotation's string argument, or nil if no such annotation is next.
+    mutating func takeNameAnnotation() throws(WatParserError) -> String? {
+        guard let token = try peek(), case .annotation(id: "name", body: let body) = token.kind else {
+            return nil
+        }
+        try consume()
+        var subParser = Parser(Lexer(parent: lexer, range: body))
+        let name = try subParser.expectString()
+        if try subParser.peek() != nil {
+            throw WatParserError(
+                "@name annotation: unexpected token", location: token.location(in: lexer)
+            )
+        }
+        return name
     }
 
     mutating func skipParenBlock() throws(WatParserError) {

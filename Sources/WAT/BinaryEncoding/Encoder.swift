@@ -29,7 +29,45 @@ package struct Encoder {
         output.append(contentsOf: contentEncoder.output)
     }
 
-    package mutating func encodeVector<Source: Collection, E: Error>(
+    /// Overload accepting any RawRepresentable<UInt8> for ergonomic use with enums.
+    mutating func section<ID: RawRepresentable<UInt8>, E: Error>(id: ID, _ sectionContent: (inout Encoder) throws(E) -> Void) throws(E) {
+        try section(id: id.rawValue, sectionContent)
+    }
+
+    mutating func section<E: Error>(
+        id: UInt8,
+        placement: CustomSectionDecl.SectionKind,
+        customSections: [CustomSectionDecl],
+        _ body: (inout Encoder) throws(E) -> Void
+    ) throws(E) {
+        for cs in customSections where cs.placement == .before(placement) {
+            encodeCustomSection(cs)
+        }
+        var contentEncoder = Encoder()
+        try body(&contentEncoder)
+        if !contentEncoder.output.isEmpty {
+            output.append(id)
+            writeUnsignedLEB128(UInt32(contentEncoder.output.count))
+            output.append(contentsOf: contentEncoder.output)
+        }
+        for cs in customSections where cs.placement == .after(placement) {
+            encodeCustomSection(cs)
+        }
+    }
+
+    mutating func encodeCustomSection(_ cs: CustomSectionDecl) {
+        section(id: 0) { encoder in
+            cs.name.encode(to: &encoder)
+            encoder.output.append(contentsOf: cs.content)
+        }
+    }
+
+    /// Append a single byte from any RawRepresentable<UInt8> value.
+    mutating func append<T: RawRepresentable<UInt8>>(_ value: T) {
+        output.append(value.rawValue)
+    }
+
+    mutating func encodeVector<Source: Collection, E: Error>(
         _ values: Source, encodeElement: (Source.Element, inout Encoder) throws(E) -> Void
     ) throws(E) {
         writeUnsignedLEB128(UInt32(values.count))
@@ -623,38 +661,37 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
     var functionLabelNames: [[(Int, String)]] = []
 
     if !functions.isEmpty {
-        try codeEncoder.section(id: 0x0A) { encoder throws(WatParserError) in
-            try encoder.encodeVector(
-                functions,
-                encodeElement: { source, encoder throws(WatParserError) in
-                    let (locals, function) = source
-                    var exprEncoder = ExpressionEncoder()
-                    // Encode locals
-                    var localsEntries: [(type: ValueType, count: UInt32)] = []
-                    for local in locals {
-                        let type = try local.type.resolve(module.types)
-                        if localsEntries.last?.type == type {
-                            localsEntries[localsEntries.count - 1].count += 1
-                        } else {
-                            localsEntries.append((type: type, count: 1))
-                        }
+        try codeEncoder.encodeVector(
+            functions,
+            encodeElement: { source, encoder throws(WatParserError) in
+                let (locals, function) = source
+                var exprEncoder = ExpressionEncoder()
+                // Encode locals
+                var localsEntries: [(type: ValueType, count: UInt32)] = []
+                for local in locals {
+                    let type = try local.type.resolve(module.types)
+                    if localsEntries.last?.type == type {
+                        localsEntries[localsEntries.count - 1].count += 1
+                    } else {
+                        localsEntries.append((type: type, count: 1))
                     }
-                    exprEncoder.encoder.encodeVector(localsEntries) { local, encoder in
-                        encoder.writeUnsignedLEB128(local.count)
-                        local.type.encode(to: &encoder)
-                    }
-                    let parseResult = try function.parse(visitor: &exprEncoder, wat: &module, features: module.features)
-                    functionSection.append(UInt32(parseResult.typeIndex))
-                    functionLabelNames.append(parseResult.labelNames)
-                    // TODO?
-                    try exprEncoder.visitEnd()
-                    encoder.writeUnsignedLEB128(UInt(exprEncoder.encoder.output.count))
-                    encoder.output.append(contentsOf: exprEncoder.encoder.output)
-                    hasDataSegmentInstruction = hasDataSegmentInstruction || exprEncoder.hasDataSegmentInstruction
-                })
-        }
+                }
+                exprEncoder.encoder.encodeVector(localsEntries) { local, encoder in
+                    encoder.writeUnsignedLEB128(local.count)
+                    local.type.encode(to: &encoder)
+                }
+                let parseResult = try function.parse(visitor: &exprEncoder, wat: &module, features: module.features)
+                functionSection.append(UInt32(parseResult.typeIndex))
+                functionLabelNames.append(parseResult.labelNames)
+                // TODO?
+                try exprEncoder.visitEnd()
+                encoder.writeUnsignedLEB128(UInt(exprEncoder.encoder.output.count))
+                encoder.output.append(contentsOf: exprEncoder.encoder.output)
+                hasDataSegmentInstruction = hasDataSegmentInstruction || exprEncoder.hasDataSegmentInstruction
+            })
     }
 
+    let cs = module.customSections
     // Pre-resolve tag type indices so their types are in the type section.
     let tagDefinitions = module.tagsMap.definitions()
     for tag in tagDefinitions {
@@ -663,22 +700,22 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
     }
 
     // Section 1: Type section
-    if !module.types.isEmpty {
-        encoder.section(id: 0x01) { encoder in
+    encoder.section(id: 0x01, placement: .type, customSections: cs) { encoder in
+        if !module.types.isEmpty {
             encoder.encodeVector(module.types, transform: \.type.signature)
         }
     }
 
     // Section 2: Import section
-    if !module.imports.isEmpty {
-        encoder.section(id: 0x02) { encoder in
+    encoder.section(id: 0x02, placement: .import, customSections: cs) { encoder in
+        if !module.imports.isEmpty {
             encoder.encodeVector(module.imports)
         }
     }
 
     // Section 3: Function section
-    if !functionSection.isEmpty {
-        encoder.section(id: 0x03) { encoder in
+    encoder.section(id: 0x03, placement: .func, customSections: cs) { encoder in
+        if !functionSection.isEmpty {
             encoder.encodeVector(functionSection) { typeIndex, encoder in
                 encoder.writeUnsignedLEB128(UInt32(typeIndex))
             }
@@ -687,8 +724,8 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
 
     // Section 4: Table section
     let tables = module.tablesMap.definitions()
-    if !tables.isEmpty {
-        try encoder.section(id: 0x04) { encoder throws(WatParserError) in
+    try encoder.section(id: 0x04, placement: .table, customSections: cs) { encoder throws(WatParserError) in
+        if !tables.isEmpty {
             try encoder.encodeVector(tables) { table, encoder throws(WatParserError) in
                 try table.type.resolve(module.types).encode(to: &encoder)
             }
@@ -697,8 +734,8 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
 
     // Section 5: Memory section
     let memories = module.memories.definitions()
-    if !memories.isEmpty {
-        encoder.section(id: 0x05) { encoder in
+    encoder.section(id: 0x05, placement: .memory, customSections: cs) { encoder in
+        if !memories.isEmpty {
             encoder.encodeVector(memories)
         }
     }
@@ -717,8 +754,8 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
 
     // Section 6: Global section
     let globals = module.globals.definitions()
-    if !globals.isEmpty {
-        try encoder.section(id: 0x06) { encoder throws(WatParserError) in
+    try encoder.section(id: 0x06, placement: .global, customSections: cs) { encoder throws(WatParserError) in
+        if !globals.isEmpty {
             try encoder.encodeVector(globals) { global, encoder throws(WatParserError) in
                 try global.encode(to: &encoder, wat: &module)
             }
@@ -726,8 +763,8 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
     }
 
     // Section 7: Export section
-    if !module.exports.isEmpty {
-        encoder.section(id: 0x07) { encoder in
+    encoder.section(id: 0x07, placement: .export, customSections: cs) { encoder in
+        if !module.exports.isEmpty {
             encoder.encodeVector(module.exports) { export, encoder in
                 export.encode(to: &encoder)
             }
@@ -735,15 +772,15 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
     }
 
     // Section 8: Start section
-    if let start = module.start {
-        encoder.section(id: 0x08) { encoder in
+    encoder.section(id: 0x08, placement: .start, customSections: cs) { encoder in
+        if let start = module.start {
             encoder.writeUnsignedLEB128(start)
         }
     }
 
     // Section 9: Element section
-    if !module.elementsMap.isEmpty {
-        try encoder.section(id: 0x09) { encoder throws(WatParserError) in
+    try encoder.section(id: 0x09, placement: .elem, customSections: cs) { encoder throws(WatParserError) in
+        if !module.elementsMap.isEmpty {
             try encoder.encodeVector(module.elementsMap) { element, encoder throws(WatParserError) in
                 try element.encode(to: &encoder, wat: &module)
             }
@@ -758,20 +795,32 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
     }
 
     // Section 10: Code section
-    encoder.output.append(contentsOf: codeEncoder.output)
+    encoder.section(id: 0x0A, placement: .code, customSections: cs) { encoder in
+        encoder.output.append(contentsOf: codeEncoder.output)
+    }
 
     // Section 11: Data section
-    if !module.data.isEmpty {
-        try encoder.section(id: 0x0B) { encoder throws(WatParserError) in
+    try encoder.section(id: 0x0B, placement: .data, customSections: cs) { encoder throws(WatParserError) in
+        if !module.data.isEmpty {
             try encoder.encodeVector(module.data) { data, encoder throws(WatParserError) in
                 try data.encode(to: &encoder, wat: &module)
             }
         }
     }
 
+    // Unplaced custom sections go after all standard sections
+    for section in cs where section.placement == .unplaced {
+        encoder.encodeCustomSection(section)
+    }
+
     // (Optional) Name Section
     if options.nameSection {
         try encodeNameSection(module: &module, options: options, encoder: &encoder, functions: functions, functionLabelNames: functionLabelNames)
+    }
+
+    // "last" placement goes after everything including the name section
+    for cs in cs where cs.placement == .before(.last) || cs.placement == .after(.last) {
+        encoder.encodeCustomSection(cs)
     }
 
     return encoder.output
@@ -900,9 +949,9 @@ private func encodeNameSection(
     encoder.section(id: 0) { encoder in
         encoder.encode("name")
 
-        if let moduleId = module.id {
+        if let moduleName = module.id {
             encoder.section(id: 0) { encoder in
-                encoder.encode(String(moduleId.dropFirst()))  // Drop "$" prefix
+                encoder.encode(moduleName.nameValue)
             }
         }
         if !functionNames.isEmpty {
