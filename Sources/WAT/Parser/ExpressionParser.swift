@@ -5,6 +5,9 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
     typealias LocalsMap = NameMapping<WatParser.ResolvedLocalDecl>
     private struct LabelStack {
         private var stack: [String?] = []
+        /// Collected label names for name section: (labelIndex, name)
+        private(set) var collectedLabels: [(index: Int, name: String)] = []
+        private var nextLabelIndex: Int = 0
 
         /// - Returns: The depth of the label of the given name in the stack.
         /// e.g. `(block $A (block $B (br $A)))`, then `["A"]` at `br $A` will return 1.
@@ -24,6 +27,10 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
 
         mutating func push(_ name: Name?) {
             stack.append(name?.value)
+            if let name = name {
+                collectedLabels.append((index: nextLabelIndex, name: String(name.value.dropFirst())))
+            }
+            nextLabelIndex += 1
         }
 
         mutating func pop() {
@@ -41,6 +48,11 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
     /// Collected label names for the name section: (labelIndex, name)
     private(set) var collectedLabelNames: [(Int, String)] = []
     private var nextLabelIndex: Int = 0
+
+    /// Label names collected during parsing, for name section emission.
+    var collectedLabels: [(index: Int, name: String)] {
+        labelStack.collectedLabels
+    }
 
     init(
         type: WatParser.FunctionType,
@@ -350,7 +362,12 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
     }
 
     /// Parse a single instruction without consuming the surrounding parentheses and instruction keyword.
-    private mutating func parseTextInstruction(keyword: String, wat: inout Wat) throws(WatParserError) -> ((inout Visitor) throws(WatParserError) -> Void) {
+    private mutating func parseTextInstruction(
+        keyword: String,
+        wat: inout Wat
+    ) throws(WatParserError) -> (
+        (inout Visitor) throws(WatParserError) -> Void
+    ) {
         switch keyword {
         case "select":
             // Special handling for "select", which have two variants 1. with type, 2. without type

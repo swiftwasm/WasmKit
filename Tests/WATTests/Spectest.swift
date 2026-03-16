@@ -16,7 +16,7 @@ enum Spectest {
         testsuitePath.appendingPathComponent(file)
     }
 
-    static func wastFiles(include: [String] = [], exclude: [String] = ["annotations.wast"]) -> [URL] {
+    static func wastFiles(include: [String] = [], exclude: [String] = ["id.wast"]) -> [URL] {
         #if os(Android)
             return []
         #else
@@ -25,6 +25,9 @@ enum Spectest {
                 testsuitePath.appendingPathComponent("proposals/memory64"),
                 testsuitePath.appendingPathComponent("proposals/tail-call"),
                 testsuitePath.appendingPathComponent("proposals/threads"),
+                testsuitePath.appendingPathComponent("proposals/annotations"),
+                vendorDirectory.appendingPathComponent("annotations/test/custom/name"),
+                vendorDirectory.appendingPathComponent("annotations/test/custom/custom"),
                 rootDirectory.appendingPathComponent("Tests/WasmKitTests/ExtraSuite"),
             ].flatMap {
                 try! FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil)
