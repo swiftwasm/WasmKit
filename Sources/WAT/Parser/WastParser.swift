@@ -255,7 +255,7 @@ public enum WastDirective {
             let message = try wastParser.parser.expectString()
             try wastParser.parser.expect(.rightParen)
             return .assertInvalid(module: module, message: message)
-        case "assert_malformed":
+        case "assert_malformed", "assert_malformed_custom":
             try wastParser.parser.consume()
             let module = try wastParser.parens { wastParser throws(WatParserError) in try ModuleDirective.parse(wastParser: &wastParser) }
             let message = try wastParser.parser.expectString()
@@ -320,6 +320,18 @@ public struct ModuleDirective {
     /// The location of the module in the source
     public let location: Location
 
+    /// The effective module name from either `@name` annotation or `$id`.
+    /// `@name` from the WAT source takes precedence over `$id`.
+    var moduleName: ModuleName? {
+        if case .text(let wat) = source, let watId = wat.id {
+            return watId
+        }
+        if let id {
+            return .identifier(id)
+        }
+        return nil
+    }
+
     static func parse(wastParser: inout WastParser) throws(WatParserError) -> ModuleDirective {
         let location = wastParser.parser.lexer.location()
         try wastParser.parser.expectKeyword("module")
@@ -346,7 +358,19 @@ public enum ModuleSource {
             }
         }
 
-        let watModule = try parseWAT(&wastParser.parser, features: wastParser.features)
+        // Consume @name annotation if present (before module fields)
+        let nameAnnot = try wastParser.parser.takeNameAnnotation()
+        if nameAnnot != nil, try wastParser.parser.takeNameAnnotation() != nil {
+            throw WatParserError("@name annotation: multiple module names", location: wastParser.parser.lexer.location())
+        }
+
+        var watModule = try parseWAT(&wastParser.parser, features: wastParser.features)
+
+        // Store @name in the Wat struct
+        if let nameAnnot {
+            watModule.id = .annotation(nameAnnot)
+        }
+
         try wastParser.parser.skipParenBlock()
         return .text(watModule)
     }

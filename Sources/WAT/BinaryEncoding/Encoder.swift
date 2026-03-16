@@ -29,7 +29,17 @@ package struct Encoder {
         output.append(contentsOf: contentEncoder.output)
     }
 
-    package mutating func encodeVector<Source: Collection, E: Error>(
+    /// Overload accepting any RawRepresentable<UInt8> for ergonomic use with enums.
+    mutating func section<ID: RawRepresentable<UInt8>, E: Error>(id: ID, _ sectionContent: (inout Encoder) throws(E) -> Void) throws(E) {
+        try section(id: id.rawValue, sectionContent)
+    }
+
+    /// Append a single byte from any RawRepresentable<UInt8> value.
+    mutating func append<T: RawRepresentable<UInt8>>(_ value: T) {
+        output.append(value.rawValue)
+    }
+
+    mutating func encodeVector<Source: Collection, E: Error>(
         _ values: Source, encodeElement: (Source.Element, inout Encoder) throws(E) -> Void
     ) throws(E) {
         writeUnsignedLEB128(UInt32(values.count))
@@ -311,7 +321,7 @@ extension WAT.WatParser.ElementDecl {
                 case .refNull(let type):
                     try exprEncoder.visitRefNull(type: type)
                 default:
-                    throw WatParserError("unexpected instruction in element expression (\(instruction)", location: nil)
+                    throw WatParserError("unexpected instruction in element expression \(instruction)", location: nil)
                 }
                 try exprEncoder.visitEnd()
                 encoder.output.append(contentsOf: exprEncoder.encoder.output)
@@ -582,22 +592,28 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
     encoder.writeHeader()
 
     var codeEncoder = Encoder()
-    let functions = module.functionsMap.compactMap { (function: WatParser.FunctionDecl) -> ([WatParser.LocalDecl], WatParser.FunctionDecl)? in
+    let functions = module.functionsMap.enumerated().compactMap { (index: Int, function: WatParser.FunctionDecl) -> (Int, [WatParser.LocalDecl], WatParser.FunctionDecl)? in
         guard case .definition(let locals, _) = function.kind else {
             return nil
         }
-        return (locals, function)
+        return (index, locals, function)
     }
     var functionSection: [UInt32] = []
     var hasDataSegmentInstruction = false
     var functionLabelNames: [[(Int, String)]] = []
+
+    // Track function type indices for name section (maps function definition index to type index)
+    var functionTypeIndices: [Int: Int] = [:]
+    // Track label names per function for name section subsection 3
+    var labelNamesPerFunction: [(funcIndex: Int, labels: [(index: Int, name: String)])] = []
+    var definitionIndex = 0
 
     if !functions.isEmpty {
         try codeEncoder.section(id: 0x0A) { encoder throws(WatParserError) in
             try encoder.encodeVector(
                 functions,
                 encodeElement: { source, encoder throws(WatParserError) in
-                    let (locals, function) = source
+                    let (funcIndex, locals, function) = source
                     var exprEncoder = ExpressionEncoder()
                     // Encode locals
                     var localsEntries: [(type: ValueType, count: UInt32)] = []
@@ -625,21 +641,37 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
         }
     }
 
+    let cs = module.customSections
+
+    func emitCustomSections(placement: CustomSectionDecl.Placement, encoder: inout Encoder) {
+        for section in cs where section.placement == placement {
+            encoder.section(id: 0) { encoder in
+                section.name.encode(to: &encoder)
+                encoder.output.append(contentsOf: section.content)
+            }
+        }
+    }
+
     // Section 1: Type section
+    emitCustomSections(placement: .before(.type), encoder: &encoder)
     if !module.types.isEmpty {
         encoder.section(id: 0x01) { encoder in
             encoder.encodeVector(module.types, transform: \.type.signature)
         }
     }
+    emitCustomSections(placement: .after(.type), encoder: &encoder)
 
     // Section 2: Import section
+    emitCustomSections(placement: .before(.import), encoder: &encoder)
     if !module.imports.isEmpty {
         encoder.section(id: 0x02) { encoder in
             encoder.encodeVector(module.imports)
         }
     }
+    emitCustomSections(placement: .after(.import), encoder: &encoder)
 
     // Section 3: Function section
+    emitCustomSections(placement: .before(.func), encoder: &encoder)
     if !functionSection.isEmpty {
         encoder.section(id: 0x03) { encoder in
             encoder.encodeVector(functionSection) { typeIndex, encoder in
@@ -647,8 +679,10 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
             }
         }
     }
+    emitCustomSections(placement: .after(.func), encoder: &encoder)
 
     // Section 4: Table section
+    emitCustomSections(placement: .before(.table), encoder: &encoder)
     let tables = module.tablesMap.definitions()
     if !tables.isEmpty {
         try encoder.section(id: 0x04) { encoder throws(WatParserError) in
@@ -657,16 +691,20 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
             }
         }
     }
+    emitCustomSections(placement: .after(.table), encoder: &encoder)
 
     // Section 5: Memory section
+    emitCustomSections(placement: .before(.memory), encoder: &encoder)
     let memories = module.memories.definitions()
     if !memories.isEmpty {
         encoder.section(id: 0x05) { encoder in
             encoder.encodeVector(memories)
         }
     }
+    emitCustomSections(placement: .after(.memory), encoder: &encoder)
 
     // Section 6: Global section
+    emitCustomSections(placement: .before(.global), encoder: &encoder)
     let globals = module.globals.definitions()
     if !globals.isEmpty {
         try encoder.section(id: 0x06) { encoder throws(WatParserError) in
@@ -675,8 +713,10 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
             }
         }
     }
+    emitCustomSections(placement: .after(.global), encoder: &encoder)
 
     // Section 7: Export section
+    emitCustomSections(placement: .before(.export), encoder: &encoder)
     if !module.exports.isEmpty {
         encoder.section(id: 0x07) { encoder in
             encoder.encodeVector(module.exports) { export, encoder in
@@ -684,15 +724,19 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
             }
         }
     }
+    emitCustomSections(placement: .after(.export), encoder: &encoder)
 
     // Section 8: Start section
+    emitCustomSections(placement: .before(.start), encoder: &encoder)
     if let start = module.start {
         encoder.section(id: 0x08) { encoder in
             encoder.writeUnsignedLEB128(start)
         }
     }
+    emitCustomSections(placement: .after(.start), encoder: &encoder)
 
     // Section 9: Element section
+    emitCustomSections(placement: .before(.elem), encoder: &encoder)
     if !module.elementsMap.isEmpty {
         try encoder.section(id: 0x09) { encoder throws(WatParserError) in
             try encoder.encodeVector(module.elementsMap) { element, encoder throws(WatParserError) in
@@ -700,6 +744,7 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
             }
         }
     }
+    emitCustomSections(placement: .after(.elem), encoder: &encoder)
 
     // Section 12: DataCount section
     if !module.data.isEmpty, hasDataSegmentInstruction {
@@ -709,9 +754,12 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
     }
 
     // Section 10: Code section
+    emitCustomSections(placement: .before(.code), encoder: &encoder)
     encoder.output.append(contentsOf: codeEncoder.output)
+    emitCustomSections(placement: .after(.code), encoder: &encoder)
 
     // Section 11: Data section
+    emitCustomSections(placement: .before(.data), encoder: &encoder)
     if !module.data.isEmpty {
         try encoder.section(id: 0x0B) { encoder throws(WatParserError) in
             try encoder.encodeVector(module.data) { data, encoder throws(WatParserError) in
@@ -719,11 +767,19 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
             }
         }
     }
+    emitCustomSections(placement: .after(.data), encoder: &encoder)
+
+    // Unplaced custom sections go after all standard sections
+    emitCustomSections(placement: .unplaced, encoder: &encoder)
 
     // (Optional) Name Section
     if options.nameSection {
-        try encodeNameSection(module: &module, options: options, encoder: &encoder, functions: functions, functionLabelNames: functionLabelNames)
+        try encodeNameSection(module: &module, options: options, encoder: &encoder, functions: functions.map { ($0.1, $0.2) }, functionLabelNames: functionLabelNames)
     }
+
+    // "last" placement goes after everything including the name section
+    emitCustomSections(placement: .before(.last), encoder: &encoder)
+    emitCustomSections(placement: .after(.last), encoder: &encoder)
 
     return encoder.output
 }
@@ -851,9 +907,9 @@ private func encodeNameSection(
     encoder.section(id: 0) { encoder in
         encoder.encode("name")
 
-        if let moduleId = module.id {
+        if let moduleName = module.id {
             encoder.section(id: 0) { encoder in
-                encoder.encode(String(moduleId.dropFirst()))  // Drop "$" prefix
+                encoder.encode(moduleName.nameValue)
             }
         }
         if !functionNames.isEmpty {

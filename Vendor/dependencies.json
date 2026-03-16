@@ -1,4 +1,15 @@
 {
+  "spec": {
+    "repository": "https://github.com/WebAssembly/spec.git",
+    "revision": "1c9a04e7b9d6998b9a30c6edf40b42d4c2a13c7b",
+    "categories": ["spec"]
+  },
+  "annotations": {
+    "repository": "https://github.com/WebAssembly/annotations.git",
+    "revision": "20a8e4f125d5d856aac392105c35055af9ed49f7",
+    "sparse-checkout": "test/custom",
+    "categories": ["default"]
+  },
   "testsuite": {
     "repository": "https://github.com/WebAssembly/testsuite.git",
     "revision": "53da17c0936a23f68f97cde4f9346a0a374dc35f",
