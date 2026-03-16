@@ -15,7 +15,7 @@ import Foundation
     import SystemPackage
 #endif
 enum TestSupport {
-    #if !os(Windows) && !os(WASI)
+    #if os(macOS) || os(Linux)
         static func countOpenFileDescriptors() -> Int {
             var count = 0
             for fd in Int32(0)..<min(getdtablesize(), 4096) {
