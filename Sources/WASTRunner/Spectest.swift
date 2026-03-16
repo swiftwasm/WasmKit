@@ -26,9 +26,11 @@ package struct SpectestDiscovery {
     }
 }
 
-/// What WasmKit cannot run yet at the top level of the spec testsuite, by file name.
+/// What WasmKit cannot run yet in the spec testsuite, by path relative to its root.
 package enum UnsupportedSpectests {
     private static let garbageCollection = "needs garbage collection"
+    private static let branchHinting = "needs branch hinting"
+    private static let nameAnnotation = "needs `@name` annotations on fields other than the module"
 
     /// Files with nothing WasmKit can run.
     package static let files: [String] =
@@ -38,7 +40,6 @@ package enum UnsupportedSpectests {
             "array_new_data.wast", "array_new_elem.wast", "extern.wast", "ref_cast.wast", "ref_null.wast",
             "ref_test.wast", "type-canon.wast", "type-subtyping.wast",
         ]
-        + ["annotations.wast"]
 
     /// Directives to skip in the other files, by the line they start on. Skipping a module also
     /// skips the directives that use it.
@@ -116,6 +117,15 @@ package enum UnsupportedSpectests {
             279: garbageCollection,  // A recursion group
             290: garbageCollection,  // A recursion group
             308: garbageCollection,  // A recursion group
+        ],
+        "custom/branch_hint.wast": [
+            50: branchHinting,  // Two hints on one instruction, which must be malformed
+            67: branchHinting,  // A hint outside a function, which must be malformed
+            85: branchHinting,  // A hint on an instruction that is not a branch, which must be invalid
+        ],
+        "custom/name_annot.wast": [
+            25: nameAnnotation,  // `@name` on functions
+            34: nameAnnotation,  // `@name` on tags
         ],
         "type-rec.wast": [
             3: garbageCollection,  // A function type that refers to itself, and recursion groups

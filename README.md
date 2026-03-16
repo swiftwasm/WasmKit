@@ -104,7 +104,7 @@ Proposals are grouped by their [phase](https://github.com/WebAssembly/meetings/b
 | [Tail Call](https://github.com/WebAssembly/tail-call) | ✅ Implemented | [0.1.4] |
 | [Typed Function References](https://github.com/WebAssembly/function-references) | ✅ Implemented | [0.4.1] |
 | [Branch Hinting](https://github.com/WebAssembly/branch-hinting) | ❌ Not implemented | |
-| [Custom Annotation Syntax in the Text Format](https://github.com/WebAssembly/annotations) | ❌ Not implemented | |
+| [Custom Annotation Syntax in the Text Format](https://github.com/WebAssembly/annotations) | ✅ Implemented | `main` branch |
 | [Extended Constant Expressions](https://github.com/WebAssembly/extended-const) | ✅ Implemented | [0.4.0] |
 | [Garbage Collection](https://github.com/WebAssembly/gc) | ❌ Not implemented | |
 | [Multiple Memories](https://github.com/WebAssembly/multi-memory) | ✅ Implemented | `main` branch |
