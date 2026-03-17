@@ -399,7 +399,7 @@ struct WASITests {
 
         #if !os(Windows)
             let elapsed = try ContinuousClock().measure {
-                try WASIBridgeToHost.withBridge() { bridge in
+                try WASIBridgeToHost.withBridge { bridge in
                     let clockPointer = UnsafeGuestBufferPointer<WASIAbi.Subscription>(baseAddress: .init(memorySpace: memory, offset: clockOffset), count: 1)
                     let result = try bridge.underlying.poll_oneoff(subscriptions: clockPointer, events: .init(baseAddress: .init(memorySpace: memory, offset: finalOffset), count: 1))
                     #expect(result == 1)

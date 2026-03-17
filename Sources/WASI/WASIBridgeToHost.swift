@@ -112,7 +112,9 @@ public final class WASIBridgeToHost {
     }
 
     deinit {
-        precondition(isClosed, """
+        precondition(
+            isClosed,
+            """
             WASIBridgeToHost was deallocated without calling close(). \
             Call close() explicitly and handle errors, or use \
             WASIBridgeToHost.withBridge() for automatic cleanup.
