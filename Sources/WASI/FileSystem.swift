@@ -7,6 +7,9 @@ struct FileAccessMode: OptionSet {
 }
 
 protocol WASIEntry {
+    /// Whether this entry wraps a borrowed file descriptor that should not be
+    /// closed when the WASI instance is torn down (e.g. process stdio).
+    var isBorrowed: Bool { get }
     func attributes() throws -> WASIAbi.Filestat
     func fileType() throws -> WASIAbi.FileType
     func status() throws -> WASIAbi.Fdflags
@@ -18,6 +21,10 @@ protocol WASIEntry {
         offset: WASIAbi.FileSize, length: WASIAbi.FileSize, advice: WASIAbi.Advice
     ) throws
     func close() throws
+}
+
+extension WASIEntry {
+    var isBorrowed: Bool { false }
 }
 
 protocol WASIFile: WASIEntry {
@@ -129,12 +136,20 @@ struct FdTable {
         }
     }
 
-    /// Closes all file descriptors except those in `skipFds`.
-    mutating func closeAll(skipping skipFds: Set<WASIAbi.Fd> = []) {
-        for (fd, entry) in map where !skipFds.contains(fd) {
-            try? entry.asEntry().close()
+    /// Closes all owned file descriptors, skipping borrowed ones (e.g. stdio).
+    mutating func closeAll() throws {
+        var firstError: (any Error)?
+        for (_, entry) in map {
+            let wasiEntry = entry.asEntry()
+            guard !wasiEntry.isBorrowed else { continue }
+            do {
+                try wasiEntry.close()
+            } catch {
+                if firstError == nil { firstError = error }
+            }
         }
-        map = map.filter { skipFds.contains($0.key) }
+        map = map.filter { $0.value.asEntry().isBorrowed }
+        if let firstError { throw firstError }
     }
 }
 

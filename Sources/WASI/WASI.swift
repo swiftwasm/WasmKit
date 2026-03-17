@@ -1377,8 +1377,21 @@ final class WASIImplementation {
         self.randomGenerator = randomGenerator
     }
 
-    deinit {
-        fdTable.closeAll(skipping: [0, 1, 2])
+    /// Closes all owned file descriptors (skipping borrowed ones like stdio).
+    func close() throws {
+        try fdTable.closeAll()
+    }
+
+    /// Look up a directory entry by WASI fd, throwing EBADF if the fd doesn't
+    /// exist or ENOTDIR if it exists but isn't a directory.
+    private func directoryEntry(fd: WASIAbi.Fd) throws -> any WASIDir {
+        guard let entry = fdTable[fd] else {
+            throw WASIAbi.Errno.EBADF
+        }
+        guard case .directory(let dirEntry) = entry else {
+            throw WASIAbi.Errno.ENOTDIR
+        }
+        return dirEntry
     }
 
     /// Reads command-line argument data.
@@ -1735,9 +1748,7 @@ final class WASIImplementation {
 
     /// Create a directory.
     func path_create_directory(dirFd: WASIAbi.Fd, path: String) throws {
-        guard case .directory(let dirEntry) = fdTable[dirFd] else {
-            throw WASIAbi.Errno.ENOTDIR
-        }
+        let dirEntry = try directoryEntry(fd: dirFd)
         try dirEntry.createDirectory(atPath: path)
     }
 
@@ -1745,9 +1756,7 @@ final class WASIImplementation {
     func path_filestat_get(
         dirFd: WASIAbi.Fd, flags: WASIAbi.LookupFlags, path: String
     ) throws -> WASIAbi.Filestat {
-        guard case .directory(let dirEntry) = fdTable[dirFd] else {
-            throw WASIAbi.Errno.ENOTDIR
-        }
+        let dirEntry = try directoryEntry(fd: dirFd)
         return try dirEntry.attributes(
             path: path, symlinkFollow: flags.contains(.SYMLINK_FOLLOW)
         )
@@ -1759,9 +1768,7 @@ final class WASIImplementation {
         path: String, atim: WASIAbi.Timestamp, mtim: WASIAbi.Timestamp,
         fstFlags: WASIAbi.FstFlags
     ) throws {
-        guard case .directory(let dirEntry) = fdTable[dirFd] else {
-            throw WASIAbi.Errno.ENOTDIR
-        }
+        let dirEntry = try directoryEntry(fd: dirFd)
         try dirEntry.setFilestatTimes(
             path: path, atim: atim, mtim: mtim,
             fstFlags: fstFlags,
@@ -1787,9 +1794,7 @@ final class WASIImplementation {
         fsRightsInheriting: WASIAbi.Rights,
         fdflags: WASIAbi.Fdflags
     ) throws -> WASIAbi.Fd {
-        guard case .directory(let dirEntry) = fdTable[dirFd] else {
-            throw WASIAbi.Errno.ENOTDIR
-        }
+        let dirEntry = try directoryEntry(fd: dirFd)
 
         let newEntry = try fileSystem.openAt(
             dirFd: dirEntry,
@@ -1807,9 +1812,7 @@ final class WASIImplementation {
 
     /// Read the contents of a symbolic link.
     func path_readlink(fd: WASIAbi.Fd, path: String, buffer: UnsafeGuestBufferPointer<UInt8>) throws -> WASIAbi.Size {
-        guard case .directory(let dirEntry) = fdTable[fd] else {
-            throw WASIAbi.Errno.ENOTDIR
-        }
+        let dirEntry = try directoryEntry(fd: fd)
 
         let linkBytes = try dirEntry.readlink(atPath: path)
         let bytesWritten = min(Int(buffer.count), linkBytes.count)
@@ -1826,9 +1829,7 @@ final class WASIImplementation {
 
     /// Remove a directory.
     func path_remove_directory(dirFd: WASIAbi.Fd, path: String) throws {
-        guard case .directory(let dirEntry) = fdTable[dirFd] else {
-            throw WASIAbi.Errno.ENOTDIR
-        }
+        let dirEntry = try directoryEntry(fd: dirFd)
         try dirEntry.removeDirectory(atPath: path)
     }
 
@@ -1837,28 +1838,20 @@ final class WASIImplementation {
         oldFd: WASIAbi.Fd, oldPath: String,
         newFd: WASIAbi.Fd, newPath: String
     ) throws {
-        guard case .directory(let oldDirEntry) = fdTable[oldFd] else {
-            throw WASIAbi.Errno.ENOTDIR
-        }
-        guard case .directory(let newDirEntry) = fdTable[newFd] else {
-            throw WASIAbi.Errno.ENOTDIR
-        }
+        let oldDirEntry = try directoryEntry(fd: oldFd)
+        let newDirEntry = try directoryEntry(fd: newFd)
         try oldDirEntry.rename(from: oldPath, toDir: newDirEntry, to: newPath)
     }
 
     /// Create a symbolic link.
     func path_symlink(oldPath: String, dirFd: WASIAbi.Fd, newPath: String) throws {
-        guard case .directory(let dirEntry) = fdTable[dirFd] else {
-            throw WASIAbi.Errno.ENOTDIR
-        }
+        let dirEntry = try directoryEntry(fd: dirFd)
         try dirEntry.symlink(from: oldPath, to: newPath)
     }
 
     /// Unlink a file.
     func path_unlink_file(dirFd: WASIAbi.Fd, path: String) throws {
-        guard case .directory(let dirEntry) = fdTable[dirFd] else {
-            throw WASIAbi.Errno.ENOTDIR
-        }
+        let dirEntry = try directoryEntry(fd: dirFd)
         try dirEntry.removeFile(atPath: path)
     }
 

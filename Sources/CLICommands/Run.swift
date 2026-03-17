@@ -303,6 +303,7 @@ package struct Run: AsyncParsableCommand {
         let moduleInstance = try module.instantiate(store: store, imports: imports)
         return {
             let exitCode = try wasi.start(moduleInstance)
+            try wasi.close()
             throw ExitCode(Int32(exitCode))
         }
     }

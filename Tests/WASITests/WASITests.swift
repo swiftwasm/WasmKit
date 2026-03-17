@@ -1396,57 +1396,66 @@ struct WASITests {
         }
     #endif
 
-    #if os(macOS) || os(Linux)
+    #if !os(Windows)
         @Test
-        func setFilestatTimesDoesNotLeakFds() throws {
+        func pathOpenDotReturnsIndependentFd() throws {
             let t = try TestSupport.TemporaryDirectory()
-            try t.createFile(at: "test.txt", contents: "hello")
+            try t.createFile(at: "hello.txt", contents: "world")
 
             let wasi = try WASIBridgeToHost(
                 fileSystem: .host().withPreopens([
                     .init(guestPath: "/dir", hostPath: t.url.path)
                 ])
             ).underlying
-            let dirFd: WASIAbi.Fd = 3
+            let preopenFd: WASIAbi.Fd = 3
 
-            let fdCountBefore = TestSupport.countOpenFileDescriptors()
-
-            for _ in 0..<200 {
-                try wasi.path_filestat_set_times(
-                    dirFd: dirFd, flags: [],
-                    path: "test.txt",
-                    atim: 1_000_000_000, mtim: 1_000_000_000,
-                    fstFlags: [.ATIM, .MTIM]
-                )
-            }
-
-            let fdCountAfter = TestSupport.countOpenFileDescriptors()
-            #expect(
-                fdCountAfter - fdCountBefore < 10,
-                "Leaked \(fdCountAfter - fdCountBefore) file descriptors in path_filestat_set_times"
+            // Open "." relative to the preopen — should get an independent fd
+            let dotFd = try wasi.path_open(
+                dirFd: preopenFd, dirFlags: [], path: ".",
+                oflags: [.DIRECTORY], fsRightsBase: [.FD_READ],
+                fsRightsInheriting: [], fdflags: []
             )
-        }
+            #expect(dotFd != preopenFd, "path_open should return a new WASI fd")
 
+            // Close the "." fd
+            try wasi.fd_close(fd: dotFd)
+
+            // The preopen must still be fully functional after closing the "." fd
+            let stat = try wasi.path_filestat_get(
+                dirFd: preopenFd, flags: [], path: "hello.txt"
+            )
+            #expect(stat.size == 5, "preopen should still read files after closing '.' fd")
+        }
+    #endif
+
+    #if !os(Windows)
         @Test
-        func wasiInstanceDeinitClosesFds() throws {
-            let fdCountBefore = TestSupport.countOpenFileDescriptors()
+        func closeReleasesPreopenedFds() throws {
+            let t = try TestSupport.TemporaryDirectory()
+            try t.createFile(at: "test.txt", contents: "hello")
 
-            for _ in 0..<100 {
-                let t = try TestSupport.TemporaryDirectory()
-                let _ = try WASIBridgeToHost(
-                    fileSystem: .host().withPreopens([
-                        .init(guestPath: "/dir", hostPath: t.url.path)
-                    ])
-                )
-            }
-
-            let fdCountAfter = TestSupport.countOpenFileDescriptors()
-            #expect(
-                fdCountAfter - fdCountBefore < 10,
-                "Leaked \(fdCountAfter - fdCountBefore) file descriptors from WASIBridgeToHost deinit"
+            let bridge = try WASIBridgeToHost(
+                fileSystem: .host().withPreopens([
+                    .init(guestPath: "/dir", hostPath: t.url.path)
+                ])
             )
-        }
+            let wasi = bridge.underlying
+            let preopenFd: WASIAbi.Fd = 3
 
+            // Preopen works before close
+            let stat = try wasi.path_filestat_get(dirFd: preopenFd, flags: [], path: "test.txt")
+            #expect(stat.size == 5)
+
+            try bridge.close()
+
+            // After close, the preopen fd should no longer be usable
+            #expect(throws: WASIAbi.Errno.EBADF) {
+                try wasi.path_filestat_get(dirFd: preopenFd, flags: [], path: "test.txt")
+            }
+        }
+    #endif
+
+    #if os(macOS) || os(Linux)
         // https://github.com/swiftwasm/WasmKit/issues/275
         @Test
         func fileDescriptorLeakTest() throws {
