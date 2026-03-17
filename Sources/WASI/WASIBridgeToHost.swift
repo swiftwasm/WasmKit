@@ -17,6 +17,7 @@ import SystemPackage
 /// ```
 public final class WASIBridgeToHost {
     internal let underlying: WASIImplementation
+    private var isClosed = false
 
     /// A preopened directory mapping from a guest path to a host path.
     ///
@@ -107,6 +108,15 @@ public final class WASIBridgeToHost {
     /// Borrowed descriptors (e.g. process stdio) are left open.
     public func close() throws {
         try underlying.close()
+        isClosed = true
+    }
+
+    deinit {
+        precondition(isClosed, """
+            WASIBridgeToHost was deallocated without calling close(). \
+            Call close() explicitly and handle errors, or use \
+            WASIBridgeToHost.withBridge() for automatic cleanup.
+            """)
     }
 
     /// Creates a new WASI bridge with host file system access.
@@ -143,10 +153,7 @@ public final class WASIBridgeToHost {
         try self.init(
             args: args,
             environment: environment,
-            preopens: preopens,
-            stdin: stdin,
-            stdout: stdout,
-            stderr: stderr,
+            fileSystemOptions: .host().withStdio(stdin: stdin, stdout: stdout, stderr: stderr).withPreopens(preopens),
             wallClock: wallClock,
             monotonicClock: monotonicClock,
             randomGenerator: randomGenerator
@@ -169,7 +176,6 @@ public final class WASIBridgeToHost {
     ///   - monotonicClock: Clock for monotonic time queries. Defaults to `SystemMonotonicClock()`.
     ///   - randomGenerator: Random number generator. Defaults to `SystemRandomNumberGenerator()`.
     /// - Throws: An error if the file system or preopens cannot be initialized.
-    @available(*, deprecated, message: "Use withBridge(args:environment:fileSystem:body:) instead to ensure file descriptors are properly closed.")
     public convenience init(
         args: [String] = [],
         environment: [String: String] = [:],
@@ -184,7 +190,7 @@ public final class WASIBridgeToHost {
         try self.init(
             args: args,
             environment: environment,
-            fileSystem: .host().withStdio(stdin: stdin, stdout: stdout, stderr: stderr).withPreopens(preopens),
+            fileSystemOptions: .host().withStdio(stdin: stdin, stdout: stdout, stderr: stderr).withPreopens(preopens),
             wallClock: wallClock,
             monotonicClock: monotonicClock,
             randomGenerator: randomGenerator
@@ -193,7 +199,7 @@ public final class WASIBridgeToHost {
 
     /// Creates a new WASI bridge with custom file system options.
     ///
-    private init(
+    package init(
         args: [String],
         environment: [String: String],
         fileSystemOptions: FileSystemOptions,
@@ -223,7 +229,6 @@ public final class WASIBridgeToHost {
     ///   - monotonicClock: Clock for monotonic time queries. Defaults to `SystemMonotonicClock()`.
     ///   - randomGenerator: Random number generator. Defaults to `SystemRandomNumberGenerator()`.
     /// - Throws: An error if the file system or initialization fails.
-    @available(*, deprecated, message: "Use withBridge(args:environment:fileSystem:body:) instead to ensure file descriptors are properly closed.")
     public convenience init(
         args: [String] = [],
         environment: [String: String] = [:],

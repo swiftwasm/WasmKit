@@ -148,7 +148,10 @@ package struct Run: AsyncParsableCommand {
                     port: debuggerPort,
                     logLevel: self.verbose ? .trace : .info,
                     wasmModulePath: FilePath(self.path),
-                    engineConfiguration: self.deriveRuntimeConfiguration()
+                    engineConfiguration: self.deriveRuntimeConfiguration(),
+                    args: self.wasiArgs,
+                    environment: self.wasiEnvironment,
+                    fileSystem: .host().withStdio().withPreopens(self.wasiPreopens)
                 )
                 try await debuggerServer.run()
                 return
@@ -281,6 +284,16 @@ package struct Run: AsyncParsableCommand {
         return nil
     }
 
+    private var wasiArgs: [String] { [self.path] + self.arguments }
+
+    private var wasiEnvironment: [String: String] {
+        environment.reduce(into: [:]) { $0[$1.key] = $1.value }
+    }
+
+    private var wasiPreopens: [WASIBridgeToHost.Preopen] {
+        directories.map { WASIBridgeToHost.Preopen(guestPath: $0, hostPath: $0) }
+    }
+
     private func deriveRuntimeConfiguration() -> EngineConfiguration {
         return EngineConfiguration(
             threadingModel: self.threadingModel?.resolve(),
@@ -290,21 +303,23 @@ package struct Run: AsyncParsableCommand {
     }
 
     func instantiateWASI(module: Module, interceptor: EngineInterceptor?) throws -> () throws -> Void {
-        // Flatten environment variables into a dictionary (Respect the last value if a key is duplicated)
-        let environment = environment.reduce(into: [String: String]()) {
-            $0[$1.key] = $1.value
-        }
-        let preopens = directories.map { WASIBridgeToHost.Preopen(guestPath: $0, hostPath: $0) }
-        let wasi = try WASIBridgeToHost(args: [path] + arguments, environment: environment, preopens: preopens)
-        let engine = Engine(configuration: deriveRuntimeConfiguration(), interceptor: interceptor)
-        let store = Store(engine: engine)
-        var imports = Imports()
-        wasi.link(to: &imports, store: store)
-        let moduleInstance = try module.instantiate(store: store, imports: imports)
+        let args = self.wasiArgs
+        let environment = self.wasiEnvironment
+        let preopens = self.wasiPreopens
         return {
-            let exitCode = try wasi.start(moduleInstance)
-            try wasi.close()
-            throw ExitCode(Int32(exitCode))
+            try WASIBridgeToHost.withBridge(
+                args: args,
+                environment: environment,
+                fileSystem: .host().withStdio().withPreopens(preopens)
+            ) { wasi in
+                let engine = Engine(configuration: self.deriveRuntimeConfiguration(), interceptor: interceptor)
+                let store = Store(engine: engine)
+                var imports = Imports()
+                wasi.link(to: &imports, store: store)
+                let moduleInstance = try module.instantiate(store: store, imports: imports)
+                let exitCode = try wasi.start(moduleInstance)
+                throw ExitCode(Int32(exitCode))
+            }
         }
     }
 

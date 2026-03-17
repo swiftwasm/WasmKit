@@ -67,18 +67,15 @@ import Foundation
 // Parse a WASI-compliant WebAssembly module from a file.
 let module = try parseWasm(filePath: "wasm/hello.wasm")
 
-// Create a WASI instance forwarding to the host environment.
-let wasi = try WASIBridgeToHost()
-// Create engine and store
-let engine = Engine()
-let store = Store(engine: engine)
-// Instantiate a parsed module importing WASI
-var imports = Imports()
-wasi.link(to: &imports, store: store)
-let instance = try module.instantiate(store: store, imports: imports)
-
-// Start the WASI command-line application.
-let exitCode = try wasi.start(instance)
+// Create a WASI bridge, run the module, and clean up automatically.
+let exitCode = try WASIBridgeToHost.withBridge { wasi in
+    let engine = Engine()
+    let store = Store(engine: engine)
+    var imports = Imports()
+    wasi.link(to: &imports, store: store)
+    let instance = try module.instantiate(store: store, imports: imports)
+    return try wasi.start(instance)
+}
 // Exit the Swift program with the WASI exit code.
 exit(Int32(exitCode))
 ```

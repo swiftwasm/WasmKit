@@ -143,14 +143,15 @@ struct RuntimeTestHarness {
             let engine = Engine()
             let store = Store(engine: engine)
 
-            let wasi = try WASIBridgeToHost(args: [compiled.path])
-            var imports = Imports()
-            wasi.link(to: &imports, store: store)
-            link(&imports, store)
+            try WASIBridgeToHost.withBridge(args: [compiled.path]) { wasi in
+                var imports = Imports()
+                wasi.link(to: &imports, store: store)
+                link(&imports, store)
 
-            let module = try parseWasm(filePath: .init(compiled.path))
-            let instance = try module.instantiate(store: store, imports: imports)
-            try run(instance)
+                let module = try parseWasm(filePath: .init(compiled.path))
+                let instance = try module.instantiate(store: store, imports: imports)
+                try run(instance)
+            }
         }
     }
 

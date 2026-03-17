@@ -134,20 +134,20 @@ package func runWasmTools(
         .withStdio(stdin: .standardInput, stdout: stdoutPipes.writeEnd, stderr: stderrPipes.writeEnd)
         .withPreopens([.init(guestPath: "/", hostPath: "/")])
 
-    let wasi = try WASIBridgeToHost(
+    let exitCode = try WASIBridgeToHost.withBridge(
         args: ["wasm-tools"] + args,
         environment: [:],
         fileSystem: fileSystemOptions
-    )
+    ) { wasi in
+        let engine = Engine()
+        let store = Store(engine: engine)
+        var imports = Imports()
+        wasi.link(to: &imports, store: store)
 
-    let engine = Engine()
-    let store = Store(engine: engine)
-    var imports = Imports()
-    wasi.link(to: &imports, store: store)
-
-    let module = try parseWasm(filePath: FilePath(wasmToolsPath))
-    let instance = try module.instantiate(store: store, imports: imports)
-    let exitCode = try wasi.start(instance)
+        let module = try parseWasm(filePath: FilePath(wasmToolsPath))
+        let instance = try module.instantiate(store: store, imports: imports)
+        return try wasi.start(instance)
+    }
 
     try stdoutPipes.writeEnd.close()
     try stderrPipes.writeEnd.close()

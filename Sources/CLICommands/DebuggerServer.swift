@@ -21,6 +21,7 @@
     import SystemPackage
     import WasmKit
     import WasmKitGDBHandler
+    import WasmKitWASI
 
     struct DebuggerServer {
         var host = "127.0.0.1"
@@ -28,6 +29,9 @@
         var logLevel = Logger.Level.info
         let wasmModulePath: FilePath
         let engineConfiguration: EngineConfiguration
+        var args: [String] = []
+        var environment: [String: String] = [:]
+        var fileSystem: WASIBridgeToHost.FileSystemOptions = .host().withStdio()
 
         func run() async throws {
             let logger = {
@@ -74,6 +78,9 @@
                 let debuggerHandler = try await WasmKitGDBHandler(
                     moduleFilePath: self.wasmModulePath,
                     engineConfiguration: self.engineConfiguration,
+                    args: self.args,
+                    environment: self.environment,
+                    fileSystem: self.fileSystem,
                     logger: logger,
                     allocator: serverChannel.channel.allocator
                 )
@@ -113,6 +120,7 @@
                     await shutDownStream.first { _ in true }
                     cancellableGroup.cancelAll()
                 }
+                try await debuggerHandler.close()
             }
         }
     }

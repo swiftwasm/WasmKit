@@ -30,11 +30,14 @@ let benchmarks: @Sendable () -> () = {
             let module = try parseWasm(
                 filePath: FilePath(wishYouWereFast.appendingPathComponent(file).path)
             )
-            let wasi = try WASIBridgeToHost(fileSystem: .host().withStdio(stdout: devNull, stderr: devNull))
-            var imports = Imports()
-            wasi.link(to: &imports, store: store)
-            let instance = try module.instantiate(store: store, imports: imports)
-            _ = try wasi.start(instance)
+            try WASIBridgeToHost.withBridge(
+                fileSystem: .host().withStdio(stdout: devNull, stderr: devNull)
+            ) { wasi in
+                var imports = Imports()
+                wasi.link(to: &imports, store: store)
+                let instance = try module.instantiate(store: store, imports: imports)
+                _ = try wasi.start(instance)
+            }
         }
     }
 }
