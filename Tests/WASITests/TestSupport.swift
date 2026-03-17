@@ -15,17 +15,6 @@ import Foundation
     import SystemPackage
 #endif
 enum TestSupport {
-    #if os(macOS) || os(Linux)
-        static func countOpenFileDescriptors() -> Int {
-            var count = 0
-            for fd in Int32(0)..<min(getdtablesize(), 4096) {
-                if fcntl(fd, F_GETFD) != -1 {
-                    count += 1
-                }
-            }
-            return count
-        }
-    #endif
 
     struct Error: Swift.Error, CustomStringConvertible {
         let description: String
