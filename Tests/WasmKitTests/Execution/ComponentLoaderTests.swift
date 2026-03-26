@@ -18,7 +18,7 @@
 
         @Test
         func componentImportsLookup() throws {
-            let engine = Engine()
+            let engine = try Engine()
             let store = Store(engine: engine)
 
             // Create a simple module instance to use as an import
@@ -47,7 +47,7 @@
 
         @Test
         func invalidCoreInstanceIndex() throws {
-            let engine = Engine()
+            let engine = try Engine()
             let store = Store(engine: engine)
             let linker = ComponentLoader(store: store)
 
@@ -75,7 +75,7 @@
 
         @Test
         func coreExportNotFound() throws {
-            let engine = Engine()
+            let engine = try Engine()
             let store = Store(engine: engine)
             let linker = ComponentLoader(store: store)
 
@@ -123,7 +123,7 @@
 
         @Test
         func missingImportValidation() throws {
-            let engine = Engine()
+            let engine = try Engine()
             let store = Store(engine: engine)
             let linker = ComponentLoader(store: store)
 
@@ -152,7 +152,7 @@
 
         @Test
         func incompatibleImportValidation() throws {
-            let engine = Engine()
+            let engine = try Engine()
             let store = Store(engine: engine)
             let linker = ComponentLoader(store: store)
 
@@ -200,7 +200,7 @@
 
         @Test
         func validModuleImport() throws {
-            let engine = Engine()
+            let engine = try Engine()
             let store = Store(engine: engine)
             let linker = ComponentLoader(store: store)
 
@@ -238,7 +238,7 @@
 
         /// Helper to parse, encode, and instantiate a component from WAT
         private func instantiateComponentWAT(_ wat: String) throws -> ComponentInstance {
-            let engine = Engine()
+            let engine = try Engine()
             let store = Store(engine: engine)
             let linker = ComponentLoader(store: store)
 

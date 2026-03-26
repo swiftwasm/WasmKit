@@ -428,7 +428,7 @@ public struct Table: Equatable {
     /// - Throws: `Trap` if the initial and maximum table size exceeds the resource limit.
     ///
     /// ```swift
-    /// let engine = Engine()
+    /// let engine = try Engine()
     /// let store = Store(engine: engine)
     /// let tableType = TableType(elementType: .funcRef, limits: Limits(min: 1))
     /// let table = try Table(store: store, type: tableType)
@@ -717,7 +717,7 @@ public struct Memory: Equatable {
     /// import WasmKit
     /// import WAT
     ///
-    /// let engine = Engine()
+    /// let engine = try Engine()
     /// let store = Store(engine: engine)
     /// let memoryType = MemoryType(min: 1, max: nil)
     /// let memory = try Memory(store: store, type: memoryType)
@@ -888,7 +888,7 @@ public struct Global: Equatable {
     /// import WasmKit
     /// import WAT
     ///
-    /// let engine = Engine()
+    /// let engine = try Engine()
     /// let store = Store(engine: engine)
     /// let globalType = GlobalType(mutability: .constant, valueType: .i32)
     /// let i32Global = try Global(store: store, type: globalType, value: .i32(42))

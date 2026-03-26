@@ -133,7 +133,7 @@ extension TestCase {
         let features = WastRunContext.deriveFeatureSet(rootPath: rootPath)
         configuration.features = features
 
-        let engine = Engine(configuration: configuration)
+        let engine = try Engine(configuration: configuration)
         let store = Store(engine: engine)
         let spectestInstance = try spectestModule.instantiate(store: store)
 

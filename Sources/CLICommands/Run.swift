@@ -209,7 +209,7 @@ package struct Run: AsyncParsableCommand {
 
             let component = try parseComponent(filePath: filePath)
 
-            let engine = Engine(configuration: deriveRuntimeConfiguration())
+            let engine = try Engine(configuration: deriveRuntimeConfiguration())
             let store = Store(engine: engine)
             let loader = ComponentLoader(store: store)
             let instance = try loader.instantiate(component: component)
@@ -282,10 +282,14 @@ package struct Run: AsyncParsableCommand {
     }
 
     private func deriveRuntimeConfiguration() -> EngineConfiguration {
+        let resolved = self.threadingModel?.resolve()
         return EngineConfiguration(
-            threadingModel: self.threadingModel?.resolve(),
+            threadingModel: resolved,
             compilationMode: self.compilationMode?.resolve(),
-            stackSize: self.stackSize
+            stackSize: self.stackSize,
+            // Token threading doesn't support mprotect bounds checking
+            // (would cause EngineConfigurationError.mprotectRequiresDirectThreading).
+            memoryBoundsChecking: resolved == .token ? .software : .auto
         )
     }
 
@@ -296,7 +300,7 @@ package struct Run: AsyncParsableCommand {
         }
         let preopens = directories.map { WASIBridgeToHost.Preopen(guestPath: $0, hostPath: $0) }
         let wasi = try WASIBridgeToHost(args: [path] + arguments, environment: environment, preopens: preopens)
-        let engine = Engine(configuration: deriveRuntimeConfiguration(), interceptor: interceptor)
+        let engine = try Engine(configuration: deriveRuntimeConfiguration(), interceptor: interceptor)
         let store = Store(engine: engine)
         var imports = Imports()
         wasi.link(to: &imports, store: store)
@@ -314,7 +318,7 @@ package struct Run: AsyncParsableCommand {
             return nil
         }
 
-        let engine = Engine(configuration: deriveRuntimeConfiguration(), interceptor: interceptor)
+        let engine = try Engine(configuration: deriveRuntimeConfiguration(), interceptor: interceptor)
         let store = Store(engine: engine)
         let instance = try module.instantiate(store: store)
         return {

@@ -99,7 +99,7 @@
             var wast = try parseComponentWAST(wastContent, features: .default)
 
             // For execution: track current component instance
-            let engine = Engine()
+            let engine = try Engine()
             let store = Store(engine: engine)
             let linker = ComponentLoader(store: store)
             var currentInstance: ComponentInstance?

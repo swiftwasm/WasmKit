@@ -153,7 +153,7 @@ let benchmarks: @Sendable () -> () = {
             let expandMessage: String
 
             init(filePath: FilePath, expandMessage: String) throws {
-                let engine = Engine()
+                let engine = try Engine()
                 let store = Store(engine: engine)
                 let module = try parseWasm(filePath: filePath)
 

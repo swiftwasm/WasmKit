@@ -6,7 +6,7 @@ public func FuzzCheck(_ start: UnsafePointer<UInt8>, _ count: Int) -> CInt {
     let bytes = Array(UnsafeBufferPointer(start: start, count: count))
     do {
         let module = try WasmKit.parseWasm(bytes: bytes)
-        let engine = WasmKit.Engine()
+        let engine = try WasmKit.Engine()
         let store = WasmKit.Store(engine: engine)
         store.resourceLimiter = FuzzerResourceLimiter()
         let instance = try module.instantiate(store: store)

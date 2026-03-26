@@ -18,7 +18,12 @@ public final class Engine {
     /// - Parameters:
     ///   - configuration: The engine configuration.
     ///   - interceptor: An optional runtime interceptor to intercept execution of instructions.
-    public init(configuration: EngineConfiguration = EngineConfiguration(), interceptor: EngineInterceptor? = nil) {
+    /// - Throws: ``EngineConfigurationError`` if the configuration is invalid.
+    public init(
+        configuration: EngineConfiguration = EngineConfiguration(),
+        interceptor: EngineInterceptor? = nil
+    ) throws(EngineConfigurationError) {
+        try configuration.validate()
         self.configuration = configuration
         self.interceptor = interceptor
         self.funcTypeInterner = Interner()
@@ -27,6 +32,19 @@ public final class Engine {
     /// Migration aid for the old ``Runtime/instantiate(module:)``
     @available(*, unavailable, message: "Use ``Module/instantiate(store:imports:)`` instead")
     public func instantiate(module: Module) -> Instance { fatalError() }
+}
+
+/// An error indicating an invalid engine configuration.
+public enum EngineConfigurationError: Error, CustomStringConvertible {
+    /// mprotect-based memory bounds checking requires the direct threading model.
+    case mprotectRequiresDirectThreading
+
+    public var description: String {
+        switch self {
+        case .mprotectRequiresDirectThreading:
+            return "mprotect-based memory bounds checking is not supported with token threading model"
+        }
+    }
 }
 
 /// The configuration for the WebAssembly execution engine.
@@ -136,6 +154,15 @@ public struct EngineConfiguration: Sendable {
         self.features = features
         self.memoryBoundsChecking = memoryBoundsChecking
         self.memoryOffsetGuardSize = memoryOffsetGuardSize
+    }
+
+    /// Validates that the configuration is internally consistent.
+    func validate() throws(EngineConfigurationError) {
+        #if WASMKIT_MPROTECT_BOUND_CHECKING && !os(WASI)
+            if threadingModel == .token && memoryBoundsChecking != .software {
+                throw .mprotectRequiresDirectThreading
+            }
+        #endif
     }
 }
 

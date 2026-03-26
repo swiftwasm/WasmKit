@@ -5,7 +5,7 @@ import WAT
 let benchmarks: @Sendable () -> () = {
     Benchmark("empty instantiation") { benchmark in
         for _ in benchmark.scaledIterations {
-            let engine = Engine()
+            let engine = try Engine()
             let store = Store(engine: engine)
             let module = try parseWasm(bytes: wat2wasm("""
             (module

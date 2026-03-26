@@ -73,7 +73,7 @@
 
             self.moduleFilePath = moduleFilePath
 
-            let store = Store(engine: Engine(configuration: engineConfiguration))
+            let store = Store(engine: try Engine(configuration: engineConfiguration))
             var imports = Imports()
             let wasi = try WASIBridgeToHost()
             wasi.link(to: &imports, store: store)

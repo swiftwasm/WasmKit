@@ -13,7 +13,7 @@ struct Example {
         )
 
         // Create a module instance from the parsed module.
-        let engine = Engine()
+        let engine = try Engine()
         let store = Store(engine: engine)
         let instance = try module.instantiate(store: store)
         let input: UInt64 = 5

@@ -26,9 +26,10 @@ package struct Explore: ParsableCommand {
 
     package func run() throws {
         let module = try parseWasm(filePath: FilePath(path))
-        // Instruction dumping requires token threading model for now
-        let configuration = EngineConfiguration(threadingModel: .token)
-        let engine = Engine(configuration: configuration)
+        // Instruction dumping requires token threading model, which doesn't support mprotect
+        // bounds checking (EngineConfigurationError.mprotectRequiresDirectThreading).
+        let configuration = EngineConfiguration(threadingModel: .token, memoryBoundsChecking: .software)
+        let engine = try Engine(configuration: configuration)
         let store = Store(engine: engine)
 
         var imports: Imports = [:]

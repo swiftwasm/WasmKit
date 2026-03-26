@@ -21,7 +21,7 @@ struct Example {
         )
 
         // Create engine and store
-        let engine = Engine()
+        let engine = try Engine()
         let store = Store(engine: engine)
 
         // Instantiate a parsed module with importing a host function

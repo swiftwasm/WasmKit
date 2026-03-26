@@ -8,7 +8,7 @@ import WAT
 struct HostModuleTests {
     @Test
     func importMemory() throws {
-        let engine = Engine()
+        let engine = try Engine()
         let store = Store(engine: engine)
         let memoryType = MemoryType(min: 1, max: nil)
         let memory = try WasmKit.Memory(store: store, type: memoryType)
@@ -30,7 +30,7 @@ struct HostModuleTests {
 
     @Test
     func reentrancy() throws {
-        let engine = Engine()
+        let engine = try Engine()
         let store = Store(engine: engine)
         let voidSignature = WasmTypes.FunctionType(parameters: [], results: [])
         let module = try parseWasm(

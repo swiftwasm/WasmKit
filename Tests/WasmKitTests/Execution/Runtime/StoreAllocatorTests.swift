@@ -40,7 +40,7 @@ struct StoreAllocatorTests {
                         (memory (;0;) 0)
                         (export "a" (memory 0)))
                     """))
-            let engine = Engine()
+            let engine = try Engine()
             let store = Store(engine: engine)
             _ = try module.instantiate(store: store)
             weakAllocator = store.allocator

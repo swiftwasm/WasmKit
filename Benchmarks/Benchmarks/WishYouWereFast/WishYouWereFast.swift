@@ -25,7 +25,7 @@ let benchmarks: @Sendable () -> () = {
         Benchmark("\(file)", configuration: .init(thresholds: [
             .peakMemoryResident: .relaxed,
         ])) { benchmark in
-            let engine = Engine()
+            let engine = try Engine()
             let store = Store(engine: engine)
             let module = try parseWasm(
                 filePath: FilePath(wishYouWereFast.appendingPathComponent(file).path)

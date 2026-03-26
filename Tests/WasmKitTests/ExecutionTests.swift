@@ -24,7 +24,7 @@ struct ExecutionTests {
                 """
             )
         )
-        let engine = Engine()
+        let engine = try Engine()
         let store = Store(engine: engine)
         let instance = try module.instantiate(store: store)
         let _start = try #require(instance.exports[function: "_start"])
@@ -48,7 +48,7 @@ struct ExecutionTests {
                 """
             )
         )
-        let engine = Engine()
+        let engine = try Engine()
         let store = Store(engine: engine)
         let instance = try module.instantiate(store: store)
         let _start = try #require(instance.exports[function: "_start"])
@@ -61,7 +61,7 @@ struct ExecutionTests {
             bytes: wat2wasm(wat, options: EncodeOptions(nameSection: true))
         )
 
-        let engine = Engine()
+        let engine = try Engine()
         let store = Store(engine: engine)
         var imports = Imports()
         for importEntry in module.imports {

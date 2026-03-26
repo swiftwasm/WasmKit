@@ -349,7 +349,7 @@ struct WASITests {
 
     @Test
     func wasiAbi() throws {
-        let engine = Engine()
+        let engine = try Engine()
         let store = Store(engine: engine)
         let memory = try Memory(store: store, type: .init(min: 1))
 
