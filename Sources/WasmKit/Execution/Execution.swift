@@ -355,7 +355,7 @@ func executeWasm(
 }
 
 extension Execution {
-    #if WASMKIT_MPROTECT_BOUND_CHECKING && !os(WASI)
+    #if os(macOS) || os(Linux)
         @inline(__always)
         func shouldUseMprotectTrapGuards(sp: Sp) -> Bool {
             guard store.value.engine.configuration.memoryBoundsChecking != .software else { return false }
@@ -417,7 +417,7 @@ extension Execution {
         static func assign(md: inout Md, ms: inout Ms, memory: inout MemoryEntity) {
             md = memory.baseAddress
             ms = memory.byteCount
-            #if WASMKIT_MPROTECT_BOUND_CHECKING && !os(WASI)
+            #if os(macOS) || os(Linux)
                 wasmkit_trap_guard_set_current_memory(md, memory.trapGuardReservationSize)
             #endif
         }
@@ -427,7 +427,7 @@ extension Execution {
         private static func assignNil(md: inout Md, ms: inout Ms) {
             md = nil
             ms = 0
-            #if WASMKIT_MPROTECT_BOUND_CHECKING && !os(WASI)
+            #if os(macOS) || os(Linux)
                 wasmkit_trap_guard_set_current_memory(md, 0)
             #endif
         }
@@ -505,12 +505,12 @@ extension Execution {
         #else
             var pc = pc
             let handler = pc.read(wasmkit_tc_exec.self)
-            #if WASMKIT_MPROTECT_BOUND_CHECKING && !os(WASI)
+            #if os(macOS) || os(Linux)
                 let storeValue = store.value
                 let shouldUseMprotectTrapGuards = self.shouldUseMprotectTrapGuards(sp: sp)
             #endif
             try withUnsafeMutablePointer(to: &self) { execution in
-                #if WASMKIT_MPROTECT_BOUND_CHECKING && !os(WASI)
+                #if os(macOS) || os(Linux)
                     if shouldUseMprotectTrapGuards {
                         let trapKind: Int32 = {
                             let statePtr = UnsafeMutableRawPointer(execution)
@@ -616,7 +616,7 @@ extension Execution {
     /// Be careful when modifying this function as it is performance-critical.
     @inline(__always)
     mutating func runTokenThreaded(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
-        #if WASMKIT_MPROTECT_BOUND_CHECKING && !os(WASI)
+        #if os(macOS) || os(Linux)
             if shouldUseMprotectTrapGuards(sp: sp) {
                 let storeValue = store.value
                 try withUnsafeMutablePointer(to: &self) { execution in

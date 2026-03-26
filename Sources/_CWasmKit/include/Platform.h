@@ -17,6 +17,16 @@
 #  define WASMKIT_USE_DIRECT_THREADED_CODE 0
 #endif
 
+#if defined(__APPLE__)
+#  include <TargetConditionals.h>
+#endif
+
+#if defined(__linux__) || (defined(__APPLE__) && TARGET_OS_OSX)
+#  define WASMKIT_MPROTECT_BOUND_CHECKING 1
+#else
+#  define WASMKIT_MPROTECT_BOUND_CHECKING 0
+#endif
+
 #define SWIFT_CC_swift __attribute__((swiftcall))
 #define SWIFT_CC_swiftasync __attribute__((swiftasynccall))
 #define SWIFT_CC(CC) SWIFT_CC_##CC

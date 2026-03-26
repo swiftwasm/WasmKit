@@ -1,6 +1,7 @@
 #include "TrapGuard.h"
+#include "Platform.h"
 
-#if defined(WASMKIT_MPROTECT_BOUND_CHECKING) && WASMKIT_MPROTECT_BOUND_CHECKING
+#if WASMKIT_MPROTECT_BOUND_CHECKING
 
 #include <pthread.h>
 #include <setjmp.h>

@@ -158,7 +158,7 @@ public struct EngineConfiguration: Sendable {
 
     /// Validates that the configuration is internally consistent.
     func validate() throws(EngineConfigurationError) {
-        #if WASMKIT_MPROTECT_BOUND_CHECKING && !os(WASI)
+        #if os(macOS) || os(Linux)
             if threadingModel == .token && memoryBoundsChecking != .software {
                 throw .mprotectRequiresDirectThreading
             }

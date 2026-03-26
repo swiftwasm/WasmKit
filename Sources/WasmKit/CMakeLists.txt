@@ -45,10 +45,5 @@ add_wasmkit_library(WasmKit
   Execution/V128Storage.swift
 )
 
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-  target_compile_options(WasmKit PRIVATE
-    $<$<COMPILE_LANGUAGE:Swift>:-DWASMKIT_MPROTECT_BOUND_CHECKING>)
-endif()
-
 target_link_wasmkit_libraries(WasmKit PUBLIC
   _CWasmKit WasmParser SystemExtras WasmTypes SystemPackage)

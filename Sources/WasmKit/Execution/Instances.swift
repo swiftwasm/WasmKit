@@ -465,7 +465,7 @@ struct MemoryEntity: ~Copyable {
         isMemory64 ? UInt64.max : UInt64(1 << 32) / UInt64(pageSize)
     }
 
-    #if WASMKIT_MPROTECT_BOUND_CHECKING && !os(WASI)
+    #if os(macOS) || os(Linux)
         private enum Storage {
             case mprotect(MprotectLinearMemory)
             case malloc(UnsafeMutableBufferPointer<UInt8>)
@@ -483,7 +483,7 @@ struct MemoryEntity: ~Copyable {
         guard try resourceLimiter.limitMemoryGrowth(to: byteSize) else {
             throw Trap(.initialMemorySizeExceedsLimit(byteSize: byteSize))
         }
-        #if WASMKIT_MPROTECT_BOUND_CHECKING && !os(WASI)
+        #if os(macOS) || os(Linux)
             if !memoryType.isMemory64, engineConfiguration.memoryBoundsChecking != .software {
                 let reservationSize = MprotectLinearMemory.wasm32ReservationSize(offsetGuardSize: engineConfiguration.memoryOffsetGuardSize)
                 do {
@@ -517,7 +517,7 @@ struct MemoryEntity: ~Copyable {
     }
 
     deinit {
-        #if WASMKIT_MPROTECT_BOUND_CHECKING && !os(WASI)
+        #if os(macOS) || os(Linux)
             switch storage {
             case .mprotect(let memory):
                 memory.deallocate()
@@ -530,7 +530,7 @@ struct MemoryEntity: ~Copyable {
     }
 
     var data: UnsafeBufferPointer<UInt8> {
-        #if WASMKIT_MPROTECT_BOUND_CHECKING && !os(WASI)
+        #if os(macOS) || os(Linux)
             switch storage {
             case .mprotect(let memory):
                 return memory.makeBufferPointer()
@@ -543,7 +543,7 @@ struct MemoryEntity: ~Copyable {
     }
 
     var baseAddress: UnsafeMutableRawPointer? {
-        #if WASMKIT_MPROTECT_BOUND_CHECKING && !os(WASI)
+        #if os(macOS) || os(Linux)
             switch storage {
             case .mprotect(let memory):
                 return memory.baseAddress
@@ -556,7 +556,7 @@ struct MemoryEntity: ~Copyable {
     }
 
     var byteCount: Int {
-        #if WASMKIT_MPROTECT_BOUND_CHECKING && !os(WASI)
+        #if os(macOS) || os(Linux)
             switch storage {
             case .mprotect(let memory):
                 return memory.committedSize
@@ -569,7 +569,7 @@ struct MemoryEntity: ~Copyable {
     }
 
     var trapGuardReservationSize: Int {
-        #if WASMKIT_MPROTECT_BOUND_CHECKING && !os(WASI)
+        #if os(macOS) || os(Linux)
             if case .mprotect(let memory) = storage {
                 return memory.reservationSize
             }
@@ -594,7 +594,7 @@ struct MemoryEntity: ~Copyable {
 
         let result = Int32(currentByteCount / MemoryEntity.pageSize).unsigned
         let newByteCount = newPageCount * MemoryEntity.pageSize
-        #if WASMKIT_MPROTECT_BOUND_CHECKING && !os(WASI)
+        #if os(macOS) || os(Linux)
             switch storage {
             case .mprotect(var memory):
                 try memory.grow(to: newByteCount)

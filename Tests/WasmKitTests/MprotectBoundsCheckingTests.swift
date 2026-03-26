@@ -1,4 +1,4 @@
-#if WASMKIT_MPROTECT_BOUND_CHECKING && !os(WASI)
+#if os(macOS) || os(Linux)
 
     import Testing
     @testable import WasmKit

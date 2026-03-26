@@ -1,4 +1,4 @@
-#if WASMKIT_MPROTECT_BOUND_CHECKING && !os(WASI)
+#if os(macOS) || os(Linux)
 
     #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
         import Darwin

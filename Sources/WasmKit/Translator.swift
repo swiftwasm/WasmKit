@@ -1993,7 +1993,7 @@ struct InstructionTranslator: InstructionVisitor {
     /// memory would need its own guard registration (md/reservation pair) and the signal
     /// handler would need to check all registered ranges.
     private func canUseUncheckedMprotectMemoryAccess(memargOffset: UInt64, accessSize: Int) -> Bool {
-        #if WASMKIT_MPROTECT_BOUND_CHECKING && !os(WASI)
+        #if os(macOS) || os(Linux)
             guard engineConfiguration.memoryBoundsChecking != .software else { return false }
             guard accessSize > 0 else { return false }
             guard engineConfiguration.memoryOffsetGuardSize >= accessSize else { return false }
@@ -2035,7 +2035,23 @@ struct InstructionTranslator: InstructionVisitor {
         case .v128Load, .v128Load8X8S, .v128Load8X8U, .v128Load16X4S, .v128Load16X4U,
             .v128Load32X2S, .v128Load32X2U, .v128Load8Splat, .v128Load16Splat, .v128Load32Splat,
             .v128Load64Splat, .v128Load32Zero, .v128Load64Zero:
-            throw ValidationError(.simdNotSupported)
+            let isMemory64 = try module.isMemory64(memoryIndex: 0)
+            try validator.validateMemArg(memarg, naturalAlignment: load.naturalAlignment)
+            guard let opcode = SIMDOpcode.fromLoad(load) else { preconditionFailure("missing SIMDOpcode mapping: \(load)") }
+            try popPushEmit(.address(isMemory64: isMemory64), .v128) { pointer, result in
+                .simd(
+                    Instruction.SimdOperand(
+                        opcode: opcode.rawValue,
+                        lane: 0,
+                        reserved: 0,
+                        offset: memarg.offset,
+                        input0: pointer,
+                        input1: 0,
+                        input2: 0,
+                        result: result
+                    ))
+            }
+            return
         case .i32Load8S:
             if useUnchecked { instruction = Instruction.i32Load8SUnchecked } else { instruction = Instruction.i32Load8S }
         case .i32Load8U:
@@ -2095,7 +2111,26 @@ struct InstructionTranslator: InstructionVisitor {
         case .f64Store:
             if useUnchecked { instruction = Instruction.f64StoreUnchecked } else { instruction = Instruction.f64Store }
         case .v128Store:
-            throw ValidationError(.simdNotSupported)
+            let isMemory64 = try module.isMemory64(memoryIndex: 0)
+            try validator.validateMemArg(memarg, naturalAlignment: store.naturalAlignment)
+            guard let opcode = SIMDOpcode.fromStore(store) else { preconditionFailure("missing SIMDOpcode mapping: \(store)") }
+            let value = try popVRegOperand(.v128)
+            let pointer = try popVRegOperand(.address(isMemory64: isMemory64))
+            if let value = value, let pointer = pointer {
+                emit(
+                    .simd(
+                        Instruction.SimdOperand(
+                            opcode: opcode.rawValue,
+                            lane: 0,
+                            reserved: 0,
+                            offset: memarg.offset,
+                            input0: pointer,
+                            input1: value,
+                            input2: 0,
+                            result: 0
+                        )))
+            }
+            return
         case .i32Store8:
             if useUnchecked { instruction = Instruction.i32Store8Unchecked } else { instruction = Instruction.i32Store8 }
         case .i32Store16:
