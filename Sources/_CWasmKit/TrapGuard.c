@@ -74,7 +74,10 @@ static void wasmkit_install_signal_handlers_once(void) {
   struct sigaction action;
   sigemptyset(&action.sa_mask);
   action.sa_sigaction = wasmkit_signal_handler;
-  action.sa_flags = SA_SIGINFO | SA_NODEFER;
+  // SA_ONSTACK: use alternate signal stack if available (via sigaltstack),
+  // preventing infinite handler recursion when SA_NODEFER is set and
+  // the handler itself faults (e.g. due to stack overflow).
+  action.sa_flags = SA_SIGINFO | SA_NODEFER | SA_ONSTACK;
 
   if (sigaction(SIGSEGV, &action, &wasmkit_prev_segv) == 0) {
     wasmkit_has_prev_segv = true;

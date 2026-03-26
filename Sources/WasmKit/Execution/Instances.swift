@@ -489,7 +489,12 @@ struct MemoryEntity: ~Copyable {
                 do {
                     storage = .mprotect(try MprotectLinearMemory(committedSize: byteSize, reservationSize: reservationSize))
                 } catch {
-                    // Best-effort: fall back to software bounds checks if we cannot reserve/mprotect.
+                    // .mprotect: user explicitly requested mprotect — propagate the error so
+                    // allocation failures (e.g. vm.max_map_count exhaustion on Linux) are not masked.
+                    if engineConfiguration.memoryBoundsChecking == .mprotect {
+                        throw error
+                    }
+                    // .auto: best-effort fall back to software bounds checks if mmap/mprotect fails.
                     let storage = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: byteSize)
                     if byteSize > 0 { storage.initialize(repeating: 0) }
                     self.storage = .malloc(storage)

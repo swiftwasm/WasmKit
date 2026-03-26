@@ -1986,6 +1986,12 @@ struct InstructionTranslator: InstructionVisitor {
         }
     }
 
+    /// Whether the given memory access can use the unchecked (mprotect-guarded) path.
+    ///
+    /// The trap guard tracks a single linear memory per thread, so unchecked access is
+    /// restricted to memory index 0. If multi-memory support is added in the future, each
+    /// memory would need its own guard registration (md/reservation pair) and the signal
+    /// handler would need to check all registered ranges.
     private func canUseUncheckedMprotectMemoryAccess(memargOffset: UInt64, accessSize: Int) -> Bool {
         #if WASMKIT_MPROTECT_BOUND_CHECKING && !os(WASI)
             guard engineConfiguration.memoryBoundsChecking != .software else { return false }

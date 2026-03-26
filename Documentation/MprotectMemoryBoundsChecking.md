@@ -2,7 +2,7 @@
 
 ## Background
 
-WasmKit currently performs software bounds checks for every linear-memory load/store in `Execution.memoryLoad` / `Execution.memoryStore` (`Sources/WasmKit/Execution/Instructions/Memory.swift`).
+WasmKit supports two strategies for linear-memory bounds checking. The default software path performs an explicit bounds check for every load/store in `Execution.memoryLoad` / `Execution.memoryStore` (`Sources/WasmKit/Execution/Instructions/Memory.swift`).
 
 On platforms where virtual memory protection and synchronous fault handling are available, we can remove these per-access checks by:
 
@@ -37,7 +37,7 @@ Bounds checking mode is configured at runtime via `EngineConfiguration`:
 
 - `memoryBoundsChecking`
   - `.auto` (default): prefer mprotect+signals when supported, otherwise software
-  - `.mprotect`: request mprotect+signals, but fall back to software if not available
+  - `.mprotect`: require mprotect+signals; propagate errors if mmap/mprotect fails
   - `.software`: always use software bounds checks
 - `memoryOffsetGuardSize` (bytes): the maximum constant `memarg.offset` range for which WasmKit is allowed to emit unchecked (mprotect-based) loads/stores.
 
@@ -84,20 +84,33 @@ All branching between mprotect-fast-path and software-fast-path is done at trans
 
 ## Platform support matrix
 
-Planned initial support:
+Supported:
 
-- macOS (arm64/x86_64): enabled
-- Linux (arm64/x86_64): enabled
+- macOS (arm64/x86_64)
+- Linux (arm64/x86_64)
 
-Disabled (fallback to software checks):
+Falls back to software checks:
 
 - Windows (requires a separate implementation for WinAPI)
 - WASI (no `mprotect`/signals)
-- `memory64` (uses software bounds checks)
+- `memory64` (address space too large to reserve)
+- Token threading model (see Limitations section below)
 
-## Testing & performance validation plan
+## Limitations and safety
 
-1. Run a quick build + targeted tests.
-2. Run CoreMark benchmark on `main` and on this branch frequently during development.
-3. After confidence, run WishYouWereFast benchmark suite and compare results against `main`.
+### Token threading is not supported
+
+mprotect-based bounds checking requires the direct threading model because `siglongjmp` from the signal handler must only unwind through C frames. The token threading model dispatches instructions through Swift frames, which `siglongjmp` cannot safely skip. Attempting to use `.mprotect` or `.auto` with `.token` threading raises `EngineConfigurationError.mprotectRequiresDirectThreading`.
+
+### SA_ONSTACK for defensive stack safety
+
+The signal handler is installed with `SA_ONSTACK` so that it runs on an alternate signal stack (if one has been configured via `sigaltstack`). Combined with `SA_NODEFER` (which allows re-entry so that `siglongjmp` can re-raise the signal disposition), `SA_ONSTACK` prevents infinite handler recursion if the handler itself faults due to a stack overflow.
+
+### Multi-memory: only memory 0 uses unchecked access
+
+The trap guard tracks a single linear memory base and reservation size per thread. Unchecked (mprotect-guarded) loads and stores are therefore restricted to memory index 0. If multi-memory support is added, each memory would need its own guard registration and the signal handler would need to check all registered ranges.
+
+### Error propagation differs between .auto and .mprotect
+
+When `.mprotect` is explicitly requested by the user, `mmap`/`mprotect` failures during memory allocation are propagated as errors so that resource exhaustion (e.g. `vm.max_map_count` on Linux) is not masked. With `.auto`, the same failures are silently swallowed and the runtime falls back to software bounds checks.
 

@@ -29,7 +29,10 @@ extension Execution {
         sp: Sp, md: Md, loadOperand: Instruction.LoadOperand, loadAs _: T.Type = T.self, castToValue: (T) -> UntypedValue
     ) throws {
         let length = UInt64(T.bitWidth) / 8
-        let i = sp[loadOperand.pointer].asAddressOffset()
+        // Mask to 32 bits: unchecked paths rely on the address falling within the
+        // 4 GiB + guard mmap reservation. A corrupted upper 32 bits could exceed
+        // the reservation and cause an unguarded segfault instead of a clean trap.
+        let i = UInt64(UInt32(truncatingIfNeeded: sp[loadOperand.pointer].i64))
         let (_, isEndOverflow) = i.addingReportingOverflow(length &+ loadOperand.offset)
         if _fastPath(!isEndOverflow) {
             let address = loadOperand.offset + i
@@ -61,7 +64,8 @@ extension Execution {
     ) throws {
         let value = sp[storeOperand.value]
         let length = UInt64(T.bitWidth) / 8
-        let i = sp[storeOperand.pointer].asAddressOffset()
+        // Mask to 32 bits: see comment in memoryLoadUnchecked.
+        let i = UInt64(UInt32(truncatingIfNeeded: sp[storeOperand.pointer].i64))
         let address = storeOperand.offset + i
         let (_, isEndOverflow) = i.addingReportingOverflow(length &+ storeOperand.offset)
         if _fastPath(!isEndOverflow) {
