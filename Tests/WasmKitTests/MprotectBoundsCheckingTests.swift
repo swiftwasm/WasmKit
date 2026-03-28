@@ -141,6 +141,43 @@
         }
 
         @Test
+        func reentrantExecutionRestoresOuterTrapGuard() throws {
+            let voidSignature = WasmTypes.FunctionType(parameters: [], results: [])
+            let module = try parseWasm(
+                bytes: wat2wasm(
+                    """
+                    (module
+                        (import "env" "reenter" (func $reenter))
+                        (memory 1)
+                        (func (export "outer")
+                            (call $reenter)
+                            (drop (i32.load (i32.const 0x10000)))
+                        )
+                        (func (export "inner")
+                            (i32.store8 (i32.const 0) (i32.const 42))
+                        )
+                    )
+                    """))
+            let engine = try Engine(configuration: .init(memoryBoundsChecking: .mprotect))
+            let store = Store(engine: engine)
+
+            var instance: Instance?
+            let imports: Imports = [
+                "env": [
+                    "reenter": Function(store: store, type: voidSignature) { _, _ in
+                        let inner = try #require(instance?.exports[function: "inner"])
+                        try inner()
+                        return []
+                    }
+                ]
+            ]
+
+            instance = try module.instantiate(store: store, imports: imports)
+            let outer = try #require(instance?.exports[function: "outer"])
+            #expect(throws: Trap.self) { try outer() }
+        }
+
+        @Test
         func i64LoadAtPageBoundary() throws {
             let module = try parseWasm(
                 bytes: wat2wasm(

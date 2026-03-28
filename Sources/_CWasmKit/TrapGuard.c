@@ -96,16 +96,17 @@ int wasmkit_trap_guard_run(wasmkit_trap_guard_fn fn, void *ctx) {
   wasmkit_trap_guard_t guard;
   guard.md = NULL;
   guard.reservation_size = 0;
+  wasmkit_trap_guard_t *previous_guard = wasmkit_current_trap_guard;
 
   wasmkit_current_trap_guard = &guard;
   int jmp = sigsetjmp(guard.env, 1);
   if (jmp == 0) {
     fn(ctx);
-    wasmkit_current_trap_guard = NULL;
+    wasmkit_current_trap_guard = previous_guard;
     return 0;
   }
 
-  wasmkit_current_trap_guard = NULL;
+  wasmkit_current_trap_guard = previous_guard;
   return 1;
 }
 
@@ -130,4 +131,3 @@ void wasmkit_trap_guard_set_current_memory(void *md, size_t reservation_size) {
 }
 
 #endif
-
