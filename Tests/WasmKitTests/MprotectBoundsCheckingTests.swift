@@ -142,6 +142,9 @@
             }
         }
 
+        // Exit tests require Swift 6.2 or later
+        // https://github.com/swiftlang/swift-evolution/blob/main/proposals/testing/0008-exit-tests.md
+        #if compiler(>=6.2)
         @Test
         func preservesPreviousSignalHandlerOutsideGuardRanges() async {
             await #expect(processExitsWith: .exitCode(previousSignalHandlerExitCode)) {
@@ -151,6 +154,7 @@
                 wasmkit_test_exit_with_code(3)
             }
         }
+        #endif
 
         @Test
         func reentrantExecutionRestoresOuterTrapGuard() throws {
