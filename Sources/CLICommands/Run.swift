@@ -282,9 +282,8 @@ package struct Run: AsyncParsableCommand {
     }
 
     private func deriveRuntimeConfiguration() -> EngineConfiguration {
-        let resolved = self.threadingModel?.resolve()
         return EngineConfiguration(
-            threadingModel: resolved,
+            threadingModel: self.threadingModel?.resolve(),
             compilationMode: self.compilationMode?.resolve(),
             stackSize: self.stackSize
         )

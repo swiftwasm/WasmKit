@@ -112,7 +112,7 @@ struct WasmKitEngine: Engine {
     var name: String { return "wasmkit" }
     func run(moduleBytes: [UInt8]) throws -> ExecResult {
         let module = try WasmKit.parseWasm(bytes: moduleBytes)
-        let engine = try WasmKit.Engine()
+        let engine = WasmKit.Engine()
         let store = WasmKit.Store(engine: engine)
         let instance = try module.instantiate(store: store)
         let exports = instance.exports.sorted(by: { $0.name < $1.name })
