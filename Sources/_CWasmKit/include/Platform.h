@@ -27,6 +27,16 @@
 #  define WASMKIT_MPROTECT_BOUND_CHECKING 0
 #endif
 
+#if defined(__has_feature)
+#  if __has_feature(address_sanitizer)
+#    define WASMKIT_ADDRESS_SANITIZER_ENABLED 1
+#  else
+#    define WASMKIT_ADDRESS_SANITIZER_ENABLED 0
+#  endif
+#else
+#  define WASMKIT_ADDRESS_SANITIZER_ENABLED 0
+#endif
+
 #define SWIFT_CC_swift __attribute__((swiftcall))
 #define SWIFT_CC_swiftasync __attribute__((swiftasynccall))
 #define SWIFT_CC(CC) SWIFT_CC_##CC

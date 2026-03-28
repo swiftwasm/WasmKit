@@ -4,12 +4,12 @@
     @testable import WasmKit
     import WAT
 
+    private let boundsCheckingModesUnderTest: [EngineConfiguration.MemoryBoundsChecking] =
+        Engine.isAddressSanitizerEnabled ? [.software] : [.mprotect, .software]
+
     @Suite
     struct MprotectBoundsCheckingTests {
-        @Test(arguments: [
-            EngineConfiguration.MemoryBoundsChecking.mprotect,
-            EngineConfiguration.MemoryBoundsChecking.software,
-        ])
+        @Test(arguments: boundsCheckingModesUnderTest)
         func outOfBoundsTrapsWithBothModes(mode: EngineConfiguration.MemoryBoundsChecking) throws {
             let module = try parseWasm(
                 bytes: wat2wasm(
@@ -30,6 +30,7 @@
 
         @Test
         func mprotectGuardPageTraps() throws {
+            guard !Engine.isAddressSanitizerEnabled else { return }
             let module = try parseWasm(
                 bytes: wat2wasm(
                     """
@@ -54,6 +55,7 @@
 
         @Test
         func trapGuardReservationSizeReflectsMode() throws {
+            guard !Engine.isAddressSanitizerEnabled else { return }
             let wat = """
                 (module (memory (export "memory") 1))
                 """
@@ -83,6 +85,7 @@
 
         @Test
         func growThenAccessNewPages() throws {
+            guard !Engine.isAddressSanitizerEnabled else { return }
             let module = try parseWasm(
                 bytes: wat2wasm(
                     """
@@ -118,6 +121,7 @@
 
         @Test
         func repeatedOobTrapsDoNotLeak() throws {
+            guard !Engine.isAddressSanitizerEnabled else { return }
             let module = try parseWasm(
                 bytes: wat2wasm(
                     """
@@ -141,6 +145,7 @@
 
         @Test
         func reentrantExecutionRestoresOuterTrapGuard() throws {
+            guard !Engine.isAddressSanitizerEnabled else { return }
             let voidSignature = WasmTypes.FunctionType(parameters: [], results: [])
             let module = try parseWasm(
                 bytes: wat2wasm(
@@ -178,6 +183,7 @@
 
         @Test
         func crossInstanceCallFromMemorylessEntryStillInstallsTrapGuard() throws {
+            guard !Engine.isAddressSanitizerEnabled else { return }
             let calleeModule = try parseWasm(
                 bytes: wat2wasm(
                     """
@@ -215,6 +221,7 @@
 
         @Test
         func i64LoadAtPageBoundary() throws {
+            guard !Engine.isAddressSanitizerEnabled else { return }
             let module = try parseWasm(
                 bytes: wat2wasm(
                     """
@@ -240,6 +247,7 @@
 
         @Test
         func largeOffsetUsesCheckedPath() throws {
+            guard !Engine.isAddressSanitizerEnabled else { return }
             // offset=0x20000 exceeds the default 64KB guard, so the translator should
             // fall back to the checked (software) path. This must still trap correctly
             // for a 1-page memory.

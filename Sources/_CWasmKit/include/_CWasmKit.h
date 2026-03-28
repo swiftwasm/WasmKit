@@ -98,6 +98,8 @@ static inline void wasmkit_fwrite_stderr(const char *_Nonnull str, size_t len) {
   fwrite(str, 1, len, stderr);
 }
 
+int wasmkit_address_sanitizer_enabled(void);
+
 // MARK: - Swift Runtime Functions
 
 struct SwiftError;

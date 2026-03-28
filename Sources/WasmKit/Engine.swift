@@ -8,6 +8,8 @@ import struct WasmParser.WasmFeatureSet
 /// WebAssembly code such as interpreting mode, enabled features, etc.
 /// Typically, you will need a single engine instance per application.
 public final class Engine {
+    static let isAddressSanitizerEnabled = wasmkit_address_sanitizer_enabled() == 1
+
     /// The engine configuration.
     public let configuration: EngineConfiguration
     let interceptor: EngineInterceptor?
@@ -24,10 +26,13 @@ public final class Engine {
     ) {
         var configuration = configuration
 
-        // If mprotect-based memory bounds checking is not supported on the current platform,
-        // or the user requested mprotect-based memory bounds checking, but the threading model is token,
+        // If mprotect-based memory bounds checking is unavailable on the current platform,
+        // incompatible with AddressSanitizer, or explicitly requested with token threading,
         // fall back to software bounds checking.
-        if WASMKIT_MPROTECT_BOUND_CHECKING == 0 || (configuration.memoryBoundsChecking == .mprotect && configuration.threadingModel == .token) {
+        if WASMKIT_MPROTECT_BOUND_CHECKING == 0
+            || Engine.isAddressSanitizerEnabled
+            || (configuration.memoryBoundsChecking == .mprotect && configuration.threadingModel == .token)
+        {
             configuration.memoryBoundsChecking = .software
         }
 
