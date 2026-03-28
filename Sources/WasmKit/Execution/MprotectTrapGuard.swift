@@ -2,57 +2,6 @@
 
     @preconcurrency import _CWasmKit
 
-    final class WasmKitTokenThreadedTrapGuardBox {
-        var execution: UnsafeMutablePointer<Execution>
-        var sp: UnsafeMutablePointer<Sp>
-        var pc: UnsafeMutablePointer<Pc>
-        var md: UnsafeMutablePointer<Md>
-        var ms: UnsafeMutablePointer<Ms>
-        var thrownError: Error?
-
-        init(
-            execution: UnsafeMutablePointer<Execution>,
-            sp: UnsafeMutablePointer<Sp>,
-            pc: UnsafeMutablePointer<Pc>,
-            md: UnsafeMutablePointer<Md>,
-            ms: UnsafeMutablePointer<Ms>
-        ) {
-            self.execution = execution
-            self.sp = sp
-            self.pc = pc
-            self.md = md
-            self.ms = ms
-            self.thrownError = nil
-        }
-    }
-
-    let wasmkit_token_threaded_trap_guard_entry: @convention(c) (UnsafeMutableRawPointer?) -> Void = { raw in
-        guard let raw else { return }
-        let box = Unmanaged<WasmKitTokenThreadedTrapGuardBox>.fromOpaque(raw).takeUnretainedValue()
-
-        let instance = box.execution.pointee.currentInstance(sp: box.sp.pointee)
-        if let memory = instance.memories.first {
-            memory.withValue { memoryEntity in
-                box.md.pointee = memoryEntity.baseAddress
-                box.ms.pointee = memoryEntity.byteCount
-                wasmkit_trap_guard_set_current_memory(box.md.pointee, memoryEntity.trapGuardReservationSize)
-            }
-        } else {
-            wasmkit_trap_guard_set_current_memory(nil, 0)
-        }
-
-        do {
-            try box.execution.pointee.runTokenThreadedImpl(
-                sp: &box.sp.pointee,
-                pc: &box.pc.pointee,
-                md: &box.md.pointee,
-                ms: &box.ms.pointee
-            )
-        } catch {
-            box.thrownError = error
-        }
-    }
-
     struct WasmKitDirectThreadedTrapGuardContext {
         var exec: wasmkit_tc_exec
         var sp: Sp

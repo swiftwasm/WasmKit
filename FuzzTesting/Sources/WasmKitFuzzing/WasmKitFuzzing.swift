@@ -19,7 +19,7 @@ public struct FuzzerResourceLimiter: ResourceLimiter {
 /// - Parameter bytes: The bytes of the Wasm module.
 public func fuzzInstantiation(bytes: [UInt8]) throws {
     let module = try WasmKit.parseWasm(bytes: bytes)
-    let engine = try Engine(configuration: EngineConfiguration(compilationMode: .eager))
+    let engine = Engine(configuration: EngineConfiguration(compilationMode: .eager))
     let store = Store(engine: engine)
     store.resourceLimiter = FuzzerResourceLimiter()
 

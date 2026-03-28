@@ -29,8 +29,8 @@ public final class Runtime {
         hostModules: [String: HostModule] = [:],
         interceptor: EngineInterceptor? = nil,
         configuration: EngineConfiguration = EngineConfiguration()
-    ) throws(EngineConfigurationError) {
-        self.engine = try Engine(configuration: configuration, interceptor: interceptor)
+    ) {
+        self.engine = Engine(configuration: configuration, interceptor: interceptor)
         store = Store(engine: engine)
 
         for (moduleName, hostModule) in hostModules {

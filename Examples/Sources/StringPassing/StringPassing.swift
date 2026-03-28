@@ -17,7 +17,7 @@ struct Example {
             bytes: try wat2wasm(String(contentsOf: watURL))
         )
 
-        let engine = try Engine()
+        let engine = Engine()
         let store = Store(engine: engine)
 
         let instance = try module.instantiate(

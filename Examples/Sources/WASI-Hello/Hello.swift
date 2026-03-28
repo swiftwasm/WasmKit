@@ -13,7 +13,7 @@ struct Example {
         // Create a WASI instance forwarding to the host environment.
         let wasi = try WASIBridgeToHost()
         // Create engine and store
-        let engine = try Engine()
+        let engine = Engine()
         let store = Store(engine: engine)
         // Instantiate a parsed module importing WASI
         var imports = Imports()

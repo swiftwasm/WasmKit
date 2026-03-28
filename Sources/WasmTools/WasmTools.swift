@@ -140,7 +140,7 @@ package func runWasmTools(
         fileSystem: fileSystemOptions
     )
 
-    let engine = try Engine()
+    let engine = Engine()
     let store = Store(engine: engine)
     var imports = Imports()
     wasi.link(to: &imports, store: store)

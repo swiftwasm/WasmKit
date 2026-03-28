@@ -140,7 +140,7 @@ struct RuntimeTestHarness {
             defer { cleanupTemporaryFiles() }
             let compiled = try compile(collectGuestInputFiles())
 
-            let engine = try Engine()
+            let engine = Engine()
             let store = Store(engine: engine)
 
             let wasi = try WASIBridgeToHost(args: [compiled.path])

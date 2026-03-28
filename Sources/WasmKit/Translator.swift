@@ -1992,34 +1992,31 @@ struct InstructionTranslator: InstructionVisitor {
     /// restricted to memory index 0. If multi-memory support is added in the future, each
     /// memory would need its own guard registration (md/reservation pair) and the signal
     /// handler would need to check all registered ranges.
-    private func canUseUncheckedMprotectMemoryAccess(memargOffset: UInt64, accessSize: Int) -> Bool {
-        #if os(macOS) || os(Linux)
-            guard engineConfiguration.memoryBoundsChecking != .software else { return false }
-            guard accessSize > 0 else { return false }
-            guard engineConfiguration.memoryOffsetGuardSize >= accessSize else { return false }
-            guard memargOffset <= UInt64(engineConfiguration.memoryOffsetGuardSize - accessSize) else { return false }
-            guard (try? module.isMemory64(memoryIndex: 0)) == false else { return false }
-            guard let memory = module.memories.first else { return false }
-            return memory.withValue { $0.trapGuardReservationSize > 0 }
-        #else
-            return false
-        #endif
+    private func canUseUncheckedMprotectMemoryAccess(isMemory64: Bool, memargOffset: UInt64, accessSize: Int) -> Bool {
+        guard engineConfiguration.memoryBoundsChecking == .mprotect else { return false }
+        guard accessSize > 0 else { return false }
+        guard engineConfiguration.memoryOffsetGuardSize >= accessSize else { return false }
+        guard memargOffset <= UInt64(engineConfiguration.memoryOffsetGuardSize - accessSize) else { return false }
+        guard isMemory64 == false else { return false }
+        guard let memory = module.memories.first else { return false }
+        return memory.withValue { $0.trapGuardReservationSize > 0 }
     }
 
     mutating func visitLoad(_ load: WasmParser.Instruction.Load, memarg: MemArg) throws {
+        let isMemory64 = try module.isMemory64(memoryIndex: 0)
         let instruction: (Instruction.LoadOperand) -> Instruction
         let useUnchecked: Bool
         switch load {
         case .i32Load, .f32Load:
-            useUnchecked = canUseUncheckedMprotectMemoryAccess(memargOffset: memarg.offset, accessSize: 4)
+            useUnchecked = canUseUncheckedMprotectMemoryAccess(isMemory64: isMemory64, memargOffset: memarg.offset, accessSize: 4)
         case .i64Load, .f64Load:
-            useUnchecked = canUseUncheckedMprotectMemoryAccess(memargOffset: memarg.offset, accessSize: 8)
+            useUnchecked = canUseUncheckedMprotectMemoryAccess(isMemory64: isMemory64, memargOffset: memarg.offset, accessSize: 8)
         case .i32Load8S, .i32Load8U, .i64Load8S, .i64Load8U:
-            useUnchecked = canUseUncheckedMprotectMemoryAccess(memargOffset: memarg.offset, accessSize: 1)
+            useUnchecked = canUseUncheckedMprotectMemoryAccess(isMemory64: isMemory64, memargOffset: memarg.offset, accessSize: 1)
         case .i32Load16S, .i32Load16U, .i64Load16S, .i64Load16U:
-            useUnchecked = canUseUncheckedMprotectMemoryAccess(memargOffset: memarg.offset, accessSize: 2)
+            useUnchecked = canUseUncheckedMprotectMemoryAccess(isMemory64: isMemory64, memargOffset: memarg.offset, accessSize: 2)
         case .i64Load32S, .i64Load32U:
-            useUnchecked = canUseUncheckedMprotectMemoryAccess(memargOffset: memarg.offset, accessSize: 4)
+            useUnchecked = canUseUncheckedMprotectMemoryAccess(isMemory64: isMemory64, memargOffset: memarg.offset, accessSize: 4)
         default:
             useUnchecked = false
         }
@@ -2035,7 +2032,6 @@ struct InstructionTranslator: InstructionVisitor {
         case .v128Load, .v128Load8X8S, .v128Load8X8U, .v128Load16X4S, .v128Load16X4U,
             .v128Load32X2S, .v128Load32X2U, .v128Load8Splat, .v128Load16Splat, .v128Load32Splat,
             .v128Load64Splat, .v128Load32Zero, .v128Load64Zero:
-            let isMemory64 = try module.isMemory64(memoryIndex: 0)
             try validator.validateMemArg(memarg, naturalAlignment: load.naturalAlignment)
             guard let opcode = SIMDOpcode.fromLoad(load) else { preconditionFailure("missing SIMDOpcode mapping: \(load)") }
             try popPushEmit(.address(isMemory64: isMemory64), .v128) { pointer, result in
@@ -2085,19 +2081,20 @@ struct InstructionTranslator: InstructionVisitor {
     }
 
     mutating func visitStore(_ store: WasmParser.Instruction.Store, memarg: MemArg) throws {
+        let isMemory64 = try module.isMemory64(memoryIndex: 0)
         let instruction: (Instruction.StoreOperand) -> Instruction
         let useUnchecked: Bool
         switch store {
         case .i32Store, .f32Store:
-            useUnchecked = canUseUncheckedMprotectMemoryAccess(memargOffset: memarg.offset, accessSize: 4)
+            useUnchecked = canUseUncheckedMprotectMemoryAccess(isMemory64: isMemory64, memargOffset: memarg.offset, accessSize: 4)
         case .i64Store, .f64Store:
-            useUnchecked = canUseUncheckedMprotectMemoryAccess(memargOffset: memarg.offset, accessSize: 8)
+            useUnchecked = canUseUncheckedMprotectMemoryAccess(isMemory64: isMemory64, memargOffset: memarg.offset, accessSize: 8)
         case .i32Store8, .i64Store8:
-            useUnchecked = canUseUncheckedMprotectMemoryAccess(memargOffset: memarg.offset, accessSize: 1)
+            useUnchecked = canUseUncheckedMprotectMemoryAccess(isMemory64: isMemory64, memargOffset: memarg.offset, accessSize: 1)
         case .i32Store16, .i64Store16:
-            useUnchecked = canUseUncheckedMprotectMemoryAccess(memargOffset: memarg.offset, accessSize: 2)
+            useUnchecked = canUseUncheckedMprotectMemoryAccess(isMemory64: isMemory64, memargOffset: memarg.offset, accessSize: 2)
         case .i64Store32:
-            useUnchecked = canUseUncheckedMprotectMemoryAccess(memargOffset: memarg.offset, accessSize: 4)
+            useUnchecked = canUseUncheckedMprotectMemoryAccess(isMemory64: isMemory64, memargOffset: memarg.offset, accessSize: 4)
         default:
             useUnchecked = false
         }
@@ -2111,7 +2108,6 @@ struct InstructionTranslator: InstructionVisitor {
         case .f64Store:
             if useUnchecked { instruction = Instruction.f64StoreUnchecked } else { instruction = Instruction.f64Store }
         case .v128Store:
-            let isMemory64 = try module.isMemory64(memoryIndex: 0)
             try validator.validateMemArg(memarg, naturalAlignment: store.naturalAlignment)
             guard let opcode = SIMDOpcode.fromStore(store) else { preconditionFailure("missing SIMDOpcode mapping: \(store)") }
             let value = try popVRegOperand(.v128)

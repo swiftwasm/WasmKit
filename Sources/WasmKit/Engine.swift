@@ -18,12 +18,19 @@ public final class Engine {
     /// - Parameters:
     ///   - configuration: The engine configuration.
     ///   - interceptor: An optional runtime interceptor to intercept execution of instructions.
-    /// - Throws: ``EngineConfigurationError`` if the configuration is invalid.
     public init(
         configuration: EngineConfiguration = EngineConfiguration(),
         interceptor: EngineInterceptor? = nil
-    ) throws(EngineConfigurationError) {
-        try configuration.validate()
+    ) {
+        var configuration = configuration
+
+        // If mprotect-based memory bounds checking is not supported on the current platform,
+        // or the user requested mprotect-based memory bounds checking, but the threading model is token,
+        // fall back to software bounds checking.
+        if WASMKIT_MPROTECT_BOUND_CHECKING == 0 || (configuration.memoryBoundsChecking == .mprotect && configuration.threadingModel == .token) {
+            configuration.memoryBoundsChecking = .software
+        }
+
         self.configuration = configuration
         self.interceptor = interceptor
         self.funcTypeInterner = Interner()
@@ -32,19 +39,6 @@ public final class Engine {
     /// Migration aid for the old ``Runtime/instantiate(module:)``
     @available(*, unavailable, message: "Use ``Module/instantiate(store:imports:)`` instead")
     public func instantiate(module: Module) -> Instance { fatalError() }
-}
-
-/// An error indicating an invalid engine configuration.
-public enum EngineConfigurationError: Error, CustomStringConvertible {
-    /// mprotect-based memory bounds checking requires the direct threading model.
-    case mprotectRequiresDirectThreading
-
-    public var description: String {
-        switch self {
-        case .mprotectRequiresDirectThreading:
-            return "mprotect-based memory bounds checking is not supported with token threading model"
-        }
-    }
 }
 
 /// The configuration for the WebAssembly execution engine.
@@ -114,15 +108,29 @@ public struct EngineConfiguration: Sendable {
 
     /// Linear memory bounds checking strategy.
     public enum MemoryBoundsChecking: Sendable {
-        /// Prefer `mprotect` + signal based traps when supported, otherwise use software bounds checks.
-        case auto
         /// Request `mprotect` + signal based traps, but fall back to software checks if unavailable.
         case mprotect
         /// Always use software bounds checks.
         case software
+
+        static var canUseMprotectMemoryBoundsChecking: Bool {
+            return WASMKIT_MPROTECT_BOUND_CHECKING == 1
+        }
+
+        static var defaultForCurrentPlatform: MemoryBoundsChecking {
+            if canUseMprotectMemoryBoundsChecking {
+                return .mprotect
+            } else {
+                return .software
+            }
+        }
     }
 
-    /// The memory bounds checking strategy to use.
+    /// Preferred linear memory bounds checking strategy.
+    ///
+    /// This value is advisory: the engine may use a different strategy when the
+    /// requested one is unavailable, incompatible with other configuration (for
+    /// example threading model), or otherwise not applicable.
     public var memoryBoundsChecking: MemoryBoundsChecking
 
     /// The maximum constant `memarg.offset` range (in bytes) for which unchecked
@@ -145,24 +153,15 @@ public struct EngineConfiguration: Sendable {
         compilationMode: CompilationMode? = nil,
         stackSize: Int? = nil,
         features: WasmFeatureSet = .default,
-        memoryBoundsChecking: MemoryBoundsChecking = .auto,
+        memoryBoundsChecking: MemoryBoundsChecking? = nil,
         memoryOffsetGuardSize: Int = 64 * 1024
     ) {
         self.threadingModel = threadingModel ?? .defaultForCurrentPlatform
         self.compilationMode = compilationMode ?? .lazy
         self.stackSize = stackSize ?? (1 << 19)
         self.features = features
-        self.memoryBoundsChecking = memoryBoundsChecking
+        self.memoryBoundsChecking = memoryBoundsChecking ?? .defaultForCurrentPlatform
         self.memoryOffsetGuardSize = memoryOffsetGuardSize
-    }
-
-    /// Validates that the configuration is internally consistent.
-    func validate() throws(EngineConfigurationError) {
-        #if os(macOS) || os(Linux)
-            if threadingModel == .token && memoryBoundsChecking != .software {
-                throw .mprotectRequiresDirectThreading
-            }
-        #endif
     }
 }
 

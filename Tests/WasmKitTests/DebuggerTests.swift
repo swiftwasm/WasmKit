@@ -353,7 +353,7 @@
 
         @Test
         func breakpoints() throws {
-            let store = Store(engine: try Engine())
+            let store = Store(engine: Engine())
             let bytes = try wat2wasm(trivialModuleWAT)
             let module = try parseWasm(bytes: bytes)
             var debugger = try Debugger(module: module, store: store, imports: [:])
@@ -380,7 +380,7 @@
         /// Ensures that breakpoints and call stacks work across multiple function calls.
         @Test
         func lazyFunctionsCompilation() throws {
-            let store = Store(engine: try Engine())
+            let store = Store(engine: Engine())
             let bytes = try wat2wasm(multiFunctionWAT)
             let module = try parseWasm(bytes: bytes)
 
@@ -413,7 +413,7 @@
 
         @Test
         func getLocal() throws {
-            let store = Store(engine: try Engine())
+            let store = Store(engine: Engine())
             let bytes = try wat2wasm(manyLocalsWAT)
             let module = try parseWasm(bytes: bytes)
             var debugger = try Debugger(module: module, store: store, imports: [:])
@@ -439,7 +439,7 @@
         /// the loop).
         @Test
         func stepFollowsBrIf() throws {
-            let store = Store(engine: try Engine())
+            let store = Store(engine: Engine())
             let bytes = try wat2wasm(loopWAT)
             let module = try parseWasm(bytes: bytes)
             var debugger = try Debugger(module: module, store: store, imports: [:])
@@ -480,7 +480,7 @@
         /// resumes inside the loop body, not past the loop.
         @Test
         func stepFollowsBr() throws {
-            let store = Store(engine: try Engine())
+            let store = Store(engine: Engine())
             let bytes = try wat2wasm(brLoopWAT)
             let module = try parseWasm(bytes: bytes)
             var debugger = try Debugger(module: module, store: store, imports: [:])
@@ -522,7 +522,7 @@
         /// resumes inside the loop body.
         @Test
         func stepFollowsBrTable() throws {
-            let store = Store(engine: try Engine())
+            let store = Store(engine: Engine())
             let bytes = try wat2wasm(brTableLoopWAT)
             let module = try parseWasm(bytes: bytes)
             var debugger = try Debugger(module: module, store: store, imports: [:])
@@ -562,7 +562,7 @@
         /// and stops at the next instruction in the caller.
         @Test
         func stepStepsOverCall() throws {
-            let store = Store(engine: try Engine())
+            let store = Store(engine: Engine())
             let bytes = try wat2wasm(callWAT)
             let module = try parseWasm(bytes: bytes)
             var debugger = try Debugger(module: module, store: store, imports: [:])
@@ -587,7 +587,7 @@
         /// the indirect call and stops at the next instruction in the caller.
         @Test
         func stepStepsOverCallIndirect() throws {
-            let store = Store(engine: try Engine())
+            let store = Store(engine: Engine())
             let bytes = try wat2wasm(callIndirectWAT)
             let module = try parseWasm(bytes: bytes)
             var debugger = try Debugger(module: module, store: store, imports: [:])
@@ -613,7 +613,7 @@
         @Test
         func stepFollowsReturnCall() throws {
             let features: WasmFeatureSet = [.tailCall]
-            let store = Store(engine: try Engine())
+            let store = Store(engine: Engine())
             let bytes = try wat2wasm(returnCallWAT, features: features)
             let module = try parseWasm(bytes: bytes, features: features)
             var debugger = try Debugger(module: module, store: store, imports: [:])
@@ -641,7 +641,7 @@
         /// step completes (lands at a breakpoint) rather than running to completion.
         @Test
         func stepThroughRecursiveCall() throws {
-            let store = Store(engine: try Engine())
+            let store = Store(engine: Engine())
             let bytes = try wat2wasm(recursiveCallWAT)
             let module = try parseWasm(bytes: bytes)
             var debugger = try Debugger(module: module, store: store, imports: [:])
@@ -666,7 +666,7 @@
         /// via call_indirect) works correctly.
         @Test
         func stepThroughIndirectRecursiveCall() throws {
-            let store = Store(engine: try Engine())
+            let store = Store(engine: Engine())
             let bytes = try wat2wasm(indirectRecursiveCallWAT)
             let module = try parseWasm(bytes: bytes)
             var debugger = try Debugger(module: module, store: store, imports: [:])
@@ -691,7 +691,7 @@
 
         @Test
         func runPreservingFactorialBreakpoint() throws {
-            let store = Store(engine: try Engine())
+            let store = Store(engine: Engine())
             let bytes = try wat2wasm(factorialWAT)
             let module = try parseWasm(bytes: bytes)
             var debugger = try Debugger(module: module, store: store, imports: [:])
@@ -727,7 +727,7 @@
         /// breakpoint on each iteration. The loop runs 3 iterations ($i: 3->2->1->0).
         @Test
         func runPreservingBrIfBreakpoint() throws {
-            let store = Store(engine: try Engine())
+            let store = Store(engine: Engine())
             let bytes = try wat2wasm(loopWAT)
             let module = try parseWasm(bytes: bytes)
             var debugger = try Debugger(module: module, store: store, imports: [:])
@@ -757,7 +757,7 @@
         /// at 2, the br breakpoint is hit once, then br_if $break exits the loop.
         @Test
         func runPreservingBrBreakpoint() throws {
-            let store = Store(engine: try Engine())
+            let store = Store(engine: Engine())
             let bytes = try wat2wasm(brLoopWAT)
             let module = try parseWasm(bytes: bytes)
             var debugger = try Debugger(module: module, store: store, imports: [:])
@@ -780,7 +780,7 @@
         /// First hit: $i=1 (default -> $continue). Second hit: $i=0 (target[0] -> $break).
         @Test
         func runPreservingBrTableBreakpoint() throws {
-            let store = Store(engine: try Engine())
+            let store = Store(engine: Engine())
             let bytes = try wat2wasm(brTableLoopWAT)
             let module = try parseWasm(bytes: bytes)
             var debugger = try Debugger(module: module, store: store, imports: [:])
@@ -806,7 +806,7 @@
         /// on `call $decrement` is re-hit on each of the 3 iterations.
         @Test
         func runPreservingCallBreakpoint() throws {
-            let store = Store(engine: try Engine())
+            let store = Store(engine: Engine())
             let bytes = try wat2wasm(callInLoopWAT)
             let module = try parseWasm(bytes: bytes)
             var debugger = try Debugger(module: module, store: store, imports: [:])
@@ -849,7 +849,7 @@
         /// The breakpoint on `call_indirect` is re-hit on each of the 3 iterations.
         @Test
         func runPreservingCallIndirectInLoopBreakpoint() throws {
-            let store = Store(engine: try Engine())
+            let store = Store(engine: Engine())
             let bytes = try wat2wasm(callIndirectInLoopWAT)
             let module = try parseWasm(bytes: bytes)
             var debugger = try Debugger(module: module, store: store, imports: [:])
@@ -895,7 +895,7 @@
         /// base case and returns.
         @Test
         func runPreservingRecursiveCallBreakpoint() throws {
-            let store = Store(engine: try Engine())
+            let store = Store(engine: Engine())
             let bytes = try wat2wasm(recursiveCallWAT)
             let module = try parseWasm(bytes: bytes)
             var debugger = try Debugger(module: module, store: store, imports: [:])
@@ -936,7 +936,7 @@
         /// function. The breakpoint is re-hit for each recursive invocation through the table.
         @Test
         func runPreservingRecursiveCallIndirectBreakpoint() throws {
-            let store = Store(engine: try Engine())
+            let store = Store(engine: Engine())
             let bytes = try wat2wasm(recursiveCallIndirectSelfWAT)
             let module = try parseWasm(bytes: bytes)
             var debugger = try Debugger(module: module, store: store, imports: [:])
@@ -981,7 +981,7 @@
         @Test
         func runPreservingRecursiveReturnCallBreakpoint() throws {
             let features: WasmFeatureSet = [.tailCall]
-            let store = Store(engine: try Engine())
+            let store = Store(engine: Engine())
             let bytes = try wat2wasm(returnCallRecursiveWAT, features: features)
             let module = try parseWasm(bytes: bytes, features: features)
             var debugger = try Debugger(module: module, store: store, imports: [:])
@@ -1015,7 +1015,7 @@
         /// verify both are hit on every loop iteration via `runPreservingCurrentBreakpoint`.
         @Test
         func counterDemoTwoBreakpointsAllIterations() throws {
-            let store = Store(engine: try Engine())
+            let store = Store(engine: Engine())
             let bytes = try wat2wasm(counterDemoWAT)
             let module = try parseWasm(bytes: bytes)
             var debugger = try Debugger(module: module, store: store, imports: [:])
@@ -1070,7 +1070,7 @@
         /// from the if-body breakpoint.
         @Test
         func counterDemoBreakpointInsideIfBody() throws {
-            let store = Store(engine: try Engine())
+            let store = Store(engine: Engine())
             let bytes = try wat2wasm(counterDemoWAT)
             let module = try parseWasm(bytes: bytes)
             var debugger = try Debugger(module: module, store: store, imports: [:])
@@ -1125,7 +1125,7 @@
         /// then calling `step()` should work.
         @Test
         func stepAfterBreakpointRemovedAtCurrentPc() throws {
-            let store = Store(engine: try Engine())
+            let store = Store(engine: Engine())
             let bytes = try wat2wasm(trivialModuleWAT)
             let module = try parseWasm(bytes: bytes)
             var debugger = try Debugger(module: module, store: store, imports: [:])
@@ -1144,7 +1144,7 @@
         /// exact scenario: stop at `_start`, then step).
         @Test
         func stepFromFactorialEntrypoint() throws {
-            let store = Store(engine: try Engine())
+            let store = Store(engine: Engine())
             let bytes = try wat2wasm(factorialWAT)
             let module = try parseWasm(bytes: bytes)
             var debugger = try Debugger(module: module, store: store, imports: [:])
@@ -1169,7 +1169,7 @@
         /// at a breakpoint via "continue", then switches to "step" mode.
         @Test
         func stepAfterRunPreservingBreakpoint() throws {
-            let store = Store(engine: try Engine())
+            let store = Store(engine: Engine())
             let bytes = try wat2wasm(factorialWAT)
             let module = try parseWasm(bytes: bytes)
             var debugger = try Debugger(module: module, store: store, imports: [:])
@@ -1203,7 +1203,7 @@
         /// This simulates lldb-dap re-syncing breakpoints (remove all, re-add active ones).
         @Test
         func breakpointRemovedAndReaddedWhileStopped() throws {
-            let store = Store(engine: try Engine())
+            let store = Store(engine: Engine())
             let bytes = try wat2wasm(factorialWAT)
             let module = try parseWasm(bytes: bytes)
             var debugger = try Debugger(module: module, store: store, imports: [:])

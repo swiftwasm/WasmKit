@@ -24,7 +24,7 @@
                         )
                     )
                     """))
-            let engine = try Engine(configuration: .init(memoryBoundsChecking: mode))
+            let engine = Engine(configuration: .init(memoryBoundsChecking: mode))
             let store = Store(engine: engine)
             let instance = try module.instantiate(store: store)
             let oob = try #require(instance.exports[function: "oob"])
@@ -43,7 +43,7 @@
                         )
                     )
                     """))
-            let engine = try Engine(configuration: .init(memoryBoundsChecking: .mprotect))
+            let engine = Engine(configuration: .init(memoryBoundsChecking: .mprotect))
             let store = Store(engine: engine)
             let instance = try module.instantiate(store: store)
             let storeAt = try #require(instance.exports[function: "store_at"])
@@ -63,7 +63,7 @@
 
             // With mprotect
             do {
-                let engine = try Engine(configuration: .init(memoryBoundsChecking: .mprotect))
+                let engine = Engine(configuration: .init(memoryBoundsChecking: .mprotect))
                 let store = Store(engine: engine)
                 let module = try parseWasm(bytes: wat2wasm(wat))
                 let instance = try module.instantiate(store: store)
@@ -74,7 +74,7 @@
 
             // With software
             do {
-                let engine = try Engine(configuration: .init(memoryBoundsChecking: .software))
+                let engine = Engine(configuration: .init(memoryBoundsChecking: .software))
                 let store = Store(engine: engine)
                 let module = try parseWasm(bytes: wat2wasm(wat))
                 let instance = try module.instantiate(store: store)
@@ -99,7 +99,7 @@
                         )
                     )
                     """))
-            let engine = try Engine(configuration: .init(memoryBoundsChecking: .mprotect))
+            let engine = Engine(configuration: .init(memoryBoundsChecking: .mprotect))
             let store = Store(engine: engine)
             let instance = try module.instantiate(store: store)
             let storeAt = try #require(instance.exports[function: "store_at"])
@@ -131,7 +131,7 @@
                         )
                     )
                     """))
-            let engine = try Engine(configuration: .init(memoryBoundsChecking: .mprotect))
+            let engine = Engine(configuration: .init(memoryBoundsChecking: .mprotect))
             let store = Store(engine: engine)
             let instance = try module.instantiate(store: store)
             let oob = try #require(instance.exports[function: "oob"])
@@ -170,7 +170,7 @@
                         )
                     )
                     """))
-            let engine = try Engine(configuration: .init(memoryBoundsChecking: .mprotect))
+            let engine = Engine(configuration: .init(memoryBoundsChecking: .mprotect))
             let store = Store(engine: engine)
 
             var instance: Instance?
@@ -211,7 +211,7 @@
                         )
                     )
                     """))
-            let engine = try Engine(configuration: .init(memoryBoundsChecking: .mprotect))
+            let engine = Engine(configuration: .init(memoryBoundsChecking: .mprotect))
             let store = Store(engine: engine)
 
             let calleeInstance = try calleeModule.instantiate(store: store)
@@ -236,7 +236,7 @@
                         )
                     )
                     """))
-            let engine = try Engine(configuration: .init(memoryBoundsChecking: .mprotect))
+            let engine = Engine(configuration: .init(memoryBoundsChecking: .mprotect))
             let store = Store(engine: engine)
             let instance = try module.instantiate(store: store)
             let loadI64 = try #require(instance.exports[function: "load_i64"])
@@ -264,7 +264,7 @@
                         )
                     )
                     """))
-            let engine = try Engine(configuration: .init(memoryBoundsChecking: .mprotect))
+            let engine = Engine(configuration: .init(memoryBoundsChecking: .mprotect))
             let store = Store(engine: engine)
             let instance = try module.instantiate(store: store)
             let bigOffset = try #require(instance.exports[function: "big_offset"])

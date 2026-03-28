@@ -355,13 +355,6 @@ func executeWasm(
 }
 
 extension Execution {
-    #if os(macOS) || os(Linux)
-        @inline(__always)
-        func shouldUseMprotectTrapGuards() -> Bool {
-            return store.value.engine.configuration.memoryBoundsChecking != .software
-        }
-    #endif
-
     #if WasmDebuggingSupport
 
         /// Counterpart to the free `executeWasm` function but implemented as a method of `Execution`,
@@ -414,9 +407,7 @@ extension Execution {
         static func assign(md: inout Md, ms: inout Ms, memory: inout MemoryEntity) {
             md = memory.baseAddress
             ms = memory.byteCount
-            #if os(macOS) || os(Linux)
-                wasmkit_trap_guard_set_current_memory(md, memory.trapGuardReservationSize)
-            #endif
+            wasmkit_trap_guard_set_current_memory(md, memory.trapGuardReservationSize)
         }
 
         /// Assigns the current memory to nil.
@@ -424,9 +415,7 @@ extension Execution {
         private static func assignNil(md: inout Md, ms: inout Ms) {
             md = nil
             ms = 0
-            #if os(macOS) || os(Linux)
-                wasmkit_trap_guard_set_current_memory(md, 0)
-            #endif
+            wasmkit_trap_guard_set_current_memory(md, 0)
         }
 
         /// Updates the current memory if the instance has changed.
@@ -502,34 +491,28 @@ extension Execution {
         #else
             var pc = pc
             let handler = pc.read(wasmkit_tc_exec.self)
-            #if os(macOS) || os(Linux)
-                let storeValue = store.value
-                let shouldUseMprotectTrapGuards = self.shouldUseMprotectTrapGuards()
-            #endif
+            let storeValue = store.value
+            let shouldUseMprotectTrapGuards = store.value.engine.configuration.memoryBoundsChecking == .mprotect
             try withUnsafeMutablePointer(to: &self) { execution in
-                #if os(macOS) || os(Linux)
-                    if shouldUseMprotectTrapGuards {
-                        let trapKind: Int32 = {
-                            let statePtr = UnsafeMutableRawPointer(execution)
-                            var context = WasmKitDirectThreadedTrapGuardContext(
-                                exec: handler,
-                                sp: sp,
-                                pc: pc,
-                                md: md,
-                                ms: ms,
-                                state: statePtr
-                            )
-                            return wasmkit_trap_guard_run(wasmkit_direct_threaded_trap_guard_entry, &context)
-                        }()
-                        if trapKind != 0 {
-                            throw Trap(.memoryOutOfBounds).withBacktrace(Self.captureBacktrace(sp: sp, store: storeValue))
-                        }
-                    } else {
-                        wasmkit_tc_start(handler, sp, pc, md, ms, execution)
+                if shouldUseMprotectTrapGuards {
+                    let trapped: Bool = {
+                        let statePtr = UnsafeMutableRawPointer(execution)
+                        var context = WasmKitDirectThreadedTrapGuardContext(
+                            exec: handler,
+                            sp: sp,
+                            pc: pc,
+                            md: md,
+                            ms: ms,
+                            state: statePtr
+                        )
+                        return wasmkit_trap_guard_run(wasmkit_direct_threaded_trap_guard_entry, &context)
+                    }()
+                    if trapped {
+                        throw Trap(.memoryOutOfBounds).withBacktrace(Self.captureBacktrace(sp: sp, store: storeValue))
                     }
-                #else
+                } else {
                     wasmkit_tc_start(handler, sp, pc, md, ms, execution)
-                #endif
+                }
             }
             if let (rawError, trappingSp) = self.trap {
                 let error = unsafeBitCast(rawError, to: Error.self)
@@ -613,43 +596,6 @@ extension Execution {
     /// Be careful when modifying this function as it is performance-critical.
     @inline(__always)
     mutating func runTokenThreaded(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
-        #if os(macOS) || os(Linux)
-            if shouldUseMprotectTrapGuards() {
-                let storeValue = store.value
-                try withUnsafeMutablePointer(to: &self) { execution in
-                    try withUnsafeMutablePointer(to: &sp) { spPtr in
-                        try withUnsafeMutablePointer(to: &pc) { pcPtr in
-                            try withUnsafeMutablePointer(to: &md) { mdPtr in
-                                try withUnsafeMutablePointer(to: &ms) { msPtr in
-                                    let box = WasmKitTokenThreadedTrapGuardBox(
-                                        execution: execution,
-                                        sp: spPtr,
-                                        pc: pcPtr,
-                                        md: mdPtr,
-                                        ms: msPtr
-                                    )
-                                    let rawBox = Unmanaged.passUnretained(box).toOpaque()
-                                    let trapKind = wasmkit_trap_guard_run(wasmkit_token_threaded_trap_guard_entry, rawBox)
-                                    if trapKind != 0 {
-                                        let trappingSp = spPtr.pointee
-                                        throw Trap(.memoryOutOfBounds).withBacktrace(Self.captureBacktrace(sp: trappingSp, store: storeValue))
-                                    }
-                                    if let error = box.thrownError {
-                                        throw error
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                return
-            }
-        #endif
-        try runTokenThreadedImpl(sp: &sp, pc: &pc, md: &md, ms: &ms)
-    }
-
-    @inline(__always)
-    mutating func runTokenThreadedImpl(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
         #if EngineStats
             var stats = StatsCollector()
             defer { stats.dump() }

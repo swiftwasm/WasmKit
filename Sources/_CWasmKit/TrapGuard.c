@@ -105,7 +105,7 @@ static void wasmkit_install_signal_handlers_once(void) {
 #endif
 }
 
-int wasmkit_trap_guard_run(wasmkit_trap_guard_fn fn, void *ctx) {
+bool wasmkit_trap_guard_run(wasmkit_trap_guard_fn fn, void *ctx) {
   pthread_once(&wasmkit_install_once, wasmkit_install_signal_handlers_once);
 
   wasmkit_trap_guard_t guard;
@@ -118,11 +118,11 @@ int wasmkit_trap_guard_run(wasmkit_trap_guard_fn fn, void *ctx) {
   if (jmp == 0) {
     fn(ctx);
     wasmkit_current_trap_guard = previous_guard;
-    return 0;
+    return false;
   }
 
   wasmkit_current_trap_guard = previous_guard;
-  return 1;
+  return true;
 }
 
 void wasmkit_trap_guard_set_current_memory(void *md, size_t reservation_size) {
@@ -135,9 +135,9 @@ void wasmkit_trap_guard_set_current_memory(void *md, size_t reservation_size) {
 
 #else
 
-int wasmkit_trap_guard_run(wasmkit_trap_guard_fn fn, void *ctx) {
+bool wasmkit_trap_guard_run(wasmkit_trap_guard_fn fn, void *ctx) {
   fn(ctx);
-  return 0;
+  return false;
 }
 
 void wasmkit_trap_guard_set_current_memory(void *md, size_t reservation_size) {
