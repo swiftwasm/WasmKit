@@ -40,4 +40,3 @@ void wasmkit_trap_guard_set_current_memory(void *_Nullable md, size_t reservatio
 #endif
 
 #endif // WASMKIT_TRAP_GUARD_H
-

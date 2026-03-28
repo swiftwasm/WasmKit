@@ -25,28 +25,40 @@ static bool wasmkit_has_prev_segv = false;
 static bool wasmkit_has_prev_bus = false;
 static pthread_once_t wasmkit_install_once = PTHREAD_ONCE_INIT;
 
+static void wasmkit_restore_and_reraise(const struct sigaction *prev, int sig) {
+  if (prev) {
+    sigaction(sig, prev, NULL);
+  }
+  kill(getpid(), sig);
+  // Preserve the conventional shell exit status for signal termination.
+  _exit(128 + sig);
+}
+
 static void wasmkit_chain_signal(const struct sigaction *prev, int sig,
                                  siginfo_t *info, void *ucontext) {
   if (!prev) {
-    _exit(128 + sig);
+    wasmkit_restore_and_reraise(NULL, sig);
   }
 
   if (prev->sa_flags & SA_SIGINFO) {
     if (prev->sa_sigaction) {
       prev->sa_sigaction(sig, info, ucontext);
-      _exit(128 + sig);
+      return;
     }
   } else {
     if (prev->sa_handler == SIG_IGN) {
-      _exit(128 + sig);
+      return;
     }
-    if (prev->sa_handler && prev->sa_handler != SIG_DFL) {
+    if (prev->sa_handler == SIG_DFL) {
+      wasmkit_restore_and_reraise(prev, sig);
+    }
+    if (prev->sa_handler) {
       prev->sa_handler(sig);
-      _exit(128 + sig);
+      return;
     }
   }
 
-  _exit(128 + sig);
+  wasmkit_restore_and_reraise(prev, sig);
 }
 
 static void wasmkit_signal_handler(int sig, siginfo_t *info, void *ucontext) {
@@ -61,13 +73,16 @@ static void wasmkit_signal_handler(int sig, siginfo_t *info, void *ucontext) {
 
   if (sig == SIGSEGV && wasmkit_has_prev_segv) {
     wasmkit_chain_signal(&wasmkit_prev_segv, sig, info, ucontext);
+    return;
   }
 #ifdef SIGBUS
   if (sig == SIGBUS && wasmkit_has_prev_bus) {
     wasmkit_chain_signal(&wasmkit_prev_bus, sig, info, ucontext);
+    return;
   }
 #endif
 
+  // Preserve the conventional shell exit status for signal termination.
   _exit(128 + sig);
 }
 

@@ -1,12 +1,14 @@
 #if os(macOS) || os(Linux)
 
+    import CWasmKitTestSupport
     import Testing
     @testable import WasmKit
     import WAT
 
+    private let previousSignalHandlerExitCode: Int32 = 99
+
     @Suite
     struct MprotectBoundsCheckingTests {
-
         @Test(arguments: [
             EngineConfiguration.MemoryBoundsChecking.mprotect,
             EngineConfiguration.MemoryBoundsChecking.software,
@@ -137,6 +139,16 @@
             // 1000 repeated OOB traps — surfaces resource leaks from siglongjmp if any
             for _ in 0..<1000 {
                 #expect(throws: Trap.self) { try oob() }
+            }
+        }
+
+        @Test
+        func preservesPreviousSignalHandlerOutsideGuardRanges() async {
+            await #expect(processExitsWith: .exitCode(previousSignalHandlerExitCode)) {
+                if wasmkit_test_signal_handler_chains_to_previous_handler() == 1 {
+                    wasmkit_test_exit_with_code(previousSignalHandlerExitCode)
+                }
+                wasmkit_test_exit_with_code(3)
             }
         }
 
