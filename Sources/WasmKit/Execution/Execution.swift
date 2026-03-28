@@ -357,11 +357,8 @@ func executeWasm(
 extension Execution {
     #if os(macOS) || os(Linux)
         @inline(__always)
-        func shouldUseMprotectTrapGuards(sp: Sp) -> Bool {
-            guard store.value.engine.configuration.memoryBoundsChecking != .software else { return false }
-            guard let instance = sp.currentInstance else { return false }
-            guard let memory = instance.memories.first else { return false }
-            return memory.withValue { $0.trapGuardReservationSize > 0 }
+        func shouldUseMprotectTrapGuards() -> Bool {
+            return store.value.engine.configuration.memoryBoundsChecking != .software
         }
     #endif
 
@@ -507,7 +504,7 @@ extension Execution {
             let handler = pc.read(wasmkit_tc_exec.self)
             #if os(macOS) || os(Linux)
                 let storeValue = store.value
-                let shouldUseMprotectTrapGuards = self.shouldUseMprotectTrapGuards(sp: sp)
+                let shouldUseMprotectTrapGuards = self.shouldUseMprotectTrapGuards()
             #endif
             try withUnsafeMutablePointer(to: &self) { execution in
                 #if os(macOS) || os(Linux)
@@ -617,7 +614,7 @@ extension Execution {
     @inline(__always)
     mutating func runTokenThreaded(sp: inout Sp, pc: inout Pc, md: inout Md, ms: inout Ms) throws {
         #if os(macOS) || os(Linux)
-            if shouldUseMprotectTrapGuards(sp: sp) {
+            if shouldUseMprotectTrapGuards() {
                 let storeValue = store.value
                 try withUnsafeMutablePointer(to: &self) { execution in
                     try withUnsafeMutablePointer(to: &sp) { spPtr in

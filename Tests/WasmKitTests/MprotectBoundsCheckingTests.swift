@@ -178,6 +178,41 @@
         }
 
         @Test
+        func crossInstanceCallFromMemorylessEntryStillInstallsTrapGuard() throws {
+            let calleeModule = try parseWasm(
+                bytes: wat2wasm(
+                    """
+                    (module
+                        (memory 1)
+                        (func (export "oob")
+                            (drop (i32.load (i32.const 0x10000)))
+                        )
+                    )
+                    """))
+            let callerModule = try parseWasm(
+                bytes: wat2wasm(
+                    """
+                    (module
+                        (import "env" "oob" (func $oob))
+                        (func (export "start")
+                            (call $oob)
+                        )
+                    )
+                    """))
+            let engine = try Engine(configuration: .init(memoryBoundsChecking: .mprotect))
+            let store = Store(engine: engine)
+
+            let calleeInstance = try calleeModule.instantiate(store: store)
+            let importedOob = try #require(calleeInstance.exports[function: "oob"])
+            let callerInstance = try callerModule.instantiate(store: store, imports: [
+                "env": ["oob": importedOob]
+            ])
+
+            let start = try #require(callerInstance.exports[function: "start"])
+            #expect(throws: Trap.self) { try start() }
+        }
+
+        @Test
         func i64LoadAtPageBoundary() throws {
             let module = try parseWasm(
                 bytes: wat2wasm(
