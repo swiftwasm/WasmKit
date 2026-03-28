@@ -73,7 +73,7 @@ let package = Package(
             path: "Tests/CWasmKitTestSupport",
             publicHeadersPath: "include",
             cSettings: [
-                .headerSearchPath("../../Sources/_CWasmKit/include"),
+                .headerSearchPath("../../Sources/_CWasmKit/include")
             ]
         ),
         .testTarget(

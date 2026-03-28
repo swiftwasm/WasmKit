@@ -216,9 +216,11 @@
 
             let calleeInstance = try calleeModule.instantiate(store: store)
             let importedOob = try #require(calleeInstance.exports[function: "oob"])
-            let callerInstance = try callerModule.instantiate(store: store, imports: [
-                "env": ["oob": importedOob]
-            ])
+            let callerInstance = try callerModule.instantiate(
+                store: store,
+                imports: [
+                    "env": ["oob": importedOob]
+                ])
 
             let start = try #require(callerInstance.exports[function: "start"])
             #expect(throws: Trap.self) { try start() }
