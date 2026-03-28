@@ -145,15 +145,15 @@
         // Exit tests require Swift 6.2 or later
         // https://github.com/swiftlang/swift-evolution/blob/main/proposals/testing/0008-exit-tests.md
         #if compiler(>=6.2)
-        @Test
-        func preservesPreviousSignalHandlerOutsideGuardRanges() async {
-            await #expect(processExitsWith: .exitCode(previousSignalHandlerExitCode)) {
-                if wasmkit_test_signal_handler_chains_to_previous_handler() == 1 {
-                    wasmkit_test_exit_with_code(previousSignalHandlerExitCode)
+            @Test
+            func preservesPreviousSignalHandlerOutsideGuardRanges() async {
+                await #expect(processExitsWith: .exitCode(previousSignalHandlerExitCode)) {
+                    if wasmkit_test_signal_handler_chains_to_previous_handler() == 1 {
+                        wasmkit_test_exit_with_code(previousSignalHandlerExitCode)
+                    }
+                    wasmkit_test_exit_with_code(3)
                 }
-                wasmkit_test_exit_with_code(3)
             }
-        }
         #endif
 
         @Test
