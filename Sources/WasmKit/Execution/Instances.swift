@@ -468,9 +468,9 @@ struct MemoryEntity: ~Copyable {
     private struct MallocStorage {
         var buffer: UnsafeMutableBufferPointer<UInt8>
 
-        init(byteCount: Int) {
-            buffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: byteCount)
-            if byteCount > 0 { buffer.initialize(repeating: 0) }
+        init(byteSize: Int, isMemory64: Bool, engineConfiguration: EngineConfiguration) {
+            buffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: byteSize)
+            if byteSize > 0 { buffer.initialize(repeating: 0) }
         }
 
         var data: UnsafeBufferPointer<UInt8> {
@@ -506,6 +506,22 @@ struct MemoryEntity: ~Copyable {
         private enum Storage {
             case mprotect(MprotectLinearMemory)
             case malloc(MallocStorage)
+
+            init(byteSize: Int, isMemory64: Bool, engineConfiguration: EngineConfiguration) {
+                if !isMemory64, engineConfiguration.memoryBoundsChecking == .mprotect {
+                    let reservationSize = MprotectLinearMemory.wasm32ReservationSize(offsetGuardSize: engineConfiguration.memoryOffsetGuardSize)
+                    do {
+                        self = .mprotect(try MprotectLinearMemory(committedSize: byteSize, reservationSize: reservationSize))
+                    } catch {
+                        // Fall back to malloc if mprotect fails for some reasons (e.g. vm.max_map_count exhaustion on Linux)
+                        let storage = MallocStorage(byteSize: byteSize, isMemory64: isMemory64, engineConfiguration: engineConfiguration)
+                        self = .malloc(storage)
+                    }
+                } else {
+                    let storage = MallocStorage(byteSize: byteSize, isMemory64: isMemory64, engineConfiguration: engineConfiguration)
+                    self = .malloc(storage)
+                }
+            }
 
             var data: UnsafeBufferPointer<UInt8> {
                 switch self {
@@ -576,19 +592,7 @@ struct MemoryEntity: ~Copyable {
         guard try resourceLimiter.limitMemoryGrowth(to: byteSize) else {
             throw Trap(.initialMemorySizeExceedsLimit(byteSize: byteSize))
         }
-        if !memoryType.isMemory64, engineConfiguration.memoryBoundsChecking == .mprotect {
-            let reservationSize = MprotectLinearMemory.wasm32ReservationSize(offsetGuardSize: engineConfiguration.memoryOffsetGuardSize)
-            do {
-                storage = .mprotect(try MprotectLinearMemory(committedSize: byteSize, reservationSize: reservationSize))
-            } catch {
-                // Fall back to malloc if mprotect fails for some reasons (e.g. vm.max_map_count exhaustion on Linux)
-                let storage = MallocStorage(byteCount: byteSize)
-                self.storage = .malloc(storage)
-            }
-        } else {
-            let storage = MallocStorage(byteCount: byteSize)
-            self.storage = .malloc(storage)
-        }
+        self.storage = Storage(byteSize: byteSize, isMemory64: memoryType.isMemory64, engineConfiguration: engineConfiguration)
         let defaultMaxPageCount = Self.maxPageCount(isMemory64: memoryType.isMemory64)
         maxPageCount = memoryType.max ?? defaultMaxPageCount
         limit = memoryType
