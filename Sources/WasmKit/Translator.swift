@@ -1986,52 +1986,17 @@ struct InstructionTranslator: InstructionVisitor {
         }
     }
 
-    /// Whether the given memory access can use the unchecked (mprotect-guarded) path.
-    ///
-    /// The trap guard tracks a single linear memory per thread, so unchecked access is
-    /// restricted to memory index 0. If multi-memory support is added in the future, each
-    /// memory would need its own guard registration (md/reservation pair) and the signal
-    /// handler would need to check all registered ranges.
-    private func canUseUncheckedMprotectMemoryAccess(isMemory64: Bool, memargOffset: UInt64, accessSize: Int) -> Bool {
-        guard engineConfiguration.memoryBoundsChecking == .mprotect else { return false }
-        guard accessSize > 0 else { return false }
-        guard engineConfiguration.memoryOffsetGuardSize >= accessSize else { return false }
-        guard memargOffset <= UInt64(engineConfiguration.memoryOffsetGuardSize - accessSize) else { return false }
-        guard isMemory64 == false else { return false }
-        guard let memory = module.memories.first else { return false }
-        return memory.withValue { $0.trapGuardReservationSize > 0 }
-    }
-
     mutating func visitLoad(_ load: WasmParser.Instruction.Load, memarg: MemArg) throws {
-        let isMemory64 = try module.isMemory64(memoryIndex: 0)
         let instruction: (Instruction.LoadOperand) -> Instruction
-        let useUnchecked: Bool
         switch load {
-        case .i32Load, .f32Load:
-            useUnchecked = canUseUncheckedMprotectMemoryAccess(isMemory64: isMemory64, memargOffset: memarg.offset, accessSize: 4)
-        case .i64Load, .f64Load:
-            useUnchecked = canUseUncheckedMprotectMemoryAccess(isMemory64: isMemory64, memargOffset: memarg.offset, accessSize: 8)
-        case .i32Load8S, .i32Load8U, .i64Load8S, .i64Load8U:
-            useUnchecked = canUseUncheckedMprotectMemoryAccess(isMemory64: isMemory64, memargOffset: memarg.offset, accessSize: 1)
-        case .i32Load16S, .i32Load16U, .i64Load16S, .i64Load16U:
-            useUnchecked = canUseUncheckedMprotectMemoryAccess(isMemory64: isMemory64, memargOffset: memarg.offset, accessSize: 2)
-        case .i64Load32S, .i64Load32U:
-            useUnchecked = canUseUncheckedMprotectMemoryAccess(isMemory64: isMemory64, memargOffset: memarg.offset, accessSize: 4)
-        default:
-            useUnchecked = false
-        }
-        switch load {
-        case .i32Load:
-            if useUnchecked { instruction = Instruction.i32LoadUnchecked } else { instruction = Instruction.i32Load }
-        case .i64Load:
-            if useUnchecked { instruction = Instruction.i64LoadUnchecked } else { instruction = Instruction.i64Load }
-        case .f32Load:
-            if useUnchecked { instruction = Instruction.f32LoadUnchecked } else { instruction = Instruction.f32Load }
-        case .f64Load:
-            if useUnchecked { instruction = Instruction.f64LoadUnchecked } else { instruction = Instruction.f64Load }
+        case .i32Load: instruction = Instruction.i32Load
+        case .i64Load: instruction = Instruction.i64Load
+        case .f32Load: instruction = Instruction.f32Load
+        case .f64Load: instruction = Instruction.f64Load
         case .v128Load, .v128Load8X8S, .v128Load8X8U, .v128Load16X4S, .v128Load16X4U,
             .v128Load32X2S, .v128Load32X2U, .v128Load8Splat, .v128Load16Splat, .v128Load32Splat,
             .v128Load64Splat, .v128Load32Zero, .v128Load64Zero:
+            let isMemory64 = try module.isMemory64(memoryIndex: 0)
             try validator.validateMemArg(memarg, naturalAlignment: load.naturalAlignment)
             guard let opcode = SIMDOpcode.fromLoad(load) else { preconditionFailure("missing SIMDOpcode mapping: \(load)") }
             try popPushEmit(.address(isMemory64: isMemory64), .v128) { pointer, result in
@@ -2048,26 +2013,16 @@ struct InstructionTranslator: InstructionVisitor {
                     ))
             }
             return
-        case .i32Load8S:
-            if useUnchecked { instruction = Instruction.i32Load8SUnchecked } else { instruction = Instruction.i32Load8S }
-        case .i32Load8U:
-            if useUnchecked { instruction = Instruction.i32Load8UUnchecked } else { instruction = Instruction.i32Load8U }
-        case .i32Load16S:
-            if useUnchecked { instruction = Instruction.i32Load16SUnchecked } else { instruction = Instruction.i32Load16S }
-        case .i32Load16U:
-            if useUnchecked { instruction = Instruction.i32Load16UUnchecked } else { instruction = Instruction.i32Load16U }
-        case .i64Load8S:
-            if useUnchecked { instruction = Instruction.i64Load8SUnchecked } else { instruction = Instruction.i64Load8S }
-        case .i64Load8U:
-            if useUnchecked { instruction = Instruction.i64Load8UUnchecked } else { instruction = Instruction.i64Load8U }
-        case .i64Load16S:
-            if useUnchecked { instruction = Instruction.i64Load16SUnchecked } else { instruction = Instruction.i64Load16S }
-        case .i64Load16U:
-            if useUnchecked { instruction = Instruction.i64Load16UUnchecked } else { instruction = Instruction.i64Load16U }
-        case .i64Load32S:
-            if useUnchecked { instruction = Instruction.i64Load32SUnchecked } else { instruction = Instruction.i64Load32S }
-        case .i64Load32U:
-            if useUnchecked { instruction = Instruction.i64Load32UUnchecked } else { instruction = Instruction.i64Load32U }
+        case .i32Load8S: instruction = Instruction.i32Load8S
+        case .i32Load8U: instruction = Instruction.i32Load8U
+        case .i32Load16S: instruction = Instruction.i32Load16S
+        case .i32Load16U: instruction = Instruction.i32Load16U
+        case .i64Load8S: instruction = Instruction.i64Load8S
+        case .i64Load8U: instruction = Instruction.i64Load8U
+        case .i64Load16S: instruction = Instruction.i64Load16S
+        case .i64Load16U: instruction = Instruction.i64Load16U
+        case .i64Load32S: instruction = Instruction.i64Load32S
+        case .i64Load32U: instruction = Instruction.i64Load32U
         case .i32AtomicLoad: instruction = Instruction.i32AtomicLoad
         case .i64AtomicLoad: instruction = Instruction.i64AtomicLoad
         case .i32AtomicLoad8U: instruction = Instruction.i32AtomicLoad8U
@@ -2081,33 +2036,14 @@ struct InstructionTranslator: InstructionVisitor {
     }
 
     mutating func visitStore(_ store: WasmParser.Instruction.Store, memarg: MemArg) throws {
-        let isMemory64 = try module.isMemory64(memoryIndex: 0)
         let instruction: (Instruction.StoreOperand) -> Instruction
-        let useUnchecked: Bool
         switch store {
-        case .i32Store, .f32Store:
-            useUnchecked = canUseUncheckedMprotectMemoryAccess(isMemory64: isMemory64, memargOffset: memarg.offset, accessSize: 4)
-        case .i64Store, .f64Store:
-            useUnchecked = canUseUncheckedMprotectMemoryAccess(isMemory64: isMemory64, memargOffset: memarg.offset, accessSize: 8)
-        case .i32Store8, .i64Store8:
-            useUnchecked = canUseUncheckedMprotectMemoryAccess(isMemory64: isMemory64, memargOffset: memarg.offset, accessSize: 1)
-        case .i32Store16, .i64Store16:
-            useUnchecked = canUseUncheckedMprotectMemoryAccess(isMemory64: isMemory64, memargOffset: memarg.offset, accessSize: 2)
-        case .i64Store32:
-            useUnchecked = canUseUncheckedMprotectMemoryAccess(isMemory64: isMemory64, memargOffset: memarg.offset, accessSize: 4)
-        default:
-            useUnchecked = false
-        }
-        switch store {
-        case .i32Store:
-            if useUnchecked { instruction = Instruction.i32StoreUnchecked } else { instruction = Instruction.i32Store }
-        case .i64Store:
-            if useUnchecked { instruction = Instruction.i64StoreUnchecked } else { instruction = Instruction.i64Store }
-        case .f32Store:
-            if useUnchecked { instruction = Instruction.f32StoreUnchecked } else { instruction = Instruction.f32Store }
-        case .f64Store:
-            if useUnchecked { instruction = Instruction.f64StoreUnchecked } else { instruction = Instruction.f64Store }
+        case .i32Store: instruction = Instruction.i32Store
+        case .i64Store: instruction = Instruction.i64Store
+        case .f32Store: instruction = Instruction.f32Store
+        case .f64Store: instruction = Instruction.f64Store
         case .v128Store:
+            let isMemory64 = try module.isMemory64(memoryIndex: 0)
             try validator.validateMemArg(memarg, naturalAlignment: store.naturalAlignment)
             guard let opcode = SIMDOpcode.fromStore(store) else { preconditionFailure("missing SIMDOpcode mapping: \(store)") }
             let value = try popVRegOperand(.v128)
@@ -2127,16 +2063,11 @@ struct InstructionTranslator: InstructionVisitor {
                         )))
             }
             return
-        case .i32Store8:
-            if useUnchecked { instruction = Instruction.i32Store8Unchecked } else { instruction = Instruction.i32Store8 }
-        case .i32Store16:
-            if useUnchecked { instruction = Instruction.i32Store16Unchecked } else { instruction = Instruction.i32Store16 }
-        case .i64Store8:
-            if useUnchecked { instruction = Instruction.i64Store8Unchecked } else { instruction = Instruction.i64Store8 }
-        case .i64Store16:
-            if useUnchecked { instruction = Instruction.i64Store16Unchecked } else { instruction = Instruction.i64Store16 }
-        case .i64Store32:
-            if useUnchecked { instruction = Instruction.i64Store32Unchecked } else { instruction = Instruction.i64Store32 }
+        case .i32Store8: instruction = Instruction.i32Store8
+        case .i32Store16: instruction = Instruction.i32Store16
+        case .i64Store8: instruction = Instruction.i64Store8
+        case .i64Store16: instruction = Instruction.i64Store16
+        case .i64Store32: instruction = Instruction.i64Store32
         case .i32AtomicStore: instruction = Instruction.i32AtomicStore
         case .i64AtomicStore: instruction = Instruction.i64AtomicStore
         case .i32AtomicStore8: instruction = Instruction.i32AtomicStore8

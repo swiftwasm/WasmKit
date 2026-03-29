@@ -138,9 +138,10 @@ public struct EngineConfiguration: Sendable {
     /// example threading model), or otherwise not applicable.
     public var memoryBoundsChecking: MemoryBoundsChecking
 
-    /// The maximum constant `memarg.offset` range (in bytes) for which unchecked
-    /// (mprotect-based) memory loads/stores are allowed.
-    public var memoryOffsetGuardSize: Int
+    /// FIXME: Make it public once we add mprotect-based bounds checking with JIT.
+    /// Extra reserved bytes after the 4 GiB wasm32 address space for future
+    /// unchecked constant-offset accesses in JIT code.
+    internal var memoryOffsetGuardSize: Int = 64 * 1024
 
     /// Initializes a new instance of `EngineConfiguration`.
     ///
@@ -159,14 +160,12 @@ public struct EngineConfiguration: Sendable {
         stackSize: Int? = nil,
         features: WasmFeatureSet = .default,
         memoryBoundsChecking: MemoryBoundsChecking? = nil,
-        memoryOffsetGuardSize: Int = 64 * 1024
     ) {
         self.threadingModel = threadingModel ?? .defaultForCurrentPlatform
         self.compilationMode = compilationMode ?? .lazy
         self.stackSize = stackSize ?? (1 << 19)
         self.features = features
         self.memoryBoundsChecking = memoryBoundsChecking ?? .defaultForCurrentPlatform
-        self.memoryOffsetGuardSize = memoryOffsetGuardSize
     }
 }
 
