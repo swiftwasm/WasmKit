@@ -8,6 +8,8 @@ import struct WasmParser.WasmFeatureSet
 /// WebAssembly code such as interpreting mode, enabled features, etc.
 /// Typically, you will need a single engine instance per application.
 public final class Engine {
+    static let isAddressSanitizerEnabled = wasmkit_address_sanitizer_enabled() == 1
+
     /// The engine configuration.
     public let configuration: EngineConfiguration
     let interceptor: EngineInterceptor?
@@ -18,7 +20,22 @@ public final class Engine {
     /// - Parameters:
     ///   - configuration: The engine configuration.
     ///   - interceptor: An optional runtime interceptor to intercept execution of instructions.
-    public init(configuration: EngineConfiguration = EngineConfiguration(), interceptor: EngineInterceptor? = nil) {
+    public init(
+        configuration: EngineConfiguration = EngineConfiguration(),
+        interceptor: EngineInterceptor? = nil
+    ) {
+        var configuration = configuration
+
+        // If mprotect-based memory bounds checking is unavailable on the current platform,
+        // incompatible with AddressSanitizer, or explicitly requested with token threading,
+        // fall back to software bounds checking.
+        if WASMKIT_MPROTECT_BOUND_CHECKING == 0
+            || Engine.isAddressSanitizerEnabled
+            || (configuration.memoryBoundsChecking == .mprotect && configuration.threadingModel == .token)
+        {
+            configuration.memoryBoundsChecking = .software
+        }
+
         self.configuration = configuration
         self.interceptor = interceptor
         self.funcTypeInterner = Interner()
@@ -94,6 +111,38 @@ public struct EngineConfiguration: Sendable {
     /// The WebAssembly features that can be used by Wasm modules running on this engine.
     public var features: WasmFeatureSet
 
+    /// Linear memory bounds checking strategy.
+    public enum MemoryBoundsChecking: Sendable {
+        /// Request `mprotect` + signal based traps, but fall back to software checks if unavailable.
+        case mprotect
+        /// Always use software bounds checks.
+        case software
+
+        static var canUseMprotectMemoryBoundsChecking: Bool {
+            return WASMKIT_MPROTECT_BOUND_CHECKING == 1
+        }
+
+        static var defaultForCurrentPlatform: MemoryBoundsChecking {
+            if canUseMprotectMemoryBoundsChecking {
+                return .mprotect
+            } else {
+                return .software
+            }
+        }
+    }
+
+    /// Preferred linear memory bounds checking strategy.
+    ///
+    /// This value is advisory: the engine may use a different strategy when the
+    /// requested one is unavailable, incompatible with other configuration (for
+    /// example threading model), or otherwise not applicable.
+    public var memoryBoundsChecking: MemoryBoundsChecking
+
+    /// FIXME: Make it public once we add mprotect-based bounds checking with JIT.
+    /// Extra reserved bytes after the 4 GiB wasm32 address space for future
+    /// unchecked constant-offset accesses in JIT code.
+    internal var memoryOffsetGuardSize: Int = 64 * 1024
+
     /// Initializes a new instance of `EngineConfiguration`.
     ///
     /// - Parameter threadingModel: The threading model to use for the virtual
@@ -109,12 +158,14 @@ public struct EngineConfiguration: Sendable {
         threadingModel: ThreadingModel? = nil,
         compilationMode: CompilationMode? = nil,
         stackSize: Int? = nil,
-        features: WasmFeatureSet = .default
+        features: WasmFeatureSet = .default,
+        memoryBoundsChecking: MemoryBoundsChecking? = nil,
     ) {
         self.threadingModel = threadingModel ?? .defaultForCurrentPlatform
         self.compilationMode = compilationMode ?? .lazy
         self.stackSize = stackSize ?? (1 << 19)
         self.features = features
+        self.memoryBoundsChecking = memoryBoundsChecking ?? .defaultForCurrentPlatform
     }
 }
 

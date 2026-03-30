@@ -355,7 +355,6 @@ func executeWasm(
 }
 
 extension Execution {
-
     #if WasmDebuggingSupport
 
         /// Counterpart to the free `executeWasm` function but implemented as a method of `Execution`,
@@ -408,6 +407,7 @@ extension Execution {
         static func assign(md: inout Md, ms: inout Ms, memory: inout MemoryEntity) {
             md = memory.baseAddress
             ms = memory.byteCount
+            wasmkit_trap_guard_set_current_memory(md, memory.trapGuardReservationSize)
         }
 
         /// Assigns the current memory to nil.
@@ -415,6 +415,7 @@ extension Execution {
         private static func assignNil(md: inout Md, ms: inout Ms) {
             md = nil
             ms = 0
+            wasmkit_trap_guard_set_current_memory(md, 0)
         }
 
         /// Updates the current memory if the instance has changed.
@@ -490,8 +491,28 @@ extension Execution {
         #else
             var pc = pc
             let handler = pc.read(wasmkit_tc_exec.self)
-            withUnsafeMutablePointer(to: &self) { selfPtr in
-                wasmkit_tc_start(handler, sp, pc, md, ms, selfPtr)
+            let storeValue = store.value
+            let shouldUseMprotectTrapGuards = store.value.engine.configuration.memoryBoundsChecking == .mprotect
+            try withUnsafeMutablePointer(to: &self) { execution in
+                if shouldUseMprotectTrapGuards {
+                    let trapped: Bool = {
+                        let statePtr = UnsafeMutableRawPointer(execution)
+                        var context = WasmKitDirectThreadedTrapGuardContext(
+                            exec: handler,
+                            sp: sp,
+                            pc: pc,
+                            md: md,
+                            ms: ms,
+                            state: statePtr
+                        )
+                        return wasmkit_trap_guard_run(wasmkit_direct_threaded_trap_guard_entry, &context)
+                    }()
+                    if trapped {
+                        throw Trap(.memoryOutOfBounds).withBacktrace(Self.captureBacktrace(sp: sp, store: storeValue))
+                    }
+                } else {
+                    wasmkit_tc_start(handler, sp, pc, md, ms, execution)
+                }
             }
             if let (rawError, trappingSp) = self.trap {
                 let error = unsafeBitCast(rawError, to: Error.self)

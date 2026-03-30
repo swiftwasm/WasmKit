@@ -883,6 +883,7 @@ struct InstructionTranslator: InstructionVisitor {
 
     let allocator: ISeqAllocator
     let funcTypeInterner: Interner<FunctionType>
+    let engineConfiguration: EngineConfiguration
     var module: InternalInstance
     private var iseqBuilder: ISeqBuilder
     var controlStack: ControlStack
@@ -920,6 +921,7 @@ struct InstructionTranslator: InstructionVisitor {
     ) throws {
         self.allocator = allocator
         self.funcTypeInterner = funcTypeInterner
+        self.engineConfiguration = engineConfiguration
         self.type = type
         self.module = module
         self.iseqBuilder = ISeqBuilder(engineConfiguration: engineConfiguration)
