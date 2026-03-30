@@ -34,6 +34,9 @@ import struct WasmTypes.FunctionType
 /// }
 /// ```
 public struct Function: Equatable {
+    /// The type of a host function implementation closure.
+    public typealias Implementation = (borrowing Caller, [Value]) throws -> [Value]
+
     internal let handle: InternalFunction
     let store: Store
 
@@ -52,7 +55,7 @@ public struct Function: Equatable {
     public init(
         store: Store,
         parameters: [ValueType], results: [ValueType] = [],
-        body: @escaping (Caller, [Value]) throws -> [Value]
+        body: @escaping Implementation
     ) {
         self.init(store: store, type: FunctionType(parameters: parameters, results: results), body: body)
     }
@@ -66,7 +69,7 @@ public struct Function: Equatable {
     public init(
         store: Store,
         type: FunctionType,
-        body: @escaping (Caller, [Value]) throws -> [Value]
+        body: @escaping Implementation
     ) {
         self.init(handle: store.allocator.allocate(type: type, implementation: body, engine: store.engine), store: store)
     }

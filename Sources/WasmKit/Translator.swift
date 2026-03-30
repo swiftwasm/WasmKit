@@ -884,6 +884,7 @@ struct InstructionTranslator: InstructionVisitor {
 
     let allocator: ISeqAllocator
     let funcTypeInterner: Interner<FunctionType>
+    let engineConfiguration: EngineConfiguration
     var module: InternalInstance
     private var iseqBuilder: ISeqBuilder
     var controlStack: ControlStack
@@ -921,6 +922,7 @@ struct InstructionTranslator: InstructionVisitor {
     ) throws(WasmKitError) {
         self.allocator = allocator
         self.funcTypeInterner = funcTypeInterner
+        self.engineConfiguration = engineConfiguration
         self.type = type
         self.module = module
         self.iseqBuilder = ISeqBuilder(engineConfiguration: engineConfiguration)
@@ -3133,10 +3135,7 @@ struct InstructionTranslator: InstructionVisitor {
     }
 
     mutating func visitAtomicFence() throws(WasmKitError) -> Output {
-        // No-op: In an interpreter, instructions are executed sequentially,
-        // so no reordering can occur. atomic.fence is only meaningful for
-        // compiled code with actual CPU-level reordering.
-        // Do not emit any instruction.
+        emit(.atomicFence)
     }
 }
 

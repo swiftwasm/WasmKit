@@ -38,6 +38,9 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
     let locals: LocalsMap
     let features: WasmFeatureSet
     private var labelStack = LabelStack()
+    /// Collected label names for the name section: (labelIndex, name)
+    private(set) var collectedLabelNames: [(Int, String)] = []
+    private var nextLabelIndex: Int = 0
 
     init(
         type: WatParser.FunctionType,
@@ -510,15 +513,30 @@ struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError 
 
 extension ExpressionParser {
     mutating func visitBlock(wat: inout Wat) throws(WatParserError) -> BlockType {
-        self.labelStack.push(try parser.takeId())
+        let label = try parser.takeId()
+        self.labelStack.push(label)
+        if let label {
+            collectedLabelNames.append((nextLabelIndex, label.value))
+        }
+        nextLabelIndex += 1
         return try blockType(wat: &wat)
     }
     mutating func visitLoop(wat: inout Wat) throws(WatParserError) -> BlockType {
-        self.labelStack.push(try parser.takeId())
+        let label = try parser.takeId()
+        self.labelStack.push(label)
+        if let label {
+            collectedLabelNames.append((nextLabelIndex, label.value))
+        }
+        nextLabelIndex += 1
         return try blockType(wat: &wat)
     }
     mutating func visitIf(wat: inout Wat) throws(WatParserError) -> BlockType {
-        self.labelStack.push(try parser.takeId())
+        let label = try parser.takeId()
+        self.labelStack.push(label)
+        if let label {
+            collectedLabelNames.append((nextLabelIndex, label.value))
+        }
+        nextLabelIndex += 1
         return try blockType(wat: &wat)
     }
     mutating func visitBr(wat: inout Wat) throws(WatParserError) -> UInt32 {

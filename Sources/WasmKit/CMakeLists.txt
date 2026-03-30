@@ -32,6 +32,8 @@ add_wasmkit_library(WasmKit
   Execution/Execution.swift
   Execution/Function.swift
   Execution/Instances.swift
+  Execution/MprotectLinearMemory.swift
+  Execution/MprotectTrapGuard.swift
   Execution/IO.swift
   Execution/NameRegistry.swift
   Execution/Profiler.swift

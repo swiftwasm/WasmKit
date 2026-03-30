@@ -91,27 +91,18 @@ struct IntegrationTests {
         #else
             var tests: [String: Set<String>] = [
                 "WASI Rust tests": [
+                    "overwrite_preopen",
                     "path_link",
                     "dir_fd_op_failures",
-                    "pwrite-with-append",
-                    "poll_oneoff_stdio",
-                    "overwrite_preopen",
                     "path_filestat",
-                    "renumber",
                     "symlink_filestat",
                     "path_open_read_write",
                     "path_open_preopen",
                     "fd_fdstat_set_rights",
                     "file_allocate",
-                    "stdio",
-                    "remove_directory_trailing_slashes",
                     "symlink_create",
-                    "sched_yield",
                 ],
-                "WASI C tests": [
-                    "sock_shutdown-invalid_fd",
-                    "sock_shutdown-not_sock",
-                ],
+                "WASI C tests": [],
             ]
             #if os(Linux)
                 tests["WASI C tests"]?.insert("pwrite-with-append")

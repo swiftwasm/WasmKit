@@ -44,7 +44,7 @@
             case stoppingAtEntrypointFailed
             case multipleThreadsNotSupported
             case unknownThreadAction(String)
-            case hostCommandNotImplemented(GDBHostCommand.Kind)
+
             case exitCodeUnknown([Value])
             case killRequestReceived
             case unknownHexEncodedArguments(String)
@@ -333,7 +333,14 @@
                 responseKind = .empty
 
             case .generalRegisters:
-                throw Error.hostCommandNotImplemented(command.kind)
+                responseKind = .empty
+
+            case .unsupported:
+                logger.debug(
+                    "unsupported GDB host command",
+                    metadata: ["rawCommand": .string(command.arguments)]
+                )
+                responseKind = .empty
             }
 
             logger.trace("handler produced a response", metadata: ["GDBTargetResponse": .string("\(responseKind)")])
