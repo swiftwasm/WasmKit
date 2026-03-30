@@ -1247,7 +1247,15 @@ struct InstructionTranslator: InstructionVisitor {
         }
         var parser = ExpressionParser(code: code)
         while let visit = try WasmKitError.wrap({ () throws(WasmParserError) in try parser.parse() }) {
-            try visit(visitor: &self)
+            do throws(WasmKitError) {
+                try visit(visitor: &self)
+            } catch {
+                var errorWithOffset = error
+                if errorWithOffset.location == nil {
+                    errorWithOffset.location = self.binaryOffset
+                }
+                throw errorWithOffset
+            }
         }
         return try finalize()
     }
