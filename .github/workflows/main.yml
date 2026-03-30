@@ -252,7 +252,7 @@ jobs:
       pages: write
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
 
   build-musl:
     runs-on: ubuntu-22.04
