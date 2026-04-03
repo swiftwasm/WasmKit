@@ -88,6 +88,9 @@ package struct InstanceEntity /* : ~Copyable */ {
 
     var instructionMapping: DebuggerInstructionMapping
 
+    /// DWARF line table for resolving code addresses to source locations.
+    var dwarfLineTable: DWARFLineTable?
+
     static var empty: InstanceEntity {
         InstanceEntity(
             types: [],
@@ -102,7 +105,8 @@ package struct InstanceEntity /* : ~Copyable */ {
             features: [],
             dataCount: nil,
             isDebuggable: false,
-            instructionMapping: .init()
+            instructionMapping: .init(),
+            dwarfLineTable: nil
         )
     }
 

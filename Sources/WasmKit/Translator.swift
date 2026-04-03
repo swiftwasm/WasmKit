@@ -900,8 +900,14 @@ struct InstructionTranslator: InstructionVisitor {
 
     // Wasm debugging support.
 
-    /// Current offset to an instruction in the original Wasm binary processed by this translator.
+    /// Current offset of the Wasm instruction being translated.
+    /// Set by the decoder to a buffer-relative value; corrected to file-level
+    /// by adding `binaryOffsetCorrection` in `updateInstructionMapping()`.
     var binaryOffset: Int = 0
+
+    /// Correction to convert buffer-relative `binaryOffset` to file-level offset.
+    /// Computed once at the start of translation from the ExpressionParser's code offset.
+    var binaryOffsetCorrection: Int = 0
 
     /// Mapping from `self.iseqBuilder.instructions` to Wasm instructions.
     /// As mapping between iSeq to Wasm is many:many, but we only care about first mapping for overlapping address,
@@ -1232,7 +1238,7 @@ struct InstructionTranslator: InstructionVisitor {
         #if WasmDebuggingSupport
             guard self.module.isDebuggable else { return }
 
-            self.iseqToWasmMapping.append((self.iseqBuilder.insertingPC.offsetFromHead, self.binaryOffset))
+            self.iseqToWasmMapping.append((self.iseqBuilder.insertingPC.offsetFromHead, self.binaryOffset + self.binaryOffsetCorrection))
         #endif
     }
 
@@ -1245,6 +1251,12 @@ struct InstructionTranslator: InstructionVisitor {
             emit(.onEnter(functionIndex))
         }
         var parser = ExpressionParser(code: code)
+        #if WasmDebuggingSupport
+            // The decoder sets binaryOffset to buffer-relative positions (expression.startIndex-based).
+            // We need file-level offsets for the instruction mapping.
+            // Correction: file_offset = buffer_offset + (code.originalAddress - expression.startIndex)
+            self.binaryOffsetCorrection = code.originalAddress - Int(code.expression.startIndex)
+        #endif
         var offset = parser.offset
         do {
             while try parser.visit(visitor: &self) {

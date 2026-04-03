@@ -45,6 +45,7 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
     var types: [FunctionType] = []
     var typeIndices: [TypeIndex] = []
     var codes: [Code] = []
+    var codeSectionStart: Int = 0
     var tables: [TableType] = []
     var memories: [MemoryType] = []
     var globals: [WasmParser.Global] = []
@@ -83,8 +84,9 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
             start = functionIndex
         case .elementSection(let elementSection):
             elements = elementSection
-        case .codeSection(let codeSection):
+        case .codeSection(let codeSection, let start):
             codes = codeSection
+            codeSectionStart = start
         case .dataSection(let dataSection):
             data = dataSection
         case .dataCount(let count):
@@ -118,7 +120,7 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
         )
     }
 
-    return Module(
+    var module = Module(
         types: types,
         functions: functions,
         elements: elements,
@@ -133,4 +135,6 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
         features: features,
         dataCount: dataCount
     )
+    module.codeSectionStart = codeSectionStart
+    return module
 }

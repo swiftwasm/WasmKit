@@ -14,6 +14,7 @@ add_wasmkit_library(WasmKit
   Component/ComponentTypes.swift
   Execution/AtomicParkingLot.swift
   Execution/DebuggerInstructionMapping.swift
+  Execution/DWARFLineTable.swift
   Execution/Instructions/Control.swift
   Execution/Instructions/Instruction.swift
   Execution/Instructions/Table.swift
