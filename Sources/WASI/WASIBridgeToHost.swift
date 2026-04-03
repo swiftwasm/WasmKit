@@ -169,7 +169,6 @@ public final class WASIBridgeToHost {
     ///   - monotonicClock: Clock for monotonic time queries. Defaults to `SystemMonotonicClock()`.
     ///   - randomGenerator: Random number generator. Defaults to `SystemRandomNumberGenerator()`.
     /// - Throws: An error if the file system or preopens cannot be initialized.
-    @available(*, deprecated, message: "Use withBridge(args:environment:fileSystem:body:) instead to ensure file descriptors are properly closed.")
     public convenience init(
         args: [String] = [],
         environment: [String: String] = [:],
@@ -223,7 +222,6 @@ public final class WASIBridgeToHost {
     ///   - monotonicClock: Clock for monotonic time queries. Defaults to `SystemMonotonicClock()`.
     ///   - randomGenerator: Random number generator. Defaults to `SystemRandomNumberGenerator()`.
     /// - Throws: An error if the file system or initialization fails.
-    @available(*, deprecated, message: "Use withBridge(args:environment:fileSystem:body:) instead to ensure file descriptors are properly closed.")
     public convenience init(
         args: [String] = [],
         environment: [String: String] = [:],
