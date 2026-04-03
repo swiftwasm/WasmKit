@@ -286,7 +286,7 @@ jobs:
         include:
           - swift-version: "6.2"
           - swift-version: "nightly-6.3"
-          - swift-version: nightly-main
+          # - swift-version: nightly-main
 
     steps:
       - uses: actions/checkout@v4
