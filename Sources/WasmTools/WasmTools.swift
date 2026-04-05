@@ -26,9 +26,9 @@ package struct WasmToolsInputFile {
     package let guestPath: String
     package let content: [UInt8]
 
-    package init(guestPath: String, content: [UInt8]) {
+    package init(guestPath: String, content: some Sequence<UInt8>) {
         self.guestPath = guestPath
-        self.content = content
+        self.content = Array(content)
     }
 
     package init(guestPath: String, content: String) {
@@ -238,7 +238,7 @@ package struct Wast2JSONCommand: Codable {
 
 package func wast2json(
     wasmToolsPath: String = defaultWasmToolsPath,
-    wastContent: [UInt8],
+    wastContent: some Sequence<UInt8>,
     wastFileName: String = "input.wast"
 ) throws -> (json: Wast2JSONOutput, wasmFiles: [String: [UInt8]]) {
     let inputPath = "/input/\(wastFileName)"

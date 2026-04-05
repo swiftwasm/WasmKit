@@ -218,11 +218,19 @@ struct WatParser {
         case start(id: Parser.IndexOrId)
         case element(ElementDecl)
         case data(DataSegmentDecl)
+        case custom(CustomSectionDecl)
     }
 
     mutating func next() throws(WatParserError) -> ModuleField? {
         // If we have reached the end of the (module ...) block, return nil
         guard try !parser.isEndOfParen() else { return nil }
+
+        // Handle @custom annotations at the module-field level
+        let customLocation = parser.lexer.location()
+        if let custom = try parser.takeCustomAnnotation() {
+            return ModuleField(location: customLocation, kind: .custom(custom))
+        }
+
         try parser.expect(.leftParen)
         let location = parser.lexer.location()
         let keyword = try parser.expectKeyword()
