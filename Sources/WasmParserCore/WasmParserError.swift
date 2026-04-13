@@ -1,7 +1,7 @@
 import WasmTypes
 
-/// A universal error type thrown by WasmKit.
-public struct WasmKitError: Swift.Error {
+/// An error type thrown by WasmParser during binary parsing.
+public struct WasmParserError: Swift.Error {
     public struct Message: Sendable {
         package let text: String
 
@@ -15,68 +15,35 @@ public struct WasmKitError: Swift.Error {
         case message(Message)
         case parserUnexpectedEnd(expected: Set<UInt8>?)
         case parserUnexpectedByte(UInt8, expected: Set<UInt8>?)
-        case unclassified(any Error)
         case leb(LEBError)
     }
 
-    package enum Location {
-        case offset(Int)
-        case utf8Index(WasmTypes.Location)
-    }
-
     package let kind: Kind
-    package var location: Location?
+    package var location: Int?
 
     @usableFromInline
     package init(kind: Kind, offset: Int? = nil) {
         self.kind = kind
-        if let offset {
-            self.location = .offset(offset)
-        } else {
-            self.location = nil
-        }
+        self.location = offset
     }
 }
 
-extension WasmKitError {
+extension WasmParserError {
     @usableFromInline
     package init(message: Message, offset: Int? = nil) {
         self.kind = .message(message)
-        if let offset {
-            self.location = .offset(offset)
-        } else {
-            self.location = nil
-        }
+        self.location = offset
     }
 
     @usableFromInline
     package init(_ string: String, offset: Int? = nil) {
         self.kind = .message(.init(string))
-        if let offset {
-            self.location = .offset(offset)
-        } else {
-            self.location = nil
-        }
+        self.location = offset
     }
 
     @usableFromInline
-    package init(_ string: String, location: WasmTypes.Location?) {
-        self.kind = .message(.init(string))
-        if let location {
-            self.location = .utf8Index(location)
-        } else {
-            self.location = nil
-        }
-    }
-
-    @usableFromInline
-    package static func leb(_ error: LEBError, offset: Int) -> WasmKitError {
-        WasmKitError(kind: .leb(error), offset: offset)
-    }
-
-    @usableFromInline
-    package static func unclassified(_ error: any Error, offset: Int? = nil) -> WasmKitError {
-        WasmKitError(kind: .unclassified(error), offset: offset)
+    static func leb(_ error: LEBError, offset: Int) -> WasmParserError {
+        WasmParserError(kind: .leb(error), offset: offset)
     }
 }
 
@@ -86,18 +53,18 @@ extension BinaryInteger {
     }
 }
 
-extension WasmKitError: CustomStringConvertible {
+extension WasmParserError: CustomStringConvertible {
     public var description: String {
         switch self.kind {
         case .message(let message):
-            if case .offset(let offset) = self.location {
+            if let offset = self.location {
                 return "\"\(message)\" at offset 0x\(String(offset, radix: 16))"
             } else {
                 return message.text
             }
         case .parserUnexpectedEnd(let expected):
             var result = "Unexpected end of byte sequence."
-            if case .offset(let offset) = self.location {
+            if let offset = self.location {
                 result.append(contentsOf: " at offset \(offset.hexString)")
             }
             if let expected, expected.count > 0 {
@@ -106,7 +73,7 @@ extension WasmKitError: CustomStringConvertible {
             return result
         case .parserUnexpectedByte(let byte, let expected):
             var result = "Unexpected byte \(byte.hexString)"
-            if case .offset(let offset) = self.location {
+            if let offset = self.location {
                 result.append(contentsOf: " at offset \(offset.hexString)")
             }
             result.append(".")
@@ -114,15 +81,13 @@ extension WasmKitError: CustomStringConvertible {
                 result.append(contentsOf: " Expected one of \(expected.map {$0.hexString})")
             }
             return result
-        case .unclassified(let error):
-            return "\(error)"
         case .leb(let error):
             return "\(error)"
         }
     }
 }
 
-extension WasmKitError.Message {
+extension WasmParserError.Message {
     @usableFromInline
     package static func invalidMagicNumber(_ bytes: [UInt8]) -> Self {
         Self("magic header not detected: expected \(WASM_MAGIC) but got \(bytes)")
@@ -153,7 +118,7 @@ extension WasmKitError.Message {
         Self("malformed value type: \(byte)")
     }
 
-    @usableFromInline static func zeroExpected(actual: UInt8) -> Self {
+    @usableFromInline package static func zeroExpected(actual: UInt8) -> Self {
         Self("Zero expected but got \(actual)")
     }
 
@@ -162,7 +127,7 @@ extension WasmKitError.Message {
         Self("Too many locals: \(count) vs \(limit)")
     }
 
-    @usableFromInline static func expectedRefType(actual: ValueType) -> Self {
+    @usableFromInline package static func expectedRefType(actual: ValueType) -> Self {
         Self("Expected reference type but got \(actual)")
     }
 
@@ -189,7 +154,7 @@ extension WasmKitError.Message {
         Self("Unknown canonical option tag: \(tag)")
     }
 
-    @usableFromInline static func illegalOpcode(_ opcode: [UInt8]) -> Self {
+    @usableFromInline package static func illegalOpcode(_ opcode: [UInt8]) -> Self {
         Self("Illegal opcode: \(opcode)")
     }
 
@@ -211,17 +176,17 @@ extension WasmKitError.Message {
         Self("Malformed limit: \(byte)")
     }
 
-    @usableFromInline static let malformedIndirectCall = Self("Malformed indirect call")
+    @usableFromInline package static let malformedIndirectCall = Self("Malformed indirect call")
 
-    @usableFromInline static func malformedDataSegmentKind(_ kind: UInt32) -> Self {
+    @usableFromInline package static func malformedDataSegmentKind(_ kind: UInt32) -> Self {
         Self("Malformed data segment kind: \(kind)")
     }
 
-    @usableFromInline static func invalidResultArity(expected: Int, actual: Int) -> Self {
+    @usableFromInline package static func invalidResultArity(expected: Int, actual: Int) -> Self {
         Self("invalid result arity: expected \(expected) but got \(actual)")
     }
 
-    @usableFromInline static func invalidFunctionType(_ index: Int64) -> Self {
+    @usableFromInline package static func invalidFunctionType(_ index: Int64) -> Self {
         Self("invalid function type index: \(index), expected a unsigned 32-bit integer")
     }
 }

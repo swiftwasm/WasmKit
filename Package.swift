@@ -75,7 +75,8 @@ let package = Package(
         .target(
             name: "WAT",
             dependencies: [
-                "WasmParser",
+                "WasmParserCore",
+                "WasmTypes",
                 .target(
                     name: "ComponentModel",
                     condition: .when(traits: ["ComponentModel"])
@@ -204,6 +205,30 @@ let package = Package(
             name: "WAVETests",
             dependencies: [
                 "WAVE",
+                "WIT",
+                .target(
+                    name: "ComponentModel",
+                    condition: .when(traits: ["ComponentModel"])
+                ),
+            ]
+        ),
+
+        .target(
+            name: "ComponentLinker",
+            dependencies: [
+                "WAT",
+                "WIT",
+                .target(
+                    name: "ComponentModel",
+                    condition: .when(traits: ["ComponentModel"])
+                ),
+            ]
+        ),
+        .testTarget(
+            name: "ComponentLinkerTests",
+            dependencies: [
+                "ComponentLinker",
+                "WasmParser",
                 "WIT",
                 .target(
                     name: "ComponentModel",

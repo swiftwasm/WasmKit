@@ -157,9 +157,9 @@ extension TestCase {
                     handler(self, location, .failed("\(error)"))
                 }
             }
-        } catch let parseError as WasmKitError {
-            if case .utf8Index(let location) = parseError.location, case .message(let message) = parseError.kind {
-                handler(self, location, .failed(message.text))
+        } catch let parseError as WatParserError {
+            if let location = parseError.location {
+                handler(self, location, .failed(parseError.message))
             } else {
                 throw parseError
             }
@@ -516,7 +516,9 @@ extension Swift.Error {
         if let error = self as? WasmKitError {
             return error.description
         }
-
+        if let error = self as? WatParserError {
+            return error.description
+        }
         return "unknown error: \(self)"
     }
 }

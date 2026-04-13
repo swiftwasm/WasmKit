@@ -1,4 +1,6 @@
 import Testing
+import WasmKit
+import WasmTypes
 
 @testable import WASI
 
@@ -343,6 +345,54 @@ struct WASITests {
         } catch let error as WASIAbi.Errno {
             #expect(error == .EEXIST)
         }
+    }
+
+    @Test
+    func wasiAbi() throws {
+        let engine = Engine()
+        let store = Store(engine: engine)
+        let memory = try Memory(store: store, type: .init(min: 1))
+
+        // Test union size and alignment end-to-end
+        let start = UnsafeGuestRawPointer(memorySpace: memory, offset: 0)
+        var pointer = start
+        let read = WASIAbi.Subscription.Union.fdRead(.init(0))
+        let write = WASIAbi.Subscription.Union.fdWrite(.init(0))
+        let writeOffset = WASIAbi.Subscription.sizeInGuest
+        let timeout: WASIAbi.Timestamp = 100_000_000
+        let clock = WASIAbi.Subscription.Union.clock(.init(id: .REALTIME, timeout: timeout, precision: 0, flags: []))
+        let clockOffset = writeOffset + WASIAbi.Subscription.sizeInGuest
+        let event = WASIAbi.Event(userData: 3, error: .EIO, eventType: .fdRead, fdReadWrite: .init(nBytes: 37, flags: [.hangup]))
+        let eventOffset = clockOffset + WASIAbi.Subscription.sizeInGuest
+        let finalOffset = eventOffset + WASIAbi.Event.sizeInGuest
+        WASIAbi.Subscription.writeToGuest(at: &pointer, value: .init(userData: 1, union: read))
+        #expect(pointer.offset == writeOffset)
+        WASIAbi.Subscription.writeToGuest(at: &pointer, value: .init(userData: 2, union: write))
+        #expect(pointer.offset == clockOffset)
+        WASIAbi.Subscription.writeToGuest(at: &pointer, value: .init(userData: 3, union: clock))
+        #expect(pointer.offset == eventOffset)
+        WASIAbi.Event.writeToGuest(at: &pointer, value: event)
+        #expect(pointer.offset == finalOffset)
+
+        // Test that reading back yields same result
+        pointer = start
+        #expect(WASIAbi.Subscription.readFromGuest(&pointer) == .init(userData: 1, union: read))
+        #expect(pointer.offset == writeOffset)
+        #expect(WASIAbi.Subscription.readFromGuest(&pointer) == .init(userData: 2, union: write))
+        #expect(pointer.offset == clockOffset)
+        #expect(WASIAbi.Subscription.readFromGuest(&pointer) == .init(userData: 3, union: clock))
+        #expect(pointer.offset == eventOffset)
+        #expect(WASIAbi.Event.readFromGuest(&pointer) == event)
+        #expect(pointer.offset == finalOffset)
+
+        #if !os(Windows)
+            let elapsed = try ContinuousClock().measure {
+                let clockPointer = UnsafeGuestBufferPointer<WASIAbi.Subscription>(baseAddress: .init(memorySpace: memory, offset: clockOffset), count: 1)
+                let result = try WASIBridgeToHost().underlying.poll_oneoff(subscriptions: clockPointer, events: .init(baseAddress: .init(memorySpace: memory, offset: finalOffset), count: 1))
+                #expect(result == 1)
+            }
+            #expect(elapsed > .nanoseconds(timeout))
+        #endif
     }
 
     @Test
@@ -1317,4 +1367,91 @@ struct WASITests {
         #expect(stat.mtim == specificTime)
     }
 
+    #if !os(Windows)
+        /// https://github.com/swiftwasm/WasmKit/issues/274
+        @Test
+        func readdirWithCyclicSymlink() throws {
+            let t = try TestSupport.TemporaryDirectory()
+
+            try t.createDir(at: "foo")
+            try t.createFile(at: "foo/a", contents: "hello")
+            try t.createSymlink(at: "foo/b", to: "b")  // cyclic symlink
+
+            let wasi = try WASIBridgeToHost(
+                fileSystem: .host().withPreopens([
+                    .init(guestPath: "/foo", hostPath: t.url.appendingPathComponent("foo").path)
+                ])
+            ).underlying
+            let preopenFd: WASIAbi.Fd = 3
+
+            let memory = TestSupport.TestGuestMemory()
+            let buffer = UnsafeGuestBufferPointer<UInt8>(
+                baseAddress: UnsafeGuestPointer<UInt8>(memorySpace: memory, offset: 0),
+                count: 4096
+            )
+
+            // Without the noFollow fix, this throws ELOOP due to the cyclic symlink
+            let nwritten = try wasi.fd_readdir(fd: preopenFd, buffer: buffer, cookie: 0)
+            #expect(nwritten > 0)
+        }
+    #endif
+
+    #if os(macOS) || os(Linux)
+        // https://github.com/swiftwasm/WasmKit/issues/275
+        @Test
+        func fileDescriptorLeakTest() throws {
+            let t = try TestSupport.TemporaryDirectory()
+
+            try t.createDir(at: "dir1")
+            try t.createDir(at: "dir1/foo")
+            try t.createDir(at: "dir2")
+            try t.createDir(at: "dir2/foo")
+
+            let wasi = try WASIBridgeToHost(
+                fileSystem: .host().withPreopens([
+                    .init(guestPath: "/dir1", hostPath: t.url.appending(component: "dir1").path),
+                    .init(guestPath: "/dir2", hostPath: t.url.appending(component: "dir2").path),
+                ])
+            ).underlying
+            let dir1Fd: WASIAbi.Fd = 3
+            let dir2Fd: WASIAbi.Fd = 4
+
+            let memory = TestSupport.TestGuestMemory()
+            let buffer = UnsafeGuestBufferPointer<UInt8>(
+                baseAddress: UnsafeGuestPointer<UInt8>(memorySpace: memory, offset: 0),
+                count: 4096
+            )
+            let writeData = Array("hello".utf8)
+            let writeVecs = memory.writeIOVecs([writeData])
+
+            for _ in 0..<1000 {
+                let fd = try wasi.path_open(
+                    dirFd: dir1Fd,
+                    dirFlags: [],
+                    path: "foo/bar",
+                    oflags: [.CREAT],
+                    fsRightsBase: [.FD_WRITE],
+                    fsRightsInheriting: [],
+                    fdflags: []
+                )
+                #expect(try wasi.fd_write(fileDescriptor: fd, ioVectors: writeVecs) > 0)
+                try wasi.fd_close(fd: fd)
+
+                try wasi.path_rename(oldFd: dir1Fd, oldPath: "foo/bar", newFd: dir2Fd, newPath: "foo/baz")
+
+                try wasi.path_symlink(oldPath: "baz", dirFd: dir2Fd, newPath: "foo/quux")
+                let stat = try wasi.path_filestat_get(dirFd: dir2Fd, flags: .SYMLINK_FOLLOW, path: "foo/quux")
+                #expect(stat.size == 5)  // hello
+                let count = try Int(wasi.path_readlink(fd: dir2Fd, path: "foo/quux", buffer: buffer))
+                buffer.withHostPointer { ptr in
+                    #expect(String(decoding: ptr[..<count], as: UTF8.self) == "baz")
+                }
+                try wasi.path_unlink_file(dirFd: dir2Fd, path: "foo/baz")
+                try wasi.path_unlink_file(dirFd: dir2Fd, path: "foo/quux")
+
+                try wasi.path_create_directory(dirFd: dir1Fd, path: "foo/bar")
+                try wasi.path_remove_directory(dirFd: dir1Fd, path: "foo/bar")
+            }
+        }
+    #endif
 }

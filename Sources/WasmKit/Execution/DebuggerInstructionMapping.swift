@@ -23,8 +23,24 @@ struct DebuggerInstructionMapping {
             if self.wasmToIseq[wasm] == nil {
                 self.wasmToIseq[wasm] = iseq
             }
-            if self.wasmMappings.last != wasm {
+            // Insert in sorted order to maintain the binary search invariant.
+            // With lazy compilation, functions may be compiled out of address order,
+            // so simple append would break the sorted invariant.
+            if let last = self.wasmMappings.last, wasm > last {
+                // Fast path: appending in order (common within a single function)
                 self.wasmMappings.append(wasm)
+            } else if self.wasmMappings.last == wasm {
+                // Duplicate of last entry, skip
+            } else if self.wasmMappings.isEmpty {
+                self.wasmMappings.append(wasm)
+            } else {
+                // Out-of-order insertion: find the sorted position
+                let insertionIndex = self.wasmMappings.firstIndex(where: { $0 >= wasm }) ?? self.wasmMappings.endIndex
+                if insertionIndex < self.wasmMappings.endIndex, self.wasmMappings[insertionIndex] == wasm {
+                    // Already present, skip
+                } else {
+                    self.wasmMappings.insert(wasm, at: insertionIndex)
+                }
             }
         }
 

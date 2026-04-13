@@ -1,6 +1,7 @@
+import WasmParser
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#memory-instructions>
-import WasmParser
+import _CWasmKit
 
 extension Execution {
     @inline(never) func throwOutOfBoundsMemoryAccess() throws -> Never {
@@ -118,11 +119,16 @@ extension Execution {
         }
         let (endAddress, isEndOverflow) = i.addingReportingOverflow(length &+ loadOperand.offset)
         if _fastPath(!isEndOverflow && endAddress <= ms) {
-            let ptr = md.unsafelyUnwrapped.advanced(by: Int(address))
-                .bindMemory(to: T.self, capacity: 1)
-            // Use atomic load with acquire ordering (sequentially consistent)
-            let loaded = ptr.pointee
-            sp[loadOperand.result] = castToValue(loaded.littleEndian)
+            let rawPtr = md.unsafelyUnwrapped.advanced(by: Int(address))
+            let loaded: T
+            switch T.bitWidth {
+            case 8: loaded = T(wasmkit_atomic_load_8(rawPtr))
+            case 16: loaded = T(wasmkit_atomic_load_16(rawPtr))
+            case 32: loaded = T(wasmkit_atomic_load_32(rawPtr))
+            case 64: loaded = T(wasmkit_atomic_load_64(rawPtr))
+            default: fatalError()
+            }
+            sp[loadOperand.result] = castToValue(loaded)
         } else {
             try throwOutOfBoundsMemoryAccess()
         }
@@ -143,10 +149,14 @@ extension Execution {
         let (endAddress, isEndOverflow) = i.addingReportingOverflow(length &+ storeOperand.offset)
         if _fastPath(!isEndOverflow && endAddress <= ms) {
             let toStore = castFromValue(value)
-            let ptr = md.unsafelyUnwrapped.advanced(by: Int(address))
-                .bindMemory(to: T.self, capacity: 1)
-            // Atomic store
-            ptr.pointee = toStore.littleEndian
+            let rawPtr = md.unsafelyUnwrapped.advanced(by: Int(address))
+            switch T.bitWidth {
+            case 8: wasmkit_atomic_store_8(rawPtr, UInt8(truncatingIfNeeded: toStore))
+            case 16: wasmkit_atomic_store_16(rawPtr, UInt16(truncatingIfNeeded: toStore))
+            case 32: wasmkit_atomic_store_32(rawPtr, UInt32(truncatingIfNeeded: toStore))
+            case 64: wasmkit_atomic_store_64(rawPtr, UInt64(truncatingIfNeeded: toStore))
+            default: fatalError()
+            }
         } else {
             try throwOutOfBoundsMemoryAccess()
         }
@@ -158,7 +168,7 @@ extension Execution {
     mutating func atomicRmw<T: FixedWidthInteger>(
         sp: Sp, md: Md, ms: Ms, rmwOperand: Instruction.RmwOperand,
         loadAs _: T.Type = T.self,
-        operation: (T, T) -> T,
+        atomicOp: (UnsafeMutableRawPointer, T) -> T,
         castFromValue: (UntypedValue) -> T,
         castToValue: (T) -> UntypedValue
     ) throws {
@@ -171,13 +181,9 @@ extension Execution {
         }
         let (endAddress, isEndOverflow) = i.addingReportingOverflow(length &+ rmwOperand.offset)
         if _fastPath(!isEndOverflow && endAddress <= ms) {
-            let ptr = md.unsafelyUnwrapped.advanced(by: Int(address))
-                .bindMemory(to: T.self, capacity: 1)
+            let rawPtr = md.unsafelyUnwrapped.advanced(by: Int(address))
             let value = castFromValue(sp[rmwOperand.value])
-            // Atomic read-modify-write
-            let oldValue = ptr.pointee.littleEndian
-            let newValue = operation(oldValue, value)
-            ptr.pointee = newValue.littleEndian
+            let oldValue = atomicOp(rawPtr, value)
             sp[rmwOperand.result] = castToValue(oldValue)
         } else {
             try throwOutOfBoundsMemoryAccess()
@@ -188,6 +194,7 @@ extension Execution {
     mutating func atomicCmpxchg<T: FixedWidthInteger>(
         sp: Sp, md: Md, ms: Ms, cmpxchgOperand: Instruction.CmpxchgOperand,
         loadAs _: T.Type = T.self,
+        atomicCmpxchg: (UnsafeMutableRawPointer, T, T) -> T,
         castFromValue: (UntypedValue) -> T,
         castToValue: (T) -> UntypedValue
     ) throws {
@@ -200,15 +207,11 @@ extension Execution {
         }
         let (endAddress, isEndOverflow) = i.addingReportingOverflow(length &+ cmpxchgOperand.offset)
         if _fastPath(!isEndOverflow && endAddress <= ms) {
-            let ptr = md.unsafelyUnwrapped.advanced(by: Int(address))
-                .bindMemory(to: T.self, capacity: 1)
+            let rawPtr = md.unsafelyUnwrapped.advanced(by: Int(address))
             let expectedValue = castFromValue(sp[cmpxchgOperand.expected])
             let replacementValue = castFromValue(sp[cmpxchgOperand.replacement])
-            let currentValue = ptr.pointee.littleEndian
-            if currentValue == expectedValue {
-                ptr.pointee = replacementValue.littleEndian
-            }
-            sp[cmpxchgOperand.result] = castToValue(currentValue)
+            let resultValue = atomicCmpxchg(rawPtr, expectedValue, replacementValue)
+            sp[cmpxchgOperand.result] = castToValue(resultValue)
         } else {
             try throwOutOfBoundsMemoryAccess()
         }
@@ -226,9 +229,8 @@ extension Execution {
         }
         let (endAddress, isEndOverflow) = i.addingReportingOverflow(4 &+ waitOperand.offset)
         if _fastPath(!isEndOverflow && endAddress <= ms) {
-            let ptr = md.unsafelyUnwrapped.advanced(by: Int(address))
-                .bindMemory(to: UInt32.self, capacity: 1)
-            let currentValue = ptr.pointee.littleEndian
+            let rawPtr = md.unsafelyUnwrapped.advanced(by: Int(address))
+            let currentValue = wasmkit_atomic_load_32(rawPtr)
             let expectedValue = sp[waitOperand.expected].i32
             let timeout = sp[waitOperand.timeout].i64
 
@@ -257,7 +259,7 @@ extension Execution {
                 address: UInt64(address),
                 validate: {
                     // Re-check the value atomically
-                    let currentValue = ptr.pointee.littleEndian
+                    let currentValue = wasmkit_atomic_load_32(rawPtr)
                     return currentValue == expectedValue
                 },
                 deadline: deadline,
@@ -286,9 +288,8 @@ extension Execution {
         }
         let (endAddress, isEndOverflow) = i.addingReportingOverflow(8 &+ waitOperand.offset)
         if _fastPath(!isEndOverflow && endAddress <= ms) {
-            let ptr = md.unsafelyUnwrapped.advanced(by: Int(address))
-                .bindMemory(to: UInt64.self, capacity: 1)
-            let currentValue = ptr.pointee.littleEndian
+            let rawPtr = md.unsafelyUnwrapped.advanced(by: Int(address))
+            let currentValue = wasmkit_atomic_load_64(rawPtr)
             let expectedValue = sp[waitOperand.expected].i64
             let timeout = sp[waitOperand.timeout].i64
 
@@ -317,7 +318,7 @@ extension Execution {
                 address: UInt64(address),
                 validate: {
                     // Re-check the value atomically
-                    let currentValue = ptr.pointee.littleEndian
+                    let currentValue = wasmkit_atomic_load_64(rawPtr)
                     return currentValue == expectedValue
                 },
                 deadline: deadline,
@@ -349,5 +350,10 @@ extension Execution {
         } else {
             try throwOutOfBoundsMemoryAccess()
         }
+    }
+
+    /// Atomic fence - sequential consistency barrier
+    mutating func atomicFence(sp: Sp) {
+        wasmkit_atomic_fence()
     }
 }

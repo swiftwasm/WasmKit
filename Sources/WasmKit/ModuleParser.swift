@@ -25,7 +25,7 @@ public func parseWasm(filePath: FilePath, features: WasmFeatureSet = .default) t
 
 /// Parse a given byte array as a WebAssembly binary format file
 /// > Note: <https://webassembly.github.io/spec/core/binary/index.html>
-public func parseWasm(bytes: [UInt8], features: WasmFeatureSet = .default) throws((WasmKitError)) -> Module {
+public func parseWasm(bytes: [UInt8], features: WasmFeatureSet = .default) throws(WasmKitError) -> Module {
     let stream = StaticByteStream(bytes: bytes)
     let module = try parseModule(stream: stream, features: features)
     return module
@@ -60,7 +60,7 @@ func parseModule<Stream: ByteStream>(stream: Stream, features: WasmFeatureSet = 
         stream: stream, features: features
     )
 
-    while let payload = try parser.parseNext() {
+    while let payload = try WasmKitError.wrap({ () throws(WasmParserError) in try parser.parseNext() }) {
         switch payload {
         case .header: break
         case .customSection(let customSection):

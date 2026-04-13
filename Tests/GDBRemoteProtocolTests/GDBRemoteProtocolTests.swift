@@ -17,6 +17,22 @@ import Testing
 
 @Suite
 struct GDBRemoteProtocolTests {
+    var decoder: GDBHostCommandDecoder {
+        var logger = Logger(label: "com.swiftwasm.WasmKit.tests")
+        logger.logLevel = .critical
+        return GDBHostCommandDecoder(logger: logger)
+    }
+
+    @Test
+    func decodingUnknownCommand() throws {
+        var decoder = self.decoder
+        // "p0" is "read single register 0" — not supported by WasmKit
+        var buffer = ByteBuffer(string: "+$p0#a0")
+        let packet = try decoder.decode(buffer: &buffer)
+        #expect(packet?.payload.kind == .unsupported)
+        #expect(packet?.payload.arguments == "p0")
+    }
+
     @Test
     func decoding() throws {
         var logger = Logger(label: "com.swiftwasm.WasmKit.tests")

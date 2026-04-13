@@ -337,6 +337,7 @@ struct StackLayout {
 }
 
 struct InstructionTranslator: InstructionVisitor {
+    typealias VisitorError = WasmKitError
     typealias Output = Void
 
     typealias LabelRef = Int
@@ -883,6 +884,7 @@ struct InstructionTranslator: InstructionVisitor {
 
     let allocator: ISeqAllocator
     let funcTypeInterner: Interner<FunctionType>
+    let engineConfiguration: EngineConfiguration
     var module: InternalInstance
     private var iseqBuilder: ISeqBuilder
     var controlStack: ControlStack
@@ -920,6 +922,7 @@ struct InstructionTranslator: InstructionVisitor {
     ) throws(WasmKitError) {
         self.allocator = allocator
         self.funcTypeInterner = funcTypeInterner
+        self.engineConfiguration = engineConfiguration
         self.type = type
         self.module = module
         self.iseqBuilder = ISeqBuilder(engineConfiguration: engineConfiguration)
@@ -1243,14 +1246,16 @@ struct InstructionTranslator: InstructionVisitor {
             emit(.onEnter(functionIndex))
         }
         var parser = ExpressionParser(code: code)
-        var offset = parser.offset
-        do {
-            while try parser.visit(visitor: &self) {
-                offset = parser.offset
+        while let visit = try WasmKitError.wrap({ () throws(WasmParserError) in try parser.parse() }) {
+            do throws(WasmKitError) {
+                try visit(visitor: &self)
+            } catch {
+                var errorWithOffset = error
+                if errorWithOffset.location == nil {
+                    errorWithOffset.location = self.binaryOffset
+                }
+                throw errorWithOffset
             }
-        } catch var error {
-            error.location = .offset(offset)
-            throw error
         }
         return try finalize()
     }
@@ -3138,10 +3143,7 @@ struct InstructionTranslator: InstructionVisitor {
     }
 
     mutating func visitAtomicFence() throws(WasmKitError) -> Output {
-        // No-op: In an interpreter, instructions are executed sequentially,
-        // so no reordering can occur. atomic.fence is only meaningful for
-        // compiled code with actual CPU-level reordering.
-        // Do not emit any instruction.
+        emit(.atomicFence)
     }
 }
 

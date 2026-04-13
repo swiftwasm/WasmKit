@@ -97,89 +97,59 @@ enum VMGen {
         }
 
         for op in atomicRmwOps {
-            let operation: String
-            switch op.op {
-            case "Add": operation = "{ $0 &+ $1 }"
-            case "Sub": operation = "{ $0 &- $1 }"
-            case "And": operation = "{ $0 & $1 }"
-            case "Or": operation = "{ $0 | $1 }"
-            case "Xor": operation = "{ $0 ^ $1 }"
-            case "Xchg": operation = "{ _, new in new }"
-            default: operation = "{ $0 &+ $1 }"
-            }
+            let opLower = op.op.lowercased()
+            let width = op.type == "i32" ? "32" : "64"
+            let loadAs = op.type == "i32" ? "UInt32" : "UInt64"
+            let cFunc = "wasmkit_atomic_rmw_\(opLower)_\(width)"
             inlineImpls[op.instruction.name] = """
-            try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: \(op.type == "i32" ? "UInt32" : "UInt64").self, operation: \(operation), castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) })
+            try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: \(loadAs).self, atomicOp: { \(cFunc)($0, $1) }, castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) })
             """
         }
 
         for op in atomicRmw8Ops {
-            let operation: String
-            switch op.op {
-            case "Add": operation = "{ $0 &+ $1 }"
-            case "Sub": operation = "{ $0 &- $1 }"
-            case "And": operation = "{ $0 & $1 }"
-            case "Or": operation = "{ $0 | $1 }"
-            case "Xor": operation = "{ $0 ^ $1 }"
-            case "Xchg": operation = "{ _, new in new }"
-            default: operation = "{ $0 &+ $1 }"
-            }
+            let opLower = op.op.lowercased()
+            let cFunc = "wasmkit_atomic_rmw_\(opLower)_8"
             inlineImpls[op.instruction.name] = """
-            try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, operation: \(operation), castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) })
+            try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, atomicOp: { \(cFunc)($0, $1) }, castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) })
             """
         }
 
         for op in atomicRmw16Ops {
-            let operation: String
-            switch op.op {
-            case "Add": operation = "{ $0 &+ $1 }"
-            case "Sub": operation = "{ $0 &- $1 }"
-            case "And": operation = "{ $0 & $1 }"
-            case "Or": operation = "{ $0 | $1 }"
-            case "Xor": operation = "{ $0 ^ $1 }"
-            case "Xchg": operation = "{ _, new in new }"
-            default: operation = "{ $0 &+ $1 }"
-            }
+            let opLower = op.op.lowercased()
+            let cFunc = "wasmkit_atomic_rmw_\(opLower)_16"
             inlineImpls[op.instruction.name] = """
-            try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, operation: \(operation), castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) })
+            try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, atomicOp: { \(cFunc)($0, $1) }, castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) })
             """
         }
 
         for op in atomicRmw32Ops {
-            let operation: String
-            switch op.op {
-            case "Add": operation = "{ $0 &+ $1 }"
-            case "Sub": operation = "{ $0 &- $1 }"
-            case "And": operation = "{ $0 & $1 }"
-            case "Or": operation = "{ $0 | $1 }"
-            case "Xor": operation = "{ $0 ^ $1 }"
-            case "Xchg": operation = "{ _, new in new }"
-            default: operation = "{ $0 &+ $1 }"
-            }
+            let opLower = op.op.lowercased()
+            let cFunc = "wasmkit_atomic_rmw_\(opLower)_32"
             inlineImpls[op.instruction.name] = """
-            try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, operation: \(operation), castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) })
+            try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, atomicOp: { \(cFunc)($0, $1) }, castFromValue: { \(op.castFromValue) }, castToValue: { \(op.castToValue) })
             """
         }
 
         inlineImpls["i32AtomicRmwCmpxchg"] = """
-        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt32.self, castFromValue: { $0.i32 }, castToValue: { .i32($0) })
+        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt32.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_32(ptr, &exp, desired); return exp }, castFromValue: { $0.i32 }, castToValue: { .i32($0) })
         """
         inlineImpls["i64AtomicRmwCmpxchg"] = """
-        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt64.self, castFromValue: { $0.i64 }, castToValue: { .i64($0) })
+        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt64.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_64(ptr, &exp, desired); return exp }, castFromValue: { $0.i64 }, castToValue: { .i64($0) })
         """
         inlineImpls["i32AtomicRmw8CmpxchgU"] = """
-        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt8.self, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
+        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt8.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_8(ptr, &exp, desired); return exp }, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
         """
         inlineImpls["i32AtomicRmw16CmpxchgU"] = """
-        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt16.self, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
+        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt16.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_16(ptr, &exp, desired); return exp }, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
         """
         inlineImpls["i64AtomicRmw8CmpxchgU"] = """
-        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt8.self, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
+        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt8.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_8(ptr, &exp, desired); return exp }, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
         """
         inlineImpls["i64AtomicRmw16CmpxchgU"] = """
-        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt16.self, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
+        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt16.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_16(ptr, &exp, desired); return exp }, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
         """
         inlineImpls["i64AtomicRmw32CmpxchgU"] = """
-        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt32.self, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
+        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt32.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_32(ptr, &exp, desired); return exp }, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
         """
         inlineImpls["memoryAtomicWait32"] = """
         try atomicWait32(sp: sp.pointee, md: md.pointee, ms: ms.pointee, waitOperand: immediate)
@@ -189,6 +159,9 @@ enum VMGen {
         """
         inlineImpls["memoryAtomicNotify"] = """
         try atomicNotify(sp: sp.pointee, md: md.pointee, ms: ms.pointee, notifyOperand: immediate)
+        """
+        inlineImpls["atomicFence"] = """
+        atomicFence(sp: sp.pointee)
         """
 
         return inlineImpls
@@ -386,6 +359,87 @@ enum VMGen {
         return output
     }
 
+    static func generateNextInstructionPredictor(instructions: [Instruction]) -> String {
+        let controlInstructions = instructions.enumerated().filter { $0.element.isControl }
+
+        var output = """
+
+        #if WasmDebuggingSupport
+
+        /// A protocol for predicting the next instruction(s) that will execute after a control-flow instruction.
+        ///
+        /// Each `isControl` instruction in VMSpec gets a dedicated method in this protocol.
+        /// Adding a new control instruction automatically adds a new protocol requirement,
+        /// so any conforming type will fail to compile until it implements the new prediction.
+        protocol NextInstructionPredictor: ~Copyable {
+
+        """
+        for (_, inst) in controlInstructions {
+            output += "    mutating func predictNext_\(inst.name)(operandPc: Pc, sp: Sp) -> [Pc]\n"
+        }
+        output += """
+        }
+
+        extension Instruction {
+            /// Dispatches to the appropriate `NextInstructionPredictor` method based on the opcode ID.
+            /// - Returns: The predicted next Pc(s), or `nil` if the opcode is not a control instruction.
+            static func predictNextPcs(
+                opcodeID: OpcodeID, operandPc: Pc, sp: Sp,
+                predictor: inout some NextInstructionPredictor & ~Copyable
+            ) -> [Pc]? {
+                switch opcodeID {
+
+        """
+        for (opcode, inst) in controlInstructions {
+            output += "        case \(opcode): return predictor.predictNext_\(inst.name)(operandPc: operandPc, sp: sp)\n"
+        }
+        output += """
+                default: return nil
+                }
+            }
+
+            /// Builds a map from head code slot to opcode ID for all control-flow instructions.
+            ///
+            /// This is generated so that adding a new `isControl` instruction automatically
+            /// includes it in the map without manual updates.
+            static func buildControlHeadSlotMap(
+                threadingModel: EngineConfiguration.ThreadingModel
+            ) -> [CodeSlot: OpcodeID] {
+                var map = [CodeSlot: OpcodeID]()
+
+        """
+        for (_, inst) in controlInstructions {
+            let dummyExpr: String
+            if let layout = inst.immediateLayout {
+                let fields = layout.fields.map { field in
+                    "\(field.name): \(field.type.name)(0)"
+                }.joined(separator: ", ")
+                dummyExpr = ".\(inst.name)(.init(\(fields)))"
+            } else if let immediate = inst.immediate {
+                // Simple immediate type (e.g. BrOperand = Int32)
+                dummyExpr = ".\(inst.name)(\(immediate.type)(0))"
+            } else {
+                dummyExpr = ".\(inst.name)"
+            }
+            output += """
+                        do {
+                            let inst = Instruction\(dummyExpr)
+                            map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+                        }
+
+            """
+        }
+        output += """
+                    return map
+                }
+            }
+
+            #endif // WasmDebuggingSupport
+
+            """
+        return output
+    }
+
     static func generateImmediateDefinitions(instructions: [Instruction]) -> String {
         var output = ""
 
@@ -580,6 +634,7 @@ enum VMGen {
             GeneratedFile(
                 projectSources + ["WasmKit", "Execution", "Instructions", "Instruction.swift"],
                 header + generateEnumDefinition(instructions: instructions)
+                + generateNextInstructionPredictor(instructions: instructions)
             ),
         ]
 
