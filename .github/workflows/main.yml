@@ -236,7 +236,7 @@ jobs:
         run: sudo chown -R $USER .build/html
       - if: matrix.build-dev-dashboard
         id: deployment
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5
         with:
           path: .build/html
 
