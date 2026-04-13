@@ -46,6 +46,7 @@ jobs:
 
       - name: Build with selected toolchain
         run: |
+          xcrun -f metal
           ~/.swiftly/bin/swiftly init --quiet-shell-followup --skip-install && \
             . "${SWIFTLY_HOME_DIR:-$HOME/.swiftly}/env.sh" && \
             hash -r
@@ -53,7 +54,6 @@ jobs:
           swiftly use ${{ matrix.toolchain }}
 
           ./Vendor/checkout-dependency --category benchmark --category component-model
-
           swift --version
           swift test --sanitize address --traits ComponentModel,WasmDebuggingSupport ${{ matrix.test-args }}
           cd Benchmarks && swift package benchmark
