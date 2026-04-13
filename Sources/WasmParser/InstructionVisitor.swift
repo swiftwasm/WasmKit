@@ -672,9 +672,10 @@ extension AnyInstructionVisitor {
 /// A visitor for WebAssembly instructions.
 ///
 /// The visitor pattern is used while parsing WebAssembly expressions to allow for easy extensibility.
-/// See the expression parsing method ``Code/parseExpression(visitor:)``
 public protocol InstructionVisitor: ~Copyable {
+    /// The error type thrown by visitor methods.
     associatedtype VisitorError: Error
+
     /// Current offset in visitor's instruction stream.
     var binaryOffset: Int { get set }
 

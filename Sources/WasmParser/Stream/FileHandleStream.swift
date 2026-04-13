@@ -26,7 +26,7 @@ public final class FileHandleStream: ByteStream {
 
             bytes = [UInt8](data)
         } catch {
-            throw WasmParserError(kind: .unclassified(error), offset: currentIndex)
+            throw WasmParserError("I/O error: \(error)", offset: currentIndex)
         }
         endOffset = startOffset + bytes.count
     }
@@ -34,7 +34,7 @@ public final class FileHandleStream: ByteStream {
     @discardableResult
     public func consumeAny() throws(WasmParserError) -> UInt8 {
         guard let consumed = try peek() else {
-            throw WasmParserError(.unexpectedEnd, offset: currentIndex)
+            throw WasmParserError(message: .unexpectedEnd, offset: currentIndex)
         }
         currentIndex = bytes.index(after: currentIndex)
         return consumed
@@ -43,13 +43,12 @@ public final class FileHandleStream: ByteStream {
     @discardableResult
     public func consume(_ expected: Set<UInt8>) throws(WasmParserError) -> UInt8 {
         guard let consumed = try peek() else {
-            throw WasmParserError(kind: .unexpectedEnd(expected: Set(expected)), offset: currentIndex)
+            throw WasmParserError(kind: .parserUnexpectedEnd(expected: Set(expected)), offset: currentIndex)
         }
         guard expected.contains(consumed) else {
             throw WasmParserError(
-                kind: .unexpectedByte(
+                kind: .parserUnexpectedByte(
                     consumed,
-                    index: currentIndex,
                     expected: Set(expected)
                 ), offset: currentIndex)
         }
@@ -71,10 +70,10 @@ public final class FileHandleStream: ByteStream {
         do {
             data = try fileHandle.read(upToCount: bytesToRead)
         } catch {
-            throw WasmParserError(kind: .unclassified(error), offset: currentIndex)
+            throw WasmParserError("I/O error: \(error)", offset: currentIndex)
         }
         guard data.count == bytesToRead else {
-            throw WasmParserError(kind: .unexpectedEnd(expected: nil), offset: currentIndex)
+            throw WasmParserError(kind: .parserUnexpectedEnd(expected: nil), offset: currentIndex)
         }
 
         bytes.append(contentsOf: [UInt8](data))

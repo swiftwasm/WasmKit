@@ -313,7 +313,10 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
             }
         }
 
-        func addImport(_ importNames: WatParser.ImportNames, makeDescriptor: @escaping () throws(WatParserError) -> ImportDescriptor) {
+        func addImport(
+            _ importNames: WatParser.ImportNames,
+            makeDescriptor: @escaping () throws(WatParserError) -> ImportDescriptor
+        ) {
             importFactories.append {
                 return Result { () throws(WatParserError) in
                     Import(
