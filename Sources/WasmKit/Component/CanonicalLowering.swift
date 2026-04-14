@@ -12,7 +12,7 @@ public enum CanonicalLowering {
         let newBuffer = try context.realloc(
             old: 0, oldSize: 0, oldAlign: 1, newSize: UInt32(bytes.count)
         )
-        newBuffer.withHostPointer(count: bytes.count) { newBuffer in
+        newBuffer.withHostPointer(in: context.guestMemory, count: bytes.count) { newBuffer in
             newBuffer.copyBytes(from: bytes)
         }
         return (newBuffer.offset, UInt32(bytes.count))

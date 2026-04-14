@@ -354,7 +354,7 @@ struct WASITests {
         let memory = try Memory(store: store, type: .init(min: 1))
 
         // Test union size and alignment end-to-end
-        let start = UnsafeGuestRawPointer(memorySpace: memory, offset: 0)
+        let start = UnsafeGuestRawPointer(offset: 0)
         var pointer = start
         let read = WASIAbi.Subscription.Union.fdRead(.init(0))
         let write = WASIAbi.Subscription.Union.fdWrite(.init(0))
@@ -365,33 +365,33 @@ struct WASITests {
         let event = WASIAbi.Event(userData: 3, error: .EIO, eventType: .fdRead, fdReadWrite: .init(nBytes: 37, flags: [.hangup]))
         let eventOffset = clockOffset + WASIAbi.Subscription.sizeInGuest
         let finalOffset = eventOffset + WASIAbi.Event.sizeInGuest
-        WASIAbi.Subscription.writeToGuest(at: &pointer, value: .init(userData: 1, union: read))
+        WASIAbi.Subscription.writeToGuest(at: &pointer, in: memory, value: .init(userData: 1, union: read))
         #expect(pointer.offset == writeOffset)
-        WASIAbi.Subscription.writeToGuest(at: &pointer, value: .init(userData: 2, union: write))
+        WASIAbi.Subscription.writeToGuest(at: &pointer, in: memory, value: .init(userData: 2, union: write))
         #expect(pointer.offset == clockOffset)
-        WASIAbi.Subscription.writeToGuest(at: &pointer, value: .init(userData: 3, union: clock))
+        WASIAbi.Subscription.writeToGuest(at: &pointer, in: memory, value: .init(userData: 3, union: clock))
         #expect(pointer.offset == eventOffset)
-        WASIAbi.Event.writeToGuest(at: &pointer, value: event)
+        WASIAbi.Event.writeToGuest(at: &pointer, in: memory, value: event)
         #expect(pointer.offset == finalOffset)
 
         // Test that reading back yields same result
         pointer = start
-        #expect(WASIAbi.Subscription.readFromGuest(&pointer) == .init(userData: 1, union: read))
+        #expect(WASIAbi.Subscription.readFromGuest(&pointer, in: memory) == .init(userData: 1, union: read))
         #expect(pointer.offset == writeOffset)
-        #expect(WASIAbi.Subscription.readFromGuest(&pointer) == .init(userData: 2, union: write))
+        #expect(WASIAbi.Subscription.readFromGuest(&pointer, in: memory) == .init(userData: 2, union: write))
         #expect(pointer.offset == clockOffset)
-        #expect(WASIAbi.Subscription.readFromGuest(&pointer) == .init(userData: 3, union: clock))
+        #expect(WASIAbi.Subscription.readFromGuest(&pointer, in: memory) == .init(userData: 3, union: clock))
         #expect(pointer.offset == eventOffset)
-        #expect(WASIAbi.Event.readFromGuest(&pointer) == event)
+        #expect(WASIAbi.Event.readFromGuest(&pointer, in: memory) == event)
         #expect(pointer.offset == finalOffset)
 
         #if !os(Windows)
             let elapsed = try ContinuousClock().measure {
-                let clockPointer = UnsafeGuestBufferPointer<WASIAbi.Subscription>(baseAddress: .init(memorySpace: memory, offset: clockOffset), count: 1)
-                let result = try WASIBridgeToHost().underlying.poll_oneoff(subscriptions: clockPointer, events: .init(baseAddress: .init(memorySpace: memory, offset: finalOffset), count: 1))
+                let clockPointer = UnsafeGuestBufferPointer<WASIAbi.Subscription>(baseAddress: .init(offset: clockOffset), count: 1)
+                let result = try WASIBridgeToHost().underlying.poll_oneoff(subscriptions: clockPointer, events: .init(baseAddress: .init(offset: finalOffset), count: 1), memory: memory)
                 #expect(result == 1)
             }
-            #expect(elapsed > .nanoseconds(timeout))
+            #expect(elapsed > Duration.nanoseconds(timeout))
         #endif
     }
 
@@ -968,13 +968,13 @@ struct WASITests {
         let writeData = Array("Hello, WASI!".utf8)
         let writeVecs = memory.writeIOVecs([writeData])
 
-        let nwritten = try wasi.fd_write(fileDescriptor: fd, ioVectors: writeVecs)
+        let nwritten = try wasi.fd_write(fileDescriptor: fd, ioVectors: writeVecs, memory: memory)
         #expect(nwritten == UInt32(writeData.count))
 
         _ = try wasi.fd_seek(fd: fd, offset: 0, whence: .SET)
 
         let readVecs = memory.readIOVecs(sizes: [writeData.count])
-        let nread = try wasi.fd_read(fd: fd, iovs: readVecs)
+        let nread = try wasi.fd_read(fd: fd, iovs: readVecs, memory: memory)
         #expect(nread == UInt32(writeData.count))
 
         let readData = memory.loadIOVecs(readVecs)
@@ -1011,7 +1011,7 @@ struct WASITests {
             let writeData = Array("Fail".utf8)
             let iovecs = memory.writeIOVecs([writeData])
 
-            _ = try wasi.fd_write(fileDescriptor: fd, ioVectors: iovecs)
+            _ = try wasi.fd_write(fileDescriptor: fd, ioVectors: iovecs, memory: memory)
             #expect(Bool(false), "Should not be able to write to read-only file")
         } catch let error as WASIAbi.Errno {
             #expect(error == .EBADF)
@@ -1047,12 +1047,12 @@ struct WASITests {
         let writeData = Array("Write only".utf8)
         let writeVecs = memory.writeIOVecs([writeData])
 
-        let nwritten = try wasi.fd_write(fileDescriptor: fd, ioVectors: writeVecs)
+        let nwritten = try wasi.fd_write(fileDescriptor: fd, ioVectors: writeVecs, memory: memory)
         #expect(nwritten == UInt32(writeData.count))
 
         do {
             let readVecs = memory.readIOVecs(sizes: [10])
-            _ = try wasi.fd_read(fd: fd, iovs: readVecs)
+            _ = try wasi.fd_read(fd: fd, iovs: readVecs, memory: memory)
             #expect(Bool(false), "Should not be able to read from write-only file")
         } catch let error as WASIAbi.Errno {
             #expect(error == .EBADF)
@@ -1097,7 +1097,7 @@ struct WASITests {
             let writeData = Array("Via handle".utf8)
             let iovecs = memory.writeIOVecs([writeData])
 
-            let nwritten = try wasi.fd_write(fileDescriptor: openedFd, ioVectors: iovecs)
+            let nwritten = try wasi.fd_write(fileDescriptor: openedFd, ioVectors: iovecs, memory: memory)
             #expect(nwritten == UInt32(writeData.count))
 
             try wasi.fd_close(fd: openedFd)
@@ -1137,7 +1137,7 @@ struct WASITests {
         let writeData = Array("End".utf8)
         let iovecs = memory.writeIOVecs([writeData])
 
-        let nwritten = try wasi.fd_write(fileDescriptor: fd, ioVectors: iovecs)
+        let nwritten = try wasi.fd_write(fileDescriptor: fd, ioVectors: iovecs, memory: memory)
         #expect(nwritten == UInt32(writeData.count))
 
         let stat = try wasi.fd_filestat_get(fd: fd)
@@ -1183,7 +1183,7 @@ struct WASITests {
         let writeData = Array("Hello, stdout!".utf8)
         let iovecs = memory.writeIOVecs([writeData])
 
-        let nwritten = try wasi.fd_write(fileDescriptor: 1, ioVectors: iovecs)
+        let nwritten = try wasi.fd_write(fileDescriptor: 1, ioVectors: iovecs, memory: memory)
         #expect(nwritten == UInt32(writeData.count))
     }
 
@@ -1201,7 +1201,7 @@ struct WASITests {
         let writeData = Array("Error message".utf8)
         let iovecs = memory.writeIOVecs([writeData])
 
-        let nwritten = try wasi.fd_write(fileDescriptor: 2, ioVectors: iovecs)
+        let nwritten = try wasi.fd_write(fileDescriptor: 2, ioVectors: iovecs, memory: memory)
         #expect(nwritten == UInt32(writeData.count))
     }
 
@@ -1220,7 +1220,7 @@ struct WASITests {
         let iovecs = memory.writeIOVecs([writeData])
 
         do {
-            _ = try wasi.fd_write(fileDescriptor: 0, ioVectors: iovecs)
+            _ = try wasi.fd_write(fileDescriptor: 0, ioVectors: iovecs, memory: memory)
             #expect(Bool(false), "Should not be able to write to stdin")
         } catch let error as WASIAbi.Errno {
             #expect(error == .EBADF)
@@ -1241,7 +1241,7 @@ struct WASITests {
         let iovecs = memory.readIOVecs(sizes: [10])
 
         do {
-            _ = try wasi.fd_read(fd: 1, iovs: iovecs)
+            _ = try wasi.fd_read(fd: 1, iovs: iovecs, memory: memory)
             #expect(Bool(false), "Should not be able to read from stdout")
         } catch let error as WASIAbi.Errno {
             #expect(error == .EBADF)
@@ -1262,7 +1262,7 @@ struct WASITests {
         let iovecs = memory.readIOVecs(sizes: [10])
 
         do {
-            _ = try wasi.fd_read(fd: 2, iovs: iovecs)
+            _ = try wasi.fd_read(fd: 2, iovs: iovecs, memory: memory)
             #expect(Bool(false), "Should not be able to read from stderr")
         } catch let error as WASIAbi.Errno {
             #expect(error == .EBADF)
@@ -1299,14 +1299,14 @@ struct WASITests {
 
         let memory = TestSupport.TestGuestMemory()
         let readVecs = memory.readIOVecs(sizes: [4])
-        _ = try wasi.fd_read(fd: fd, iovs: readVecs)
+        _ = try wasi.fd_read(fd: fd, iovs: readVecs, memory: memory)
 
         let stat2 = try wasi.fd_filestat_get(fd: fd)
         #expect(stat2.atim >= stat1.atim)
 
         let writeData = Array("more".utf8)
         let writeVecs = memory.writeIOVecs([writeData])
-        _ = try wasi.fd_write(fileDescriptor: fd, ioVectors: writeVecs)
+        _ = try wasi.fd_write(fileDescriptor: fd, ioVectors: writeVecs, memory: memory)
 
         let stat3 = try wasi.fd_filestat_get(fd: fd)
         #expect(stat3.mtim >= stat2.mtim)
@@ -1386,12 +1386,12 @@ struct WASITests {
 
             let memory = TestSupport.TestGuestMemory()
             let buffer = UnsafeGuestBufferPointer<UInt8>(
-                baseAddress: UnsafeGuestPointer<UInt8>(memorySpace: memory, offset: 0),
+                baseAddress: UnsafeGuestPointer<UInt8>(offset: 0),
                 count: 4096
             )
 
             // Without the noFollow fix, this throws ELOOP due to the cyclic symlink
-            let nwritten = try wasi.fd_readdir(fd: preopenFd, buffer: buffer, cookie: 0)
+            let nwritten = try wasi.fd_readdir(fd: preopenFd, buffer: buffer, cookie: 0, memory: memory)
             #expect(nwritten > 0)
         }
     #endif
@@ -1418,7 +1418,7 @@ struct WASITests {
 
             let memory = TestSupport.TestGuestMemory()
             let buffer = UnsafeGuestBufferPointer<UInt8>(
-                baseAddress: UnsafeGuestPointer<UInt8>(memorySpace: memory, offset: 0),
+                baseAddress: UnsafeGuestPointer<UInt8>(offset: 0),
                 count: 4096
             )
             let writeData = Array("hello".utf8)
@@ -1434,7 +1434,7 @@ struct WASITests {
                     fsRightsInheriting: [],
                     fdflags: []
                 )
-                #expect(try wasi.fd_write(fileDescriptor: fd, ioVectors: writeVecs) > 0)
+                #expect(try wasi.fd_write(fileDescriptor: fd, ioVectors: writeVecs, memory: memory) > 0)
                 try wasi.fd_close(fd: fd)
 
                 try wasi.path_rename(oldFd: dir1Fd, oldPath: "foo/bar", newFd: dir2Fd, newPath: "foo/baz")
@@ -1442,8 +1442,8 @@ struct WASITests {
                 try wasi.path_symlink(oldPath: "baz", dirFd: dir2Fd, newPath: "foo/quux")
                 let stat = try wasi.path_filestat_get(dirFd: dir2Fd, flags: .SYMLINK_FOLLOW, path: "foo/quux")
                 #expect(stat.size == 5)  // hello
-                let count = try Int(wasi.path_readlink(fd: dir2Fd, path: "foo/quux", buffer: buffer))
-                buffer.withHostPointer { ptr in
+                let count = try Int(wasi.path_readlink(fd: dir2Fd, path: "foo/quux", buffer: buffer, memory: memory))
+                buffer.withHostPointer(in: memory) { ptr in
                     #expect(String(decoding: ptr[..<count], as: UTF8.self) == "baz")
                 }
                 try wasi.path_unlink_file(dirFd: dir2Fd, path: "foo/baz")

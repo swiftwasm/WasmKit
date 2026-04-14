@@ -6,11 +6,23 @@ struct StaticCanonicalLoading: CanonicalLoading {
 
     let printer: SourcePrinter
     let builder: SwiftFunctionBuilder
+    /// When non-nil, generated code uses `ptr.read(from: <contextVarName>.guestMemory)` instead of `ptr.pointee`
+    let contextVarName: String?
+
+    init(printer: SourcePrinter, builder: SwiftFunctionBuilder, contextVarName: String? = nil) {
+        self.printer = printer
+        self.builder = builder
+        self.contextVarName = contextVarName
+    }
 
     private func loadByteSwappable(at pointer: Pointer, type: String) -> Operand {
         let boundPointer = "\(pointer).assumingMemoryBound(to: \(type).self)"
         let loadedVar = builder.variable("loaded")
-        printer.write(line: "let \(loadedVar) = \(boundPointer).pointee")
+        if let contextVarName {
+            printer.write(line: "let \(loadedVar) = \(boundPointer).read(from: \(contextVarName).guestMemory)")
+        } else {
+            printer.write(line: "let \(loadedVar) = \(boundPointer).pointee")
+        }
         return .variable(loadedVar)
     }
 

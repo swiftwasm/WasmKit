@@ -26,7 +26,6 @@ struct HostStaticCanonicalLifting: StaticCanonicalLifting {
         return .call(
             "UnsafeGuestPointer<\(pointeeTypeName)>",
             arguments: [
-                ("memorySpace", .accessField(.variable(context.contextVar), name: "guestMemory")),
                 ("offset", value),
             ])
     }
@@ -37,6 +36,13 @@ struct HostStaticCanonicalLifting: StaticCanonicalLifting {
             arguments: [
                 ("baseAddress", value), ("count", length),
             ])
+    }
+
+    func liftString(pointer: Operand, length: Operand, encoding: String) throws -> Operand {
+        let bufferPointer = liftBufferPointer(liftPointer(pointer, pointeeTypeName: "UInt8"), length: length)
+        let liftedVar = builder.variable("stringLifted")
+        printer.write(line: "let \(liftedVar) = \(bufferPointer).withHostPointer(in: \(context.contextVar).guestMemory) { String(decoding: $0, as: UTF8.self) }")
+        return .variable(liftedVar)
     }
 
     func liftList(
@@ -150,7 +156,7 @@ struct HostExportFunction {
         var coreParameters = coreSignature.parameters.makeIterator()
 
         var lowering = HostStaticCanonicalLowering(printer: printer, builder: builder, context: context, definitionMapping: definitionMapping)
-        var storing = StaticCanonicalStoring(printer: printer, builder: builder, definitionMapping: definitionMapping)
+        var storing = StaticCanonicalStoring(printer: printer, builder: builder, definitionMapping: definitionMapping, contextVarName: context.contextVar)
 
         for (parameter, parameterName) in zip(function.parameters, parameterNames) {
             let type = try typeResolver(parameter.type)
@@ -175,7 +181,7 @@ struct HostExportFunction {
         printer: SourcePrinter
     ) throws {
         let resultPtrVar = builder.variable("resultPtr")
-        var loading = StaticCanonicalLoading(printer: printer, builder: builder)
+        var loading = StaticCanonicalLoading(printer: printer, builder: builder, contextVarName: context.contextVar)
         printer.write(line: "let \(resultPtrVar) = \(call)[0].i32")
 
         var lifting = HostStaticCanonicalLifting(
@@ -184,7 +190,7 @@ struct HostExportFunction {
         )
         let hostPointerVar = builder.variable("guestPointer")
         printer.write(
-            line: "let \(hostPointerVar) = UnsafeGuestRawPointer(memorySpace: \(context.contextVar).guestMemory, offset: \(resultPtrVar))"
+            line: "let \(hostPointerVar) = UnsafeGuestRawPointer(offset: \(resultPtrVar))"
         )
 
         var loadedResults: [StaticMetaOperand] = []
@@ -225,7 +231,7 @@ struct HostExportFunction {
             printer: printer, builder: builder, context: context,
             definitionMapping: definitionMapping
         )
-        var loading = StaticCanonicalLoading(printer: printer, builder: builder)
+        var loading = StaticCanonicalLoading(printer: printer, builder: builder, contextVarName: context.contextVar)
         for resultType in function.results.types {
             let resolvedResultType = try typeResolver(resultType)
             let lifted = try WIT.CanonicalABI.lift(
