@@ -7,10 +7,23 @@ struct StaticCanonicalStoring: CanonicalStoring {
     let printer: SourcePrinter
     let builder: SwiftFunctionBuilder
     let definitionMapping: DefinitionMapping
+    /// When non-nil, generated code uses `ptr.write(value, to: <contextVarName>.guestMemory)` instead of `ptr.pointee = value`
+    let contextVarName: String?
+
+    init(printer: SourcePrinter, builder: SwiftFunctionBuilder, definitionMapping: DefinitionMapping, contextVarName: String? = nil) {
+        self.printer = printer
+        self.builder = builder
+        self.definitionMapping = definitionMapping
+        self.contextVarName = contextVarName
+    }
 
     private func storeByteSwappable(at pointer: Pointer, value: Operand, type: String) {
         let boundPointer = "\(pointer).assumingMemoryBound(to: \(type).self)"
-        printer.write(line: "\(boundPointer).pointee = \(type)(\(value))")
+        if let contextVarName {
+            printer.write(line: "\(boundPointer).write(\(type)(\(value)), to: \(contextVarName).guestMemory)")
+        } else {
+            printer.write(line: "\(boundPointer).pointee = \(type)(\(value))")
+        }
     }
 
     private func storeUInt(at pointer: Pointer, value: Operand, bitWidth: Int) {
