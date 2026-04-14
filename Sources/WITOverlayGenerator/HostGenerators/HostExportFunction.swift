@@ -26,7 +26,7 @@ struct HostStaticCanonicalLifting: StaticCanonicalLifting {
         return .call(
             "UnsafeGuestPointer<\(pointeeTypeName)>",
             arguments: [
-                ("offset", value),
+                ("offset", value)
             ])
     }
 
