@@ -472,7 +472,7 @@ func parseHexDigit(_ char: Unicode.Scalar) throws(WatParserError) -> UInt8? {
 
 extension Lexer.Cursor {
     mutating func parseHexNumber() throws(WatParserError) -> String {
-        return try parseUnderscoredChars(continueParsing: \.properties.isASCIIHexDigit)
+        return try parseUnderscoredChars(continueParsing: { $0.properties.isASCIIHexDigit })
     }
 
     mutating func parseDecimalNumber() throws(WatParserError) -> String {
