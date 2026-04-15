@@ -2,7 +2,7 @@ import WasmTypes
 
 /// An error type thrown during WAT (WebAssembly Text Format) parsing.
 public struct WatParserError: Swift.Error {
-    package let message: String
+    public let message: String
     public let location: Location?
 
     package init(_ message: String, location: Location?) {
