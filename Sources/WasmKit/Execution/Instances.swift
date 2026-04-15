@@ -67,7 +67,7 @@ package struct EntityHandle<T: ~Copyable>: Equatable, Hashable, Copyable {
 }
 
 extension EntityHandle: ValidatableEntity where T: ValidatableEntity, T: ~Copyable {
-    static func createOutOfBoundsError(index: Int, count: Int) -> Error {
+    static func createOutOfBoundsError(index: Int, count: Int) -> WasmKitError {
         T.createOutOfBoundsError(index: index, count: count)
     }
 }
@@ -377,8 +377,8 @@ struct TableEntity /* : ~Copyable */ {
 }
 
 extension TableEntity: ValidatableEntity {
-    static func createOutOfBoundsError(index: Int, count: Int) -> Error {
-        ValidationError(.indexOutOfBounds("table", index, max: count))
+    static func createOutOfBoundsError(index: Int, count: Int) -> WasmKitError {
+        WasmKitError(message: .indexOutOfBounds("table", index, max: count))
     }
 }
 
@@ -465,20 +465,134 @@ struct MemoryEntity: ~Copyable {
         isMemory64 ? UInt64.max : UInt64(1 << 32) / UInt64(pageSize)
     }
 
-    private var storage: UnsafeMutableBufferPointer<UInt8>
+    private struct MallocStorage {
+        var buffer: UnsafeMutableBufferPointer<UInt8>
+
+        init(byteSize: Int, isMemory64: Bool, engineConfiguration: EngineConfiguration) {
+            buffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: byteSize)
+            if byteSize > 0 { buffer.initialize(repeating: 0) }
+        }
+
+        var data: UnsafeBufferPointer<UInt8> {
+            UnsafeBufferPointer(buffer)
+        }
+        var baseAddress: UnsafeMutableRawPointer? {
+            UnsafeMutableRawPointer(buffer.baseAddress)
+        }
+
+        var byteCount: Int {
+            buffer.count
+        }
+
+        var trapGuardReservationSize: Int { 0 }
+
+        mutating func grow(to newByteCount: Int) throws {
+            let storage = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: newByteCount)
+            let oldStorage = self.buffer
+            if newByteCount > 0 { storage.initialize(repeating: 0) }
+            if oldStorage.count > 0 {
+                storage.baseAddress!.update(from: oldStorage.baseAddress!, count: oldStorage.count)
+            }
+            oldStorage.deallocate()
+            self.buffer = storage
+        }
+
+        func deallocate() {
+            buffer.deallocate()
+        }
+    }
+
+    #if os(macOS) || os(Linux)
+        private enum Storage {
+            case mprotect(MprotectLinearMemory)
+            case malloc(MallocStorage)
+
+            init(byteSize: Int, isMemory64: Bool, engineConfiguration: EngineConfiguration) {
+                if !isMemory64, engineConfiguration.memoryBoundsChecking == .mprotect {
+                    let reservationSize = MprotectLinearMemory.wasm32ReservationSize(offsetGuardSize: engineConfiguration.memoryOffsetGuardSize)
+                    do {
+                        self = .mprotect(try MprotectLinearMemory(committedSize: byteSize, reservationSize: reservationSize))
+                    } catch {
+                        // Fall back to malloc if mprotect fails for some reasons (e.g. vm.max_map_count exhaustion on Linux)
+                        let storage = MallocStorage(byteSize: byteSize, isMemory64: isMemory64, engineConfiguration: engineConfiguration)
+                        self = .malloc(storage)
+                    }
+                } else {
+                    let storage = MallocStorage(byteSize: byteSize, isMemory64: isMemory64, engineConfiguration: engineConfiguration)
+                    self = .malloc(storage)
+                }
+            }
+
+            var data: UnsafeBufferPointer<UInt8> {
+                switch self {
+                case .mprotect(let memory):
+                    return memory.makeBufferPointer()
+                case .malloc(let buffer):
+                    return buffer.data
+                }
+            }
+
+            var baseAddress: UnsafeMutableRawPointer? {
+                switch self {
+                case .mprotect(let memory):
+                    return memory.baseAddress
+                case .malloc(let buffer):
+                    return buffer.baseAddress
+                }
+            }
+
+            var byteCount: Int {
+                switch self {
+                case .mprotect(let memory):
+                    return memory.committedSize
+                case .malloc(let buffer):
+                    return buffer.byteCount
+                }
+            }
+
+            var trapGuardReservationSize: Int {
+                switch self {
+                case .mprotect(let memory):
+                    return memory.reservationSize
+                case .malloc(let buffer):
+                    return buffer.trapGuardReservationSize
+                }
+            }
+
+            mutating func grow(to newByteCount: Int) throws {
+                switch self {
+                case .mprotect(var memory):
+                    try memory.grow(to: newByteCount)
+                    self = .mprotect(memory)
+                case .malloc(var buffer):
+                    try buffer.grow(to: newByteCount)
+                    self = .malloc(buffer)
+                }
+            }
+
+            func deallocate() {
+                switch self {
+                case .mprotect(let memory):
+                    memory.deallocate()
+                case .malloc(let buffer):
+                    buffer.deallocate()
+                }
+            }
+        }
+    #else
+        private typealias Storage = MallocStorage
+    #endif
+    private var storage: Storage
     let maxPageCount: UInt64
     let limit: Limits
     let sharedMutex: Mutex<Void>?
 
-    init(_ memoryType: MemoryType, resourceLimiter: any ResourceLimiter) throws {
+    init(_ memoryType: MemoryType, engineConfiguration: EngineConfiguration, resourceLimiter: any ResourceLimiter) throws {
         let byteSize = Int(memoryType.min) * Self.pageSize
         guard try resourceLimiter.limitMemoryGrowth(to: byteSize) else {
             throw Trap(.initialMemorySizeExceedsLimit(byteSize: byteSize))
         }
-        storage = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: byteSize)
-        if byteSize > 0 {
-            storage.initialize(repeating: 0)
-        }
+        self.storage = Storage(byteSize: byteSize, isMemory64: memoryType.isMemory64, engineConfiguration: engineConfiguration)
         let defaultMaxPageCount = Self.maxPageCount(isMemory64: memoryType.isMemory64)
         maxPageCount = memoryType.max ?? defaultMaxPageCount
         limit = memoryType
@@ -489,22 +603,21 @@ struct MemoryEntity: ~Copyable {
         storage.deallocate()
     }
 
-    var data: UnsafeBufferPointer<UInt8> {
-        UnsafeBufferPointer(storage)
-    }
+    var data: UnsafeBufferPointer<UInt8> { storage.data }
 
-    var baseAddress: UnsafeMutableRawPointer? {
-        UnsafeMutableRawPointer(storage.baseAddress)
-    }
+    var baseAddress: UnsafeMutableRawPointer? { storage.baseAddress }
 
-    var byteCount: Int {
-        storage.count
+    var byteCount: Int { storage.byteCount }
+
+    var trapGuardReservationSize: Int {
+        storage.trapGuardReservationSize
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#grow-mem>
     mutating func grow(by pageCount: Int, resourceLimiter: any ResourceLimiter) throws -> Value {
-        let newPageCount = storage.count / Self.pageSize + pageCount
+        let currentByteCount = byteCount
+        let newPageCount = currentByteCount / Self.pageSize + pageCount
 
         guard newPageCount <= maxPageCount else {
             return limit.isMemory64 ? .i64((-1 as Int64).unsigned) : .i32((-1 as Int32).unsigned)
@@ -513,17 +626,9 @@ struct MemoryEntity: ~Copyable {
             return limit.isMemory64 ? .i64((-1 as Int64).unsigned) : .i32((-1 as Int32).unsigned)
         }
 
-        let result = Int32(storage.count / MemoryEntity.pageSize).unsigned
-        let oldStorage = storage
+        let result = Int32(currentByteCount / MemoryEntity.pageSize).unsigned
         let newByteCount = newPageCount * MemoryEntity.pageSize
-        storage = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: newByteCount)
-        if newByteCount > 0 {
-            storage.initialize(repeating: 0)
-        }
-        if oldStorage.count > 0 {
-            storage.baseAddress!.update(from: oldStorage.baseAddress!, count: oldStorage.count)
-        }
-        oldStorage.deallocate()
+        try storage.grow(to: newByteCount)
 
         return limit.isMemory64 ? .i64(UInt64(result)) : .i32(result)
     }
@@ -532,14 +637,15 @@ struct MemoryEntity: ~Copyable {
         let (destinationEnd, destinationOverflow) = destination.addingReportingOverflow(count)
         let (sourceEnd, sourceOverflow) = source.addingReportingOverflow(count)
 
-        guard !destinationOverflow, destinationEnd <= storage.count,
-            !sourceOverflow, sourceEnd <= storage.count
+        let byteCount = byteCount
+        guard !destinationOverflow, destinationEnd <= byteCount,
+            !sourceOverflow, sourceEnd <= byteCount
         else {
             throw Trap(.memoryOutOfBounds)
         }
         let count = Int(count)
         guard count > 0 else { return }
-        guard let baseAddress = storage.baseAddress else { return }
+        guard let baseAddress = baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
         let destination = Int(destination)
         let source = Int(source)
         if destination < source {
@@ -557,14 +663,15 @@ struct MemoryEntity: ~Copyable {
         let (destinationEnd, destinationOverflow) = destination.addingReportingOverflow(UInt64(count))
         let (sourceEnd, sourceOverflow) = source.addingReportingOverflow(count)
 
-        guard !destinationOverflow, destinationEnd <= storage.count,
+        let byteCount = byteCount
+        guard !destinationOverflow, destinationEnd <= byteCount,
             !sourceOverflow, sourceEnd <= segment.data.count
         else {
             throw Trap(.memoryOutOfBounds)
         }
         segment.data.withUnsafeBufferPointer { segment in
             guard
-                let memory = UnsafeMutableRawPointer(storage.baseAddress),
+                let memory = baseAddress,
                 let segment = UnsafeRawPointer(segment.baseAddress)
             else { return }
             let dest = memory.advanced(by: Int(destination))
@@ -575,28 +682,28 @@ struct MemoryEntity: ~Copyable {
 
     mutating func write(offset: Int, bytes: ArraySlice<UInt8>) throws {
         let endOffset = offset + bytes.count
-        guard endOffset <= storage.count else {
+        guard endOffset <= byteCount else {
             throw Trap(.memoryOutOfBounds)
         }
         guard bytes.count > 0 else { return }
         bytes.withUnsafeBufferPointer { source in
-            storage.baseAddress!.advanced(by: offset).update(from: source.baseAddress!, count: bytes.count)
+            baseAddress!.advanced(by: offset).assumingMemoryBound(to: UInt8.self).update(from: source.baseAddress!, count: bytes.count)
         }
     }
 
     mutating func fill(offset: Int, value: UInt8, count: Int) throws {
         let endOffset = offset + count
-        guard endOffset <= storage.count else {
+        guard endOffset <= byteCount else {
             throw Trap(.memoryOutOfBounds)
         }
         guard count > 0 else { return }
-        storage.baseAddress!.advanced(by: offset).update(repeating: value, count: count)
+        baseAddress!.advanced(by: offset).assumingMemoryBound(to: UInt8.self).update(repeating: value, count: count)
     }
 }
 
 extension MemoryEntity: ValidatableEntity {
-    static func createOutOfBoundsError(index: Int, count: Int) -> Error {
-        ValidationError(.indexOutOfBounds("memory", index, max: count))
+    static func createOutOfBoundsError(index: Int, count: Int) -> WasmKitError {
+        WasmKitError(message: .indexOutOfBounds("memory", index, max: count))
     }
 }
 
@@ -641,7 +748,7 @@ public struct Memory: Equatable {
         try ModuleValidator.checkMemoryType(type, features: store.engine.configuration.features)
 
         self.init(
-            handle: try store.allocator.allocate(memoryType: type, resourceLimiter: store.resourceLimiter),
+            handle: try store.allocator.allocate(memoryType: type, engineConfiguration: store.engine.configuration, resourceLimiter: store.resourceLimiter),
             allocator: store.allocator
         )
     }
@@ -738,8 +845,8 @@ struct GlobalEntity /* : ~Copyable */ {
 }
 
 extension GlobalEntity: ValidatableEntity {
-    static func createOutOfBoundsError(index: Int, count: Int) -> Error {
-        ValidationError(.indexOutOfBounds("global", index, max: count))
+    static func createOutOfBoundsError(index: Int, count: Int) -> WasmKitError {
+        WasmKitError(message: .indexOutOfBounds("global", index, max: count))
     }
 }
 
@@ -825,8 +932,8 @@ struct ElementSegmentEntity {
 }
 
 extension ElementSegmentEntity: ValidatableEntity {
-    static func createOutOfBoundsError(index: Int, count: Int) -> Error {
-        ValidationError(.indexOutOfBounds("element", index, max: count))
+    static func createOutOfBoundsError(index: Int, count: Int) -> WasmKitError {
+        WasmKitError(message: .indexOutOfBounds("element", index, max: count))
     }
 }
 

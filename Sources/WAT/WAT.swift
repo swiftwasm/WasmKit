@@ -68,6 +68,8 @@ public func wat2wasm(
 
 /// A WAT module representation.
 public struct Wat {
+    /// The module name from `(module $name ...)`, including the `$` prefix.
+    var id: String? = nil
     var types: TypesMap
     let functionsMap: NameMapping<WatParser.FunctionDecl>
     let tablesMap: NameMapping<WatParser.TableDecl>
@@ -137,13 +139,19 @@ public struct Wat {
 /// ```
 public func parseWAT(_ input: String, features: WasmFeatureSet = .default) throws -> Wat {
     var parser = Parser(input)
-    let wat: Wat
+    var wat: Wat
     if try parser.takeParenBlockStart("module") {
+        let moduleId = try parser.takeId()
         wat = try parseWAT(&parser, features: features)
+        wat.id = moduleId?.value
         try parser.skipParenBlock()
     } else {
         // The root (module) may be omitted
         wat = try parseWAT(&parser, features: features)
+    }
+    // Validate that all input has been consumed
+    if let token = try parser.peek() {
+        throw WatParserError("unexpected token", location: token.location(in: parser.lexer))
     }
     return wat
 }
@@ -305,7 +313,10 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
             }
         }
 
-        func addImport(_ importNames: WatParser.ImportNames, makeDescriptor: @escaping () throws(WatParserError) -> ImportDescriptor) {
+        func addImport(
+            _ importNames: WatParser.ImportNames,
+            makeDescriptor: @escaping () throws(WatParserError) -> ImportDescriptor
+        ) {
             importFactories.append {
                 return Result { () throws(WatParserError) in
                     Import(

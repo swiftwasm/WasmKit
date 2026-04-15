@@ -555,6 +555,8 @@ enum Instruction: Equatable {
     case memoryAtomicWait64(Instruction.AtomicWaitOperand)
     /// WebAssembly Core Instruction `memory.atomic.notify`
     case memoryAtomicNotify(Instruction.AtomicNotifyOperand)
+    /// WebAssembly Core Instruction `atomic.fence`
+    case atomicFence
 }
 
 extension Instruction {
@@ -1690,6 +1692,7 @@ extension Instruction {
         case .memoryAtomicWait32: return 266
         case .memoryAtomicWait64: return 267
         case .memoryAtomicNotify: return 268
+        case .atomicFence: return 269
         }
     }
 }
@@ -1970,6 +1973,7 @@ extension Instruction {
         case 266: return .memoryAtomicWait32(Instruction.AtomicWaitOperand.load(from: &pc))
         case 267: return .memoryAtomicWait64(Instruction.AtomicWaitOperand.load(from: &pc))
         case 268: return .memoryAtomicNotify(Instruction.AtomicNotifyOperand.load(from: &pc))
+        case 269: return .atomicFence
         default: fatalError("Unknown instruction opcode: \(opcode)")
         }
     }
@@ -2253,8 +2257,129 @@ extension Instruction {
         case 266: return "memoryAtomicWait32"
         case 267: return "memoryAtomicWait64"
         case 268: return "memoryAtomicNotify"
+        case 269: return "atomicFence"
         default: fatalError("Unknown instruction index: \(opcode)")
         }
     }
 }
 #endif // EngineStats
+
+#if WasmDebuggingSupport
+
+/// A protocol for predicting the next instruction(s) that will execute after a control-flow instruction.
+///
+/// Each `isControl` instruction in VMSpec gets a dedicated method in this protocol.
+/// Adding a new control instruction automatically adds a new protocol requirement,
+/// so any conforming type will fail to compile until it implements the new prediction.
+protocol NextInstructionPredictor: ~Copyable {
+    mutating func predictNext_call(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_compilingCall(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_internalCall(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_callIndirect(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_returnCall(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_returnCallIndirect(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_unreachable(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_br(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIf(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brIfNot(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_brTable(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext__return(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_endOfExecution(operandPc: Pc, sp: Sp) -> [Pc]
+    mutating func predictNext_breakpoint(operandPc: Pc, sp: Sp) -> [Pc]
+}
+
+extension Instruction {
+    /// Dispatches to the appropriate `NextInstructionPredictor` method based on the opcode ID.
+    /// - Returns: The predicted next Pc(s), or `nil` if the opcode is not a control instruction.
+    static func predictNextPcs(
+        opcodeID: OpcodeID, operandPc: Pc, sp: Sp,
+        predictor: inout some NextInstructionPredictor & ~Copyable
+    ) -> [Pc]? {
+        switch opcodeID {
+        case 3: return predictor.predictNext_call(operandPc: operandPc, sp: sp)
+        case 4: return predictor.predictNext_compilingCall(operandPc: operandPc, sp: sp)
+        case 5: return predictor.predictNext_internalCall(operandPc: operandPc, sp: sp)
+        case 6: return predictor.predictNext_callIndirect(operandPc: operandPc, sp: sp)
+        case 8: return predictor.predictNext_returnCall(operandPc: operandPc, sp: sp)
+        case 9: return predictor.predictNext_returnCallIndirect(operandPc: operandPc, sp: sp)
+        case 10: return predictor.predictNext_unreachable(operandPc: operandPc, sp: sp)
+        case 12: return predictor.predictNext_br(operandPc: operandPc, sp: sp)
+        case 13: return predictor.predictNext_brIf(operandPc: operandPc, sp: sp)
+        case 14: return predictor.predictNext_brIfNot(operandPc: operandPc, sp: sp)
+        case 15: return predictor.predictNext_brTable(operandPc: operandPc, sp: sp)
+        case 16: return predictor.predictNext__return(operandPc: operandPc, sp: sp)
+        case 17: return predictor.predictNext_endOfExecution(operandPc: operandPc, sp: sp)
+        case 202: return predictor.predictNext_breakpoint(operandPc: operandPc, sp: sp)
+        default: return nil
+        }
+    }
+
+    /// Builds a map from head code slot to opcode ID for all control-flow instructions.
+    ///
+    /// This is generated so that adding a new `isControl` instruction automatically
+    /// includes it in the map without manual updates.
+    static func buildControlHeadSlotMap(
+        threadingModel: EngineConfiguration.ThreadingModel
+    ) -> [CodeSlot: OpcodeID] {
+        var map = [CodeSlot: OpcodeID]()
+            do {
+                let inst = Instruction.call(.init(rawCallee: UInt64(0), spAddend: VReg(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.compilingCall(.init(rawCallee: UInt64(0), spAddend: VReg(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.internalCall(.init(rawCallee: UInt64(0), spAddend: VReg(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.callIndirect(.init(tableIndex: UInt32(0), rawType: UInt32(0), index: VReg(0), spAddend: VReg(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.returnCall(.init(rawCallee: UInt64(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.returnCallIndirect(.init(tableIndex: UInt32(0), rawType: UInt32(0), index: VReg(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.unreachable
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.br(Instruction.BrOperand(0))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIf(.init(condition: LVReg(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brIfNot(.init(condition: LVReg(0), offset: Int32(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.brTable(.init(rawBaseAddress: UInt64(0), count: UInt16(0), index: VReg(0)))
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction._return
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.endOfExecution
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+            do {
+                let inst = Instruction.breakpoint
+                map[inst.headSlot(threadingModel: threadingModel)] = inst.opcodeID
+            }
+        return map
+    }
+}
+
+#endif // WasmDebuggingSupport

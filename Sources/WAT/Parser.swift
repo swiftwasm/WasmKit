@@ -1,4 +1,5 @@
 import WasmParser
+import WasmTypes
 
 internal struct Parser {
     var lexer: Lexer
@@ -422,24 +423,5 @@ extension Parser {
             }
         }
         return results
-    }
-}
-
-public struct WatParserError: Error, CustomStringConvertible {
-    public let message: String
-    public let location: Location?
-
-    public var description: String {
-        if let location {
-            let (line, column) = location.computeLineAndColumn()
-            return "\(line):\(column): \(message)"
-        } else {
-            return message
-        }
-    }
-
-    init(_ message: String, location: Location?) {
-        self.message = message
-        self.location = location
     }
 }

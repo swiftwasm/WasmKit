@@ -2,7 +2,7 @@ import WasmParser
 import WasmTypes
 
 protocol WastConstInstructionVisitor: InstructionVisitor {
-    mutating func visitRefExtern(value: UInt32) throws(VisitorError)
+    mutating func visitRefExtern(value: UInt32) throws(WatParserError)
 }
 
 /// A parser for WAST format.
@@ -54,7 +54,6 @@ struct WastParser {
     }
 
     struct ConstExpressionCollector: WastConstInstructionVisitor {
-        typealias VisitorError = WatParserError
         var binaryOffset: Int = 0
         let addValue: (WastConstValue) -> Void
 

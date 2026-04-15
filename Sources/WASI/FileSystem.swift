@@ -1,4 +1,5 @@
 import SystemPackage
+import WasmTypes
 
 struct FileAccessMode: OptionSet {
     let rawValue: UInt32
@@ -37,17 +38,17 @@ protocol WASIFile: WASIEntry {
     func tell() throws -> WASIAbi.FileSize
     func seek(offset: WASIAbi.FileDelta, whence: WASIAbi.Whence) throws -> WASIAbi.FileSize
 
-    func write<Buffer: Sequence>(
-        vectored buffer: Buffer
+    func write<M: GuestMemory, Buffer: Sequence>(
+        vectored buffer: Buffer, memory: M
     ) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec
-    func pwrite<Buffer: Sequence>(
-        vectored buffer: Buffer, offset: WASIAbi.FileSize
+    func pwrite<M: GuestMemory, Buffer: Sequence>(
+        vectored buffer: Buffer, memory: M, offset: WASIAbi.FileSize
     ) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec
-    func read<Buffer: Sequence>(
-        into buffer: Buffer
+    func read<M: GuestMemory, Buffer: Sequence>(
+        into buffer: Buffer, memory: M
     ) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec
-    func pread<Buffer: Sequence>(
-        into buffer: Buffer, offset: WASIAbi.FileSize
+    func pread<M: GuestMemory, Buffer: Sequence>(
+        into buffer: Buffer, memory: M, offset: WASIAbi.FileSize
     ) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec
 }
 

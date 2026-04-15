@@ -27,10 +27,11 @@ extension FdTable {
     }
 }
 
-func poll(
+func poll<M: GuestMemory>(
     subscriptions: some Sequence<WASIAbi.Subscription>,
     events: UnsafeGuestBufferPointer<WASIAbi.Event>,
-    _ fdTable: FdTable
+    _ fdTable: FdTable,
+    memory: M
 ) throws -> WASIAbi.Size {
     #if os(Windows)
         throw WASIAbi.Errno.ENOTSUP
@@ -60,7 +61,7 @@ func poll(
         var updatedEvents: WASIAbi.Size = 0
         if result == 0, let clockUserData {
             updatedEvents += 1
-            events[0] = .init(userData: clockUserData, error: .SUCCESS, eventType: .clock, fdReadWrite: .init(nBytes: 0, flags: .init(rawValue: 0)))
+            events.write(at: 0, .init(userData: clockUserData, error: .SUCCESS, eventType: .clock, fdReadWrite: .init(nBytes: 0, flags: .init(rawValue: 0))), to: memory)
         } else if result > 0 {
             for (i, fd) in pollfds.enumerated() {
                 guard fd.revents != 0 else { continue }
@@ -68,12 +69,12 @@ func poll(
                 updatedEvents += 1
                 let hangup: WASIAbi.Event.FdReadWrite.Flags = fd.revents & Int16(POLLHUP) != 0 ? [.hangup] : []
                 if fd.revents & Int16(POLLIN) != 0 || (fd.events & Int16(POLLIN) != 0 && fd.revents & Int16(POLLHUP) != 0) {
-                    events[.init(eventIndex)] = .init(userData: fdUserData[i], error: .SUCCESS, eventType: .fdRead, fdReadWrite: .init(nBytes: 0, flags: hangup))
+                    events.write(at: .init(eventIndex), .init(userData: fdUserData[i], error: .SUCCESS, eventType: .fdRead, fdReadWrite: .init(nBytes: 0, flags: hangup)), to: memory)
                 } else if fd.revents & Int16(POLLOUT) != 0 || (fd.events & Int16(POLLOUT) != 0 && fd.revents & Int16(POLLHUP) != 0) {
-                    events[.init(eventIndex)] = .init(userData: fdUserData[i], error: .SUCCESS, eventType: .fdWrite, fdReadWrite: .init(nBytes: 0, flags: hangup))
+                    events.write(at: .init(eventIndex), .init(userData: fdUserData[i], error: .SUCCESS, eventType: .fdWrite, fdReadWrite: .init(nBytes: 0, flags: hangup)), to: memory)
                 } else if fd.revents & Int16(POLLERR | POLLNVAL) != 0 {
                     let eventType: WASIAbi.EventType = fd.events & Int16(POLLIN) != 0 ? .fdRead : .fdWrite
-                    events[.init(eventIndex)] = .init(userData: fdUserData[i], error: .EBADF, eventType: eventType, fdReadWrite: .init(nBytes: 0, flags: []))
+                    events.write(at: .init(eventIndex), .init(userData: fdUserData[i], error: .EBADF, eventType: eventType, fdReadWrite: .init(nBytes: 0, flags: [])), to: memory)
                 }
             }
         } else {

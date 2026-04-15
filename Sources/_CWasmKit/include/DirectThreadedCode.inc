@@ -1750,6 +1750,12 @@ SWIFT_CC(swiftasync) static inline void wasmkit_tc_memoryAtomicNotify(Sp sp, Pc 
     if (error) return wasmkit_execution_state_set_error(error, sp, state);
     return ((wasmkit_tc_exec)next)(sp, pc, md, ms, state);
 }
+SWIFT_CC(swiftasync) static inline void wasmkit_tc_atomicFence(Sp sp, Pc pc, Md md, Ms ms, SWIFT_CONTEXT void *state) {
+    SWIFT_CC(swift) uint64_t wasmkit_execute_atomicFence(Sp *sp, Pc *pc, Md *md, Ms *ms, SWIFT_CONTEXT void *state, SWIFT_ERROR_RESULT void **error);
+    void * _Nullable error = NULL; uint64_t next;
+    INLINE_CALL next = wasmkit_execute_atomicFence(&sp, &pc, &md, &ms, state, &error);
+    return ((wasmkit_tc_exec)next)(sp, pc, md, ms, state);
+}
 static const uintptr_t wasmkit_tc_exec_handlers[] = {
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_copyStack),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_globalGet),
@@ -2020,4 +2026,5 @@ static const uintptr_t wasmkit_tc_exec_handlers[] = {
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_memoryAtomicWait32),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_memoryAtomicWait64),
     (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_memoryAtomicNotify),
+    (uintptr_t)((wasmkit_tc_exec)&wasmkit_tc_atomicFence),
 };

@@ -1,16 +1,16 @@
 import WasmTypes
 
 extension GuestPointee {
-    static func readFromGuest(_ pointer: inout UnsafeGuestRawPointer) -> Self {
+    static func readFromGuest<M: GuestMemory>(_ pointer: inout UnsafeGuestRawPointer, in memory: M) -> Self {
         pointer = pointer.alignedUp(toMultipleOf: Self.alignInGuest)
-        let value = readFromGuest(pointer)
+        let value = readFromGuest(pointer, in: memory)
         pointer = pointer.advanced(by: sizeInGuest)
         return value
     }
 
-    static func writeToGuest(at pointer: inout UnsafeGuestRawPointer, value: Self) {
+    static func writeToGuest<M: GuestMemory>(at pointer: inout UnsafeGuestRawPointer, in memory: M, value: Self) {
         pointer = pointer.alignedUp(toMultipleOf: Self.alignInGuest)
-        writeToGuest(at: pointer, value: value)
+        writeToGuest(at: pointer, in: memory, value: value)
         pointer = pointer.advanced(by: sizeInGuest)
     }
 }

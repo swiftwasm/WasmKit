@@ -513,10 +513,12 @@ extension Array where Element == Value {
 
 extension Swift.Error {
     var text: String {
-        if let error = self as? WasmParserError {
+        if let error = self as? WasmKitError {
             return error.description
         }
-
+        if let error = self as? WatParserError {
+            return error.description
+        }
         return "unknown error: \(self)"
     }
 }

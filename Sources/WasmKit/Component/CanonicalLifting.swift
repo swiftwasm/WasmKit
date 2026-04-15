@@ -16,7 +16,7 @@ public enum CanonicalLifting {
     ) throws -> [Element] {
         var elements = [Element]()
         elements.reserveCapacity(Int(elementSize))
-        let guestPointer = UnsafeGuestRawPointer(memorySpace: context.guestMemory, offset: pointer)
+        let guestPointer = UnsafeGuestRawPointer(offset: pointer)
         for i in 0..<length {
             let element = try loadElement(guestPointer.advanced(by: i * elementSize))
             elements.append(element)

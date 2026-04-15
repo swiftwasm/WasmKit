@@ -49,7 +49,7 @@ public struct CanonicalCallContext {
         guard case .i32(let new) = results[0] else {
             throw CanonicalABIError(description: "\"cabi_realloc\" export should return an i32 value")
         }
-        return UnsafeGuestRawPointer(memorySpace: guestMemory, offset: new)
+        return UnsafeGuestRawPointer(offset: new)
     }
 }
 
@@ -62,16 +62,5 @@ extension CanonicalCallContext {
     @available(*, deprecated, renamed: "init(options:instance:)")
     public init(options: CanonicalOptions, moduleInstance: Instance, runtime: Runtime) {
         self.init(options: options, instance: moduleInstance)
-    }
-}
-
-@available(*, deprecated, renamed: "Memory", message: "WasmKitGuestMemory has been removed; use Memory instead")
-public typealias WasmKitGuestMemory = Memory
-
-extension Memory {
-    /// Creates a new memory instance from the given store and address
-    @available(*, unavailable, message: "WasmKitGuestMemory has been removed; use Memory instead")
-    public init(store: Store, memory: Memory) {
-        fatalError()
     }
 }

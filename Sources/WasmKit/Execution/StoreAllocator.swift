@@ -60,7 +60,7 @@ class BumpAllocator<T: ~Copyable> {
 
 protocol ValidatableEntity: ~Copyable {
     /// Create an error for an out-of-bounds access to the entity.
-    static func createOutOfBoundsError(index: Int, count: Int) -> any Error
+    static func createOutOfBoundsError(index: Int, count: Int) -> WasmKitError
 }
 
 /// A simple bump allocator for immutable arrays with various element types.
@@ -121,15 +121,15 @@ struct ImmutableArray<T> {
 
     /// Accesses the element at the specified position, with bounds checking.
     subscript(validating index: Int) -> T where T: ValidatableEntity {
-        get throws {
+        get throws(WasmKitError) {
             return try self[validating: index, T.createOutOfBoundsError]
         }
     }
 
     /// Accesses the element at the specified position, with bounds checking
     /// and a custom error creation function.
-    subscript(validating index: Int, createError: (_ index: Int, _ count: Int) -> any Error) -> T {
-        get throws {
+    subscript(validating index: Int, createError: (_ index: Int, _ count: Int) -> WasmKitError) -> T {
+        get throws(WasmKitError) {
             guard index >= 0 && index < buffer.count else {
                 throw createError(index, buffer.count)
             }
@@ -286,7 +286,7 @@ extension StoreAllocator {
             case (.function(let typeIndex), .function(let externalFunc)):
                 let type = externalFunc.type
                 guard typeIndex < module.types.count else {
-                    throw ValidationError(.indexOutOfBounds("type", typeIndex, max: module.types.count))
+                    throw WasmKitError(message: .indexOutOfBounds("type", typeIndex, max: module.types.count))
                 }
                 let expected = module.types[Int(typeIndex)]
                 guard engine.internType(expected) == type else {
@@ -387,7 +387,7 @@ extension StoreAllocator {
         let memories = try allocateEntities(
             imports: importedMemories,
             internals: module.internalMemories,
-            allocateHandle: { m, _ in try allocate(memoryType: m, resourceLimiter: resourceLimiter) }
+            allocateHandle: { m, _ in try allocate(memoryType: m, engineConfiguration: engine.configuration, resourceLimiter: resourceLimiter) }
         )
 
         var functionRefs: Set<InternalFunction> = []
@@ -463,7 +463,7 @@ extension StoreAllocator {
 
         let exports: [String: InternalExternalValue] = try module.exports.reduce(into: [:]) { result, export in
             guard result[export.name] == nil else {
-                throw ValidationError(.duplicateExportName(name: export.name))
+                throw WasmKitError(message: .duplicateExportName(name: export.name))
             }
             result[export.name] = try createExportValue(export)
         }
@@ -510,7 +510,7 @@ extension StoreAllocator {
 
     internal func allocate(
         type: FunctionType,
-        implementation: @escaping (Caller, [Value]) throws -> [Value],
+        implementation: @escaping Function.Implementation,
         engine: Engine
     ) -> InternalFunction {
         let pointer = hostFunctions.allocate(
@@ -530,8 +530,8 @@ extension StoreAllocator {
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/exec/modules.html#alloc-mem>
-    func allocate(memoryType: MemoryType, resourceLimiter: any ResourceLimiter) throws -> InternalMemory {
-        let pointer = try memories.allocate(initializing: MemoryEntity(memoryType, resourceLimiter: resourceLimiter))
+    func allocate(memoryType: MemoryType, engineConfiguration: EngineConfiguration, resourceLimiter: any ResourceLimiter) throws -> InternalMemory {
+        let pointer = try memories.allocate(initializing: MemoryEntity(memoryType, engineConfiguration: engineConfiguration, resourceLimiter: resourceLimiter))
         return InternalMemory(unsafe: pointer)
     }
 

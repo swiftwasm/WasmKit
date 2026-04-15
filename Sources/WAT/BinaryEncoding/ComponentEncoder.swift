@@ -1,5 +1,6 @@
 #if ComponentModel
     import ComponentModel
+    import WasmParser
     import WasmTypes
 
     /// Binary component encoder, implementing CM proposal `Binary.md` spec: https://github.com/WebAssembly/component-model/blob/main/design/mvp/Binary.md
@@ -8,38 +9,41 @@
 
         public init() {}
 
-        mutating func writeHeader() {
-            underlying.output.append(contentsOf: [
-                0x00, 0x61, 0x73, 0x6D,  // magic
-                0x0d, 0x00,  // version
-                0x01, 0x00,  // layer
-            ])
-        }
-
         public mutating func encode(
             _ component: ComponentWatParser.ComponentDef,
             options: EncodeOptions
         ) throws(WatParserError) -> [UInt8] {
-            writeHeader()
+            underlying.writeComponentHeader()
 
-            // Collect metadata needed for encoding
-            let fields = try groupFields(component.fields)
+            // Compute metadata directly from component fields
+            let coreInstances: [(ComponentWatParser.CoreInstanceDef, Location)] = component.fields.compactMap { field in
+                if case .coreInstance(let def) = field.kind { return (def, field.location) }
+                return nil
+            }
+            let canons: [(ComponentWatParser.CanonDef, Location)] = component.fields.compactMap { field in
+                if case .canon(let def) = field.kind { return (def, field.location) }
+                return nil
+            }
+            let exports: [(ComponentWatParser.ExportDef, Location)] = component.fields.compactMap { field in
+                if case .componentExport(let def) = field.kind { return (def, field.location) }
+                return nil
+            }
 
             // Build core instance index mapping (parser index -> binary index)
             // This accounts for inline export instances that shift indices
-            let coreInstanceIndexMapping = buildCoreInstanceIndexMapping(component: component, fields: fields)
+            let coreInstanceIndexMapping = buildCoreInstanceIndexMapping(coreInstances: coreInstances)
 
             let coreFuncAliases = try collectCoreFuncAliases(
-                from: fields.canons,
+                from: canons,
                 component: component,
                 coreInstanceIndexMapping: coreInstanceIndexMapping
             )
-            let componentFuncAliases = try collectComponentFuncAliases(from: fields.canons, component: component)
-            let exportFuncAliases = try collectExportFuncAliases(from: fields.exports, component: component)
+            let componentFuncAliases = try collectComponentFuncAliases(from: canons, component: component)
+            let exportFuncAliases = try collectExportFuncAliases(from: exports, component: component)
 
             // Collect type indices that are exported
             var exportedTypeIndices = Set<Int>()
-            for (exportDef, _) in fields.exports {
+            for (exportDef, _) in exports {
                 if case .type(let indexOrId) = exportDef.descriptor {
                     if case .index(let idx, _) = indexOrId {
                         exportedTypeIndices.insert(Int(idx))
@@ -77,7 +81,7 @@
             }
 
             // Helper to flush accumulated core types as a batched section
-            var pendingCoreTypes: [UInt32] = []
+            var pendingCoreTypes: [ComponentWatParser.CoreTypeDef] = []
             func flushPendingCoreTypes() throws(WatParserError) {
                 if !pendingCoreTypes.isEmpty {
                     try encodeBatchedCoreTypes(
@@ -89,7 +93,7 @@
             }
 
             // Helper to flush accumulated core instances as a batched section
-            var pendingCoreInstances: [(CoreInstanceIndex, Location)] = []
+            var pendingCoreInstances: [(ComponentWatParser.CoreInstanceDef, Location)] = []
             func flushPendingCoreInstances() throws(WatParserError) {
                 if !pendingCoreInstances.isEmpty {
                     try encodeCoreInstances(
@@ -141,25 +145,25 @@
                 try flushPendingSectionsExcept(field.kind.sectionKind)
 
                 switch field.kind {
-                case .componentType(let typeIndex):
+                case .componentType(_, let typeIndex):
                     // Collect all unemitted types up to and including this type index
                     // This ensures anonymous dependency types (with lower indices) get batched
                     // with the types that reference them
-                    let maxIndex = Int(typeIndex.rawValue)
+                    let maxIndex = typeIndex
                     for (oldIndex, _) in typeIndexMapping.sorted(by: { $0.key < $1.key }) {
                         if oldIndex <= maxIndex && !emittedTypes.contains(oldIndex) && !pendingComponentTypes.contains(oldIndex) {
                             pendingComponentTypes.append(oldIndex)
                         }
                     }
 
-                case .coreModule(let index):
-                    try encodeSingleCoreModule(index, component: component, options: options)
+                case .coreModule(let moduleDef):
+                    try encodeSingleCoreModule(moduleDef, options: options)
 
-                case .coreInstance(let index):
-                    pendingCoreInstances.append((index, field.location))
+                case .coreInstance(let instanceDef):
+                    pendingCoreInstances.append((instanceDef, field.location))
 
-                case .coreType(let index):
-                    pendingCoreTypes.append(UInt32(index))
+                case .coreType(let coreTypeDef):
+                    pendingCoreTypes.append(coreTypeDef)
 
                 case .canon(let canonDef):
                     try emitRequiredTypesForCanon(
@@ -208,11 +212,11 @@
                         emittedExportFuncAliases: &emittedExportFuncAliases
                     )
 
-                case .component(let index):
-                    try encodeSingleComponent(index, component: component, options: options)
+                case .component(let nestedDef):
+                    try encodeSingleComponent(nestedDef, options: options)
 
-                case .instance(let index):
-                    try encodeSingleComponentInstance(index, component: component, location: field.location)
+                case .instance(let instanceDef):
+                    try encodeSingleComponentInstance(instanceDef, component: component, location: field.location)
 
                 case .alias(let alias):
                     pendingAliases.append(alias)
@@ -586,15 +590,10 @@
 
         // Encode a single core module as its own section
         private mutating func encodeSingleCoreModule(
-            _ moduleIndex: CoreModuleIndex,
-            component: ComponentWatParser.ComponentDef,
+            _ moduleDef: ComponentWatParser.ModuleDef,
             options: EncodeOptions
         ) throws(WatParserError) {
-            guard Int(moduleIndex.rawValue) < component.coreModulesMap.count else {
-                throw WatParserError("Invalid core module index \(moduleIndex.rawValue)", location: nil)
-            }
-
-            var moduleDef = component.coreModulesMap[Int(moduleIndex.rawValue)]
+            var moduleDef = moduleDef
             var moduleBytes = try WAT.encode(module: &moduleDef.wat, options: options)
 
             if options.nameSection, let moduleId = moduleDef.id {
@@ -740,17 +739,15 @@
 
         // Encode multiple core types in a single batched section
         private mutating func encodeBatchedCoreTypes(
-            _ typeIndices: [UInt32],
+            _ typeDefs: [ComponentWatParser.CoreTypeDef],
             component: ComponentWatParser.ComponentDef
         ) throws(WatParserError) {
-            guard !typeIndices.isEmpty else { return }
+            guard !typeDefs.isEmpty else { return }
 
             try underlying.section(id: 0x03) { encoder throws(WatParserError) in
-                encoder.writeUnsignedLEB128(UInt32(typeIndices.count))
+                encoder.writeUnsignedLEB128(UInt32(typeDefs.count))
 
-                for typeIndex in typeIndices {
-                    guard Int(typeIndex) < component.coreTypesMap.count else { continue }
-                    let typeDef = component.coreTypesMap[Int(typeIndex)]
+                for typeDef in typeDefs {
                     try Self.encodeCoreTypeContent(typeDef, component: component, encoder: &encoder)
                 }
             }
@@ -1201,15 +1198,9 @@
 
         // Encode a single nested component as its own section
         private mutating func encodeSingleComponent(
-            _ componentIndex: ComponentIndex,
-            component: ComponentWatParser.ComponentDef,
+            _ nestedComponent: ComponentWatParser.ComponentDef,
             options: EncodeOptions
         ) throws(WatParserError) {
-            guard Int(componentIndex.rawValue) < component.componentsMap.count else {
-                throw WatParserError("Invalid component index \(componentIndex.rawValue)", location: nil)
-            }
-
-            let nestedComponent = component.componentsMap[Int(componentIndex.rawValue)]
             var nestedEncoder = ComponentEncoder()
             _ = try nestedEncoder.encode(nestedComponent, options: options)
 
@@ -1220,16 +1211,10 @@
 
         // Encode a single component instance as its own section
         private mutating func encodeSingleComponentInstance(
-            _ instanceIndex: ComponentInstanceIndex,
+            _ instanceDef: ComponentWatParser.ComponentInstanceDef,
             component: ComponentWatParser.ComponentDef,
             location: Location
         ) throws(WatParserError) {
-            guard Int(instanceIndex.rawValue) < component.componentInstancesMap.count else {
-                throw WatParserError("Invalid component instance index \(instanceIndex.rawValue)", location: location)
-            }
-
-            let instanceDef = component.componentInstancesMap[Int(instanceIndex.rawValue)]
-
             guard let componentRef = instanceDef.componentRef else {
                 throw WatParserError("Component instance has no component reference", location: location)
             }
@@ -1255,57 +1240,16 @@
             }
         }
 
-        private func groupFields(_ fields: [ComponentWatParser.ComponentDefField]) throws(WatParserError) -> GroupedFields {
-            var result = GroupedFields()
-
-            for field in fields {
-                switch field.kind {
-                case .coreModule(let index):
-                    result.coreModules.append((index, field.location))
-                case .coreInstance(let index):
-                    result.coreInstances.append((index, field.location))
-                case .coreType(let index):
-                    result.coreTypes.append((index, field.location))
-                case .component(let index):
-                    result.components.append((index, field.location))
-                case .canon(let canonDef):
-                    result.canons.append((canonDef, field.location))
-                case .componentExport(let exportDef):
-                    result.exports.append((exportDef, field.location))
-                case .componentImport(let importDef):
-                    result.imports.append((importDef, field.location))
-                case .instance(let index):
-                    result.instances.append((index, field.location))
-                case .componentType:
-                    // Component types are handled separately in the main encoding loop
-                    // They don't need to be grouped for auxiliary calculations
-                    break
-                case .alias:
-                    // Aliases are handled in the main encoding loop with batching
-                    // They don't need to be grouped for auxiliary calculations
-                    break
-                }
-            }
-
-            return result
-        }
-
         /// Build a mapping from parser core instance index to binary index.
         /// This accounts for inline export instances that shift indices.
         private func buildCoreInstanceIndexMapping(
-            component: ComponentWatParser.ComponentDef,
-            fields: GroupedFields
+            coreInstances: [(ComponentWatParser.CoreInstanceDef, Location)]
         ) -> [Int: Int] {
             var mapping: [Int: Int] = [:]
             var binaryIndex = 0
 
             // Process core instances in order, counting inline export instances
-            for (instanceIndex, _) in fields.coreInstances {
-                let idx = Int(instanceIndex.rawValue)
-                guard idx < component.coreInstancesMap.count else { continue }
-
-                let instanceDef = component.coreInstancesMap[idx]
-
+            for (parserIndex, (instanceDef, _)) in coreInstances.enumerated() {
                 // Count inline export instances that will be emitted first
                 var inlineExportCount = 0
                 for arg in instanceDef.arguments {
@@ -1316,7 +1260,7 @@
 
                 // Inline exports come first, then the main instance
                 // So the main instance index is offset by inline export count
-                mapping[idx] = binaryIndex + inlineExportCount
+                mapping[parserIndex] = binaryIndex + inlineExportCount
                 binaryIndex += 1 + inlineExportCount  // 1 for main instance + inline exports
             }
 
@@ -1372,21 +1316,18 @@
         }
 
         private mutating func encodeCoreInstances(
-            _ instances: [(CoreInstanceIndex, Location)],
+            _ instances: [(ComponentWatParser.CoreInstanceDef, Location)],
             component: ComponentWatParser.ComponentDef
         ) throws(WatParserError) {
             // First pass: collect all inline export instances that need to be created
             // and compute the mapping from original to actual instance indices
             var inlineExportInstances: [(exports: [ComponentWatParser.CoreInstanceDef.Argument.Kind.Export], location: Location)] = []
-            var inlineExportInstanceMapping: [Int: Int] = [:]  // Map from (instance index, arg index) hash to inline instance index
+            var inlineExportInstanceMapping: [Int: Int] = [:]  // Map from (instance position, arg index) hash to inline instance index
 
-            for (instanceIndex, location) in instances {
-                guard Int(instanceIndex.rawValue) < component.coreInstancesMap.count else { continue }
-                let instanceDef = component.coreInstancesMap[Int(instanceIndex.rawValue)]
-
+            for (instancePosition, (instanceDef, location)) in instances.enumerated() {
                 for (argIndex, arg) in instanceDef.arguments.enumerated() {
                     if case .exports(let exports) = arg.kind {
-                        let key = Int(instanceIndex.rawValue) * 1000 + argIndex
+                        let key = instancePosition * 1000 + argIndex
                         inlineExportInstanceMapping[key] = inlineExportInstances.count
                         inlineExportInstances.append((exports: exports, location: location))
                     }
@@ -1414,13 +1355,7 @@
                 // Second: encode instantiate instances (form 0x00)
                 let inlineInstanceBaseIndex = inlineExportInstances.count
 
-                for (instanceIndex, location) in instances {
-                    guard Int(instanceIndex.rawValue) < component.coreInstancesMap.count else {
-                        throw WatParserError("Invalid core instance index \(instanceIndex.rawValue)", location: location)
-                    }
-
-                    let instanceDef = component.coreInstancesMap[Int(instanceIndex.rawValue)]
-
+                for (instancePosition, (instanceDef, location)) in instances.enumerated() {
                     encoder.output.append(0x00)  // instantiate form
 
                     let moduleIndex = try component.coreModulesMap.resolveIndex(use: instanceDef.moduleId)
@@ -1439,7 +1374,7 @@
                         case .exports:
                             // Reference the inline export instance we created earlier
                             encoder.output.append(0x12)
-                            let key = Int(instanceIndex.rawValue) * 1000 + argIndex
+                            let key = instancePosition * 1000 + argIndex
                             guard let inlineIndex = inlineExportInstanceMapping[key] else {
                                 throw WatParserError("Internal error: inline export instance not found", location: location)
                             }
@@ -1706,17 +1641,6 @@
                 }
             }
         }
-    }
-
-    private struct GroupedFields {
-        var coreModules: [(CoreModuleIndex, Location)] = []
-        var coreInstances: [(CoreInstanceIndex, Location)] = []
-        var coreTypes: [(UInt32, Location)] = []
-        var components: [(ComponentIndex, Location)] = []
-        var instances: [(ComponentInstanceIndex, Location)] = []
-        var canons: [(ComponentWatParser.CanonDef, Location)] = []
-        var exports: [(ComponentWatParser.ExportDef, Location)] = []
-        var imports: [(ComponentWatParser.ImportDef, Location)] = []
     }
 
     private typealias CoreFuncAlias = (instanceIndex: Int, exportName: String)

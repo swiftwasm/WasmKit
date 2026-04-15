@@ -181,13 +181,13 @@ public final class Runtime {
 @available(*, deprecated, renamed: "Function", message: "`HostFunction` is now unified with `Function`")
 public struct HostFunction {
     @available(*, deprecated, renamed: "Function.init(store:type:implementation:)", message: "Use `Engine`-based API instead")
-    public init(type: FunctionType, implementation: @escaping (Caller, [Value]) throws -> [Value]) {
+    public init(type: FunctionType, implementation: @escaping Function.Implementation) {
         self.type = type
         self.implementation = implementation
     }
 
     public let type: FunctionType
-    public let implementation: (Caller, [Value]) throws -> [Value]
+    public let implementation: Function.Implementation
 }
 
 /// A collection of globals and functions that are exported from a host module.

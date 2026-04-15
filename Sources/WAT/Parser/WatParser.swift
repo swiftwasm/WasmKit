@@ -112,8 +112,13 @@ struct WatParser {
         /// Parse the function and call corresponding visit methods of the given visitor
         /// This method may modify TypesMap of the given WATModule
         ///
-        /// - Returns: Type index of this function
-        func parse<V: InstructionVisitor>(visitor: inout V, wat: inout Wat, features: WasmFeatureSet) throws(WatParserError) -> Int where V.VisitorError == WatParserError {
+        /// - Returns: Tuple of (type index, collected label names for name section)
+        func parse<V: InstructionVisitor>(
+            visitor: inout V,
+            wat: inout Wat,
+            features: WasmFeatureSet
+        ) throws(WatParserError) -> (typeIndex: Int, labelNames: [(Int, String)])
+        where V.VisitorError == WatParserError {
             guard case .definition(let locals, let body) = kind else {
                 fatalError("Imported functions cannot be parsed")
             }
@@ -127,7 +132,7 @@ struct WatParser {
             guard try parser.parser.isEndOfParen() else {
                 throw WatParserError("unexpected token", location: parser.parser.lexer.location())
             }
-            return typeIndex
+            return (typeIndex, parser.collectedLabelNames)
         }
     }
 

@@ -67,11 +67,12 @@ enum TestSupport {
             var dataReadOffset: UInt32 = 0
             for buffer in buffers {
                 let iovec = WASIAbi.IOVec(
-                    buffer: UnsafeGuestRawPointer(memorySpace: self, offset: dataReadOffset),
+                    buffer: UnsafeGuestRawPointer(offset: dataReadOffset),
                     length: UInt32(buffer.count)
                 )
                 WASIAbi.IOVec.writeToGuest(
-                    at: UnsafeGuestRawPointer(memorySpace: self, offset: iovecWriteOffset),
+                    at: UnsafeGuestRawPointer(offset: iovecWriteOffset),
+                    in: self,
                     value: iovec
                 )
                 dataReadOffset += UInt32(buffer.count)
@@ -79,7 +80,7 @@ enum TestSupport {
             }
 
             return UnsafeGuestBufferPointer<WASIAbi.IOVec>(
-                baseAddress: UnsafeGuestPointer(memorySpace: self, offset: iovecOffset),
+                baseAddress: UnsafeGuestPointer(offset: iovecOffset),
                 count: UInt32(buffers.count)
             )
         }
@@ -91,11 +92,12 @@ enum TestSupport {
             var iovecWriteOffset = iovecOffset
             for size in sizes {
                 let iovec = WASIAbi.IOVec(
-                    buffer: UnsafeGuestRawPointer(memorySpace: self, offset: currentDataOffset),
+                    buffer: UnsafeGuestRawPointer(offset: currentDataOffset),
                     length: UInt32(size)
                 )
                 WASIAbi.IOVec.writeToGuest(
-                    at: UnsafeGuestRawPointer(memorySpace: self, offset: iovecWriteOffset),
+                    at: UnsafeGuestRawPointer(offset: iovecWriteOffset),
+                    in: self,
                     value: iovec
                 )
                 currentDataOffset += UInt32(size)
@@ -103,7 +105,7 @@ enum TestSupport {
             }
 
             return UnsafeGuestBufferPointer<WASIAbi.IOVec>(
-                baseAddress: UnsafeGuestPointer(memorySpace: self, offset: iovecOffset),
+                baseAddress: UnsafeGuestPointer(offset: iovecOffset),
                 count: UInt32(sizes.count)
             )
         }
@@ -112,10 +114,10 @@ enum TestSupport {
             var result: [[UInt8]] = []
 
             for i in 0..<Int(iovecs.count) {
-                let iovec = (iovecs.baseAddress + UInt32(i)).pointee
+                let iovec = (iovecs.baseAddress + UInt32(i)).read(from: self)
                 var buffer = [UInt8](repeating: 0, count: Int(iovec.length))
 
-                iovec.buffer.withHostPointer(count: Int(iovec.length)) { hostBuffer in
+                iovec.buffer.withHostPointer(in: self, count: Int(iovec.length)) { hostBuffer in
                     buffer.withUnsafeMutableBytes { destBuffer in
                         destBuffer.copyMemory(from: UnsafeRawBufferPointer(hostBuffer))
                     }

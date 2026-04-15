@@ -1,4 +1,5 @@
 import SystemPackage
+import WasmTypes
 
 /// Base protocol for all file system nodes in memory.
 protocol MemFSNode: AnyObject {
@@ -268,7 +269,7 @@ final class MemoryCharacterDeviceEntry: WASIFile {
         throw WASIAbi.Errno.ESPIPE
     }
 
-    func write<Buffer: Sequence>(vectored buffer: Buffer) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+    func write<M: GuestMemory, Buffer: Sequence>(vectored buffer: Buffer, memory: M) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
         guard accessMode.contains(.write) else {
             throw WASIAbi.Errno.EBADF
         }
@@ -277,7 +278,7 @@ final class MemoryCharacterDeviceEntry: WASIFile {
         case .null:
             var totalBytes: UInt32 = 0
             for iovec in buffer {
-                iovec.withHostBufferPointer { bufferPtr in
+                iovec.withHostBufferPointer(in: memory) { bufferPtr in
                     totalBytes += UInt32(bufferPtr.count)
                 }
             }
@@ -285,11 +286,11 @@ final class MemoryCharacterDeviceEntry: WASIFile {
         }
     }
 
-    func pwrite<Buffer: Sequence>(vectored buffer: Buffer, offset: WASIAbi.FileSize) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+    func pwrite<M: GuestMemory, Buffer: Sequence>(vectored buffer: Buffer, memory: M, offset: WASIAbi.FileSize) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
         throw WASIAbi.Errno.ESPIPE
     }
 
-    func read<Buffer: Sequence>(into buffer: Buffer) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+    func read<M: GuestMemory, Buffer: Sequence>(into buffer: Buffer, memory: M) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
         guard accessMode.contains(.read) else {
             throw WASIAbi.Errno.EBADF
         }
@@ -300,7 +301,7 @@ final class MemoryCharacterDeviceEntry: WASIFile {
         }
     }
 
-    func pread<Buffer: Sequence>(into buffer: Buffer, offset: WASIAbi.FileSize) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+    func pread<M: GuestMemory, Buffer: Sequence>(into buffer: Buffer, memory: M, offset: WASIAbi.FileSize) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
         throw WASIAbi.Errno.ESPIPE
     }
 }
