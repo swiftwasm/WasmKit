@@ -278,12 +278,8 @@ jobs:
       matrix:
         include:
           - swift-version: "6.2"
-<<<<<<< maxd/wasi-fd-leaks
-          - swift-version: "nightly-6.3"
-=======
           - swift-version: "6.3"
           # Regressed since `swift-DEVELOPMENT-SNAPSHOT-2026-04-01-a`
->>>>>>> main
           # - swift-version: nightly-main
 
     steps:
