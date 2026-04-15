@@ -1,4 +1,4 @@
-import WasmParser
+import WasmParserCore
 import WasmTypes
 
 struct ExpressionParser<Visitor: InstructionVisitor> where Visitor.VisitorError == WatParserError {
