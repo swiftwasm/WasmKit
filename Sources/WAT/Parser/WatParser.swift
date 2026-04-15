@@ -36,32 +36,40 @@ struct WatParser {
     }
 
     struct UnresolvedType<T> {
-        private let make: (any NameToIndexResolver) -> Result<T, WatParserError>
+        typealias IndexResolver = (Parser.IndexOrId) throws(WatParserError) -> Int
 
-        init(make: @escaping (any NameToIndexResolver) -> Result<T, WatParserError>) {
+        private let make: (IndexResolver) throws(WatParserError) -> T
+
+        init(make: @escaping (IndexResolver) throws(WatParserError) -> T) {
             self.make = make
         }
 
         init(_ value: T) {
-            self.make = { _ in .success(value) }
+            self.make = { _ in value }
         }
 
         func project<U>(_ keyPath: KeyPath<T, U>) -> UnresolvedType<U> {
-            return UnresolvedType<U> {
-                let parent = make($0)
-                return parent.map { $0[keyPath: keyPath] }
+            return UnresolvedType<U> { (resolveIndex: IndexResolver) throws(WatParserError) in
+                try self.make(resolveIndex)[keyPath: keyPath]
             }
         }
 
         func map<U>(_ transform: @escaping (T) -> U) -> UnresolvedType<U> {
-            return UnresolvedType<U>(make: { resolver in Result { () throws(WatParserError) in transform(try resolve(resolver)) } })
+            return UnresolvedType<U> { (resolveIndex: IndexResolver) throws(WatParserError) in
+                try transform(self.make(resolveIndex))
+            }
         }
 
         func resolve(_ typeMap: TypesMap) throws(WatParserError) -> T {
-            return try resolve(typeMap.nameMapping)
+            return try make(typeMap.nameMapping.resolveIndex)
         }
-        func resolve(_ resolver: any NameToIndexResolver) throws(WatParserError) -> T {
-            return try make(resolver).get()
+
+        func resolve(_ resolver: some NameToIndexResolver) throws(WatParserError) -> T {
+            return try make(resolver.resolveIndex)
+        }
+
+        func resolve(_ resolveIndex: IndexResolver) throws(WatParserError) -> T {
+            return try make(resolveIndex)
         }
     }
 
@@ -324,7 +332,7 @@ struct WatParser {
                 if try parser.peek(.leftParen) != nil {
                     let (numberOfItems, indices) = try parseExprList()
                     inlineElement = ElementDecl(
-                        mode: .inline, type: tableType.project(\.elementType), indices: indices
+                        mode: .inline, type: tableType.map({ $0.elementType }), indices: indices
                     )
                     tableType = tableType.map {
                         var value = $0
@@ -650,13 +658,11 @@ struct WatParser {
         let (params, names) = try params(mayHaveName: true)
         let results = try results()
         try parser.expect(.rightParen)
-        return UnresolvedType<FunctionType> { typeMap in
-            Result { () throws(WatParserError) in
-                let params = try params.map { param throws(WatParserError) in try param.resolve(typeMap) }
-                let results = try results.map { result throws(WatParserError) in try result.resolve(typeMap) }
-                let signature = WasmTypes.FunctionType(parameters: params, results: results)
-                return FunctionType(signature: signature, parameterNames: names)
-            }
+        return UnresolvedType<FunctionType> { (resolveIndex: UnresolvedType<ValueType>.IndexResolver) throws(WatParserError) in
+            let params = try params.map { param throws(WatParserError) in try param.resolve(resolveIndex) }
+            let results = try results.map { result throws(WatParserError) in try result.resolve(resolveIndex) }
+            let signature = WasmTypes.FunctionType(parameters: params, results: results)
+            return FunctionType(signature: signature, parameterNames: names)
         }
     }
 
@@ -666,13 +672,11 @@ struct WatParser {
         if results.isEmpty, params.isEmpty {
             return nil
         }
-        return UnresolvedType<FunctionType> { typeMap in
-            Result { () throws(WatParserError) in
-                let params = try params.map { resolver throws(WatParserError) in try resolver.resolve(typeMap) }
-                let results = try results.map { resolver throws(WatParserError) in try resolver.resolve(typeMap) }
-                let signature = WasmTypes.FunctionType(parameters: params, results: results)
-                return FunctionType(signature: signature, parameterNames: names)
-            }
+        return UnresolvedType<FunctionType> { (resolveIndex: UnresolvedType<ValueType>.IndexResolver) throws(WatParserError) in
+            let params = try params.map { param throws(WatParserError) in try param.resolve(resolveIndex) }
+            let results = try results.map { result throws(WatParserError) in try result.resolve(resolveIndex) }
+            let signature = WasmTypes.FunctionType(parameters: params, results: results)
+            return FunctionType(signature: signature, parameterNames: names)
         }
     }
 
@@ -746,8 +750,8 @@ struct WatParser {
         } else if try parser.takeKeyword("extern") {
             return UnresolvedType(.abstract(.externRef))
         } else if let id = try parser.takeIndexOrId() {
-            return UnresolvedType(make: { resolver in
-                Result { () throws(WatParserError) in try .concrete(typeIndex: UInt32(resolver.resolveIndex(use: id))) }
+            return UnresolvedType(make: { (resolveIndex: UnresolvedType<HeapType>.IndexResolver) throws(WatParserError) in
+                try .concrete(typeIndex: UInt32(resolveIndex(id)))
             })
         }
         throw WatParserError("expected heap type", location: parser.lexer.location())

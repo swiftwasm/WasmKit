@@ -625,7 +625,7 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
     // Section 1: Type section
     if !module.types.isEmpty {
         encoder.section(id: 0x01) { encoder in
-            encoder.encodeVector(module.types, transform: \.type.signature)
+            encoder.encodeVector(module.types, transform: { $0.type.signature })
         }
     }
 
