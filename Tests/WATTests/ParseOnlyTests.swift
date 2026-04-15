@@ -48,7 +48,7 @@ struct ParseOnlyTests {
     }
 
     private func parseWasmBytes(_ bytes: [UInt8], features: WasmFeatureSet) throws {
-        var parser = WasmParser.Parser(bytes: bytes, features: features)
+        var parser = WasmParserCore.Parser(bytes: bytes, features: features)
         while (try parser.parseNext()) != nil {}
     }
 

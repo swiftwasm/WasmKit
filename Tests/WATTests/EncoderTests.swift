@@ -382,7 +382,7 @@ struct EncoderTests {
             options: EncodeOptions(nameSection: true)
         )
 
-        var parser = WasmParser.Parser(bytes: bytes)
+        var parser = WasmParserCore.Parser(bytes: bytes)
         var customSections: [CustomSection] = []
         while let payload = try parser.parseNext() {
             guard case .customSection(let section) = payload else {
@@ -427,7 +427,7 @@ struct EncoderTests {
         )
 
         // Extract the name custom section bytes
-        var parser = WasmParser.Parser(bytes: bytes)
+        var parser = WasmParserCore.Parser(bytes: bytes)
         var nameBytes: ArraySlice<UInt8>?
         while let payload = try parser.parseNext() {
             if case .customSection(let section) = payload, section.name == "name" {

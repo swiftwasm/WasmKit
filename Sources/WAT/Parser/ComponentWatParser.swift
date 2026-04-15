@@ -833,7 +833,7 @@
 
             // Core types must be simple value types (i32, i64, f32, f64), not type references.
             // Resolve immediately using a throwing resolver since these types don't reference other definitions.
-            return try unresolvedType.resolve { use in
+            return try unresolvedType.resolve { (use: Parser.IndexOrId) throws(WatParserError) in
                 throw WatParserError("Core value types cannot reference other types", location: use.location)
             }
         }
