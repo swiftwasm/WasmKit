@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 import WAT
-import WasmParser
+import WasmParserCore
 
 @Suite
 struct ParseOnlyTests {

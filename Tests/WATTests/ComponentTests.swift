@@ -6,7 +6,7 @@
     import WAT
     import WasmKit
     import WasmKitWASI
-    import WasmParser
+    import WasmParserCore
     import WasmTools
 
     @Suite
