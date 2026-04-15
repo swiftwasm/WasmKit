@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-import WasmParser
+import WasmParserCore
 import WasmTypes
 
 @testable import WAT
