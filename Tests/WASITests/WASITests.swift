@@ -549,8 +549,8 @@ struct WASITests {
             #expect(stat.size == 23)
 
             try wasi.fd_close(fd: openedFd)
+            try bridge.close()
         #endif
-        try bridge.close()
     }
 
     @Test
@@ -583,8 +583,8 @@ struct WASITests {
             #expect(stat.size == 12)
 
             try wasi.fd_close(fd: fd)
+            try bridge.close()
         #endif
-        try bridge.close()
     }
 
     @Test
@@ -1152,8 +1152,8 @@ struct WASITests {
 
             let content = try String(contentsOf: tempDir.url.appendingPathComponent("target.txt"), encoding: .utf8)
             #expect(content == "Via handle")
+            try bridge.close()
         #endif
-        try bridge.close()
     }
 
     @Test
