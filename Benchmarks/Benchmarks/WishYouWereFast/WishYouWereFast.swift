@@ -35,6 +35,7 @@ let benchmarks: @Sendable () -> () = {
             wasi.link(to: &imports, store: store)
             let instance = try module.instantiate(store: store, imports: imports)
             _ = try wasi.start(instance)
+            try wasi.close()
         }
     }
 }

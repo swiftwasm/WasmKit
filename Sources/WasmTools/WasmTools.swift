@@ -148,6 +148,7 @@ package func runWasmTools(
     let module = try parseWasm(filePath: FilePath(wasmToolsPath))
     let instance = try module.instantiate(store: store, imports: imports)
     let exitCode = try wasi.start(instance)
+    try wasi.close()
 
     try stdoutPipes.writeEnd.close()
     try stderrPipes.writeEnd.close()

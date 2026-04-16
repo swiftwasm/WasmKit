@@ -113,6 +113,7 @@
                     await shutDownStream.first { _ in true }
                     cancellableGroup.cancelAll()
                 }
+                try await debuggerHandler.close()
             }
         }
     }

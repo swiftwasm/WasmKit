@@ -151,6 +151,7 @@ let benchmarks: @Sendable () -> () = {
             let pluginToHost: FileDescriptor
             let pump: Function
             let expandMessage: String
+            let bridge: WASIBridgeToHost
 
             init(filePath: FilePath, expandMessage: String) throws {
                 let engine = Engine()
@@ -174,6 +175,7 @@ let benchmarks: @Sendable () -> () = {
                 self.pluginToHost = pluginToHostPipes.readEnd
                 self.pump = pump
                 self.expandMessage = expandMessage
+                self.bridge = bridge
             }
 
             func writeMessage(_ message: String) throws {
@@ -204,6 +206,10 @@ let benchmarks: @Sendable () -> () = {
                 try pump()
                 _ = try readMessage()
             }
+
+            func close() throws {
+                try bridge.close()
+            }
         }
 
         guard let expandMessage = expandMessages[file] else {
@@ -214,10 +220,12 @@ let benchmarks: @Sendable () -> () = {
             let setup = try Setup(filePath: macrosDir.appending(file), expandMessage: expandMessage)
             try setup.writeMessage(handshakeMessage)
             try setup.tick()
+            try setup.close()
         }
 
         Benchmark("Expand \(file)") { benchmark, setup in
             try setup.tick()
+            try setup.close()
         } setup: { () -> Setup in
             let setup = try Setup(
                 filePath: macrosDir.appending(file),

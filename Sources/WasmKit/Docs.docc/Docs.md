@@ -79,6 +79,7 @@ let instance = try module.instantiate(store: store, imports: imports)
 
 // Start the WASI command-line application.
 let exitCode = try wasi.start(instance)
+try wasi.close()
 // Exit the Swift program with the WASI exit code.
 exit(Int32(exitCode))
 ```

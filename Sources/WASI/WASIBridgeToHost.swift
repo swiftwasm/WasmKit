@@ -14,9 +14,12 @@ import SystemPackage
 ///     environment: ["PATH": "/usr/bin"],
 ///     preopens: [WASIBridgeToHost.Preopen(guestPath: "/sandbox", hostPath: "/real/path")]
 /// )
+/// // ... use bridge ...
+/// try bridge.close()
 /// ```
 public final class WASIBridgeToHost {
     internal let underlying: WASIImplementation
+    private var isClosed = false
 
     /// A preopened directory mapping from a guest path to a host path.
     ///
@@ -107,6 +110,11 @@ public final class WASIBridgeToHost {
     /// Borrowed descriptors (e.g. process stdio) are left open.
     public func close() throws {
         try underlying.close()
+        isClosed = true
+    }
+
+    deinit {
+        precondition(isClosed, "WASIBridgeToHost.close() must be called before the bridge is deallocated")
     }
 
     /// Creates a new WASI bridge with host file system access.
@@ -235,42 +243,5 @@ public final class WASIBridgeToHost {
             wallClock: wallClock, monotonicClock: monotonicClock,
             randomGenerator: randomGenerator
         )
-    }
-
-    /// Creates a WASI bridge, passes it to `body`, and closes all owned file
-    /// descriptors when `body` returns (or throws). This ensures preopened
-    /// directory fds are always cleaned up.
-    ///
-    /// - Parameters:
-    ///   - args: Command-line arguments to pass to the WASI module.
-    ///   - environment: Environment variables to expose to the WASI module.
-    ///   - fileSystem: Configuration for the file system implementation.
-    ///   - wallClock: Clock for wall-clock time queries.
-    ///   - monotonicClock: Clock for monotonic time queries.
-    ///   - randomGenerator: Random number generator.
-    ///   - body: A closure that receives the bridge and returns a value.
-    /// - Returns: The value returned by `body`.
-    public static func withBridge<R>(
-        args: [String] = [],
-        environment: [String: String] = [:],
-        fileSystem: FileSystemOptions = .host().withStdio(),
-        wallClock: WallClock = SystemWallClock(),
-        monotonicClock: MonotonicClock = SystemMonotonicClock(),
-        randomGenerator: RandomBufferGenerator = SystemRandomNumberGenerator(),
-        body: (WASIBridgeToHost) throws -> R
-    ) throws -> R {
-        let bridge = try WASIBridgeToHost(
-            args: args, environment: environment, fileSystemOptions: fileSystem,
-            wallClock: wallClock, monotonicClock: monotonicClock,
-            randomGenerator: randomGenerator
-        )
-        do {
-            let result = try body(bridge)
-            try bridge.close()
-            return result
-        } catch {
-            try? bridge.close()
-            throw error
-        }
     }
 }

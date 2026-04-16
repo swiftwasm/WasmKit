@@ -57,6 +57,7 @@
         private var debugger: Debugger
 
         private var memoryView: DebuggerMemoryView
+        private let wasi: WASIBridgeToHost
 
         package init(
             moduleFilePath: FilePath,
@@ -77,6 +78,7 @@
             var imports = Imports()
             let wasi = try WASIBridgeToHost()
             wasi.link(to: &imports, store: store)
+            self.wasi = wasi
 
             self.debugger = try Debugger(module: parseWasm(bytes: .init(buffer: wasmBinary)), store: store, imports: imports)
             try self.debugger.stopAtEntrypoint()
@@ -86,6 +88,10 @@
             }
 
             self.memoryView = DebuggerMemoryView(allocator: allocator, wasmBinary: wasmBinary)
+        }
+
+        package func close() throws {
+            try wasi.close()
         }
 
         private func hexDump<I: FixedWidthInteger>(_ value: I, endianness: Endianness) -> String {
