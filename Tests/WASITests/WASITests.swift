@@ -32,6 +32,7 @@ struct WASITests {
                     .init(guestPath: "/Sandbox", hostPath: t.url.appendingPathComponent("Sandbox").path)
                 ])
             )
+            try wasi.runAndClose { wasi in
             let mntFd: WASIAbi.Fd = 3
 
             func assertResolve(_ path: String, followSymlink: Bool, directory: Bool = false) throws {
@@ -136,7 +137,7 @@ struct WASITests {
             try assertNotResolve("link-loop.txt", followSymlink: true) { error in
                 #expect(error == .ELOOP)
             }
-            try wasi.close()
+            }
         }
     #endif
 
@@ -186,6 +187,7 @@ struct WASITests {
                 .init(guestPath: "/", hostPath: "/")
             ])
         )
+        try bridge.runAndClose { _ in
         let wasi = bridge.underlying
 
         let rootFd: WASIAbi.Fd = 3
@@ -205,7 +207,7 @@ struct WASITests {
         #expect(stat.size == 12)
 
         try wasi.fd_close(fd: fd)
-        try bridge.close()
+        }
     }
 
     @Test
@@ -219,6 +221,7 @@ struct WASITests {
                 .init(guestPath: "/", hostPath: "/")
             ])
         )
+        try bridge.runAndClose { _ in
         let wasi = bridge.underlying
         let rootFd: WASIAbi.Fd = 3
 
@@ -239,7 +242,7 @@ struct WASITests {
         #expect(tell == 7)
 
         try wasi.fd_close(fd: fd)
-        try bridge.close()
+        }
     }
 
     @Test
@@ -252,6 +255,7 @@ struct WASITests {
                 .init(guestPath: "/", hostPath: "/")
             ])
         )
+        try bridge.runAndClose { _ in
         let wasi = bridge.underlying
         let rootFd: WASIAbi.Fd = 3
 
@@ -279,7 +283,7 @@ struct WASITests {
         try wasi.path_unlink_file(dirFd: rootFd, path: "newdir/file1.txt")
         #expect(fs.lookup(at: "/newdir/file1.txt") == nil)
         #expect(fs.lookup(at: "/newdir/file2.txt") != nil)
-        try bridge.close()
+        }
     }
 
     @Test
@@ -292,6 +296,7 @@ struct WASITests {
                 .init(guestPath: "/", hostPath: "/")
             ])
         )
+        try bridge.runAndClose { _ in
         let wasi = bridge.underlying
         let rootFd: WASIAbi.Fd = 3
 
@@ -324,7 +329,7 @@ struct WASITests {
         #expect(stat.size == 0)
 
         try wasi.fd_close(fd: fd2)
-        try bridge.close()
+        }
     }
 
     @Test
@@ -338,6 +343,7 @@ struct WASITests {
                 .init(guestPath: "/", hostPath: "/")
             ])
         )
+        try bridge.runAndClose { _ in
         let wasi = bridge.underlying
         let rootFd: WASIAbi.Fd = 3
 
@@ -355,7 +361,7 @@ struct WASITests {
         } catch let error as WASIAbi.Errno {
             #expect(error == .EEXIST)
         }
-        try bridge.close()
+        }
     }
 
     @Test
@@ -400,9 +406,10 @@ struct WASITests {
             let elapsed = try ContinuousClock().measure {
                 let clockPointer = UnsafeGuestBufferPointer<WASIAbi.Subscription>(baseAddress: .init(offset: clockOffset), count: 1)
                 let bridge = try WASIBridgeToHost()
-                let result = try bridge.underlying.poll_oneoff(subscriptions: clockPointer, events: .init(baseAddress: .init(offset: finalOffset), count: 1), memory: memory)
-                #expect(result == 1)
-                try bridge.close()
+                try bridge.runAndClose { _ in
+                    let result = try bridge.underlying.poll_oneoff(subscriptions: clockPointer, events: .init(baseAddress: .init(offset: finalOffset), count: 1), memory: memory)
+                    #expect(result == 1)
+                }
             }
             #expect(elapsed > Duration.nanoseconds(timeout))
         #endif
@@ -420,9 +427,10 @@ struct WASITests {
             try fs.ensureDirectory(at: preopen.hostPath)
         }
         let wasi = try WASIBridgeToHost(fileSystem: .memory(fs).withPreopens(preopens))
-        #expect(fs.lookup(at: "/tmp") != nil)
-        #expect(fs.lookup(at: "/data") != nil)
-        try wasi.close()
+        try wasi.runAndClose { _ in
+            #expect(fs.lookup(at: "/tmp") != nil)
+            #expect(fs.lookup(at: "/data") != nil)
+        }
     }
 
     @Test
@@ -435,6 +443,7 @@ struct WASITests {
             WASIBridgeToHost.Preopen(guestPath: "/", hostPath: "/"),
         ]
         let bridge = try WASIBridgeToHost(fileSystem: .memory(fs).withPreopens(preopens))
+        try bridge.runAndClose { _ in
         let wasi = bridge.underlying
 
         guard case .directory(let fd3Dir) = wasi.fdTable[3] else {
@@ -448,7 +457,7 @@ struct WASITests {
 
         #expect(fd3Dir.preopenPath == ".")
         #expect(fd4Dir.preopenPath == "/")
-        try bridge.close()
+        }
     }
 
     @Test
@@ -461,6 +470,7 @@ struct WASITests {
                 .init(guestPath: "/sandbox", hostPath: "/sandbox")
             ])
         )
+        try bridge.runAndClose { _ in
         let wasi = bridge.underlying
 
         let prestat = try wasi.fd_prestat_get(fd: 3)
@@ -469,7 +479,7 @@ struct WASITests {
             return
         }
         #expect(pathLen == 8)
-        try bridge.close()
+        }
     }
 
     @Test
@@ -531,6 +541,7 @@ struct WASITests {
                     .init(guestPath: "/", hostPath: "/")
                 ])
             )
+            try bridge.runAndClose { _ in
             let wasi = bridge.underlying
             let rootFd: WASIAbi.Fd = 3
 
@@ -549,7 +560,7 @@ struct WASITests {
             #expect(stat.size == 23)
 
             try wasi.fd_close(fd: openedFd)
-            try bridge.close()
+            }
         #endif
     }
 
@@ -565,6 +576,7 @@ struct WASITests {
                     .init(guestPath: "/sandbox", hostPath: tempDir.url.path)
                 ])
             )
+            try bridge.runAndClose { _ in
             let wasi = bridge.underlying
 
             let sandboxFd: WASIAbi.Fd = 3
@@ -583,7 +595,7 @@ struct WASITests {
             #expect(stat.size == 12)
 
             try wasi.fd_close(fd: fd)
-            try bridge.close()
+            }
         #endif
     }
 
@@ -599,6 +611,7 @@ struct WASITests {
                 .init(guestPath: "/", hostPath: "/")
             ])
         )
+        try bridge.runAndClose { _ in
         let wasi = bridge.underlying
 
         let rootFd: WASIAbi.Fd = 3
@@ -617,7 +630,7 @@ struct WASITests {
         #expect(stat.size == 14)
 
         try wasi.fd_close(fd: fd)
-        try bridge.close()
+        }
     }
 
     @Test
@@ -631,6 +644,7 @@ struct WASITests {
                 .init(guestPath: "/", hostPath: "/")
             ])
         )
+        try bridge.runAndClose { _ in
         let wasi = bridge.underlying
         let rootFd: WASIAbi.Fd = 3
 
@@ -657,7 +671,7 @@ struct WASITests {
         #expect(midPos == 5)
 
         try wasi.fd_close(fd: fd)
-        try bridge.close()
+        }
     }
 
     @Test
@@ -671,6 +685,7 @@ struct WASITests {
                 .init(guestPath: "/", hostPath: "/")
             ])
         )
+        try bridge.runAndClose { _ in
         let wasi = bridge.underlying
         let rootFd: WASIAbi.Fd = 3
 
@@ -705,7 +720,7 @@ struct WASITests {
         #expect(writeStat.fsRightsBase.contains(.FD_WRITE))
 
         try wasi.fd_close(fd: writeOnlyFd)
-        try bridge.close()
+        }
     }
 
     @Test
@@ -773,6 +788,7 @@ struct WASITests {
                 .init(guestPath: "/", hostPath: "/")
             ])
         )
+        try bridge.runAndClose { _ in
         let wasi = bridge.underlying
         let rootFd: WASIAbi.Fd = 3
 
@@ -799,7 +815,7 @@ struct WASITests {
         #expect(bytes == Array("Long".utf8))
 
         try wasi.fd_close(fd: fd)
-        try bridge.close()
+        }
     }
 
     @Test
@@ -813,6 +829,7 @@ struct WASITests {
                 .init(guestPath: "/", hostPath: "/")
             ])
         )
+        try bridge.runAndClose { _ in
         let wasi = bridge.underlying
         let rootFd: WASIAbi.Fd = 3
 
@@ -843,7 +860,7 @@ struct WASITests {
         #expect(bytes[9] == 0)
 
         try wasi.fd_close(fd: fd)
-        try bridge.close()
+        }
     }
 
     @Test
@@ -857,6 +874,7 @@ struct WASITests {
                 .init(guestPath: "/", hostPath: "/")
             ])
         )
+        try bridge.runAndClose { _ in
         let wasi = bridge.underlying
         let rootFd: WASIAbi.Fd = 3
 
@@ -876,7 +894,7 @@ struct WASITests {
             return
         }
         #expect(bytes == Array("Content".utf8))
-        try bridge.close()
+        }
     }
 
     @Test
@@ -891,6 +909,7 @@ struct WASITests {
                 .init(guestPath: "/", hostPath: "/")
             ])
         )
+        try bridge.runAndClose { _ in
         let wasi = bridge.underlying
         let rootFd: WASIAbi.Fd = 3
 
@@ -903,7 +922,7 @@ struct WASITests {
 
         #expect(fs.lookup(at: "/file.txt") == nil)
         #expect(fs.lookup(at: "/subdir/moved.txt") != nil)
-        try bridge.close()
+        }
     }
 
     @Test
@@ -917,12 +936,13 @@ struct WASITests {
                 .init(guestPath: "/", hostPath: "/")
             ])
         )
+        try bridge.runAndClose { _ in
         let wasi = bridge.underlying
         let rootFd: WASIAbi.Fd = 3
 
         try wasi.path_remove_directory(dirFd: rootFd, path: "emptydir")
         #expect(fs.lookup(at: "/emptydir") == nil)
-        try bridge.close()
+        }
     }
 
     @Test
@@ -937,6 +957,7 @@ struct WASITests {
                 .init(guestPath: "/", hostPath: "/")
             ])
         )
+        try bridge.runAndClose { _ in
         let wasi = bridge.underlying
         let rootFd: WASIAbi.Fd = 3
 
@@ -948,7 +969,7 @@ struct WASITests {
         }
 
         #expect(fs.lookup(at: "/nonempty") != nil)
-        try bridge.close()
+        }
     }
 
     @Test
@@ -962,6 +983,7 @@ struct WASITests {
                 .init(guestPath: "/", hostPath: "/")
             ])
         )
+        try bridge.runAndClose { _ in
         let wasi = bridge.underlying
         let rootFd: WASIAbi.Fd = 3
 
@@ -979,7 +1001,7 @@ struct WASITests {
         try wasi.fd_datasync(fd: fd)
 
         try wasi.fd_close(fd: fd)
-        try bridge.close()
+        }
     }
 
     @Test
@@ -993,6 +1015,7 @@ struct WASITests {
                 .init(guestPath: "/", hostPath: "/")
             ])
         )
+        try bridge.runAndClose { _ in
         let wasi = bridge.underlying
         let rootFd: WASIAbi.Fd = 3
 
@@ -1023,7 +1046,7 @@ struct WASITests {
         #expect(readData[0] == writeData)
 
         try wasi.fd_close(fd: fd)
-        try bridge.close()
+        }
     }
 
     @Test
@@ -1037,6 +1060,7 @@ struct WASITests {
                 .init(guestPath: "/", hostPath: "/")
             ])
         )
+        try bridge.runAndClose { _ in
         let wasi = bridge.underlying
         let rootFd: WASIAbi.Fd = 3
 
@@ -1062,7 +1086,7 @@ struct WASITests {
         }
 
         try wasi.fd_close(fd: fd)
-        try bridge.close()
+        }
     }
 
     @Test
@@ -1076,6 +1100,7 @@ struct WASITests {
                 .init(guestPath: "/", hostPath: "/")
             ])
         )
+        try bridge.runAndClose { _ in
         let wasi = bridge.underlying
         let rootFd: WASIAbi.Fd = 3
 
@@ -1105,7 +1130,7 @@ struct WASITests {
         }
 
         try wasi.fd_close(fd: fd)
-        try bridge.close()
+        }
     }
 
     @Test
@@ -1128,6 +1153,7 @@ struct WASITests {
                     .init(guestPath: "/", hostPath: "/")
                 ])
             )
+            try bridge.runAndClose { _ in
             let wasi = bridge.underlying
             let rootFd: WASIAbi.Fd = 3
 
@@ -1152,7 +1178,7 @@ struct WASITests {
 
             let content = try String(contentsOf: tempDir.url.appendingPathComponent("target.txt"), encoding: .utf8)
             #expect(content == "Via handle")
-            try bridge.close()
+            }
         #endif
     }
 
@@ -1167,6 +1193,7 @@ struct WASITests {
                 .init(guestPath: "/", hostPath: "/")
             ])
         )
+        try bridge.runAndClose { _ in
         let wasi = bridge.underlying
         let rootFd: WASIAbi.Fd = 3
 
@@ -1194,7 +1221,7 @@ struct WASITests {
         #expect(stat.size == 103)
 
         try wasi.fd_close(fd: fd)
-        try bridge.close()
+        }
     }
 
     @Test
@@ -1206,6 +1233,7 @@ struct WASITests {
                 .init(guestPath: "/", hostPath: "/")
             ])
         )
+        try bridge.runAndClose { _ in
         let wasi = bridge.underlying
 
         let stdinStat = try wasi.fd_fdstat_get(fileDescriptor: 0)
@@ -1219,7 +1247,7 @@ struct WASITests {
         let stderrStat = try wasi.fd_fdstat_get(fileDescriptor: 2)
         #expect(!stderrStat.fsRightsBase.contains(.FD_READ))
         #expect(stderrStat.fsRightsBase.contains(.FD_WRITE))
-        try bridge.close()
+        }
     }
 
     @Test
@@ -1231,6 +1259,7 @@ struct WASITests {
                 .init(guestPath: "/", hostPath: "/")
             ])
         )
+        try bridge.runAndClose { _ in
         let wasi = bridge.underlying
 
         let memory = TestSupport.TestGuestMemory()
@@ -1239,7 +1268,7 @@ struct WASITests {
 
         let nwritten = try wasi.fd_write(fileDescriptor: 1, ioVectors: iovecs, memory: memory)
         #expect(nwritten == UInt32(writeData.count))
-        try bridge.close()
+        }
     }
 
     @Test
@@ -1251,6 +1280,7 @@ struct WASITests {
                 .init(guestPath: "/", hostPath: "/")
             ])
         )
+        try bridge.runAndClose { _ in
         let wasi = bridge.underlying
 
         let memory = TestSupport.TestGuestMemory()
@@ -1259,7 +1289,7 @@ struct WASITests {
 
         let nwritten = try wasi.fd_write(fileDescriptor: 2, ioVectors: iovecs, memory: memory)
         #expect(nwritten == UInt32(writeData.count))
-        try bridge.close()
+        }
     }
 
     @Test
@@ -1271,6 +1301,7 @@ struct WASITests {
                 .init(guestPath: "/", hostPath: "/")
             ])
         )
+        try bridge.runAndClose { _ in
         let wasi = bridge.underlying
 
         let memory = TestSupport.TestGuestMemory()
@@ -1283,7 +1314,7 @@ struct WASITests {
         } catch let error as WASIAbi.Errno {
             #expect(error == .EBADF)
         }
-        try bridge.close()
+        }
     }
 
     @Test
@@ -1295,6 +1326,7 @@ struct WASITests {
                 .init(guestPath: "/", hostPath: "/")
             ])
         )
+        try bridge.runAndClose { _ in
         let wasi = bridge.underlying
 
         let memory = TestSupport.TestGuestMemory()
@@ -1306,7 +1338,7 @@ struct WASITests {
         } catch let error as WASIAbi.Errno {
             #expect(error == .EBADF)
         }
-        try bridge.close()
+        }
     }
 
     @Test
@@ -1318,6 +1350,7 @@ struct WASITests {
                 .init(guestPath: "/", hostPath: "/")
             ])
         )
+        try bridge.runAndClose { _ in
         let wasi = bridge.underlying
 
         let memory = TestSupport.TestGuestMemory()
@@ -1329,7 +1362,7 @@ struct WASITests {
         } catch let error as WASIAbi.Errno {
             #expect(error == .EBADF)
         }
-        try bridge.close()
+        }
     }
 
     @Test
@@ -1343,6 +1376,7 @@ struct WASITests {
                 .init(guestPath: "/", hostPath: "/")
             ])
         )
+        try bridge.runAndClose { _ in
         let wasi = bridge.underlying
         let rootFd: WASIAbi.Fd = 3
 
@@ -1376,7 +1410,7 @@ struct WASITests {
         #expect(stat3.mtim >= stat2.mtim)
 
         try wasi.fd_close(fd: fd)
-        try bridge.close()
+        }
     }
 
     @Test
@@ -1389,6 +1423,7 @@ struct WASITests {
                 .init(guestPath: "/", hostPath: "/")
             ])
         )
+        try bridge.runAndClose { _ in
         let wasi = bridge.underlying
         let rootFd: WASIAbi.Fd = 3
 
@@ -1402,7 +1437,7 @@ struct WASITests {
 
         let stat2 = try wasi.path_filestat_get(dirFd: rootFd, flags: [], path: "testdir")
         #expect(stat2.mtim >= stat1.mtim)
-        try bridge.close()
+        }
     }
 
     @Test
@@ -1416,6 +1451,7 @@ struct WASITests {
                 .init(guestPath: "/", hostPath: "/")
             ])
         )
+        try bridge.runAndClose { _ in
         let wasi = bridge.underlying
         let rootFd: WASIAbi.Fd = 3
 
@@ -1433,7 +1469,7 @@ struct WASITests {
         let stat = try wasi.path_filestat_get(dirFd: rootFd, flags: [], path: "file.txt")
         #expect(stat.atim == specificTime)
         #expect(stat.mtim == specificTime)
-        try bridge.close()
+        }
     }
 
     #if !os(Windows)
@@ -1451,6 +1487,7 @@ struct WASITests {
                     .init(guestPath: "/foo", hostPath: t.url.appendingPathComponent("foo").path)
                 ])
             )
+            try bridge.runAndClose { _ in
             let wasi = bridge.underlying
             let preopenFd: WASIAbi.Fd = 3
 
@@ -1463,7 +1500,7 @@ struct WASITests {
             // Without the noFollow fix, this throws ELOOP due to the cyclic symlink
             let nwritten = try wasi.fd_readdir(fd: preopenFd, buffer: buffer, cookie: 0, memory: memory)
             #expect(nwritten > 0)
-            try bridge.close()
+            }
         }
     #endif
 
@@ -1478,6 +1515,7 @@ struct WASITests {
                     .init(guestPath: "/dir", hostPath: t.url.path)
                 ])
             )
+            try bridge.runAndClose { _ in
             let wasi = bridge.underlying
             let preopenFd: WASIAbi.Fd = 3
 
@@ -1497,7 +1535,7 @@ struct WASITests {
                 dirFd: preopenFd, flags: [], path: "hello.txt"
             )
             #expect(stat.size == 5, "preopen should still read files after closing '.' fd")
-            try bridge.close()
+            }
         }
     #endif
 
@@ -1512,18 +1550,23 @@ struct WASITests {
                     .init(guestPath: "/dir", hostPath: t.url.path)
                 ])
             )
-            let wasi = bridge.underlying
-            let preopenFd: WASIAbi.Fd = 3
+            do {
+                let wasi = bridge.underlying
+                let preopenFd: WASIAbi.Fd = 3
 
-            // Preopen works before close
-            let stat = try wasi.path_filestat_get(dirFd: preopenFd, flags: [], path: "test.txt")
-            #expect(stat.size == 5)
+                // Preopen works before close
+                let stat = try wasi.path_filestat_get(dirFd: preopenFd, flags: [], path: "test.txt")
+                #expect(stat.size == 5)
 
-            try bridge.close()
+                try bridge.close()
 
-            // After close, the preopen fd should no longer be usable
-            #expect(throws: WASIAbi.Errno.EBADF) {
-                try wasi.path_filestat_get(dirFd: preopenFd, flags: [], path: "test.txt")
+                // After close, the preopen fd should no longer be usable
+                #expect(throws: WASIAbi.Errno.EBADF) {
+                    try wasi.path_filestat_get(dirFd: preopenFd, flags: [], path: "test.txt")
+                }
+            } catch {
+                try bridge.close()
+                throw error
             }
         }
     #endif
@@ -1545,6 +1588,7 @@ struct WASITests {
                     .init(guestPath: "/dir2", hostPath: t.url.appending(component: "dir2").path),
                 ])
             )
+            try bridge.runAndClose { _ in
             let wasi = bridge.underlying
             let dir1Fd: WASIAbi.Fd = 3
             let dir2Fd: WASIAbi.Fd = 4
@@ -1585,7 +1629,7 @@ struct WASITests {
                 try wasi.path_create_directory(dirFd: dir1Fd, path: "foo/bar")
                 try wasi.path_remove_directory(dirFd: dir1Fd, path: "foo/bar")
             }
-            try bridge.close()
+            }
         }
     #endif
 }

@@ -80,11 +80,16 @@
             wasi.link(to: &imports, store: store)
             self.wasi = wasi
 
-            self.debugger = try Debugger(module: parseWasm(bytes: .init(buffer: wasmBinary)), store: store, imports: imports)
-            try self.debugger.stopAtEntrypoint()
-            try self.debugger.run()
-            guard case .stoppedAtBreakpoint = self.debugger.state else {
-                throw Error.stoppingAtEntrypointFailed
+            do {
+                self.debugger = try Debugger(module: parseWasm(bytes: .init(buffer: wasmBinary)), store: store, imports: imports)
+                try self.debugger.stopAtEntrypoint()
+                try self.debugger.run()
+                guard case .stoppedAtBreakpoint = self.debugger.state else {
+                    throw Error.stoppingAtEntrypointFailed
+                }
+            } catch {
+                try wasi.close()
+                throw error
             }
 
             self.memoryView = DebuggerMemoryView(allocator: allocator, wasmBinary: wasmBinary)

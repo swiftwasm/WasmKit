@@ -165,17 +165,22 @@ let benchmarks: @Sendable () -> () = {
                   stdout: pluginToHostPipes.writeEnd,
                   stderr: .standardError
                 )
-                var imports = Imports()
-                bridge.link(to: &imports, store: store)
-                let instance = try module.instantiate(store: store, imports: imports)
-                try instance.exports[function: "_start"]!()
-                let pump = instance.exports[function: "swift_wasm_macro_v1_pump"]!
+                do {
+                    var imports = Imports()
+                    bridge.link(to: &imports, store: store)
+                    let instance = try module.instantiate(store: store, imports: imports)
+                    try instance.exports[function: "_start"]!()
+                    let pump = instance.exports[function: "swift_wasm_macro_v1_pump"]!
 
-                self.hostToPlugin = hostToPluginPipes.writeEnd
-                self.pluginToHost = pluginToHostPipes.readEnd
-                self.pump = pump
-                self.expandMessage = expandMessage
-                self.bridge = bridge
+                    self.hostToPlugin = hostToPluginPipes.writeEnd
+                    self.pluginToHost = pluginToHostPipes.readEnd
+                    self.pump = pump
+                    self.expandMessage = expandMessage
+                    self.bridge = bridge
+                } catch {
+                    try bridge.close()
+                    throw error
+                }
             }
 
             func writeMessage(_ message: String) throws {

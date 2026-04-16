@@ -14,8 +14,9 @@ import SystemPackage
 ///     environment: ["PATH": "/usr/bin"],
 ///     preopens: [WASIBridgeToHost.Preopen(guestPath: "/sandbox", hostPath: "/real/path")]
 /// )
-/// // ... use bridge ...
-/// try bridge.close()
+/// try bridge.runAndClose { wasi in
+///     // ... use wasi ...
+/// }
 /// ```
 public final class WASIBridgeToHost {
     internal let underlying: WASIImplementation
@@ -111,6 +112,22 @@ public final class WASIBridgeToHost {
     public func close() throws {
         try underlying.close()
         isClosed = true
+    }
+
+    /// Passes the bridge to `body`, then closes all owned file descriptors
+    /// regardless of whether `body` returns normally or throws.
+    ///
+    /// - Parameter body: A closure that receives the bridge and returns a value.
+    /// - Returns: The value returned by `body`.
+    public func runAndClose<R>(_ body: (WASIBridgeToHost) throws -> R) throws -> R {
+        do {
+            let result = try body(self)
+            try close()
+            return result
+        } catch {
+            try close()
+            throw error
+        }
     }
 
     deinit {

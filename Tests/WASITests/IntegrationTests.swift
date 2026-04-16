@@ -194,14 +194,15 @@ struct IntegrationTests {
             environment: manifest.env ?? [:],
             fileSystem: .host().withStdio().withPreopens(preopens)
         )
-        let engine = Engine()
-        let store = Store(engine: engine)
-        var imports = Imports()
-        wasi.link(to: &imports, store: store)
-        let module = try parseWasm(filePath: FilePath(path.path))
-        let instance = try module.instantiate(store: store, imports: imports)
-        let exitCode = try wasi.start(instance)
-        #expect(exitCode == manifest.exitCode ?? 0, "\(path.path)")
-        try wasi.close()
+        try wasi.runAndClose { wasi in
+            let engine = Engine()
+            let store = Store(engine: engine)
+            var imports = Imports()
+            wasi.link(to: &imports, store: store)
+            let module = try parseWasm(filePath: FilePath(path.path))
+            let instance = try module.instantiate(store: store, imports: imports)
+            let exitCode = try wasi.start(instance)
+            #expect(exitCode == manifest.exitCode ?? 0, "\(path.path)")
+        }
     }
 }

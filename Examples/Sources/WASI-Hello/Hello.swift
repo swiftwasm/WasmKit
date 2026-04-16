@@ -12,17 +12,17 @@ struct Example {
 
         // Create a WASI instance forwarding to the host environment.
         let wasi = try WASIBridgeToHost()
-        // Create engine and store
-        let engine = Engine()
-        let store = Store(engine: engine)
-        // Instantiate a parsed module importing WASI
-        var imports = Imports()
-        wasi.link(to: &imports, store: store)
-        let instance = try module.instantiate(store: store, imports: imports)
-
-        // Start the WASI command-line application.
-        let exitCode = try wasi.start(instance)
-        try wasi.close()
+        // Start the WASI command-line application and close the bridge.
+        let exitCode = try wasi.runAndClose { wasi in
+            // Create engine and store
+            let engine = Engine()
+            let store = Store(engine: engine)
+            // Instantiate a parsed module importing WASI
+            var imports = Imports()
+            wasi.link(to: &imports, store: store)
+            let instance = try module.instantiate(store: store, imports: imports)
+            return try wasi.start(instance)
+        }
         // Exit the Swift program with the WASI exit code.
         exit(Int32(exitCode))
     }
