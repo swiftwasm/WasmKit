@@ -110,8 +110,9 @@ public final class WASIBridgeToHost {
     /// guest-opened files that were not closed by the WASI program).
     /// Borrowed descriptors (e.g. process stdio) are left open.
     public func close() throws {
-        try underlying.close()
+        guard !isClosed else { return }
         isClosed = true
+        try underlying.close()
     }
 
     /// Passes the bridge to `body`, then closes all owned file descriptors
