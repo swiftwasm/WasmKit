@@ -1,5 +1,6 @@
 import SystemExtras
 import SystemPackage
+import WasmTypes
 
 /// A WASIFile implementation for regular files in the memory file system.
 final class MemoryFileEntry: WASIFile {
@@ -195,7 +196,7 @@ final class MemoryFileEntry: WASIFile {
         return WASIAbi.FileSize(newPosition)
     }
 
-    func write<Buffer: Sequence>(vectored buffer: Buffer) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+    func write<M: GuestMemory, Buffer: Sequence>(vectored buffer: Buffer, memory: M) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
         guard accessMode.contains(.write) else {
             throw WASIAbi.Errno.EBADF
         }
@@ -206,7 +207,7 @@ final class MemoryFileEntry: WASIFile {
         case .bytes(var bytes):
             var currentPosition = position
             for iovec in buffer {
-                iovec.withHostBufferPointer { bufferPtr in
+                iovec.withHostBufferPointer(in: memory) { bufferPtr in
                     let bytesToWrite = bufferPtr.count
                     let requiredSize = currentPosition + bytesToWrite
 
@@ -226,7 +227,7 @@ final class MemoryFileEntry: WASIFile {
         case .handle(let handle):
             var currentOffset = Int64(position)
             for iovec in buffer {
-                let nwritten = try iovec.withHostBufferPointer { bufferPtr in
+                let nwritten = try iovec.withHostBufferPointer(in: memory) { bufferPtr in
                     try handle.writeAll(toAbsoluteOffset: currentOffset, bufferPtr)
                 }
                 currentOffset += Int64(nwritten)
@@ -238,7 +239,7 @@ final class MemoryFileEntry: WASIFile {
         return totalWritten
     }
 
-    func pwrite<Buffer: Sequence>(vectored buffer: Buffer, offset: WASIAbi.FileSize) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+    func pwrite<M: GuestMemory, Buffer: Sequence>(vectored buffer: Buffer, memory: M, offset: WASIAbi.FileSize) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
         guard accessMode.contains(.write) else {
             throw WASIAbi.Errno.EBADF
         }
@@ -249,7 +250,7 @@ final class MemoryFileEntry: WASIFile {
         case .bytes(var bytes):
             var currentOffset = Int(offset)
             for iovec in buffer {
-                iovec.withHostBufferPointer { bufferPtr in
+                iovec.withHostBufferPointer(in: memory) { bufferPtr in
                     let bytesToWrite = bufferPtr.count
                     let requiredSize = currentOffset + bytesToWrite
 
@@ -268,7 +269,7 @@ final class MemoryFileEntry: WASIFile {
         case .handle(let handle):
             var currentOffset = Int64(offset)
             for iovec in buffer {
-                let nwritten = try iovec.withHostBufferPointer { bufferPtr in
+                let nwritten = try iovec.withHostBufferPointer(in: memory) { bufferPtr in
                     try handle.writeAll(toAbsoluteOffset: currentOffset, bufferPtr)
                 }
                 currentOffset += Int64(nwritten)
@@ -279,7 +280,7 @@ final class MemoryFileEntry: WASIFile {
         return totalWritten
     }
 
-    func read<Buffer: Sequence>(into buffer: Buffer) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+    func read<M: GuestMemory, Buffer: Sequence>(into buffer: Buffer, memory: M) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
         guard accessMode.contains(.read) else {
             throw WASIAbi.Errno.EBADF
         }
@@ -290,7 +291,7 @@ final class MemoryFileEntry: WASIFile {
         case .bytes(let bytes):
             var currentPosition = position
             for iovec in buffer {
-                iovec.withHostBufferPointer { bufferPtr in
+                iovec.withHostBufferPointer(in: memory) { bufferPtr in
                     let available = max(0, bytes.count - currentPosition)
                     let toRead = min(bufferPtr.count, available)
 
@@ -311,7 +312,7 @@ final class MemoryFileEntry: WASIFile {
         case .handle(let handle):
             var currentOffset = Int64(position)
             for iovec in buffer {
-                let nread = try iovec.withHostBufferPointer { bufferPtr in
+                let nread = try iovec.withHostBufferPointer(in: memory) { bufferPtr in
                     try handle.read(fromAbsoluteOffset: currentOffset, into: bufferPtr)
                 }
                 currentOffset += Int64(nread)
@@ -323,7 +324,7 @@ final class MemoryFileEntry: WASIFile {
         return totalRead
     }
 
-    func pread<Buffer: Sequence>(into buffer: Buffer, offset: WASIAbi.FileSize) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
+    func pread<M: GuestMemory, Buffer: Sequence>(into buffer: Buffer, memory: M, offset: WASIAbi.FileSize) throws -> WASIAbi.Size where Buffer.Element == WASIAbi.IOVec {
         guard accessMode.contains(.read) else {
             throw WASIAbi.Errno.EBADF
         }
@@ -334,7 +335,7 @@ final class MemoryFileEntry: WASIFile {
         case .bytes(let bytes):
             var currentOffset = Int(offset)
             for iovec in buffer {
-                iovec.withHostBufferPointer { bufferPtr in
+                iovec.withHostBufferPointer(in: memory) { bufferPtr in
                     let available = max(0, bytes.count - currentOffset)
                     let toRead = min(bufferPtr.count, available)
 
@@ -354,7 +355,7 @@ final class MemoryFileEntry: WASIFile {
         case .handle(let handle):
             var currentOffset = Int64(offset)
             for iovec in buffer {
-                let nread = try iovec.withHostBufferPointer { bufferPtr in
+                let nread = try iovec.withHostBufferPointer(in: memory) { bufferPtr in
                     try handle.read(fromAbsoluteOffset: currentOffset, into: bufferPtr)
                 }
                 currentOffset += Int64(nread)

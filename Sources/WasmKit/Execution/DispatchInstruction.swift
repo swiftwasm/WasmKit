@@ -282,6 +282,7 @@ extension Execution {
         case 266: return try self.execute_memoryAtomicWait32(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 267: return try self.execute_memoryAtomicWait64(sp: &sp, pc: &pc, md: &md, ms: &ms)
         case 268: return try self.execute_memoryAtomicNotify(sp: &sp, pc: &pc, md: &md, ms: &ms)
+        case 269: return self.execute_atomicFence(sp: &sp, pc: &pc, md: &md, ms: &ms)
         default: preconditionFailure("Unknown instruction!?")
 
         }
@@ -2010,7 +2011,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i32AtomicRmwAdd") @inline(__always)
     mutating func execute_i32AtomicRmwAdd(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, operation: { $0 &+ $1 }, castFromValue: { $0.i32 }, castToValue: { .i32($0) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, atomicOp: { wasmkit_atomic_rmw_add_32($0, $1) }, castFromValue: { $0.i32 }, castToValue: { .i32($0) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2018,7 +2019,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicRmwAdd") @inline(__always)
     mutating func execute_i64AtomicRmwAdd(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt64.self, operation: { $0 &+ $1 }, castFromValue: { $0.i64 }, castToValue: { .i64($0) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt64.self, atomicOp: { wasmkit_atomic_rmw_add_64($0, $1) }, castFromValue: { $0.i64 }, castToValue: { .i64($0) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2026,7 +2027,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i32AtomicRmwSub") @inline(__always)
     mutating func execute_i32AtomicRmwSub(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, operation: { $0 &- $1 }, castFromValue: { $0.i32 }, castToValue: { .i32($0) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, atomicOp: { wasmkit_atomic_rmw_sub_32($0, $1) }, castFromValue: { $0.i32 }, castToValue: { .i32($0) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2034,7 +2035,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicRmwSub") @inline(__always)
     mutating func execute_i64AtomicRmwSub(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt64.self, operation: { $0 &- $1 }, castFromValue: { $0.i64 }, castToValue: { .i64($0) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt64.self, atomicOp: { wasmkit_atomic_rmw_sub_64($0, $1) }, castFromValue: { $0.i64 }, castToValue: { .i64($0) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2042,7 +2043,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i32AtomicRmwAnd") @inline(__always)
     mutating func execute_i32AtomicRmwAnd(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, operation: { $0 & $1 }, castFromValue: { $0.i32 }, castToValue: { .i32($0) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, atomicOp: { wasmkit_atomic_rmw_and_32($0, $1) }, castFromValue: { $0.i32 }, castToValue: { .i32($0) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2050,7 +2051,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicRmwAnd") @inline(__always)
     mutating func execute_i64AtomicRmwAnd(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt64.self, operation: { $0 & $1 }, castFromValue: { $0.i64 }, castToValue: { .i64($0) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt64.self, atomicOp: { wasmkit_atomic_rmw_and_64($0, $1) }, castFromValue: { $0.i64 }, castToValue: { .i64($0) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2058,7 +2059,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i32AtomicRmwOr") @inline(__always)
     mutating func execute_i32AtomicRmwOr(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, operation: { $0 | $1 }, castFromValue: { $0.i32 }, castToValue: { .i32($0) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, atomicOp: { wasmkit_atomic_rmw_or_32($0, $1) }, castFromValue: { $0.i32 }, castToValue: { .i32($0) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2066,7 +2067,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicRmwOr") @inline(__always)
     mutating func execute_i64AtomicRmwOr(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt64.self, operation: { $0 | $1 }, castFromValue: { $0.i64 }, castToValue: { .i64($0) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt64.self, atomicOp: { wasmkit_atomic_rmw_or_64($0, $1) }, castFromValue: { $0.i64 }, castToValue: { .i64($0) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2074,7 +2075,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i32AtomicRmwXor") @inline(__always)
     mutating func execute_i32AtomicRmwXor(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, operation: { $0 ^ $1 }, castFromValue: { $0.i32 }, castToValue: { .i32($0) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, atomicOp: { wasmkit_atomic_rmw_xor_32($0, $1) }, castFromValue: { $0.i32 }, castToValue: { .i32($0) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2082,7 +2083,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicRmwXor") @inline(__always)
     mutating func execute_i64AtomicRmwXor(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt64.self, operation: { $0 ^ $1 }, castFromValue: { $0.i64 }, castToValue: { .i64($0) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt64.self, atomicOp: { wasmkit_atomic_rmw_xor_64($0, $1) }, castFromValue: { $0.i64 }, castToValue: { .i64($0) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2090,7 +2091,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i32AtomicRmwXchg") @inline(__always)
     mutating func execute_i32AtomicRmwXchg(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, operation: { _, new in new }, castFromValue: { $0.i32 }, castToValue: { .i32($0) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, atomicOp: { wasmkit_atomic_rmw_xchg_32($0, $1) }, castFromValue: { $0.i32 }, castToValue: { .i32($0) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2098,7 +2099,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicRmwXchg") @inline(__always)
     mutating func execute_i64AtomicRmwXchg(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt64.self, operation: { _, new in new }, castFromValue: { $0.i64 }, castToValue: { .i64($0) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt64.self, atomicOp: { wasmkit_atomic_rmw_xchg_64($0, $1) }, castFromValue: { $0.i64 }, castToValue: { .i64($0) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2106,7 +2107,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i32AtomicRmw8AddU") @inline(__always)
     mutating func execute_i32AtomicRmw8AddU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, operation: { $0 &+ $1 }, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, atomicOp: { wasmkit_atomic_rmw_add_8($0, $1) }, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2114,7 +2115,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicRmw8AddU") @inline(__always)
     mutating func execute_i64AtomicRmw8AddU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, operation: { $0 &+ $1 }, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, atomicOp: { wasmkit_atomic_rmw_add_8($0, $1) }, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2122,7 +2123,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i32AtomicRmw8SubU") @inline(__always)
     mutating func execute_i32AtomicRmw8SubU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, operation: { $0 &- $1 }, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, atomicOp: { wasmkit_atomic_rmw_sub_8($0, $1) }, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2130,7 +2131,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicRmw8SubU") @inline(__always)
     mutating func execute_i64AtomicRmw8SubU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, operation: { $0 &- $1 }, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, atomicOp: { wasmkit_atomic_rmw_sub_8($0, $1) }, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2138,7 +2139,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i32AtomicRmw8AndU") @inline(__always)
     mutating func execute_i32AtomicRmw8AndU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, operation: { $0 & $1 }, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, atomicOp: { wasmkit_atomic_rmw_and_8($0, $1) }, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2146,7 +2147,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicRmw8AndU") @inline(__always)
     mutating func execute_i64AtomicRmw8AndU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, operation: { $0 & $1 }, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, atomicOp: { wasmkit_atomic_rmw_and_8($0, $1) }, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2154,7 +2155,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i32AtomicRmw8OrU") @inline(__always)
     mutating func execute_i32AtomicRmw8OrU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, operation: { $0 | $1 }, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, atomicOp: { wasmkit_atomic_rmw_or_8($0, $1) }, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2162,7 +2163,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicRmw8OrU") @inline(__always)
     mutating func execute_i64AtomicRmw8OrU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, operation: { $0 | $1 }, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, atomicOp: { wasmkit_atomic_rmw_or_8($0, $1) }, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2170,7 +2171,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i32AtomicRmw8XorU") @inline(__always)
     mutating func execute_i32AtomicRmw8XorU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, operation: { $0 ^ $1 }, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, atomicOp: { wasmkit_atomic_rmw_xor_8($0, $1) }, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2178,7 +2179,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicRmw8XorU") @inline(__always)
     mutating func execute_i64AtomicRmw8XorU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, operation: { $0 ^ $1 }, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, atomicOp: { wasmkit_atomic_rmw_xor_8($0, $1) }, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2186,7 +2187,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i32AtomicRmw8XchgU") @inline(__always)
     mutating func execute_i32AtomicRmw8XchgU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, operation: { _, new in new }, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, atomicOp: { wasmkit_atomic_rmw_xchg_8($0, $1) }, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2194,7 +2195,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicRmw8XchgU") @inline(__always)
     mutating func execute_i64AtomicRmw8XchgU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, operation: { _, new in new }, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt8.self, atomicOp: { wasmkit_atomic_rmw_xchg_8($0, $1) }, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2202,7 +2203,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i32AtomicRmw16AddU") @inline(__always)
     mutating func execute_i32AtomicRmw16AddU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, operation: { $0 &+ $1 }, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, atomicOp: { wasmkit_atomic_rmw_add_16($0, $1) }, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2210,7 +2211,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicRmw16AddU") @inline(__always)
     mutating func execute_i64AtomicRmw16AddU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, operation: { $0 &+ $1 }, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, atomicOp: { wasmkit_atomic_rmw_add_16($0, $1) }, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2218,7 +2219,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i32AtomicRmw16SubU") @inline(__always)
     mutating func execute_i32AtomicRmw16SubU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, operation: { $0 &- $1 }, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, atomicOp: { wasmkit_atomic_rmw_sub_16($0, $1) }, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2226,7 +2227,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicRmw16SubU") @inline(__always)
     mutating func execute_i64AtomicRmw16SubU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, operation: { $0 &- $1 }, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, atomicOp: { wasmkit_atomic_rmw_sub_16($0, $1) }, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2234,7 +2235,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i32AtomicRmw16AndU") @inline(__always)
     mutating func execute_i32AtomicRmw16AndU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, operation: { $0 & $1 }, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, atomicOp: { wasmkit_atomic_rmw_and_16($0, $1) }, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2242,7 +2243,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicRmw16AndU") @inline(__always)
     mutating func execute_i64AtomicRmw16AndU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, operation: { $0 & $1 }, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, atomicOp: { wasmkit_atomic_rmw_and_16($0, $1) }, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2250,7 +2251,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i32AtomicRmw16OrU") @inline(__always)
     mutating func execute_i32AtomicRmw16OrU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, operation: { $0 | $1 }, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, atomicOp: { wasmkit_atomic_rmw_or_16($0, $1) }, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2258,7 +2259,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicRmw16OrU") @inline(__always)
     mutating func execute_i64AtomicRmw16OrU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, operation: { $0 | $1 }, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, atomicOp: { wasmkit_atomic_rmw_or_16($0, $1) }, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2266,7 +2267,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i32AtomicRmw16XorU") @inline(__always)
     mutating func execute_i32AtomicRmw16XorU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, operation: { $0 ^ $1 }, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, atomicOp: { wasmkit_atomic_rmw_xor_16($0, $1) }, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2274,7 +2275,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicRmw16XorU") @inline(__always)
     mutating func execute_i64AtomicRmw16XorU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, operation: { $0 ^ $1 }, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, atomicOp: { wasmkit_atomic_rmw_xor_16($0, $1) }, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2282,7 +2283,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i32AtomicRmw16XchgU") @inline(__always)
     mutating func execute_i32AtomicRmw16XchgU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, operation: { _, new in new }, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, atomicOp: { wasmkit_atomic_rmw_xchg_16($0, $1) }, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2290,7 +2291,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicRmw16XchgU") @inline(__always)
     mutating func execute_i64AtomicRmw16XchgU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, operation: { _, new in new }, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt16.self, atomicOp: { wasmkit_atomic_rmw_xchg_16($0, $1) }, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2298,7 +2299,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicRmw32AddU") @inline(__always)
     mutating func execute_i64AtomicRmw32AddU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, operation: { $0 &+ $1 }, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, atomicOp: { wasmkit_atomic_rmw_add_32($0, $1) }, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2306,7 +2307,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicRmw32SubU") @inline(__always)
     mutating func execute_i64AtomicRmw32SubU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, operation: { $0 &- $1 }, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, atomicOp: { wasmkit_atomic_rmw_sub_32($0, $1) }, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2314,7 +2315,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicRmw32AndU") @inline(__always)
     mutating func execute_i64AtomicRmw32AndU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, operation: { $0 & $1 }, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, atomicOp: { wasmkit_atomic_rmw_and_32($0, $1) }, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2322,7 +2323,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicRmw32OrU") @inline(__always)
     mutating func execute_i64AtomicRmw32OrU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, operation: { $0 | $1 }, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, atomicOp: { wasmkit_atomic_rmw_or_32($0, $1) }, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2330,7 +2331,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicRmw32XorU") @inline(__always)
     mutating func execute_i64AtomicRmw32XorU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, operation: { $0 ^ $1 }, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, atomicOp: { wasmkit_atomic_rmw_xor_32($0, $1) }, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2338,7 +2339,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicRmw32XchgU") @inline(__always)
     mutating func execute_i64AtomicRmw32XchgU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.RmwOperand.load(from: &pc.pointee)
-        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, operation: { _, new in new }, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
+        try atomicRmw(sp: sp.pointee, md: md.pointee, ms: ms.pointee, rmwOperand: immediate, loadAs: UInt32.self, atomicOp: { wasmkit_atomic_rmw_xchg_32($0, $1) }, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2346,7 +2347,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i32AtomicRmwCmpxchg") @inline(__always)
     mutating func execute_i32AtomicRmwCmpxchg(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.CmpxchgOperand.load(from: &pc.pointee)
-        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt32.self, castFromValue: { $0.i32 }, castToValue: { .i32($0) })
+        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt32.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_32(ptr, &exp, desired); return exp }, castFromValue: { $0.i32 }, castToValue: { .i32($0) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2354,7 +2355,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicRmwCmpxchg") @inline(__always)
     mutating func execute_i64AtomicRmwCmpxchg(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.CmpxchgOperand.load(from: &pc.pointee)
-        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt64.self, castFromValue: { $0.i64 }, castToValue: { .i64($0) })
+        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt64.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_64(ptr, &exp, desired); return exp }, castFromValue: { $0.i64 }, castToValue: { .i64($0) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2362,7 +2363,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i32AtomicRmw8CmpxchgU") @inline(__always)
     mutating func execute_i32AtomicRmw8CmpxchgU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.CmpxchgOperand.load(from: &pc.pointee)
-        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt8.self, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
+        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt8.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_8(ptr, &exp, desired); return exp }, castFromValue: { UInt8(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2370,7 +2371,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i32AtomicRmw16CmpxchgU") @inline(__always)
     mutating func execute_i32AtomicRmw16CmpxchgU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.CmpxchgOperand.load(from: &pc.pointee)
-        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt16.self, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
+        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt16.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_16(ptr, &exp, desired); return exp }, castFromValue: { UInt16(truncatingIfNeeded: $0.i32) }, castToValue: { .i32(UInt32($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2378,7 +2379,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicRmw8CmpxchgU") @inline(__always)
     mutating func execute_i64AtomicRmw8CmpxchgU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.CmpxchgOperand.load(from: &pc.pointee)
-        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt8.self, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
+        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt8.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_8(ptr, &exp, desired); return exp }, castFromValue: { UInt8(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2386,7 +2387,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicRmw16CmpxchgU") @inline(__always)
     mutating func execute_i64AtomicRmw16CmpxchgU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.CmpxchgOperand.load(from: &pc.pointee)
-        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt16.self, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
+        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt16.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_16(ptr, &exp, desired); return exp }, castFromValue: { UInt16(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2394,7 +2395,7 @@ extension Execution {
     @_silgen_name("wasmkit_execute_i64AtomicRmw32CmpxchgU") @inline(__always)
     mutating func execute_i64AtomicRmw32CmpxchgU(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.CmpxchgOperand.load(from: &pc.pointee)
-        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt32.self, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
+        try atomicCmpxchg(sp: sp.pointee, md: md.pointee, ms: ms.pointee, cmpxchgOperand: immediate, loadAs: UInt32.self, atomicCmpxchg: { ptr, expected, desired in var exp = expected; _ = wasmkit_atomic_cmpxchg_32(ptr, &exp, desired); return exp }, castFromValue: { UInt32(truncatingIfNeeded: $0.i64) }, castToValue: { .i64(UInt64($0)) })
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next
@@ -2419,6 +2420,13 @@ extension Execution {
     mutating func execute_memoryAtomicNotify(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) throws -> CodeSlot {
         let immediate = Instruction.AtomicNotifyOperand.load(from: &pc.pointee)
         try atomicNotify(sp: sp.pointee, md: md.pointee, ms: ms.pointee, notifyOperand: immediate)
+        let next = pc.pointee.pointee
+        pc.pointee = pc.pointee.advanced(by: 1)
+        return next
+    }
+    @_silgen_name("wasmkit_execute_atomicFence") @inline(__always)
+    mutating func execute_atomicFence(sp: UnsafeMutablePointer<Sp>, pc: UnsafeMutablePointer<Pc>, md: UnsafeMutablePointer<Md>, ms: UnsafeMutablePointer<Ms>) -> CodeSlot {
+        atomicFence(sp: sp.pointee)
         let next = pc.pointee.pointee
         pc.pointee = pc.pointee.advanced(by: 1)
         return next

@@ -32,7 +32,7 @@
         }
 
         /// Returns the parsed root component after all fields have been processed
-        consuming func parse(_ parser: inout Parser) throws(WasmKitError) -> ComponentDef {
+        consuming func parse(_ parser: inout Parser) throws(WatParserError) -> ComponentDef {
             try parser.expect(.leftParen)
             try parser.expectKeyword("component")
             let id = try parser.takeId()
@@ -45,7 +45,7 @@
         /// Parses a component body when `(component $id?` has already been consumed.
         /// Expects the parser to be positioned at the first field or closing `)`.
         /// Consumes the closing `)` and returns the parsed ComponentDef.
-        consuming func parseComponentBody(_ parser: inout Parser, id: Name?) throws(WasmKitError) -> ComponentDef {
+        consuming func parseComponentBody(_ parser: inout Parser, id: Name?) throws(WatParserError) -> ComponentDef {
             componentStack.append(ComponentDef(id: id))
             try parseComponentFields(&parser)
             try parser.expect(.rightParen)
@@ -54,7 +54,7 @@
 
         /// Parses component fields until a closing `)` is encountered.
         /// Assumes the parser is positioned after `(component $id?`.
-        private mutating func parseComponentFields(_ parser: inout Parser) throws(WasmKitError) {
+        private mutating func parseComponentFields(_ parser: inout Parser) throws(WatParserError) {
             while try parser.take(.leftParen) {
                 let keyword = try parser.expectKeyword()
                 let location = parser.lexer.location()
@@ -70,8 +70,8 @@
                     componentStack.append(ComponentDef(id: nestedId))
                     try parseComponentFields(&parser)  // Recursive call for nested components
                     let nested = componentStack.removeLast()
-                    let idx = try currentComponent.componentsMap.add(nested)
-                    currentComponent.fields.append(.init(location: location, kind: .component(.init(idx))))
+                    _ = try currentComponent.componentsMap.add(nested)
+                    currentComponent.fields.append(.init(location: location, kind: .component(nested)))
                 case "import":
                     try parseComponentImport(&parser, location: location)
                 case "export":
@@ -81,7 +81,7 @@
                 case "alias":
                     try parseComponentAlias(&parser, location: location)
                 default:
-                    throw WasmKitError(
+                    throw WatParserError(
                         "Unknown component definition keyword \(keyword)",
                         location: location
                     )
@@ -91,29 +91,29 @@
         }
 
         /// Parse a core definition (module, instance, type, or func via canon lower) and add it to the current component
-        private mutating func parseCoreDef(_ parser: inout Parser) throws(WasmKitError) {
+        private mutating func parseCoreDef(_ parser: inout Parser) throws(WatParserError) {
             let coreKeyword = try parser.expectKeyword()
             let location = parser.lexer.location()
             switch coreKeyword {
             case "module":
                 let moduleDef = try self.parseModuleDef(&parser)
-                let index = try self.currentComponent.coreModulesMap.add(moduleDef)
+                _ = try self.currentComponent.coreModulesMap.add(moduleDef)
                 self.currentComponent.fields.append(
-                    .init(location: location, kind: .coreModule(.init(index)))
+                    .init(location: location, kind: .coreModule(moduleDef))
                 )
 
             case "instance":
                 let instanceDef = try self.parseCoreInstanceDef(&parser)
-                let index = try self.currentComponent.coreInstancesMap.add(instanceDef)
+                _ = try self.currentComponent.coreInstancesMap.add(instanceDef)
                 self.currentComponent.fields.append(
-                    .init(location: location, kind: .coreInstance(.init(index)))
+                    .init(location: location, kind: .coreInstance(instanceDef))
                 )
 
             case "type":
                 let coreTypeDef = try self.parseCoreTypeDef(&parser)
-                let resolvedId = try self.currentComponent.coreTypesMap.add(coreTypeDef)
+                _ = try self.currentComponent.coreTypesMap.add(coreTypeDef)
                 self.currentComponent.fields.append(
-                    .init(location: location, kind: .coreType(TypeIndex(resolvedId)))
+                    .init(location: location, kind: .coreType(coreTypeDef))
                 )
 
             case "func":
@@ -154,7 +154,7 @@
                 _ = coreFuncIndex  // Will be used for resolving references
 
             default:
-                throw WasmKitError(
+                throw WatParserError(
                     "Unknown core definition keyword \(coreKeyword)",
                     location: location
                 )
@@ -163,7 +163,7 @@
 
         /// Parse a component import definition
         /// Syntax: (import "name" (instance $id? (export "name" (func ...))...))
-        private mutating func parseComponentImport(_ parser: inout Parser, location: Location) throws(WasmKitError) {
+        private mutating func parseComponentImport(_ parser: inout Parser, location: Location) throws(WatParserError) {
             let importName = try parser.expectString()
             try parser.expect(.leftParen)
             let descKeyword = try parser.expectKeyword()
@@ -189,7 +189,7 @@
                 currentComponent.fields.append(
                     .init(
                         location: location,
-                        kind: .importDef(
+                        kind: .componentImport(
                             ImportDef(
                                 importModuleName: "",  // Not used for component imports
                                 importName: importName,
@@ -222,7 +222,7 @@
                 currentComponent.fields.append(
                     .init(
                         location: location,
-                        kind: .importDef(
+                        kind: .componentImport(
                             ImportDef(
                                 importModuleName: "",
                                 importName: importName,
@@ -232,13 +232,13 @@
                 )
 
             default:
-                throw WasmKitError("Unsupported import descriptor '\(descKeyword)'", location: parser.lexer.location())
+                throw WatParserError("Unsupported import descriptor '\(descKeyword)'", location: parser.lexer.location())
             }
         }
 
         /// Parse a component export definition
         /// Syntax: (export "name" (func $ref)) or (export "name" (func $instance "exportname"))
-        private mutating func parseComponentExport(_ parser: inout Parser, location: Location) throws(WasmKitError) {
+        private mutating func parseComponentExport(_ parser: inout Parser, location: Location) throws(WatParserError) {
             let exportName = try parser.expectString()
             try parser.expect(.leftParen)
             let descKeyword = try parser.expectKeyword()
@@ -271,13 +271,13 @@
                 try parser.expect(.rightParen)
 
             default:
-                throw WasmKitError("Unsupported export descriptor '\(descKeyword)'", location: parser.lexer.location())
+                throw WatParserError("Unsupported export descriptor '\(descKeyword)'", location: parser.lexer.location())
             }
 
             currentComponent.fields.append(
                 .init(
                     location: location,
-                    kind: .exportDef(
+                    kind: .componentExport(
                         ExportDef(
                             exportName: exportName,
                             descriptor: descriptor
@@ -288,7 +288,7 @@
 
         /// Parse a component-level alias definition
         /// Syntax: (alias core export $instance "name" (core <sort> $bindingId))
-        private mutating func parseComponentAlias(_ parser: inout Parser, location: Location) throws(WasmKitError) {
+        private mutating func parseComponentAlias(_ parser: inout Parser, location: Location) throws(WatParserError) {
             // Parse: core export $instance "name"
             try parser.expectKeyword("core")
             try parser.expectKeyword("export")
@@ -301,7 +301,7 @@
             let sortKeyword = try parser.expectKeyword()
 
             guard let sort = CoreDefSort(rawValue: sortKeyword) else {
-                throw WasmKitError("Unknown core alias sort '\(sortKeyword)'", location: parser.lexer.location())
+                throw WatParserError("Unknown core alias sort '\(sortKeyword)'", location: parser.lexer.location())
             }
 
             let bindingId = try parser.takeId()
@@ -334,7 +334,7 @@
 
         /// Parse a component instance definition
         /// Syntax: (instance $id (instantiate $component (with "name" (instance $ref))...))
-        private mutating func parseComponentInstance(_ parser: inout Parser, location: Location) throws(WasmKitError) {
+        private mutating func parseComponentInstance(_ parser: inout Parser, location: Location) throws(WatParserError) {
             let instanceId = try parser.takeId()
             try parser.expect(.leftParen)
             try parser.expectKeyword("instantiate")
@@ -353,7 +353,7 @@
                     let instanceRef = try parser.expectIndexOrId()
                     argValue = .instance(instanceRef)
                 default:
-                    throw WasmKitError("Unsupported component instance argument kind '\(argKind)'", location: parser.lexer.location())
+                    throw WatParserError("Unsupported component instance argument kind '\(argKind)'", location: parser.lexer.location())
                 }
 
                 try parser.expect(.rightParen)  // Close (instance ...)
@@ -364,14 +364,14 @@
             try parser.expect(.rightParen)  // Close (instantiate ...)
 
             let instanceDef = ComponentInstanceDef(id: instanceId, componentRef: componentRef, arguments: arguments)
-            let index = try currentComponent.componentInstancesMap.add(instanceDef)
+            _ = try currentComponent.componentInstancesMap.add(instanceDef)
             currentComponent.fields.append(
-                .init(location: location, kind: .instance(.init(index)))
+                .init(location: location, kind: .instance(instanceDef))
             )
         }
 
         /// Parse a component type definition (func, instance, component, or primitive) with optional inline exports
-        private mutating func parseComponentTypeDef(_ parser: inout Parser) throws(WasmKitError) {
+        private mutating func parseComponentTypeDef(_ parser: inout Parser) throws(WatParserError) {
             let typeLocation = parser.lexer.location()
             let typeId = try parser.takeId()
 
@@ -570,7 +570,7 @@
                     kind = .value(resultType)
 
                 default:
-                    throw WasmKitError(
+                    throw WatParserError(
                         "Unsupported type definition keyword \(typeKeyword)",
                         location: parser.lexer.location()
                     )
@@ -589,7 +589,7 @@
             self.currentComponent.fields.append(
                 .init(
                     location: typeLocation,
-                    kind: .componentType(ComponentTypeIndex(rawValue: typeIndex))
+                    kind: .componentType(typeDef, typeIndex: typeIndex)
                 )
             )
 
@@ -598,7 +598,7 @@
                 self.currentComponent.fields.append(
                     .init(
                         location: inlineExport.location,
-                        kind: .exportDef(
+                        kind: .componentExport(
                             ExportDef(
                                 exportName: inlineExport.name,
                                 descriptor: .type(.index(UInt32(typeIndex), typeLocation))
@@ -608,13 +608,13 @@
             }
         }
 
-        private mutating func parseModuleDef(_ parser: inout Parser) throws(WasmKitError) -> ModuleDef {
+        private mutating func parseModuleDef(_ parser: inout Parser) throws(WatParserError) -> ModuleDef {
             let moduleID = try parser.takeId()
             let wat = try parseWAT(&parser, features: features)
             return .init(id: moduleID, wat: wat)
         }
 
-        private mutating func parseModuleInstanceArguments(_ parser: inout Parser) throws(WasmKitError) -> CoreInstanceDef.Argument {
+        private mutating func parseModuleInstanceArguments(_ parser: inout Parser) throws(WatParserError) -> CoreInstanceDef.Argument {
             try parser.expectKeyword("with")
             let importName = try parser.expectString()
             try parser.expect(.leftParen)
@@ -638,9 +638,9 @@
                             resolvedIndex = try UInt32(self.currentComponent.coreFunctionsMap.resolveIndex(use: indexOrId))
                         case .memory:
                             // For memory, we'd need to resolve through core memory index space
-                            throw WasmKitError("Inline export of memory not yet supported", location: parser.lexer.location())
+                            throw WatParserError("Inline export of memory not yet supported", location: parser.lexer.location())
                         default:
-                            throw WasmKitError("Inline export of \(sort) not yet supported", location: parser.lexer.location())
+                            throw WatParserError("Inline export of \(sort) not yet supported", location: parser.lexer.location())
                         }
 
                         try parser.expect(.rightParen)  // Close (func/memory/etc.)
@@ -655,16 +655,16 @@
                     result = .instance(instanceID)
                 }
             } else {
-                throw WasmKitError("Expected 'instance' keyword after '('", location: parser.lexer.location())
+                throw WatParserError("Expected 'instance' keyword after '('", location: parser.lexer.location())
             }
             try parser.expect(.rightParen)
             return .init(importName: importName, kind: result)
         }
 
-        private mutating func parseCoreDefSort(_ parser: inout Parser) throws(WasmKitError) -> CoreDefSort {
+        private mutating func parseCoreDefSort(_ parser: inout Parser) throws(WatParserError) -> CoreDefSort {
             let rawKeyword = try parser.expectKeyword()
             guard let keyword = CoreDefSort(rawValue: rawKeyword) else {
-                throw WasmKitError(
+                throw WatParserError(
                     "Unexpected core declaration sort `\(rawKeyword)",
                     location: parser.lexer.location()
                 )
@@ -673,7 +673,7 @@
             return keyword
         }
 
-        private mutating func parseComponentDefSort(_ parser: inout Parser) throws(WasmKitError) -> ComponentDefSort {
+        private mutating func parseComponentDefSort(_ parser: inout Parser) throws(WatParserError) -> ComponentDefSort {
             let rawKeyword = try parser.expectKeyword()
             switch rawKeyword {
             case "core":
@@ -686,14 +686,14 @@
             case "instance": return .instance
 
             default:
-                throw WasmKitError(
+                throw WatParserError(
                     "Unexpected component declaration sort `\(rawKeyword)",
                     location: parser.lexer.location()
                 )
             }
         }
 
-        private mutating func parseCoreInstanceDef(_ parser: inout Parser) throws(WasmKitError) -> CoreInstanceDef {
+        private mutating func parseCoreInstanceDef(_ parser: inout Parser) throws(WatParserError) -> CoreInstanceDef {
             let instanceId = try parser.takeId()
             try parser.expect(.leftParen)
 
@@ -715,7 +715,7 @@
             )
         }
 
-        private mutating func parseCoreTypeDef(_ parser: inout Parser) throws(WasmKitError) -> CoreTypeDef {
+        private mutating func parseCoreTypeDef(_ parser: inout Parser) throws(WatParserError) -> CoreTypeDef {
             let typeId = try parser.takeId()
             try parser.expect(.leftParen)
             let keyword = try parser.expectKeyword()
@@ -723,11 +723,11 @@
             let kind: CoreTypeDef.Kind
             switch keyword {
             case "func":
-                let (parameters, parameterNames) = try parser.parseParamList(mayHaveName: true) { parser throws(WasmKitError) in
+                let (parameters, parameterNames) = try parser.parseParamList(mayHaveName: true) { parser throws(WatParserError) in
                     try Self.parseCoreValueType(&parser)
                 }
 
-                let results = try parser.parseResultList { parser throws(WasmKitError) in
+                let results = try parser.parseResultList { parser throws(WatParserError) in
                     try Self.parseCoreValueType(&parser)
                 }
 
@@ -753,7 +753,7 @@
                         try parser.expect(.rightParen)
 
                         guard let aliasSort = CoreDefSort(rawValue: sortKeyword) else {
-                            throw WasmKitError("Unknown alias sort '\(sortKeyword)'", location: parser.lexer.location())
+                            throw WatParserError("Unknown alias sort '\(sortKeyword)'", location: parser.lexer.location())
                         }
 
                         // Resolve outer alias immediately using component stack
@@ -782,7 +782,7 @@
                             try parser.expect(.rightParen)
                             descriptor = .func(typeIndex: typeIndex)
                         default:
-                            throw WasmKitError("Unsupported import descriptor '\(descKeyword)'", location: parser.lexer.location())
+                            throw WatParserError("Unsupported import descriptor '\(descKeyword)'", location: parser.lexer.location())
                         }
 
                         try parser.expect(.rightParen)
@@ -796,7 +796,7 @@
                                 )))
 
                     default:
-                        throw WasmKitError("Unknown module declaration '\(declKeyword)'", location: parser.lexer.location())
+                        throw WatParserError("Unknown module declaration '\(declKeyword)'", location: parser.lexer.location())
                     }
                     try parser.expect(.rightParen)
                 }
@@ -810,7 +810,7 @@
                         let bindingId = alias.bindingId
                     {
                         if moduleTypeDef.localTypeBindings[bindingId.value] != nil {
-                            throw WasmKitError("Duplicate type binding \(bindingId.value)", location: bindingId.location)
+                            throw WatParserError("Duplicate type binding \(bindingId.value)", location: bindingId.location)
                         }
                         moduleTypeDef.localTypeBindings[bindingId.value] = index
                     }
@@ -819,14 +819,14 @@
                 kind = .module(moduleTypeDef)
 
             default:
-                throw WasmKitError("Unknown core type keyword \(keyword)", location: parser.lexer.location())
+                throw WatParserError("Unknown core type keyword \(keyword)", location: parser.lexer.location())
             }
 
             try parser.expect(.rightParen)
             return CoreTypeDef(id: typeId, kind: kind)
         }
 
-        private static func parseCoreValueType(_ parser: inout Parser) throws(WasmKitError) -> WasmTypes.ValueType {
+        private static func parseCoreValueType(_ parser: inout Parser) throws(WatParserError) -> WasmTypes.ValueType {
             var tempParser = WatParser(parser: parser)
             let unresolvedType = try tempParser.valueType()
             parser = tempParser.parser
@@ -834,8 +834,8 @@
             // Core types must be simple value types (i32, i64, f32, f64), not type references.
             // Resolve immediately using a dummy resolver since these types don't reference other definitions.
             struct DummyResolver: NameToIndexResolver {
-                func resolveIndex(use: Parser.IndexOrId) throws(WasmKitError) -> Int {
-                    throw WasmKitError("Core value types cannot reference other types", location: use.location)
+                func resolveIndex(use: Parser.IndexOrId) throws(WatParserError) -> Int {
+                    throw WatParserError("Core value types cannot reference other types", location: use.location)
                 }
             }
 
@@ -844,13 +844,13 @@
 
         /// Resolve an outer alias reference to a component's type
         /// Returns a tuple of (resolvedTypeIndex, outerCount) where outerCount is the distance to the target component
-        private mutating func resolveOuterReference(componentId: Parser.IndexOrId, typeIndex: Parser.IndexOrId, sort: CoreDefSort) throws(WasmKitError) -> (resolvedIndex: Int, outerCount: Int) {
+        private mutating func resolveOuterReference(componentId: Parser.IndexOrId, typeIndex: Parser.IndexOrId, sort: CoreDefSort) throws(WatParserError) -> (resolvedIndex: Int, outerCount: Int) {
             // Find the target component in the component stack
             // For now, we assume componentId refers to a parent component by name
             // TODO: Support numeric outer counts (e.g., outer 0, outer 1)
 
             guard case .id(let targetName, _) = componentId else {
-                throw WasmKitError("Numeric outer counts not yet supported", location: componentId.location)
+                throw WatParserError("Numeric outer counts not yet supported", location: componentId.location)
             }
 
             // Search component stack from top down (most recent first)
@@ -869,16 +869,16 @@
                         let resolvedIndex = try component.coreTypesMap.resolveIndex(use: typeIndex)
                         return (resolvedIndex, outerCount)
                     case .func, .table, .memory, .global, .module, .instance:
-                        throw WasmKitError("Outer alias sort '\(sort.rawValue)' not yet supported", location: componentId.location)
+                        throw WatParserError("Outer alias sort '\(sort.rawValue)' not yet supported", location: componentId.location)
                     }
                 }
             }
 
-            throw WasmKitError("Component '\(targetName.value)' not found in outer scope", location: componentId.location)
+            throw WatParserError("Component '\(targetName.value)' not found in outer scope", location: componentId.location)
         }
 
         /// Parse instance type declarations (type decls and exports)
-        private mutating func parseInstanceTypeDeclarations(_ parser: inout Parser) throws(WasmKitError) -> InstanceTypeDef {
+        private mutating func parseInstanceTypeDeclarations(_ parser: inout Parser) throws(WatParserError) -> InstanceTypeDef {
             var typeDecls: [InstanceTypeDef.TypeDecl] = []
             var exports: [InstanceTypeDef.ExportDecl] = []
 
@@ -905,7 +905,7 @@
                     exports.append(InstanceTypeDef.ExportDecl(name: exportName))
                     continue  // Skip the outer expect(.rightParen) since we already consumed it
                 default:
-                    throw WasmKitError("Unknown instance type declaration '\(declKeyword)'", location: parser.lexer.location())
+                    throw WatParserError("Unknown instance type declaration '\(declKeyword)'", location: parser.lexer.location())
                 }
                 try parser.expect(.rightParen)
             }
@@ -914,7 +914,7 @@
         }
 
         /// Parse component type declarations (type decls, imports, and exports)
-        private mutating func parseComponentTypeDeclarations(_ parser: inout Parser) throws(WasmKitError) -> ComponentInnerTypeDef {
+        private mutating func parseComponentTypeDeclarations(_ parser: inout Parser) throws(WatParserError) -> ComponentInnerTypeDef {
             var typeDecls: [ComponentInnerTypeDef.TypeDecl] = []
             var imports: [ComponentInnerTypeDef.ImportDecl] = []
             var exports: [ComponentInnerTypeDef.ExportDecl] = []
@@ -958,7 +958,7 @@
                     exports.append(ComponentInnerTypeDef.ExportDecl(name: exportName))
                     continue
                 default:
-                    throw WasmKitError("Unknown component type declaration '\(declKeyword)'", location: parser.lexer.location())
+                    throw WatParserError("Unknown component type declaration '\(declKeyword)'", location: parser.lexer.location())
                 }
                 try parser.expect(.rightParen)
             }
@@ -966,7 +966,7 @@
             return ComponentInnerTypeDef(typeDecls: typeDecls, imports: imports, exports: exports)
         }
 
-        private mutating func parseComponentValueType(_ parser: inout Parser) throws(WasmKitError) -> ComponentValueType {
+        private mutating func parseComponentValueType(_ parser: inout Parser) throws(WatParserError) -> ComponentValueType {
             // First check for type reference (identifier like $A1)
             if let typeRef = try parser.takeId() {
                 // Resolve the type reference to an index
@@ -996,7 +996,7 @@
                 case "string": primitiveType = .string
                 case "error-context": primitiveType = .errorContext
                 default:
-                    throw WasmKitError(
+                    throw WatParserError(
                         "Unexpected primitive component type keyword `\(primitiveTypeKeyword)`",
                         location: parser.lexer.location()
                     )
@@ -1172,12 +1172,12 @@
                     return .indexed(ComponentTypeIndex(rawValue: typeIndex))
 
                 case "func", "component", "instance":
-                    throw WasmKitError(
+                    throw WatParserError(
                         "Not supported yet: `\(compositeTypeKeyword)`",
                         location: parser.lexer.location()
                     )
                 default:
-                    throw WasmKitError(
+                    throw WatParserError(
                         "Unexpected composite component type keyword `\(compositeTypeKeyword)`",
                         location: parser.lexer.location()
                     )
@@ -1186,7 +1186,7 @@
         }
 
         /// Add an anonymous component type for inline type references
-        private mutating func addAnonymousComponentType(_ valueType: ComponentValueType) throws(WasmKitError) -> Int {
+        private mutating func addAnonymousComponentType(_ valueType: ComponentValueType) throws(WatParserError) -> Int {
             let typeDef = ComponentTypeDef(id: nil, kind: .value(valueType))
 
             // Check if this type already exists as an anonymous type (deduplication)
@@ -1206,12 +1206,12 @@
             return index
         }
 
-        private mutating func parseComponentFuncParam(_ parser: inout Parser) throws(WasmKitError) -> ComponentFuncType.Param {
+        private mutating func parseComponentFuncParam(_ parser: inout Parser) throws(WatParserError) -> ComponentFuncType.Param {
             try .init(name: parser.expectString(), type: try parseComponentValueType(&parser))
         }
 
         /// Parse function parameters for component function types
-        private mutating func parseFuncParams(_ parser: inout Parser) throws(WasmKitError) -> [ComponentFuncType.Param] {
+        private mutating func parseFuncParams(_ parser: inout Parser) throws(WatParserError) -> [ComponentFuncType.Param] {
             var params: [ComponentFuncType.Param] = []
             while try parser.takeParenBlockStart("param") {
                 let name = try parser.expectString()
@@ -1222,7 +1222,7 @@
             return params
         }
 
-        private mutating func parseComponentFunc(_ parser: inout Parser) throws(WasmKitError) {
+        private mutating func parseComponentFunc(_ parser: inout Parser) throws(WatParserError) {
             _ = parser.lexer.location()
             _ = try parser.takeId()
             var parameters = [ComponentFuncType.Param]()
@@ -1240,7 +1240,7 @@
                 switch keyword {
                 case "param":
                     guard resultType == nil else {
-                        throw WasmKitError(
+                        throw WatParserError(
                             "Unknown component function parameter after function result is already declared",
                             location: parser.lexer.location()
                         )
@@ -1281,7 +1281,7 @@
                     )
 
                 default:
-                    throw WasmKitError(
+                    throw WatParserError(
                         "Unknown component function keyword \(keyword)",
                         location: parser.lexer.location()
                     )
@@ -1313,7 +1313,7 @@
                 self.currentComponent.fields.append(
                     .init(
                         location: exportDef.location,
-                        kind: .exportDef(ExportDef(exportName: exportDef.exportName, descriptor: .function(.init(funcIndex))))
+                        kind: .componentExport(ExportDef(exportName: exportDef.exportName, descriptor: .function(.init(funcIndex))))
                     )
                 )
             }
@@ -1322,7 +1322,7 @@
                 self.currentComponent.fields.append(
                     .init(
                         location: importDef.location,
-                        kind: .importDef(
+                        kind: .componentImport(
                             .init(
                                 importModuleName: importDef.importModule,
                                 importName: importDef.importName,
@@ -1334,7 +1334,7 @@
             }
         }
 
-        private mutating func parseCanonOpt(_ parser: inout Parser) throws(WasmKitError) -> CanonDef.Option {
+        private mutating func parseCanonOpt(_ parser: inout Parser) throws(WatParserError) -> CanonDef.Option {
             let keyword = try parser.expectKeyword()
             switch keyword {
             case "memory":
@@ -1359,14 +1359,14 @@
                 case "latin1+utf16":
                     encoding = .latin1UTF16
                 default:
-                    throw WasmKitError(
+                    throw WatParserError(
                         "Unknown string encoding '\(encodingKeyword)'",
                         location: parser.lexer.location()
                     )
                 }
                 return .stringEncoding(encoding)
             default:
-                throw WasmKitError(
+                throw WatParserError(
                     "Unknown canon options keyword \(keyword)",
                     location: parser.lexer.location()
                 )
@@ -1375,13 +1375,13 @@
 
         /// Parse a core memory reference: $instance "export"
         /// Used in canon options: (memory $instance "export")
-        private mutating func parseCoreMemoryRef(_ parser: inout Parser) throws(WasmKitError) -> MemoryRef {
+        private mutating func parseCoreMemoryRef(_ parser: inout Parser) throws(WatParserError) -> MemoryRef {
             let instanceId = try parser.expectIndexOrId()
             let exportName = try parser.expectString()
             return .init(instance: instanceId, exportName: exportName)
         }
 
-        private mutating func parseCoreFunctionIndex(_ parser: inout Parser) throws(WasmKitError) -> FuncIndex {
+        private mutating func parseCoreFunctionIndex(_ parser: inout Parser) throws(WatParserError) -> FuncIndex {
             try parser.expect(.leftParen)
             try parser.expectKeyword("core")
             try parser.expectKeyword("func")
@@ -1394,7 +1394,7 @@
 
         /// Parse a core function reference for canon options: (func $instance "export")
         /// Used in realloc, post-return, callback options.
-        private mutating func parseOptionFuncIndex(_ parser: inout Parser) throws(WasmKitError) -> FuncIndex {
+        private mutating func parseOptionFuncIndex(_ parser: inout Parser) throws(WatParserError) -> FuncIndex {
             try parser.expect(.leftParen)
             try parser.expectKeyword("func")
             let instanceId = try parser.expectIndexOrId()
@@ -1406,7 +1406,7 @@
 
         /// Parse a component function reference: (func $instance "export")
         /// Used in canon lower syntax.
-        private mutating func parseComponentFunctionIndex(_ parser: inout Parser) throws(WasmKitError) -> ComponentFuncRef {
+        private mutating func parseComponentFunctionIndex(_ parser: inout Parser) throws(WatParserError) -> ComponentFuncRef {
             try parser.expect(.leftParen)
             try parser.expectKeyword("func")
             let instanceId = try parser.expectIndexOrId()
@@ -1414,295 +1414,6 @@
             try parser.expect(.rightParen)
 
             return .init(instance: instanceId, exportName: exportName)
-        }
-    }
-
-    extension ComponentWatParser {
-        struct ComponentDefField {
-            enum Kind {
-                case coreModule(CoreModuleIndex)
-                case coreInstance(CoreInstanceIndex)
-                case coreType(TypeIndex)
-                case component(ComponentIndex)
-                case instance(ComponentInstanceIndex)
-                case componentType(ComponentTypeIndex)
-                case canon(CanonDef)
-                case exportDef(ExportDef)
-                case importDef(ImportDef)
-                case alias(ComponentAlias)
-            }
-
-            let location: Location
-            let kind: Kind
-        }
-
-        struct ValueDef: NamedFieldDecl {
-            var id: Name?
-        }
-
-        struct ComponentInstanceDef: NamedFieldDecl {
-            var id: Name?
-            var componentRef: Parser.IndexOrId?
-            var arguments: [ComponentInstanceArgument]
-        }
-
-        struct ComponentInstanceArgument {
-            enum Kind {
-                case instance(Parser.IndexOrId)
-            }
-            let name: String
-            let kind: Kind
-        }
-
-        /// A core function definition created via canon lower.
-        struct CoreFuncDef: NamedFieldDecl {
-            var id: Name?
-        }
-
-        /// A core memory definition created via alias.
-        struct CoreMemoryAliasDef: NamedFieldDecl {
-            var id: Name?
-        }
-
-        /// https://github.com/WebAssembly/component-model/blob/main/design/mvp/Explainer.md#index-spaces
-        public struct ComponentDef: NamedFieldDecl {
-            var id: Name?
-
-            // Listed in the order of section indices in binary encoding.
-            var coreModulesMap: NameMapping<ModuleDef> = .init()
-            var coreInstancesMap: NameMapping<CoreInstanceDef> = .init()
-            var coreTypesMap: CoreTypesMap = .init()
-            var coreFunctionsMap: NameMapping<CoreFuncDef> = .init()  // Core functions created by canon lower
-            var coreMemoriesMap: NameMapping<CoreMemoryAliasDef> = .init()  // Core memories created by alias
-
-            var componentFunctions: NameMapping<ComponentFuncDef> = .init()
-            var valuesMap: NameMapping<ValueDef> = .init()
-            var componentTypes: NameMapping<ComponentTypeDef> = .init()
-            var componentInstancesMap: NameMapping<ComponentInstanceDef> = .init()
-            var componentsMap: NameMapping<ComponentDef> = .init()
-
-            /// As sections in CM binaries can stay disjoint and unmerged,
-            /// we should preserve disjoint sections together with their ordering.
-            var fields = [ComponentDefField]()
-
-            /// Mapping from a component type to its unique ID in `componentTypes` name mapping storage.
-            var typesMap = [ComponentTypeDef.Kind: Int]()
-        }
-
-        struct ModuleDef: NamedFieldDecl {
-            var id: Name?
-            var wat: Wat
-        }
-
-        struct CoreInstanceDef: NamedFieldDecl {
-            struct Argument {
-                enum Kind {
-                    struct Export {
-                        let name: String
-                        let sort: CoreDefSort
-                        let index: UInt32
-                    }
-                    case instance(Parser.IndexOrId)
-                    case exports([Export])
-                }
-
-                let importName: String
-                let kind: Kind
-            }
-
-            var id: Name?
-            var moduleId: Parser.IndexOrId
-            var arguments: [Argument]
-        }
-
-        struct CoreTypeDef: NamedFieldDecl {
-            enum Kind {
-                case function(WatParser.FunctionType)
-                case module(CoreModuleTypeDef)
-            }
-            var id: Name?
-            let kind: Kind
-        }
-
-        struct CoreModuleTypeDef {
-            var declarations: [CoreModuleDecl]
-            var localTypeBindings: [String: Int] = [:]
-
-            func resolveTypeIndex(use: Parser.IndexOrId, globalResolver: CoreTypesMap) throws(WasmKitError) -> Int {
-                switch use {
-                case .id(let id, _):
-                    if let localDeclIndex = localTypeBindings[id.value] {
-                        return localDeclIndex
-                    }
-                    return try globalResolver.resolveIndex(use: use)
-                case .index:
-                    return try globalResolver.resolveIndex(use: use)
-                }
-            }
-        }
-
-        enum CoreModuleDecl {
-            case alias(CoreModuleAlias)
-            case type(TypeIndex)
-            case `import`(CoreModuleImport)
-            case export(CoreModuleExport)
-        }
-
-        struct CoreModuleAlias {
-            let sort: CoreDefSort
-            let target: CoreModuleAliasTarget
-            let bindingId: Name?
-        }
-
-        enum CoreModuleAliasTarget {
-            case outer(componentId: Parser.IndexOrId, index: Parser.IndexOrId, resolvedIndex: Int, outerCount: Int)
-        }
-
-        enum CoreAliasSort: String {
-            case `func`
-            case table
-            case memory
-            case global
-            case type
-        }
-
-        /// Component-level alias definition.
-        /// Syntax: (alias core export $instance "name" (core <sort> $bindingId))
-        ///         (alias export $instance "name" (<sort> $bindingId))
-        ///         (alias outer $component $idx (<sort> $bindingId))
-        ///
-        /// This is separate from `ComponentModel.ComponentAlias` because the parser works with
-        /// unresolved symbolic references (`Parser.IndexOrId`) while the binary representation
-        /// uses resolved numeric indices (`UInt32`). The encoder resolves these during binary encoding.
-        struct ComponentAlias {
-            enum Target {
-                case export(isCore: Bool, instanceIndex: Parser.IndexOrId, exportName: String)
-                case outer(outerCount: Parser.IndexOrId, typeIndex: Parser.IndexOrId)
-            }
-
-            let sort: ComponentDefSort
-            let target: Target
-            let bindingId: Name?
-        }
-
-        struct CoreModuleImport {
-            let moduleName: String
-            let name: String
-            let descriptor: CoreImportDesc
-        }
-
-        enum CoreImportDesc {
-            case `func`(typeIndex: Parser.IndexOrId)
-        }
-
-        struct CoreModuleExport {
-            let name: String
-            let descriptor: CoreImportDesc
-        }
-
-        struct FuncIndex {
-            var instance: Parser.IndexOrId
-            var exportName: String
-        }
-
-        /// Reference to a core memory via instance export.
-        /// Used in canon options: (memory $instance "export")
-        struct MemoryRef {
-            var instance: Parser.IndexOrId
-            var exportName: String
-        }
-
-        /// Reference to a component function via instance export.
-        /// Used in canon lower: (func $instance "export")
-        struct ComponentFuncRef {
-            var instance: Parser.IndexOrId
-            var exportName: String
-        }
-
-        struct CanonDef {
-            enum Option {
-                case stringEncoding(ComponentStringEncoding)
-                case memory(MemoryRef)
-                case realloc(FuncIndex)
-                case postReturn(FuncIndex)
-                case `async`
-                case callback(FuncIndex)
-            }
-
-            enum Kind {
-                case lower(ComponentFuncRef)
-                case lift(FuncIndex)
-            }
-            let kind: Kind
-            let functionIndex: FuncIndex
-            let options: [Option]
-        }
-
-        enum ExternDesc {
-            case module(Parser.IndexOrId)
-            case function(ComponentFuncIndex)
-            case functionFromInstance(Parser.IndexOrId, String)  // (instance, exportName)
-            case value(Parser.IndexOrId)
-            case type(Parser.IndexOrId)
-            case component(Parser.IndexOrId)
-            case instance(Parser.IndexOrId)
-        }
-
-        struct ExportDef {
-            let exportName: String
-            let descriptor: ExternDesc
-        }
-
-        struct ImportDef {
-            let importModuleName: String
-            let importName: String
-            let descriptor: ExternDesc
-        }
-
-        struct ComponentFuncDef: NamedFieldDecl {
-            var id: Name?
-            let paramNames: [String]
-            let type: ComponentTypeIndex
-        }
-
-        struct ComponentTypeDef: NamedFieldDecl {
-            enum Kind: Hashable {
-                case function(ComponentFuncType)
-                case value(ComponentValueType)
-                case instance(InstanceTypeDef)
-                case component(ComponentInnerTypeDef)
-            }
-            var id: Name?
-            let kind: Kind
-        }
-
-        struct InstanceTypeDef: Hashable {
-            struct TypeDecl: Hashable {
-                let id: Name?
-                let valueType: ComponentValueType
-            }
-            struct ExportDecl: Hashable {
-                let name: String
-                // Simplified - full implementation would handle type equality constraints
-            }
-            let typeDecls: [TypeDecl]
-            let exports: [ExportDecl]
-        }
-
-        struct ComponentInnerTypeDef: Hashable {
-            struct TypeDecl: Hashable {
-                let id: Name?
-                let valueType: ComponentValueType
-            }
-            struct ImportDecl: Hashable {
-                let name: String
-            }
-            struct ExportDecl: Hashable {
-                let name: String
-            }
-            let typeDecls: [TypeDecl]
-            let imports: [ImportDecl]
-            let exports: [ExportDecl]
         }
     }
 

@@ -98,7 +98,10 @@ struct WatPrinter {
                 indentLevel: 2,
                 append: { line in instrLines.append(line) }
             )
-            try code.parseExpression(visitor: &visitor)
+            var exprParser = WasmParser.ExpressionParser(code: code)
+            while let visit = try exprParser.parse() {
+                visit(visitor: &visitor)
+            }
             for line in instrLines {
                 output += line
             }

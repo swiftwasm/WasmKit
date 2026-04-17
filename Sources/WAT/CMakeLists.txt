@@ -13,6 +13,7 @@ add_wasmkit_library(WAT
   Printer/TextInstructionVisitor.swift
   Printer/WatPrinter.swift
   WAT.swift
+  WatParserError.swift
 )
 
 target_link_wasmkit_libraries(WAT PUBLIC

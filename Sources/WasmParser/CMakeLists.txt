@@ -5,7 +5,7 @@ add_wasmkit_library(WasmParser
   InstructionVisitor.swift
   LEB.swift
   ParsingLimits.swift
-  WasmKitError.swift
+  WasmParserError.swift
   WasmParser.swift
   WasmTypes.swift
 )

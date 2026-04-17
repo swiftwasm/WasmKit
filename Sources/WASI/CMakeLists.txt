@@ -15,6 +15,7 @@ add_wasmkit_library(WASI
   FileSystem.swift
   GuestMemorySupport.swift
   Clock.swift
+  Poll.swift
   RandomBufferGenerator.swift
   WASI.swift
   WASIBridgeToHost.swift

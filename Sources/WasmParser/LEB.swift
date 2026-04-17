@@ -7,7 +7,7 @@ public enum LEBError: Swift.Error, Equatable {
 @inlinable
 func decodeLEB128<IntType, Stream>(
     stream: Stream
-) throws(WasmKitError) -> IntType where IntType: FixedWidthInteger, IntType: UnsignedInteger, Stream: ByteStream {
+) throws(WasmParserError) -> IntType where IntType: FixedWidthInteger, IntType: UnsignedInteger, Stream: ByteStream {
     let firstByte = try stream.consumeAny()
     var result: IntType = IntType(firstByte & 0b0111_1111)
     if _fastPath(firstByte & 0b1000_0000 == 0) {
@@ -35,7 +35,7 @@ func decodeLEB128<IntType, Stream>(
 @inlinable
 func decodeLEB128<IntType, Stream>(
     stream: Stream, bitWidth: Int = IntType.bitWidth
-) throws(WasmKitError) -> IntType where IntType: FixedWidthInteger, IntType: RawSignedInteger, Stream: ByteStream {
+) throws(WasmParserError) -> IntType where IntType: FixedWidthInteger, IntType: RawSignedInteger, Stream: ByteStream {
     let firstByte = try stream.consumeAny()
     var result = IntType.Unsigned(firstByte & 0b0111_1111)
     if _fastPath(firstByte & 0b1000_0000 == 0) {

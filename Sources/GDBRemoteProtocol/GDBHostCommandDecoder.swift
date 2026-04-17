@@ -51,9 +51,6 @@ package struct GDBHostCommandDecoder: ByteToMessageDecoder {
         /// Unexpected arguments value supplied for a given command.
         case unexpectedArgumentsValue
 
-        /// Host command kind could not be parsed. See `GDBHostCommand.Kind` for the
-        /// list of supported commands.
-        case unknownCommand(kind: String, arguments: String)
     }
 
     /// Type of the output value produced by this decoder.
@@ -180,7 +177,7 @@ package struct GDBHostCommandDecoder: ByteToMessageDecoder {
             )
         }
 
-        let payload = try GDBHostCommand(
+        let payload = GDBHostCommand(
             kindString: String(decoding: self.accummulatedKind, as: UTF8.self),
             arguments: String(decoding: self.accummulatedArguments, as: UTF8.self)
         )

@@ -96,8 +96,10 @@ enum WasmGen {
             /// A visitor for WebAssembly instructions.
             ///
             /// The visitor pattern is used while parsing WebAssembly expressions to allow for easy extensibility.
-            /// See the expression parsing method ``Code/parseExpression(visitor:)``
             public protocol InstructionVisitor: ~Copyable {
+                /// The error type thrown by visitor methods.
+                associatedtype VisitorError: Error
+
                 /// Current offset in visitor's instruction stream.
                 var binaryOffset: Int { get set }
 
@@ -110,13 +112,13 @@ enum WasmGen {
             code += instruction.associatedValues.map { i in
                 "\(i.argumentName ?? "_"): \(i.type)"
             }.joined(separator: ", ")
-            code += ") throws(WasmKitError)"
+            code += ") throws(VisitorError)"
         }
 
         code += """
 
                 /// Returns: `true` if the parser should silently proceed parsing.
-                mutating func visitUnknown(_ opcode: [UInt8]) throws(WasmKitError) -> Bool
+                mutating func visitUnknown(_ opcode: [UInt8]) throws(VisitorError) -> Bool
             }
             """
 
@@ -125,7 +127,7 @@ enum WasmGen {
 
             extension InstructionVisitor where Self: ~Copyable {
                 /// Visits an instruction.
-                public mutating func visit(_ instruction: Instruction) throws(WasmKitError) {
+                public mutating func visit(_ instruction: Instruction) throws(VisitorError) {
                     switch instruction {
 
             """
@@ -167,10 +169,10 @@ enum WasmGen {
                     return "\(i.argumentName ?? "_") \(i.parameterName): \(i.type)"
                 }
             }.joined(separator: ", ")
-            code += ") throws(WasmKitError) {}\n"
+            code += ") throws(VisitorError) {}\n"
         }
         code += """
-            public mutating func visitUnknown(_ opcode: [UInt8]) throws(WasmKitError) -> Bool { false }
+            public mutating func visitUnknown(_ opcode: [UInt8]) throws(VisitorError) -> Bool { false }
         }
 
         """
@@ -242,7 +244,7 @@ enum WasmGen {
             /// A visitor that visits all instructions by a single visit method.
             public protocol AnyInstructionVisitor: InstructionVisitor {
                 /// Visiting any instruction.
-                mutating func visit(_ instruction: Instruction) throws(WasmKitError)
+                mutating func visit(_ instruction: Instruction) throws(VisitorError)
             }
 
             extension AnyInstructionVisitor {
@@ -258,7 +260,7 @@ enum WasmGen {
                     return "\(i.argumentName ?? "_") \(i.parameterName): \(i.type)"
                 }
             }.joined(separator: ", ")
-            code += ") throws(WasmKitError) { "
+            code += ") throws(VisitorError) { "
             code += "return try self.visit(" + buildInstructionInstanceFromContext(instruction) + ")"
             code += " }\n"
         }
@@ -272,6 +274,8 @@ enum WasmGen {
         var code = """
             /// A visitor that traces the instructions visited.
             public struct InstructionTracingVisitor<V: InstructionVisitor>: InstructionVisitor {
+                public typealias VisitorError = V.VisitorError
+
                 /// A closure that is invoked with the visited instruction.
                 public let trace: (Instruction) -> Void
                 /// The visitor to forward the instructions to.
@@ -298,7 +302,7 @@ enum WasmGen {
                     return "\(i.argumentName ?? "_") \(i.parameterName): \(i.type)"
                 }
             }.joined(separator: ", ")
-            code += ") throws(WasmKitError) {\n"
+            code += ") throws(VisitorError) {\n"
             code += "       trace("
             code += buildInstructionInstanceFromContext(instruction)
             code += ")\n"
@@ -335,7 +339,7 @@ enum WasmGen {
                 keyword: String,
                 expressionParser: inout ExpressionParser<V>,
                 wat: inout Wat
-            ) throws(WasmKitError) -> ((inout V) throws(WasmKitError) -> Void)? {
+            ) throws(WatParserError) -> ((inout V) throws(V.VisitorError) -> Void)? {
                 switch keyword {
 
             """
@@ -359,7 +363,7 @@ enum WasmGen {
             } else {
                 code += " "
             }
-            code += "return { visitor throws(WasmKitError) in return try visitor.\(instruction.visitMethodName)("
+            code += "return { visitor throws(V.VisitorError) in return try visitor.\(instruction.visitMethodName)("
             var arguments: [(label: String?, value: String)] = []
             if instruction.category != nil {
                 arguments.append((label: nil, value: ".\(instruction.name.enumCase)"))
@@ -472,7 +476,7 @@ enum WasmGen {
             /// in Wasm binary format.
             protocol BinaryInstructionEncoder: InstructionVisitor {
                 /// Encodes an instruction opcode.
-                mutating func encodeInstruction(_ opcode: [UInt8]) throws(WasmKitError)
+                mutating func encodeInstruction(_ opcode: [UInt8]) throws(VisitorError)
 
                 // MARK: - Immediates encoding
 
@@ -502,7 +506,7 @@ enum WasmGen {
             code += immediates.map { i in
                 "\(i.label): \(i.type)"
             }.joined(separator: ", ")
-            code += ") throws(WasmKitError)\n"
+            code += ") throws(VisitorError)\n"
         }
 
         code += """
@@ -522,7 +526,7 @@ enum WasmGen {
                     return "\(i.argumentName ?? "_") \(i.parameterName): \(i.type)"
                 }
             }.joined(separator: ", ")
-            code += ") throws(WasmKitError) {"
+            code += ") throws(VisitorError) {"
 
             var encodeInstrCall: String
             if let category = instruction.explicitCategory {
@@ -599,10 +603,10 @@ enum WasmGen {
             var offset: Int { get }
 
             /// Claim the next byte to be decoded
-            @inlinable func claimNextByte() throws(WasmKitError) -> UInt8
+            @inlinable func claimNextByte() throws(WasmParserError) -> UInt8
 
             /// Throw an error due to unknown opcode.
-            func throwUnknown(_ opcode: [UInt8]) throws(WasmKitError) -> Never
+            func throwUnknown(_ opcode: [UInt8]) throws(WasmParserError) -> Never
 
         """
         for instruction in instructions.categorized {
@@ -612,7 +616,7 @@ enum WasmGen {
             if let categoryType = instruction.categoryTypeName {
                 code += "_: Instruction.\(categoryType)"
             }
-            code += ") throws(WasmKitError) -> "
+            code += ") throws(WasmParserError) -> "
             if instruction.immediates.count == 1 {
                 code += "\(instruction.immediates[0].type)"
             } else {
@@ -625,17 +629,16 @@ enum WasmGen {
 
         """
 
+        // Generate parseBinaryInstruction — pure parsing, returns Instruction enum
         code += """
 
         @inlinable
         func parseBinaryInstruction(
-            visitor: inout some InstructionVisitor & ~Copyable,
             decoder: inout some BinaryInstructionDecoder
-        ) throws(WasmKitError) -> Bool {
-            visitor.binaryOffset = decoder.offset
+        ) throws(WasmParserError) -> Instruction {
         """
 
-        func renderSwitchCase(_ root: Trie, depth: Int = 0) {
+        func renderParseSwitchCase(_ root: Trie, depth: Int = 0) {
             let indent = String(repeating: " ", count: (depth + 1) * 4)
             func opcodeByteName(_ depth: Int) -> String { "opcode\(depth)" }
             let opcodeByte = opcodeByteName(depth)
@@ -648,6 +651,10 @@ enum WasmGen {
             for (opcode, trie) in root.children.sorted(by: { $0.key < $1.key }) {
                 code += "\(indent)case \(String(format: "0x%02X", opcode)):\n"
                 if let instruction = trie.instruction {
+                    let categorized = instructions.categorized.first(where: {
+                        $0.visitMethodName == instruction.visitMethodName
+                    })!
+
                     if !instruction.immediates.isEmpty {
                         code += "\(indent)    let ("
                         code += instruction.immediates.map(\.label).joined(separator: ", ")
@@ -658,40 +665,53 @@ enum WasmGen {
                         code += ")\n"
                     }
 
-                    code += "\(indent)    try visitor.\(instruction.visitMethodName)("
-                    var arguments: [(label: String?, value: String)] = []
-                    if instruction.category != nil {
-                        arguments.append((label: nil, value: ".\(instruction.name.enumCase)"))
-                    }
-                    for immediate in instruction.immediates {
-                        arguments.append((label: immediate.label, value: immediate.label))
-                    }
-                    code += arguments.map { i in
-                        if let label = i.label {
-                            return "\(label): \(i.value)"
-                        } else {
-                            return i.value
+                    // Build the Instruction enum value
+                    code += "\(indent)    return "
+                    if categorized.associatedValues.isEmpty {
+                        code += ".\(categorized.enumCaseName)\n"
+                    } else {
+                        code += ".\(categorized.enumCaseName)("
+                        var arguments: [(label: String?, value: String)] = []
+                        if instruction.category != nil {
+                            arguments.append((label: nil, value: ".\(instruction.name.enumCase)"))
                         }
-                    }.joined(separator: ", ")
-                    code += ")\n"
-                    if instruction.name.text == "end" {
-                        code += "\(indent)    return true\n"
+                        for immediate in instruction.immediates {
+                            arguments.append((label: immediate.label, value: immediate.label))
+                        }
+                        code += arguments.map { i in
+                            if let label = i.label {
+                                return "\(label): \(i.value)"
+                            } else {
+                                return i.value
+                            }
+                        }.joined(separator: ", ")
+                        code += ")\n"
                     }
                 } else {
-                    renderSwitchCase(trie, depth: depth + 1)
+                    renderParseSwitchCase(trie, depth: depth + 1)
                 }
             }
             code += "\(indent)default:\n"
-            code += "\(indent)    if try !visitor.visitUnknown("
             let opcode = "[" + (0...depth).map { opcodeByteName($0) }.joined(separator: ", ") + "]"
-            code += opcode
-            code += ") { try decoder.throwUnknown(\(opcode)) }\n"
+            code += "\(indent)    try decoder.throwUnknown(\(opcode))\n"
             code += "\(indent)}\n"
         }
 
-        renderSwitchCase(root)
-        code += "    return false\n"
+        renderParseSwitchCase(root)
         code += "}\n"
+
+        // Generate dispatchInstruction — pure dispatch to visitor
+        code += """
+
+        @inlinable
+        func dispatchInstruction<V: InstructionVisitor & ~Copyable>(
+            _ instruction: Instruction, to visitor: inout V
+        ) throws(V.VisitorError) {
+            try visitor.visit(instruction)
+        }
+
+        """
+
         return code
     }
 

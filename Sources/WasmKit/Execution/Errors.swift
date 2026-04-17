@@ -3,19 +3,19 @@ import WasmTypes
 import struct WasmParser.Import
 
 /// The backtrace of the trap.
-struct Backtrace: CustomStringConvertible, Sendable {
+public struct Backtrace: CustomStringConvertible, Sendable {
     /// A symbol in the backtrace.
-    struct Symbol: @unchecked Sendable {
+    public struct Symbol: @unchecked Sendable {
         /// The name of the symbol.
-        let name: String?
+        public let name: String?
         let address: Pc
     }
 
     /// The symbols in the backtrace.
-    let symbols: [Symbol]
+    public let symbols: [Symbol]
 
     /// Textual description of the backtrace.
-    var description: String {
+    public var description: String {
         symbols.enumerated().map { (index, symbol) in
             let name = symbol.name ?? "unknown"
             return "    \(index): (\(symbol.address)) \(name)"

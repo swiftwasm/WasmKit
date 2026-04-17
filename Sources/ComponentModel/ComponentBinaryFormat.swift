@@ -3,7 +3,7 @@
 /// Reference: `Vendor/component-model/design/mvp/Binary.md`
 
 /// Section IDs per Binary.md
-package enum ComponentSectionID: UInt8 {
+package enum ComponentSectionID: UInt8, Comparable {
     case custom = 0x00
     case coreModule = 0x01
     case coreInstance = 0x02
@@ -17,6 +17,10 @@ package enum ComponentSectionID: UInt8 {
     case `import` = 0x0A
     case export = 0x0B
     case value = 0x0C
+
+    package static func < (lhs: ComponentSectionID, rhs: ComponentSectionID) -> Bool {
+        lhs.rawValue < rhs.rawValue
+    }
 }
 
 // MARK: - Value Type Opcodes
