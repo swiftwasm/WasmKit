@@ -32,30 +32,11 @@ struct WASITests {
                     .init(guestPath: "/Sandbox", hostPath: t.url.appendingPathComponent("Sandbox").path)
                 ])
             )
-            let mntFd: WASIAbi.Fd = 3
+            try wasi.runAndClose { wasi in
+                let mntFd: WASIAbi.Fd = 3
 
-            func assertResolve(_ path: String, followSymlink: Bool, directory: Bool = false) throws {
-                let fd = try wasi.underlying.path_open(
-                    dirFd: mntFd,
-                    dirFlags: followSymlink ? [.SYMLINK_FOLLOW] : [],
-                    path: path,
-                    oflags: directory ? [.DIRECTORY] : [],
-                    fsRightsBase: .DIRECTORY_BASE_RIGHTS,
-                    fsRightsInheriting: .DIRECTORY_INHERITING_RIGHTS,
-                    fdflags: []
-                )
-                try wasi.underlying.fd_close(fd: fd)
-            }
-
-            func assertNotResolve(
-                _ path: String,
-                followSymlink: Bool,
-                directory: Bool = false,
-                sourceLocation: SourceLocation = #_sourceLocation,
-                _ checkError: ((WASIAbi.Errno) throws -> Void)?
-            ) throws {
-                do {
-                    _ = try wasi.underlying.path_open(
+                func assertResolve(_ path: String, followSymlink: Bool, directory: Bool = false) throws {
+                    let fd = try wasi.underlying.path_open(
                         dirFd: mntFd,
                         dirFlags: followSymlink ? [.SYMLINK_FOLLOW] : [],
                         path: path,
@@ -64,77 +45,98 @@ struct WASITests {
                         fsRightsInheriting: .DIRECTORY_INHERITING_RIGHTS,
                         fdflags: []
                     )
-                    #expect((false), "Expected not to be able to open \(path)", sourceLocation: sourceLocation)
-                } catch {
-                    guard let error = error as? WASIAbi.Errno else {
-                        #expect((false), "Expected WASIAbi.Errno error but got \(error)", sourceLocation: sourceLocation)
-                        return
-                    }
-                    try checkError?(error)
+                    try wasi.underlying.fd_close(fd: fd)
                 }
-            }
 
-            try assertNotResolve("non-existent.txt", followSymlink: false) { error in
-                #expect(error == .ENOENT)
-            }
+                func assertNotResolve(
+                    _ path: String,
+                    followSymlink: Bool,
+                    directory: Bool = false,
+                    sourceLocation: SourceLocation = #_sourceLocation,
+                    _ checkError: ((WASIAbi.Errno) throws -> Void)?
+                ) throws {
+                    do {
+                        _ = try wasi.underlying.path_open(
+                            dirFd: mntFd,
+                            dirFlags: followSymlink ? [.SYMLINK_FOLLOW] : [],
+                            path: path,
+                            oflags: directory ? [.DIRECTORY] : [],
+                            fsRightsBase: .DIRECTORY_BASE_RIGHTS,
+                            fsRightsInheriting: .DIRECTORY_INHERITING_RIGHTS,
+                            fdflags: []
+                        )
+                        #expect((false), "Expected not to be able to open \(path)", sourceLocation: sourceLocation)
+                    } catch {
+                        guard let error = error as? WASIAbi.Errno else {
+                            #expect((false), "Expected WASIAbi.Errno error but got \(error)", sourceLocation: sourceLocation)
+                            return
+                        }
+                        try checkError?(error)
+                    }
+                }
 
-            try assertResolve("link-hello.txt", followSymlink: true)
-            try assertNotResolve("link-hello.txt", followSymlink: false) { error in
-                #expect(error == .ELOOP)
-            }
-            try assertNotResolve("link-hello.txt", followSymlink: true, directory: true) { error in
-                #expect(error == .ENOTDIR)
-            }
+                try assertNotResolve("non-existent.txt", followSymlink: false) { error in
+                    #expect(error == .ENOENT)
+                }
 
-            try assertNotResolve("link-hello.txt/", followSymlink: true) { error in
-                #expect(error == .ENOTDIR)
-            }
+                try assertResolve("link-hello.txt", followSymlink: true)
+                try assertNotResolve("link-hello.txt", followSymlink: false) { error in
+                    #expect(error == .ELOOP)
+                }
+                try assertNotResolve("link-hello.txt", followSymlink: true, directory: true) { error in
+                    #expect(error == .ENOTDIR)
+                }
 
-            try assertResolve("link-world.dir", followSymlink: true)
-            try assertNotResolve("link-world.dir", followSymlink: false) { error in
-                #expect(error == .ELOOP)
-            }
+                try assertNotResolve("link-hello.txt/", followSymlink: true) { error in
+                    #expect(error == .ENOTDIR)
+                }
 
-            try assertNotResolve("link-external-secret-a.txt", followSymlink: true) { error in
-                #expect(error == .EPERM)
-            }
-            try assertNotResolve("link-external-secret-a.txt", followSymlink: false) { error in
-                #expect(error == .ELOOP)
-            }
+                try assertResolve("link-world.dir", followSymlink: true)
+                try assertNotResolve("link-world.dir", followSymlink: false) { error in
+                    #expect(error == .ELOOP)
+                }
 
-            try assertNotResolve("link-external-non-existent.txt", followSymlink: true) { error in
-                #expect(error == .EPERM)
-            }
-            try assertNotResolve("link-external-non-existent.txt", followSymlink: false) { error in
-                #expect(error == .ELOOP)
-            }
+                try assertNotResolve("link-external-secret-a.txt", followSymlink: true) { error in
+                    #expect(error == .EPERM)
+                }
+                try assertNotResolve("link-external-secret-a.txt", followSymlink: false) { error in
+                    #expect(error == .ELOOP)
+                }
 
-            try assertNotResolve("link-updown-hello.txt", followSymlink: true) { error in
-                #expect(error == .EPERM)
-            }
-            try assertNotResolve("link-updown-hello.txt", followSymlink: false) { error in
-                #expect(error == .ELOOP)
-            }
+                try assertNotResolve("link-external-non-existent.txt", followSymlink: true) { error in
+                    #expect(error == .EPERM)
+                }
+                try assertNotResolve("link-external-non-existent.txt", followSymlink: false) { error in
+                    #expect(error == .ELOOP)
+                }
 
-            try assertNotResolve("link-secret-dir-b/secret-c.txt", followSymlink: true) { error in
-                #expect(error == .EPERM)
-            }
-            try assertNotResolve("link-secret-dir-b/secret-c.txt", followSymlink: false) { error in
-                #expect(error == .ENOTDIR)
-            }
+                try assertNotResolve("link-updown-hello.txt", followSymlink: true) { error in
+                    #expect(error == .EPERM)
+                }
+                try assertNotResolve("link-updown-hello.txt", followSymlink: false) { error in
+                    #expect(error == .ELOOP)
+                }
 
-            try assertNotResolve("link-root", followSymlink: true) { error in
-                #expect(error == .EPERM)
-            }
-            try assertNotResolve("link-root", followSymlink: false) { error in
-                #expect(error == .ELOOP)
-            }
+                try assertNotResolve("link-secret-dir-b/secret-c.txt", followSymlink: true) { error in
+                    #expect(error == .EPERM)
+                }
+                try assertNotResolve("link-secret-dir-b/secret-c.txt", followSymlink: false) { error in
+                    #expect(error == .ENOTDIR)
+                }
 
-            try assertNotResolve("link-loop.txt", followSymlink: false) { error in
-                #expect(error == .ELOOP)
-            }
-            try assertNotResolve("link-loop.txt", followSymlink: true) { error in
-                #expect(error == .ELOOP)
+                try assertNotResolve("link-root", followSymlink: true) { error in
+                    #expect(error == .EPERM)
+                }
+                try assertNotResolve("link-root", followSymlink: false) { error in
+                    #expect(error == .ELOOP)
+                }
+
+                try assertNotResolve("link-loop.txt", followSymlink: false) { error in
+                    #expect(error == .ELOOP)
+                }
+                try assertNotResolve("link-loop.txt", followSymlink: true) { error in
+                    #expect(error == .ELOOP)
+                }
             }
         }
     #endif
@@ -180,29 +182,32 @@ struct WASITests {
         try fs.addFile(at: "/test.txt", content: Array("Test Content".utf8))
         try fs.ensureDirectory(at: "/testdir")
 
-        let wasi = try WASIBridgeToHost(
+        let bridge = try WASIBridgeToHost(
             fileSystem: .memory(fs).withPreopens([
                 .init(guestPath: "/", hostPath: "/")
             ])
-        ).underlying
-
-        let rootFd: WASIAbi.Fd = 3
-
-        let fd = try wasi.path_open(
-            dirFd: rootFd,
-            dirFlags: [],
-            path: "test.txt",
-            oflags: [],
-            fsRightsBase: [.FD_READ],
-            fsRightsInheriting: [],
-            fdflags: []
         )
+        try bridge.runAndClose { _ in
+            let wasi = bridge.underlying
 
-        let stat = try wasi.fd_filestat_get(fd: fd)
-        #expect(stat.filetype == .REGULAR_FILE)
-        #expect(stat.size == 12)
+            let rootFd: WASIAbi.Fd = 3
 
-        try wasi.fd_close(fd: fd)
+            let fd = try wasi.path_open(
+                dirFd: rootFd,
+                dirFlags: [],
+                path: "test.txt",
+                oflags: [],
+                fsRightsBase: [.FD_READ],
+                fsRightsInheriting: [],
+                fdflags: []
+            )
+
+            let stat = try wasi.fd_filestat_get(fd: fd)
+            #expect(stat.filetype == .REGULAR_FILE)
+            #expect(stat.size == 12)
+
+            try wasi.fd_close(fd: fd)
+        }
     }
 
     @Test
@@ -211,30 +216,33 @@ struct WASITests {
         try fs.ensureDirectory(at: "/")
         try fs.addFile(at: "/readwrite.txt", content: Array("Initial".utf8))
 
-        let wasi = try WASIBridgeToHost(
+        let bridge = try WASIBridgeToHost(
             fileSystem: .memory(fs).withPreopens([
                 .init(guestPath: "/", hostPath: "/")
             ])
-        ).underlying
-        let rootFd: WASIAbi.Fd = 3
-
-        let fd = try wasi.path_open(
-            dirFd: rootFd,
-            dirFlags: [],
-            path: "readwrite.txt",
-            oflags: [],
-            fsRightsBase: [.FD_READ, .FD_WRITE, .FD_SEEK],
-            fsRightsInheriting: [],
-            fdflags: []
         )
+        try bridge.runAndClose { _ in
+            let wasi = bridge.underlying
+            let rootFd: WASIAbi.Fd = 3
 
-        let newOffset = try wasi.fd_seek(fd: fd, offset: 0, whence: .END)
-        #expect(newOffset == 7)
+            let fd = try wasi.path_open(
+                dirFd: rootFd,
+                dirFlags: [],
+                path: "readwrite.txt",
+                oflags: [],
+                fsRightsBase: [.FD_READ, .FD_WRITE, .FD_SEEK],
+                fsRightsInheriting: [],
+                fdflags: []
+            )
 
-        let tell = try wasi.fd_tell(fd: fd)
-        #expect(tell == 7)
+            let newOffset = try wasi.fd_seek(fd: fd, offset: 0, whence: .END)
+            #expect(newOffset == 7)
 
-        try wasi.fd_close(fd: fd)
+            let tell = try wasi.fd_tell(fd: fd)
+            #expect(tell == 7)
+
+            try wasi.fd_close(fd: fd)
+        }
     }
 
     @Test
@@ -242,37 +250,40 @@ struct WASITests {
         let fs = try MemoryFileSystem()
         try fs.ensureDirectory(at: "/")
 
-        let wasi = try WASIBridgeToHost(
+        let bridge = try WASIBridgeToHost(
             fileSystem: .memory(fs).withPreopens([
                 .init(guestPath: "/", hostPath: "/")
             ])
-        ).underlying
-        let rootFd: WASIAbi.Fd = 3
-
-        try wasi.path_create_directory(dirFd: rootFd, path: "newdir")
-        #expect(fs.lookup(at: "/newdir") != nil)
-
-        let dirStat = try wasi.path_filestat_get(dirFd: rootFd, flags: [], path: "newdir")
-        #expect(dirStat.filetype == .DIRECTORY)
-
-        let dirFd = try wasi.path_open(
-            dirFd: rootFd,
-            dirFlags: [],
-            path: "newdir",
-            oflags: [.DIRECTORY],
-            fsRightsBase: .DIRECTORY_BASE_RIGHTS,
-            fsRightsInheriting: .DIRECTORY_INHERITING_RIGHTS,
-            fdflags: []
         )
+        try bridge.runAndClose { _ in
+            let wasi = bridge.underlying
+            let rootFd: WASIAbi.Fd = 3
 
-        try fs.addFile(at: "/newdir/file1.txt", content: Array("file1".utf8))
-        try fs.addFile(at: "/newdir/file2.txt", content: Array("file2".utf8))
+            try wasi.path_create_directory(dirFd: rootFd, path: "newdir")
+            #expect(fs.lookup(at: "/newdir") != nil)
 
-        try wasi.fd_close(fd: dirFd)
+            let dirStat = try wasi.path_filestat_get(dirFd: rootFd, flags: [], path: "newdir")
+            #expect(dirStat.filetype == .DIRECTORY)
 
-        try wasi.path_unlink_file(dirFd: rootFd, path: "newdir/file1.txt")
-        #expect(fs.lookup(at: "/newdir/file1.txt") == nil)
-        #expect(fs.lookup(at: "/newdir/file2.txt") != nil)
+            let dirFd = try wasi.path_open(
+                dirFd: rootFd,
+                dirFlags: [],
+                path: "newdir",
+                oflags: [.DIRECTORY],
+                fsRightsBase: .DIRECTORY_BASE_RIGHTS,
+                fsRightsInheriting: .DIRECTORY_INHERITING_RIGHTS,
+                fdflags: []
+            )
+
+            try fs.addFile(at: "/newdir/file1.txt", content: Array("file1".utf8))
+            try fs.addFile(at: "/newdir/file2.txt", content: Array("file2".utf8))
+
+            try wasi.fd_close(fd: dirFd)
+
+            try wasi.path_unlink_file(dirFd: rootFd, path: "newdir/file1.txt")
+            #expect(fs.lookup(at: "/newdir/file1.txt") == nil)
+            #expect(fs.lookup(at: "/newdir/file2.txt") != nil)
+        }
     }
 
     @Test
@@ -280,42 +291,45 @@ struct WASITests {
         let fs = try MemoryFileSystem()
         try fs.ensureDirectory(at: "/")
 
-        let wasi = try WASIBridgeToHost(
+        let bridge = try WASIBridgeToHost(
             fileSystem: .memory(fs).withPreopens([
                 .init(guestPath: "/", hostPath: "/")
             ])
-        ).underlying
-        let rootFd: WASIAbi.Fd = 3
-
-        let fd1 = try wasi.path_open(
-            dirFd: rootFd,
-            dirFlags: [],
-            path: "created.txt",
-            oflags: [.CREAT],
-            fsRightsBase: [.FD_WRITE],
-            fsRightsInheriting: [],
-            fdflags: []
         )
-        try wasi.fd_close(fd: fd1)
+        try bridge.runAndClose { _ in
+            let wasi = bridge.underlying
+            let rootFd: WASIAbi.Fd = 3
 
-        #expect(fs.lookup(at: "/created.txt") != nil)
+            let fd1 = try wasi.path_open(
+                dirFd: rootFd,
+                dirFlags: [],
+                path: "created.txt",
+                oflags: [.CREAT],
+                fsRightsBase: [.FD_WRITE],
+                fsRightsInheriting: [],
+                fdflags: []
+            )
+            try wasi.fd_close(fd: fd1)
 
-        try fs.addFile(at: "/truncate.txt", content: Array("Long content here".utf8))
+            #expect(fs.lookup(at: "/created.txt") != nil)
 
-        let fd2 = try wasi.path_open(
-            dirFd: rootFd,
-            dirFlags: [],
-            path: "truncate.txt",
-            oflags: [.TRUNC],
-            fsRightsBase: [.FD_WRITE],
-            fsRightsInheriting: [],
-            fdflags: []
-        )
+            try fs.addFile(at: "/truncate.txt", content: Array("Long content here".utf8))
 
-        let stat = try wasi.fd_filestat_get(fd: fd2)
-        #expect(stat.size == 0)
+            let fd2 = try wasi.path_open(
+                dirFd: rootFd,
+                dirFlags: [],
+                path: "truncate.txt",
+                oflags: [.TRUNC],
+                fsRightsBase: [.FD_WRITE],
+                fsRightsInheriting: [],
+                fdflags: []
+            )
 
-        try wasi.fd_close(fd: fd2)
+            let stat = try wasi.fd_filestat_get(fd: fd2)
+            #expect(stat.size == 0)
+
+            try wasi.fd_close(fd: fd2)
+        }
     }
 
     @Test
@@ -324,26 +338,29 @@ struct WASITests {
         try fs.ensureDirectory(at: "/")
         try fs.addFile(at: "/existing.txt", content: [])
 
-        let wasi = try WASIBridgeToHost(
+        let bridge = try WASIBridgeToHost(
             fileSystem: .memory(fs).withPreopens([
                 .init(guestPath: "/", hostPath: "/")
             ])
-        ).underlying
-        let rootFd: WASIAbi.Fd = 3
+        )
+        try bridge.runAndClose { _ in
+            let wasi = bridge.underlying
+            let rootFd: WASIAbi.Fd = 3
 
-        do {
-            _ = try wasi.path_open(
-                dirFd: rootFd,
-                dirFlags: [],
-                path: "existing.txt",
-                oflags: [.CREAT, .EXCL],
-                fsRightsBase: [.FD_WRITE],
-                fsRightsInheriting: [],
-                fdflags: []
-            )
-            #expect(Bool(false), "Should have thrown EEXIST")
-        } catch let error as WASIAbi.Errno {
-            #expect(error == .EEXIST)
+            do {
+                _ = try wasi.path_open(
+                    dirFd: rootFd,
+                    dirFlags: [],
+                    path: "existing.txt",
+                    oflags: [.CREAT, .EXCL],
+                    fsRightsBase: [.FD_WRITE],
+                    fsRightsInheriting: [],
+                    fdflags: []
+                )
+                #expect(Bool(false), "Should have thrown EEXIST")
+            } catch let error as WASIAbi.Errno {
+                #expect(error == .EEXIST)
+            }
         }
     }
 
@@ -388,8 +405,11 @@ struct WASITests {
         #if !os(Windows)
             let elapsed = try ContinuousClock().measure {
                 let clockPointer = UnsafeGuestBufferPointer<WASIAbi.Subscription>(baseAddress: .init(offset: clockOffset), count: 1)
-                let result = try WASIBridgeToHost().underlying.poll_oneoff(subscriptions: clockPointer, events: .init(baseAddress: .init(offset: finalOffset), count: 1), memory: memory)
-                #expect(result == 1)
+                let bridge = try WASIBridgeToHost()
+                try bridge.runAndClose { _ in
+                    let result = try bridge.underlying.poll_oneoff(subscriptions: clockPointer, events: .init(baseAddress: .init(offset: finalOffset), count: 1), memory: memory)
+                    #expect(result == 1)
+                }
             }
             #expect(elapsed > Duration.nanoseconds(timeout))
         #endif
@@ -407,9 +427,10 @@ struct WASITests {
             try fs.ensureDirectory(at: preopen.hostPath)
         }
         let wasi = try WASIBridgeToHost(fileSystem: .memory(fs).withPreopens(preopens))
-        #expect(fs.lookup(at: "/tmp") != nil)
-        #expect(fs.lookup(at: "/data") != nil)
-        _ = wasi
+        try wasi.runAndClose { _ in
+            #expect(fs.lookup(at: "/tmp") != nil)
+            #expect(fs.lookup(at: "/data") != nil)
+        }
     }
 
     @Test
@@ -421,19 +442,22 @@ struct WASITests {
             WASIBridgeToHost.Preopen(guestPath: ".", hostPath: "."),
             WASIBridgeToHost.Preopen(guestPath: "/", hostPath: "/"),
         ]
-        let wasi = try WASIBridgeToHost(fileSystem: .memory(fs).withPreopens(preopens)).underlying
+        let bridge = try WASIBridgeToHost(fileSystem: .memory(fs).withPreopens(preopens))
+        try bridge.runAndClose { _ in
+            let wasi = bridge.underlying
 
-        guard case .directory(let fd3Dir) = wasi.fdTable[3] else {
-            #expect(Bool(false), "Expected fd=3 to be a preopened directory")
-            return
-        }
-        guard case .directory(let fd4Dir) = wasi.fdTable[4] else {
-            #expect(Bool(false), "Expected fd=4 to be a preopened directory")
-            return
-        }
+            guard case .directory(let fd3Dir) = wasi.fdTable[3] else {
+                #expect(Bool(false), "Expected fd=3 to be a preopened directory")
+                return
+            }
+            guard case .directory(let fd4Dir) = wasi.fdTable[4] else {
+                #expect(Bool(false), "Expected fd=4 to be a preopened directory")
+                return
+            }
 
-        #expect(fd3Dir.preopenPath == ".")
-        #expect(fd4Dir.preopenPath == "/")
+            #expect(fd3Dir.preopenPath == ".")
+            #expect(fd4Dir.preopenPath == "/")
+        }
     }
 
     @Test
@@ -441,18 +465,21 @@ struct WASITests {
         let fs = try MemoryFileSystem()
         try fs.ensureDirectory(at: "/sandbox")
 
-        let wasi = try WASIBridgeToHost(
+        let bridge = try WASIBridgeToHost(
             fileSystem: .memory(fs).withPreopens([
                 .init(guestPath: "/sandbox", hostPath: "/sandbox")
             ])
-        ).underlying
+        )
+        try bridge.runAndClose { _ in
+            let wasi = bridge.underlying
 
-        let prestat = try wasi.fd_prestat_get(fd: 3)
-        guard case .dir(let pathLen) = prestat else {
-            #expect(Bool(false), "Expected directory prestat")
-            return
+            let prestat = try wasi.fd_prestat_get(fd: 3)
+            guard case .dir(let pathLen) = prestat else {
+                #expect(Bool(false), "Expected directory prestat")
+                return
+            }
+            #expect(pathLen == 8)
         }
-        #expect(pathLen == 8)
     }
 
     @Test
@@ -509,28 +536,31 @@ struct WASITests {
             try fs.ensureDirectory(at: "/")
             try fs.addFile(at: "/mounted.txt", handle: fd)
 
-            let wasi = try WASIBridgeToHost(
+            let bridge = try WASIBridgeToHost(
                 fileSystem: .memory(fs).withPreopens([
                     .init(guestPath: "/", hostPath: "/")
                 ])
-            ).underlying
-            let rootFd: WASIAbi.Fd = 3
-
-            let openedFd = try wasi.path_open(
-                dirFd: rootFd,
-                dirFlags: [],
-                path: "mounted.txt",
-                oflags: [],
-                fsRightsBase: [.FD_READ],
-                fsRightsInheriting: [],
-                fdflags: []
             )
+            try bridge.runAndClose { _ in
+                let wasi = bridge.underlying
+                let rootFd: WASIAbi.Fd = 3
 
-            let stat = try wasi.fd_filestat_get(fd: openedFd)
-            #expect(stat.filetype == .REGULAR_FILE)
-            #expect(stat.size == 23)
+                let openedFd = try wasi.path_open(
+                    dirFd: rootFd,
+                    dirFlags: [],
+                    path: "mounted.txt",
+                    oflags: [],
+                    fsRightsBase: [.FD_READ],
+                    fsRightsInheriting: [],
+                    fdflags: []
+                )
 
-            try wasi.fd_close(fd: openedFd)
+                let stat = try wasi.fd_filestat_get(fd: openedFd)
+                #expect(stat.filetype == .REGULAR_FILE)
+                #expect(stat.size == 23)
+
+                try wasi.fd_close(fd: openedFd)
+            }
         #endif
     }
 
@@ -541,28 +571,31 @@ struct WASITests {
             try tempDir.createFile(at: "host.txt", contents: "Host content")
 
             // Using default host filesystem
-            let wasi = try WASIBridgeToHost(
+            let bridge = try WASIBridgeToHost(
                 fileSystem: .host().withPreopens([
                     .init(guestPath: "/sandbox", hostPath: tempDir.url.path)
                 ])
-            ).underlying
-
-            let sandboxFd: WASIAbi.Fd = 3
-            let fd = try wasi.path_open(
-                dirFd: sandboxFd,
-                dirFlags: [],
-                path: "host.txt",
-                oflags: [],
-                fsRightsBase: [.FD_READ],
-                fsRightsInheriting: [],
-                fdflags: []
             )
+            try bridge.runAndClose { _ in
+                let wasi = bridge.underlying
 
-            let stat = try wasi.fd_filestat_get(fd: fd)
-            #expect(stat.filetype == .REGULAR_FILE)
-            #expect(stat.size == 12)
+                let sandboxFd: WASIAbi.Fd = 3
+                let fd = try wasi.path_open(
+                    dirFd: sandboxFd,
+                    dirFlags: [],
+                    path: "host.txt",
+                    oflags: [],
+                    fsRightsBase: [.FD_READ],
+                    fsRightsInheriting: [],
+                    fdflags: []
+                )
 
-            try wasi.fd_close(fd: fd)
+                let stat = try wasi.fd_filestat_get(fd: fd)
+                #expect(stat.filetype == .REGULAR_FILE)
+                #expect(stat.size == 12)
+
+                try wasi.fd_close(fd: fd)
+            }
         #endif
     }
 
@@ -573,28 +606,31 @@ struct WASITests {
         try memFS.addFile(at: "/memory.txt", content: "Memory content")
 
         // Using memory filesystem through unified bridge
-        let wasi = try WASIBridgeToHost(
+        let bridge = try WASIBridgeToHost(
             fileSystem: .memory(memFS).withPreopens([
                 .init(guestPath: "/", hostPath: "/")
             ])
-        ).underlying
-
-        let rootFd: WASIAbi.Fd = 3
-        let fd = try wasi.path_open(
-            dirFd: rootFd,
-            dirFlags: [],
-            path: "memory.txt",
-            oflags: [],
-            fsRightsBase: [.FD_READ],
-            fsRightsInheriting: [],
-            fdflags: []
         )
+        try bridge.runAndClose { _ in
+            let wasi = bridge.underlying
 
-        let stat = try wasi.fd_filestat_get(fd: fd)
-        #expect(stat.filetype == .REGULAR_FILE)
-        #expect(stat.size == 14)
+            let rootFd: WASIAbi.Fd = 3
+            let fd = try wasi.path_open(
+                dirFd: rootFd,
+                dirFlags: [],
+                path: "memory.txt",
+                oflags: [],
+                fsRightsBase: [.FD_READ],
+                fsRightsInheriting: [],
+                fdflags: []
+            )
 
-        try wasi.fd_close(fd: fd)
+            let stat = try wasi.fd_filestat_get(fd: fd)
+            #expect(stat.filetype == .REGULAR_FILE)
+            #expect(stat.size == 14)
+
+            try wasi.fd_close(fd: fd)
+        }
     }
 
     @Test
@@ -603,36 +639,39 @@ struct WASITests {
         try fs.ensureDirectory(at: "/")
         try fs.addFile(at: "/positions.txt", content: Array("0123456789".utf8))
 
-        let wasi = try WASIBridgeToHost(
+        let bridge = try WASIBridgeToHost(
             fileSystem: .memory(fs).withPreopens([
                 .init(guestPath: "/", hostPath: "/")
             ])
-        ).underlying
-        let rootFd: WASIAbi.Fd = 3
-
-        let fd = try wasi.path_open(
-            dirFd: rootFd,
-            dirFlags: [],
-            path: "positions.txt",
-            oflags: [],
-            fsRightsBase: [.FD_READ, .FD_SEEK, .FD_TELL],
-            fsRightsInheriting: [],
-            fdflags: []
         )
+        try bridge.runAndClose { _ in
+            let wasi = bridge.underlying
+            let rootFd: WASIAbi.Fd = 3
 
-        let startPos = try wasi.fd_tell(fd: fd)
-        #expect(startPos == 0)
+            let fd = try wasi.path_open(
+                dirFd: rootFd,
+                dirFlags: [],
+                path: "positions.txt",
+                oflags: [],
+                fsRightsBase: [.FD_READ, .FD_SEEK, .FD_TELL],
+                fsRightsInheriting: [],
+                fdflags: []
+            )
 
-        let endPos = try wasi.fd_seek(fd: fd, offset: 0, whence: .END)
-        #expect(endPos == 10)
+            let startPos = try wasi.fd_tell(fd: fd)
+            #expect(startPos == 0)
 
-        let currentPos = try wasi.fd_tell(fd: fd)
-        #expect(currentPos == 10)
+            let endPos = try wasi.fd_seek(fd: fd, offset: 0, whence: .END)
+            #expect(endPos == 10)
 
-        let midPos = try wasi.fd_seek(fd: fd, offset: -5, whence: .CUR)
-        #expect(midPos == 5)
+            let currentPos = try wasi.fd_tell(fd: fd)
+            #expect(currentPos == 10)
 
-        try wasi.fd_close(fd: fd)
+            let midPos = try wasi.fd_seek(fd: fd, offset: -5, whence: .CUR)
+            #expect(midPos == 5)
+
+            try wasi.fd_close(fd: fd)
+        }
     }
 
     @Test
@@ -641,44 +680,47 @@ struct WASITests {
         try fs.ensureDirectory(at: "/")
         try fs.addFile(at: "/file.txt", content: Array("test".utf8))
 
-        let wasi = try WASIBridgeToHost(
+        let bridge = try WASIBridgeToHost(
             fileSystem: .memory(fs).withPreopens([
                 .init(guestPath: "/", hostPath: "/")
             ])
-        ).underlying
-        let rootFd: WASIAbi.Fd = 3
-
-        let readOnlyFd = try wasi.path_open(
-            dirFd: rootFd,
-            dirFlags: [],
-            path: "file.txt",
-            oflags: [],
-            fsRightsBase: [.FD_READ],
-            fsRightsInheriting: [],
-            fdflags: []
         )
+        try bridge.runAndClose { _ in
+            let wasi = bridge.underlying
+            let rootFd: WASIAbi.Fd = 3
 
-        let stat = try wasi.fd_fdstat_get(fileDescriptor: readOnlyFd)
-        #expect(stat.fsRightsBase.contains(.FD_READ))
-        #expect(!stat.fsRightsBase.contains(.FD_WRITE))
+            let readOnlyFd = try wasi.path_open(
+                dirFd: rootFd,
+                dirFlags: [],
+                path: "file.txt",
+                oflags: [],
+                fsRightsBase: [.FD_READ],
+                fsRightsInheriting: [],
+                fdflags: []
+            )
 
-        try wasi.fd_close(fd: readOnlyFd)
+            let stat = try wasi.fd_fdstat_get(fileDescriptor: readOnlyFd)
+            #expect(stat.fsRightsBase.contains(.FD_READ))
+            #expect(!stat.fsRightsBase.contains(.FD_WRITE))
 
-        let writeOnlyFd = try wasi.path_open(
-            dirFd: rootFd,
-            dirFlags: [],
-            path: "file.txt",
-            oflags: [],
-            fsRightsBase: [.FD_WRITE],
-            fsRightsInheriting: [],
-            fdflags: []
-        )
+            try wasi.fd_close(fd: readOnlyFd)
 
-        let writeStat = try wasi.fd_fdstat_get(fileDescriptor: writeOnlyFd)
-        #expect(!writeStat.fsRightsBase.contains(.FD_READ))
-        #expect(writeStat.fsRightsBase.contains(.FD_WRITE))
+            let writeOnlyFd = try wasi.path_open(
+                dirFd: rootFd,
+                dirFlags: [],
+                path: "file.txt",
+                oflags: [],
+                fsRightsBase: [.FD_WRITE],
+                fsRightsInheriting: [],
+                fdflags: []
+            )
 
-        try wasi.fd_close(fd: writeOnlyFd)
+            let writeStat = try wasi.fd_fdstat_get(fileDescriptor: writeOnlyFd)
+            #expect(!writeStat.fsRightsBase.contains(.FD_READ))
+            #expect(writeStat.fsRightsBase.contains(.FD_WRITE))
+
+            try wasi.fd_close(fd: writeOnlyFd)
+        }
     }
 
     @Test
@@ -741,36 +783,39 @@ struct WASITests {
         try fs.ensureDirectory(at: "/")
         try fs.addFile(at: "/truncate.txt", content: Array("Long content here".utf8))
 
-        let wasi = try WASIBridgeToHost(
+        let bridge = try WASIBridgeToHost(
             fileSystem: .memory(fs).withPreopens([
                 .init(guestPath: "/", hostPath: "/")
             ])
-        ).underlying
-        let rootFd: WASIAbi.Fd = 3
-
-        let fd = try wasi.path_open(
-            dirFd: rootFd,
-            dirFlags: [],
-            path: "truncate.txt",
-            oflags: [],
-            fsRightsBase: [.FD_READ, .FD_WRITE, .FD_FILESTAT_SET_SIZE],
-            fsRightsInheriting: [],
-            fdflags: []
         )
+        try bridge.runAndClose { _ in
+            let wasi = bridge.underlying
+            let rootFd: WASIAbi.Fd = 3
 
-        try wasi.fd_filestat_set_size(fd: fd, size: 4)
+            let fd = try wasi.path_open(
+                dirFd: rootFd,
+                dirFlags: [],
+                path: "truncate.txt",
+                oflags: [],
+                fsRightsBase: [.FD_READ, .FD_WRITE, .FD_FILESTAT_SET_SIZE],
+                fsRightsInheriting: [],
+                fdflags: []
+            )
 
-        let stat = try wasi.fd_filestat_get(fd: fd)
-        #expect(stat.size == 4)
+            try wasi.fd_filestat_set_size(fd: fd, size: 4)
 
-        let content = try fs.getFile(at: "/truncate.txt")
-        guard case .bytes(let bytes) = content else {
-            #expect(Bool(false), "Expected bytes content")
-            return
+            let stat = try wasi.fd_filestat_get(fd: fd)
+            #expect(stat.size == 4)
+
+            let content = try fs.getFile(at: "/truncate.txt")
+            guard case .bytes(let bytes) = content else {
+                #expect(Bool(false), "Expected bytes content")
+                return
+            }
+            #expect(bytes == Array("Long".utf8))
+
+            try wasi.fd_close(fd: fd)
         }
-        #expect(bytes == Array("Long".utf8))
-
-        try wasi.fd_close(fd: fd)
     }
 
     @Test
@@ -779,40 +824,43 @@ struct WASITests {
         try fs.ensureDirectory(at: "/")
         try fs.addFile(at: "/expand.txt", content: Array("Hi".utf8))
 
-        let wasi = try WASIBridgeToHost(
+        let bridge = try WASIBridgeToHost(
             fileSystem: .memory(fs).withPreopens([
                 .init(guestPath: "/", hostPath: "/")
             ])
-        ).underlying
-        let rootFd: WASIAbi.Fd = 3
-
-        let fd = try wasi.path_open(
-            dirFd: rootFd,
-            dirFlags: [],
-            path: "expand.txt",
-            oflags: [],
-            fsRightsBase: [.FD_WRITE, .FD_FILESTAT_SET_SIZE],
-            fsRightsInheriting: [],
-            fdflags: []
         )
+        try bridge.runAndClose { _ in
+            let wasi = bridge.underlying
+            let rootFd: WASIAbi.Fd = 3
 
-        try wasi.fd_filestat_set_size(fd: fd, size: 10)
+            let fd = try wasi.path_open(
+                dirFd: rootFd,
+                dirFlags: [],
+                path: "expand.txt",
+                oflags: [],
+                fsRightsBase: [.FD_WRITE, .FD_FILESTAT_SET_SIZE],
+                fsRightsInheriting: [],
+                fdflags: []
+            )
 
-        let stat = try wasi.fd_filestat_get(fd: fd)
-        #expect(stat.size == 10)
+            try wasi.fd_filestat_set_size(fd: fd, size: 10)
 
-        let content = try fs.getFile(at: "/expand.txt")
-        guard case .bytes(let bytes) = content else {
-            #expect(Bool(false), "Expected bytes content")
-            return
+            let stat = try wasi.fd_filestat_get(fd: fd)
+            #expect(stat.size == 10)
+
+            let content = try fs.getFile(at: "/expand.txt")
+            guard case .bytes(let bytes) = content else {
+                #expect(Bool(false), "Expected bytes content")
+                return
+            }
+            #expect(bytes.count == 10)
+            #expect(bytes[0] == UInt8(ascii: "H"))
+            #expect(bytes[1] == UInt8(ascii: "i"))
+            #expect(bytes[2] == 0)
+            #expect(bytes[9] == 0)
+
+            try wasi.fd_close(fd: fd)
         }
-        #expect(bytes.count == 10)
-        #expect(bytes[0] == UInt8(ascii: "H"))
-        #expect(bytes[1] == UInt8(ascii: "i"))
-        #expect(bytes[2] == 0)
-        #expect(bytes[9] == 0)
-
-        try wasi.fd_close(fd: fd)
     }
 
     @Test
@@ -821,29 +869,32 @@ struct WASITests {
         try fs.ensureDirectory(at: "/")
         try fs.addFile(at: "/old.txt", content: Array("Content".utf8))
 
-        let wasi = try WASIBridgeToHost(
+        let bridge = try WASIBridgeToHost(
             fileSystem: .memory(fs).withPreopens([
                 .init(guestPath: "/", hostPath: "/")
             ])
-        ).underlying
-        let rootFd: WASIAbi.Fd = 3
-
-        try wasi.path_rename(
-            oldFd: rootFd,
-            oldPath: "old.txt",
-            newFd: rootFd,
-            newPath: "new.txt"
         )
+        try bridge.runAndClose { _ in
+            let wasi = bridge.underlying
+            let rootFd: WASIAbi.Fd = 3
 
-        #expect(fs.lookup(at: "/old.txt") == nil)
-        #expect(fs.lookup(at: "/new.txt") != nil)
+            try wasi.path_rename(
+                oldFd: rootFd,
+                oldPath: "old.txt",
+                newFd: rootFd,
+                newPath: "new.txt"
+            )
 
-        let content = try fs.getFile(at: "/new.txt")
-        guard case .bytes(let bytes) = content else {
-            #expect(Bool(false), "Expected bytes content")
-            return
+            #expect(fs.lookup(at: "/old.txt") == nil)
+            #expect(fs.lookup(at: "/new.txt") != nil)
+
+            let content = try fs.getFile(at: "/new.txt")
+            guard case .bytes(let bytes) = content else {
+                #expect(Bool(false), "Expected bytes content")
+                return
+            }
+            #expect(bytes == Array("Content".utf8))
         }
-        #expect(bytes == Array("Content".utf8))
     }
 
     @Test
@@ -853,22 +904,25 @@ struct WASITests {
         try fs.addFile(at: "/file.txt", content: Array("test".utf8))
         try fs.ensureDirectory(at: "/subdir")
 
-        let wasi = try WASIBridgeToHost(
+        let bridge = try WASIBridgeToHost(
             fileSystem: .memory(fs).withPreopens([
                 .init(guestPath: "/", hostPath: "/")
             ])
-        ).underlying
-        let rootFd: WASIAbi.Fd = 3
-
-        try wasi.path_rename(
-            oldFd: rootFd,
-            oldPath: "file.txt",
-            newFd: rootFd,
-            newPath: "subdir/moved.txt"
         )
+        try bridge.runAndClose { _ in
+            let wasi = bridge.underlying
+            let rootFd: WASIAbi.Fd = 3
 
-        #expect(fs.lookup(at: "/file.txt") == nil)
-        #expect(fs.lookup(at: "/subdir/moved.txt") != nil)
+            try wasi.path_rename(
+                oldFd: rootFd,
+                oldPath: "file.txt",
+                newFd: rootFd,
+                newPath: "subdir/moved.txt"
+            )
+
+            #expect(fs.lookup(at: "/file.txt") == nil)
+            #expect(fs.lookup(at: "/subdir/moved.txt") != nil)
+        }
     }
 
     @Test
@@ -877,15 +931,18 @@ struct WASITests {
         try fs.ensureDirectory(at: "/")
         try fs.ensureDirectory(at: "/emptydir")
 
-        let wasi = try WASIBridgeToHost(
+        let bridge = try WASIBridgeToHost(
             fileSystem: .memory(fs).withPreopens([
                 .init(guestPath: "/", hostPath: "/")
             ])
-        ).underlying
-        let rootFd: WASIAbi.Fd = 3
+        )
+        try bridge.runAndClose { _ in
+            let wasi = bridge.underlying
+            let rootFd: WASIAbi.Fd = 3
 
-        try wasi.path_remove_directory(dirFd: rootFd, path: "emptydir")
-        #expect(fs.lookup(at: "/emptydir") == nil)
+            try wasi.path_remove_directory(dirFd: rootFd, path: "emptydir")
+            #expect(fs.lookup(at: "/emptydir") == nil)
+        }
     }
 
     @Test
@@ -895,21 +952,24 @@ struct WASITests {
         try fs.ensureDirectory(at: "/nonempty")
         try fs.addFile(at: "/nonempty/file.txt", content: [])
 
-        let wasi = try WASIBridgeToHost(
+        let bridge = try WASIBridgeToHost(
             fileSystem: .memory(fs).withPreopens([
                 .init(guestPath: "/", hostPath: "/")
             ])
-        ).underlying
-        let rootFd: WASIAbi.Fd = 3
+        )
+        try bridge.runAndClose { _ in
+            let wasi = bridge.underlying
+            let rootFd: WASIAbi.Fd = 3
 
-        do {
-            try wasi.path_remove_directory(dirFd: rootFd, path: "nonempty")
-            #expect(Bool(false), "Should not remove non-empty directory")
-        } catch let error as WASIAbi.Errno {
-            #expect(error == .ENOTEMPTY)
+            do {
+                try wasi.path_remove_directory(dirFd: rootFd, path: "nonempty")
+                #expect(Bool(false), "Should not remove non-empty directory")
+            } catch let error as WASIAbi.Errno {
+                #expect(error == .ENOTEMPTY)
+            }
+
+            #expect(fs.lookup(at: "/nonempty") != nil)
         }
-
-        #expect(fs.lookup(at: "/nonempty") != nil)
     }
 
     @Test
@@ -918,27 +978,30 @@ struct WASITests {
         try fs.ensureDirectory(at: "/")
         try fs.addFile(at: "/sync.txt", content: [])
 
-        let wasi = try WASIBridgeToHost(
+        let bridge = try WASIBridgeToHost(
             fileSystem: .memory(fs).withPreopens([
                 .init(guestPath: "/", hostPath: "/")
             ])
-        ).underlying
-        let rootFd: WASIAbi.Fd = 3
-
-        let fd = try wasi.path_open(
-            dirFd: rootFd,
-            dirFlags: [],
-            path: "sync.txt",
-            oflags: [],
-            fsRightsBase: [.FD_SYNC, .FD_DATASYNC],
-            fsRightsInheriting: [],
-            fdflags: []
         )
+        try bridge.runAndClose { _ in
+            let wasi = bridge.underlying
+            let rootFd: WASIAbi.Fd = 3
 
-        try wasi.fd_sync(fd: fd)
-        try wasi.fd_datasync(fd: fd)
+            let fd = try wasi.path_open(
+                dirFd: rootFd,
+                dirFlags: [],
+                path: "sync.txt",
+                oflags: [],
+                fsRightsBase: [.FD_SYNC, .FD_DATASYNC],
+                fsRightsInheriting: [],
+                fdflags: []
+            )
 
-        try wasi.fd_close(fd: fd)
+            try wasi.fd_sync(fd: fd)
+            try wasi.fd_datasync(fd: fd)
+
+            try wasi.fd_close(fd: fd)
+        }
     }
 
     @Test
@@ -947,40 +1010,43 @@ struct WASITests {
         try fs.ensureDirectory(at: "/")
         try fs.addFile(at: "/test.txt", content: [])
 
-        let wasi = try WASIBridgeToHost(
+        let bridge = try WASIBridgeToHost(
             fileSystem: .memory(fs).withPreopens([
                 .init(guestPath: "/", hostPath: "/")
             ])
-        ).underlying
-        let rootFd: WASIAbi.Fd = 3
-
-        let fd = try wasi.path_open(
-            dirFd: rootFd,
-            dirFlags: [],
-            path: "test.txt",
-            oflags: [],
-            fsRightsBase: [.FD_READ, .FD_WRITE],
-            fsRightsInheriting: [],
-            fdflags: []
         )
+        try bridge.runAndClose { _ in
+            let wasi = bridge.underlying
+            let rootFd: WASIAbi.Fd = 3
 
-        let memory = TestSupport.TestGuestMemory()
-        let writeData = Array("Hello, WASI!".utf8)
-        let writeVecs = memory.writeIOVecs([writeData])
+            let fd = try wasi.path_open(
+                dirFd: rootFd,
+                dirFlags: [],
+                path: "test.txt",
+                oflags: [],
+                fsRightsBase: [.FD_READ, .FD_WRITE],
+                fsRightsInheriting: [],
+                fdflags: []
+            )
 
-        let nwritten = try wasi.fd_write(fileDescriptor: fd, ioVectors: writeVecs, memory: memory)
-        #expect(nwritten == UInt32(writeData.count))
+            let memory = TestSupport.TestGuestMemory()
+            let writeData = Array("Hello, WASI!".utf8)
+            let writeVecs = memory.writeIOVecs([writeData])
 
-        _ = try wasi.fd_seek(fd: fd, offset: 0, whence: .SET)
+            let nwritten = try wasi.fd_write(fileDescriptor: fd, ioVectors: writeVecs, memory: memory)
+            #expect(nwritten == UInt32(writeData.count))
 
-        let readVecs = memory.readIOVecs(sizes: [writeData.count])
-        let nread = try wasi.fd_read(fd: fd, iovs: readVecs, memory: memory)
-        #expect(nread == UInt32(writeData.count))
+            _ = try wasi.fd_seek(fd: fd, offset: 0, whence: .SET)
 
-        let readData = memory.loadIOVecs(readVecs)
-        #expect(readData[0] == writeData)
+            let readVecs = memory.readIOVecs(sizes: [writeData.count])
+            let nread = try wasi.fd_read(fd: fd, iovs: readVecs, memory: memory)
+            #expect(nread == UInt32(writeData.count))
 
-        try wasi.fd_close(fd: fd)
+            let readData = memory.loadIOVecs(readVecs)
+            #expect(readData[0] == writeData)
+
+            try wasi.fd_close(fd: fd)
+        }
     }
 
     @Test
@@ -989,35 +1055,38 @@ struct WASITests {
         try fs.ensureDirectory(at: "/")
         try fs.addFile(at: "/readonly.txt", content: Array("Read only".utf8))
 
-        let wasi = try WASIBridgeToHost(
+        let bridge = try WASIBridgeToHost(
             fileSystem: .memory(fs).withPreopens([
                 .init(guestPath: "/", hostPath: "/")
             ])
-        ).underlying
-        let rootFd: WASIAbi.Fd = 3
-
-        let fd = try wasi.path_open(
-            dirFd: rootFd,
-            dirFlags: [],
-            path: "readonly.txt",
-            oflags: [],
-            fsRightsBase: [.FD_READ],
-            fsRightsInheriting: [],
-            fdflags: []
         )
+        try bridge.runAndClose { _ in
+            let wasi = bridge.underlying
+            let rootFd: WASIAbi.Fd = 3
 
-        do {
-            let memory = TestSupport.TestGuestMemory()
-            let writeData = Array("Fail".utf8)
-            let iovecs = memory.writeIOVecs([writeData])
+            let fd = try wasi.path_open(
+                dirFd: rootFd,
+                dirFlags: [],
+                path: "readonly.txt",
+                oflags: [],
+                fsRightsBase: [.FD_READ],
+                fsRightsInheriting: [],
+                fdflags: []
+            )
 
-            _ = try wasi.fd_write(fileDescriptor: fd, ioVectors: iovecs, memory: memory)
-            #expect(Bool(false), "Should not be able to write to read-only file")
-        } catch let error as WASIAbi.Errno {
-            #expect(error == .EBADF)
+            do {
+                let memory = TestSupport.TestGuestMemory()
+                let writeData = Array("Fail".utf8)
+                let iovecs = memory.writeIOVecs([writeData])
+
+                _ = try wasi.fd_write(fileDescriptor: fd, ioVectors: iovecs, memory: memory)
+                #expect(Bool(false), "Should not be able to write to read-only file")
+            } catch let error as WASIAbi.Errno {
+                #expect(error == .EBADF)
+            }
+
+            try wasi.fd_close(fd: fd)
         }
-
-        try wasi.fd_close(fd: fd)
     }
 
     @Test
@@ -1026,39 +1095,42 @@ struct WASITests {
         try fs.ensureDirectory(at: "/")
         try fs.addFile(at: "/writeonly.txt", content: [])
 
-        let wasi = try WASIBridgeToHost(
+        let bridge = try WASIBridgeToHost(
             fileSystem: .memory(fs).withPreopens([
                 .init(guestPath: "/", hostPath: "/")
             ])
-        ).underlying
-        let rootFd: WASIAbi.Fd = 3
-
-        let fd = try wasi.path_open(
-            dirFd: rootFd,
-            dirFlags: [],
-            path: "writeonly.txt",
-            oflags: [],
-            fsRightsBase: [.FD_WRITE],
-            fsRightsInheriting: [],
-            fdflags: []
         )
+        try bridge.runAndClose { _ in
+            let wasi = bridge.underlying
+            let rootFd: WASIAbi.Fd = 3
 
-        let memory = TestSupport.TestGuestMemory()
-        let writeData = Array("Write only".utf8)
-        let writeVecs = memory.writeIOVecs([writeData])
+            let fd = try wasi.path_open(
+                dirFd: rootFd,
+                dirFlags: [],
+                path: "writeonly.txt",
+                oflags: [],
+                fsRightsBase: [.FD_WRITE],
+                fsRightsInheriting: [],
+                fdflags: []
+            )
 
-        let nwritten = try wasi.fd_write(fileDescriptor: fd, ioVectors: writeVecs, memory: memory)
-        #expect(nwritten == UInt32(writeData.count))
+            let memory = TestSupport.TestGuestMemory()
+            let writeData = Array("Write only".utf8)
+            let writeVecs = memory.writeIOVecs([writeData])
 
-        do {
-            let readVecs = memory.readIOVecs(sizes: [10])
-            _ = try wasi.fd_read(fd: fd, iovs: readVecs, memory: memory)
-            #expect(Bool(false), "Should not be able to read from write-only file")
-        } catch let error as WASIAbi.Errno {
-            #expect(error == .EBADF)
+            let nwritten = try wasi.fd_write(fileDescriptor: fd, ioVectors: writeVecs, memory: memory)
+            #expect(nwritten == UInt32(writeData.count))
+
+            do {
+                let readVecs = memory.readIOVecs(sizes: [10])
+                _ = try wasi.fd_read(fd: fd, iovs: readVecs, memory: memory)
+                #expect(Bool(false), "Should not be able to read from write-only file")
+            } catch let error as WASIAbi.Errno {
+                #expect(error == .EBADF)
+            }
+
+            try wasi.fd_close(fd: fd)
         }
-
-        try wasi.fd_close(fd: fd)
     }
 
     @Test
@@ -1076,34 +1148,37 @@ struct WASITests {
             try fs.ensureDirectory(at: "/")
             try fs.addFile(at: "/handle.txt", handle: fd)
 
-            let wasi = try WASIBridgeToHost(
+            let bridge = try WASIBridgeToHost(
                 fileSystem: .memory(fs).withPreopens([
                     .init(guestPath: "/", hostPath: "/")
                 ])
-            ).underlying
-            let rootFd: WASIAbi.Fd = 3
-
-            let openedFd = try wasi.path_open(
-                dirFd: rootFd,
-                dirFlags: [],
-                path: "handle.txt",
-                oflags: [],
-                fsRightsBase: [.FD_WRITE],
-                fsRightsInheriting: [],
-                fdflags: []
             )
+            try bridge.runAndClose { _ in
+                let wasi = bridge.underlying
+                let rootFd: WASIAbi.Fd = 3
 
-            let memory = TestSupport.TestGuestMemory()
-            let writeData = Array("Via handle".utf8)
-            let iovecs = memory.writeIOVecs([writeData])
+                let openedFd = try wasi.path_open(
+                    dirFd: rootFd,
+                    dirFlags: [],
+                    path: "handle.txt",
+                    oflags: [],
+                    fsRightsBase: [.FD_WRITE],
+                    fsRightsInheriting: [],
+                    fdflags: []
+                )
 
-            let nwritten = try wasi.fd_write(fileDescriptor: openedFd, ioVectors: iovecs, memory: memory)
-            #expect(nwritten == UInt32(writeData.count))
+                let memory = TestSupport.TestGuestMemory()
+                let writeData = Array("Via handle".utf8)
+                let iovecs = memory.writeIOVecs([writeData])
 
-            try wasi.fd_close(fd: openedFd)
+                let nwritten = try wasi.fd_write(fileDescriptor: openedFd, ioVectors: iovecs, memory: memory)
+                #expect(nwritten == UInt32(writeData.count))
 
-            let content = try String(contentsOf: tempDir.url.appendingPathComponent("target.txt"), encoding: .utf8)
-            #expect(content == "Via handle")
+                try wasi.fd_close(fd: openedFd)
+
+                let content = try String(contentsOf: tempDir.url.appendingPathComponent("target.txt"), encoding: .utf8)
+                #expect(content == "Via handle")
+            }
         #endif
     }
 
@@ -1113,117 +1188,132 @@ struct WASITests {
         try fs.ensureDirectory(at: "/")
         try fs.addFile(at: "/small.txt", content: Array("Small".utf8))
 
-        let wasi = try WASIBridgeToHost(
+        let bridge = try WASIBridgeToHost(
             fileSystem: .memory(fs).withPreopens([
                 .init(guestPath: "/", hostPath: "/")
             ])
-        ).underlying
-        let rootFd: WASIAbi.Fd = 3
-
-        let fd = try wasi.path_open(
-            dirFd: rootFd,
-            dirFlags: [],
-            path: "small.txt",
-            oflags: [],
-            fsRightsBase: [.FD_READ, .FD_WRITE, .FD_SEEK],
-            fsRightsInheriting: [],
-            fdflags: []
         )
+        try bridge.runAndClose { _ in
+            let wasi = bridge.underlying
+            let rootFd: WASIAbi.Fd = 3
 
-        let newPos = try wasi.fd_seek(fd: fd, offset: 100, whence: .SET)
-        #expect(newPos == 100)
+            let fd = try wasi.path_open(
+                dirFd: rootFd,
+                dirFlags: [],
+                path: "small.txt",
+                oflags: [],
+                fsRightsBase: [.FD_READ, .FD_WRITE, .FD_SEEK],
+                fsRightsInheriting: [],
+                fdflags: []
+            )
 
-        let memory = TestSupport.TestGuestMemory()
-        let writeData = Array("End".utf8)
-        let iovecs = memory.writeIOVecs([writeData])
+            let newPos = try wasi.fd_seek(fd: fd, offset: 100, whence: .SET)
+            #expect(newPos == 100)
 
-        let nwritten = try wasi.fd_write(fileDescriptor: fd, ioVectors: iovecs, memory: memory)
-        #expect(nwritten == UInt32(writeData.count))
+            let memory = TestSupport.TestGuestMemory()
+            let writeData = Array("End".utf8)
+            let iovecs = memory.writeIOVecs([writeData])
 
-        let stat = try wasi.fd_filestat_get(fd: fd)
-        #expect(stat.size == 103)
+            let nwritten = try wasi.fd_write(fileDescriptor: fd, ioVectors: iovecs, memory: memory)
+            #expect(nwritten == UInt32(writeData.count))
 
-        try wasi.fd_close(fd: fd)
+            let stat = try wasi.fd_filestat_get(fd: fd)
+            #expect(stat.size == 103)
+
+            try wasi.fd_close(fd: fd)
+        }
     }
 
     @Test
     func stdioFileDescriptors() throws {
         let fs = try MemoryFileSystem()
         try fs.ensureDirectory(at: "/")
-        let wasi = try WASIBridgeToHost(
+        let bridge = try WASIBridgeToHost(
             fileSystem: .memory(fs).withStdio().withPreopens([
                 .init(guestPath: "/", hostPath: "/")
             ])
-        ).underlying
+        )
+        try bridge.runAndClose { _ in
+            let wasi = bridge.underlying
 
-        let stdinStat = try wasi.fd_fdstat_get(fileDescriptor: 0)
-        #expect(stdinStat.fsRightsBase.contains(.FD_READ))
-        #expect(!stdinStat.fsRightsBase.contains(.FD_WRITE))
+            let stdinStat = try wasi.fd_fdstat_get(fileDescriptor: 0)
+            #expect(stdinStat.fsRightsBase.contains(.FD_READ))
+            #expect(!stdinStat.fsRightsBase.contains(.FD_WRITE))
 
-        let stdoutStat = try wasi.fd_fdstat_get(fileDescriptor: 1)
-        #expect(!stdoutStat.fsRightsBase.contains(.FD_READ))
-        #expect(stdoutStat.fsRightsBase.contains(.FD_WRITE))
+            let stdoutStat = try wasi.fd_fdstat_get(fileDescriptor: 1)
+            #expect(!stdoutStat.fsRightsBase.contains(.FD_READ))
+            #expect(stdoutStat.fsRightsBase.contains(.FD_WRITE))
 
-        let stderrStat = try wasi.fd_fdstat_get(fileDescriptor: 2)
-        #expect(!stderrStat.fsRightsBase.contains(.FD_READ))
-        #expect(stderrStat.fsRightsBase.contains(.FD_WRITE))
+            let stderrStat = try wasi.fd_fdstat_get(fileDescriptor: 2)
+            #expect(!stderrStat.fsRightsBase.contains(.FD_READ))
+            #expect(stderrStat.fsRightsBase.contains(.FD_WRITE))
+        }
     }
 
     @Test
     func stdoutWrite() throws {
         let fs = try MemoryFileSystem()
         try fs.ensureDirectory(at: "/")
-        let wasi = try WASIBridgeToHost(
+        let bridge = try WASIBridgeToHost(
             fileSystem: .memory(fs).withStdio().withPreopens([
                 .init(guestPath: "/", hostPath: "/")
             ])
-        ).underlying
+        )
+        try bridge.runAndClose { _ in
+            let wasi = bridge.underlying
 
-        let memory = TestSupport.TestGuestMemory()
-        let writeData = Array("Hello, stdout!".utf8)
-        let iovecs = memory.writeIOVecs([writeData])
+            let memory = TestSupport.TestGuestMemory()
+            let writeData = Array("Hello, stdout!".utf8)
+            let iovecs = memory.writeIOVecs([writeData])
 
-        let nwritten = try wasi.fd_write(fileDescriptor: 1, ioVectors: iovecs, memory: memory)
-        #expect(nwritten == UInt32(writeData.count))
+            let nwritten = try wasi.fd_write(fileDescriptor: 1, ioVectors: iovecs, memory: memory)
+            #expect(nwritten == UInt32(writeData.count))
+        }
     }
 
     @Test
     func stderrWrite() throws {
         let fs = try MemoryFileSystem()
         try fs.ensureDirectory(at: "/")
-        let wasi = try WASIBridgeToHost(
+        let bridge = try WASIBridgeToHost(
             fileSystem: .memory(fs).withStdio().withPreopens([
                 .init(guestPath: "/", hostPath: "/")
             ])
-        ).underlying
+        )
+        try bridge.runAndClose { _ in
+            let wasi = bridge.underlying
 
-        let memory = TestSupport.TestGuestMemory()
-        let writeData = Array("Error message".utf8)
-        let iovecs = memory.writeIOVecs([writeData])
+            let memory = TestSupport.TestGuestMemory()
+            let writeData = Array("Error message".utf8)
+            let iovecs = memory.writeIOVecs([writeData])
 
-        let nwritten = try wasi.fd_write(fileDescriptor: 2, ioVectors: iovecs, memory: memory)
-        #expect(nwritten == UInt32(writeData.count))
+            let nwritten = try wasi.fd_write(fileDescriptor: 2, ioVectors: iovecs, memory: memory)
+            #expect(nwritten == UInt32(writeData.count))
+        }
     }
 
     @Test
     func stdinCannotWrite() throws {
         let fs = try MemoryFileSystem()
         try fs.ensureDirectory(at: "/")
-        let wasi = try WASIBridgeToHost(
+        let bridge = try WASIBridgeToHost(
             fileSystem: .memory(fs).withStdio().withPreopens([
                 .init(guestPath: "/", hostPath: "/")
             ])
-        ).underlying
+        )
+        try bridge.runAndClose { _ in
+            let wasi = bridge.underlying
 
-        let memory = TestSupport.TestGuestMemory()
-        let writeData = Array("Should fail".utf8)
-        let iovecs = memory.writeIOVecs([writeData])
+            let memory = TestSupport.TestGuestMemory()
+            let writeData = Array("Should fail".utf8)
+            let iovecs = memory.writeIOVecs([writeData])
 
-        do {
-            _ = try wasi.fd_write(fileDescriptor: 0, ioVectors: iovecs, memory: memory)
-            #expect(Bool(false), "Should not be able to write to stdin")
-        } catch let error as WASIAbi.Errno {
-            #expect(error == .EBADF)
+            do {
+                _ = try wasi.fd_write(fileDescriptor: 0, ioVectors: iovecs, memory: memory)
+                #expect(Bool(false), "Should not be able to write to stdin")
+            } catch let error as WASIAbi.Errno {
+                #expect(error == .EBADF)
+            }
         }
     }
 
@@ -1231,20 +1321,23 @@ struct WASITests {
     func stdoutCannotRead() throws {
         let fs = try MemoryFileSystem()
         try fs.ensureDirectory(at: "/")
-        let wasi = try WASIBridgeToHost(
+        let bridge = try WASIBridgeToHost(
             fileSystem: .memory(fs).withPreopens([
                 .init(guestPath: "/", hostPath: "/")
             ])
-        ).underlying
+        )
+        try bridge.runAndClose { _ in
+            let wasi = bridge.underlying
 
-        let memory = TestSupport.TestGuestMemory()
-        let iovecs = memory.readIOVecs(sizes: [10])
+            let memory = TestSupport.TestGuestMemory()
+            let iovecs = memory.readIOVecs(sizes: [10])
 
-        do {
-            _ = try wasi.fd_read(fd: 1, iovs: iovecs, memory: memory)
-            #expect(Bool(false), "Should not be able to read from stdout")
-        } catch let error as WASIAbi.Errno {
-            #expect(error == .EBADF)
+            do {
+                _ = try wasi.fd_read(fd: 1, iovs: iovecs, memory: memory)
+                #expect(Bool(false), "Should not be able to read from stdout")
+            } catch let error as WASIAbi.Errno {
+                #expect(error == .EBADF)
+            }
         }
     }
 
@@ -1252,20 +1345,23 @@ struct WASITests {
     func stderrCannotRead() throws {
         let fs = try MemoryFileSystem()
         try fs.ensureDirectory(at: "/")
-        let wasi = try WASIBridgeToHost(
+        let bridge = try WASIBridgeToHost(
             fileSystem: .memory(fs).withPreopens([
                 .init(guestPath: "/", hostPath: "/")
             ])
-        ).underlying
+        )
+        try bridge.runAndClose { _ in
+            let wasi = bridge.underlying
 
-        let memory = TestSupport.TestGuestMemory()
-        let iovecs = memory.readIOVecs(sizes: [10])
+            let memory = TestSupport.TestGuestMemory()
+            let iovecs = memory.readIOVecs(sizes: [10])
 
-        do {
-            _ = try wasi.fd_read(fd: 2, iovs: iovecs, memory: memory)
-            #expect(Bool(false), "Should not be able to read from stderr")
-        } catch let error as WASIAbi.Errno {
-            #expect(error == .EBADF)
+            do {
+                _ = try wasi.fd_read(fd: 2, iovs: iovecs, memory: memory)
+                #expect(Bool(false), "Should not be able to read from stderr")
+            } catch let error as WASIAbi.Errno {
+                #expect(error == .EBADF)
+            }
         }
     }
 
@@ -1275,43 +1371,46 @@ struct WASITests {
         try fs.ensureDirectory(at: "/")
         try fs.addFile(at: "/file.txt", content: "test")
 
-        let wasi = try WASIBridgeToHost(
+        let bridge = try WASIBridgeToHost(
             fileSystem: .memory(fs).withPreopens([
                 .init(guestPath: "/", hostPath: "/")
             ])
-        ).underlying
-        let rootFd: WASIAbi.Fd = 3
-
-        let stat1 = try wasi.path_filestat_get(dirFd: rootFd, flags: [], path: "file.txt")
-        #expect(stat1.atim > 0)
-        #expect(stat1.mtim > 0)
-        #expect(stat1.ctim > 0)
-
-        let fd = try wasi.path_open(
-            dirFd: rootFd,
-            dirFlags: [],
-            path: "file.txt",
-            oflags: [],
-            fsRightsBase: [.FD_READ, .FD_WRITE],
-            fsRightsInheriting: [],
-            fdflags: []
         )
+        try bridge.runAndClose { _ in
+            let wasi = bridge.underlying
+            let rootFd: WASIAbi.Fd = 3
 
-        let memory = TestSupport.TestGuestMemory()
-        let readVecs = memory.readIOVecs(sizes: [4])
-        _ = try wasi.fd_read(fd: fd, iovs: readVecs, memory: memory)
+            let stat1 = try wasi.path_filestat_get(dirFd: rootFd, flags: [], path: "file.txt")
+            #expect(stat1.atim > 0)
+            #expect(stat1.mtim > 0)
+            #expect(stat1.ctim > 0)
 
-        let stat2 = try wasi.fd_filestat_get(fd: fd)
-        #expect(stat2.atim >= stat1.atim)
+            let fd = try wasi.path_open(
+                dirFd: rootFd,
+                dirFlags: [],
+                path: "file.txt",
+                oflags: [],
+                fsRightsBase: [.FD_READ, .FD_WRITE],
+                fsRightsInheriting: [],
+                fdflags: []
+            )
 
-        let writeData = Array("more".utf8)
-        let writeVecs = memory.writeIOVecs([writeData])
-        _ = try wasi.fd_write(fileDescriptor: fd, ioVectors: writeVecs, memory: memory)
+            let memory = TestSupport.TestGuestMemory()
+            let readVecs = memory.readIOVecs(sizes: [4])
+            _ = try wasi.fd_read(fd: fd, iovs: readVecs, memory: memory)
 
-        let stat3 = try wasi.fd_filestat_get(fd: fd)
-        #expect(stat3.mtim >= stat2.mtim)
+            let stat2 = try wasi.fd_filestat_get(fd: fd)
+            #expect(stat2.atim >= stat1.atim)
 
-        try wasi.fd_close(fd: fd)
+            let writeData = Array("more".utf8)
+            let writeVecs = memory.writeIOVecs([writeData])
+            _ = try wasi.fd_write(fileDescriptor: fd, ioVectors: writeVecs, memory: memory)
+
+            let stat3 = try wasi.fd_filestat_get(fd: fd)
+            #expect(stat3.mtim >= stat2.mtim)
+
+            try wasi.fd_close(fd: fd)
+        }
     }
 
     @Test
@@ -1319,23 +1418,26 @@ struct WASITests {
         let fs = try MemoryFileSystem()
         try fs.ensureDirectory(at: "/")
 
-        let wasi = try WASIBridgeToHost(
+        let bridge = try WASIBridgeToHost(
             fileSystem: .memory(fs).withPreopens([
                 .init(guestPath: "/", hostPath: "/")
             ])
-        ).underlying
-        let rootFd: WASIAbi.Fd = 3
+        )
+        try bridge.runAndClose { _ in
+            let wasi = bridge.underlying
+            let rootFd: WASIAbi.Fd = 3
 
-        try wasi.path_create_directory(dirFd: rootFd, path: "testdir")
+            try wasi.path_create_directory(dirFd: rootFd, path: "testdir")
 
-        let stat1 = try wasi.path_filestat_get(dirFd: rootFd, flags: [], path: "testdir")
-        #expect(stat1.atim > 0)
-        #expect(stat1.mtim > 0)
+            let stat1 = try wasi.path_filestat_get(dirFd: rootFd, flags: [], path: "testdir")
+            #expect(stat1.atim > 0)
+            #expect(stat1.mtim > 0)
 
-        try fs.addFile(at: "/testdir/file.txt", content: [])
+            try fs.addFile(at: "/testdir/file.txt", content: [])
 
-        let stat2 = try wasi.path_filestat_get(dirFd: rootFd, flags: [], path: "testdir")
-        #expect(stat2.mtim >= stat1.mtim)
+            let stat2 = try wasi.path_filestat_get(dirFd: rootFd, flags: [], path: "testdir")
+            #expect(stat2.mtim >= stat1.mtim)
+        }
     }
 
     @Test
@@ -1344,27 +1446,30 @@ struct WASITests {
         try fs.ensureDirectory(at: "/")
         try fs.addFile(at: "/file.txt", content: [])
 
-        let wasi = try WASIBridgeToHost(
+        let bridge = try WASIBridgeToHost(
             fileSystem: .memory(fs).withPreopens([
                 .init(guestPath: "/", hostPath: "/")
             ])
-        ).underlying
-        let rootFd: WASIAbi.Fd = 3
-
-        let specificTime: WASIAbi.Timestamp = 1_000_000_000_000_000_000
-
-        try wasi.path_filestat_set_times(
-            dirFd: rootFd,
-            flags: [],
-            path: "file.txt",
-            atim: specificTime,
-            mtim: specificTime,
-            fstFlags: [.ATIM, .MTIM]
         )
+        try bridge.runAndClose { _ in
+            let wasi = bridge.underlying
+            let rootFd: WASIAbi.Fd = 3
 
-        let stat = try wasi.path_filestat_get(dirFd: rootFd, flags: [], path: "file.txt")
-        #expect(stat.atim == specificTime)
-        #expect(stat.mtim == specificTime)
+            let specificTime: WASIAbi.Timestamp = 1_000_000_000_000_000_000
+
+            try wasi.path_filestat_set_times(
+                dirFd: rootFd,
+                flags: [],
+                path: "file.txt",
+                atim: specificTime,
+                mtim: specificTime,
+                fstFlags: [.ATIM, .MTIM]
+            )
+
+            let stat = try wasi.path_filestat_get(dirFd: rootFd, flags: [], path: "file.txt")
+            #expect(stat.atim == specificTime)
+            #expect(stat.mtim == specificTime)
+        }
     }
 
     #if !os(Windows)
@@ -1377,22 +1482,92 @@ struct WASITests {
             try t.createFile(at: "foo/a", contents: "hello")
             try t.createSymlink(at: "foo/b", to: "b")  // cyclic symlink
 
-            let wasi = try WASIBridgeToHost(
+            let bridge = try WASIBridgeToHost(
                 fileSystem: .host().withPreopens([
                     .init(guestPath: "/foo", hostPath: t.url.appendingPathComponent("foo").path)
                 ])
-            ).underlying
-            let preopenFd: WASIAbi.Fd = 3
-
-            let memory = TestSupport.TestGuestMemory()
-            let buffer = UnsafeGuestBufferPointer<UInt8>(
-                baseAddress: UnsafeGuestPointer<UInt8>(offset: 0),
-                count: 4096
             )
+            try bridge.runAndClose { _ in
+                let wasi = bridge.underlying
+                let preopenFd: WASIAbi.Fd = 3
 
-            // Without the noFollow fix, this throws ELOOP due to the cyclic symlink
-            let nwritten = try wasi.fd_readdir(fd: preopenFd, buffer: buffer, cookie: 0, memory: memory)
-            #expect(nwritten > 0)
+                let memory = TestSupport.TestGuestMemory()
+                let buffer = UnsafeGuestBufferPointer<UInt8>(
+                    baseAddress: UnsafeGuestPointer<UInt8>(offset: 0),
+                    count: 4096
+                )
+
+                // Without the noFollow fix, this throws ELOOP due to the cyclic symlink
+                let nwritten = try wasi.fd_readdir(fd: preopenFd, buffer: buffer, cookie: 0, memory: memory)
+                #expect(nwritten > 0)
+            }
+        }
+    #endif
+
+    #if !os(Windows)
+        @Test
+        func pathOpenDotReturnsIndependentFd() throws {
+            let t = try TestSupport.TemporaryDirectory()
+            try t.createFile(at: "hello.txt", contents: "world")
+
+            let bridge = try WASIBridgeToHost(
+                fileSystem: .host().withPreopens([
+                    .init(guestPath: "/dir", hostPath: t.url.path)
+                ])
+            )
+            try bridge.runAndClose { _ in
+                let wasi = bridge.underlying
+                let preopenFd: WASIAbi.Fd = 3
+
+                // Open "." relative to the preopen — should get an independent fd
+                let dotFd = try wasi.path_open(
+                    dirFd: preopenFd, dirFlags: [], path: ".",
+                    oflags: [.DIRECTORY], fsRightsBase: [.FD_READ],
+                    fsRightsInheriting: [], fdflags: []
+                )
+                #expect(dotFd != preopenFd, "path_open should return a new WASI fd")
+
+                // Close the "." fd
+                try wasi.fd_close(fd: dotFd)
+
+                // The preopen must still be fully functional after closing the "." fd
+                let stat = try wasi.path_filestat_get(
+                    dirFd: preopenFd, flags: [], path: "hello.txt"
+                )
+                #expect(stat.size == 5, "preopen should still read files after closing '.' fd")
+            }
+        }
+    #endif
+
+    #if !os(Windows)
+        @Test
+        func closeReleasesPreopenedFds() throws {
+            let t = try TestSupport.TemporaryDirectory()
+            try t.createFile(at: "test.txt", contents: "hello")
+
+            let bridge = try WASIBridgeToHost(
+                fileSystem: .host().withPreopens([
+                    .init(guestPath: "/dir", hostPath: t.url.path)
+                ])
+            )
+            do {
+                let wasi = bridge.underlying
+                let preopenFd: WASIAbi.Fd = 3
+
+                // Preopen works before close
+                let stat = try wasi.path_filestat_get(dirFd: preopenFd, flags: [], path: "test.txt")
+                #expect(stat.size == 5)
+
+                try bridge.close()
+
+                // After close, the preopen fd should no longer be usable
+                #expect(throws: WASIAbi.Errno.EBADF) {
+                    try wasi.path_filestat_get(dirFd: preopenFd, flags: [], path: "test.txt")
+                }
+            } catch {
+                try bridge.close()
+                throw error
+            }
         }
     #endif
 
@@ -1407,50 +1582,53 @@ struct WASITests {
             try t.createDir(at: "dir2")
             try t.createDir(at: "dir2/foo")
 
-            let wasi = try WASIBridgeToHost(
+            let bridge = try WASIBridgeToHost(
                 fileSystem: .host().withPreopens([
                     .init(guestPath: "/dir1", hostPath: t.url.appending(component: "dir1").path),
                     .init(guestPath: "/dir2", hostPath: t.url.appending(component: "dir2").path),
                 ])
-            ).underlying
-            let dir1Fd: WASIAbi.Fd = 3
-            let dir2Fd: WASIAbi.Fd = 4
-
-            let memory = TestSupport.TestGuestMemory()
-            let buffer = UnsafeGuestBufferPointer<UInt8>(
-                baseAddress: UnsafeGuestPointer<UInt8>(offset: 0),
-                count: 4096
             )
-            let writeData = Array("hello".utf8)
-            let writeVecs = memory.writeIOVecs([writeData])
+            try bridge.runAndClose { _ in
+                let wasi = bridge.underlying
+                let dir1Fd: WASIAbi.Fd = 3
+                let dir2Fd: WASIAbi.Fd = 4
 
-            for _ in 0..<1000 {
-                let fd = try wasi.path_open(
-                    dirFd: dir1Fd,
-                    dirFlags: [],
-                    path: "foo/bar",
-                    oflags: [.CREAT],
-                    fsRightsBase: [.FD_WRITE],
-                    fsRightsInheriting: [],
-                    fdflags: []
+                let memory = TestSupport.TestGuestMemory()
+                let buffer = UnsafeGuestBufferPointer<UInt8>(
+                    baseAddress: UnsafeGuestPointer<UInt8>(offset: 0),
+                    count: 4096
                 )
-                #expect(try wasi.fd_write(fileDescriptor: fd, ioVectors: writeVecs, memory: memory) > 0)
-                try wasi.fd_close(fd: fd)
+                let writeData = Array("hello".utf8)
+                let writeVecs = memory.writeIOVecs([writeData])
 
-                try wasi.path_rename(oldFd: dir1Fd, oldPath: "foo/bar", newFd: dir2Fd, newPath: "foo/baz")
+                for _ in 0..<1000 {
+                    let fd = try wasi.path_open(
+                        dirFd: dir1Fd,
+                        dirFlags: [],
+                        path: "foo/bar",
+                        oflags: [.CREAT],
+                        fsRightsBase: [.FD_WRITE],
+                        fsRightsInheriting: [],
+                        fdflags: []
+                    )
+                    #expect(try wasi.fd_write(fileDescriptor: fd, ioVectors: writeVecs, memory: memory) > 0)
+                    try wasi.fd_close(fd: fd)
 
-                try wasi.path_symlink(oldPath: "baz", dirFd: dir2Fd, newPath: "foo/quux")
-                let stat = try wasi.path_filestat_get(dirFd: dir2Fd, flags: .SYMLINK_FOLLOW, path: "foo/quux")
-                #expect(stat.size == 5)  // hello
-                let count = try Int(wasi.path_readlink(fd: dir2Fd, path: "foo/quux", buffer: buffer, memory: memory))
-                buffer.withHostPointer(in: memory) { ptr in
-                    #expect(String(decoding: ptr[..<count], as: UTF8.self) == "baz")
+                    try wasi.path_rename(oldFd: dir1Fd, oldPath: "foo/bar", newFd: dir2Fd, newPath: "foo/baz")
+
+                    try wasi.path_symlink(oldPath: "baz", dirFd: dir2Fd, newPath: "foo/quux")
+                    let stat = try wasi.path_filestat_get(dirFd: dir2Fd, flags: .SYMLINK_FOLLOW, path: "foo/quux")
+                    #expect(stat.size == 5)  // hello
+                    let count = try Int(wasi.path_readlink(fd: dir2Fd, path: "foo/quux", buffer: buffer, memory: memory))
+                    buffer.withHostPointer(in: memory) { ptr in
+                        #expect(String(decoding: ptr[..<count], as: UTF8.self) == "baz")
+                    }
+                    try wasi.path_unlink_file(dirFd: dir2Fd, path: "foo/baz")
+                    try wasi.path_unlink_file(dirFd: dir2Fd, path: "foo/quux")
+
+                    try wasi.path_create_directory(dirFd: dir1Fd, path: "foo/bar")
+                    try wasi.path_remove_directory(dirFd: dir1Fd, path: "foo/bar")
                 }
-                try wasi.path_unlink_file(dirFd: dir2Fd, path: "foo/baz")
-                try wasi.path_unlink_file(dirFd: dir2Fd, path: "foo/quux")
-
-                try wasi.path_create_directory(dirFd: dir1Fd, path: "foo/bar")
-                try wasi.path_remove_directory(dirFd: dir1Fd, path: "foo/bar")
             }
         }
     #endif

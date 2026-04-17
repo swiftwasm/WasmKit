@@ -88,6 +88,10 @@ struct SplitPath: ~Copyable {
     var basename: String
     var isTemporary: Bool
 
+    borrowing func withFields<R>(_ body: (FileDescriptor, String) throws -> R) rethrows -> R {
+        try body(parentFd, basename)
+    }
+
     deinit {
         if isTemporary {
             try? parentFd.close()

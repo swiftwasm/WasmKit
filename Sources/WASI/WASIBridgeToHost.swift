@@ -14,9 +14,13 @@ import SystemPackage
 ///     environment: ["PATH": "/usr/bin"],
 ///     preopens: [WASIBridgeToHost.Preopen(guestPath: "/sandbox", hostPath: "/real/path")]
 /// )
+/// try bridge.runAndClose { wasi in
+///     // ... use wasi ...
+/// }
 /// ```
 public final class WASIBridgeToHost {
     internal let underlying: WASIImplementation
+    private var isClosed = false
 
     /// A preopened directory mapping from a guest path to a host path.
     ///
@@ -102,6 +106,35 @@ public final class WASIBridgeToHost {
     /// which can be used to register with a WebAssembly runtime.
     public var wasiHostModules: [String: WASIHostModule] { underlying._hostModules }
 
+    /// Closes all owned file descriptors (preopened directories and any
+    /// guest-opened files that were not closed by the WASI program).
+    /// Borrowed descriptors (e.g. process stdio) are left open.
+    public func close() throws {
+        guard !isClosed else { return }
+        isClosed = true
+        try underlying.close()
+    }
+
+    /// Passes the bridge to `body`, then closes all owned file descriptors
+    /// regardless of whether `body` returns normally or throws.
+    ///
+    /// - Parameter body: A closure that receives the bridge and returns a value.
+    /// - Returns: The value returned by `body`.
+    public func runAndClose<R>(_ body: (WASIBridgeToHost) throws -> R) throws -> R {
+        do {
+            let result = try body(self)
+            try close()
+            return result
+        } catch {
+            try close()
+            throw error
+        }
+    }
+
+    deinit {
+        precondition(isClosed, "WASIBridgeToHost.close() must be called before the bridge is deallocated")
+    }
+
     /// Creates a new WASI bridge with host file system access.
     ///
     /// This is a convenience initializer that automatically configures the bridge
@@ -185,24 +218,13 @@ public final class WASIBridgeToHost {
 
     /// Creates a new WASI bridge with custom file system options.
     ///
-    /// This is the designated initializer that allows full control over the file system
-    /// backend (host or in-memory) and all other WASI subsystems.
-    ///
-    /// - Parameters:
-    ///   - args: Command-line arguments to pass to the WASI module. Defaults to an empty array.
-    ///   - environment: Environment variables to expose to the WASI module. Defaults to an empty dictionary.
-    ///   - fileSystem: Configuration for the file system implementation. Defaults to `.host()`.
-    ///   - wallClock: Clock for wall-clock time queries. Defaults to `SystemWallClock()`.
-    ///   - monotonicClock: Clock for monotonic time queries. Defaults to `SystemMonotonicClock()`.
-    ///   - randomGenerator: Random number generator. Defaults to `SystemRandomNumberGenerator()`.
-    /// - Throws: An error if the file system or initialization fails.
-    public init(
-        args: [String] = [],
-        environment: [String: String] = [:],
-        fileSystem fileSystemOptions: FileSystemOptions = .host().withStdio(),
-        wallClock: WallClock = SystemWallClock(),
-        monotonicClock: MonotonicClock = SystemMonotonicClock(),
-        randomGenerator: RandomBufferGenerator = SystemRandomNumberGenerator()
+    private init(
+        args: [String],
+        environment: [String: String],
+        fileSystemOptions: FileSystemOptions,
+        wallClock: WallClock,
+        monotonicClock: MonotonicClock,
+        randomGenerator: RandomBufferGenerator
     ) throws {
         let fileSystem = try fileSystemOptions.factory()
         self.underlying = try WASIImplementation(
@@ -215,5 +237,29 @@ public final class WASIBridgeToHost {
         )
         try fileSystemOptions.initializeStdio?(&underlying.fdTable)
         try fileSystemOptions.initializePreopens?(fileSystem, &underlying.fdTable)
+    }
+
+    /// Creates a new WASI bridge with custom file system options.
+    /// - Parameters:
+    ///   - args: Command-line arguments to pass to the WASI module. Defaults to an empty array.
+    ///   - environment: Environment variables to expose to the WASI module. Defaults to an empty dictionary.
+    ///   - fileSystem: Configuration for the file system implementation. Defaults to `.host()`.
+    ///   - wallClock: Clock for wall-clock time queries. Defaults to `SystemWallClock()`.
+    ///   - monotonicClock: Clock for monotonic time queries. Defaults to `SystemMonotonicClock()`.
+    ///   - randomGenerator: Random number generator. Defaults to `SystemRandomNumberGenerator()`.
+    /// - Throws: An error if the file system or initialization fails.
+    public convenience init(
+        args: [String] = [],
+        environment: [String: String] = [:],
+        fileSystem fileSystemOptions: FileSystemOptions = .host().withStdio(),
+        wallClock: WallClock = SystemWallClock(),
+        monotonicClock: MonotonicClock = SystemMonotonicClock(),
+        randomGenerator: RandomBufferGenerator = SystemRandomNumberGenerator()
+    ) throws {
+        try self.init(
+            args: args, environment: environment, fileSystemOptions: fileSystemOptions,
+            wallClock: wallClock, monotonicClock: monotonicClock,
+            randomGenerator: randomGenerator
+        )
     }
 }

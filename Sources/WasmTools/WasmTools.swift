@@ -140,14 +140,16 @@ package func runWasmTools(
         fileSystem: fileSystemOptions
     )
 
-    let engine = Engine()
-    let store = Store(engine: engine)
-    var imports = Imports()
-    wasi.link(to: &imports, store: store)
+    let exitCode = try wasi.runAndClose { wasi in
+        let engine = Engine()
+        let store = Store(engine: engine)
+        var imports = Imports()
+        wasi.link(to: &imports, store: store)
 
-    let module = try parseWasm(filePath: FilePath(wasmToolsPath))
-    let instance = try module.instantiate(store: store, imports: imports)
-    let exitCode = try wasi.start(instance)
+        let module = try parseWasm(filePath: FilePath(wasmToolsPath))
+        let instance = try module.instantiate(store: store, imports: imports)
+        return try wasi.start(instance)
+    }
 
     try stdoutPipes.writeEnd.close()
     try stderrPipes.writeEnd.close()
