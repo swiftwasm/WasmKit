@@ -298,12 +298,14 @@ package struct Run: AsyncParsableCommand {
         let wasi = try WASIBridgeToHost(args: [path] + arguments, environment: environment, preopens: preopens)
         let engine = Engine(configuration: deriveRuntimeConfiguration(), interceptor: interceptor)
         let store = Store(engine: engine)
-        var imports = Imports()
-        wasi.link(to: &imports, store: store)
-        let moduleInstance = try module.instantiate(store: store, imports: imports)
         return {
-            let exitCode = try wasi.start(moduleInstance)
-            throw ExitCode(Int32(exitCode))
+            try wasi.runAndClose { wasi in
+                var imports = Imports()
+                wasi.link(to: &imports, store: store)
+                let moduleInstance = try module.instantiate(store: store, imports: imports)
+                let exitCode = try wasi.start(moduleInstance)
+                throw ExitCode(Int32(exitCode))
+            }
         }
     }
 

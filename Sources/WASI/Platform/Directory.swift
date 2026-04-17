@@ -90,6 +90,7 @@ extension DirEntry: WASIDir, FdWASIEntry {
             symlinkFollow: symlinkFollow, path: path,
             oflags: [], accessMode: .write, fdflags: []
         )
+        defer { try? fd.close() }
         let (access, modification) = try WASIAbi.Timestamp.platformTimeSpec(
             atim: atim, mtim: mtim, fstFlags: fstFlags
         )
@@ -100,10 +101,10 @@ extension DirEntry: WASIDir, FdWASIEntry {
 
     func removeFile(atPath path: String) throws {
         let result = try SandboxPrimitives.openParent(start: fd, path: path)
-        let dir = result.parentFd
-        let basename = result.basename
-        try WASIAbi.Errno.translatingPlatformErrno {
-            try dir.remove(at: FilePath(basename), options: [])
+        try result.withFields { dir, basename in
+            try WASIAbi.Errno.translatingPlatformErrno {
+                try dir.remove(at: FilePath(basename), options: [])
+            }
         }
     }
 
@@ -113,10 +114,10 @@ extension DirEntry: WASIDir, FdWASIEntry {
         #else
             let path = SandboxPrimitives.stripDirSuffix(path)
             let result = try SandboxPrimitives.openParent(start: fd, path: path)
-            let dir = result.parentFd
-            let basename = result.basename
-            try WASIAbi.Errno.translatingPlatformErrno {
-                try dir.remove(at: FilePath(basename), options: .removeDirectory)
+            try result.withFields { dir, basename in
+                try WASIAbi.Errno.translatingPlatformErrno {
+                    try dir.remove(at: FilePath(basename), options: .removeDirectory)
+                }
             }
         #endif
     }
@@ -125,10 +126,10 @@ extension DirEntry: WASIDir, FdWASIEntry {
         let result = try SandboxPrimitives.openParent(
             start: fd, path: destPath
         )
-        let destDir = result.parentFd
-        let destBasename = result.basename
-        try WASIAbi.Errno.translatingPlatformErrno {
-            try destDir.createSymlink(original: FilePath(sourcePath), link: FilePath(destBasename))
+        try result.withFields { destDir, destBasename in
+            try WASIAbi.Errno.translatingPlatformErrno {
+                try destDir.createSymlink(original: FilePath(sourcePath), link: FilePath(destBasename))
+            }
         }
     }
 
@@ -152,24 +153,23 @@ extension DirEntry: WASIDir, FdWASIEntry {
             let sourceResult = try SandboxPrimitives.openParent(
                 start: fd, path: oldPath
             )
-            let sourceDir = sourceResult.parentFd
-            let sourceBasename = sourceResult.basename
             let destResult = try SandboxPrimitives.openParent(
                 start: newDir.fd, path: newPath
             )
-            let destDir = destResult.parentFd
-            let destBasename = destResult.basename
+            try sourceResult.withFields { sourceDir, sourceBasename in
+                try destResult.withFields { destDir, destBasename in
+                    // Re-append a slash if the original path had one
+                    let finalSourceBasename = oldHasTrailingSlash ? sourceBasename + "/" : sourceBasename
+                    let finalDestBasename = newHasTrailingSlash ? destBasename + "/" : destBasename
 
-            // Re-append a slash if the original path had one
-            let finalSourceBasename = oldHasTrailingSlash ? sourceBasename + "/" : sourceBasename
-            let finalDestBasename = newHasTrailingSlash ? destBasename + "/" : destBasename
-
-            try WASIAbi.Errno.translatingPlatformErrno {
-                try sourceDir.rename(
-                    at: FilePath(finalSourceBasename),
-                    to: destDir,
-                    at: FilePath(finalDestBasename)
-                )
+                    try WASIAbi.Errno.translatingPlatformErrno {
+                        try sourceDir.rename(
+                            at: FilePath(finalSourceBasename),
+                            to: destDir,
+                            at: FilePath(finalDestBasename)
+                        )
+                    }
+                }
             }
         #endif
     }
@@ -216,10 +216,10 @@ extension DirEntry: WASIDir, FdWASIEntry {
 
     func createDirectory(atPath path: String) throws {
         let result = try SandboxPrimitives.openParent(start: fd, path: path)
-        let dir = result.parentFd
-        let basename = result.basename
-        try WASIAbi.Errno.translatingPlatformErrno {
-            try dir.createDirectory(at: FilePath(basename), permissions: .ownerReadWriteExecute)
+        try result.withFields { dir, basename in
+            try WASIAbi.Errno.translatingPlatformErrno {
+                try dir.createDirectory(at: FilePath(basename), permissions: .ownerReadWriteExecute)
+            }
         }
     }
 
@@ -232,15 +232,15 @@ extension DirEntry: WASIDir, FdWASIEntry {
                 options.insert(.noFollow)
             }
             let result = try SandboxPrimitives.openParent(start: fd, path: path)
-            let dir = result.parentFd
-            let basename = result.basename
-            let attributes = try basename.withCString { cBasename in
-                try WASIAbi.Errno.translatingPlatformErrno {
-                    try dir.attributes(at: cBasename, options: options)
+            return try result.withFields { dir, basename in
+                let attributes = try basename.withCString { cBasename in
+                    try WASIAbi.Errno.translatingPlatformErrno {
+                        try dir.attributes(at: cBasename, options: options)
+                    }
                 }
-            }
 
-            return WASIAbi.Filestat(stat: attributes)
+                return WASIAbi.Filestat(stat: attributes)
+            }
         #endif
     }
 }

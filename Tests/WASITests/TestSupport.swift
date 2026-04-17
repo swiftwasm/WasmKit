@@ -3,10 +3,19 @@ import Foundation
 @testable import WASI
 @testable import WasmKit
 
+#if canImport(Darwin)
+    import Darwin
+#elseif canImport(Glibc)
+    import Glibc
+#elseif canImport(Musl)
+    import Musl
+#endif
+
 #if canImport(System)
     import SystemPackage
 #endif
 enum TestSupport {
+
     struct Error: Swift.Error, CustomStringConvertible {
         let description: String
 

@@ -31,10 +31,12 @@ let benchmarks: @Sendable () -> () = {
                 filePath: FilePath(wishYouWereFast.appendingPathComponent(file).path)
             )
             let wasi = try WASIBridgeToHost(fileSystem: .host().withStdio(stdout: devNull, stderr: devNull))
-            var imports = Imports()
-            wasi.link(to: &imports, store: store)
-            let instance = try module.instantiate(store: store, imports: imports)
-            _ = try wasi.start(instance)
+            _ = try wasi.runAndClose { wasi in
+                var imports = Imports()
+                wasi.link(to: &imports, store: store)
+                let instance = try module.instantiate(store: store, imports: imports)
+                return try wasi.start(instance)
+            }
         }
     }
 }

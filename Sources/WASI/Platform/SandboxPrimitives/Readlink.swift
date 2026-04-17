@@ -30,29 +30,28 @@ extension SandboxPrimitives {
             let maxBufferCapacity = max(initialBufferCapacity, Int(PATH_MAX))
 
             let result = try openParent(start: start, path: path)
-            let dir = result.parentFd
-            let basename = result.basename
-
-            return try basename.withCString { cBasename in
-                var capacity = min(initialBufferCapacity, maxBufferCapacity)
-                while true {
-                    var buffer = [UInt8](repeating: 0, count: capacity)
-                    let count = try buffer.withUnsafeMutableBytes { rawBuffer -> Int in
-                        guard let baseAddress = rawBuffer.baseAddress else {
-                            throw WASIAbi.Errno.EINVAL
+            return try result.withFields { dir, basename in
+                try basename.withCString { cBasename in
+                    var capacity = min(initialBufferCapacity, maxBufferCapacity)
+                    while true {
+                        var buffer = [UInt8](repeating: 0, count: capacity)
+                        let count = try buffer.withUnsafeMutableBytes { rawBuffer -> Int in
+                            guard let baseAddress = rawBuffer.baseAddress else {
+                                throw WASIAbi.Errno.EINVAL
+                            }
+                            let base = baseAddress.assumingMemoryBound(to: Int8.self)
+                            let written = readlinkat(dir.rawValue, cBasename, base, rawBuffer.count)
+                            guard written >= 0 else {
+                                throw try WASIAbi.Errno(platformErrno: errno)
+                            }
+                            return written
                         }
-                        let base = baseAddress.assumingMemoryBound(to: Int8.self)
-                        let written = readlinkat(dir.rawValue, cBasename, base, rawBuffer.count)
-                        guard written >= 0 else {
-                            throw try WASIAbi.Errno(platformErrno: errno)
-                        }
-                        return written
-                    }
 
-                    if count < capacity || capacity == maxBufferCapacity {
-                        return Array(buffer.prefix(count))
+                        if count < capacity || capacity == maxBufferCapacity {
+                            return Array(buffer.prefix(count))
+                        }
+                        capacity = min(capacity * 2, maxBufferCapacity)
                     }
-                    capacity = min(capacity * 2, maxBufferCapacity)
                 }
             }
         #endif

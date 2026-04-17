@@ -227,6 +227,15 @@ struct PathResolution {
             case .regular: try regular(component: component)
             }
         }
+
+        // If the path resolved without opening any new fd (e.g. "."),
+        // dup to avoid returning an aliased fd to the caller.
+        if baseFd.rawValue == startFd.rawValue {
+            baseFd = try startFd.open(
+                at: ".", mode, options: options, permissions: permissions
+            )
+        }
+
         resultFd = self.baseFd
         return self.baseFd
     }

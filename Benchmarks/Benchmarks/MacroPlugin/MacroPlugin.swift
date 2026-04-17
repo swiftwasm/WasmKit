@@ -151,6 +151,7 @@ let benchmarks: @Sendable () -> () = {
             let pluginToHost: FileDescriptor
             let pump: Function
             let expandMessage: String
+            let bridge: WASIBridgeToHost
 
             init(filePath: FilePath, expandMessage: String) throws {
                 let engine = Engine()
@@ -164,16 +165,22 @@ let benchmarks: @Sendable () -> () = {
                   stdout: pluginToHostPipes.writeEnd,
                   stderr: .standardError
                 )
-                var imports = Imports()
-                bridge.link(to: &imports, store: store)
-                let instance = try module.instantiate(store: store, imports: imports)
-                try instance.exports[function: "_start"]!()
-                let pump = instance.exports[function: "swift_wasm_macro_v1_pump"]!
+                do {
+                    var imports = Imports()
+                    bridge.link(to: &imports, store: store)
+                    let instance = try module.instantiate(store: store, imports: imports)
+                    try instance.exports[function: "_start"]!()
+                    let pump = instance.exports[function: "swift_wasm_macro_v1_pump"]!
 
-                self.hostToPlugin = hostToPluginPipes.writeEnd
-                self.pluginToHost = pluginToHostPipes.readEnd
-                self.pump = pump
-                self.expandMessage = expandMessage
+                    self.hostToPlugin = hostToPluginPipes.writeEnd
+                    self.pluginToHost = pluginToHostPipes.readEnd
+                    self.pump = pump
+                    self.expandMessage = expandMessage
+                    self.bridge = bridge
+                } catch {
+                    try bridge.close()
+                    throw error
+                }
             }
 
             func writeMessage(_ message: String) throws {
@@ -204,6 +211,10 @@ let benchmarks: @Sendable () -> () = {
                 try pump()
                 _ = try readMessage()
             }
+
+            func close() throws {
+                try bridge.close()
+            }
         }
 
         guard let expandMessage = expandMessages[file] else {
@@ -214,10 +225,12 @@ let benchmarks: @Sendable () -> () = {
             let setup = try Setup(filePath: macrosDir.appending(file), expandMessage: expandMessage)
             try setup.writeMessage(handshakeMessage)
             try setup.tick()
+            try setup.close()
         }
 
         Benchmark("Expand \(file)") { benchmark, setup in
             try setup.tick()
+            try setup.close()
         } setup: { () -> Setup in
             let setup = try Setup(
                 filePath: macrosDir.appending(file),

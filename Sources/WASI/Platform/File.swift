@@ -106,6 +106,8 @@ struct StdioFileEntry: FdWASIFile {
     let fd: FileDescriptor
     let accessMode: FileAccessMode
 
+    let isBorrowed: Bool = true
+
     func attributes() throws -> WASIAbi.Filestat {
         return WASIAbi.Filestat(
             dev: 0, ino: 0, filetype: .CHARACTER_DEVICE,
