@@ -2,13 +2,16 @@ add_wasmkit_library(WAT
   BinaryEncoding/BinaryInstructionEncoder.swift
   BinaryEncoding/Encoder.swift
   Lexer.swift
-  Location.swift
   NameMapping.swift
   ParseTextInstruction.swift
   Parser.swift
   Parser/ExpressionParser.swift
   Parser/WastParser.swift
   Parser/WatParser.swift
+  Printer/InstructionMnemonics.swift
+  Printer/ModuleCollector.swift
+  Printer/TextInstructionVisitor.swift
+  Printer/WatPrinter.swift
   WAT.swift
   WatParserError.swift
 )

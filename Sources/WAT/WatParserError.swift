@@ -1,3 +1,5 @@
+import WasmTypes
+
 /// An error type thrown during WAT (WebAssembly Text Format) parsing.
 public struct WatParserError: Swift.Error {
     package let message: String

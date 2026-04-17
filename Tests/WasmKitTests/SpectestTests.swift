@@ -1,6 +1,9 @@
 import Foundation
+import SystemPackage
 import Testing
+import WAT
 import WasmKit
+import WasmParser
 
 @Suite
 struct SpectestTests {
@@ -40,6 +43,30 @@ struct SpectestTests {
             // Sanity check that non-default threading models work.
             let runner = try SpectestRunner(configuration: defaultConfig)
             try runner.run(test: test, reporter: NullSpectestProgressReporter())
+        }
+
+        @Test(arguments: try SpectestDiscovery(path: SpectestTests.testPaths).discover())
+        func roundTrip(test: TestCase) throws {
+            guard let data = FileManager.default.contents(atPath: test.path) else { return }
+            let rootPath = FilePath(test.path).removingLastComponent()
+            let features = WastRunContext.deriveFeatureSet(rootPath: rootPath)
+            var content = try parseWAST(String(data: data, encoding: .utf8)!, features: features)
+
+            while let (directive, _) = try content.nextDirective() {
+                guard case .module(let moduleDirective) = directive else { continue }
+                let binary: [UInt8]
+                switch moduleDirective.source {
+                case .text(let wat): binary = try wat.encode()
+                case .binary:
+                    // Binary modules may use non-canonical encodings (e.g. non-minimal LEB128).
+                    continue
+                case .quote(let text): binary = try wat2wasm(String(decoding: text, as: UTF8.self), features: features)
+                }
+
+                let text = try wasm2wat(StaticByteStream(bytes: binary), features: features)
+                let binary2 = try wat2wasm(text, features: features)
+                #expect(binary == binary2, "Round-trip mismatch in \(test.relativePath)")
+            }
         }
     #endif
 }
