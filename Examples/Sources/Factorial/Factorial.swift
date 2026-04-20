@@ -9,7 +9,7 @@ struct Example {
     static func main() throws {
         // Convert a WAT file to a Wasm binary, then parse it.
         let module = try parseWasm(
-            bytes: try wat2wasm(String(contentsOfFile: "wasm/factorial.wat"))
+            bytes: try wat2wasm(String(contentsOfFile: "wasm/factorial.wat", encoding: .utf8))
         )
 
         // Create a module instance from the parsed module.
