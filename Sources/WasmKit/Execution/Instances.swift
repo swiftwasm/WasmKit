@@ -51,7 +51,7 @@ package struct EntityHandle<T>: Equatable, Hashable {
         self.pointer = pointer
     }
 
-    subscript<R>(dynamicMember keyPath: KeyPath<T, R>) -> R {
+    package subscript<R>(dynamicMember keyPath: KeyPath<T, R>) -> R {
         pointer.pointee[keyPath: keyPath]
     }
 
