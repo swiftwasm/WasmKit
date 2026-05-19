@@ -1,4 +1,5 @@
-import WasmParser
+import WasmParserCore
+import WasmTypes
 
 /// Options for encoding a WebAssembly module into a binary format.
 public struct EncodeOptions: Sendable {

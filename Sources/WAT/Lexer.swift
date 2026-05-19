@@ -1,4 +1,5 @@
-import WasmParser
+import WasmParserCore
+import WasmTypes
 
 enum TokenKind: Equatable {
     case leftParen

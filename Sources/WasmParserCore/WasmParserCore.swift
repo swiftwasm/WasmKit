@@ -1,8 +1,5 @@
 import WasmTypes
 
-
-
-
 /// A streaming parser for WebAssembly binary format.
 ///
 /// The parser is designed to be used to incrementally parse a WebAssembly binary bytestream.

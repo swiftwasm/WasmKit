@@ -104,7 +104,8 @@ let package = Package(
                     name: "ComponentModel",
                     condition: .when(traits: ["ComponentModel"])
                 ),
-            ]
+            ],
+            exclude: ["CMakeLists.txt"]
         ),
         .target(
             name: "WasmParser",

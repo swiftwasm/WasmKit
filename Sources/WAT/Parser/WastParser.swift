@@ -1,4 +1,4 @@
-import WasmParser
+import WasmParserCore
 import WasmTypes
 
 protocol WastConstInstructionVisitor: InstructionVisitor {

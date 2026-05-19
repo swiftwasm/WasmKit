@@ -1,5 +1,6 @@
 import SystemPackage
 import WasmParser
+import WasmParserCore
 
 #if os(Windows)
     import ucrt
