@@ -7,17 +7,10 @@ import WasmParser
 @Suite
 struct Wasm2watTests {
 
-    // MARK: - Helper
-
-    /// Assemble WAT text → binary.
-    private func assemble(_ wat: String) throws -> StaticByteStream {
-        try StaticByteStream(bytes: wat2wasm(wat))
-    }
-
     // MARK: - ModuleCollector unit tests
 
     @Test func collectEmptyModule() throws {
-        let binary = try assemble("(module)")
+        let binary = try binaryStream(forWat:"(module)")
         let info = try collectModule(stream: binary)
         #expect(info.types.isEmpty)
         #expect(info.imports.isEmpty)
@@ -27,13 +20,13 @@ struct Wasm2watTests {
         #expect(info.globals.isEmpty)
         #expect(info.exports.isEmpty)
         #expect(info.start == nil)
-        #expect(info.elements.isEmpty)
-        #expect(info.codes.isEmpty)
-        #expect(info.data.isEmpty)
+        #expect(info.elementSectionBytes == nil)
+        #expect(info.codeSectionBytes == nil)
+        #expect(info.dataSectionBytes == nil)
     }
 
     @Test func collectTypeSection() throws {
-        let binary = try assemble(
+        let binary = try binaryStream(forWat:
             """
             (module
               (type (func (param i32 i32) (result i32)))
@@ -49,7 +42,7 @@ struct Wasm2watTests {
     }
 
     @Test func collectFunctionAndCode() throws {
-        let binary = try assemble(
+        let binary = try binaryStream(forWat:
             """
             (module
               (func (param i32 i32) (result i32)
@@ -60,12 +53,17 @@ struct Wasm2watTests {
             """)
         let info = try collectModule(stream: binary)
         #expect(info.functionTypeIndices.count == 1)
-        #expect(info.codes.count == 1)
-        #expect(info.codes[0].locals == [])
+        // Code is now stored as a raw slice; parse one entry to verify it.
+        let codeBytes = try #require(info.codeSectionBytes)
+        var parser = WasmParser.Parser(sectionBodyBytes: codeBytes)
+        let count: UInt32 = try parser.parseUnsigned()
+        #expect(count == 1)
+        let code = try parser.parseCodeEntry()
+        #expect(code.locals == [])
     }
 
     @Test func collectImports() throws {
-        let binary = try assemble(
+        let binary = try binaryStream(forWat:
             """
             (module
               (import "env" "log" (func (param i32)))
@@ -90,7 +88,7 @@ struct Wasm2watTests {
     }
 
     @Test func collectExports() throws {
-        let binary = try assemble(
+        let binary = try binaryStream(forWat:
             """
             (module
               (func (export "add") (param i32 i32) (result i32)
@@ -110,7 +108,7 @@ struct Wasm2watTests {
     }
 
     @Test func collectMemory() throws {
-        let binary = try assemble("(module (memory 1 4))")
+        let binary = try binaryStream(forWat:"(module (memory 1 4))")
         let info = try collectModule(stream: binary)
         #expect(info.memories.count == 1)
         #expect(info.memories[0].type.min == 1)
@@ -118,7 +116,7 @@ struct Wasm2watTests {
     }
 
     @Test func collectGlobal() throws {
-        let binary = try assemble(
+        let binary = try binaryStream(forWat:
             """
             (module
               (global i32 (i32.const 42))
@@ -134,7 +132,7 @@ struct Wasm2watTests {
     }
 
     @Test func collectDataSegment() throws {
-        let binary = try assemble(
+        let binary = try binaryStream(forWat:
             """
             (module
               (memory 1)
@@ -142,10 +140,14 @@ struct Wasm2watTests {
             )
             """)
         let info = try collectModule(stream: binary)
-        #expect(info.data.count == 1)
-        if case .active(let seg) = info.data[0] {
-            #expect(seg.index == 0)
-            #expect(Array(seg.initializer) == Array("hello".utf8))
+        let dataBytes = try #require(info.dataSectionBytes)
+        var parser = WasmParser.Parser(sectionBodyBytes: dataBytes)
+        let count: UInt32 = try parser.parseUnsigned()
+        #expect(count == 1)
+        let seg = try parser.parseDataSegmentEntry()
+        if case .active(let active) = seg {
+            #expect(active.index == 0)
+            #expect(Array(active.initializer) == Array("hello".utf8))
         } else {
             Issue.record("Expected active data segment")
         }
@@ -154,7 +156,7 @@ struct Wasm2watTests {
     // MARK: - WatPrinter unit tests
 
     @Test func printEmptyModule() throws {
-        let binary = try assemble("(module)")
+        let binary = try binaryStream(forWat:"(module)")
         let info = try collectModule(stream: binary)
         var printer = WatPrinter(info: info)
         let wat = try printer.print()
@@ -162,7 +164,7 @@ struct Wasm2watTests {
     }
 
     @Test func printFunctionType() throws {
-        let binary = try assemble(
+        let binary = try binaryStream(forWat:
             """
             (module
               (type (func (param i32 i32) (result i32)))
@@ -175,7 +177,7 @@ struct Wasm2watTests {
     }
 
     @Test func printMemoryWithMax() throws {
-        let binary = try assemble("(module (memory 1 4))")
+        let binary = try binaryStream(forWat:"(module (memory 1 4))")
         let info = try collectModule(stream: binary)
         var printer = WatPrinter(info: info)
         let wat = try printer.print()
@@ -183,7 +185,7 @@ struct Wasm2watTests {
     }
 
     @Test func printExport() throws {
-        let binary = try assemble(
+        let binary = try binaryStream(forWat:
             """
             (module
               (func (export "add") (param i32 i32) (result i32)
@@ -199,7 +201,7 @@ struct Wasm2watTests {
     }
 
     @Test func printGlobalMutable() throws {
-        let binary = try assemble(
+        let binary = try binaryStream(forWat:
             """
             (module
               (global (mut i32) (i32.const 0))
@@ -212,7 +214,7 @@ struct Wasm2watTests {
     }
 
     @Test func printDataSegment() throws {
-        let binary = try assemble(
+        let binary = try binaryStream(forWat:
             """
             (module
               (memory 1)

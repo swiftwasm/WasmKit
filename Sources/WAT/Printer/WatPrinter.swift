@@ -3,6 +3,11 @@ import WasmParser
 import WasmTypes
 
 /// Converts a `ModuleInfo` (parsed from a Wasm binary) into WAT text.
+///
+/// Big sections (code, data, element) are streamed: their raw bytes were
+/// captured in `ModuleInfo` during the skim pass; this printer spins up a
+/// per-section sub-parser and emits one entry at a time, discarding each
+/// after emit so the entire section is never simultaneously materialised.
 struct WatPrinter {
     private let info: ModuleInfo
     private var output: String = ""
@@ -14,17 +19,19 @@ struct WatPrinter {
     /// Produces the full WAT text for the module.
     mutating func print() throws -> String {
         output = ""
-        writeLine("(module")
+        let moduleNamePart = info.moduleName.map { " $\($0)" } ?? ""
+        writeLine("(module\(moduleNamePart)")
         try printTypes()
         try printImports()
         try printFunctions()
         printTables()
         printMemories()
         printGlobals()
+        printTags()
         printExports()
         printStart()
         try printElements()
-        printData()
+        try printData()
         writeLine(")")
         return output
     }
@@ -33,7 +40,8 @@ struct WatPrinter {
 
     private mutating func printTypes() throws {
         for (i, ft) in info.types.enumerated() {
-            writeLine("  (type (;\(i);) (func\(funcTypeSuffix(ft))))")
+            let name = info.typeNames[UInt32(i)].map { " $\($0)" } ?? ""
+            writeLine("  (type\(name) (;\(i);) (func\(funcTypeSuffix(ft))))")
         }
     }
 
@@ -53,58 +61,85 @@ struct WatPrinter {
                     ? "(mut \(valueTypeName(gt.valueType)))"
                     : valueTypeName(gt.valueType)
                 desc = "(global \(mut))"
+            case .tag(let ti):
+                desc = "(tag (type \(ti)))"
             }
             writeLine("  (import \(quotedString(imp.module)) \(quotedString(imp.name)) \(desc))")
         }
     }
 
     private mutating func printFunctions() throws {
+        guard let codeBytes = info.codeSectionBytes else { return }
+        let parser = WasmParser.Parser(sectionBodyBytes: codeBytes, features: info.features)
+        let codeCount: UInt32 = try parser.parseUnsigned()
         let importedFuncCount = info.importedFunctionCount
-        for (localIdx, typeIdx) in info.functionTypeIndices.enumerated() {
-            let funcIdx = UInt32(importedFuncCount + localIdx)
-            guard localIdx < info.codes.count else { continue }
-            let code = info.codes[localIdx]
-            let ft = typeIdx < info.types.count ? info.types[Int(typeIdx)] : FunctionType(parameters: [], results: [])
-
-            let funcName = info.functionNames[funcIdx].map { " $\($0)" } ?? ""
-            var header = "  (func\(funcName) (;\(funcIdx);) (type \(typeIdx))"
-
-            let params = ft.parameters
-            if !params.isEmpty {
-                header += " (param"
-                for vt in params { header += " \(valueTypeName(vt))" }
-                header += ")"
-            }
-            if !ft.results.isEmpty {
-                header += " (result"
-                for vt in ft.results { header += " \(valueTypeName(vt))" }
-                header += ")"
-            }
-            writeLine(header)
-
-            let localNameMap = info.localNames[funcIdx] ?? [:]
-            for (li, localType) in code.locals.enumerated() {
-                let lIdx = UInt32(params.count + li)
-                let localName = localNameMap[lIdx].map { " $\($0)" } ?? ""
-                writeLine("    (local\(localName) \(valueTypeName(localType)))")
-            }
-
-            // Collect instruction lines
-            var instrLines: [String] = []
-            var visitor = TextInstructionVisitor(
-                functionNames: info.functionNames,
-                globalNames: [:],
-                localNames: localNameMap,
-                indentLevel: 2,
-                append: { line in instrLines.append(line) }
+        let typeCount = info.functionTypeIndices.count
+        if Int(codeCount) != typeCount {
+            throw WatParserError(
+                "function/code section length mismatch (function: \(typeCount), code: \(codeCount))",
+                location: nil
             )
-            try code.parseExpression(visitor: &visitor)
-            for line in instrLines {
-                output += line
-            }
-
-            writeLine("  )")
         }
+        for localIdx in 0..<typeCount {
+            let typeIdx = info.functionTypeIndices[localIdx]
+            let code = try parser.parseCodeEntry()
+            emitFunction(localIdx: localIdx, typeIdx: typeIdx, code: code, importedFuncCount: importedFuncCount)
+        }
+        try assertFullyConsumed(parser, kind: .code)
+    }
+
+    private mutating func emitFunction(
+        localIdx: Int, typeIdx: TypeIndex, code: Code, importedFuncCount: Int
+    ) {
+        let funcIdx = UInt32(importedFuncCount + localIdx)
+        let ft = typeIdx < info.types.count ? info.types[Int(typeIdx)] : FunctionType(parameters: [], results: [])
+
+        let funcName = info.functionNames[funcIdx].map { " $\($0)" } ?? ""
+        var header = "  (func\(funcName) (;\(funcIdx);) (type \(typeIdx))"
+
+        let params = ft.parameters
+        if !params.isEmpty {
+            header += " (param"
+            for vt in params { header += " \(valueTypeName(vt))" }
+            header += ")"
+        }
+        if !ft.results.isEmpty {
+            header += " (result"
+            for vt in ft.results { header += " \(valueTypeName(vt))" }
+            header += ")"
+        }
+        writeLine(header)
+
+        let localNameMap = info.localNames[funcIdx] ?? [:]
+        for (li, localType) in code.locals.enumerated() {
+            let lIdx = UInt32(params.count + li)
+            let localName = localNameMap[lIdx].map { " $\($0)" } ?? ""
+            writeLine("    (local\(localName) \(valueTypeName(localType)))")
+        }
+
+        var instrLines: [String] = []
+        var visitor = TextInstructionVisitor(
+            functionNames: info.functionNames,
+            globalNames: [:],
+            localNames: localNameMap,
+            indentLevel: 2,
+            append: { line in instrLines.append(line) }
+        )
+        var exprParser = WasmParser.ExpressionParser(code: code)
+        do {
+            while let visit = try exprParser.parse() {
+                visit(visitor: &visitor)
+            }
+        } catch {
+            // Surface as a runtime failure so the caller sees the malformed
+            // expression rather than a silently-truncated WAT.
+            instrLines.append("    ;; expression parse failed: \(error)\n")
+        }
+        for line in instrLines {
+            output += line
+        }
+
+        writeLine("  )")
     }
 
     private mutating func printTables() {
@@ -114,9 +149,10 @@ struct WatPrinter {
         }.count
         for (i, table) in info.tables.enumerated() {
             let idx = importedCount + i
+            let name = info.tableNames[UInt32(idx)].map { " $\($0)" } ?? ""
             let limits = tableLimitsText(table.type.limits)
             let elemType = refTypeName(table.type.elementType)
-            writeLine("  (table (;\(idx);) \(limits) \(elemType))")
+            writeLine("  (table\(name) (;\(idx);) \(limits) \(elemType))")
         }
     }
 
@@ -127,7 +163,8 @@ struct WatPrinter {
         }.count
         for (i, mem) in info.memories.enumerated() {
             let idx = importedCount + i
-            writeLine("  (memory (;\(idx);) \(memoryLimitsText(mem.type)))")
+            let name = info.memoryNames[UInt32(idx)].map { " $\($0)" } ?? ""
+            writeLine("  (memory\(name) (;\(idx);) \(memoryLimitsText(mem.type)))")
         }
     }
 
@@ -138,13 +175,28 @@ struct WatPrinter {
         }.count
         for (i, global) in info.globals.enumerated() {
             let idx = importedCount + i
+            let name = info.globalNames[UInt32(idx)].map { " $\($0)" } ?? ""
             let mut = global.type.mutability == .variable
             let typeStr =
                 mut
                 ? "(mut \(valueTypeName(global.type.valueType)))"
                 : valueTypeName(global.type.valueType)
             let initStr = constExprStr(global.initializer)
-            writeLine("  (global (;\(idx);) \(typeStr) (\(initStr)))")
+            writeLine("  (global\(name) (;\(idx);) \(typeStr) (\(initStr)))")
+        }
+    }
+
+    /// Tag forms (`(tag (type $T))`). Tag names are not part of the standard
+    /// `name` custom section v1, so no `$name` annotation on tags.
+    private mutating func printTags() {
+        let importedCount = info.imports.filter {
+            if case .tag = $0.descriptor { return true }
+            return false
+        }.count
+        for (i, tag) in info.tags.enumerated() {
+            let idx = importedCount + i
+            let typeRef = info.typeNames[tag.type].map { "$\($0)" } ?? "\(tag.type)"
+            writeLine("  (tag (;\(idx);) (type \(typeRef)))")
         }
     }
 
@@ -156,6 +208,7 @@ struct WatPrinter {
             case .table(let i): desc = "(table \(i))"
             case .memory(let i): desc = "(memory \(i))"
             case .global(let i): desc = "(global \(i))"
+            case .tag(let i): desc = "(tag \(i))"
             }
             writeLine("  (export \(quotedString(exp.name)) \(desc))")
         }
@@ -169,55 +222,90 @@ struct WatPrinter {
     }
 
     private mutating func printElements() throws {
-        for (i, elem) in info.elements.enumerated() {
-            let useExpressions = elemUsesExpressions(elem)
-            let typeStr = refTypeName(elem.type)
+        guard let bytes = info.elementSectionBytes else { return }
+        var parser = WasmParser.Parser(sectionBodyBytes: bytes, features: info.features)
+        let count: UInt32 = try parser.parseUnsigned()
+        for i in 0..<count {
+            let elem = try parser.parseElementEntry()
+            emitElement(elem, index: Int(i))
+        }
+        try assertFullyConsumed(parser, kind: .element)
+    }
 
-            let indicesPart: String
-            if useExpressions {
-                let exprs = elem.initializer.map { expr -> String in
-                    let parts = constExprParts(expr)
-                    if parts.count == 1 {
-                        return "(\(singleInstrStr(parts[0])))"
-                    }
-                    return "(" + parts.map { singleInstrStr($0) }.joined(separator: " ") + ")"
+    private mutating func emitElement(_ elem: ElementSegment, index i: Int) {
+        let useExpressions = elemUsesExpressions(elem)
+        let typeStr = refTypeName(elem.type)
+        let name = info.elementNames[UInt32(i)].map { " $\($0)" } ?? ""
+
+        let indicesPart: String
+        if useExpressions {
+            let exprs = elem.initializer.map { expr -> String in
+                let parts = constExprParts(expr)
+                if parts.count == 1 {
+                    return "(\(singleInstrStr(parts[0])))"
                 }
-                indicesPart = "\(typeStr) \(exprs.joined(separator: " "))"
+                return "(" + parts.map { singleInstrStr($0) }.joined(separator: " ") + ")"
+            }
+            indicesPart = "\(typeStr) \(exprs.joined(separator: " "))"
+        } else {
+            let indices = elem.initializer.compactMap { expr -> String? in
+                guard let first = expr.first, case .refFunc(let fi) = first else { return nil }
+                return info.functionNames[fi].map { "$\($0)" } ?? "\(fi)"
+            }
+            indicesPart = "func \(indices.joined(separator: " "))"
+        }
+
+        switch elem.mode {
+        case .active(let table, let offset):
+            let offsetStr = constExprStr(offset)
+            if table == 0 {
+                writeLine("  (elem\(name) (;\(i);) (\(offsetStr)) \(indicesPart))")
             } else {
-                let indices = elem.initializer.compactMap { expr -> String? in
-                    guard let first = expr.first, case .refFunc(let fi) = first else { return nil }
-                    return info.functionNames[fi].map { "$\($0)" } ?? "\(fi)"
-                }
-                indicesPart = "func \(indices.joined(separator: " "))"
+                writeLine("  (elem\(name) (;\(i);) (table \(table)) (\(offsetStr)) \(indicesPart))")
             }
-
-            switch elem.mode {
-            case .active(let table, let offset):
-                let offsetStr = constExprStr(offset)
-                if table == 0 {
-                    writeLine("  (elem (;\(i);) (\(offsetStr)) \(indicesPart))")
-                } else {
-                    writeLine("  (elem (;\(i);) (table \(table)) (\(offsetStr)) \(indicesPart))")
-                }
-            case .passive:
-                writeLine("  (elem (;\(i);) \(indicesPart))")
-            case .declarative:
-                writeLine("  (elem (;\(i);) declare \(indicesPart))")
-            }
+        case .passive:
+            writeLine("  (elem\(name) (;\(i);) \(indicesPart))")
+        case .declarative:
+            writeLine("  (elem\(name) (;\(i);) declare \(indicesPart))")
         }
     }
 
-    private mutating func printData() {
-        for (i, seg) in info.data.enumerated() {
-            switch seg {
-            case .active(let active):
-                let offsetStr = constExprStr(active.offset)
-                let dataStr = bytesToWatString(Array(active.initializer))
-                writeLine("  (data (;\(i);) (\(offsetStr)) \"\(dataStr)\")")
-            case .passive(let bytes):
-                let dataStr = bytesToWatString(Array(bytes))
-                writeLine("  (data (;\(i);) \"\(dataStr)\")")
+    private mutating func printData() throws {
+        guard let bytes = info.dataSectionBytes else {
+            // No data section, but if a DataCount section declared > 0, the
+            // module is malformed.
+            if let dc = info.dataCount, dc != 0 {
+                throw WatParserError(
+                    "DataCount declared \(dc) but no data section present", location: nil
+                )
             }
+            return
+        }
+        var parser = WasmParser.Parser(sectionBodyBytes: bytes, features: info.features)
+        let count: UInt32 = try parser.parseUnsigned()
+        if let declaredCount = info.dataCount, declaredCount != count {
+            throw WatParserError(
+                "DataCount section declares \(declaredCount) data segments but data section has \(count)",
+                location: nil
+            )
+        }
+        for i in 0..<count {
+            let seg = try parser.parseDataSegmentEntry()
+            emitData(seg, index: Int(i))
+        }
+        try assertFullyConsumed(parser, kind: .data)
+    }
+
+    private mutating func emitData(_ seg: DataSegment, index i: Int) {
+        let name = info.dataNames[UInt32(i)].map { " $\($0)" } ?? ""
+        switch seg {
+        case .active(let active):
+            let offsetStr = constExprStr(active.offset)
+            let dataStr = bytesToWatString(Array(active.initializer))
+            writeLine("  (data\(name) (;\(i);) (\(offsetStr)) \"\(dataStr)\")")
+        case .passive(let bytes):
+            let dataStr = bytesToWatString(Array(bytes))
+            writeLine("  (data\(name) (;\(i);) \"\(dataStr)\")")
         }
     }
 
