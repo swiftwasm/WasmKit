@@ -5,7 +5,7 @@ import WasmParser
 import WasmTypes
 
 @Suite
-struct PerEntryParseTests {
+struct StreamingParseTests {
     /// Helper: produces `RawSection.body` for the matching section kind
     /// in the given Wasm binary.
     private static func sectionBytes(kind: RawSection.Kind, in binary: [UInt8]) throws -> ArraySlice<UInt8> {
@@ -17,7 +17,7 @@ struct PerEntryParseTests {
         return []
     }
 
-    @Test func codePerEntryMatchesVector() throws {
+    @Test func codeEntryMatchesVector() throws {
         let wat = """
             (module (func (param i32) (result i32) local.get 0)
                     (func (param i64) (result i64) local.get 0))
@@ -42,7 +42,7 @@ struct PerEntryParseTests {
         }
     }
 
-    @Test func dataPerEntryMatchesVector() throws {
+    @Test func dataEntryMatchesVector() throws {
         let wat = """
             (module (memory 1)
                     (data (i32.const 0) "first")
@@ -63,7 +63,7 @@ struct PerEntryParseTests {
         #expect(viaVector == viaEntry)
     }
 
-    @Test func elementPerEntryMatchesVector() throws {
+    @Test func elementEntryMatchesVector() throws {
         let wat = """
             (module
               (table 4 funcref)
