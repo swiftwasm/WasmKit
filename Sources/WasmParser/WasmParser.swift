@@ -253,7 +253,7 @@ extension Parser {
 
     @inline(__always)
     @inlinable
-    func parseUnsigned<T: RawUnsignedInteger>(_: T.Type = T.self) throws(WasmParserError) -> T {
+    package func parseUnsigned<T: RawUnsignedInteger>(_: T.Type = T.self) throws(WasmParserError) -> T {
         try stream.parseUnsigned(T.self)
     }
 
@@ -786,7 +786,7 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#custom-section>
     @usableFromInline
-    func parseCustomSection(size: UInt32) throws(WasmParserError) -> CustomSection {
+    package func parseCustomSection(size: UInt32) throws(WasmParserError) -> CustomSection {
         let preNameIndex = stream.currentIndex
         let name = try parseName()
         let nameSize = stream.currentIndex - preNameIndex
@@ -804,14 +804,14 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#type-section>
     @inlinable
-    func parseTypeSection() throws(WasmParserError) -> [FunctionType] {
+    package func parseTypeSection() throws(WasmParserError) -> [FunctionType] {
         return try parseVector { () throws(WasmParserError) in try parseFunctionType() }
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#import-section>
     @usableFromInline
-    func parseImportSection() throws(WasmParserError) -> [Import] {
+    package func parseImportSection() throws(WasmParserError) -> [Import] {
         return try parseVector { () throws(WasmParserError) in
             let module = try parseName()
             let name = try parseName()
@@ -842,28 +842,28 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#function-section>
     @inlinable
-    func parseFunctionSection() throws(WasmParserError) -> [TypeIndex] {
+    package func parseFunctionSection() throws(WasmParserError) -> [TypeIndex] {
         return try parseVector { () throws(WasmParserError) in try parseUnsigned() }
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#table-section>
     @usableFromInline
-    func parseTableSection() throws(WasmParserError) -> [Table] {
+    package func parseTableSection() throws(WasmParserError) -> [Table] {
         return try parseVector { () throws(WasmParserError) in try Table(type: parseTableType()) }
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#memory-section>
     @usableFromInline
-    func parseMemorySection() throws(WasmParserError) -> [Memory] {
+    package func parseMemorySection() throws(WasmParserError) -> [Memory] {
         return try parseVector { () throws(WasmParserError) in try Memory(type: parseLimits()) }
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#global-section>
     @usableFromInline
-    mutating func parseGlobalSection() throws(WasmParserError) -> [Global] {
+    package mutating func parseGlobalSection() throws(WasmParserError) -> [Global] {
         return try parseVector { () throws(WasmParserError) in
             let type = try parseGlobalType()
             let expression = try parseConstExpression()
@@ -874,7 +874,7 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/exception-handling/core/binary/modules.html#tag-section>
     @usableFromInline
-    func parseTagSection() throws(WasmParserError) -> [Tag] {
+    package func parseTagSection() throws(WasmParserError) -> [Tag] {
         return try parseVector { () throws(WasmParserError) in
             let attribute: UInt8 = try parseUnsigned()
             guard attribute == 0 else { throw makeError(.invalidTagAttribute(attribute)) }
@@ -886,7 +886,7 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#export-section>
     @usableFromInline
-    func parseExportSection() throws(WasmParserError) -> [Export] {
+    package func parseExportSection() throws(WasmParserError) -> [Export] {
         return try parseVector { () throws(WasmParserError) in
             let name = try parseName()
             let descriptor = try parseExportDescriptor()
@@ -913,127 +913,29 @@ extension Parser {
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#start-section>
     @usableFromInline
-    func parseStartSection() throws(WasmParserError) -> FunctionIndex {
+    package func parseStartSection() throws(WasmParserError) -> FunctionIndex {
         return try parseUnsigned()
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#element-section>
     @inlinable
-    mutating func parseElementSection() throws(WasmParserError) -> [ElementSegment] {
-        return try parseVector { () throws(WasmParserError) in
-            let flag = try ElementSegment.Flag(rawValue: parseUnsigned())
-
-            let type: ReferenceType
-            let initializer: [ConstExpression]
-            let mode: ElementSegment.Mode
-
-            if flag.contains(.isPassiveOrDeclarative) {
-                if flag.contains(.isDeclarative) {
-                    mode = .declarative
-                } else {
-                    mode = .passive
-                }
-            } else {
-                let table: TableIndex
-
-                if flag.contains(.hasTableIndex) {
-                    table = try parseUnsigned()
-                } else {
-                    table = 0
-                }
-
-                let offset = try parseConstExpression()
-                mode = .active(table: table, offset: offset)
-            }
-
-            if flag.segmentHasRefType {
-                let valueType = try parseValueType()
-
-                guard case .ref(let refType) = valueType else {
-                    throw makeError(.expectedRefType(actual: valueType))
-                }
-
-                type = refType
-            } else {
-                type = .funcRef
-            }
-
-            if flag.segmentHasElemKind {
-                // `elemkind` parsing as defined in the spec
-                let elemKind = try parseUnsigned() as UInt32
-                guard elemKind == 0x00 else {
-                    throw makeError(.unexpectedElementKind(expected: 0x00, actual: elemKind))
-                }
-            }
-
-            if flag.contains(.usesExpressions) {
-                initializer = try parseVector { () throws(WasmParserError) in try parseConstExpression() }
-            } else {
-                initializer = try parseVector { () throws(WasmParserError) in
-                    try [Instruction.refFunc(functionIndex: parseUnsigned() as UInt32)]
-                }
-            }
-
-            return ElementSegment(type: type, initializer: initializer, mode: mode)
-        }
+    package mutating func parseElementSection() throws(WasmParserError) -> [ElementSegment] {
+        try parseVector { () throws(WasmParserError) in try self.parseElementEntry() }
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#code-section>
     @inlinable
-    func parseCodeSection() throws(WasmParserError) -> [Code] {
-        return try parseVector { () throws(WasmParserError) in
-            let size = try parseUnsigned() as UInt32
-            let bodyStart = stream.currentIndex
-            let localTypes = try parseVector { () throws(WasmParserError) -> (n: UInt32, type: ValueType) in
-                let n: UInt32 = try parseUnsigned()
-                let t = try parseValueType()
-                return (n, t)
-            }
-            let totalLocals = localTypes.reduce(UInt64(0)) { $0 + UInt64($1.n) }
-            guard totalLocals < limits.maxFunctionLocals else {
-                throw makeError(.tooManyLocals(totalLocals, limit: limits.maxFunctionLocals))
-            }
-
-            let locals = localTypes.flatMap { (n: UInt32, type: ValueType) in
-                return Array(repeating: type, count: Int(n))
-            }
-            let expressionStart = stream.currentIndex
-            let expressionBytes = try stream.consume(
-                count: Int(size) - (expressionStart - bodyStart)
-            )
-            return Code(
-                locals: locals, expression: expressionBytes,
-                offset: expressionStart, features: features
-            )
-        }
+    package func parseCodeSection() throws(WasmParserError) -> [Code] {
+        try parseVector { () throws(WasmParserError) in try self.parseCodeEntry() }
     }
 
     /// > Note:
     /// <https://webassembly.github.io/spec/core/binary/modules.html#data-section>
     @inlinable
-    mutating func parseDataSection() throws(WasmParserError) -> [DataSegment] {
-        return try parseVector { () throws(WasmParserError) in
-            let kind: UInt32 = try parseUnsigned()
-            switch kind {
-            case 0:
-                let offset = try parseConstExpression()
-                let initializer = try parseVectorBytes()
-                return .active(.init(index: 0, offset: offset, initializer: initializer))
-
-            case 1:
-                return try .passive(parseVectorBytes())
-
-            case 2:
-                let index: UInt32 = try parseUnsigned()
-                let offset = try parseConstExpression()
-                let initializer = try parseVectorBytes()
-                return .active(.init(index: index, offset: offset, initializer: initializer))
-            default:
-                throw makeError(.malformedDataSegmentKind(kind))
-            }
-        }
+    package mutating func parseDataSection() throws(WasmParserError) -> [DataSegment] {
+        try parseVector { () throws(WasmParserError) in try self.parseDataSegmentEntry() }
     }
 
     /// > Note:

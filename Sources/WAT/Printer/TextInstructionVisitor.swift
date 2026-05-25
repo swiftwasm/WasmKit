@@ -72,7 +72,7 @@ struct TextInstructionVisitor: AnyInstructionVisitor {
             indentLevel += 1
         case .end:
             if labelStack.isEmpty {
-                // Function body end – represented by closing ')' in (func ...), skip.
+                // Function body end, represented by closing ')' in (func ...), skip.
                 return
             }
             labelStack.removeLast()
@@ -301,6 +301,7 @@ func heapTypeName(_ ht: HeapType) -> String {
         switch abs {
         case .funcRef: return "func"
         case .externRef: return "extern"
+        case .exnRef: return "exn"
         }
     case .concrete(let ti):
         return "\(ti)"
