@@ -10,7 +10,7 @@ struct Wasm2watTests {
     // MARK: - ModuleCollector unit tests
 
     @Test func collectEmptyModule() throws {
-        let binary = try binaryStream(forWat:"(module)")
+        let binary = try binaryStream(forWat: "(module)")
         let info = try collectModule(stream: binary)
         #expect(info.types.isEmpty)
         #expect(info.imports.isEmpty)
@@ -26,13 +26,14 @@ struct Wasm2watTests {
     }
 
     @Test func collectTypeSection() throws {
-        let binary = try binaryStream(forWat:
-            """
-            (module
-              (type (func (param i32 i32) (result i32)))
-              (type (func))
-            )
-            """)
+        let binary = try binaryStream(
+            forWat:
+                """
+                (module
+                  (type (func (param i32 i32) (result i32)))
+                  (type (func))
+                )
+                """)
         let info = try collectModule(stream: binary)
         #expect(info.types.count == 2)
         #expect(info.types[0].parameters == [.i32, .i32])
@@ -42,15 +43,16 @@ struct Wasm2watTests {
     }
 
     @Test func collectFunctionAndCode() throws {
-        let binary = try binaryStream(forWat:
-            """
-            (module
-              (func (param i32 i32) (result i32)
-                local.get 0
-                local.get 1
-                i32.add)
-            )
-            """)
+        let binary = try binaryStream(
+            forWat:
+                """
+                (module
+                  (func (param i32 i32) (result i32)
+                    local.get 0
+                    local.get 1
+                    i32.add)
+                )
+                """)
         let info = try collectModule(stream: binary)
         #expect(info.functionTypeIndices.count == 1)
         // Code is now stored as a raw slice; parse one entry to verify it.
@@ -63,13 +65,14 @@ struct Wasm2watTests {
     }
 
     @Test func collectImports() throws {
-        let binary = try binaryStream(forWat:
-            """
-            (module
-              (import "env" "log" (func (param i32)))
-              (import "env" "mem" (memory 1))
-            )
-            """)
+        let binary = try binaryStream(
+            forWat:
+                """
+                (module
+                  (import "env" "log" (func (param i32)))
+                  (import "env" "mem" (memory 1))
+                )
+                """)
         let info = try collectModule(stream: binary)
         #expect(info.imports.count == 2)
         #expect(info.imports[0].module == "env")
@@ -88,15 +91,16 @@ struct Wasm2watTests {
     }
 
     @Test func collectExports() throws {
-        let binary = try binaryStream(forWat:
-            """
-            (module
-              (func (export "add") (param i32 i32) (result i32)
-                local.get 0
-                local.get 1
-                i32.add)
-            )
-            """)
+        let binary = try binaryStream(
+            forWat:
+                """
+                (module
+                  (func (export "add") (param i32 i32) (result i32)
+                    local.get 0
+                    local.get 1
+                    i32.add)
+                )
+                """)
         let info = try collectModule(stream: binary)
         #expect(info.exports.count == 1)
         #expect(info.exports[0].name == "add")
@@ -108,7 +112,7 @@ struct Wasm2watTests {
     }
 
     @Test func collectMemory() throws {
-        let binary = try binaryStream(forWat:"(module (memory 1 4))")
+        let binary = try binaryStream(forWat: "(module (memory 1 4))")
         let info = try collectModule(stream: binary)
         #expect(info.memories.count == 1)
         #expect(info.memories[0].type.min == 1)
@@ -116,13 +120,14 @@ struct Wasm2watTests {
     }
 
     @Test func collectGlobal() throws {
-        let binary = try binaryStream(forWat:
-            """
-            (module
-              (global i32 (i32.const 42))
-              (global (mut i64) (i64.const -1))
-            )
-            """)
+        let binary = try binaryStream(
+            forWat:
+                """
+                (module
+                  (global i32 (i32.const 42))
+                  (global (mut i64) (i64.const -1))
+                )
+                """)
         let info = try collectModule(stream: binary)
         #expect(info.globals.count == 2)
         #expect(info.globals[0].type.mutability == .constant)
@@ -132,13 +137,14 @@ struct Wasm2watTests {
     }
 
     @Test func collectDataSegment() throws {
-        let binary = try binaryStream(forWat:
-            """
-            (module
-              (memory 1)
-              (data (i32.const 0) "hello")
-            )
-            """)
+        let binary = try binaryStream(
+            forWat:
+                """
+                (module
+                  (memory 1)
+                  (data (i32.const 0) "hello")
+                )
+                """)
         let info = try collectModule(stream: binary)
         let dataBytes = try #require(info.dataSectionBytes)
         var parser = WasmParser.Parser(sectionBodyBytes: dataBytes)
@@ -156,7 +162,7 @@ struct Wasm2watTests {
     // MARK: - WatPrinter unit tests
 
     @Test func printEmptyModule() throws {
-        let binary = try binaryStream(forWat:"(module)")
+        let binary = try binaryStream(forWat: "(module)")
         let info = try collectModule(stream: binary)
         var printer = WatPrinter(info: info)
         let wat = try printer.print()
@@ -164,12 +170,13 @@ struct Wasm2watTests {
     }
 
     @Test func printFunctionType() throws {
-        let binary = try binaryStream(forWat:
-            """
-            (module
-              (type (func (param i32 i32) (result i32)))
-            )
-            """)
+        let binary = try binaryStream(
+            forWat:
+                """
+                (module
+                  (type (func (param i32 i32) (result i32)))
+                )
+                """)
         let info = try collectModule(stream: binary)
         var printer = WatPrinter(info: info)
         let wat = try printer.print()
@@ -177,7 +184,7 @@ struct Wasm2watTests {
     }
 
     @Test func printMemoryWithMax() throws {
-        let binary = try binaryStream(forWat:"(module (memory 1 4))")
+        let binary = try binaryStream(forWat: "(module (memory 1 4))")
         let info = try collectModule(stream: binary)
         var printer = WatPrinter(info: info)
         let wat = try printer.print()
@@ -185,15 +192,16 @@ struct Wasm2watTests {
     }
 
     @Test func printExport() throws {
-        let binary = try binaryStream(forWat:
-            """
-            (module
-              (func (export "add") (param i32 i32) (result i32)
-                local.get 0
-                local.get 1
-                i32.add)
-            )
-            """)
+        let binary = try binaryStream(
+            forWat:
+                """
+                (module
+                  (func (export "add") (param i32 i32) (result i32)
+                    local.get 0
+                    local.get 1
+                    i32.add)
+                )
+                """)
         let info = try collectModule(stream: binary)
         var printer = WatPrinter(info: info)
         let wat = try printer.print()
@@ -201,12 +209,13 @@ struct Wasm2watTests {
     }
 
     @Test func printGlobalMutable() throws {
-        let binary = try binaryStream(forWat:
-            """
-            (module
-              (global (mut i32) (i32.const 0))
-            )
-            """)
+        let binary = try binaryStream(
+            forWat:
+                """
+                (module
+                  (global (mut i32) (i32.const 0))
+                )
+                """)
         let info = try collectModule(stream: binary)
         var printer = WatPrinter(info: info)
         let wat = try printer.print()
@@ -214,13 +223,14 @@ struct Wasm2watTests {
     }
 
     @Test func printDataSegment() throws {
-        let binary = try binaryStream(forWat:
-            """
-            (module
-              (memory 1)
-              (data (i32.const 0) "hello")
-            )
-            """)
+        let binary = try binaryStream(
+            forWat:
+                """
+                (module
+                  (memory 1)
+                  (data (i32.const 0) "hello")
+                )
+                """)
         let info = try collectModule(stream: binary)
         var printer = WatPrinter(info: info)
         let wat = try printer.print()

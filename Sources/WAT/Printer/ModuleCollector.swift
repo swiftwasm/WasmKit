@@ -168,16 +168,16 @@ private func parseNameSection(_ bytes: ArraySlice<UInt8>, into info: inout Modul
     }
     for parsed in parsedNames {
         switch parsed {
-        case .moduleName(let name):    info.moduleName = name
-        case .functions(let map):      info.functionNames = map
-        case .locals(let map):         info.localNames = map
-        case .labels(let map):         info.labelNames = map
-        case .types(let map):          info.typeNames = map
-        case .tables(let map):         info.tableNames = map
-        case .memories(let map):       info.memoryNames = map
-        case .globals(let map):        info.globalNames = map
-        case .elements(let map):       info.elementNames = map
-        case .dataSegments(let map):   info.dataNames = map
+        case .moduleName(let name): info.moduleName = name
+        case .functions(let map): info.functionNames = map
+        case .locals(let map): info.localNames = map
+        case .labels(let map): info.labelNames = map
+        case .types(let map): info.typeNames = map
+        case .tables(let map): info.tableNames = map
+        case .memories(let map): info.memoryNames = map
+        case .globals(let map): info.globalNames = map
+        case .elements(let map): info.elementNames = map
+        case .dataSegments(let map): info.dataNames = map
         }
     }
 }

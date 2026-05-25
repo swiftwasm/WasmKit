@@ -6,7 +6,7 @@ import WasmParser
 @Suite
 struct Wasm2watStreamingTests {
     @Test func collectFunctionAndCode_capturesCodeSectionBytes() throws {
-        let binary = try binaryStream(forWat:"(module (func) (func) (func))")
+        let binary = try binaryStream(forWat: "(module (func) (func) (func))")
         let info = try collectModule(stream: binary, features: .default)
         let bytes = try #require(info.codeSectionBytes)
         #expect(bytes.count > 0)
@@ -17,7 +17,7 @@ struct Wasm2watStreamingTests {
     }
 
     @Test func collectModule_threadsFeaturesIntoModuleInfo() throws {
-        let binary = try binaryStream(forWat:"(module)")
+        let binary = try binaryStream(forWat: "(module)")
         let info = try collectModule(stream: binary, features: .default)
         #expect(info.features == .default)
     }

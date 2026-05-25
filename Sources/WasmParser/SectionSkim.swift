@@ -60,11 +60,12 @@ extension Parser {
                 body = try stream.consume(count: Int(sectionSize))
             } catch {
                 if case .parserUnexpectedEnd = error.kind {
-                    throw makeError(.sectionSizeMismatch(
-                        sectionID: sectionIDByte,
-                        expected: sectionStart + Int(sectionSize),
-                        actual: stream.currentIndex
-                    ))
+                    throw makeError(
+                        .sectionSizeMismatch(
+                            sectionID: sectionIDByte,
+                            expected: sectionStart + Int(sectionSize),
+                            actual: stream.currentIndex
+                        ))
                 }
                 throw error
             }
@@ -76,20 +77,20 @@ extension Parser {
             }
             let order: OrderTracking.Order?
             switch kind {
-            case .custom:    order = nil
-            case .type:      order = .type
-            case .`import`:  order = ._import
-            case .function:  order = .function
-            case .table:     order = .table
-            case .memory:    order = .memory
-            case .global:    order = .global
-            case .export:    order = .export
-            case .start:     order = .start
-            case .element:   order = .element
-            case .code:      order = .code
-            case .data:      order = .data
+            case .custom: order = nil
+            case .type: order = .type
+            case .`import`: order = ._import
+            case .function: order = .function
+            case .table: order = .table
+            case .memory: order = .memory
+            case .global: order = .global
+            case .export: order = .export
+            case .start: order = .start
+            case .element: order = .element
+            case .code: order = .code
+            case .data: order = .data
             case .dataCount: order = .dataCount
-            case .tag:       order = .tag
+            case .tag: order = .tag
             }
             if let order = order {
                 try orderTracking.track(order: order, parser: self)
