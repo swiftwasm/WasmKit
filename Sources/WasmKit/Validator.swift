@@ -86,6 +86,12 @@ struct ModuleValidator {
         for tableType in module.tableTypes {
             try Self.checkTableType(tableType, features: module.features)
         }
+        for tagTypeIndex in module.tagTypes {
+            let tagType = try Module.resolveType(tagTypeIndex, typeSection: module.types)
+            guard tagType.results.isEmpty else {
+                throw WasmKitError(message: .nonEmptyTagResultType)
+            }
+        }
         try checkStartFunction()
     }
 
@@ -166,6 +172,8 @@ extension WasmTypes.Reference {
         case (.function(nil), .funcRef, true): return
         case (.extern(_?), .externRef, _): return
         case (.extern(nil), .externRef, true): return
+        case (.exception(_?), .exnRef, _): return
+        case (.exception(nil), .exnRef, true): return
         default:
             throw WasmKitError(message: .expectTypeButGot(expected: "\(type)", got: "\(self)"))
         }

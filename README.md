@@ -91,6 +91,7 @@ Proposals are grouped by their [phase](https://github.com/WebAssembly/meetings/b
 | Proposal | Status | WasmKit version |
 |----------|--------|-----------------|
 | [Bulk Memory Operations](https://github.com/WebAssembly/bulk-memory-operations) | ✅ Implemented | [0.0.2] |
+| [Exception Handling](https://github.com/WebAssembly/exception-handling) | ✅ Implemented | `main` branch |
 | [Fixed-width SIMD](https://github.com/webassembly/simd) | ✅ Implemented | `main` branch |
 | [Import/Export of Mutable Globals](https://github.com/WebAssembly/mutable-global) | ✅ Implemented | [0.0.2] |
 | [Memory64](https://github.com/WebAssembly/memory64) | ✅ Implemented | [0.0.2] |
@@ -102,7 +103,6 @@ Proposals are grouped by their [phase](https://github.com/WebAssembly/meetings/b
 | [Typed Function References](https://github.com/WebAssembly/function-references) | 🚧 Parser implemented | [0.2.0] |
 | [Branch Hinting](https://github.com/WebAssembly/branch-hinting) | ❌ Not implemented | |
 | [Custom Annotation Syntax in the Text Format](https://github.com/WebAssembly/annotations) | ❌ Not implemented | |
-| [Exception Handling](https://github.com/WebAssembly/exception-handling) | ❌ Not implemented | |
 | [Extended Constant Expressions](https://github.com/WebAssembly/extended-const) | ❌ Not implemented | |
 | [Garbage Collection](https://github.com/WebAssembly/gc) | ❌ Not implemented | |
 | [Multiple Memories](https://github.com/WebAssembly/multi-memory) | ❌ Not implemented | |

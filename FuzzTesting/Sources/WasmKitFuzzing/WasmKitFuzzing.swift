@@ -45,6 +45,10 @@ public func fuzzInstantiation(bytes: [UInt8]) throws {
             value = try Memory(store: store, type: memoryType)
         case .table(let tableType):
             value = try Table(store: store, type: tableType)
+        case .tag(let typeIndex):
+            guard typeIndex < module.types.count else { return }
+            let type = module.types[Int(typeIndex)]
+            value = Tag(store: store, type: type)
         }
         imports.define(module: importEntry.module, name: importEntry.name, value.externalValue)
     }

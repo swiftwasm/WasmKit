@@ -305,6 +305,15 @@ extension WastRunContext {
                 }
                 return .passed
             }
+        case .assertException(let execute):
+            do {
+                _ = try wastExecute(execute: execute)
+                return .failed("exception expected")
+            } catch is WasmKitException {
+                return .passed
+            } catch {
+                return .failed("expected WasmKitException but got: \(error)")
+            }
         case .assertUnlinkable(let wat, let message):
             currentInstance = nil
 
@@ -365,6 +374,7 @@ extension WastRunContext {
                 switch heapType {
                 case .abstract(.funcRef): return .ref(.function(nil))
                 case .abstract(.externRef): return .ref(.extern(nil))
+                case .abstract(.exnRef): return .ref(.exception(nil))
                 case .concrete:
                     throw SpectestError("concrete ref.null is not supported yet")
                 }
@@ -386,6 +396,9 @@ extension WastRunContext {
             // as they test core WebAssembly features without reference types
             features.remove(.referenceTypes)
             features.insert(.threads)
+        }
+        if rootPath.ends(with: "proposals/exception-handling") {
+            features.insert(.exceptionHandling)
         }
         return features
     }
@@ -487,7 +500,8 @@ extension Value {
         case (.ref(.function(let lhs?)), .refFunc(let rhs)):
             return rhs.map { lhs == $0 } ?? true
         case (.ref(.extern(nil)), .refNull(.abstract(.externRef))),
-            (.ref(.function(nil)), .refNull(.abstract(.funcRef))):
+            (.ref(.function(nil)), .refNull(.abstract(.funcRef))),
+            (.ref(.exception(nil)), .refNull(.abstract(.exnRef))):
             return true
         default:
             return false

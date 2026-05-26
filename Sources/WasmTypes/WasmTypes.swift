@@ -20,6 +20,9 @@ public enum AbstractHeapType: UInt8, Equatable, Hashable, Sendable {
 
     /// An external host data.
     case externRef  // -> to be renamed extern
+
+    /// A reference to an exception.
+    case exnRef
 }
 
 public enum HeapType: Equatable, Hashable, Sendable {
@@ -32,6 +35,10 @@ public enum HeapType: Equatable, Hashable, Sendable {
 
     public static var externRef: HeapType {
         return .abstract(.externRef)
+    }
+
+    public static var exnRef: HeapType {
+        return .abstract(.exnRef)
     }
 }
 
@@ -46,6 +53,10 @@ public struct ReferenceType: Equatable, Hashable, Sendable {
 
     public static var externRef: ReferenceType {
         ReferenceType(isNullable: true, heapType: .externRef)
+    }
+
+    public static var exnRef: ReferenceType {
+        ReferenceType(isNullable: true, heapType: .exnRef)
     }
 
     public init(isNullable: Bool, heapType: HeapType) {
@@ -97,6 +108,8 @@ public struct V128ShuffleMask: Equatable, Hashable, Sendable {
 public typealias FunctionAddress = Int
 /// Runtime representation of an external entity reference.
 public typealias ExternAddress = Int
+/// Runtime representation of an exception reference.
+public typealias ExceptionAddress = Int
 
 @available(*, unavailable, message: "Address-based APIs has been removed; use `Table` instead")
 public typealias TableAddress = Int
@@ -114,6 +127,8 @@ public enum Reference: Hashable, Sendable {
     case function(FunctionAddress?)
     /// A reference to an external entity.
     case extern(ExternAddress?)
+    /// A reference to an exception.
+    case exception(ExceptionAddress?)
 }
 
 /// Runtime representation of a value.

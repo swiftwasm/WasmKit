@@ -189,4 +189,14 @@ extension WasmParserError.Message {
     @usableFromInline static func invalidFunctionType(_ index: Int64) -> Self {
         Self("invalid function type index: \(index), expected a unsigned 32-bit integer")
     }
+
+    @usableFromInline
+    static func invalidTagAttribute(_ attribute: UInt8) -> Self {
+        Self("Invalid tag attribute: \(attribute) (expected 0)")
+    }
+
+    @usableFromInline
+    static func invalidCatchClauseId(_ id: UInt8) -> Self {
+        Self("Invalid catch clause id: \(id)")
+    }
 }
