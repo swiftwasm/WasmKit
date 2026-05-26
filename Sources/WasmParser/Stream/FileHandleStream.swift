@@ -1,5 +1,6 @@
 import struct SystemPackage.FileDescriptor
 
+/// A stream backed by an open `FileDescriptor`.
 public final class FileHandleStream: ByteStream {
     private(set) public var currentIndex: Int = 0
 
@@ -10,6 +11,12 @@ public final class FileHandleStream: ByteStream {
     private var startOffset: Int = 0
     private var bytes: [UInt8] = []
 
+    /// Initializes a new stream at 0 offset for a given open file descriptor.
+    /// - Parameters:
+    ///   - fileHandle: open `FileDescriptor` that's semantically (not enforced statically due to copyability of
+    ///   `FileDescriptor` type) borrowed and not owned by this stream. It's the responsibility of the user to
+    ///   close the file descriptor after `FileHandleStream` is consumed.
+    ///   - bufferLength: size of stream's underlying buffer.
     public init(fileHandle: FileDescriptor, bufferLength: Int = 1024 * 8) throws {
         self.fileHandle = fileHandle
         self.bufferLength = bufferLength
