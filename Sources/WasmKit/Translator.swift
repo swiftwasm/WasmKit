@@ -1583,8 +1583,26 @@ struct InstructionTranslator: InstructionVisitor {
 
         if let condition {
             // If branch taken, fallthrough to landing pad, copy stack values,
-            // clean up exception handlers, then branch to the actual place.
+            // clean up exception handlers (if any), then branch to the actual place.
             // If branch not taken, branch to the next of the landing pad.
+            //
+            // (block (result i32)
+            //   (i32.const 42)
+            //   (i32.const 24)
+            //   (local.get 0)
+            //   (br_if 0) ------+
+            //   (local.get 1)   |
+            // )         <-------+
+            //
+            // [0x00] (i32.const 42 reg:0)
+            // [0x01] (i32.const 24 reg:1)
+            // [0x02] (local.get 0 result=reg:2)
+            // [0x03] (br_if_z offset=+0x3 cond=reg:2) --+
+            // [0x04] (stack.copy reg:1 -> reg:0)        |
+            //        (catchHandlersEnd count=N)?        |  // only if handlersToUnwind > 0
+            // [0x05] (br offset=+0x2) --------+         |
+            // [0x06] (local.get 1 reg:2) <----|---------+
+            // [0x07] ...              <-------+
             let onBranchNotTaken = iseqBuilder.allocLabel()
             self.updateInstructionMapping()
             iseqBuilder.emitWithLabel(Instruction.brIfNot, onBranchNotTaken) { _, conditionCheckAt, continuation in

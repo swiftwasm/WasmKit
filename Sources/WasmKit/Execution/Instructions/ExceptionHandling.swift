@@ -22,7 +22,7 @@ extension Execution {
         throw WasmKitException(tag: tag, payload: payload)
     }
 
-    /// Rethrow an exception from an `exnref` value.
+    /// Throw the exception referenced by an `exnref` value.
     @inline(never)
     func throwRef(sp: Sp, pc: Pc, immediate: Instruction.ThrowRefOperand) throws -> (Pc, CodeSlot) {
         let ref = UntypedValue(storage: sp[i64: immediate.exnRef])
