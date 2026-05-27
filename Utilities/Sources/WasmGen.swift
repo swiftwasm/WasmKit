@@ -323,7 +323,7 @@ enum WasmGen {
 
     static func generateTextInstructionParser(_ instructions: InstructionSet) -> String {
         var code = """
-            import WasmParser
+            import WasmParserCore
             import WasmTypes
 
             /// Parses a text instruction, consuming immediate tokens as necessary.
@@ -412,7 +412,7 @@ enum WasmGen {
 
     static func generateBinaryInstructionEncoder(_ instructions: InstructionSet) -> String {
         var code = """
-            import WasmParser
+            import WasmParserCore
             import WasmTypes
 
             /// An instruction encoder that is responsible for encoding opcodes and immediates
@@ -751,7 +751,7 @@ enum WasmGen {
 
         let generatedFiles = [
             GeneratedFile(
-                projectSources + ["WasmParser", "InstructionVisitor.swift"],
+                projectSources + ["WasmParserCore", "InstructionVisitor.swift"],
                 header + generateInstructionEnum(instructions)
                     + "\n\n"
                     + generateAnyInstructionVisitor(instructions)
@@ -760,7 +760,7 @@ enum WasmGen {
                     + "\n"
             ),
             GeneratedFile(
-                projectSources + ["WasmParser", "BinaryInstructionDecoder.swift"],
+                projectSources + ["WasmParserCore", "BinaryInstructionDecoder.swift"],
                 header + generateBinaryInstructionDecoder(instructions)
             ),
             GeneratedFile(

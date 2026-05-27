@@ -1,4 +1,4 @@
-import WasmParser
+import WasmParserCore
 import WasmTypes
 
 /// A name with its location in the source file

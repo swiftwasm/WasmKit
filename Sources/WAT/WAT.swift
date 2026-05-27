@@ -1,4 +1,5 @@
-import WasmParser
+import WasmParserCore
+import WasmTypes
 
 /// Options for encoding a WebAssembly module into a binary format.
 public struct EncodeOptions: Sendable {
@@ -39,7 +40,7 @@ public func wat2wasm(
     _ input: String,
     features: WasmFeatureSet = .default,
     options: EncodeOptions = .default
-) throws -> [UInt8] {
+) throws(WatParserError) -> [UInt8] {
     #if ComponentModel
         // Look ahead to determine if this is a component or module
         var peekParser = Parser(input)
@@ -111,7 +112,7 @@ public struct Wat {
     /// This method effectively consumes the module value, encoding it into a
     /// binary format byte array. If you need to encode the module multiple times,
     /// you should create a copy of the module value before encoding it.
-    public consuming func encode(options: EncodeOptions = .default) throws -> [UInt8] {
+    public consuming func encode(options: EncodeOptions = .default) throws(WatParserError) -> [UInt8] {
         try WAT.encode(module: &self, options: options)
     }
 }
@@ -137,7 +138,7 @@ public struct Wat {
 ///
 /// let wasm = try wat.encode()
 /// ```
-public func parseWAT(_ input: String, features: WasmFeatureSet = .default) throws -> Wat {
+public func parseWAT(_ input: String, features: WasmFeatureSet = .default) throws(WatParserError) -> Wat {
     var parser = Parser(input)
     var wat: Wat
     if try parser.takeParenBlockStart("module") {
@@ -168,7 +169,7 @@ public struct Wast {
     ///
     /// - Returns: A tuple containing the parsed directive and its location in the WAST script
     ///   or `nil` if there are no more directives to parse.
-    public mutating func nextDirective() throws -> (directive: WastDirective, location: Location)? {
+    public mutating func nextDirective() throws(WatParserError) -> (directive: WastDirective, location: Location)? {
         let location = try parser.parser.peek()?.location(in: parser.parser.lexer) ?? parser.parser.lexer.location()
         if let directive = try parser.nextDirective() {
             return (directive, location)

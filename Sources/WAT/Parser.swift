@@ -1,4 +1,4 @@
-import WasmParser
+import WasmParserCore
 import WasmTypes
 
 internal struct Parser {
@@ -266,7 +266,7 @@ internal struct Parser {
 
     mutating func expectFloat32() throws(WatParserError) -> IEEE754.Float32 {
         let bitPattern = try expectFloatingPoint(
-            Float32.self, toBitPattern: \.bitPattern,
+            Float32.self, toBitPattern: { $0.bitPattern },
             isNaN: { Float32(bitPattern: $0).isNaN },
             buildBitPattern: {
                 UInt32(
@@ -280,7 +280,7 @@ internal struct Parser {
 
     mutating func expectFloat64() throws(WatParserError) -> IEEE754.Float64 {
         let bitPattern = try expectFloatingPoint(
-            Float64.self, toBitPattern: \.bitPattern,
+            Float64.self, toBitPattern: { $0.bitPattern },
             isNaN: { Float64(bitPattern: $0).isNaN },
             buildBitPattern: {
                 UInt64(
