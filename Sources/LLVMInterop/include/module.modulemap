@@ -1,0 +1,4 @@
+module LLVMInterop {
+    header "IRContext.h"
+    requires cplusplus
+}
