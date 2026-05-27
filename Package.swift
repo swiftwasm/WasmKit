@@ -23,6 +23,7 @@ let package = Package(
     platforms: [.macOS(.v15), .iOS(.v18)],
     products: [
         .executable(name: "wasmkit-cli", targets: ["CLI"]),
+        .executable(name: "wasm-component-ld", targets: ["wasm-component-ld"]),
         .library(name: "WasmKit", targets: ["WasmKit"]),
         .library(name: "WasmKitWASI", targets: ["WasmKitWASI"]),
         .library(name: "WASI", targets: ["WASI"]),
@@ -42,6 +43,23 @@ let package = Package(
             name: "CLI",
             dependencies: ["CLICommands"],
             exclude: ["CMakeLists.txt"]
+        ),
+        .executableTarget(
+            name: "wasm-component-ld",
+            path: "Sources/wasm-component-ld",
+            cSettings: [
+                .define("HAS_UNISTD", to: "1"),
+                .define("HAS_SYSUIO", to: "1"),
+                .define("HAS_SYSTIME", to: "1"),
+                .define("HAS_SYSRESOURCE", to: "1"),
+                .define("HAS_STRNDUP", to: "1"),
+                .define("HAS_FCNTL", to: "1"),
+                .define("HAS_LSTAT", to: "1"),
+                .define("HAS_GETENTROPY", to: "1"),
+                .define("HAS_TIMESPEC", to: "1"),
+                .define("_BSD_SOURCE", to: "1", .when(platforms: [.macOS])),
+                .unsafeFlags(["-std=c90", "-fno-modules"]),
+            ]
         ),
         .target(
             name: "WasmKit",
