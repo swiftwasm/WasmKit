@@ -1,5 +1,6 @@
 #if ComponentModel
     import ComponentModel
+    import SystemExtras
     import SystemPackage
     import WasmParser
 
@@ -19,9 +20,12 @@
         features: WasmFeatureSet = .default
     ) throws -> ParsedComponent {
         let fileHandle = try FileDescriptor.open(filePath, .readOnly)
-        defer { try? fileHandle.close() }
-        let stream = try FileHandleStream(fileHandle: fileHandle)
-        return try parseComponent(stream: stream, features: features)
+        return try withThrowing {
+            let stream = try FileHandleStream(fileHandle: fileHandle)
+            return try parseComponent(stream: stream, features: features)
+        } defer: {
+            try fileHandle.close()
+        }
     }
 
     /// Parse a component binary into a `ParsedComponent` ready for instantiation.
