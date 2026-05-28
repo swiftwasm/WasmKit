@@ -9,6 +9,7 @@ let DarwinPlatforms: [Platform] = [.macOS, .iOS, .watchOS, .tvOS, .visionOS]
 let cliCommandsTarget = Target.target(
     name: "CLICommands",
     dependencies: [
+        "SystemExtras",
         "WAT",
         "WasmKit",
         "WasmKitWASI",
@@ -99,6 +100,7 @@ let package = Package(
         .target(
             name: "WasmParser",
             dependencies: [
+                "SystemExtras",
                 "WasmTypes",
                 .product(name: "SystemPackage", package: "swift-system"),
                 .target(
