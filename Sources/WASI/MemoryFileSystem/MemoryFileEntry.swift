@@ -5,11 +5,13 @@ import WasmTypes
 /// A WASIFile implementation for regular files in the memory file system.
 final class MemoryFileEntry: WASIFile {
     let fileNode: MemoryFileNode
+    let fileSystem: MemoryFileSystem
     let accessMode: FileAccessMode
     var position: Int
 
-    init(fileNode: MemoryFileNode, accessMode: FileAccessMode, position: Int = 0) {
+    init(fileNode: MemoryFileNode, fileSystem: MemoryFileSystem, accessMode: FileAccessMode, position: Int = 0) {
         self.fileNode = fileNode
+        self.fileSystem = fileSystem
         self.accessMode = accessMode
         self.position = position
     }
@@ -17,10 +19,12 @@ final class MemoryFileEntry: WASIFile {
     // MARK: - WASIEntry
 
     func attributes() throws -> WASIAbi.Filestat {
-        let timestamps = fileNode.timestamps
+        let (timestamps, size) = fileSystem.withTreeLock {
+            (fileNode.timestamps, fileNode.size)
+        }
         return WASIAbi.Filestat(
             dev: 0, ino: 0, filetype: .REGULAR_FILE,
-            nlink: 1, size: WASIAbi.FileSize(fileNode.size),
+            nlink: 1, size: WASIAbi.FileSize(size),
             atim: timestamps.atim,
             mtim: timestamps.mtim,
             ctim: timestamps.ctim
@@ -60,7 +64,9 @@ final class MemoryFileEntry: WASIFile {
                 newMtim = nil
             }
 
-            fileNode.setTimes(atim: newAtim, mtim: newMtim)
+            fileSystem.withTreeLock {
+                fileNode.setTimes(atim: newAtim, mtim: newMtim)
+            }
 
         case .handle(let handle):
             let accessTime: FileTime
@@ -128,15 +134,18 @@ final class MemoryFileEntry: WASIFile {
 
     func setFilestatSize(_ size: WASIAbi.FileSize) throws {
         switch fileNode.content {
-        case .bytes(var bytes):
-            let newSize = Int(size)
-            if newSize < bytes.count {
-                bytes = Array(bytes.prefix(newSize))
-            } else if newSize > bytes.count {
-                bytes.append(contentsOf: Array(repeating: 0, count: newSize - bytes.count))
+        case .bytes:
+            fileSystem.withTreeLock {
+                guard case .bytes(var bytes) = fileNode.content else { return }
+                let newSize = Int(size)
+                if newSize < bytes.count {
+                    bytes = Array(bytes.prefix(newSize))
+                } else if newSize > bytes.count {
+                    bytes.append(contentsOf: Array(repeating: 0, count: newSize - bytes.count))
+                }
+                fileNode.content = .bytes(bytes)
+                fileNode.touchModificationTime()
             }
-            fileNode.content = .bytes(bytes)
-            fileNode.touchModificationTime()
 
         case .handle(let handle):
             try handle.truncate(size: Int64(size))
@@ -163,14 +172,18 @@ final class MemoryFileEntry: WASIFile {
         let newPosition: Int
 
         switch fileNode.content {
-        case .bytes(let bytes):
+        case .bytes:
+            let byteCount = fileSystem.withTreeLock {
+                guard case .bytes(let bytes) = fileNode.content else { return 0 }
+                return bytes.count
+            }
             switch whence {
             case .SET:
                 newPosition = Int(offset)
             case .CUR:
                 newPosition = position + Int(offset)
             case .END:
-                newPosition = bytes.count + Int(offset)
+                newPosition = byteCount + Int(offset)
             }
 
         case .handle(let handle):
@@ -204,25 +217,28 @@ final class MemoryFileEntry: WASIFile {
         var totalWritten: UInt32 = 0
 
         switch fileNode.content {
-        case .bytes(var bytes):
-            var currentPosition = position
-            for iovec in buffer {
-                iovec.withHostBufferPointer(in: memory) { bufferPtr in
-                    let bytesToWrite = bufferPtr.count
-                    let requiredSize = currentPosition + bytesToWrite
+        case .bytes:
+            fileSystem.withTreeLock {
+                guard case .bytes(var bytes) = fileNode.content else { return }
+                var currentPosition = position
+                for iovec in buffer {
+                    iovec.withHostBufferPointer(in: memory) { bufferPtr in
+                        let bytesToWrite = bufferPtr.count
+                        let requiredSize = currentPosition + bytesToWrite
 
-                    if requiredSize > bytes.count {
-                        bytes.append(contentsOf: Array(repeating: 0, count: requiredSize - bytes.count))
+                        if requiredSize > bytes.count {
+                            bytes.append(contentsOf: Array(repeating: 0, count: requiredSize - bytes.count))
+                        }
+
+                        bytes.replaceSubrange(currentPosition..<(currentPosition + bytesToWrite), with: bufferPtr)
+                        currentPosition += bytesToWrite
+                        totalWritten += UInt32(bytesToWrite)
                     }
-
-                    bytes.replaceSubrange(currentPosition..<(currentPosition + bytesToWrite), with: bufferPtr)
-                    currentPosition += bytesToWrite
-                    totalWritten += UInt32(bytesToWrite)
                 }
+                fileNode.content = .bytes(bytes)
+                position = currentPosition
+                fileNode.touchModificationTime()
             }
-            fileNode.content = .bytes(bytes)
-            position = currentPosition
-            fileNode.touchModificationTime()
 
         case .handle(let handle):
             var currentOffset = Int64(position)
@@ -247,24 +263,27 @@ final class MemoryFileEntry: WASIFile {
         var totalWritten: UInt32 = 0
 
         switch fileNode.content {
-        case .bytes(var bytes):
-            var currentOffset = Int(offset)
-            for iovec in buffer {
-                iovec.withHostBufferPointer(in: memory) { bufferPtr in
-                    let bytesToWrite = bufferPtr.count
-                    let requiredSize = currentOffset + bytesToWrite
+        case .bytes:
+            fileSystem.withTreeLock {
+                guard case .bytes(var bytes) = fileNode.content else { return }
+                var currentOffset = Int(offset)
+                for iovec in buffer {
+                    iovec.withHostBufferPointer(in: memory) { bufferPtr in
+                        let bytesToWrite = bufferPtr.count
+                        let requiredSize = currentOffset + bytesToWrite
 
-                    if requiredSize > bytes.count {
-                        bytes.append(contentsOf: Array(repeating: 0, count: requiredSize - bytes.count))
+                        if requiredSize > bytes.count {
+                            bytes.append(contentsOf: Array(repeating: 0, count: requiredSize - bytes.count))
+                        }
+
+                        bytes.replaceSubrange(currentOffset..<(currentOffset + bytesToWrite), with: bufferPtr)
+                        currentOffset += bytesToWrite
+                        totalWritten += UInt32(bytesToWrite)
                     }
-
-                    bytes.replaceSubrange(currentOffset..<(currentOffset + bytesToWrite), with: bufferPtr)
-                    currentOffset += bytesToWrite
-                    totalWritten += UInt32(bytesToWrite)
                 }
+                fileNode.content = .bytes(bytes)
+                fileNode.touchModificationTime()
             }
-            fileNode.content = .bytes(bytes)
-            fileNode.touchModificationTime()
 
         case .handle(let handle):
             var currentOffset = Int64(offset)
@@ -288,26 +307,29 @@ final class MemoryFileEntry: WASIFile {
         var totalRead: UInt32 = 0
 
         switch fileNode.content {
-        case .bytes(let bytes):
-            var currentPosition = position
-            for iovec in buffer {
-                iovec.withHostBufferPointer(in: memory) { bufferPtr in
-                    let available = max(0, bytes.count - currentPosition)
-                    let toRead = min(bufferPtr.count, available)
+        case .bytes:
+            fileSystem.withTreeLock {
+                guard case .bytes(let bytes) = fileNode.content else { return }
+                var currentPosition = position
+                for iovec in buffer {
+                    iovec.withHostBufferPointer(in: memory) { bufferPtr in
+                        let available = max(0, bytes.count - currentPosition)
+                        let toRead = min(bufferPtr.count, available)
 
-                    guard toRead > 0 else { return }
+                        guard toRead > 0 else { return }
 
-                    bytes.withUnsafeBytes { contentBytes in
-                        let sourcePtr = contentBytes.baseAddress!.advanced(by: currentPosition)
-                        bufferPtr.baseAddress!.copyMemory(from: sourcePtr, byteCount: toRead)
+                        bytes.withUnsafeBytes { contentBytes in
+                            let sourcePtr = contentBytes.baseAddress!.advanced(by: currentPosition)
+                            bufferPtr.baseAddress!.copyMemory(from: sourcePtr, byteCount: toRead)
+                        }
+
+                        currentPosition += toRead
+                        totalRead += UInt32(toRead)
                     }
-
-                    currentPosition += toRead
-                    totalRead += UInt32(toRead)
                 }
+                position = currentPosition
+                fileNode.touchAccessTime()
             }
-            position = currentPosition
-            fileNode.touchAccessTime()
 
         case .handle(let handle):
             var currentOffset = Int64(position)
@@ -332,25 +354,28 @@ final class MemoryFileEntry: WASIFile {
         var totalRead: UInt32 = 0
 
         switch fileNode.content {
-        case .bytes(let bytes):
-            var currentOffset = Int(offset)
-            for iovec in buffer {
-                iovec.withHostBufferPointer(in: memory) { bufferPtr in
-                    let available = max(0, bytes.count - currentOffset)
-                    let toRead = min(bufferPtr.count, available)
+        case .bytes:
+            fileSystem.withTreeLock {
+                guard case .bytes(let bytes) = fileNode.content else { return }
+                var currentOffset = Int(offset)
+                for iovec in buffer {
+                    iovec.withHostBufferPointer(in: memory) { bufferPtr in
+                        let available = max(0, bytes.count - currentOffset)
+                        let toRead = min(bufferPtr.count, available)
 
-                    guard toRead > 0 else { return }
+                        guard toRead > 0 else { return }
 
-                    bytes.withUnsafeBytes { contentBytes in
-                        let sourcePtr = contentBytes.baseAddress!.advanced(by: currentOffset)
-                        bufferPtr.baseAddress!.copyMemory(from: sourcePtr, byteCount: toRead)
+                        bytes.withUnsafeBytes { contentBytes in
+                            let sourcePtr = contentBytes.baseAddress!.advanced(by: currentOffset)
+                            bufferPtr.baseAddress!.copyMemory(from: sourcePtr, byteCount: toRead)
+                        }
+
+                        currentOffset += toRead
+                        totalRead += UInt32(toRead)
                     }
-
-                    currentOffset += toRead
-                    totalRead += UInt32(toRead)
                 }
+                fileNode.touchAccessTime()
             }
-            fileNode.touchAccessTime()
 
         case .handle(let handle):
             var currentOffset = Int64(offset)

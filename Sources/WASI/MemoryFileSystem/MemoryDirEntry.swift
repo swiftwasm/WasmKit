@@ -14,7 +14,7 @@ struct MemoryDirEntry: WASIDir {
     }
 
     func attributes() throws -> WASIAbi.Filestat {
-        let timestamps = dirNode.timestamps
+        let timestamps = fileSystem.withTreeLock { dirNode.timestamps }
         return WASIAbi.Filestat(
             dev: 0, ino: 0, filetype: .DIRECTORY,
             nlink: 1, size: 0,
@@ -55,7 +55,9 @@ struct MemoryDirEntry: WASIDir {
             newMtim = nil
         }
 
-        dirNode.setTimes(atim: newAtim, mtim: newMtim)
+        fileSystem.withTreeLock {
+            dirNode.setTimes(atim: newAtim, mtim: newMtim)
+        }
     }
 
     func advise(
@@ -86,11 +88,11 @@ struct MemoryDirEntry: WASIDir {
     }
 
     func removeDirectory(atPath path: String) throws {
-        try fileSystem.removeNode(in: dirNode, at: path, mustBeDirectory: true)
+        try fileSystem.removeNode(at: self.path, relativePath: path, mustBeDirectory: true)
     }
 
     func removeFile(atPath path: String) throws {
-        try fileSystem.removeNode(in: dirNode, at: path, mustBeDirectory: false)
+        try fileSystem.removeNode(at: self.path, relativePath: path, mustBeDirectory: false)
     }
 
     func symlink(from sourcePath: String, to destPath: String) throws {
@@ -104,13 +106,13 @@ struct MemoryDirEntry: WASIDir {
         }
 
         try fileSystem.rename(
-            from: sourcePath, in: dirNode,
-            to: destPath, in: newMemoryDir.dirNode
+            from: sourcePath, at: self.path,
+            to: destPath, at: newMemoryDir.path
         )
     }
 
     func readEntries(cookie: WASIAbi.DirCookie) throws -> AnyIterator<Result<ReaddirElement, any Error>> {
-        let children = dirNode.listChildren()
+        let children = fileSystem.withTreeLock { dirNode.listChildren() }
 
         let iterator = children.enumerated()
             .dropFirst(Int(cookie))
@@ -214,7 +216,7 @@ struct MemoryDirEntry: WASIDir {
         }
 
         if let dirNode = node as? MemoryDirectoryNode {
-            dirNode.setTimes(atim: newAtim, mtim: newMtim)
+            fileSystem.withTreeLock { dirNode.setTimes(atim: newAtim, mtim: newMtim) }
             return
         }
 
@@ -224,7 +226,7 @@ struct MemoryDirEntry: WASIDir {
 
         switch fileNode.content {
         case .bytes:
-            fileNode.setTimes(atim: newAtim, mtim: newMtim)
+            fileSystem.withTreeLock { fileNode.setTimes(atim: newAtim, mtim: newMtim) }
 
         case .handle(let handle):
             let accessTime: FileTime

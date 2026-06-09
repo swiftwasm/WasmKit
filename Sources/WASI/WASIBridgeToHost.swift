@@ -1,3 +1,4 @@
+import Synchronization
 import SystemPackage
 
 /// A bridge that connects WebAssembly System Interface (WASI) calls to the host system.
@@ -18,9 +19,9 @@ import SystemPackage
 ///     // ... use wasi ...
 /// }
 /// ```
-public final class WASIBridgeToHost {
+public final class WASIBridgeToHost: Sendable {
     internal let underlying: WASIImplementation
-    private var isClosed = false
+    private let isClosed = Mutex(false)
 
     /// A preopened directory mapping from a guest path to a host path.
     ///
@@ -110,8 +111,12 @@ public final class WASIBridgeToHost {
     /// guest-opened files that were not closed by the WASI program).
     /// Borrowed descriptors (e.g. process stdio) are left open.
     public func close() throws {
-        guard !isClosed else { return }
-        isClosed = true
+        let shouldClose = isClosed.withLock { closed -> Bool in
+            if closed { return false }
+            closed = true
+            return true
+        }
+        guard shouldClose else { return }
         try underlying.close()
     }
 
@@ -132,7 +137,7 @@ public final class WASIBridgeToHost {
     }
 
     deinit {
-        precondition(isClosed, "WASIBridgeToHost.close() must be called before the bridge is deallocated")
+        precondition(isClosed.withLock { $0 }, "WASIBridgeToHost.close() must be called before the bridge is deallocated")
     }
 
     /// Creates a new WASI bridge with host file system access.
@@ -235,8 +240,10 @@ public final class WASIBridgeToHost {
             monotonicClock: monotonicClock,
             randomGenerator: randomGenerator
         )
-        try fileSystemOptions.initializeStdio?(&underlying.fdTable)
-        try fileSystemOptions.initializePreopens?(fileSystem, &underlying.fdTable)
+        try underlying.fdTable.withLock { table in
+            try fileSystemOptions.initializeStdio?(&table)
+            try fileSystemOptions.initializePreopens?(fileSystem, &table)
+        }
     }
 
     /// Creates a new WASI bridge with custom file system options.

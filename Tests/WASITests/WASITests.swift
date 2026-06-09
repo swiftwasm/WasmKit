@@ -446,11 +446,11 @@ struct WASITests {
         try bridge.runAndClose { _ in
             let wasi = bridge.underlying
 
-            guard case .directory(let fd3Dir) = wasi.fdTable[3] else {
+            guard case .directory(let fd3Dir) = wasi.fdTable.withLock({ $0[3] }) else {
                 #expect(Bool(false), "Expected fd=3 to be a preopened directory")
                 return
             }
-            guard case .directory(let fd4Dir) = wasi.fdTable[4] else {
+            guard case .directory(let fd4Dir) = wasi.fdTable.withLock({ $0[4] }) else {
                 #expect(Bool(false), "Expected fd=4 to be a preopened directory")
                 return
             }
@@ -505,18 +505,14 @@ struct WASITests {
         try fs.ensureDirectory(at: "/")
         try fs.ensureDirectory(at: "/dir")
         try fs.addFile(at: "/dir/file.txt", content: [])
-        guard let dirNode = fs.lookup(at: "/dir") as? MemoryDirectoryNode else {
-            #expect(Bool(false), "Expected DirectoryNode")
-            return
-        }
-        let resolved = fs.resolve(from: dirNode, at: "/dir", path: "file.txt")
+        let resolved = fs.resolve(at: "/dir", path: "file.txt")
         #expect(resolved != nil)
         #expect(resolved?.type == .file)
 
-        let dotResolved = fs.resolve(from: dirNode, at: "/dir", path: ".")
+        let dotResolved = fs.resolve(at: "/dir", path: ".")
         #expect(dotResolved != nil)
 
-        let parentResolved = fs.resolve(from: dirNode, at: "/dir", path: "..")
+        let parentResolved = fs.resolve(at: "/dir", path: "..")
         #expect(parentResolved != nil)
         #expect(parentResolved?.type == .directory)
     }

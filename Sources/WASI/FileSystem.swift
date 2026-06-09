@@ -163,7 +163,7 @@ public enum FileContent {
 /// Protocol for file system implementations used by WASI.
 ///
 /// This protocol contains WASI-specific implementation details.
-protocol FileSystemImplementation: ~Copyable {
+protocol FileSystemImplementation: ~Copyable, Sendable {
     /// Preopens a directory and returns a WASIDir implementation.
     func preopenDirectory(guestPath: String, hostPath: String) throws -> any WASIDir
 
