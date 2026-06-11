@@ -2,8 +2,8 @@ import Foundation
 import Testing
 
 @Suite struct PluginSmokeTests {
-
-    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS) || compiler(>=6.4) // WITExtractor is not compatible with new Swift 6.4 build system.
+    // WITExtractor is not compatible with new Swift 6.4 build system.
+    #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS) || compiler(>=6.4)
     #else
         @Test(
             .disabled(
