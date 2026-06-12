@@ -332,11 +332,11 @@ extension FileDescriptor {
     }
     .map { Attributes(rawValue: info) }
     #else
-    var stat: stat = stat()
+    var statBuffer: stat = .init()
     return nothingOrErrno(retryOnInterrupt: false) {
-      system_fstat(self.rawValue, &stat)
+      system_fstat(self.rawValue, &statBuffer)
     }
-    .map { Attributes(rawValue: stat) }
+    .map { Attributes(rawValue: statBuffer) }
     #endif
   }
 
