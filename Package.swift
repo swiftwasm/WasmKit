@@ -261,7 +261,7 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
         // which breaks swift-nio's `_NIOFileSystem` (a test/benchmark dependency) on
         // Linux/Swift 6.2 under `MemberImportVisibility`. Drop the bound once swift-nio
         // builds against swift-system 1.7.0.
-        .package(url: "https://github.com/apple/swift-system", "1.5.0" ..< "1.7.0"),
+        .package(url: "https://github.com/apple/swift-system", "1.5.0"..<"1.7.0"),
         .package(url: "https://github.com/apple/swift-nio", from: "2.90.0"),
         .package(url: "https://github.com/apple/swift-log", from: "1.7.1"),
     ]
