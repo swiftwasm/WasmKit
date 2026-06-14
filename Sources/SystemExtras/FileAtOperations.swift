@@ -187,11 +187,11 @@ extension FileDescriptor {
     #if os(Windows)
     return .failure(Errno(rawValue: ERROR_NOT_SUPPORTED))
     #else
-    var stat: stat = stat()
+    var statBuffer: stat = .init()
     return nothingOrErrno(retryOnInterrupt: false) {
-      system_fstatat(self.rawValue, path, &stat, options.rawValue)
+      system_fstatat(self.rawValue, path, &statBuffer, options.rawValue)
     }
-    .map { Attributes(rawValue: stat) }
+    .map { Attributes(rawValue: statBuffer) }
     #endif
   }
 
