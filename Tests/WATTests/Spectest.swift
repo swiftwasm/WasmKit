@@ -1,5 +1,5 @@
 import Foundation
-import WasmParser
+import WasmParserCore
 
 enum Spectest {
     static let rootDirectory = URL(fileURLWithPath: #filePath)

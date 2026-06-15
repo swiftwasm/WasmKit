@@ -1,7 +1,7 @@
 #if ComponentModel
 
     import ComponentModel
-    import WasmParser
+    import WasmParserCore
     import WasmTypes
 
     extension ComponentWatParser {

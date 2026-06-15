@@ -77,7 +77,7 @@ let package = Package(
         .target(
             name: "WAT",
             dependencies: [
-                "WasmParser",
+                "WasmParserCore",
                 .target(
                     name: "ComponentModel",
                     condition: .when(traits: ["ComponentModel"])
@@ -97,14 +97,21 @@ let package = Package(
         ),
 
         .target(
-            name: "WasmParser",
+            name: "WasmParserCore",
             dependencies: [
                 "WasmTypes",
-                .product(name: "SystemPackage", package: "swift-system"),
                 .target(
                     name: "ComponentModel",
                     condition: .when(traits: ["ComponentModel"])
                 ),
+            ],
+            exclude: ["CMakeLists.txt"]
+        ),
+        .target(
+            name: "WasmParser",
+            dependencies: [
+                "WasmParserCore",
+                .product(name: "SystemPackage", package: "swift-system"),
             ],
             exclude: ["CMakeLists.txt"]
         ),

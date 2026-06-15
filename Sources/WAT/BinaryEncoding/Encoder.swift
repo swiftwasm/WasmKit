@@ -1,4 +1,4 @@
-import WasmParser
+import WasmParserCore
 import WasmTypes
 
 package struct Encoder {
@@ -511,7 +511,7 @@ struct ExpressionEncoder: BinaryInstructionEncoder {
     mutating func encodeInstruction(_ opcode: [UInt8]) {
         encoder.output.append(contentsOf: opcode)
     }
-    mutating func encodeImmediates(blockType: WasmParser.BlockType) {
+    mutating func encodeImmediates(blockType: WasmParserCore.BlockType) {
         switch blockType {
         case .empty: encoder.output.append(0x40)
         case .type(let valueType): encoder.encode(valueType)
@@ -528,12 +528,12 @@ struct ExpressionEncoder: BinaryInstructionEncoder {
     mutating func encodeImmediates(globalIndex: UInt32) { encodeUnsigned(globalIndex) }
     mutating func encodeImmediates(localIndex: UInt32) { encodeUnsigned(localIndex) }
     mutating func encodeImmediates(typeIndex: UInt32) { encodeUnsigned(typeIndex) }
-    mutating func encodeImmediates(memarg: WasmParser.MemArg) {
+    mutating func encodeImmediates(memarg: WasmParserCore.MemArg) {
         encodeUnsigned(UInt(memarg.align))
         encodeUnsigned(memarg.offset)
     }
     mutating func encodeImmediates(lane: UInt8) { encoder.output.append(lane) }
-    mutating func encodeImmediates(memarg: WasmParser.MemArg, lane: UInt8) {
+    mutating func encodeImmediates(memarg: WasmParserCore.MemArg, lane: UInt8) {
         encodeImmediates(memarg: memarg)
         encodeImmediates(lane: lane)
     }
@@ -543,7 +543,7 @@ struct ExpressionEncoder: BinaryInstructionEncoder {
     mutating func encodeImmediates(memory: UInt32) { encodeUnsigned(memory) }
     mutating func encodeImmediates(relativeDepth: UInt32) { encodeUnsigned(relativeDepth) }
     mutating func encodeImmediates(table: UInt32) { encodeUnsigned(table) }
-    mutating func encodeImmediates(targets: WasmParser.BrTable) {
+    mutating func encodeImmediates(targets: WasmParserCore.BrTable) {
         encoder.encodeVector(targets.labelIndices) { value, encoder in
             encoder.writeUnsignedLEB128(value)
         }
@@ -554,8 +554,8 @@ struct ExpressionEncoder: BinaryInstructionEncoder {
     mutating func encodeImmediates(value: Int32) { encodeSigned(value) }
     mutating func encodeImmediates(value: Int64) { encodeSigned(value) }
     mutating func encodeImmediates(value: WasmTypes.V128) { encoder.output.append(contentsOf: value.bytes) }
-    mutating func encodeImmediates(value: WasmParser.IEEE754.Float32) { encodeFixedWidth(value.bitPattern) }
-    mutating func encodeImmediates(value: WasmParser.IEEE754.Float64) { encodeFixedWidth(value.bitPattern) }
+    mutating func encodeImmediates(value: WasmParserCore.IEEE754.Float32) { encodeFixedWidth(value.bitPattern) }
+    mutating func encodeImmediates(value: WasmParserCore.IEEE754.Float64) { encodeFixedWidth(value.bitPattern) }
     mutating func encodeImmediates(dstMem: UInt32, srcMem: UInt32) {
         encodeUnsigned(dstMem)
         encodeUnsigned(srcMem)
@@ -625,7 +625,7 @@ func encode(module: inout Wat, options: EncodeOptions) throws(WatParserError) ->
     // Section 1: Type section
     if !module.types.isEmpty {
         encoder.section(id: 0x01) { encoder in
-            encoder.encodeVector(module.types, transform: \.type.signature)
+            encoder.encodeVector(module.types, transform: { $0.type.signature })
         }
     }
 
