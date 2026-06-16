@@ -76,7 +76,7 @@ struct UntypedValue: Equatable, Hashable {
         case .v128:
             assertionFailure("v128 cannot be represented in UntypedValue; use stack-slot based storage")
             storage = 0
-        case .ref(.function(let value)), .ref(.extern(let value)):
+        case .ref(.function(let value)), .ref(.extern(let value)), .ref(.exception(let value)):
             storage = encodeOptionalInt(value)
         }
     }
@@ -122,8 +122,10 @@ struct UntypedValue: Equatable, Hashable {
             return .function(decodeOptionalInt())
         case .abstract(.externRef):
             return .extern(decodeOptionalInt())
+        case .abstract(.exnRef):
+            return .exception(decodeOptionalInt())
         case .concrete:
-            fatalError("heap type other than `func` and `extern` is not implemented yet")
+            fatalError("heap type other than `func`, `extern`, and `exn` is not implemented yet")
         }
     }
 

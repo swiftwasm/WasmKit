@@ -39,6 +39,8 @@ extension ValueType {
                 return .ref(.function(nil))
             case .abstract(.externRef):
                 return .ref(.extern(nil))
+            case .abstract(.exnRef):
+                return .ref(.exception(nil))
             case .concrete:
                 // We don't model GC reference heap types yet; use a null externref.
                 return .ref(.extern(nil))

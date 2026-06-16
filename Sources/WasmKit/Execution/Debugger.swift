@@ -490,6 +490,19 @@
         mutating func predictNext_unreachable(operandPc: Pc, sp: Sp) -> [Pc] { [] }
         mutating func predictNext_endOfExecution(operandPc: Pc, sp: Sp) -> [Pc] { [] }
         mutating func predictNext_breakpoint(operandPc: Pc, sp: Sp) -> [Pc] { [] }
+
+        // Exception-handling instructions — destination depends on which handler
+        // catches at runtime, so static prediction is not possible.
+        mutating func predictNext_throwTag(operandPc: Pc, sp: Sp) -> [Pc] { [] }
+        mutating func predictNext_throwRef(operandPc: Pc, sp: Sp) -> [Pc] { [] }
+
+        // `catchHandlers` registers exception handlers and falls through to the
+        // immediately-following instruction.
+        mutating func predictNext_catchHandlers(operandPc: Pc, sp: Sp) -> [Pc] {
+            var pc = operandPc
+            _ = Instruction.CatchHandlersOperand.load(from: &pc)
+            return [pc]
+        }
     }
 
 #endif
