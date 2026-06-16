@@ -343,7 +343,7 @@ struct StackLayout {
     }
 }
 
-struct InstructionTranslator: InstructionVisitor {
+struct InstructionTranslator: ~Copyable, InstructionVisitor {
     typealias VisitorError = WasmKitError
     typealias Output = Void
 
@@ -620,15 +620,15 @@ struct InstructionTranslator: InstructionVisitor {
         }
     }
 
-    fileprivate struct ISeqBuilder {
+    fileprivate struct ISeqBuilder: ~Copyable {
         typealias InstructionFactoryWithLabel = (
-            ISeqBuilder,
+            borrowing ISeqBuilder,
             // The position of the next slot of the creating instruction
             _ source: MetaProgramCounter,
             // The position of the resolved label
             _ target: MetaProgramCounter
         ) -> (WasmKit.Instruction)
-        typealias BrTableEntryFactory = (ISeqBuilder, MetaProgramCounter) -> Instruction.BrTableOperand.Entry
+        typealias BrTableEntryFactory = (borrowing ISeqBuilder, MetaProgramCounter) -> Instruction.BrTableOperand.Entry
         typealias BuildingBrTable = UnsafeMutableBufferPointer<Instruction.BrTableOperand.Entry>
         typealias BuildingCatchTable = UnsafeMutableBufferPointer<CatchTableEntry>
 
@@ -740,7 +740,7 @@ struct InstructionTranslator: InstructionVisitor {
             }
         }
 
-        func finalize() -> [UInt64] {
+        consuming func finalize() -> [UInt64] {
             return instructions
         }
 
@@ -811,7 +811,7 @@ struct InstructionTranslator: InstructionVisitor {
             line: UInt = #line,
             make:
                 @escaping (
-                    ISeqBuilder,
+                    borrowing ISeqBuilder,
                     // The position of the next slot of the creating instruction
                     _ source: MetaProgramCounter,
                     // The position of the resolved label
@@ -1256,7 +1256,7 @@ struct InstructionTranslator: InstructionVisitor {
         try valueStack.truncate(height: currentFrame.valueStackHeight)
     }
 
-    private mutating func finalize() throws(WasmKitError) -> InstructionSequence {
+    private consuming func finalize() throws(WasmKitError) -> InstructionSequence {
         if controlStack.numberOfFrames > 1 {
             throw WasmKitError(message: .expectedMoreEndInstructions(count: controlStack.numberOfFrames - 1))
         }
@@ -1299,7 +1299,7 @@ struct InstructionTranslator: InstructionVisitor {
     // MARK: Main entry point
 
     /// Translate a Wasm expression into a sequence of instructions.
-    mutating func translate(code: Code) throws(WasmKitError) -> InstructionSequence {
+    consuming func translate(code: Code) throws(WasmKitError) -> InstructionSequence {
         if isIntercepting {
             // Emit `onEnter` instruction at the beginning of the function
             emit(.onEnter(functionIndex))
