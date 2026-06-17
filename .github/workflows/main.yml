@@ -255,7 +255,7 @@ jobs:
     steps:
       - uses: compnerd/gha-setup-swift@main
         with:
-          swift-version: swift-6.3-release
+          swift-version: swift-6.3.2-release
           swift-build: 6.3.2-RELEASE
       - uses: actions/checkout@v6
       - run: python3 ./Vendor/checkout-dependency --category default
