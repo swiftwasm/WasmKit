@@ -1,8 +1,8 @@
-FROM gcr.io/oss-fuzz-base/base-builder-swift:v1
+FROM gcr.io/oss-fuzz-base/base-builder-swift:ubuntu-24-04
 RUN apt-get update && apt-get install -y make autoconf automake libtool
 ENV SWIFT_PREFIX=/opt/swift
 RUN mkdir -p "$SWIFT_PREFIX" && \
-  curl -L https://download.swift.org/swift-6.1.3-release/ubuntu2004/swift-6.1.3-RELEASE/swift-6.1.3-RELEASE-ubuntu20.04.tar.gz | tar xz -C "$SWIFT_PREFIX" --strip-component 1
+  curl -L https://download.swift.org/swift-6.3.2-release/ubuntu2404/swift-6.3.2-RELEASE/swift-6.3.2-RELEASE-ubuntu24.04.tar.gz | tar xz -C "$SWIFT_PREFIX" --strip-component 1
 ENV PATH="$SWIFT_PREFIX/usr/bin:$PATH"
 COPY . $SRC/wasmkit
 WORKDIR $SRC/wasmkit
