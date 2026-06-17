@@ -259,12 +259,6 @@ jobs:
           swift-build: 6.3.2-RELEASE
       - uses: actions/checkout@v6
       - run: python3 ./Vendor/checkout-dependency --category default
-      - run: winget install Ninja-build.Ninja Kitware.CMake --disable-interactivity --accept-source-agreements
-      - run: |
-          echo "$env:LOCALAPPDATA\Microsoft\WinGet\Links" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          echo "$env:ProgramFiles\CMake\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-      - run: cmake -G Ninja -B .build/cmake
-      - run: cmake --build .build/cmake
       # Run tests with SwiftPM
       - name: Run tests with SwiftPM
         run: swift test
