@@ -24,13 +24,13 @@ jobs:
     steps:
     - name: Build Fuzzers (${{ matrix.sanitizer }})
       id: build
-      uses: google/clusterfuzzlite/actions/build_fuzzers@v1
+      uses: google/clusterfuzzlite/actions/build_fuzzers@d2c7d068aab9081cbbc57825ad0d5d6ca6674f95 # google/clusterfuzzlite#146 (Ubuntu 24.04); revert to @v1 once merged
       with:
         language: swift
         sanitizer: ${{ matrix.sanitizer }}
     - name: Run Fuzzers (${{ matrix.sanitizer }})
       id: run
-      uses: google/clusterfuzzlite/actions/run_fuzzers@v1
+      uses: google/clusterfuzzlite/actions/run_fuzzers@d2c7d068aab9081cbbc57825ad0d5d6ca6674f95 # google/clusterfuzzlite#146 (Ubuntu 24.04); revert to @v1 once merged
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         fuzz-seconds: ${{ github.event.inputs.fuzz-seconds || 3600 }}
