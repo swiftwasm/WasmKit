@@ -134,7 +134,7 @@ Proposals are grouped by their [phase](https://github.com/WebAssembly/meetings/b
 
 ## Minimum Supported Swift Version (MSSV)
 
-Currently, the minimum supported version is Swift 6.1. The general strategy is to support last two minor versions of the Swift toolchain available at the time of WasmKit's release. At the same time, development branches of WasmKit tend to adopt newer development versions of the Swift toolchain.
+Currently, the minimum supported version is Swift 6.3. When possible, our goal is to support the last two minor versions of the Swift toolchain available at the time of WasmKit's release. At the same time, development branches of WasmKit tend to adopt newer development versions of the Swift toolchain.
 
 ## Testing
 
