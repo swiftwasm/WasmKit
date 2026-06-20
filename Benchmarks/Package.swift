@@ -19,11 +19,11 @@ package.targets += [
         dependencies: [
             .product(name: "WasmKit", package: "WasmKit"),
             .product(name: "WasmKitWASI", package: "WasmKit"),
-            .product(name: "Benchmark", package: "package-benchmark"),
+            .product(name: "Benchmark", package: "benchmark"),
         ],
         path: "Benchmarks/WishYouWereFast",
         plugins: [
-            .plugin(name: "BenchmarkPlugin", package: "package-benchmark")
+            .plugin(name: "BenchmarkPlugin", package: "benchmark")
         ]
     ),
 ]
@@ -36,11 +36,11 @@ package.targets += [
             .product(name: "WAT", package: "WasmKit"),
             .product(name: "WasmKit", package: "WasmKit"),
             .product(name: "WasmKitWASI", package: "WasmKit"),
-            .product(name: "Benchmark", package: "package-benchmark"),
+            .product(name: "Benchmark", package: "benchmark"),
         ],
         path: "Benchmarks/MicroBench",
         plugins: [
-            .plugin(name: "BenchmarkPlugin", package: "package-benchmark")
+            .plugin(name: "BenchmarkPlugin", package: "benchmark")
         ]
     ),
 ]
@@ -52,11 +52,11 @@ package.targets += [
         dependencies: [
             .product(name: "WasmKit", package: "WasmKit"),
             .product(name: "WasmKitWASI", package: "WasmKit"),
-            .product(name: "Benchmark", package: "package-benchmark"),
+            .product(name: "Benchmark", package: "benchmark"),
         ],
         path: "Benchmarks/MacroPlugin",
         plugins: [
-            .plugin(name: "BenchmarkPlugin", package: "package-benchmark")
+            .plugin(name: "BenchmarkPlugin", package: "benchmark")
         ]
     ),
 ]
@@ -66,14 +66,14 @@ package.targets += [
     .executableTarget(
         name: "WasmParserBenchmark",
         dependencies: [
-            .product(name: "Benchmark", package: "package-benchmark"),
+            .product(name: "Benchmark", package: "benchmark"),
             .product(name: "SystemPackage", package: "swift-system"),
             .product(name: "WasmKit", package: "WasmKit"),
             .product(name: "WAT", package: "WasmKit"),
         ],
         path: "Benchmarks/WasmParserBenchmark",
         plugins: [
-            .plugin(name: "BenchmarkPlugin", package: "package-benchmark")
+            .plugin(name: "BenchmarkPlugin", package: "benchmark")
         ]
     ),
 ]
