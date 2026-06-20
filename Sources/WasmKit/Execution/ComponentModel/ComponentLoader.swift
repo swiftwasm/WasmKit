@@ -202,7 +202,7 @@
         var nestedComponentDefs: [ParsedComponent] = []
 
         /// Type resolver for canonical ABI operations
-        let resolveType: (ComponentTypeIndex) throws -> ComponentValueType
+        let resolveType: (ComponentTypeIndex) throws -> ComponentDefValType
 
         /// Nested component instances (from component instances index space)
         var nestedComponents: [InternalComponentInstance] = []
@@ -247,9 +247,9 @@
 
         public init() {}
 
-        /// Resolve a ComponentTypeIndex to its ComponentValueType definition.
+        /// Resolve a ComponentTypeIndex to its ComponentDefValType definition.
         /// This is used during canonical ABI lowering/lifting to resolve nested types.
-        public func resolveType(_ index: ComponentTypeIndex) throws -> ComponentValueType {
+        public func resolveType(_ index: ComponentTypeIndex) throws -> ComponentDefValType {
             let idx = Int(index.rawValue)
             guard idx < componentTypes.count else {
                 throw CanonicalABIError(description: "Type index \(idx) out of bounds (have \(componentTypes.count) types)")
@@ -507,7 +507,7 @@
         case function(ComponentFuncType)
 
         /// Import a value
-        case value(ComponentValueType)
+        case value(ComponentDefValType)
 
         /// Import an instance
         case instance

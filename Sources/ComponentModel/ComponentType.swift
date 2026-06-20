@@ -65,29 +65,54 @@ public enum ComponentDefSort {
     case instance
 }
 
-public enum ComponentValueType: Hashable {
+/// Primitive value types that can be encoded inline in valtypes.
+/// Corresponds to `primvaltype` in the Component Model binary spec.
+public enum ComponentPrimValType: Hashable {
     case bool
-    case u8
-    case u16
-    case u32
-    case u64
     case s8
     case s16
     case s32
     case s64
+    case u8
+    case u16
+    case u32
+    case u64
     case float32
     case float64
     case char
     case string
     case errorContext
-    case list(ComponentTypeIndex)
-    //    case handleOwn(ResourceSyntax)
-    //    case handleBorrow(ResourceSyntax)
-    case tuple([ComponentTypeIndex])
-    case option(ComponentTypeIndex)
-    case result(ok: ComponentTypeIndex?, error: ComponentTypeIndex?)
-    case future(ComponentTypeIndex?)
-    case stream(element: ComponentTypeIndex?, end: ComponentTypeIndex?)
+}
+
+/// A value type reference: either a type index or an inline primitive.
+/// Corresponds to `valtype` in the Component Model binary spec:
+/// `valtype ::= i:<typeidx> | pvt:<primvaltype>`
+public enum ComponentValType: Hashable {
+    case index(ComponentTypeIndex)
+    case primitive(ComponentPrimValType)
+
+    /// Resolve this value-type reference to a definition type: inline primitives
+    /// become `.inlined(.primitive(...))`; type indices are looked up via `resolveType`.
+    package func resolve(
+        _ resolveType: (ComponentTypeIndex) throws -> ComponentDefValType
+    ) rethrows -> ComponentDefValType {
+        switch self {
+        case .primitive(let prim): return .inlined(.primitive(prim))
+        case .index(let idx): return try resolveType(idx)
+        }
+    }
+}
+
+public enum ComponentDefValType: Hashable {
+    /// A value type: a type index or an inline primitive.
+    case inlined(ComponentValType)
+
+    case list(ComponentValType)
+    case tuple([ComponentValType])
+    case option(ComponentValType)
+    case result(ok: ComponentValType?, error: ComponentValType?)
+    case future(ComponentValType?)
+    case stream(element: ComponentValType?, end: ComponentValType?)
 
     // Named type declarations
 
@@ -97,43 +122,43 @@ public enum ComponentValueType: Hashable {
     case variant([ComponentCaseField])
     case resource(destructor: ComponentFuncIndex)
 
-    case indexed(ComponentTypeIndex)
+    /// Construct an inline-primitive value type.
+    public static func primitive(_ type: ComponentPrimValType) -> Self { .inlined(.primitive(type)) }
 
-    /// Returns `true` if this is a primitive type that can be inlined in valtypes during binary encoding
+    /// Construct a type-index value type.
+    public static func indexed(_ index: ComponentTypeIndex) -> Self { .inlined(.index(index)) }
+
+    /// `true` if this is an inline-primitive value type.
     package var isPrimitive: Bool {
-        switch self {
-        case .bool, .s8, .u8, .s16, .u16, .s32, .u32, .s64, .u64, .float32, .float64, .char, .string, .errorContext:
-            return true
-        case .list, .tuple, .option, .result, .future, .stream, .record, .flags, .enum, .variant, .resource, .indexed:
-            return false
-        }
+        guard case .inlined(.primitive) = self else { return false }
+        return true
     }
 }
 
 public struct ComponentFuncType: Hashable {
-    public init(params: [ComponentFuncType.Param], result: ComponentValueType?) {
+    public init(params: [ComponentFuncType.Param], result: ComponentDefValType?) {
         self.params = params
         self.result = result
     }
 
     public struct Param: Hashable {
-        public init(name: String, type: ComponentValueType) {
+        public init(name: String, type: ComponentDefValType) {
             self.name = name
             self.type = type
         }
 
         public let name: String
-        public let type: ComponentValueType
+        public let type: ComponentDefValType
     }
     public let params: [Param]
-    public let result: ComponentValueType?
+    public let result: ComponentDefValType?
 }
 
 public struct ComponentRecordField: Hashable {
     public let name: String
-    public let type: ComponentTypeIndex
+    public let type: ComponentValType
 
-    public init(name: String, type: ComponentTypeIndex) {
+    public init(name: String, type: ComponentValType) {
         self.name = name
         self.type = type
     }
@@ -141,9 +166,9 @@ public struct ComponentRecordField: Hashable {
 
 public struct ComponentCaseField: Hashable {
     public let name: String
-    public let type: ComponentTypeIndex?
+    public let type: ComponentValType?
 
-    public init(name: String, type: ComponentTypeIndex?) {
+    public init(name: String, type: ComponentValType?) {
         self.name = name
         self.type = type
     }

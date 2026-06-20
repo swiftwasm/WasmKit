@@ -20,7 +20,7 @@
         private let extractor: WITInterfaceExtractor
 
         // Function parameter types
-        var functions: [String: [(name: String, type: ComponentValueType)]] {
+        var functions: [String: [(name: String, type: ComponentDefValType)]] {
             extractor.functions
         }
 
@@ -33,7 +33,7 @@
             self.extractor = extractor
         }
 
-        func resolver(_ idx: ComponentTypeIndex) -> ComponentValueType {
+        func resolver(_ idx: ComponentTypeIndex) -> ComponentDefValType {
             return extractor.converter.resolve(idx)
         }
     }
