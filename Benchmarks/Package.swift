@@ -7,7 +7,7 @@ let package = Package(
     platforms: [.macOS(.v15)],
     dependencies: [
         .package(name: "WasmKit", path: "../"),
-        .package(url: "https://github.com/ordo-one/package-benchmark", .upToNextMajor(from: "1.4.0")),
+        .package(url: "https://github.com/ordo-one/benchmark", .upToNextMajor(from: "1.4.0")),
         .package(url: "https://github.com/apple/swift-system.git", from: "1.6.4"),
     ]
 )
