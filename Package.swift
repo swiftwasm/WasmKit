@@ -185,7 +185,13 @@ let package = Package(
                 )
             ]
         ),
-        .testTarget(name: "WITTests", dependencies: ["WIT"]),
+        .testTarget(
+            name: "WITTests",
+            dependencies: [
+                "WIT",
+                .target(name: "WasmTools", condition: .when(traits: ["ComponentModel"])),
+            ]
+        ),
 
         .target(
             name: "WAVE",
