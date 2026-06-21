@@ -197,29 +197,29 @@
         @Test
         func parseBool() throws {
             var parser = WAVEParser("true")
-            let value = try parser.parse(type: .bool)
+            let value = try parser.parse(type: .primitive(.bool))
             if case .bool(true) = value {} else { Issue.record("Expected bool(true)") }
 
             var parser2 = WAVEParser("false")
-            let value2 = try parser2.parse(type: .bool)
+            let value2 = try parser2.parse(type: .primitive(.bool))
             if case .bool(false) = value2 {} else { Issue.record("Expected bool(false)") }
         }
 
         @Test
         func parseIntegers() throws {
             var parser = WAVEParser("42")
-            let value = try parser.parse(type: .u32)
+            let value = try parser.parse(type: .primitive(.u32))
             if case .u32(42) = value {} else { Issue.record("Expected u32(42)") }
 
             var parser2 = WAVEParser("-123")
-            let value2 = try parser2.parse(type: .s32)
+            let value2 = try parser2.parse(type: .primitive(.s32))
             if case .s32(-123) = value2 {} else { Issue.record("Expected s32(-123)") }
         }
 
         @Test
         func parseFloats() throws {
             var parser = WAVEParser("3.14")
-            let value = try parser.parse(type: .float32)
+            let value = try parser.parse(type: .primitive(.float32))
             if case .float32(let f) = value {
                 #expect(abs(f - 3.14) < 0.001)
             } else {
@@ -227,7 +227,7 @@
             }
 
             var parser2 = WAVEParser("nan")
-            let value2 = try parser2.parse(type: .float64)
+            let value2 = try parser2.parse(type: .primitive(.float64))
             if case .float64(let f) = value2 {
                 #expect(f.isNaN)
             } else {
@@ -238,14 +238,14 @@
         @Test
         func parseString() throws {
             var parser = WAVEParser(#""hello world""#)
-            let value = try parser.parse(type: .string)
+            let value = try parser.parse(type: .primitive(.string))
             if case .string("hello world") = value {} else { Issue.record("Expected string") }
         }
 
         @Test
         func parseChar() throws {
             var parser = WAVEParser("'x'")
-            let value = try parser.parse(type: .char)
+            let value = try parser.parse(type: .primitive(.char))
             if case .char(let c) = value, c == "x" {} else { Issue.record("Expected char 'x'") }
         }
 

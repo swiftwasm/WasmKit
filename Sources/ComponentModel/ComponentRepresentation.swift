@@ -133,7 +133,7 @@ public enum ComponentExternDesc {
 /// A bound on a value type.
 public enum ComponentValueBound {
     case eq(valueIndex: UInt32)
-    case type(ComponentValueType)
+    case type(ComponentDefValType)
 }
 
 /// A bound on a type.
@@ -222,10 +222,10 @@ public struct ComponentExportDef {
 
 /// A value definition (from binary section 12).
 public struct ComponentValueDef {
-    public let type: ComponentValueType
+    public let type: ComponentDefValType
     public let value: [UInt8]  // Raw bytes, interpretation depends on type
 
-    public init(type: ComponentValueType, value: [UInt8]) {
+    public init(type: ComponentDefValType, value: [UInt8]) {
         self.type = type
         self.value = value
     }

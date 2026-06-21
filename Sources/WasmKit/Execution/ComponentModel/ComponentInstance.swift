@@ -171,7 +171,7 @@
         let instance: InternalComponentInstance
 
         /// Type resolver for nested type lookups during canonical ABI operations
-        let resolveType: (ComponentTypeIndex) throws -> ComponentValueType
+        let resolveType: (ComponentTypeIndex) throws -> ComponentDefValType
     }
 
     /// Type-safe handle to a component function entity.
@@ -196,7 +196,7 @@
 
         /// Resolves a type index to its component value type.
         /// Used for parsing nested types in WAVE arguments.
-        public func resolveType(_ index: ComponentTypeIndex) throws -> ComponentValueType {
+        public func resolveType(_ index: ComponentTypeIndex) throws -> ComponentDefValType {
             try handle.resolveType(index)
         }
 

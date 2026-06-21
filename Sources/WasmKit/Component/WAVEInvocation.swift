@@ -126,7 +126,7 @@
         }
 
         // Use the component's type resolver for nested type lookups.
-        let resolver: (ComponentTypeIndex) throws -> ComponentValueType = { idx in
+        let resolver: (ComponentTypeIndex) throws -> ComponentDefValType = { idx in
             try function.resolveType(idx)
         }
 

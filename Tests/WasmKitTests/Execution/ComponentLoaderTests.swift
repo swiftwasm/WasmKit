@@ -98,7 +98,7 @@
             component.coreInstanceDefs.append(.instantiate(moduleIndex: 0, args: []))
 
             // Try to lift a function that doesn't exist
-            let funcType = ComponentFuncType(params: [], result: .s32)
+            let funcType = ComponentFuncType(params: [], result: .primitive(.s32))
             component.canonicalDefinitions.append(
                 ParsedCanonicalDefinition(
                     kind: .lift(coreInstanceIndex: 0, functionName: "nonexistent", type: funcType)
@@ -175,7 +175,7 @@
             component.imports.append(
                 ParsedComponentImport(
                     name: "my-import",
-                    kind: .function(ComponentFuncType(params: [], result: .s32))
+                    kind: .function(ComponentFuncType(params: [], result: .primitive(.s32)))
                 ))
 
             // Provide a coreInstance instead of a function
@@ -285,7 +285,7 @@
 
             #expect(doubleFunc.type.params.count == 1)
             #expect(doubleFunc.type.params[0].name == "value")
-            #expect(doubleFunc.type.result == .s32)
+            #expect(doubleFunc.type.result == .primitive(.s32))
 
             // Test invocation
             let results = try doubleFunc.invoke([.s32(21)])
