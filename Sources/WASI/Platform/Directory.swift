@@ -1,3 +1,4 @@
+import SystemExtras
 import SystemPackage
 
 struct DirEntry {
@@ -90,12 +91,15 @@ extension DirEntry: WASIDir, FdWASIEntry {
             symlinkFollow: symlinkFollow, path: path,
             oflags: [], accessMode: .write, fdflags: []
         )
-        defer { try? fd.close() }
-        let (access, modification) = try WASIAbi.Timestamp.platformTimeSpec(
-            atim: atim, mtim: mtim, fstFlags: fstFlags
-        )
-        try WASIAbi.Errno.translatingPlatformErrno {
-            try fd.setTimes(access: access, modification: modification)
+        try withThrowing {
+            let (access, modification) = try WASIAbi.Timestamp.platformTimeSpec(
+                atim: atim, mtim: mtim, fstFlags: fstFlags
+            )
+            try WASIAbi.Errno.translatingPlatformErrno {
+                try fd.setTimes(access: access, modification: modification)
+            }
+        } defer: {
+            try fd.close()
         }
     }
 
