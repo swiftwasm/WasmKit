@@ -202,7 +202,7 @@
             case "func":
                 // Handle function imports
                 let funcId = try parser.takeId()
-                #warning("Skipping the type constraint as unimplemented")
+                // TODO: Skipping the type constraint as unimplemented
                 var depth = 1
                 while depth > 0 {
                     if try parser.take(.leftParen) {
@@ -323,7 +323,7 @@
                 _ = try currentComponent.coreMemoriesMap.add(memDef)
             case .table, .global, .type, .module, .instance:
                 // TODO: Add support for table and global aliases
-                #warning("Not all core alias sorts supported yet")
+                // TODO: Not all core alias sorts supported yet
                 break
             }
 
@@ -891,7 +891,7 @@
                     typeDecls.append(InstanceTypeDef.TypeDecl(id: typeId, valueType: valueType))
                 case "export":
                     let exportName = try parser.expectString()
-                    #warning("Skipping the type constraint as unimplemented")
+                    // TODO: Skipping the type constraint as unimplemented
                     var depth = 1
                     while depth > 0 {
                         if try parser.take(.leftParen) {
@@ -928,7 +928,7 @@
                     typeDecls.append(ComponentInnerTypeDef.TypeDecl(id: typeId, valueType: valueType))
                 case "import":
                     let importName = try parser.expectString()
-                    #warning("Skipping the type constraint as unimplemented")
+                    // TODO: Skipping the type constraint as unimplemented
                     var depth = 1
                     while depth > 0 {
                         if try parser.take(.leftParen) {
@@ -944,7 +944,7 @@
                 case "export":
                     let exportName = try parser.expectString()
 
-                    #warning("Skipping the type constraint as unimplemented")
+                    // TODO: Skipping the type constraint as unimplemented
                     var depth = 1
                     while depth > 0 {
                         if try parser.take(.leftParen) {

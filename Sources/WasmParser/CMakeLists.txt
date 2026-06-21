@@ -11,4 +11,4 @@ add_wasmkit_library(WasmParser
 )
 
 target_link_wasmkit_libraries(WasmParser PUBLIC
-  WasmTypes SystemPackage)
+  SystemExtras WasmTypes SystemPackage)

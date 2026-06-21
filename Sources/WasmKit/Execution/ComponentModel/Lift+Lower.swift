@@ -1425,7 +1425,7 @@
             default:
                 // For complex types, we'll need heap-based ABI
                 // For now, return empty to avoid crashes - these will fail at runtime
-                #warning("Complex types not supported in `flattenedComponentDefValType`")
+                // TODO: Complex types not supported in `flattenedComponentDefValType`
                 return []
             }
         }

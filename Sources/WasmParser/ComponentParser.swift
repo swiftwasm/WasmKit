@@ -467,7 +467,7 @@
             // Handle version suffix if present
             if prefix == 0x01 {
                 let suffixLen: UInt32 = try parseUnsigned()
-                #warning("Version suffix skipped in `parseImportExportName` as not implemented yet")
+                // TODO: Version suffix skipped in `parseImportExportName` as not implemented yet
                 _ = try stream.consume(count: Int(suffixLen))  // Skip version suffix for now
             }
 

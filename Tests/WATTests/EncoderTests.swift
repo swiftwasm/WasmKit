@@ -69,7 +69,7 @@ struct EncoderTests {
         }
 
         var parser = WastParser(
-            try String(contentsOf: wast),
+            try String(contentsOf: wast, encoding: .utf8),
             features: Spectest.deriveFeatureSet(wast: wast)
         )
         var watModules: [ModuleDirective] = []
@@ -104,7 +104,7 @@ struct EncoderTests {
         }
 
         switch module.source {
-        case .text(var wat):
+        case .text(let wat):
             #expect(throws: (any Error).self, diagnostic()) {
                 _ = try wat.encode()
                 recordFail()
@@ -433,7 +433,7 @@ struct EncoderTests {
                 nameBytes = section.bytes
             }
         }
-        let sectionBytes = try #require(Array(nameBytes ?? []))
+        let sectionBytes = Array(nameBytes ?? [])
         let nameParser = NameSectionParser(
             stream: StaticByteStream(bytes: sectionBytes)
         )

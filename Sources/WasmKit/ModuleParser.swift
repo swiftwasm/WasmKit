@@ -1,3 +1,4 @@
+import SystemExtras
 import SystemPackage
 import WasmParser
 
@@ -17,10 +18,13 @@ public func parseWasm(filePath: FilePath, features: WasmFeatureSet = .default) t
         let accessMode: FileDescriptor.AccessMode = .readOnly
     #endif
     let fileHandle = try FileDescriptor.open(filePath, accessMode)
-    defer { try? fileHandle.close() }
-    let stream = try FileHandleStream(fileHandle: fileHandle)
-    let module = try parseModule(stream: stream, features: features)
-    return module
+    return try withThrowing {
+        let stream = try FileHandleStream(fileHandle: fileHandle)
+        let module = try parseModule(stream: stream, features: features)
+        return module
+    } defer: {
+        try fileHandle.close()
+    }
 }
 
 /// Parse a given byte array as a WebAssembly binary format file

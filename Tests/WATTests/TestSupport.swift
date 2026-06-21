@@ -18,7 +18,7 @@ enum TestSupport {
     ) throws -> Result {
         let tempdir = URL(fileURLWithPath: NSTemporaryDirectory())
         let templatePath = tempdir.appendingPathComponent("WasmKit.XXXXXX")
-        var template = [UInt8](templatePath.path.utf8).map({ Int8($0) }) + [Int8(0)]
+        var template = [UInt8](templatePath.path.utf8).map({ UInt8($0) }) + [UInt8(0)]
 
         #if os(Windows)
             if _mktemp_s(&template, template.count) != 0 {
@@ -37,7 +37,7 @@ enum TestSupport {
             }
         #endif
 
-        let path = String(cString: template)
+        let path = String(decoding: template.dropLast(), as: UTF8.self)
         var shouldRetain = false
         defer {
             if !shouldRetain {

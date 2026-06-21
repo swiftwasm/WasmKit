@@ -1217,11 +1217,11 @@
                 // Validate the kind matches
                 switch (required.kind, provided) {
                 case (.function, .function):
-                    #warning("Function type compatibility not covered yet in `ComponentLoader.validateImports")
+                    // TODO: Function type compatibility not covered yet in `ComponentLoader.validateImports
                     break
 
                 case (.value, .value):
-                    #warning("Value type compatibility not covered yet in `ComponentLoader.validateImports")
+                    // TODO: Value type compatibility not covered yet in `ComponentLoader.validateImports
                     break
 
                 case (.instance, .instance):

@@ -499,7 +499,7 @@
                     )
                 }
 
-                #warning("Instance types not fully supported in component binary encoder")
+                // TODO: Instance types not fully supported in component binary encoder
                 for export in instanceType.exports {
                     encoder.output.append(0x04)  // export declaration tag
                     encoder.output.append(0x00)  // outer count (simplified)
@@ -524,7 +524,7 @@
                     )
                 }
 
-                #warning("Imports and exports not fully supported in component binary encoder")
+                // TODO: Imports and exports not fully supported in component binary encoder
                 for importDecl in componentType.imports {
                     encoder.output.append(0x03)  // import declaration tag
                     encoder.output.append(0x00)  // outer count (simplified)
@@ -776,7 +776,7 @@
                         encoder.output.append(0x00)  // sort: core
                         encoder.output.append(coreSort.binaryEncoding)
                     case .func, .value, .type, .component, .instance:
-                        #warning("Unhandled cases for core aliases in `encodeBatchedAliases`")
+                        // TODO: Unhandled cases for core aliases in `encodeBatchedAliases`
                         // Non-core sorts not yet supported in batched aliases
                         break
                     }
@@ -809,11 +809,11 @@
                             coreFunctionCount += 1
                         case .table, .global, .type, .module, .instance:
                             // TODO: Track table and global counts
-                            #warning("Table and global counts not tracked in `encodeBatchedAlises`")
+                            // TODO: Table and global counts not tracked in `encodeBatchedAlises`
                             break
                         }
                     case .func, .value, .type, .component, .instance:
-                        #warning("Component-level alias counts not tracked in `encodeBatchedAlises`")
+                        // TODO: Component-level alias counts not tracked in `encodeBatchedAlises`
                         break
                     }
                 }
@@ -882,7 +882,7 @@
                             idx += 1
                         }
                     }
-                    #warning("Non-core func aliases not fully supported in component binary encoder")
+                    // TODO: Non-core func aliases not fully supported in component binary encoder
                     coreFuncIndex = coreFunctionCount - (emittedCoreFuncAliases.count - idx)
                 }
 
@@ -1075,12 +1075,12 @@
                     encoder.output.append(0x01)  // canon.lower
                     encoder.output.append(0x00)  // sub-opcode
 
-                    #warning("No function imports in enabled test cases yet to exercise this code path fully")
+                    // TODO: No function imports in enabled test cases yet to exercise this code path fully
                     // Reference the component function by its aliased index
                     encoder.writeUnsignedLEB128(UInt32(componentFuncIndex))
 
                     // No options for now
-                    #warning("canon.lower options not emitted yet in `encodeSingleCanon`")
+                    // TODO: canon.lower options not emitted yet in `encodeSingleCanon`
                     encoder.writeUnsignedLEB128(UInt32(0))  // 0 options
                 }
                 coreFunctionCount += 1  // canon.lower creates a core function

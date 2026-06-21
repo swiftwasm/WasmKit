@@ -1,4 +1,5 @@
 import ArgumentParser
+import SystemExtras
 import SystemPackage
 import WAT
 
@@ -81,45 +82,49 @@ package struct Wat2wasm: ParsableCommand {
         let filePath = FilePath(path)
         guard filePath.extension == "wat" else { throw Error.unknownFileExtension(filePath.extension) }
         let fileHandle = try FileDescriptor.open(filePath, .readOnly)
-        defer { try? fileHandle.close() }
+        try withThrowing {
+            let size = try fileHandle.seek(offset: 0, from: .end)
 
-        let size = try fileHandle.seek(offset: 0, from: .end)
+            let wat: String
+            if #available(macOS 11.0, iOS 14.0, macCatalyst 14.0, tvOS 14.0, visionOS 1.0, watchOS 7.0, *) {
+                wat = try String(unsafeUninitializedCapacity: Int(size)) {
+                    try fileHandle.read(fromAbsoluteOffset: 0, into: .init($0))
+                }
+            } else {
+                let watBuffer = try [UInt8](unsafeUninitializedCapacity: Int(size)) { buffer, count in
+                    count = try fileHandle.read(fromAbsoluteOffset: 0, into: .init(buffer))
+                }
+                wat = String(decoding: watBuffer, as: UTF8.self)
+            }
 
-        let wat: String
-        if #available(macOS 11.0, iOS 14.0, macCatalyst 14.0, tvOS 14.0, visionOS 1.0, watchOS 7.0, *) {
-            wat = try String(unsafeUninitializedCapacity: Int(size)) {
-                try fileHandle.read(fromAbsoluteOffset: 0, into: .init($0))
+            let wasm = try wat2wasm(wat, options: EncodeOptions(nameSection: nameSection))
+
+            var outputPath: FilePath
+
+            if let output {
+                outputPath = FilePath(output)
+            } else {
+                outputPath = filePath
+                outputPath.extension = "wasm"
+
+                guard (try? FileDescriptor.open(outputPath, .readOnly)) == nil else {
+                    throw Error.fileAlreadyExists(outputPath.string)
+                }
             }
-        } else {
-            let watBuffer = try [UInt8](unsafeUninitializedCapacity: Int(size)) { buffer, count in
-                count = try fileHandle.read(fromAbsoluteOffset: 0, into: .init(buffer))
+
+            let outputHandle = try FileDescriptor.open(
+                outputPath,
+                .writeOnly,
+                options: [.create],
+                permissions: [.ownerReadWrite, .groupRead, .otherRead]
+            )
+            try withThrowing {
+                try outputHandle.writeAll(wasm)
+            } defer: {
+                try outputHandle.close()
             }
-            wat = String(decoding: watBuffer, as: UTF8.self)
+        } defer: {
+            try fileHandle.close()
         }
-
-        let wasm = try wat2wasm(wat, options: EncodeOptions(nameSection: nameSection))
-
-        var outputPath: FilePath
-
-        if let output {
-            outputPath = FilePath(output)
-        } else {
-            outputPath = filePath
-            outputPath.extension = "wasm"
-
-            guard (try? FileDescriptor.open(outputPath, .readOnly)) == nil else {
-                throw Error.fileAlreadyExists(outputPath.string)
-            }
-        }
-
-        let outputHandle = try FileDescriptor.open(
-            outputPath,
-            .writeOnly,
-            options: [.create],
-            permissions: [.ownerReadWrite, .groupRead, .otherRead]
-        )
-        defer { try? outputHandle.close() }
-
-        try outputHandle.writeAll(wasm)
     }
 }
