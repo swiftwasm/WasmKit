@@ -7,7 +7,7 @@ import class Foundation.ProcessInfo
 let DarwinPlatforms: [Platform] = [.macOS, .iOS, .watchOS, .tvOS, .visionOS]
 
 let swiftSettings: [SwiftSetting] = [
-    .treatAllWarnings(as: .error, .when(platforms: DarwinPlatforms + [.linux, .wasi, .android, .openbsd])),
+    .treatAllWarnings(as: .error, .when(platforms: DarwinPlatforms + [.linux, .wasi, .android, .openbsd]))
 ]
 
 let cliCommandsTarget = Target.target(
