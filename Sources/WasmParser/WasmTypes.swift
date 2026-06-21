@@ -3,7 +3,7 @@ import WasmTypes
 /// Function code in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/binary/modules.html#binary-code>
-public struct Code {
+public struct Code: Sendable {
     /// Local variables in the function
     public let locals: [ValueType]
     /// Expression body of the function
@@ -34,7 +34,7 @@ extension Code: Equatable {
     }
 }
 
-public struct MemArg: Equatable {
+public struct MemArg: Equatable, Sendable {
     public let offset: UInt64
     public let align: UInt32
 
@@ -44,7 +44,7 @@ public struct MemArg: Equatable {
     }
 }
 
-public enum BlockType: Equatable {
+public enum BlockType: Equatable, Sendable {
     case empty
     case type(ValueType)
     case funcType(UInt32)
@@ -52,7 +52,7 @@ public enum BlockType: Equatable {
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#limits>
-public struct Limits: Equatable {
+public struct Limits: Equatable, Sendable {
     public var min: UInt64
     public var max: UInt64?
     public var isMemory64: Bool
@@ -72,7 +72,7 @@ public typealias MemoryType = Limits
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#table-types>
-public struct TableType: Equatable {
+public struct TableType: Equatable, Sendable {
     public var elementType: ReferenceType
     public var limits: Limits
 
@@ -84,14 +84,14 @@ public struct TableType: Equatable {
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#global-types>
-public enum Mutability: Equatable {
+public enum Mutability: Equatable, Sendable {
     case constant
     case variable
 }
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#global-types>
-public struct GlobalType: Equatable {
+public struct GlobalType: Equatable, Sendable {
     public let mutability: Mutability
     public let valueType: ValueType
 
@@ -103,7 +103,7 @@ public struct GlobalType: Equatable {
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/types.html#external-types>
-public enum ExternalType {
+public enum ExternalType: Sendable {
     case function(FunctionType)
     case table(TableType)
     case memory(MemoryType)
@@ -111,14 +111,14 @@ public enum ExternalType {
 }
 
 public enum IEEE754 {
-    public struct Float32: Equatable {
+    public struct Float32: Equatable, Sendable {
         public let bitPattern: UInt32
 
         public init(bitPattern: UInt32) {
             self.bitPattern = bitPattern
         }
     }
-    public struct Float64: Equatable {
+    public struct Float64: Equatable, Sendable {
         public let bitPattern: UInt64
 
         public init(bitPattern: UInt64) {
@@ -127,7 +127,7 @@ public enum IEEE754 {
     }
 }
 
-public struct BrTable: Equatable {
+public struct BrTable: Equatable, Sendable {
     public let labelIndices: [UInt32]
     public let defaultIndex: UInt32
 
@@ -138,7 +138,7 @@ public struct BrTable: Equatable {
 }
 
 /// A custom section in a module
-public struct CustomSection: Equatable {
+public struct CustomSection: Equatable, Sendable {
     public let name: String
     public let bytes: ArraySlice<UInt8>
 }
@@ -168,7 +168,7 @@ public typealias ConstExpression = [Instruction]
 /// Table entry in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#tables>
-public struct Table: Equatable {
+public struct Table: Equatable, Sendable {
     public let type: TableType
 
     public init(type: TableType) {
@@ -178,14 +178,14 @@ public struct Table: Equatable {
 
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#memories>
-public struct Memory: Equatable {
+public struct Memory: Equatable, Sendable {
     public let type: MemoryType
 }
 
 /// Global entry in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#globals>
-public struct Global: Equatable {
+public struct Global: Equatable, Sendable {
     public let type: GlobalType
     public let initializer: ConstExpression
 }
@@ -228,7 +228,7 @@ public struct TryCatch: Equatable {
 /// Segment of elements that are initialized in a table
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#element-segments>
-public struct ElementSegment: Equatable {
+public struct ElementSegment: Equatable, Sendable {
     @usableFromInline
     struct Flag: OptionSet, Sendable {
         @usableFromInline let rawValue: UInt32
@@ -252,7 +252,7 @@ public struct ElementSegment: Equatable {
         @usableFromInline static let usesExpressions = Flag(rawValue: 1 << 2)
     }
 
-    public enum Mode: Equatable {
+    public enum Mode: Equatable, Sendable {
         case active(table: UInt32, offset: ConstExpression)
         case declarative
         case passive
@@ -272,8 +272,8 @@ public struct ElementSegment: Equatable {
 /// Data segment in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#data-segments>
-public enum DataSegment: Equatable {
-    public struct Active: Equatable {
+public enum DataSegment: Equatable, Sendable {
+    public struct Active: Equatable, Sendable {
         public let index: UInt32
         public let offset: ConstExpression
         public let initializer: ArraySlice<UInt8>
@@ -292,7 +292,7 @@ public enum DataSegment: Equatable {
 /// Exported entity in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#exports>
-public struct Export: Equatable {
+public struct Export: Equatable, Sendable {
     /// Name of the export
     public let name: String
     /// Descriptor of the export
@@ -305,7 +305,7 @@ public struct Export: Equatable {
 }
 
 /// Export descriptor
-public enum ExportDescriptor: Equatable {
+public enum ExportDescriptor: Equatable, Sendable {
     /// Function export
     case function(FunctionIndex)
     /// Table export
@@ -321,7 +321,7 @@ public enum ExportDescriptor: Equatable {
 /// Import entity in a module
 /// > Note:
 /// <https://webassembly.github.io/spec/core/syntax/modules.html#imports>
-public struct Import: Equatable {
+public struct Import: Equatable, Sendable {
     /// Module name imported from
     public let module: String
     /// Name of the import
@@ -337,7 +337,7 @@ public struct Import: Equatable {
 }
 
 /// Import descriptor
-public enum ImportDescriptor: Equatable {
+public enum ImportDescriptor: Equatable, Sendable {
     /// Function import
     case function(TypeIndex)
     /// Table import

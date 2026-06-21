@@ -4,8 +4,8 @@
 
 import WasmTypes
 
-public enum Instruction: Equatable {
-    public enum Load: Equatable {
+public enum Instruction: Equatable, Sendable {
+    public enum Load: Equatable, Sendable {
         case i32Load
         case i64Load
         case f32Load
@@ -41,7 +41,7 @@ public enum Instruction: Equatable {
         case v128Load32Zero
         case v128Load64Zero
     }
-    public enum Store: Equatable {
+    public enum Store: Equatable, Sendable {
         case i32Store
         case i64Store
         case f32Store
@@ -60,7 +60,7 @@ public enum Instruction: Equatable {
         case i64AtomicStore32
         case v128Store
     }
-    public enum Cmp: Equatable {
+    public enum Cmp: Equatable, Sendable {
         case i32Eq
         case i32Ne
         case i32LtS
@@ -94,7 +94,7 @@ public enum Instruction: Equatable {
         case f64Le
         case f64Ge
     }
-    public enum Unary: Equatable {
+    public enum Unary: Equatable, Sendable {
         case i32Clz
         case i32Ctz
         case i32Popcnt
@@ -121,7 +121,7 @@ public enum Instruction: Equatable {
         case i64Extend16S
         case i64Extend32S
     }
-    public enum Binary: Equatable {
+    public enum Binary: Equatable, Sendable {
         case i32Add
         case i32Sub
         case i32Mul
@@ -167,7 +167,7 @@ public enum Instruction: Equatable {
         case f64Max
         case f64Copysign
     }
-    public enum Conversion: Equatable {
+    public enum Conversion: Equatable, Sendable {
         case i32WrapI64
         case i32TruncF32S
         case i32TruncF32U
@@ -202,7 +202,7 @@ public enum Instruction: Equatable {
         case i64TruncSatF64S
         case i64TruncSatF64U
     }
-    public enum Simd: Equatable {
+    public enum Simd: Equatable, Sendable {
         case i8x16Swizzle
         case i8x16Splat
         case i16x8Splat
@@ -402,7 +402,7 @@ public enum Instruction: Equatable {
         case i32x4ExtaddPairwiseI16X8S
         case i32x4ExtaddPairwiseI16X8U
     }
-    public enum SimdLane: Equatable {
+    public enum SimdLane: Equatable, Sendable {
         case i8x16ExtractLaneS
         case i8x16ExtractLaneU
         case i8x16ReplaceLane
@@ -418,7 +418,7 @@ public enum Instruction: Equatable {
         case f64x2ExtractLane
         case f64x2ReplaceLane
     }
-    public enum SimdMemLane: Equatable {
+    public enum SimdMemLane: Equatable, Sendable {
         case v128Load8Lane
         case v128Load16Lane
         case v128Load32Lane

@@ -182,7 +182,7 @@ enum WasmGen {
         var code = """
             import WasmTypes
 
-            public enum Instruction: Equatable {
+            public enum Instruction: Equatable, Sendable {
 
             """
 
@@ -190,7 +190,7 @@ enum WasmGen {
 
         for instruction in categorized {
             guard let categoryTypeName = instruction.categoryTypeName else { continue }
-            code += "    public enum \(categoryTypeName): Equatable {\n"
+            code += "    public enum \(categoryTypeName): Equatable, Sendable {\n"
             for sourceInstruction in instruction.sourceInstructions {
                 code += "        case \(sourceInstruction.name.enumCase)\n"
             }
