@@ -6,6 +6,10 @@ import class Foundation.ProcessInfo
 
 let DarwinPlatforms: [Platform] = [.macOS, .iOS, .watchOS, .tvOS, .visionOS]
 
+let swiftSettings: [SwiftSetting] = [
+    .treatAllWarnings(as: .error, .when(platforms: DarwinPlatforms + [.linux, .wasi, .android, .openbsd])),
+]
+
 let cliCommandsTarget = Target.target(
     name: "CLICommands",
     dependencies: [
@@ -15,7 +19,8 @@ let cliCommandsTarget = Target.target(
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
         .product(name: "SystemPackage", package: "swift-system"),
     ],
-    exclude: ["CMakeLists.txt"]
+    exclude: ["CMakeLists.txt"],
+    swiftSettings: swiftSettings
 )
 
 let package = Package(
@@ -41,7 +46,8 @@ let package = Package(
         .executableTarget(
             name: "CLI",
             dependencies: ["CLICommands"],
-            exclude: ["CMakeLists.txt"]
+            exclude: ["CMakeLists.txt"],
+            swiftSettings: swiftSettings
         ),
         .target(
             name: "WasmKit",
@@ -60,18 +66,21 @@ let package = Package(
                     condition: .when(traits: ["ComponentModel"])
                 ),
             ],
-            exclude: ["CMakeLists.txt"]
+            exclude: ["CMakeLists.txt"],
+            swiftSettings: swiftSettings
         ),
         .target(name: "_CWasmKit"),
         .target(
             name: "WasmKitFuzzing",
             dependencies: ["WasmKit"],
-            path: "FuzzTesting/Sources/WasmKitFuzzing"
+            path: "FuzzTesting/Sources/WasmKitFuzzing",
+            swiftSettings: swiftSettings
         ),
         .testTarget(
             name: "WasmKitTests",
             dependencies: ["WasmKit", "WAT", "WasmKitFuzzing"],
-            exclude: ["ExtraSuite", "CMakeLists.txt"]
+            exclude: ["ExtraSuite", "CMakeLists.txt"],
+            swiftSettings: swiftSettings
         ),
 
         .target(
@@ -83,7 +92,8 @@ let package = Package(
                     condition: .when(traits: ["ComponentModel"])
                 ),
             ],
-            exclude: ["CMakeLists.txt"]
+            exclude: ["CMakeLists.txt"],
+            swiftSettings: swiftSettings
         ),
         .testTarget(
             name: "WATTests",
@@ -93,7 +103,8 @@ let package = Package(
                     condition: .when(traits: ["ComponentModel"])
                 ),
                 "WAT",
-            ]
+            ],
+            swiftSettings: swiftSettings
         ),
 
         .target(
@@ -106,7 +117,8 @@ let package = Package(
                     condition: .when(traits: ["ComponentModel"])
                 ),
             ],
-            exclude: ["CMakeLists.txt"]
+            exclude: ["CMakeLists.txt"],
+            swiftSettings: swiftSettings
         ),
         .testTarget(
             name: "WasmParserTests",
@@ -116,22 +128,25 @@ let package = Package(
                     name: "ComponentModel",
                     condition: .when(traits: ["ComponentModel"])
                 ),
-            ]
+            ],
+            swiftSettings: swiftSettings
         ),
 
-        .target(name: "WasmTypes", exclude: ["CMakeLists.txt"]),
+        .target(name: "WasmTypes", exclude: ["CMakeLists.txt"], swiftSettings: swiftSettings),
 
         .target(
             name: "WasmKitWASI",
             dependencies: ["WasmKit", "WASI"],
-            exclude: ["CMakeLists.txt"]
+            exclude: ["CMakeLists.txt"],
+            swiftSettings: swiftSettings
         ),
         .target(
             name: "WASI",
             dependencies: ["WasmTypes", "SystemExtras"],
-            exclude: ["CMakeLists.txt"]
+            exclude: ["CMakeLists.txt"],
+            swiftSettings: swiftSettings
         ),
-        .testTarget(name: "WASITests", dependencies: ["WASI", "WasmKitWASI"]),
+        .testTarget(name: "WASITests", dependencies: ["WASI", "WasmKitWASI"], swiftSettings: swiftSettings),
 
         .target(
             name: "SystemExtras",
@@ -140,7 +155,7 @@ let package = Package(
                 .target(name: "CSystemExtras", condition: .when(platforms: [.wasi])),
             ],
             exclude: ["CMakeLists.txt"],
-            swiftSettings: [
+            swiftSettings: swiftSettings + [
                 .define("SYSTEM_PACKAGE_DARWIN", .when(platforms: DarwinPlatforms))
             ]
         ),
@@ -156,14 +171,16 @@ let package = Package(
                 "WasmKit",
                 "WasmKitWASI",
                 .product(name: "SystemPackage", package: "swift-system"),
-            ]
+            ],
+            swiftSettings: swiftSettings
         ),
 
         .target(
             name: "ComponentModel",
             dependencies: [
                 "WasmTypes"
-            ]
+            ],
+            swiftSettings: swiftSettings
         ),
 
         .executableTarget(
@@ -173,7 +190,8 @@ let package = Package(
                 "WITOverlayGenerator",
                 "WITExtractor",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
-            ]
+            ],
+            swiftSettings: swiftSettings
         ),
 
         .target(
@@ -183,9 +201,10 @@ let package = Package(
                     name: "ComponentModel",
                     condition: .when(traits: ["ComponentModel"])
                 )
-            ]
+            ],
+            swiftSettings: swiftSettings
         ),
-        .testTarget(name: "WITTests", dependencies: ["WIT"]),
+        .testTarget(name: "WITTests", dependencies: ["WIT"], swiftSettings: swiftSettings),
 
         .target(
             name: "WAVE",
@@ -194,7 +213,8 @@ let package = Package(
                     name: "ComponentModel",
                     condition: .when(traits: ["ComponentModel"])
                 )
-            ]
+            ],
+            swiftSettings: swiftSettings
         ),
         .testTarget(
             name: "WAVETests",
@@ -205,7 +225,8 @@ let package = Package(
                     name: "ComponentModel",
                     condition: .when(traits: ["ComponentModel"])
                 ),
-            ]
+            ],
+            swiftSettings: swiftSettings
         ),
 
         .target(
@@ -217,7 +238,8 @@ let package = Package(
                     name: "ComponentModel",
                     condition: .when(traits: ["ComponentModel"])
                 ),
-            ]
+            ],
+            swiftSettings: swiftSettings
         ),
         .testTarget(
             name: "ComponentLinkerTests",
@@ -229,14 +251,15 @@ let package = Package(
                     name: "ComponentModel",
                     condition: .when(traits: ["ComponentModel"])
                 ),
-            ]
+            ],
+            swiftSettings: swiftSettings
         ),
 
-        .target(name: "WITOverlayGenerator", dependencies: ["WIT"]),
+        .target(name: "WITOverlayGenerator", dependencies: ["WIT"], swiftSettings: swiftSettings),
         .target(name: "_CabiShims"),
 
-        .target(name: "WITExtractor"),
-        .testTarget(name: "WITExtractorTests", dependencies: ["WITExtractor", "WIT"]),
+        .target(name: "WITExtractor", swiftSettings: swiftSettings),
+        .testTarget(name: "WITExtractorTests", dependencies: ["WITExtractor", "WIT"], swiftSettings: swiftSettings),
 
         .target(
             name: "GDBRemoteProtocol",
@@ -244,12 +267,14 @@ let package = Package(
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "NIOCore", package: "swift-nio"),
             ],
-            exclude: ["LICENSE.txt"]
+            exclude: ["LICENSE.txt"],
+            swiftSettings: swiftSettings
         ),
         .testTarget(
             name: "GDBRemoteProtocolTests",
             dependencies: ["GDBRemoteProtocol"],
-            exclude: ["LICENSE.txt"]
+            exclude: ["LICENSE.txt"],
+            swiftSettings: swiftSettings
         ),
     ]
 )
@@ -288,6 +313,7 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
             name: "WITOverlayGeneratorTests",
             dependencies: ["WITOverlayGenerator", "WasmKit", "WasmKitWASI"],
             exclude: ["Fixtures", "Compiled", "Generated", "EmbeddedSupport"],
+            swiftSettings: swiftSettings,
             plugins: [.plugin(name: "GenerateOverlayForTesting")]
         ),
         .plugin(
@@ -300,7 +326,8 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
         ),
         .testTarget(
             name: "WITExtractorPluginTests",
-            exclude: ["Fixtures"]
+            exclude: ["Fixtures"],
+            swiftSettings: swiftSettings
         ),
 
         .target(
@@ -313,7 +340,8 @@ if ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] == nil {
                 "WasmKitWASI",
                 "GDBRemoteProtocol",
             ],
-            exclude: ["LICENSE.txt"]
+            exclude: ["LICENSE.txt"],
+            swiftSettings: swiftSettings
         ),
     ])
 

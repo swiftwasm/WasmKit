@@ -1,6 +1,6 @@
 #if ComponentModel
     import ComponentModel
-    package import WAT
+    import WAT
     import WIT
 
     /// Serializes WIT world definitions into the component-type custom section
