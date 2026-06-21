@@ -164,7 +164,7 @@
 
                     case .assertInvalid, .assertMalformed, .register, .invoke:
                         // TODO: Not implemented yet
-                        #warning(".assertInvalid, .assertMalformed, .register, .invoke commands not implemented yet")
+                        // TODO: .assertInvalid, .assertMalformed, .register, .invoke commands not implemented yet
                         continue
                     }
                 } catch {
