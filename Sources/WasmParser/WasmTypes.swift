@@ -205,7 +205,7 @@ public struct Tag: Equatable {
 /// Catch clause within a `try_table` instruction.
 /// > Note:
 /// <https://webassembly.github.io/exception-handling/core/binary/instructions.html#control-instructions>
-public enum CatchClause: Equatable {
+public enum CatchClause: Equatable, Sendable {
     /// Catches an exception matching the given tag and branches with payload values.
     case `catch`(tagIndex: TagIndex, labelIndex: UInt32)
     /// Like `catch`, but also passes an `exnref`.
@@ -217,7 +217,7 @@ public enum CatchClause: Equatable {
 }
 
 /// The catch clauses of a `try_table` instruction.
-public struct TryCatch: Equatable {
+public struct TryCatch: Equatable, Sendable {
     public let catches: [CatchClause]
 
     public init(catches: [CatchClause]) {
