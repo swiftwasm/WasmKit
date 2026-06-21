@@ -89,10 +89,7 @@ let package = Package(
         .testTarget(
             name: "WATTests",
             dependencies: [
-                .target(
-                    name: "WasmTools",
-                    condition: .when(traits: ["ComponentModel"])
-                ),
+                "WasmTools",
                 "WAT",
             ]
         ),

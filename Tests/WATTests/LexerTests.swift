@@ -56,7 +56,7 @@ struct LexerTests {
         #expect(try collectToken("\"foo\"") == [.string(Array("foo".utf8))])
         #expect(try collectToken("\"\\t\\n\\r\\\"\\\\\"") == [.string(Array("\t\n\r\"\\".utf8))])
         #expect(try collectToken("\"\\u{1F600}\"") == [.string(Array("😀".utf8))])
-        #expect(try collectToken("$\"foo\"") == [.id])
+        #expect(try collectToken("$\"foo\"") == [.quotedId])
         #expect(try collectToken("0$x") == [.unknown])
     }
 

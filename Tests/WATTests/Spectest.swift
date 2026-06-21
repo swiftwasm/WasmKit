@@ -16,7 +16,9 @@ enum Spectest {
         testsuitePath.appendingPathComponent(file)
     }
 
-    static func wastFiles(include: [String] = [], exclude: [String] = ["annotations.wast"]) -> [URL] {
+    // id.wast exercises annotation IDs that WABT and WasmTools don't support;
+    // it's covered separately in `annotationProposalSpectest()`.
+    static func wastFiles(include: [String] = [], exclude: [String] = ["id.wast"]) -> [URL] {
         #if os(Android)
             return []
         #else

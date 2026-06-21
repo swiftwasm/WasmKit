@@ -1,5 +1,35 @@
 import WasmParser
 
+/// A `@custom` annotation declaring an inline custom section in WAT.
+struct CustomSectionDecl {
+    /// Standard section kinds used in placement directives.
+    enum SectionKind: String {
+        case type
+        case `import`
+        case `func`
+        case table
+        case memory
+        case global
+        case export
+        case start
+        case elem
+        case code
+        case data
+        case last
+    }
+
+    /// Where this custom section should be placed in the binary.
+    enum Placement: Equatable {
+        case unplaced
+        case before(SectionKind)
+        case after(SectionKind)
+    }
+
+    let name: String
+    let placement: Placement
+    let content: [UInt8]
+}
+
 /// Options for encoding a WebAssembly module into a binary format.
 public struct EncodeOptions: Sendable {
     /// Whether to include the name section.
@@ -17,7 +47,7 @@ public struct EncodeOptions: Sendable {
 /// Transforms a WebAssembly text format (WAT) string into a WebAssembly binary format byte array.
 ///
 /// This function supports both core modules and Component Model components (when the `ComponentModel`
-/// trait is enabled). It tries to parse as a module first, then falls back to component parsing.
+/// trait is enabled). It looks ahead to determine whether the input is a component or core module.
 ///
 /// - Parameter input: The WAT string to transform
 /// - Returns: The WebAssembly binary format byte array
@@ -66,10 +96,26 @@ public func wat2wasm(
     #endif
 }
 
+/// The origin of a module name: either from a `$id` identifier or an `@name` annotation.
+public enum ModuleName: Equatable {
+    /// From `$id`; value includes the `$` prefix.
+    case identifier(String)
+    /// From `(@name "...")`; raw UTF-8 string, no prefix.
+    case annotation(String)
+
+    /// The name for the name section (`$` prefix stripped for identifiers).
+    var nameValue: String {
+        switch self {
+        case .identifier(let s): String(s.dropFirst())
+        case .annotation(let s): s
+        }
+    }
+}
+
 /// A WAT module representation.
 public struct Wat {
-    /// The module name from `(module $name ...)`, including the `$` prefix.
-    var id: String? = nil
+    /// The module name from `(module $name ...)` or `(module (@name "...") ...)`.
+    var id: ModuleName? = nil
     var types: TypesMap
     let functionsMap: NameMapping<WatParser.FunctionDecl>
     let tablesMap: NameMapping<WatParser.TableDecl>
@@ -82,7 +128,7 @@ public struct Wat {
     let start: FunctionIndex?
     let imports: [Import]
     let exports: [Export]
-    let customSections = [CustomSection]()
+    let customSections: [CustomSectionDecl]
     let features: WasmFeatureSet
 
     let parser: Parser
@@ -101,6 +147,7 @@ public struct Wat {
             start: nil,
             imports: [],
             exports: [],
+            customSections: [],
             features: features,
             parser: Parser("")
         )
@@ -144,8 +191,16 @@ public func parseWAT(_ input: String, features: WasmFeatureSet = .default) throw
     var wat: Wat
     if try parser.takeParenBlockStart("module") {
         let moduleId = try parser.takeId()
+        let nameAnnot = try parser.takeNameAnnotation()
+        if nameAnnot != nil, try parser.takeNameAnnotation() != nil {
+            throw WatParserError("@name annotation: multiple module names", location: parser.lexer.location())
+        }
         wat = try parseWAT(&parser, features: features)
-        wat.id = moduleId?.value
+        if let nameAnnot {
+            wat.id = .annotation(nameAnnot)
+        } else if let moduleId {
+            wat.id = .identifier(moduleId.value)
+        }
         try parser.skipParenBlock()
     } else {
         // The root (module) may be omitted
@@ -305,6 +360,7 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
     var start: Parser.IndexOrId?
 
     var exportDecls: [WatParser.ExportDecl] = []
+    var customSections: [CustomSectionDecl] = []
 
     var hasNonImport = false
     func visitDecl(decl: WatParser.ModuleField) throws(WatParserError) {
@@ -413,6 +469,8 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
                 throw WatParserError("Multiple start sections", location: location)
             }
             start = startIndex
+        case .custom(let decl):
+            customSections.append(decl)
         }
     }
 
@@ -461,6 +519,7 @@ func parseWAT(_ parser: inout Parser, features: WasmFeatureSet) throws(WatParser
         start: startIndex,
         imports: imports,
         exports: exports,
+        customSections: customSections,
         features: features,
         parser: parser
     )

@@ -5,7 +5,14 @@ enum TokenKind: Equatable {
     case rightParen
     case lineComment
     case blockComment
+    /// An annotation `(@id ... )`. The lexer eagerly consumes the body and
+    /// closing `)`, returning the body's source range so recognized-annotation
+    /// parsers (e.g. `@name`, `@custom`) can re-lex it.
+    case annotation(id: String, body: Range<Lexer.Index>)
+    /// `$idchars` form. The id text is the token's source range as-is.
     case id
+    /// `$"..."` form. The Parser decodes the source range on consumption.
+    case quotedId
     case keyword
     case string([UInt8])
     case integer(FloatingPointSign?, IntegerToken)
@@ -51,10 +58,11 @@ struct Lexer {
     typealias Index = String.UnicodeScalarView.Index
     fileprivate struct Cursor {
         let input: String.UnicodeScalarView
+        let endIndex: Index
         var nextIndex: Index
 
         var isEOF: Bool {
-            return nextIndex == input.endIndex
+            return nextIndex == endIndex
         }
 
         init(input: String) {
@@ -63,7 +71,14 @@ struct Lexer {
 
         init(input: String.UnicodeScalarView) {
             self.input = input
-            self.nextIndex = self.input.startIndex
+            self.endIndex = input.endIndex
+            self.nextIndex = input.startIndex
+        }
+
+        init(input: String.UnicodeScalarView, range: Range<Index>) {
+            self.input = input
+            self.endIndex = range.upperBound
+            self.nextIndex = range.lowerBound
         }
 
         /// Seek to the given offset
@@ -74,7 +89,7 @@ struct Lexer {
 
         func peek(at offset: Int = 0) -> Unicode.Scalar? {
             precondition(offset >= 0)
-            guard self.input.index(self.nextIndex, offsetBy: offset) < self.input.endIndex else {
+            guard self.input.index(self.nextIndex, offsetBy: offset) < endIndex else {
                 return nil
             }
             let index = self.input.index(self.nextIndex, offsetBy: offset)
@@ -82,7 +97,7 @@ struct Lexer {
         }
 
         mutating func next() -> Unicode.Scalar? {
-            guard self.nextIndex < self.input.endIndex else { return nil }
+            guard self.nextIndex < endIndex else { return nil }
             defer { self.nextIndex = self.input.index(after: self.nextIndex) }
             return self.input[self.nextIndex]
         }
@@ -98,7 +113,7 @@ struct Lexer {
         mutating func eat(_ expected: String) -> Bool {
             var index = self.nextIndex
             for char in expected.unicodeScalars {
-                guard index < self.input.endIndex, self.input[index] == char else {
+                guard index < endIndex, self.input[index] == char else {
                     return false
                 }
                 index = self.input.index(after: index)
@@ -126,13 +141,13 @@ struct Lexer {
         func match(_ expected: String, eof: Bool = false) -> Bool {
             var index = self.nextIndex
             for char in expected.unicodeScalars {
-                guard index < self.input.endIndex, self.input[index] == char else {
+                guard index < endIndex, self.input[index] == char else {
                     return false
                 }
                 index = self.input.index(after: index)
             }
             if eof {
-                return index == self.input.endIndex
+                return index == endIndex
             }
             return true
         }
@@ -155,6 +170,13 @@ struct Lexer {
 
     init(input: String) {
         self.cursor = Cursor(input: input)
+    }
+
+    /// Construct a sub-lexer that shares another lexer's input but is bounded
+    /// to the given source range. Indices remain valid in the parent's input,
+    /// so error locations from the sub-lexer map back to the original source.
+    init(parent: Lexer, range: Range<Index>) {
+        self.cursor = Cursor(input: parent.cursor.input, range: range)
     }
 
     /// Seek to the given offset
@@ -195,6 +217,12 @@ struct Lexer {
             case ";":
                 _ = cursor.next()
                 return try lexBlockComment()
+            case "@":
+                _ = cursor.next()
+                let id = try readAnnotationId()
+                let bodyStart = cursor.nextIndex
+                let bodyEnd = try consumeAnnotationBody()
+                return .annotation(id: id, body: bodyStart..<bodyEnd)
             default: return .leftParen
             }
         case ")":
@@ -202,30 +230,25 @@ struct Lexer {
             return .rightParen
         case ";":
             _ = cursor.next()
-            // Lex ";; ..." line comment
             guard cursor.eat(";") else {
                 throw cursor.createError("Expected ';' after ';' line comment")
             }
-            while let char = cursor.next() {
-                switch char {
-                case "\r":
-                    if cursor.peek() == "\n" {
-                        _ = cursor.next()
-                    }
-                    return .lineComment
-                case "\n":
-                    return .lineComment
-                default: break
-                }
-            }
-            // source file ends with line comment
+            skipLineComment()
             return .lineComment
         case "\"",
             _ where isIdChar(initialChar):
             let (kind, text) = try lexReservedChars(initial: initialChar)
             switch kind {
+            case .quotedId:
+                // $"..." quoted identifier form. The Parser decodes the source
+                // range and enforces non-empty + valid UTF-8.
+                return .quotedId
             case .idChars:
                 if initialChar == "$" {
+                    // id ::= '$' idchar+; must have at least one char after '$'
+                    guard text.count > 1 else {
+                        throw cursor.createError("empty identifier")
+                    }
                     return .id
                 }
                 do {
@@ -303,6 +326,23 @@ struct Lexer {
         }
     }
 
+    /// Skip a line comment body. The leading `;;` has already been consumed.
+    /// Consumes through the end of line (or EOF).
+    private mutating func skipLineComment() {
+        while let char = cursor.next() {
+            switch char {
+            case "\r":
+                if cursor.peek() == "\n" {
+                    _ = cursor.next()
+                }
+                return
+            case "\n":
+                return
+            default: break
+            }
+        }
+    }
+
     private mutating func lexBlockComment() throws(WatParserError) -> TokenKind {
         var level = 1
         while true {
@@ -328,6 +368,91 @@ struct Lexer {
         }
     }
 
+    /// Read an annotation ID after `(@` has been consumed.
+    private mutating func readAnnotationId() throws(WatParserError) -> String {
+        if let ch = cursor.peek(), ch == "\"" {
+            _ = cursor.next()
+            let str = try readString()
+            guard !str.isEmpty else {
+                throw cursor.createError("empty annotation id")
+            }
+            guard let id = String(validating: str, as: UTF8.self) else {
+                throw cursor.createError("malformed UTF-8 encoding")
+            }
+            return id
+        } else if let ch = cursor.peek(), isIdChar(ch) {
+            let idStart = cursor.nextIndex
+            _ = cursor.next()
+            while let next = cursor.peek(), isIdChar(next) {
+                _ = cursor.next()
+            }
+            return String(cursor.input[idStart..<cursor.nextIndex])
+        } else {
+            throw cursor.createError("empty annotation id")
+        }
+    }
+
+    /// Consume the body of an annotation, tracking paren depth. Returns the
+    /// index of the closing `)` (i.e. the body's exclusive end), with the
+    /// cursor advanced just past it.
+    ///
+    /// This method has its own token dispatch rather than delegating to
+    /// `classifyToken` because annotation bodies differ from top-level WAT
+    /// in three ways:
+    /// - A lone `;` is legal body content (not the start of a line comment).
+    /// - Non-ASCII and control characters must be rejected (`classifyToken`
+    ///   returns `.unknown` instead).
+    /// - `(@)` is a valid parenthesized group (not a malformed annotation),
+    ///   so `(@` must peek ahead before consuming the annotation ID.
+    private mutating func consumeAnnotationBody() throws(WatParserError) -> Lexer.Index {
+        var depth = 1
+        while true {
+            guard let char = cursor.peek() else {
+                throw cursor.createError("unclosed annotation")
+            }
+            switch char {
+            case "(":
+                _ = cursor.next()
+                if cursor.peek() == ";" {
+                    // Block comment: (; ... ;), fully consumed, no depth change
+                    _ = cursor.next()
+                    _ = try lexBlockComment()
+                } else {
+                    if cursor.peek() == "@" {
+                        // Consume the annotation ID so body-skipping doesn't misparse it.
+                        let charAfterAt = cursor.peek(at: 1)
+                        if let c = charAfterAt, isIdChar(c) || c == "\"" {
+                            _ = cursor.next()
+                            _ = try readAnnotationId()
+                        }
+                    }
+                    depth += 1
+                }
+            case ")":
+                let closingParenIndex = cursor.nextIndex
+                _ = cursor.next()
+                depth -= 1
+                if depth == 0 {
+                    return closingParenIndex
+                }
+            case "\"":
+                _ = cursor.next()
+                _ = try readString()
+            case ";":
+                _ = cursor.next()
+                if cursor.eat(";") {
+                    skipLineComment()
+                }
+            // A lone `;` is just a regular character in annotation body
+            default:
+                if isIllegalWATChar(char) {
+                    throw cursor.createError("illegal character")
+                }
+                _ = cursor.next()
+            }
+        }
+    }
+
     private mutating func peekNonWhitespaceChar() -> (index: Lexer.Index, byte: Unicode.Scalar)? {
         guard var char = cursor.peek() else { return nil }
         var start: Lexer.Index = cursor.nextIndex
@@ -340,6 +465,17 @@ struct Lexer {
             char = newChar
         }
         return (start, char)
+    }
+
+    /// Returns true if the scalar is not a legal WAT character outside of strings.
+    /// Legal: U+09 (tab), U+0A (LF), U+0D (CR), U+20..U+7E (printable ASCII).
+    private func isIllegalWATChar(_ char: Unicode.Scalar) -> Bool {
+        let value = char.value
+        return value <= 0x08
+            || (value >= 0x0B && value <= 0x0C)
+            || (value >= 0x0E && value <= 0x1F)
+            || value == 0x7F
+            || value >= 0x80
     }
 
     // https://webassembly.github.io/spec/core/text/values.html#text-idchar
@@ -359,6 +495,9 @@ struct Lexer {
     private enum ReservedKind {
         case string([UInt8])
         case idChars
+        /// A quoted identifier: `$"..."` form. The decoded bytes are discarded
+        /// here; the Parser re-decodes from the source range.
+        case quotedId
         case unknown
     }
 
@@ -387,12 +526,12 @@ struct Lexer {
         } else if numberOfIdChars == 0, strings.count == 1 {
             return (.string(strings[0]), text)
         } else if numberOfIdChars == 1, strings.count == 1, initial == "$" {
-            return (.idChars, text)
+            return (.quotedId, text)
         }
         return (.unknown, text)
     }
 
-    private mutating func readString() throws(WatParserError) -> [UInt8] {
+    mutating func readString() throws(WatParserError) -> [UInt8] {
         var copyingBuffer: [UInt8] = []
         func append(_ char: Unicode.Scalar) {
             copyingBuffer.append(contentsOf: String(char).utf8)
@@ -444,6 +583,12 @@ struct Lexer {
                     throw cursor.createError("Invalid escape sequence: \(other)")
                 }
             } else {
+                // Validate: char must be a valid stringchar (not a control character)
+                // WAT spec: char ::= U+20 | ... | U+7E | <non-control Unicode chars>
+                let value = char.value
+                if value < 0x20 || value == 0x7F {
+                    throw cursor.createError("illegal character in string")
+                }
                 append(char)
             }
         }
