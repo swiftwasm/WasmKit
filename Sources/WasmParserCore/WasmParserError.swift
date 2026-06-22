@@ -47,6 +47,7 @@ extension WasmParserError {
     }
 }
 
+#if !$Embedded
 extension BinaryInteger {
     var hexString: String {
         "0x\(String(self, radix: 16))"
@@ -86,6 +87,7 @@ extension WasmParserError: CustomStringConvertible {
         }
     }
 }
+#endif  // !$Embedded
 
 extension WasmParserError.Message {
     @usableFromInline

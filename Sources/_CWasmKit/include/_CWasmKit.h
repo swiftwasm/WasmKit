@@ -4,8 +4,13 @@
 #include <stdatomic.h>
 #include <stddef.h>
 #include <stdint.h>
+// stdio.h and stdlib.h are only available on OS-bearing platforms.
+// On bare-metal targets (e.g. RISC-V ESP32-C6 with Embedded Swift) there is no
+// file I/O, so we skip these and provide a no-op stub for wasmkit_fwrite_stderr.
+#if !defined(__riscv) || defined(__linux__)
 #include <stdio.h>
 #include <stdlib.h>
+#endif
 
 #include "Platform.h"
 
@@ -92,11 +97,30 @@ static inline void wasmkit_tc_start(
 ) {
   exec(sp, pc, md, ms, state);
 }
-#endif
 
+#else  // !WASMKIT_USE_DIRECT_THREADED_CODE
+
+// On platforms that don't support direct threaded code (e.g. bare-metal
+// RISC-V with Embedded Swift), provide stub types so Swift source files that
+// reference `wasmkit_tc_exec` still compile.  The code paths that use these
+// types are never reached when the token threading model is selected.
+typedef void (*wasmkit_tc_exec)(void);
+static inline void wasmkit_tc_start(
+    wasmkit_tc_exec exec, Sp sp, Pc pc, Md md, Ms ms, void *_Nullable state
+) { (void)exec; (void)sp; (void)pc; (void)md; (void)ms; (void)state; }
+
+#endif  // WASMKIT_USE_DIRECT_THREADED_CODE
+
+#if !defined(__riscv) || defined(__linux__)
 static inline void wasmkit_fwrite_stderr(const char *_Nonnull str, size_t len) {
   fwrite(str, 1, len, stderr);
 }
+#else
+// Bare-metal: no file I/O; output is handled by the firmware's UART/USB.
+static inline void wasmkit_fwrite_stderr(const char *_Nonnull str, size_t len) {
+    (void)str; (void)len;
+}
+#endif
 
 int wasmkit_address_sanitizer_enabled(void);
 

@@ -2,7 +2,7 @@ import WasmTypes
 
 extension Execution {
     @inline(__always)
-    private func boundsCheck(_ start: UInt64, length: UInt64, ms: Ms) throws {
+    private func boundsCheck(_ start: UInt64, length: UInt64, ms: Ms) throws(Trap) {
         let (end, overflow) = start.addingReportingOverflow(length)
         if _fastPath(!overflow && end <= UInt64(ms)) { return }
         try throwOutOfBoundsMemoryAccess()
@@ -34,7 +34,7 @@ extension Execution {
         md: Md,
         ms: Ms,
         immediate: Instruction.SimdOperand
-    ) throws -> Bool {
+    ) throws(Trap) -> Bool {
         @inline(__always)
         func storeI32(_ value: UInt32) { sp[immediate.result] = UntypedValue.i32(value) }
         @inline(__always)

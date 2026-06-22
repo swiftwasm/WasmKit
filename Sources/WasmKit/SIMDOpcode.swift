@@ -1,4 +1,4 @@
-import WasmParser
+import WasmParserCore
 
 /// A compact opcode space for all SIMD-related Wasm instructions executed by `Instruction.simd`.
 enum SIMDOpcode: UInt16 {
@@ -265,7 +265,7 @@ enum SIMDOpcode: UInt16 {
 }
 
 extension SIMDOpcode {
-    static func fromLoad(_ value: WasmParser.Instruction.Load) -> SIMDOpcode? {
+    static func fromLoad(_ value: WasmParserCore.Instruction.Load) -> SIMDOpcode? {
         switch value {
         case .v128Load: return .v128Load
         case .v128Load8X8S: return .v128Load8X8S
@@ -284,14 +284,14 @@ extension SIMDOpcode {
         }
     }
 
-    static func fromStore(_ value: WasmParser.Instruction.Store) -> SIMDOpcode? {
+    static func fromStore(_ value: WasmParserCore.Instruction.Store) -> SIMDOpcode? {
         switch value {
         case .v128Store: return .v128Store
         default: return nil
         }
     }
 
-    static func fromSimd(_ value: WasmParser.Instruction.Simd) -> SIMDOpcode? {
+    static func fromSimd(_ value: WasmParserCore.Instruction.Simd) -> SIMDOpcode? {
         switch value {
         case .i8x16Swizzle: return .i8x16Swizzle
         case .i8x16Splat: return .i8x16Splat
@@ -494,7 +494,7 @@ extension SIMDOpcode {
         }
     }
 
-    static func fromSimdLane(_ value: WasmParser.Instruction.SimdLane) -> SIMDOpcode? {
+    static func fromSimdLane(_ value: WasmParserCore.Instruction.SimdLane) -> SIMDOpcode? {
         switch value {
         case .i8x16ExtractLaneS: return .i8x16ExtractLaneS
         case .i8x16ExtractLaneU: return .i8x16ExtractLaneU
@@ -513,7 +513,7 @@ extension SIMDOpcode {
         }
     }
 
-    static func fromSimdMemLane(_ value: WasmParser.Instruction.SimdMemLane) -> SIMDOpcode? {
+    static func fromSimdMemLane(_ value: WasmParserCore.Instruction.SimdMemLane) -> SIMDOpcode? {
         switch value {
         case .v128Load8Lane: return .v128Load8Lane
         case .v128Load16Lane: return .v128Load16Lane

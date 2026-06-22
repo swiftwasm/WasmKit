@@ -1,4 +1,4 @@
-import WasmParser
+import WasmParserCore
 
 import struct WasmTypes.FunctionType
 
@@ -85,10 +85,17 @@ public struct Function: Equatable {
     ///   - arguments: The arguments to pass to the function.
     /// - Throws: A trap if the function invocation fails.
     /// - Returns: The results of the function invocation.
+    #if !$Embedded
     @discardableResult
     public func invoke(_ arguments: [Value] = []) throws -> [Value] {
         return try handle.invoke(arguments, store: store)
     }
+    #else
+    @discardableResult
+    public func invoke(_ arguments: [Value] = []) throws(Trap) -> [Value] {
+        return try handle.invoke(arguments, store: store)
+    }
+    #endif
 
     /// Invokes a function of the given address with the given parameters.
     ///
@@ -96,10 +103,17 @@ public struct Function: Equatable {
     ///   - arguments: The arguments to pass to the function.
     /// - Throws: A trap if the function invocation fails.
     /// - Returns: The results of the function invocation.
+    #if !$Embedded
     @discardableResult
     public func callAsFunction(_ arguments: [Value] = []) throws -> [Value] {
         return try invoke(arguments)
     }
+    #else
+    @discardableResult
+    public func callAsFunction(_ arguments: [Value] = []) throws(Trap) -> [Value] {
+        return try invoke(arguments)
+    }
+    #endif
 
     /// Invokes a function of the given address with the given parameters.
     ///
@@ -108,11 +122,13 @@ public struct Function: Equatable {
     ///   - runtime: The runtime to use for the function invocation.
     /// - Throws: A trap if the function invocation fails.
     /// - Returns: The results of the function invocation.
+    #if !$Embedded
     @available(*, deprecated, renamed: "invoke(_:)")
     @discardableResult
     public func invoke(_ arguments: [Value] = [], runtime: Runtime) throws -> [Value] {
         return try invoke(arguments)
     }
+    #endif
 }
 
 @available(*, deprecated, renamed: "Function", message: "Use Function instead")
@@ -166,6 +182,7 @@ extension InternalFunction: ValidatableEntity {
 }
 
 extension InternalFunction {
+    #if !$Embedded
     func invoke(_ arguments: [Value], store: Store) throws -> [Value] {
         if isWasm {
             let entity = wasm
@@ -187,6 +204,23 @@ extension InternalFunction {
             return results
         }
     }
+    #else
+    func invoke(_ arguments: [Value], store: Store) throws(Trap) -> [Value] {
+        if isWasm {
+            let entity = wasm
+            let resolvedType = store.engine.resolveType(entity.type)
+            try check(functionType: resolvedType, parameters: arguments)
+            return try executeWasm(
+                store: store,
+                function: self,
+                type: resolvedType,
+                arguments: arguments
+            )
+        } else {
+            fatalError("Host functions are not supported in embedded Swift")
+        }
+    }
+    #endif
 
     private func check(expectedTypes: [ValueType], values: [Value]) -> Bool {
         guard expectedTypes.count == values.count else { return false }
@@ -202,13 +236,13 @@ extension InternalFunction {
         return true
     }
 
-    private func check(functionType: FunctionType, parameters: [Value]) throws {
+    private func check(functionType: FunctionType, parameters: [Value]) throws(Trap) {
         guard check(expectedTypes: functionType.parameters, values: parameters) else {
             throw Trap(.parameterTypesMismatch(expected: functionType.parameters, got: parameters))
         }
     }
 
-    private func check(functionType: FunctionType, results: [Value]) throws {
+    private func check(functionType: FunctionType, results: [Value]) throws(Trap) {
         guard check(expectedTypes: functionType.results, values: results) else {
             throw Trap(.resultTypesMismatch(expected: functionType.results, got: results))
         }
@@ -244,7 +278,7 @@ struct WasmFunctionEntity {
         self.index = index
     }
 
-    mutating func ensureCompiled(store: StoreRef) throws -> InstructionSequence {
+    mutating func ensureCompiled(store: StoreRef) throws(Trap) -> InstructionSequence {
         switch code {
         case .uncompiled(let code):
             return try compile(store: store, code: code)
@@ -254,22 +288,32 @@ struct WasmFunctionEntity {
     }
 
     @inline(never)
-    mutating func compile(store: StoreRef, code: InternalUncompiledCode) throws -> InstructionSequence {
+    mutating func compile(store: StoreRef, code: InternalUncompiledCode) throws(Trap) -> InstructionSequence {
         let store = store.value
         let engine = store.engine
         let type = self.type
-        let iseq = try code.withValue { code in
-            try InstructionTranslator(
-                allocator: store.allocator.iseqAllocator,
-                engineConfiguration: engine.configuration,
-                funcTypeInterner: engine.funcTypeInterner,
-                module: instance,
-                type: engine.resolveType(type),
-                locals: code.locals,
-                functionIndex: index,
-                codeSize: code.expression.count,
-                isIntercepting: engine.interceptor != nil
-            ).translate(code: code)
+        #if !$Embedded
+        let isIntercepting = engine.interceptor != nil
+        #else
+        let isIntercepting = false
+        #endif
+        let iseq: InstructionSequence
+        do throws(WasmKitError) {
+            iseq = try code.withValue { (codeEntity: inout Code) throws(WasmKitError) -> InstructionSequence in
+                try InstructionTranslator(
+                    allocator: store.allocator.iseqAllocator,
+                    engineConfiguration: engine.configuration,
+                    funcTypeInterner: engine.funcTypeInterner,
+                    module: instance,
+                    type: engine.resolveType(type),
+                    locals: codeEntity.locals,
+                    functionIndex: index,
+                    codeSize: codeEntity.expression.count,
+                    isIntercepting: isIntercepting
+                ).translate(code: codeEntity)
+            }
+        } catch let e {
+            throw Trap(.message(TrapReason.Message("trap")))
         }
         self.code = .compiled(iseq)
         return iseq
@@ -279,15 +323,15 @@ struct WasmFunctionEntity {
 extension EntityHandle<WasmFunctionEntity> {
     @inline(never)
     @discardableResult
-    func ensureCompiled(store: StoreRef) throws -> InstructionSequence {
+    func ensureCompiled(store: StoreRef) throws(Trap) -> InstructionSequence {
         switch self.code {
         case .uncompiled(let code):
-            return try self.withValue {
-                let iseq = try $0.compile(store: store, code: code)
-                if $0.instance.isDebuggable {
-                    $0.code = .debuggable(code, iseq)
+            return try self.withValue { (fn: inout WasmFunctionEntity) throws(Trap) -> InstructionSequence in
+                let iseq = try fn.compile(store: store, code: code)
+                if fn.instance.isDebuggable {
+                    fn.code = .debuggable(code, iseq)
                 } else {
-                    $0.code = .compiled(iseq)
+                    fn.code = .compiled(iseq)
                 }
                 return iseq
             }
@@ -334,3 +378,13 @@ extension Reference {
         return .function(value.bitPattern)
     }
 }
+
+#if $Embedded
+extension EntityHandle<WasmFunctionEntity> {
+    var type: InternedFuncType { withValue { $0.type } }
+    var instance: InternalInstance { withValue { $0.instance } }
+    var index: FunctionIndex { withValue { $0.index } }
+    var numberOfNonParameterLocalSlots: Int { withValue { $0.numberOfNonParameterLocalSlots } }
+    var code: CodeBody { withValue { $0.code } }
+}
+#endif  // $Embedded

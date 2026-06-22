@@ -1,4 +1,4 @@
-import struct WasmParser.Import
+import struct WasmParserCore.Import
 
 /// A set of entities used to import values when instantiating a module.
 ///
@@ -23,7 +23,15 @@ import struct WasmParser.Import
 /// let instance = try module.instantiate(store: store, imports: imports)
 /// ```
 public struct Imports {
+    #if !$Embedded
     private var definitions: [String: [String: ExternalValue]] = [:]
+    #else
+    // Embedded Swift: use a flat array instead of nested dictionaries.
+    // Dictionary<String,...> uses String.hashValue which pulls in Unicode NFC
+    // normalization tables (~31 KB rodata).  Linear search with UTF-8 byte
+    // comparison is sufficient for the small number of WASM imports.
+    private var embeddedEntries: [(module: String, name: String, value: ExternalValue)] = []
+    #endif
 
     /// Initializes a new instance of `Imports`.
     public init() {
@@ -31,16 +39,22 @@ public struct Imports {
 
     /// Define a value to be imported by the given module and name.
     public mutating func define<Extern: ExternalValueConvertible>(module: String, name: String, _ value: Extern) {
+        #if !$Embedded
         definitions[module, default: [:]][name] = value.externalValue
+        #else
+        embeddedEntries.append((module: module, name: name, value: value.externalValue))
+        #endif
     }
 
     /// Define a set of values to be imported by the given module.
     /// - Parameters:
     ///   - module: The module name to be used for resolving the imports.
     ///   - values: The values to be imported keyed by their name.
+    #if !$Embedded
     public mutating func define(module: String, _ values: Exports) {
         definitions[module, default: [:]].merge(values.map { ($0, $1) }, uniquingKeysWith: { _, new in new })
     }
+    #endif
 
     mutating func define(_ importEntry: Import, _ value: ExternalValue) {
         define(module: importEntry.module, name: importEntry.name, value)
@@ -48,7 +62,22 @@ public struct Imports {
 
     /// Lookup a value to be imported by the given module and name.
     func lookup(module: String, name: String) -> (InternalExternalValue, StoreAllocator)? {
-        definitions[module]?[name]?.internalize()
+        #if !$Embedded
+        return definitions[module]?[name]?.internalize()
+        #else
+        // Byte-by-byte UTF-8 comparison avoids String.hashValue and
+        // String.== which transitively require Unicode NFC normalization.
+        let mBytes = module.utf8
+        let nBytes = name.utf8
+        for entry in embeddedEntries {
+            guard entry.module.utf8.count == mBytes.count,
+                  entry.name.utf8.count == nBytes.count else { continue }
+            guard entry.module.utf8.elementsEqual(mBytes) else { continue }
+            guard entry.name.utf8.elementsEqual(nBytes) else { continue }
+            return entry.value.internalize()
+        }
+        return nil
+        #endif
     }
 }
 
@@ -81,8 +110,10 @@ extension Tag: ExternalValueConvertible {
     public var externalValue: ExternalValue { .tag(self) }
 }
 
+#if !$Embedded
 extension Imports: ExpressibleByDictionaryLiteral {
     public typealias Key = String
+    #if !$Embedded
     public struct Value: ExpressibleByDictionaryLiteral {
         public typealias Key = String
         public typealias Value = ExternalValueConvertible
@@ -93,8 +124,21 @@ extension Imports: ExpressibleByDictionaryLiteral {
             self.definitions = Dictionary(uniqueKeysWithValues: elements.map { ($0.0, $0.1.externalValue) })
         }
     }
+    #else
+    public struct Value: ExpressibleByDictionaryLiteral {
+        public typealias Key = String
+        public typealias Value = ExternalValue
+
+        let definitions: [String: ExternalValue]
+
+        public init(dictionaryLiteral elements: (String, ExternalValue)...) {
+            self.definitions = Dictionary(uniqueKeysWithValues: elements.map { ($0.0, $0.1) })
+        }
+    }
+    #endif
 
     public init(dictionaryLiteral elements: (String, Value)...) {
         self.definitions = Dictionary(uniqueKeysWithValues: elements.map { ($0.0, $0.1.definitions) })
     }
 }
+#endif  // !$Embedded

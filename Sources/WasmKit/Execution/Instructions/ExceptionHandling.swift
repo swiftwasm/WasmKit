@@ -1,5 +1,10 @@
 /// > Note:
 /// <https://webassembly.github.io/exception-handling/core/exec/instructions.html>
+// Exception handling throws WasmKitException (dynamic error) which is not
+// supported in embedded Swift.
+#if !$Embedded
+import WasmParserCore
+
 extension Execution {
 
     /// Throw a new exception with the given tag.
@@ -131,3 +136,4 @@ extension Execution {
         return storedExceptions[address]
     }
 }
+#endif  // !$Embedded

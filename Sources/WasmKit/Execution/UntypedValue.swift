@@ -1,3 +1,5 @@
+import WasmParserCore
+
 /// A type-erased value that can represent any WebAssembly value type.
 ///
 /// NOTE: This type assumes any non-null references can be represented as a

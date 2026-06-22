@@ -1,20 +1,18 @@
 import WasmTypes
 
-import struct WasmParser.Import
+import struct WasmParserCore.Import
 
 /// The backtrace of the trap.
-public struct Backtrace: CustomStringConvertible, Sendable {
-    /// A symbol in the backtrace.
+public struct Backtrace: Sendable {
     public struct Symbol: @unchecked Sendable {
-        /// The name of the symbol.
         public let name: String?
         let address: Pc
     }
-
-    /// The symbols in the backtrace.
     public let symbols: [Symbol]
+}
 
-    /// Textual description of the backtrace.
+#if !$Embedded
+extension Backtrace: CustomStringConvertible {
     public var description: String {
         symbols.enumerated().map { (index, symbol) in
             let name = symbol.name ?? "unknown"
@@ -22,13 +20,11 @@ public struct Backtrace: CustomStringConvertible, Sendable {
         }.joined(separator: "\n")
     }
 }
+#endif
 
 /// An error that occurs during execution of a WebAssembly module.
-public struct Trap: Error, CustomStringConvertible {
-    /// The reason for the trap.
+public struct Trap: Error {
     package private(set) var reason: TrapReason
-
-    /// The backtrace of the trap.
     private(set) var backtrace: Backtrace?
 
     init(_ code: TrapReason, backtrace: Backtrace? = nil) {
@@ -40,15 +36,6 @@ public struct Trap: Error, CustomStringConvertible {
         self.init(.message(message), backtrace: backtrace)
     }
 
-    /// The description of the trap.
-    public var description: String {
-        var desc = "Trap: \(reason)"
-        if let backtrace = backtrace {
-            desc += "\n\(backtrace)"
-        }
-        return desc
-    }
-
     func withBacktrace(_ backtrace: Backtrace) -> Trap {
         var trap = self
         trap.backtrace = backtrace
@@ -56,12 +43,19 @@ public struct Trap: Error, CustomStringConvertible {
     }
 }
 
+#if !$Embedded
+extension Trap: CustomStringConvertible {
+    public var description: String {
+        var desc = "Trap: \(reason)"
+        if let backtrace = backtrace { desc += "\n\(backtrace)" }
+        return desc
+    }
+}
+#endif
+
 /// An uncaught WebAssembly exception that propagated out of a module.
-public struct WasmKitException: Error, CustomStringConvertible {
-    /// The tag identity, stored as the bit pattern of the tag handle pointer.
-    /// Used only for equality comparison when matching catch clauses.
+public struct WasmKitException: Error {
     let tagIdentity: Int
-    /// The exception payload values.
     let payload: [Value]
 
     init(tag: InternalTag, payload: [Value]) {
@@ -69,69 +63,46 @@ public struct WasmKitException: Error, CustomStringConvertible {
         self.payload = payload
     }
 
-    public var description: String {
-        "wasm exception (payload: \(payload))"
-    }
-
-    /// Returns true if this exception's tag matches the given tag handle.
-    func hasTag(_ tag: InternalTag) -> Bool {
-        tagIdentity == tag.bitPattern
-    }
+    func hasTag(_ tag: InternalTag) -> Bool { tagIdentity == tag.bitPattern }
 }
 
+#if !$Embedded
+extension WasmKitException: CustomStringConvertible {
+    public var description: String { "wasm exception (payload: \(payload))" }
+}
+#endif
+
 /// A reason for a trap that occurred during execution of a WebAssembly module.
-package enum TrapReason: Error, CustomStringConvertible {
+package enum TrapReason: Error {
     package struct Message {
         let text: String
-
-        init(_ text: String) {
-            self.text = text
-        }
+        init(_ text: String) { self.text = text }
     }
-    /// A trap with a string message
     case message(Message)
-    /// `unreachable` instruction executed
     case unreachable
-    /// Too deep call stack
-    ///
-    /// Note: When this trap occurs, consider extending ``EngineConfiguration/stackSize``.
     case callStackExhausted
-    /// Out of bounds table access
     case tableOutOfBounds(Int)
-    /// Out of bounds memory access
     case memoryOutOfBounds
-    /// Unaligned atomic memory access
     case unalignedAtomic
-    /// `call_indirect` instruction called an uninitialized table element.
     case indirectCallToNull(Int)
-    /// Indirect call type mismatch
     case typeMismatchCall(actual: FunctionType, expected: FunctionType)
-    /// Integer divided by zero
     case integerDividedByZero
-    /// Integer overflowed during arithmetic operation
     case integerOverflow
-    /// Invalid conversion to integer
     case invalidConversionToInteger
+}
 
-    /// The description of the trap reason.
+#if !$Embedded
+extension TrapReason: CustomStringConvertible {
     package var description: String {
         switch self {
-        case .message(let message):
-            return message.text
-        case .unreachable:
-            return "unreachable"
-        case .callStackExhausted:
-            return "call stack exhausted"
-        case .memoryOutOfBounds:
-            return "out of bounds memory access"
-        case .unalignedAtomic:
-            return "unaligned atomic"
-        case .integerDividedByZero:
-            return "integer divide by zero"
-        case .integerOverflow:
-            return "integer overflow"
-        case .invalidConversionToInteger:
-            return "invalid conversion to integer"
+        case .message(let message): return message.text
+        case .unreachable: return "unreachable"
+        case .callStackExhausted: return "call stack exhausted"
+        case .memoryOutOfBounds: return "out of bounds memory access"
+        case .unalignedAtomic: return "unaligned atomic"
+        case .integerDividedByZero: return "integer divide by zero"
+        case .integerOverflow: return "integer overflow"
+        case .invalidConversionToInteger: return "invalid conversion to integer"
         case .indirectCallToNull(let elementIndex):
             return "indirect call to null element (uninitialized element \(elementIndex))"
         case .typeMismatchCall(let actual, let expected):
@@ -141,28 +112,55 @@ package enum TrapReason: Error, CustomStringConvertible {
         }
     }
 }
+#endif
 
 extension TrapReason.Message {
     static func initialTableSizeExceedsLimit(numberOfElements: Int) -> Self {
+        #if !$Embedded
         Self("initial table size exceeds the resource limit: \(numberOfElements) elements")
+        #else
+        Self("initial table size exceeds the resource limit")
+        #endif
     }
     static func initialMemorySizeExceedsLimit(byteSize: Int) -> Self {
+        #if !$Embedded
         Self("initial memory size exceeds the resource limit: \(byteSize) bytes")
+        #else
+        Self("initial memory size exceeds the resource limit")
+        #endif
     }
+    // In Embedded mode, avoid String interpolation over [ValueType]/[Value] arrays
+    // which pulls in collection description formatting (~4-8 KB of code).
     static func parameterTypesMismatch(expected: [ValueType], got: [Value]) -> Self {
+        #if !$Embedded
         Self("parameter types don't match, expected \(expected), got \(got)")
+        #else
+        Self("(cannot print value in embedded Swift)")
+        #endif
     }
     static func resultTypesMismatch(expected: [ValueType], got: [Value]) -> Self {
+        #if !$Embedded
         Self("result types don't match, expected \(expected), got \(got)")
+        #else
+        Self("(cannot print value in embedded Swift)")
+        #endif
     }
     static var cannotAssignToImmutableGlobal: Self {
         Self("cannot assign to an immutable global")
     }
     static func noGlobalExportWithName(globalName: String, instance: Instance) -> Self {
+        #if !$Embedded
         Self("no global export with name \(globalName) in a module instance \(instance)")
+        #else
+        Self("no global export with name found in module instance")
+        #endif
     }
     static func exportedFunctionNotFound(name: String, instance: Instance) -> Self {
+        #if !$Embedded
         Self("exported function \(name) not found in instance \(instance)")
+        #else
+        Self("exported function not found in instance")
+        #endif
     }
     static func unimplemented(feature: String) -> Self {
         Self("\(feature) is not implemented yet")

@@ -1,4 +1,4 @@
-import WasmParser
+import WasmParserCore
 
 /// A register that is used to store a value in the stack.
 typealias VReg = Int16
@@ -453,7 +453,9 @@ struct InstructionPrintingContext {
         case ._return:
             target.write("return")
         default:
+            #if !$Embedded
             target.write(String(describing: instruction))
+            #endif
         }
     }
 }

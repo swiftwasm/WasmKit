@@ -1,4 +1,4 @@
-import WasmTypes
+@_exported import WasmTypes
 
 /// Function code in a module
 /// > Note:

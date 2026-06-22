@@ -1,12 +1,17 @@
-import WasmParser
+import WasmParserCore
 
 /// A container to manage WebAssembly object space.
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/runtime.html#store>
 public final class Store {
     var nameRegistry = NameRegistry()
+    #if !$Embedded
     @_spi(Fuzzing)  // Consider making this public
-    public var resourceLimiter: ResourceLimiter = DefaultResourceLimiter()
+    public var resourceLimiter: any ResourceLimiter = DefaultResourceLimiter()
+    #else
+    @_spi(Fuzzing)
+    public var resourceLimiter: DefaultResourceLimiter = DefaultResourceLimiter()
+    #endif
 
     @available(*, unavailable)
     public var namedModuleInstances: [String: Any] {
@@ -18,8 +23,10 @@ public final class Store {
     /// The engine associated with this store.
     public let engine: Engine
 
+    #if !$Embedded
     /// Parking lot for atomic wait/notify operations
     let atomicParkingLot = AtomicParkingLot()
+    #endif
 
     /// Create a new store associated with the given engine.
     public init(engine: Engine) {
@@ -54,9 +61,11 @@ public struct Caller: ~Copyable {
     /// The store associated with the caller execution context.
     public let store: Store
 
+    #if !$Embedded
     /// The runtime that called the host function.
     @available(*, unavailable, message: "Use `engine` instead")
     public var runtime: Runtime { fatalError() }
+    #endif
 
     init(instanceHandle: InternalInstance?, store: Store, sp: Sp? = nil) {
         self.instanceHandle = instanceHandle
@@ -88,8 +97,10 @@ extension Store {
     /// - Parameters:
     ///   - hostModule: A host module to register.
     ///   - name: A name to register the given host module.
+    #if !$Embedded
     @available(*, unavailable, message: "Use ``Imports/define(_:as:)`` instead. Or use ``Runtime/register(_:as:)`` as a temporary drop-in replacement.")
     public func register(_ hostModule: HostModule, as name: String, runtime: Any) throws {}
+    #endif
 
     @available(*, deprecated, message: "Address-based APIs has been removed; use Memory instead")
     public func memory(at address: Memory) -> Memory {

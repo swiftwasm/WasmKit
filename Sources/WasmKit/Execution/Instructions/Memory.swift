@@ -1,18 +1,18 @@
-import WasmParser
 /// > Note:
 /// <https://webassembly.github.io/spec/core/exec/instructions.html#memory-instructions>
 import _CWasmKit
+import WasmParserCore
 
 extension Execution {
-    @inline(never) func throwOutOfBoundsMemoryAccess() throws -> Never {
+    @inline(never) func throwOutOfBoundsMemoryAccess() throws(Trap) -> Never {
         throw Trap(.memoryOutOfBounds)
     }
-    @inline(never) func throwUnalignedAtomicAccess() throws -> Never {
+    @inline(never) func throwUnalignedAtomicAccess() throws(Trap) -> Never {
         throw Trap(.unalignedAtomic)
     }
     mutating func memoryLoad<T: FixedWidthInteger>(
         sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand, loadAs _: T.Type = T.self, castToValue: (T) -> UntypedValue
-    ) throws {
+    ) throws(Trap) {
         let length = UInt64(T.bitWidth) / 8
         let i = sp[loadOperand.pointer].asAddressOffset()
         let (endAddress, isEndOverflow) = i.addingReportingOverflow(length &+ loadOperand.offset)
@@ -26,7 +26,7 @@ extension Execution {
     }
 
     /// `[type].store[bitWidth]`
-    mutating func memoryStore<T: FixedWidthInteger>(sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand, castFromValue: (UntypedValue) -> T) throws {
+    mutating func memoryStore<T: FixedWidthInteger>(sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand, castFromValue: (UntypedValue) -> T) throws(Trap) {
         let value = sp[storeOperand.value]
         let length = UInt64(T.bitWidth) / 8
         let i = sp[storeOperand.pointer].asAddressOffset()
@@ -51,9 +51,9 @@ extension Execution {
         }
     }
 
-    mutating func memoryGrow(sp: Sp, md: inout Md, ms: inout Ms, immediate: Instruction.MemoryGrowOperand) throws {
+    mutating func memoryGrow(sp: Sp, md: inout Md, ms: inout Ms, immediate: Instruction.MemoryGrowOperand) throws(Trap) {
         let memory = currentInstance(sp: sp).memories[Int(immediate.memory)]
-        try memory.withValue { memory in
+        try memory.withValue { (memory: inout MemoryEntity) throws(Trap) -> Void in
             let isMemory64 = memory.limit.isMemory64
 
             let value = sp[immediate.delta]
@@ -63,10 +63,10 @@ extension Execution {
             sp[immediate.result] = UntypedValue(oldPageCount)
         }
     }
-    mutating func memoryInit(sp: Sp, immediate: Instruction.MemoryInitOperand) throws {
+    mutating func memoryInit(sp: Sp, immediate: Instruction.MemoryInitOperand) throws(Trap) {
         let instance = currentInstance(sp: sp)
         let memory = instance.memories[0]
-        try memory.withValue { memory in
+        try memory.withValue { (memory: inout MemoryEntity) throws(Trap) -> Void in
             let segment = instance.dataSegments[Int(immediate.segmentIndex)]
 
             let size = sp[immediate.size].i32
@@ -79,9 +79,9 @@ extension Execution {
         let segment = currentInstance(sp: sp).dataSegments[Int(immediate.segmentIndex)]
         segment.withValue { $0.drop() }
     }
-    mutating func memoryCopy(sp: Sp, immediate: Instruction.MemoryCopyOperand) throws {
+    mutating func memoryCopy(sp: Sp, immediate: Instruction.MemoryCopyOperand) throws(Trap) {
         let memory = currentInstance(sp: sp).memories[0]
-        try memory.withValue { memory in
+        try memory.withValue { (memory: inout MemoryEntity) throws(Trap) -> Void in
             let isMemory64 = memory.limit.isMemory64
             let size = sp[immediate.size].asAddressOffset(isMemory64)
             let source = sp[immediate.sourceOffset].asAddressOffset(isMemory64)
@@ -89,9 +89,9 @@ extension Execution {
             try memory.copy(from: source, to: destination, count: size)
         }
     }
-    mutating func memoryFill(sp: Sp, immediate: Instruction.MemoryFillOperand) throws {
+    mutating func memoryFill(sp: Sp, immediate: Instruction.MemoryFillOperand) throws(Trap) {
         let memory = currentInstance(sp: sp).memories[0]
-        try memory.withValue { memoryInstance in
+        try memory.withValue { (memoryInstance: inout MemoryEntity) throws(Trap) -> Void in
             let isMemory64 = memoryInstance.limit.isMemory64
             let copyCounter = Int(sp[immediate.size].asAddressOffset(isMemory64))
             let value = sp[immediate.value].i32
@@ -109,7 +109,7 @@ extension Execution {
     /// Atomic load operation
     mutating func atomicLoad<T: FixedWidthInteger>(
         sp: Sp, md: Md, ms: Ms, loadOperand: Instruction.LoadOperand, loadAs _: T.Type = T.self, castToValue: (T) -> UntypedValue
-    ) throws {
+    ) throws(Trap) {
         let length = UInt64(T.bitWidth) / 8
         let i = sp[loadOperand.pointer].asAddressOffset()
         let address = loadOperand.offset + i
@@ -137,7 +137,7 @@ extension Execution {
     /// Atomic store operation
     mutating func atomicStore<T: FixedWidthInteger>(
         sp: Sp, md: Md, ms: Ms, storeOperand: Instruction.StoreOperand, castFromValue: (UntypedValue) -> T
-    ) throws {
+    ) throws(Trap) {
         let value = sp[storeOperand.value]
         let length = UInt64(T.bitWidth) / 8
         let i = sp[storeOperand.pointer].asAddressOffset()
@@ -171,7 +171,7 @@ extension Execution {
         atomicOp: (UnsafeMutableRawPointer, T) -> T,
         castFromValue: (UntypedValue) -> T,
         castToValue: (T) -> UntypedValue
-    ) throws {
+    ) throws(Trap) {
         let length = UInt64(T.bitWidth) / 8
         let i = sp[rmwOperand.pointer].asAddressOffset()
         let address = rmwOperand.offset + i
@@ -197,7 +197,7 @@ extension Execution {
         atomicCmpxchg: (UnsafeMutableRawPointer, T, T) -> T,
         castFromValue: (UntypedValue) -> T,
         castToValue: (T) -> UntypedValue
-    ) throws {
+    ) throws(Trap) {
         let length = UInt64(T.bitWidth) / 8
         let i = sp[cmpxchgOperand.pointer].asAddressOffset()
         let address = cmpxchgOperand.offset + i
@@ -219,6 +219,7 @@ extension Execution {
 
     // MARK: - Atomic Wait/Notify
 
+    #if !$Embedded
     /// Atomic wait32 - wait for a value to change at an address
     mutating func atomicWait32(sp: Sp, md: Md, ms: Ms, waitOperand: Instruction.AtomicWaitOperand) throws {
         let i = sp[waitOperand.pointer].asAddressOffset()
@@ -351,6 +352,8 @@ extension Execution {
             try throwOutOfBoundsMemoryAccess()
         }
     }
+
+    #endif  // !$Embedded
 
     /// Atomic fence - sequential consistency barrier
     mutating func atomicFence(sp: Sp) {

@@ -1,4 +1,4 @@
-import WasmParser
+import WasmParserCore
 import WasmTypes
 
 class ISeqAllocator {
@@ -704,14 +704,12 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             let headSlot = instruction.headSlot(threadingModel: engineConfiguration.threadingModel)
             trace("        [\(index)] = 0x\(String(headSlot, radix: 16))")
             self.instructions[index] = headSlot
-            if let immediate = instruction.rawImmediate {
-                var slots: [CodeSlot] = []
-                immediate.emit(to: { slots.append($0) })
-                for (i, slot) in slots.enumerated() {
-                    let slotIndex = index + 1 + i
-                    trace("        [\(slotIndex)] = 0x\(String(slot, radix: 16))")
-                    self.instructions[slotIndex] = slot
-                }
+            var slots: [CodeSlot] = []
+            instruction.emitImmediate(to: { slots.append($0) })
+            for (i, slot) in slots.enumerated() {
+                let slotIndex = index + 1 + i
+                trace("        [\(slotIndex)] = 0x\(String(slot, radix: 16))")
+                self.instructions[slotIndex] = slot
             }
         }
 
@@ -748,11 +746,9 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             self.lastEmission = LastEmission(position: insertingPC, resultRelink: resultRelink)
             trace("emitInstruction: \(instruction)")
             emitSlot(instruction.headSlot(threadingModel: engineConfiguration.threadingModel))
-            if let immediate = instruction.rawImmediate {
-                var slots: [CodeSlot] = []
-                immediate.emit(to: { slots.append($0) })
-                for slot in slots { emitSlot(slot) }
-            }
+            var slots: [CodeSlot] = []
+            instruction.emitImmediate(to: { slots.append($0) })
+            for slot in slots { emitSlot(slot) }
         }
 
         mutating func putLabel() -> LabelRef {
@@ -1329,7 +1325,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         emit(.nop)
     }
 
-    mutating func visitBlock(blockType: WasmParser.BlockType) throws(WasmKitError) -> Output {
+    mutating func visitBlock(blockType: WasmParserCore.BlockType) throws(WasmKitError) -> Output {
         let blockType = try module.resolveBlockType(blockType)
         let endLabel = iseqBuilder.allocLabel()
         self.preserveLocalsOnStack(depth: self.valueStack.valueHeight)
@@ -1345,7 +1341,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         )
     }
 
-    mutating func visitLoop(blockType: WasmParser.BlockType) throws(WasmKitError) -> Output {
+    mutating func visitLoop(blockType: WasmParserCore.BlockType) throws(WasmKitError) -> Output {
         let blockType = try module.resolveBlockType(blockType)
         preserveOnStack(depth: blockType.parameters.count)
         iseqBuilder.resetLastEmission()
@@ -1368,7 +1364,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         )
     }
 
-    mutating func visitIf(blockType: WasmParser.BlockType) throws(WasmKitError) -> Output {
+    mutating func visitIf(blockType: WasmParserCore.BlockType) throws(WasmKitError) -> Output {
         // Pop condition value
         let condition = try popVRegOperand(.i32)
         let blockType = try module.resolveBlockType(blockType)
@@ -1622,7 +1618,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         try popPushValues(frame.copyTypes)
     }
 
-    mutating func visitBrTable(targets: WasmParser.BrTable) throws(WasmKitError) -> Output {
+    mutating func visitBrTable(targets: WasmParserCore.BrTable) throws(WasmKitError) -> Output {
         guard let index = try popVRegOperand(.i32) else { return }
 
         let defaultFrame = try controlStack.branchTarget(relativeDepth: targets.defaultIndex)
@@ -1877,7 +1873,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         try markUnreachable()
     }
 
-    mutating func visitTryTable(blockType: WasmParser.BlockType, tryCatch: WasmParser.TryCatch) throws(WasmKitError) -> Output {
+    mutating func visitTryTable(blockType: WasmParserCore.BlockType, tryCatch: WasmParserCore.TryCatch) throws(WasmKitError) -> Output {
         let blockType = try module.resolveBlockType(blockType)
         let endLabel = iseqBuilder.allocLabel()
 
@@ -2223,7 +2219,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
     }
 
-    mutating func visitLoad(_ load: WasmParser.Instruction.Load, memarg: MemArg) throws(WasmKitError) {
+    mutating func visitLoad(_ load: WasmParserCore.Instruction.Load, memarg: MemArg) throws(WasmKitError) {
         let instruction: (Instruction.LoadOperand) -> Instruction
         switch load {
         case .i32Load: instruction = Instruction.i32Load
@@ -2272,7 +2268,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         try visitLoad(memarg, load.type, load.naturalAlignment, instruction)
     }
 
-    mutating func visitStore(_ store: WasmParser.Instruction.Store, memarg: MemArg) throws(WasmKitError) {
+    mutating func visitStore(_ store: WasmParserCore.Instruction.Store, memarg: MemArg) throws(WasmKitError) {
         let instruction: (Instruction.StoreOperand) -> Instruction
         switch store {
         case .i32Store: instruction = Instruction.i32Store
@@ -2343,7 +2339,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
     }
 
-    mutating func visitSimd(_ simd: WasmParser.Instruction.Simd) throws(WasmKitError) {
+    mutating func visitSimd(_ simd: WasmParserCore.Instruction.Simd) throws(WasmKitError) {
         guard let opcode = SIMDOpcode.fromSimd(simd) else { preconditionFailure("missing SIMDOpcode mapping: \(simd)") }
         func emitUnaryV128() throws(WasmKitError) {
             try popPushEmit(.v128, .v128) { v0, result in
@@ -2455,7 +2451,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
     }
 
-    mutating func visitSimdLane(_ simdLane: WasmParser.Instruction.SimdLane, lane: UInt8) throws(WasmKitError) {
+    mutating func visitSimdLane(_ simdLane: WasmParserCore.Instruction.SimdLane, lane: UInt8) throws(WasmKitError) {
         guard let opcode = SIMDOpcode.fromSimdLane(simdLane) else { preconditionFailure("missing SIMDOpcode mapping: \(simdLane)") }
         let laneCount: UInt8
         switch simdLane {
@@ -2507,7 +2503,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
     }
 
-    mutating func visitSimdMemLane(_ simdMemLane: WasmParser.Instruction.SimdMemLane, memarg: MemArg, lane: UInt8) throws(WasmKitError) {
+    mutating func visitSimdMemLane(_ simdMemLane: WasmParserCore.Instruction.SimdMemLane, memarg: MemArg, lane: UInt8) throws(WasmKitError) {
         let isMemory64 = try module.isMemory64(memoryIndex: 0)
         guard let opcode = SIMDOpcode.fromSimdMemLane(simdMemLane) else { preconditionFailure("missing SIMDOpcode mapping: \(simdMemLane)") }
         let naturalAlignment: Int
@@ -2629,7 +2625,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             .i32Eqz(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
     }
-    mutating func visitCmp(_ cmp: WasmParser.Instruction.Cmp) throws(WasmKitError) {
+    mutating func visitCmp(_ cmp: WasmParserCore.Instruction.Cmp) throws(WasmKitError) {
         let operand: ValueType
         let instruction: (Instruction.BinaryOperand) -> Instruction
         switch cmp {
@@ -2668,7 +2664,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
         try visitCmp(operand, instruction)
     }
-    public mutating func visitBinary(_ binary: WasmParser.Instruction.Binary) throws(WasmKitError) {
+    public mutating func visitBinary(_ binary: WasmParserCore.Instruction.Binary) throws(WasmKitError) {
         let operand: ValueType
         let result: ValueType
         let instruction: (Instruction.BinaryOperand) -> Instruction
@@ -2725,7 +2721,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
             .i64Eqz(Instruction.UnaryOperand(result: LVReg(result), input: LVReg(value)))
         }
     }
-    mutating func visitUnary(_ unary: WasmParser.Instruction.Unary) throws(WasmKitError) {
+    mutating func visitUnary(_ unary: WasmParserCore.Instruction.Unary) throws(WasmKitError) {
         let operand: ValueType
         let instruction: (Instruction.UnaryOperand) -> Instruction
         switch unary {
@@ -2757,7 +2753,7 @@ struct InstructionTranslator: ~Copyable, InstructionVisitor {
         }
         try visitUnary(operand, instruction)
     }
-    mutating func visitConversion(_ conversion: WasmParser.Instruction.Conversion) throws(WasmKitError) {
+    mutating func visitConversion(_ conversion: WasmParserCore.Instruction.Conversion) throws(WasmKitError) {
         let from: ValueType
         let to: ValueType
         let instruction: (Instruction.UnaryOperand) -> Instruction
@@ -3385,7 +3381,7 @@ extension InstructionTranslator.MetaValue {
 }
 
 extension FunctionType {
-    fileprivate init(blockType: WasmParser.BlockType, typeSection: [FunctionType]) throws(WasmKitError) {
+    fileprivate init(blockType: WasmParserCore.BlockType, typeSection: [FunctionType]) throws(WasmKitError) {
         switch blockType {
         case .type(let valueType):
             self.init(parameters: [], results: [valueType])
